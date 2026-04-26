@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireSignedInProfile } from "@/lib/auth";
 
 type StatusVariant = "pending" | "approved" | "rejected" | "suspended";
 
@@ -48,24 +47,7 @@ const allowedWhilePending = [
 ];
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("full_name, company_name, role, approval_status, is_active")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error("Failed to load dashboard profile.");
-  }
+  const { user, profile } = await requireSignedInProfile();
 
   const status = (profile?.approval_status ?? "pending") as StatusVariant;
   const banner = statusCopy[status] ?? statusCopy.pending;
@@ -75,7 +57,7 @@ export default async function DashboardPage() {
       <section className="mx-auto flex max-w-5xl flex-col gap-8">
         <div className="max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
-            Step 1 Dashboard
+            BuildFlow Supply
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight">
             Welcome{profile?.full_name ? `, ${profile.full_name}` : ""}
@@ -91,6 +73,7 @@ export default async function DashboardPage() {
               {banner.badge}
             </span>
             <span className="text-sm opacity-80">Role: {profile?.role ?? "client"}</span>
+            <span className="text-sm opacity-80">Status: {profile?.approval_status ?? "pending"}</span>
             <span className="text-sm opacity-80">
               Active: {profile?.is_active === false ? "No" : "Yes"}
             </span>
@@ -101,19 +84,30 @@ export default async function DashboardPage() {
 
         <div className="grid gap-4 md:grid-cols-2">
           <article className="rounded-3xl border border-white/10 bg-white/5 p-6">
+            <h2 className="text-lg font-semibold">Current account</h2>
+            <dl className="mt-4 space-y-3 text-sm text-slate-300">
+              <div>
+                <dt className="font-medium text-white">Email</dt>
+                <dd>{user.email}</dd>
+              </div>
+              <div>
+                <dt className="font-medium text-white">Role</dt>
+                <dd>{profile?.role ?? "client"}</dd>
+              </div>
+              <div>
+                <dt className="font-medium text-white">Approval status</dt>
+                <dd>{profile?.approval_status ?? "pending"}</dd>
+              </div>
+            </dl>
+          </article>
+
+          <article className="rounded-3xl border border-white/10 bg-white/5 p-6">
             <h2 className="text-lg font-semibold">Available in this step</h2>
             <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
               {allowedWhilePending.map((item) => (
                 <li key={item}>• {item}</li>
               ))}
             </ul>
-          </article>
-
-          <article className="rounded-3xl border border-white/10 bg-white/5 p-6">
-            <h2 className="text-lg font-semibold">Restricted for now</h2>
-            <p className="mt-4 text-sm leading-6 text-slate-300">
-              Supplier orders must stay blocked until Admin approval and later Step 1 actions are wired.
-            </p>
           </article>
         </div>
 
@@ -122,7 +116,7 @@ export default async function DashboardPage() {
             Create another account
           </Link>
           <Link href="/admin/users" className="underline underline-offset-4">
-            Admin users placeholder
+            Admin users
           </Link>
         </div>
       </section>
