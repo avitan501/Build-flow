@@ -34,49 +34,81 @@ export default function SignupPage() {
     setError(null);
     setIsSubmitting(true);
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-      options: {
-        data: {
-          full_name: form.fullName,
-          company_name: form.companyName,
-          phone: form.phone,
+    try {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: {
+            full_name: form.fullName,
+            company_name: form.companyName,
+            phone: form.phone,
+          },
         },
-      },
-    });
+      });
 
-    if (signUpError || !data.user?.id) {
-      setError(signUpError?.message ?? "Signup failed. Please try again.");
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
+
+      if (!data.user?.id) {
+        setError("Signup succeeded but no auth user was returned.");
+        return;
+      }
+
+      try {
+        const profileResponse = await fetch("/api/auth/create-profile", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: data.user.id,
+            fullName: form.fullName,
+            companyName: form.companyName,
+            phone: form.phone,
+          }),
+        });
+
+        if (!profileResponse.ok) {
+          const responseText = await profileResponse.text();
+          let message = "Account created, but profile setup failed.";
+
+          try {
+            const payload = JSON.parse(responseText) as { error?: string };
+            if (payload.error) {
+              message = payload.error;
+            }
+          } catch {
+            if (responseText.trim()) {
+              message = responseText.trim();
+            }
+          }
+
+          setError(message);
+          return;
+        }
+      } catch (profileRequestError) {
+        setError(
+          profileRequestError instanceof Error
+            ? profileRequestError.message
+            : "Profile setup request failed.",
+        );
+        return;
+      }
+
+      router.push("/dashboard");
+      router.refresh();
+    } catch (signupRequestError) {
+      setError(
+        signupRequestError instanceof Error
+          ? signupRequestError.message
+          : "Signup request failed.",
+      );
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    const profileResponse = await fetch("/api/auth/create-profile", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        userId: data.user.id,
-        fullName: form.fullName,
-        companyName: form.companyName,
-        phone: form.phone,
-      }),
-    });
-
-    if (!profileResponse.ok) {
-      const payload = (await profileResponse.json().catch(() => null)) as
-        | { error?: string }
-        | null;
-
-      setError(payload?.error ?? "Account created, but profile setup failed.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    router.push("/dashboard");
-    router.refresh();
   }
 
   return (

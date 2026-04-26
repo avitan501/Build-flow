@@ -12,13 +12,30 @@ type CreateProfileBody = {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as CreateProfileBody;
+    let body: CreateProfileBody;
+
+    try {
+      body = (await request.json()) as CreateProfileBody;
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid request body." },
+        { status: 400 },
+      );
+    }
+
     const userId = body.userId?.trim();
     const fullName = body.fullName?.trim();
     const companyName = body.companyName?.trim();
     const phone = body.phone?.trim();
 
-    if (!userId || !fullName || !companyName || !phone) {
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Missing user id for profile creation." },
+        { status: 400 },
+      );
+    }
+
+    if (!fullName || !companyName || !phone) {
       return NextResponse.json(
         { error: "Missing required profile fields." },
         { status: 400 },
@@ -28,9 +45,16 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const { data: userData, error: userError } = await admin.auth.admin.getUserById(userId);
 
-    if (userError || !userData.user?.id || !userData.user.email) {
+    if (userError) {
       return NextResponse.json(
-        { error: "Unable to verify auth user for profile creation." },
+        { error: userError.message || "Missing user for profile creation." },
+        { status: 400 },
+      );
+    }
+
+    if (!userData.user?.id || !userData.user.email) {
+      return NextResponse.json(
+        { error: "Missing user for profile creation." },
         { status: 400 },
       );
     }
@@ -51,15 +75,20 @@ export async function POST(request: Request) {
 
     if (profileError) {
       return NextResponse.json(
-        { error: "Failed to create profile row." },
+        { error: profileError.message || "Profile insert failed." },
         { status: 500 },
       );
     }
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (error) {
     return NextResponse.json(
-      { error: "Unexpected error while creating profile." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unexpected error while creating profile.",
+      },
       { status: 500 },
     );
   }
