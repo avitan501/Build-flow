@@ -1,6 +1,9 @@
+import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-slate-950 text-white">
+      <RecoveryLinkHandler />
       <section className="mx-auto flex min-h-screen max-w-5xl flex-col items-start justify-center px-6 py-16 sm:px-10">
         <div className="mb-3 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-1 text-xs font-medium uppercase tracking-[0.24em] text-emerald-300">
           LIVE BUILD DEMO
