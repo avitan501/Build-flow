@@ -115,9 +115,11 @@ export default async function DashboardPage() {
           <Link href="/signup" className="underline underline-offset-4">
             Create another account
           </Link>
-          <Link href="/admin/users" className="underline underline-offset-4">
-            Admin users
-          </Link>
+          {profile?.role === "admin" ? (
+            <Link href="/admin/users" className="underline underline-offset-4">
+              Admin users
+            </Link>
+          ) : null}
         </div>
       </section>
     </main>

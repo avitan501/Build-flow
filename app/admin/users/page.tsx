@@ -1,10 +1,28 @@
 import { changeUserRole, approvePendingUser, rejectUser, suspendUser } from "@/app/admin/users/actions";
-import { requireAdminProfile } from "@/lib/auth";
+import { requireSignedInProfile } from "@/lib/auth";
 
 const roleOptions = ["admin", "staff", "client"] as const;
 
 export default async function AdminUsersPage() {
-  const { supabase, profile } = await requireAdminProfile();
+  const { supabase, profile } = await requireSignedInProfile();
+
+  if (!profile || profile.role !== "admin") {
+    return (
+      <main className="min-h-screen bg-slate-950 px-6 py-16 text-white sm:px-10">
+        <section className="mx-auto flex max-w-3xl flex-col gap-6 rounded-3xl border border-rose-500/20 bg-rose-500/10 p-8">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
+              BuildFlow Supply
+            </p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight">Access denied</h1>
+            <p className="mt-4 text-sm leading-7 text-slate-200">
+              Only admin accounts can view user approvals and role-management controls.
+            </p>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   const { data: users, error } = await supabase
     .from("profiles")
