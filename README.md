@@ -1,5 +1,7 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+<!-- redeploy trigger: 2026-04-26T17:56Z -->
+
 ## Getting Started
 
 First, run the development server:
