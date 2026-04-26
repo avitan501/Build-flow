@@ -1,64 +1,63 @@
--- Draft RLS policies for profiles. Review before running.
+-- Draft RLS policies for profiles. Review carefully before running.
+-- Simplified Step 1 approach:
+-- - User can read own profile
+-- - Admin has full access
+-- - Staff can read profiles
+-- - No self-update or staff-update policy yet
+-- - Approval/update actions should be handled server-side later
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and role = 'admin'
+  );
+$$;
+
+create or replace function public.is_staff()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and role = 'staff'
+  );
+$$;
+
+create or replace function public.is_admin_or_staff()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select public.is_admin() or public.is_staff();
+$$;
 
 create policy "profiles_select_own"
 on public.profiles
 for select
 using (auth.uid() = id);
 
-create policy "profiles_update_own_basic_fields"
-on public.profiles
-for update
-using (auth.uid() = id)
-with check (
-  auth.uid() = id
-  and role = (select p.role from public.profiles p where p.id = auth.uid())
-  and approval_status = (select p.approval_status from public.profiles p where p.id = auth.uid())
-);
-
 create policy "profiles_admin_all"
 on public.profiles
 for all
-using (
-  exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid()
-      and p.role = 'admin'
-  )
-)
-with check (
-  exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid()
-      and p.role = 'admin'
-  )
-);
+using (public.is_admin())
+with check (public.is_admin());
 
 create policy "profiles_staff_read"
 on public.profiles
 for select
-using (
-  exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid()
-      and p.role in ('admin', 'staff')
-  )
-);
-
-create policy "profiles_staff_can_approve_pending_only"
-on public.profiles
-for update
-using (
-  exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid()
-      and p.role = 'staff'
-  )
-)
-with check (
-  exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid()
-      and p.role = 'staff'
-  )
-  and approval_status = 'approved'
-);
+using (public.is_admin_or_staff());
