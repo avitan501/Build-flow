@@ -84,7 +84,7 @@ export default function SignupPage() {
       <section className="mx-auto flex max-w-md flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/20">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
-            Step 1 Signup
+            BuildFlow Supply
           </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight">Create account</h1>
           <p className="mt-3 text-sm leading-6 text-slate-300">
@@ -167,7 +167,7 @@ export default function SignupPage() {
         </form>
 
         <Link href="/login" className="text-sm text-slate-300 underline underline-offset-4">
-          Go to login placeholder
+          Go to login
         </Link>
       </section>
     </main>
