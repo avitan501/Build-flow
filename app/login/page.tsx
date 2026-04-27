@@ -51,19 +51,35 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-16 text-white sm:px-10">
-      <section className="mx-auto flex max-w-md flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/20">
-        <div>
+    <main className="min-h-screen bg-slate-950 px-6 py-12 text-white sm:px-10">
+      <section className="mx-auto grid max-w-5xl items-center gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/20">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
             BuildFlow Supply
           </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">Log in</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-300">
-            Sign in with your BuildFlow email and password.
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Log in</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">
+            Sign in with your BuildFlow email and password to continue into the approval-first workflow.
           </p>
+
+          <div className="mt-6 grid gap-3 text-sm text-slate-300">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">Admin and client roles stay separated.</div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">Supplier actions stay controlled through approval flows.</div>
+          </div>
         </div>
 
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+        <section className="rounded-[32px] border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/20">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+              Secure account access
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight">Welcome back</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Use your BuildFlow account credentials below.
+            </p>
+          </div>
+
+          <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
           <label className="flex flex-col gap-2 text-sm text-slate-200">
             Email
             <input
@@ -103,9 +119,15 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <Link href="/signup" className="text-sm text-slate-300 underline underline-offset-4">
-          Create an account
-        </Link>
+          <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-300">
+            <Link href="/signup" className="underline underline-offset-4">
+              Create an account
+            </Link>
+            <Link href="/reset-password" className="underline underline-offset-4">
+              Reset password
+            </Link>
+          </div>
+        </section>
       </section>
     </main>
   );

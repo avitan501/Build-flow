@@ -46,6 +46,21 @@ const allowedWhilePending = [
   "Pay later if needed",
 ];
 
+const quickActions = [
+  {
+    href: "/admin/users",
+    label: "Admin users",
+    description: "Review approvals, suspend users, and manage roles.",
+    adminOnly: true,
+  },
+  {
+    href: "/admin/whatsapp",
+    label: "WhatsApp Draft Inbox",
+    description: "Preview safe draft-only WhatsApp review screens.",
+    adminOnly: true,
+  },
+];
+
 export default async function DashboardPage() {
   const { user, profile } = await requireSignedInProfile();
 
@@ -111,6 +126,23 @@ export default async function DashboardPage() {
           </article>
         </div>
 
+        {profile?.role === "admin" ? (
+          <section className="grid gap-4 md:grid-cols-2">
+            {quickActions
+              .filter((item) => !item.adminOnly || profile?.role === "admin")
+              .map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-emerald-400/30 hover:bg-white/8"
+                >
+                  <div className="text-sm font-semibold text-white">{item.label}</div>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">{item.description}</p>
+                </Link>
+              ))}
+          </section>
+        ) : null}
+
         <div className="flex flex-wrap gap-4 text-sm text-slate-300">
           <Link href="/signup" className="underline underline-offset-4">
             Create another account
@@ -118,6 +150,11 @@ export default async function DashboardPage() {
           {profile?.role === "admin" ? (
             <Link href="/admin/users" className="underline underline-offset-4">
               Admin users
+            </Link>
+          ) : null}
+          {profile?.role === "admin" ? (
+            <Link href="/admin/whatsapp" className="underline underline-offset-4">
+              WhatsApp Draft Inbox
             </Link>
           ) : null}
         </div>

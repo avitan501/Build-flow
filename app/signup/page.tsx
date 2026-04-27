@@ -112,19 +112,36 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-16 text-white sm:px-10">
-      <section className="mx-auto flex max-w-md flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/20">
-        <div>
+    <main className="min-h-screen bg-slate-950 px-6 py-12 text-white sm:px-10">
+      <section className="mx-auto grid max-w-6xl items-start gap-8 lg:grid-cols-[0.8fr_1.2fr]">
+        <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/20">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
             BuildFlow Supply
           </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">Create account</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-300">
-            New accounts are created in Supabase Auth and start as pending until approval.
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Create account</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">
+            New accounts start as pending until Admin review is complete. This keeps supplier actions and future messaging safe.
           </p>
+
+          <div className="mt-6 grid gap-3 text-sm text-slate-300">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">Client and admin roles stay separated.</div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">Approval status appears clearly after signup.</div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">No live ordering or sending is unlocked automatically.</div>
+          </div>
         </div>
 
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+        <section className="rounded-[32px] border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/20">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+              Account setup
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight">Create your BuildFlow access</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-300">
+              Fill in the core details below. Your dashboard opens after account and profile setup finish.
+            </p>
+          </div>
+
+          <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
           <label className="flex flex-col gap-2 text-sm text-slate-200">
             Full name
             <input
@@ -198,9 +215,12 @@ export default function SignupPage() {
           </button>
         </form>
 
-        <Link href="/login" className="text-sm text-slate-300 underline underline-offset-4">
-          Go to login
-        </Link>
+          <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-300">
+            <Link href="/login" className="underline underline-offset-4">
+              Go to login
+            </Link>
+          </div>
+        </section>
       </section>
     </main>
   );
