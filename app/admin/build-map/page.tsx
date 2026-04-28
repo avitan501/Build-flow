@@ -6,8 +6,8 @@ import { getBuildflowWireframeData, type RouteSpec } from "@/lib/buildflow-wiref
 
 const flowLabels: Record<RouteSpec["flow"], string> = {
   client: "Client flow",
-  admin: "Admin flow",
-  whatsapp: "WhatsApp flow",
+  admin: "Admin / Ops",
+  whatsapp: "WhatsApp Operations",
   ai: "AI Takeoff flow",
   orders: "Order flow",
 };
@@ -35,11 +35,14 @@ export default async function AdminBuildMapPage() {
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Admin only · main clickable map</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Admin only · system map</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Build Map</h1>
               <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-                Clickable wireframe map of the whole BuildFlow system. Every page shows status, progress, missing pieces, and next step.
+                Clickable wireframe map of BuildFlow with the main areas separated clearly: Client Flow, Admin / Ops, and WhatsApp Operations.
               </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Who this page is for: Admin / Ops</span>
+              </div>
             </div>
             <div className="grid gap-3 sm:min-w-72">
               <span className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${tone.badge}`}>
@@ -84,7 +87,7 @@ export default async function AdminBuildMapPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold">{flowLabels[flow]}</h2>
-                <p className="mt-1 text-sm text-slate-500">Route map with simple labels, visible status colors, and next step links.</p>
+                <p className="mt-1 text-sm text-slate-500">Route map with simple labels, visible status colors, and a clear audience boundary for each area.</p>
               </div>
             </div>
             <div className="mt-5 grid gap-4 lg:grid-cols-2">
@@ -98,6 +101,9 @@ export default async function AdminBuildMapPage() {
                           <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
                           <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${itemTone.badge}`}>
                             {item.status}
+                          </span>
+                          <span className="rounded-full border border-white/70 bg-white/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-700">
+                            {item.audience === "admin" ? "Admin / Ops" : item.audience === "signed_in" ? "Client Flow" : "Public / Client"}
                           </span>
                         </div>
                         <p className="mt-2 text-sm leading-6 text-slate-700">{item.purpose}</p>

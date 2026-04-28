@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ProgressMiniCards, statusButtonClass, statusClasses } from "@/components/buildflow/wireframe";
+import { JourneyStrip, ProgressMiniCards, statusButtonClass, statusClasses } from "@/components/buildflow/wireframe";
 import { requireSignedInProfile } from "@/lib/auth";
 import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
 
@@ -27,15 +27,18 @@ export default async function DashboardPage() {
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Client dashboard</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Client Flow · signed in</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
                 {isPending ? "Pending Approval" : `Welcome${profile?.full_name ? `, ${profile.full_name}` : ""}`}
               </h1>
               <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
                 {isPending
                   ? "Your account is pending approval. Your account is pending admin approval."
-                  : `Command center for the current client flow. Signed in as ${user.email}. This is still a development skeleton, not a finished client portal.`}
+                  : `BuildFlow command center for the client journey. Signed in as ${user.email}. Start a project, upload plans, review materials, and move toward order approval.`}
               </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Who this page is for: Client Flow</span>
+              </div>
             </div>
             <div className="grid gap-3 sm:min-w-72">
               <span className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${isPending ? "border-orange-200 bg-orange-50 text-orange-700" : statusTone.badge}`}>
@@ -77,6 +80,18 @@ export default async function DashboardPage() {
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
+              <h2 className="text-lg font-semibold">4-step client flow</h2>
+              <p className="mt-1 text-sm text-slate-500">This dashboard should always point back to the next client step.</p>
+            </div>
+          </div>
+          <div className="mt-5">
+            <JourneyStrip activeStep={0} />
+          </div>
+        </section>
+
+        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
               <h2 className="text-lg font-semibold">Main actions</h2>
               <p className="mt-1 text-sm text-slate-500">
                 {isPending
@@ -98,14 +113,14 @@ export default async function DashboardPage() {
               </>
             ) : (
               <>
-                <Link href="/projects" className={statusButtonClass(projects.status)}>My Projects</Link>
+                <Link href="/projects/new" className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">Start Project</Link>
                 <Link href="/upload" className={statusButtonClass(upload.status)}>Upload Plans</Link>
-                <Link href={profile?.role === "admin" ? "/admin/whatsapp" : "/orders"} className={statusButtonClass(profile?.role === "admin" ? whatsapp.status : orders.status)}>
-                  WhatsApp Messages
+                <Link href="/materials" className={statusButtonClass(materials.status)}>Review Materials</Link>
+                <Link href="/orders" className={statusButtonClass(orders.status)}>Approve Order</Link>
+                <Link href="/projects" className={statusButtonClass(projects.status)}>My Projects</Link>
+                <Link href={profile?.role === "admin" ? "/admin/whatsapp" : "/orders/demo"} className={statusButtonClass(profile?.role === "admin" ? whatsapp.status : orders.status)}>
+                  {profile?.role === "admin" ? "WhatsApp Operations" : "Track Delivery"}
                 </Link>
-                <Link href="/materials" className={statusButtonClass(materials.status)}>Materials</Link>
-                <Link href="/orders" className={statusButtonClass(orders.status)}>Orders</Link>
-                <button type="button" className={statusButtonClass(dashboard.status)}>Next Step</button>
               </>
             )}
           </div>

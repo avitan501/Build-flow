@@ -27,12 +27,14 @@ export default async function AdminWhatsAppSettingsPage() {
           progress={spec.progress}
           missing={spec.missing}
           nextStep={spec.nextStep}
+          audience={spec.audience}
+          flow={spec.flow}
         />
 
         <div className="flex flex-col gap-4 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">BuildFlow Supply</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">WhatsApp Operations</p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Preview settings</h2>
               <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
                 Admin-only behavior controls for the future WhatsApp workflow. This remains a preview shell until persistent storage is approved.

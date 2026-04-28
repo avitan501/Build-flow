@@ -63,6 +63,8 @@ export default async function AdminUsersPage() {
           progress={spec.progress}
           missing={spec.missing}
           nextStep={spec.nextStep}
+          audience={spec.audience}
+          flow={spec.flow}
         />
 
         <div className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4">

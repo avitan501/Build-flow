@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BuildFlow Supply",
-  description: "Approval-first construction supply workflow for BuildFlow.",
+  title: "BuildFlow",
+  description: "Approval-first construction materials workflow for BuildFlow.",
 };
 
 export default function RootLayout({

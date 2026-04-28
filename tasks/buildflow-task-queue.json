@@ -6,7 +6,7 @@
   "qa_policy": "qa_only_tests",
   "parallel_repo_execution": false,
   "current_task_id": null,
-  "updated_at": "2026-04-28T22:50:10Z",
+  "updated_at": "2026-04-28T23:18:54.758Z",
   "task_template": {
     "id": "TASK-1001",
     "title": "Example task title",
@@ -141,6 +141,44 @@
         "/root/buildflow-supply/lib/whatsapp-log-importer.ts",
         "/root/buildflow-supply/data/whatsapp-import-status.json",
         "/root/buildflow-supply/tasks/buildflow-task-queue.json",
+        "/root/mysite/data/buildflow-live-status.json",
+        "/root/mysite/data/buildflow-progress.json"
+      ],
+      "test_result": "build_passed_push_pending"
+    },
+    {
+      "id": "TASK-1009",
+      "title": "BuildFlow website UX review and wireframe recommendations",
+      "status": "done",
+      "risk": "low",
+      "needs_approval": false,
+      "files_touched": [
+        "/root/mysite/data/buildflow-recommendations.json",
+        "/root/buildflow-supply/tasks/buildflow-task-queue.json"
+      ],
+      "test_result": "review_completed_no_code_changes"
+    },
+    {
+      "id": "TASK-1010",
+      "title": "BuildFlow wireframe rewrite for clearer client journey and area separation",
+      "status": "done",
+      "risk": "low",
+      "needs_approval": false,
+      "files_touched": [
+        "/root/buildflow-supply/app/page.tsx",
+        "/root/buildflow-supply/app/dashboard/page.tsx",
+        "/root/buildflow-supply/app/admin/build-map/page.tsx",
+        "/root/buildflow-supply/app/admin/users/page.tsx",
+        "/root/buildflow-supply/app/admin/whatsapp/page.tsx",
+        "/root/buildflow-supply/app/admin/whatsapp/settings/page.tsx",
+        "/root/buildflow-supply/app/login/page.tsx",
+        "/root/buildflow-supply/app/signup/page.tsx",
+        "/root/buildflow-supply/app/layout.tsx",
+        "/root/buildflow-supply/components/buildflow/wireframe.tsx",
+        "/root/buildflow-supply/components/buildflow/wireframe-page-loader.tsx",
+        "/root/buildflow-supply/lib/buildflow-wireframe.ts",
+        "/root/buildflow-supply/tasks/buildflow-task-queue.json",
+        "/root/mysite/data/buildflow-recommendations.json",
         "/root/mysite/data/buildflow-live-status.json",
         "/root/mysite/data/buildflow-progress.json"
       ],

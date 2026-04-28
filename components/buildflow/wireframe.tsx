@@ -2,6 +2,51 @@ import Link from "next/link";
 
 import type { RouteSpec, UiStatus } from "@/lib/buildflow-wireframe";
 
+const journeySteps = ["Start Project", "Upload Plans", "Review Materials", "Approve Order"] as const;
+
+export function audienceLabel(audience: RouteSpec["audience"]) {
+  if (audience === "admin") return "Admin / Ops";
+  if (audience === "signed_in") return "Client Flow";
+  return "Public / Client";
+}
+
+export function flowLabel(flow: RouteSpec["flow"]) {
+  if (flow === "whatsapp") return "WhatsApp Operations";
+  if (flow === "admin") return "Admin / Ops";
+  if (flow === "client") return "Client Flow";
+  if (flow === "ai") return "AI Takeoff";
+  return "Orders";
+}
+
+function activeStepForSpec(spec: RouteSpec) {
+  if (spec.key === "upload") return 1;
+  if (spec.key === "materials" || spec.key === "quotes" || spec.key === "takeoff-review" || spec.key === "admin-materials" || spec.key === "admin-quotes") return 2;
+  if (spec.key === "orders" || spec.key === "orders-demo" || spec.key === "admin-orders" || spec.key === "admin-vendors") return 3;
+  if (spec.flow === "client") return 0;
+  return undefined;
+}
+
+export function JourneyStrip({ activeStep }: { activeStep?: number }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-4">
+      {journeySteps.map((step, index) => {
+        const isActive = activeStep === index;
+        return (
+          <div
+            key={step}
+            className={`rounded-2xl border px-4 py-4 ${
+              isActive ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-slate-50"
+            }`}
+          >
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Step {index + 1}</div>
+            <div className="mt-2 text-sm font-semibold text-slate-900">{step}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function statusClasses(status: UiStatus) {
   if (status === "Live") {
     return {
@@ -48,6 +93,9 @@ export function PageStatusHeader({
   missing,
   nextStep,
   backHref = "/admin/build-map",
+  audience,
+  flow,
+  activeStep,
 }: {
   title: string;
   purpose: string;
@@ -56,6 +104,9 @@ export function PageStatusHeader({
   missing: string[];
   nextStep: string;
   backHref?: string;
+  audience?: RouteSpec["audience"];
+  flow?: RouteSpec["flow"];
+  activeStep?: number;
 }) {
   const tone = statusClasses(status);
   const remaining = Math.max(0, 100 - progress);
@@ -66,6 +117,18 @@ export function PageStatusHeader({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">BuildFlow wireframe</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{title}</h1>
           <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">{purpose}</p>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
+            {audience ? (
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">
+                Who this page is for: {audienceLabel(audience)}
+              </span>
+            ) : null}
+            {flow ? (
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">
+                Area: {flowLabel(flow)}
+              </span>
+            ) : null}
+          </div>
         </div>
         <div className="flex flex-col gap-3 sm:min-w-72">
           <span className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${tone.badge}`}>
@@ -75,6 +138,11 @@ export function PageStatusHeader({
             {progress}% complete · {remaining}% remaining
           </div>
         </div>
+      </div>
+
+      <div className="mt-6">
+        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Core user journey</div>
+        <JourneyStrip activeStep={activeStep} />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
@@ -181,6 +249,9 @@ export function SimpleWireframePage({ spec, detailCards, backHref = "/admin/buil
           missing={spec.missing}
           nextStep={spec.nextStep}
           backHref={backHref}
+          audience={spec.audience}
+          flow={spec.flow}
+          activeStep={activeStepForSpec(spec)}
         />
 
         <ActionGrid actions={spec.actions} />

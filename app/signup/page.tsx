@@ -116,7 +116,7 @@ export default function SignupPage() {
       <section className="mx-auto grid max-w-6xl items-start gap-8 lg:grid-cols-[0.8fr_1.2fr]">
         <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/20">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
-            BuildFlow Supply
+            BuildFlow
           </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Create account</h1>
           <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">
@@ -124,7 +124,7 @@ export default function SignupPage() {
           </p>
 
           <div className="mt-6 grid gap-3 text-sm text-slate-300">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">Client and admin roles stay separated.</div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">Who this page is for: new client and internal accounts.</div>
             <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">Approval status appears clearly after signup.</div>
             <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">No live ordering or sending is unlocked automatically.</div>
           </div>

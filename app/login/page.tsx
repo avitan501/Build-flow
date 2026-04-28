@@ -55,7 +55,7 @@ export default function LoginPage() {
       <section className="mx-auto grid max-w-5xl items-center gap-8 lg:grid-cols-[0.95fr_1.05fr]">
         <div className="rounded-[32px] border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/20">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
-            BuildFlow Supply
+            BuildFlow
           </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Log in</h1>
           <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">
@@ -63,7 +63,7 @@ export default function LoginPage() {
           </p>
 
           <div className="mt-6 grid gap-3 text-sm text-slate-300">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">Admin and client roles stay separated.</div>
+            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">Who this page is for: approved clients and admins.</div>
             <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">Supplier actions stay controlled through approval flows.</div>
           </div>
         </div>
@@ -71,7 +71,7 @@ export default function LoginPage() {
         <section className="rounded-[32px] border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/20">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-              Secure account access
+              BuildFlow account access
             </p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight">Welcome back</h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">

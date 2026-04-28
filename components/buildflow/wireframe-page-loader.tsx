@@ -1,4 +1,4 @@
-import { SimpleWireframePage } from "@/components/buildflow/wireframe";
+import { SimpleWireframePage, audienceLabel, flowLabel } from "@/components/buildflow/wireframe";
 import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
 
 export function WireframePageByKey({ pageKey }: { pageKey: string }) {
@@ -13,10 +13,10 @@ export function WireframePageByKey({ pageKey }: { pageKey: string }) {
     <SimpleWireframePage
       spec={spec}
       detailCards={[
-        { label: "Audience", value: spec.audience.replaceAll("_", " "), status: spec.status },
-        { label: "Flow", value: spec.flow, status: spec.status },
+        { label: "Who this page is for", value: audienceLabel(spec.audience), status: spec.status },
+        { label: "Area", value: flowLabel(spec.flow), status: spec.status },
         { label: "Current status", value: spec.status, status: spec.status },
-        { label: "Helper", value: spec.purpose, status: spec.status },
+        { label: "Why it exists", value: spec.purpose, status: spec.status },
       ]}
     />
   );
