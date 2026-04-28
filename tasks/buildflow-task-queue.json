@@ -6,7 +6,7 @@
   "qa_policy": "qa_only_tests",
   "parallel_repo_execution": false,
   "current_task_id": null,
-  "updated_at": "2026-04-28T13:09:43Z",
+  "updated_at": "2026-04-28T21:08:23Z",
   "task_template": {
     "id": "TASK-1001",
     "title": "Example task title",
@@ -102,7 +102,23 @@
         "/root/buildflow-supply/components/buildflow/wireframe-page-loader.tsx",
         "/root/buildflow-supply/lib/buildflow-wireframe.ts"
       ],
-      "test_result": "lint_passed_build_passed"
+      "test_result": "qa_passed_build_passed_push_passed"
+    },
+    {
+      "id": "TASK-1007",
+      "title": "Connect WhatsApp Draft Inbox UI to real Supabase data",
+      "status": "done",
+      "risk": "low",
+      "needs_approval": false,
+      "files_touched": [
+        "/root/buildflow-supply/app/admin/whatsapp/page.tsx",
+        "/root/buildflow-supply/app/admin/whatsapp/[threadId]/page.tsx",
+        "/root/buildflow-supply/lib/whatsapp-draft-inbox.ts",
+        "/root/buildflow-supply/tasks/buildflow-task-queue.json",
+        "/root/mysite/data/buildflow-live-status.json",
+        "/root/mysite/data/buildflow-progress.json"
+      ],
+      "test_result": "build_passed_push_pending"
     }
   ]
 }

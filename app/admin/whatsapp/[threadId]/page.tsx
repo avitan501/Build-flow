@@ -2,7 +2,22 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { requireAdminProfile } from "@/lib/auth";
-import { getInboxThread, whatsappInboxMock, whatsappPermissionOptions, whatsappSafetyRules } from "@/lib/whatsapp-draft-inbox";
+import { formatWhatsAppDateTime, getInboxThread, whatsappPermissionOptions, whatsappSafetyRules } from "@/lib/whatsapp-draft-inbox";
+
+function toneForDirection(direction: string) {
+  if (direction === "draft") return "border-amber-400/20 bg-amber-400/10 text-amber-50";
+  if (direction === "system") return "border-sky-400/20 bg-sky-400/10 text-sky-50";
+  return "border-white/10 bg-slate-950/50 text-slate-100";
+}
+
+function prettyJson(value: unknown) {
+  if (!value) return "—";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
 
 export default async function AdminWhatsAppThreadPage({
   params,
@@ -11,11 +26,13 @@ export default async function AdminWhatsAppThreadPage({
 }) {
   await requireAdminProfile();
   const { threadId } = await params;
-  const thread = getInboxThread(threadId);
+  const detail = await getInboxThread(threadId);
 
-  if (!thread || !whatsappInboxMock.some((entry) => entry.id === threadId)) {
+  if (!detail) {
     notFound();
   }
+
+  const { thread, messages, drafts, auditLog, contactNotes } = detail;
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-10 text-white sm:px-8 lg:px-10">
@@ -25,11 +42,9 @@ export default async function AdminWhatsAppThreadPage({
             <Link href="/admin/whatsapp" className="text-sm text-slate-400 underline underline-offset-4">
               Back to inbox
             </Link>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              WhatsApp review thread
-            </h1>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">WhatsApp review thread</h1>
             <p className="mt-2 text-sm text-slate-400">
-              UI-only draft workflow. Real sending is still disabled.
+              Read-only DB view for thread, contact, messages, drafts, and audit log. Real sending is still disabled.
             </p>
           </div>
           <button
@@ -54,21 +69,26 @@ export default async function AdminWhatsAppThreadPage({
                 <div className="mt-1">{thread.phone}</div>
               </div>
               <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Thread key</div>
+                <div className="mt-1 break-all">{thread.threadKey}</div>
+              </div>
+              <div>
                 <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Contact type</div>
-                <select defaultValue={thread.contactType} className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white">
-                  <option value="client">Client</option>
-                  <option value="supplier">Supplier</option>
-                  <option value="worker">Worker</option>
-                  <option value="unknown">Unknown</option>
-                </select>
+                <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white">{thread.contactType}</div>
               </div>
               <div>
                 <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Linked client</div>
-                <input defaultValue={thread.linkedClient ?? ""} placeholder="Link to client" className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white placeholder:text-slate-500" />
+                <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white">{thread.linkedClient ?? "Unassigned"}</div>
               </div>
               <div>
                 <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Linked project</div>
-                <input defaultValue={thread.linkedProject ?? ""} placeholder="Assign project" className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white placeholder:text-slate-500" />
+                <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white">{thread.linkedProject ?? "Unassigned"}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Contact notes</div>
+                <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white whitespace-pre-wrap">
+                  {contactNotes?.trim() || "No notes yet"}
+                </div>
               </div>
             </div>
           </aside>
@@ -77,7 +97,7 @@ export default async function AdminWhatsAppThreadPage({
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
               <div>
                 <h2 className="text-lg font-semibold">Thread view</h2>
-                <p className="mt-1 text-sm text-slate-400">Incoming message, media references, and draft response area.</p>
+                <p className="mt-1 text-sm text-slate-400">Real DB-backed timeline of inbound, draft, and system messages.</p>
               </div>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.16em] text-slate-300">
                 {thread.status.replaceAll("_", " ")}
@@ -85,54 +105,76 @@ export default async function AdminWhatsAppThreadPage({
             </div>
 
             <div className="mt-5 grid gap-4">
-              <div className="rounded-[24px] border border-white/10 bg-slate-950/50 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-white">Inbound WhatsApp</div>
-                    <div className="text-xs text-slate-500">{thread.lastMessageAt}</div>
-                  </div>
-                  {thread.hasMedia ? (
-                    <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs uppercase tracking-[0.16em] text-sky-100">
-                      files attached
-                    </span>
-                  ) : null}
+              {messages.length === 0 ? (
+                <div className="rounded-[24px] border border-dashed border-white/15 bg-slate-950/35 p-8 text-center text-sm text-slate-300">
+                  No messages yet for this thread.
                 </div>
-                <p className="mt-4 text-sm leading-7 text-slate-200">{thread.lastMessage}</p>
-              </div>
+              ) : (
+                messages.map((message) => (
+                  <div key={message.id} className={`rounded-[24px] border p-4 ${toneForDirection(message.direction)}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-white">{message.direction}</div>
+                        <div className="text-xs text-slate-400">{formatWhatsAppDateTime(message.created_at)}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.16em] text-slate-300">
+                        {message.needs_review ? <span className="rounded-full border border-orange-400/20 bg-orange-400/10 px-3 py-1">needs review</span> : null}
+                        {message.media_type ? <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1">{message.media_type}</span> : null}
+                      </div>
+                    </div>
+                    <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-slate-100">{message.message_text?.trim() || "No text body"}</p>
+                    {(message.media_path || message.media_url) ? (
+                      <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-3 text-xs text-slate-300">
+                        <div>media_path: {message.media_path || "—"}</div>
+                        <div className="mt-1 break-all">media_url: {message.media_url || "—"}</div>
+                      </div>
+                    ) : null}
+                  </div>
+                ))
+              )}
 
               <div className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
                 <div className="rounded-[24px] border border-white/10 bg-slate-950/50 p-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-200">Media / file references</h3>
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-200">Draft history</h3>
                   <div className="mt-4 space-y-3 text-sm text-slate-300">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      Quote-photo-01.jpg · inbound reference only
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                      Floor-plan-markup.pdf · preview later after DB importer is active
-                    </div>
+                    {drafts.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4">No drafts yet.</div>
+                    ) : (
+                      drafts.map((draft) => (
+                        <div key={draft.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-xs uppercase tracking-[0.16em] text-slate-400">{draft.draft_source} · {draft.status}</span>
+                            <span className="text-xs text-slate-400">{formatWhatsAppDateTime(draft.updated_at)}</span>
+                          </div>
+                          <div className="mt-3 whitespace-pre-wrap leading-6 text-slate-100">{draft.draft_text}</div>
+                          {draft.rejection_reason ? <div className="mt-3 text-xs text-rose-200">Rejected: {draft.rejection_reason}</div> : null}
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
                 <div className="rounded-[24px] border border-white/10 bg-slate-950/50 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-200">Draft reply editor</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-200">Read-only draft preview</h3>
                     <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs uppercase tracking-[0.16em] text-amber-100">
                       Draft only
                     </span>
                   </div>
                   <textarea
-                    defaultValue={"Draft reply placeholder:\n\nThanks — we received your message. Admin review is required before anything is sent.\n\n(Real sending remains disabled in V1.)"}
-                    className="mt-4 min-h-48 w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-4 text-sm leading-6 text-white outline-none placeholder:text-slate-500"
+                    readOnly
+                    value={drafts[0]?.draft_text || "No draft yet. When drafts exist in the DB, the newest one appears here for copy/review only."}
+                    className="mt-4 min-h-48 w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-4 text-sm leading-6 text-white outline-none"
                   />
                   <div className="mt-4 flex flex-wrap gap-3">
-                    <button type="button" className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-950">
-                      Edit Draft
+                    <button type="button" disabled className="rounded-full bg-white/15 px-5 py-3 text-sm font-semibold text-white opacity-70">
+                      Edit Draft · Coming Soon
                     </button>
-                    <button type="button" className="rounded-full bg-rose-400 px-5 py-3 text-sm font-semibold text-slate-950">
-                      Reject Draft
+                    <button type="button" disabled className="rounded-full bg-rose-400/40 px-5 py-3 text-sm font-semibold text-white opacity-70">
+                      Reject Draft · Coming Soon
                     </button>
-                    <button type="button" className="rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white">
-                      Assign to Project
+                    <button type="button" disabled className="rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white opacity-70">
+                      Assign to Project · Coming Soon
                     </button>
                   </div>
                 </div>
@@ -145,13 +187,9 @@ export default async function AdminWhatsAppThreadPage({
               <h2 className="text-lg font-semibold">Permissions</h2>
               <div className="mt-4 space-y-3">
                 <label className="text-xs uppercase tracking-[0.18em] text-slate-500">Primary mode</label>
-                <select defaultValue={thread.permissionMode} className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white">
-                  {whatsappPermissionOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white">
+                  {whatsappPermissionOptions.find((option) => option.value === thread.permissionMode)?.label || thread.permissionMode}
+                </div>
               </div>
               <div className="mt-4 grid gap-3 text-sm text-slate-300">
                 <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3">
@@ -181,15 +219,22 @@ export default async function AdminWhatsAppThreadPage({
             <section className="rounded-[28px] border border-white/10 bg-white/5 p-5 sm:p-6">
               <h2 className="text-lg font-semibold">Audit log</h2>
               <div className="mt-4 space-y-3 text-sm text-slate-300">
-                <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-3">
-                  02:22 · Draft edited by Admin
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-3">
-                  02:18 · Contact marked as client
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-3">
-                  02:11 · Project assignment prepared for review
-                </div>
+                {auditLog.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/15 bg-slate-950/40 p-4">No audit rows yet.</div>
+                ) : (
+                  auditLog.map((item) => (
+                    <div key={item.id} className="rounded-2xl border border-white/10 bg-slate-950/40 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="font-medium text-white">{item.action}</div>
+                        <div className="text-xs text-slate-400">{formatWhatsAppDateTime(item.created_at)}</div>
+                      </div>
+                      <div className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
+                        {item.target_type}{item.target_id ? ` · ${item.target_id}` : ""}
+                      </div>
+                      <pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-xl bg-black/20 p-3 text-xs text-slate-300">{prettyJson(item.after_json ?? item.before_json)}</pre>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
           </aside>
