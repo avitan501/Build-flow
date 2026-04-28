@@ -103,7 +103,7 @@ export function getBuildflowWireframeData() {
   const quotes = byCategory("Quotes", { progress: 5, nextStep: "Add the quote review shell." });
   const orders = byCategory("Orders", { progress: 35, nextStep: "Keep the order flow visual while data stays draft-only." });
   const adminUsers = byCategory("Admin Users", { progress: 65, nextStep: "Improve audit clarity without changing auth." });
-  const whatsapp = byCategory("WhatsApp", { progress: 55, nextStep: "Wait for approved DB path before real inbox data." });
+  const whatsapp = byCategory("WhatsApp", { progress: 70, nextStep: "Build read-only importer from WhatsApp logs into DB." });
   const foundation = byCategory("Foundation", { progress: 88, nextStep: liveData.current_next_step || "Keep the shell clear and readable." });
   const auth = byCategory("Auth", { progress: 85, nextStep: "Keep auth routes stable while UI grows." });
   const security = byCategory("Security", { progress: 72, nextStep: "Protect routes without loosening current guards." });
@@ -306,16 +306,22 @@ export function getBuildflowWireframeData() {
       key: "admin-whatsapp",
       href: "/admin/whatsapp",
       title: "WhatsApp Inbox",
-      purpose: "Protected draft-only inbox preview.",
+      purpose: "Protected DB-backed read-only inbox preview.",
       flow: "whatsapp",
       audience: "admin",
       category: "WhatsApp",
-      status: whatsapp.status,
-      progress: whatsapp.progress,
-      nextStep: whatsapp.nextStep,
-      missing: ["DB-backed threads", "Approve Send rules", "Migration apply path"],
+      status: "Preview",
+      progress: clampProgress(whatsapp.progress, 70),
+      nextStep: "Build read-only importer from WhatsApp logs into DB.",
+      missing: [
+        "WhatsApp log importer",
+        "Real draft write/actions",
+        "Contact permissions connected to DB",
+        "Approve Send rules later",
+        "Outbound sending still disabled",
+      ],
       actions: [
-        { label: "Inbox Settings", href: "/admin/whatsapp/settings", status: whatsapp.status },
+        { label: "Inbox Settings", href: "/admin/whatsapp/settings", status: "Preview" },
         { label: "Build Map", href: "/admin/build-map", status: foundation.status },
       ],
     },
