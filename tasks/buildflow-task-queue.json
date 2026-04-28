@@ -6,7 +6,7 @@
   "qa_policy": "qa_only_tests",
   "parallel_repo_execution": false,
   "current_task_id": null,
-  "updated_at": "2026-04-28T21:50:28Z",
+  "updated_at": "2026-04-28T22:50:10Z",
   "task_template": {
     "id": "TASK-1001",
     "title": "Example task title",
@@ -36,7 +36,7 @@
     },
     {
       "id": "TASK-1002",
-      "title": "Build WhatsApp log importer V1",
+      "title": "WhatsApp Log Importer V1",
       "status": "done",
       "risk": "medium",
       "needs_approval": false,
@@ -50,7 +50,7 @@
         "/root/mysite/data/buildflow-live-status.json",
         "/root/mysite/data/buildflow-progress.json"
       ],
-      "test_result": "build_passed_dry_run_passed_push_pending"
+      "test_result": "build_passed_dry_run_passed_apply_passed_push_passed_qa_passed"
     },
     {
       "id": "TASK-1003",
@@ -128,6 +128,23 @@
         "/root/mysite/data/buildflow-progress.json"
       ],
       "test_result": "build_passed_push_passed"
+    },
+    {
+      "id": "TASK-1008",
+      "title": "Build WhatsApp import status panel",
+      "status": "done",
+      "risk": "low",
+      "needs_approval": false,
+      "files_touched": [
+        "/root/buildflow-supply/app/admin/whatsapp/page.tsx",
+        "/root/buildflow-supply/lib/whatsapp-import-status.ts",
+        "/root/buildflow-supply/lib/whatsapp-log-importer.ts",
+        "/root/buildflow-supply/data/whatsapp-import-status.json",
+        "/root/buildflow-supply/tasks/buildflow-task-queue.json",
+        "/root/mysite/data/buildflow-live-status.json",
+        "/root/mysite/data/buildflow-progress.json"
+      ],
+      "test_result": "build_passed_push_pending"
     }
   ]
 }

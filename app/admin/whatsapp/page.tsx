@@ -4,6 +4,7 @@ import { PageStatusHeader, statusButtonClass } from "@/components/buildflow/wire
 import { requireAdminProfile } from "@/lib/auth";
 import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
 import { formatWhatsAppDateTime, listInboxThreads } from "@/lib/whatsapp-draft-inbox";
+import { readWhatsAppImportStatus } from "@/lib/whatsapp-import-status";
 
 function badgeClass(status: string) {
   if (status === "awaiting_review") return "border-orange-200 bg-orange-50 text-orange-700";
@@ -17,6 +18,7 @@ export default async function AdminWhatsAppInboxPage() {
   const { specMap } = getBuildflowWireframeData();
   const spec = specMap.get("admin-whatsapp");
   const threads = await listInboxThreads();
+  const importStatus = readWhatsAppImportStatus();
 
   if (!spec) {
     throw new Error("Missing admin WhatsApp wireframe spec.");
@@ -68,7 +70,7 @@ export default async function AdminWhatsAppInboxPage() {
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Next safe step</div>
-              <div className="mt-2 text-lg font-semibold">Importer later, no writes now</div>
+              <div className="mt-2 text-lg font-semibold">Import status panel, then admin draft actions</div>
             </div>
           </div>
         </div>
@@ -141,13 +143,52 @@ export default async function AdminWhatsAppInboxPage() {
 
           <aside className="grid gap-6">
             <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <h2 className="text-lg font-semibold">Importer status</h2>
+              <p className="mt-1 text-sm text-slate-500">Manual importer visibility only. No runtime sends, replies, or auto-import.</p>
+              <div className="mt-4 grid gap-3">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Last import time</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-800">{formatWhatsAppDateTime(importStatus.lastImportTime)}</div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Messages imported</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-800">{importStatus.messagesImported}</div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Duplicates skipped</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-800">{importStatus.duplicatesSkipped}</div>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Filter used</div>
+                  <div className="mt-1 text-sm text-slate-700">
+                    sender last4: <strong>{importStatus.filters.senderLast4 ?? "none"}</strong>
+                    <br />
+                    window: <strong>{importStatus.filters.since ?? "-"}</strong> → <strong>{importStatus.filters.until ?? "-"}</strong>
+                    <br />
+                    max messages: <strong>{importStatus.filters.maxMessages ?? "-"}</strong>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Source log file</div>
+                  <div className="mt-1 break-all text-sm text-slate-700">{importStatus.sourceLogFile ?? "No importer run recorded yet."}</div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-xs uppercase tracking-[0.16em] text-slate-500">Importer mode</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-800">Manual only{importStatus.lastRunMode ? ` · last run ${importStatus.lastRunMode}` : ""}</div>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <h2 className="text-lg font-semibold">What is live now</h2>
               <div className="mt-4 grid gap-3">
                 {[
                   "Supabase threads + contacts + latest message preview",
                   "Admin-only page access",
-                  "Empty state when no DB rows exist",
                   "Read-only thread detail navigation",
+                  "Manual importer status visibility",
                 ].map((item) => (
                   <div key={item} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                     <span className="text-sm text-slate-700">{item}</span>
@@ -161,9 +202,10 @@ export default async function AdminWhatsAppInboxPage() {
               <h2 className="text-lg font-semibold">Safety status</h2>
               <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
                 <li>• No outbound WhatsApp sending</li>
+                <li>• No auto replies</li>
+                <li>• No cron / auto-import</li>
                 <li>• Approve Send stays disabled / Coming Soon</li>
-                <li>• No inserts or importer in this V1 step</li>
-                <li>• Inbox data is read-only from Supabase</li>
+                <li>• Inbox and importer status stay admin-side only</li>
               </ul>
               <Link href="/admin/build-map" className="mt-5 inline-flex text-sm font-semibold text-slate-700 underline underline-offset-4">
                 Back to Build Map

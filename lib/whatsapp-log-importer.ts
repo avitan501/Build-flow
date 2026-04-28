@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
+import { readWhatsAppImportStatus, writeWhatsAppImportStatus } from "./whatsapp-import-status.ts";
 import { readInboundWhatsAppLogEvents } from "./whatsapp-log-source.ts";
 import type { ParsedWhatsAppLogEvent } from "./whatsapp-log-parser.ts";
 import type { WhatsAppLogSourceFilters } from "./whatsapp-log-source.ts";
@@ -150,6 +151,33 @@ async function fetchExistingMessages(supabase: SupabaseClient, externalMessageId
   );
 }
 
+function persistImportStatus(summary: ImportSummary) {
+  const current = readWhatsAppImportStatus();
+  const isApply = summary.mode === "apply";
+  writeWhatsAppImportStatus({
+    lastImportTime: isApply ? new Date().toISOString() : current.lastImportTime,
+    importerMode: "manual-only",
+    messagesImported: isApply ? summary.applied.messagesInserted : current.messagesImported,
+    duplicatesSkipped: isApply ? summary.dryRun.duplicateMessageIds.length : current.duplicatesSkipped,
+    filters: isApply
+      ? {
+          senderLast4: summary.filters.senderLast4,
+          since: summary.filters.since,
+          until: summary.filters.until,
+          maxMessages: summary.filters.maxMessages,
+          lookbackDays: summary.filters.lookbackDays,
+        }
+      : current.filters,
+    sourceLogFile: isApply ? (summary.filesScanned[0] ?? current.sourceLogFile) : current.sourceLogFile,
+    lastRunMode: summary.mode,
+    safety: {
+      noOutboundSending: true,
+      noAutoReplies: true,
+      noCronAutoImport: true,
+    },
+  });
+}
+
 export async function importWhatsAppLogs(options: ImportOptions = {}): Promise<ImportSummary> {
   const mode: ImportMode = options.mode === "apply" ? "apply" : "dry-run";
   const maxMessages = Math.max(1, Math.min(50, Math.floor(options.maxMessages ?? 5)));
@@ -224,6 +252,7 @@ export async function importWhatsAppLogs(options: ImportOptions = {}): Promise<I
   };
 
   if (mode !== "apply" || messagesToInsert.length === 0) {
+    persistImportStatus(summary);
     return summary;
   }
 
@@ -341,5 +370,6 @@ export async function importWhatsAppLogs(options: ImportOptions = {}): Promise<I
     if (error) throw new Error(`Failed to update thread ${threadId}: ${error.message}`);
   }
 
+  persistImportStatus(summary);
   return summary;
 }
