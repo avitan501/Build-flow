@@ -1,0 +1,30 @@
+{
+  "storage_mode": "temporary_json",
+  "version": 1,
+  "assistant_mode": "draft_only",
+  "safe_ack_message": "קיבלנו, נבדוק ונחזור אליך",
+  "forbidden_rules": {
+    "no_final_price": true,
+    "no_delivery_promise": true,
+    "no_order_confirmation": true,
+    "no_payment_confirmation": true,
+    "no_discount": true,
+    "no_supplier_commitment": true
+  },
+  "languages": {
+    "hebrew": true,
+    "english": true,
+    "spanish": true,
+    "auto_detect": true
+  },
+  "tone": "warm_personal",
+  "alert_rules": {
+    "urgent": true,
+    "angry_customer": true,
+    "payment_question": true,
+    "price_question": true,
+    "order_change": true,
+    "supplier_issue": true
+  },
+  "updated_at": "2026-04-28T03:33:47.610Z"
+}

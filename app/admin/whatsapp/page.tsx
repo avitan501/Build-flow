@@ -29,8 +29,16 @@ export default async function AdminWhatsAppInboxPage() {
                 workflow are prepared here. Real WhatsApp sending remains disabled.
               </p>
             </div>
-            <div className="rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-              Approve Send: <strong>Coming Soon</strong>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/admin/whatsapp/settings"
+                className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/15"
+              >
+                Open Settings
+              </Link>
+              <div className="rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                Approve Send: <strong>Coming Soon</strong>
+              </div>
             </div>
           </div>
 
