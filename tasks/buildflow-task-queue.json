@@ -6,7 +6,7 @@
   "qa_policy": "qa_only_tests",
   "parallel_repo_execution": false,
   "current_task_id": null,
-  "updated_at": "2026-04-28T21:08:23Z",
+  "updated_at": "2026-04-28T21:50:28Z",
   "task_template": {
     "id": "TASK-1001",
     "title": "Example task title",
@@ -36,12 +36,21 @@
     },
     {
       "id": "TASK-1002",
-      "title": "WhatsApp Draft Inbox DB importer",
-      "status": "blocked",
-      "risk": "high",
-      "needs_approval": true,
-      "files_touched": [],
-      "test_result": "blocked_until_db_migration_or_database_url"
+      "title": "Build WhatsApp log importer V1",
+      "status": "done",
+      "risk": "medium",
+      "needs_approval": false,
+      "files_touched": [
+        "/root/buildflow-supply/lib/whatsapp-log-importer.ts",
+        "/root/buildflow-supply/lib/whatsapp-log-parser.ts",
+        "/root/buildflow-supply/lib/whatsapp-log-source.ts",
+        "/root/buildflow-supply/scripts/import-whatsapp-logs.ts",
+        "/root/buildflow-supply/tsconfig.json",
+        "/root/buildflow-supply/tasks/buildflow-task-queue.json",
+        "/root/mysite/data/buildflow-live-status.json",
+        "/root/mysite/data/buildflow-progress.json"
+      ],
+      "test_result": "build_passed_dry_run_passed_push_pending"
     },
     {
       "id": "TASK-1003",
