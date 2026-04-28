@@ -118,7 +118,7 @@
         "/root/mysite/data/buildflow-live-status.json",
         "/root/mysite/data/buildflow-progress.json"
       ],
-      "test_result": "build_passed_push_pending"
+      "test_result": "build_passed_push_passed"
     }
   ]
 }
