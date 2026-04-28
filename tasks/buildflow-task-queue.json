@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "system": "buildflow_task_queue",
+  "mode": "sequential_manual_start",
+  "builder_policy": "builder_only_edits_code",
+  "qa_policy": "qa_only_tests",
+  "parallel_repo_execution": false,
+  "current_task_id": null,
+  "updated_at": "2026-04-28T13:09:43Z",
+  "task_template": {
+    "id": "TASK-1001",
+    "title": "Example task title",
+    "status": "queued",
+    "risk": "low",
+    "needs_approval": false,
+    "files_touched": [],
+    "test_result": "not_run"
+  },
+  "tasks": [
+    {
+      "id": "TASK-1001",
+      "title": "WhatsApp Settings page",
+      "status": "done",
+      "risk": "low",
+      "needs_approval": false,
+      "files_touched": [
+        "/root/buildflow-supply/app/admin/whatsapp/page.tsx",
+        "/root/buildflow-supply/app/admin/whatsapp/settings/page.tsx",
+        "/root/buildflow-supply/app/admin/whatsapp/settings/SettingsForm.tsx",
+        "/root/buildflow-supply/app/api/admin/whatsapp/settings/route.ts",
+        "/root/buildflow-supply/lib/whatsapp-settings.ts",
+        "/root/buildflow-supply/data/whatsapp-settings.json",
+        "/root/mysite/index.js"
+      ],
+      "test_result": "build_passed_push_passed"
+    },
+    {
+      "id": "TASK-1002",
+      "title": "WhatsApp Draft Inbox DB importer",
+      "status": "blocked",
+      "risk": "high",
+      "needs_approval": true,
+      "files_touched": [],
+      "test_result": "blocked_until_db_migration_or_database_url"
+    },
+    {
+      "id": "TASK-1003",
+      "title": "Improve Admin Users audit log",
+      "status": "queued",
+      "risk": "medium",
+      "needs_approval": false,
+      "files_touched": [],
+      "test_result": "not_run"
+    },
+    {
+      "id": "TASK-1004",
+      "title": "Add Projects placeholder page",
+      "status": "queued",
+      "risk": "low",
+      "needs_approval": false,
+      "files_touched": [],
+      "test_result": "not_run"
+    },
+    {
+      "id": "TASK-1005",
+      "title": "Add Upload Plans placeholder page",
+      "status": "queued",
+      "risk": "low",
+      "needs_approval": false,
+      "files_touched": [],
+      "test_result": "not_run"
+    },
+    {
+      "id": "TASK-1006",
+      "title": "Functional Wireframe / Clickable Skeleton",
+      "status": "done",
+      "risk": "low",
+      "needs_approval": false,
+      "files_touched": [
+        "/root/buildflow-supply/app/page.tsx",
+        "/root/buildflow-supply/app/dashboard/page.tsx",
+        "/root/buildflow-supply/app/projects/page.tsx",
+        "/root/buildflow-supply/app/projects/new/page.tsx",
+        "/root/buildflow-supply/app/upload/page.tsx",
+        "/root/buildflow-supply/app/takeoff-review/page.tsx",
+        "/root/buildflow-supply/app/materials/page.tsx",
+        "/root/buildflow-supply/app/quotes/page.tsx",
+        "/root/buildflow-supply/app/orders/page.tsx",
+        "/root/buildflow-supply/app/orders/demo/page.tsx",
+        "/root/buildflow-supply/app/admin/build-map/page.tsx",
+        "/root/buildflow-supply/app/admin/users/page.tsx",
+        "/root/buildflow-supply/app/admin/whatsapp/page.tsx",
+        "/root/buildflow-supply/app/admin/whatsapp/settings/page.tsx",
+        "/root/buildflow-supply/app/admin/whatsapp/settings/SettingsForm.tsx",
+        "/root/buildflow-supply/app/admin/projects/page.tsx",
+        "/root/buildflow-supply/app/admin/quotes/page.tsx",
+        "/root/buildflow-supply/app/admin/materials/page.tsx",
+        "/root/buildflow-supply/app/admin/orders/page.tsx",
+        "/root/buildflow-supply/app/admin/vendors/page.tsx",
+        "/root/buildflow-supply/app/admin/settings/page.tsx",
+        "/root/buildflow-supply/components/buildflow/wireframe.tsx",
+        "/root/buildflow-supply/components/buildflow/wireframe-page-loader.tsx",
+        "/root/buildflow-supply/lib/buildflow-wireframe.ts"
+      ],
+      "test_result": "lint_passed_build_passed"
+    }
+  ]
+}

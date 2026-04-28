@@ -1,73 +1,80 @@
 import Link from "next/link";
 
+import { PageStatusHeader, statusButtonClass } from "@/components/buildflow/wireframe";
 import { requireAdminProfile } from "@/lib/auth";
+import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
 import { whatsappInboxMock } from "@/lib/whatsapp-draft-inbox";
 
 function badgeClass(status: string) {
-  if (status === "awaiting_review") return "border-amber-400/30 bg-amber-400/10 text-amber-100";
-  if (status === "blocked") return "border-rose-400/30 bg-rose-400/10 text-rose-100";
-  return "border-emerald-400/30 bg-emerald-400/10 text-emerald-100";
+  if (status === "awaiting_review") return "border-orange-200 bg-orange-50 text-orange-700";
+  if (status === "blocked") return "border-red-200 bg-red-50 text-red-700";
+  return "border-emerald-200 bg-emerald-50 text-emerald-700";
 }
 
 export default async function AdminWhatsAppInboxPage() {
   await requireAdminProfile();
+  const { specMap } = getBuildflowWireframeData();
+  const spec = specMap.get("admin-whatsapp");
+
+  if (!spec) {
+    throw new Error("Missing admin WhatsApp wireframe spec.");
+  }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-10 text-white sm:px-8 lg:px-10">
-      <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <div className="flex flex-col gap-4 rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 sm:p-8">
+    <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
+      <section className="mx-auto flex max-w-7xl flex-col gap-6">
+        <PageStatusHeader
+          title={spec.title}
+          purpose={spec.purpose}
+          status={spec.status}
+          progress={spec.progress}
+          missing={spec.missing}
+          nextStep={spec.nextStep}
+        />
+
+        <div className="flex flex-col gap-4 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">
-                BuildFlow Supply
-              </p>
-              <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                WhatsApp Draft Inbox
-              </h1>
-              <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">
-                Safe UI preview only. Incoming WhatsApp review, contact permissions, and draft reply
-                workflow are prepared here. Real WhatsApp sending remains disabled.
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">BuildFlow Supply</p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Draft thread preview</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
+                Safe UI preview only. Incoming WhatsApp review, permission labels, and draft reply flow are visible here without changing runtime behavior.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link
-                href="/admin/whatsapp/settings"
-                className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/15"
-              >
+              <Link href="/admin/whatsapp/settings" className={statusButtonClass(spec.status)}>
                 Open Settings
               </Link>
-              <div className="rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+              <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
                 Approve Send: <strong>Coming Soon</strong>
               </div>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Inbox status</div>
-              <div className="mt-2 text-lg font-semibold">Draft-only mode</div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Inbox status</div>
+              <div className="mt-2 text-lg font-semibold">{spec.status}</div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Current blocker</div>
-              <div className="mt-2 text-lg font-semibold">DB schema not applied yet</div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Page progress</div>
+              <div className="mt-2 text-lg font-semibold">{spec.progress}% complete</div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Next safe step</div>
-              <div className="mt-2 text-lg font-semibold">Apply reviewed migration safely</div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Next safe step</div>
+              <div className="mt-2 text-lg font-semibold">{spec.nextStep}</div>
             </div>
           </div>
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-          <section className="rounded-[28px] border border-white/10 bg-white/5 p-5 sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
               <div>
                 <h2 className="text-lg font-semibold">Incoming messages</h2>
-                <p className="mt-1 text-sm text-slate-400">
-                  Preview layout for incoming WhatsApp threads and manual review queue.
-                </p>
+                <p className="mt-1 text-sm text-slate-500">Preview layout for incoming threads and the manual review queue.</p>
               </div>
-              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.16em] text-slate-300">
+              <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs uppercase tracking-[0.16em] text-slate-600">
                 {whatsappInboxMock.length} threads
               </div>
             </div>
@@ -77,24 +84,24 @@ export default async function AdminWhatsAppInboxPage() {
                 <Link
                   key={thread.id}
                   href={`/admin/whatsapp/${thread.id}`}
-                  className="rounded-[24px] border border-white/10 bg-slate-950/40 p-4 transition hover:border-emerald-400/30 hover:bg-slate-900/80"
+                  className="rounded-[24px] border border-slate-200 bg-slate-50 p-4 transition hover:border-emerald-300 hover:bg-white"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base font-semibold text-white">{thread.contactName}</h3>
-                        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-slate-300">
+                        <h3 className="text-base font-semibold text-slate-900">{thread.contactName}</h3>
+                        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-slate-600">
                           {thread.contactType}
                         </span>
                         {thread.hasMedia ? (
-                          <span className="rounded-full border border-sky-400/20 bg-sky-400/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-sky-100">
+                          <span className="rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-orange-700">
                             media
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-1 text-sm text-slate-400">{thread.phone}</p>
-                      <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-200">{thread.lastMessage}</p>
-                      <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-400">
+                      <p className="mt-1 text-sm text-slate-500">{thread.phone}</p>
+                      <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-700">{thread.lastMessage}</p>
+                      <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
                         <span>Project: {thread.linkedProject ?? "Unassigned"}</span>
                         <span>Client: {thread.linkedClient ?? "Unknown"}</span>
                         <span>Permission: {thread.permissionMode.replaceAll("_", " ")}</span>
@@ -104,9 +111,9 @@ export default async function AdminWhatsAppInboxPage() {
                       <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${badgeClass(thread.status)}`}>
                         {thread.status.replaceAll("_", " ")}
                       </span>
-                      <span className="text-xs text-slate-400">{thread.lastMessageAt}</span>
+                      <span className="text-xs text-slate-500">{thread.lastMessageAt}</span>
                       {thread.unreadCount > 0 ? (
-                        <span className="rounded-full bg-emerald-400 px-2.5 py-1 text-xs font-semibold text-slate-950">
+                        <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white">
                           {thread.unreadCount} new
                         </span>
                       ) : null}
@@ -118,10 +125,10 @@ export default async function AdminWhatsAppInboxPage() {
           </section>
 
           <aside className="grid gap-6">
-            <section className="rounded-[28px] border border-white/10 bg-white/5 p-5 sm:p-6">
+            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <h2 className="text-lg font-semibold">Contact permissions</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Permissions are displayed here for review and future editing. No live bot changes happen from this page yet.
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Labels for review only. No live bot changes happen from this page.
               </p>
               <div className="mt-4 grid gap-3">
                 {[
@@ -133,22 +140,25 @@ export default async function AdminWhatsAppInboxPage() {
                   "Create lead",
                   "Create project draft",
                 ].map((item) => (
-                  <div key={item} className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3">
-                    <span className="text-sm text-slate-200">{item}</span>
-                    <span className="text-xs uppercase tracking-[0.16em] text-slate-500">UI ready</span>
+                  <div key={item} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <span className="text-sm text-slate-700">{item}</span>
+                    <span className="text-xs uppercase tracking-[0.16em] text-orange-700">Preview</span>
                   </div>
                 ))}
               </div>
             </section>
 
-            <section className="rounded-[28px] border border-white/10 bg-white/5 p-5 sm:p-6">
+            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <h2 className="text-lg font-semibold">Safety status</h2>
-              <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
+              <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
                 <li>• No outbound WhatsApp sending</li>
                 <li>• Approve Send stays disabled / Coming Soon</li>
                 <li>• Auto-replies remain disabled</li>
-                <li>• Inbox UI can be built safely before DB apply</li>
+                <li>• Inbox UI can grow before DB apply</li>
               </ul>
+              <Link href="/admin/build-map" className="mt-5 inline-flex text-sm font-semibold text-slate-700 underline underline-offset-4">
+                Back to Build Map
+              </Link>
             </section>
           </aside>
         </div>
