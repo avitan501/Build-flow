@@ -33,13 +33,13 @@ export default async function DashboardPage() {
               </h1>
               <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
                 {isPending
-                  ? "Your account is pending admin approval."
+                  ? "Your account is pending approval. Your account is pending admin approval."
                   : `Command center for the current client flow. Signed in as ${user.email}. This is still a development skeleton, not a finished client portal.`}
               </p>
             </div>
             <div className="grid gap-3 sm:min-w-72">
               <span className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${isPending ? "border-orange-200 bg-orange-50 text-orange-700" : statusTone.badge}`}>
-                {isPending ? "Awaiting Admin Approval" : dashboard.status}
+                {isPending ? "Pending" : dashboard.status}
               </span>
               <div className={`rounded-2xl border px-4 py-3 text-sm ${isPending ? "border-orange-200 bg-orange-50 text-orange-700" : statusTone.card}`}>
                 {isPending ? "Pending account state · limited access" : `${dashboard.progress}% complete · ${100 - dashboard.progress}% remaining`}
@@ -50,7 +50,7 @@ export default async function DashboardPage() {
           {isPending ? (
             <div className="mt-6 rounded-3xl border border-orange-200 bg-orange-50 p-5 text-orange-700">
               <div className="text-xs font-semibold uppercase tracking-[0.16em]">Next step</div>
-              <p className="mt-3 text-sm leading-6">Your account is pending admin approval.</p>
+              <p className="mt-3 text-sm leading-6">Pending Approval. Your account is pending approval.</p>
             </div>
           ) : null}
 
