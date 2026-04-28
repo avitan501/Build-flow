@@ -1,13 +1,13 @@
 import Link from "next/link";
 
 import { requireAdminProfile } from "@/lib/auth";
-import { readWhatsAppSettings } from "@/lib/whatsapp-settings";
+import { getWhatsAppSettingsState } from "@/lib/whatsapp-settings";
 
 import { SettingsForm } from "./SettingsForm";
 
 export default async function AdminWhatsAppSettingsPage() {
   await requireAdminProfile();
-  const settings = await readWhatsAppSettings();
+  const { settings, readOnly, reason } = await getWhatsAppSettingsState();
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-10 text-white sm:px-8 lg:px-10">
@@ -33,8 +33,8 @@ export default async function AdminWhatsAppSettingsPage() {
               >
                 Back to Draft Inbox
               </Link>
-              <div className="rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
-                No live sending • no runtime changes
+              <div className={`rounded-2xl px-4 py-3 text-sm ${readOnly ? "border border-amber-400/25 bg-amber-400/10 text-amber-100" : "border border-emerald-400/25 bg-emerald-400/10 text-emerald-100"}`}>
+                {readOnly ? "Preview only on live runtime" : "Temporary JSON writes enabled locally"}
               </div>
             </div>
           </div>
@@ -42,7 +42,7 @@ export default async function AdminWhatsAppSettingsPage() {
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Storage</div>
-              <div className="mt-2 text-lg font-semibold">Temporary JSON only</div>
+              <div className="mt-2 text-lg font-semibold">{readOnly ? "Read-only preview" : "Temporary JSON only"}</div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Assistant mode</div>
@@ -55,7 +55,13 @@ export default async function AdminWhatsAppSettingsPage() {
           </div>
         </div>
 
-        <SettingsForm initialSettings={settings} />
+        {reason ? (
+          <div className="rounded-[28px] border border-amber-400/25 bg-amber-400/10 px-5 py-4 text-sm leading-6 text-amber-100 sm:px-6">
+            {reason}
+          </div>
+        ) : null}
+
+        <SettingsForm initialSettings={settings} readOnly={readOnly} />
       </section>
     </main>
   );

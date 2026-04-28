@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionWithProfile } from "@/lib/auth";
-import { readWhatsAppSettings, saveWhatsAppSettings } from "@/lib/whatsapp-settings";
+import { getWhatsAppSettingsState, saveWhatsAppSettings } from "@/lib/whatsapp-settings";
 
 function unauthorized(message: string, status = 403) {
   return NextResponse.json({ error: message }, { status });
@@ -26,8 +26,8 @@ export async function GET() {
     const auth = await requireAdminApi();
     if ("error" in auth) return auth.error;
 
-    const settings = await readWhatsAppSettings();
-    return NextResponse.json({ ok: true, settings, temporary: true });
+    const state = await getWhatsAppSettingsState();
+    return NextResponse.json({ ok: true, settings: state.settings, temporary: true, readOnly: state.readOnly, reason: state.reason });
   } catch (error) {
     return NextResponse.json(
       {
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     const { settings, backupPath } = await saveWhatsAppSettings(body);
-    return NextResponse.json({ ok: true, settings, backupPath, temporary: true });
+    return NextResponse.json({ ok: true, settings, backupPath, temporary: true, readOnly: false });
   } catch (error) {
     return NextResponse.json(
       {
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
             ? error.message
             : "Unexpected error while saving WhatsApp settings.",
       },
-      { status: 400 },
+      { status: error instanceof Error && error.message.includes("read-only") ? 503 : 400 },
     );
   }
 }

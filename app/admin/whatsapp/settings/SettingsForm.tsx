@@ -6,6 +6,7 @@ import type { WhatsAppSettings } from "@/lib/whatsapp-settings";
 
 type Props = {
   initialSettings: WhatsAppSettings;
+  readOnly: boolean;
 };
 
 type SaveState = {
@@ -13,7 +14,7 @@ type SaveState = {
   message: string;
 };
 
-export function SettingsForm({ initialSettings }: Props) {
+export function SettingsForm({ initialSettings, readOnly }: Props) {
   const [settings, setSettings] = useState(initialSettings);
   const [isSaving, setIsSaving] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>({ type: "idle", message: "" });
@@ -103,6 +104,7 @@ export function SettingsForm({ initialSettings }: Props) {
             <h2 className="text-lg font-semibold">Temporary storage mode</h2>
             <p className="mt-2 text-sm leading-6 text-slate-400">
               These settings are stored in a server-side JSON file only until the Supabase migration is approved.
+              {readOnly ? " On the live serverless runtime this page is currently preview-only." : ""}
             </p>
           </div>
           <div className="rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-xs uppercase tracking-[0.16em] text-amber-100">
@@ -116,7 +118,8 @@ export function SettingsForm({ initialSettings }: Props) {
             <select
               value={settings.assistant_mode}
               onChange={(event) => setSettings((current) => ({ ...current, assistant_mode: event.target.value as WhatsAppSettings["assistant_mode"] }))}
-              className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none"
+              disabled={readOnly}
+              className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="off">Off</option>
               <option value="draft_only">Draft only</option>
@@ -129,7 +132,8 @@ export function SettingsForm({ initialSettings }: Props) {
             <select
               value={settings.tone}
               onChange={(event) => setSettings((current) => ({ ...current, tone: event.target.value as WhatsAppSettings["tone"] }))}
-              className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none"
+              disabled={readOnly}
+              className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="warm_personal">Warm personal</option>
               <option value="professional">Professional</option>
@@ -144,7 +148,8 @@ export function SettingsForm({ initialSettings }: Props) {
             value={settings.safe_ack_message}
             onChange={(event) => setSettings((current) => ({ ...current, safe_ack_message: event.target.value }))}
             rows={4}
-            className="rounded-[24px] border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none"
+            disabled={readOnly}
+            className="rounded-[24px] border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
           />
         </label>
       </section>
@@ -161,6 +166,7 @@ export function SettingsForm({ initialSettings }: Props) {
                 key={key}
                 label={label}
                 checked={settings.forbidden_rules[key]}
+                disabled={readOnly}
                 onChange={(checked) =>
                   setSettings((current) => ({
                     ...current,
@@ -183,6 +189,7 @@ export function SettingsForm({ initialSettings }: Props) {
                 key={key}
                 label={label}
                 checked={settings.languages[key]}
+                disabled={readOnly}
                 onChange={(checked) =>
                   setSettings((current) => ({
                     ...current,
@@ -205,6 +212,7 @@ export function SettingsForm({ initialSettings }: Props) {
                 key={key}
                 label={label}
                 checked={settings.alert_rules[key]}
+                disabled={readOnly}
                 onChange={(checked) =>
                   setSettings((current) => ({
                     ...current,
@@ -229,10 +237,10 @@ export function SettingsForm({ initialSettings }: Props) {
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <button
             type="submit"
-            disabled={isSaving}
+            disabled={isSaving || readOnly}
             className="rounded-full bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSaving ? "Saving…" : "Save temporary settings"}
+            {readOnly ? "Preview only on live runtime" : isSaving ? "Saving…" : "Save temporary settings"}
           </button>
           <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
             Last updated: {new Date(settings.updated_at).toLocaleString()}
@@ -258,18 +266,20 @@ export function SettingsForm({ initialSettings }: Props) {
 type ToggleRowProps = {
   label: string;
   checked: boolean;
+  disabled?: boolean;
   onChange: (checked: boolean) => void;
 };
 
-function ToggleRow({ label, checked, onChange }: ToggleRowProps) {
+function ToggleRow({ label, checked, disabled = false, onChange }: ToggleRowProps) {
   return (
     <label className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-200">
       <span>{label}</span>
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 rounded border-white/20 bg-slate-950 text-emerald-400"
+        className="h-4 w-4 rounded border-white/20 bg-slate-950 text-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
       />
     </label>
   );
