@@ -1,8 +1,17 @@
 import Link from "next/link";
 
-import { JourneyStrip, ProgressMiniCards, statusButtonClass, statusClasses } from "@/components/buildflow/wireframe";
+import { ProgressMiniCards, statusButtonClass, statusClasses } from "@/components/buildflow/wireframe";
 import { requireSignedInProfile } from "@/lib/auth";
 import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
+
+const clientSteps = [
+  "Start Project",
+  "Upload Plans",
+  "Review Materials",
+  "Review Quote",
+  "Approve Order",
+  "Track Delivery",
+] as const;
 
 export default async function DashboardPage() {
   const { user, profile } = await requireSignedInProfile();
@@ -11,10 +20,10 @@ export default async function DashboardPage() {
   const projects = specMap.get("projects");
   const upload = specMap.get("upload");
   const materials = specMap.get("materials");
+  const quotes = specMap.get("quotes");
   const orders = specMap.get("orders");
-  const whatsapp = specMap.get("admin-whatsapp");
 
-  if (!dashboard || !projects || !upload || !materials || !orders || !whatsapp) {
+  if (!dashboard || !projects || !upload || !materials || !quotes || !orders) {
     throw new Error("Missing BuildFlow dashboard route data.");
   }
 
@@ -34,7 +43,7 @@ export default async function DashboardPage() {
               <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
                 {isPending
                   ? "Your account is pending approval. Your account is pending admin approval."
-                  : `BuildFlow command center for the client journey. Signed in as ${user.email}. Start a project, upload plans, review materials, and move toward order approval.`}
+                  : `BuildFlow command center for the client journey. Signed in as ${user.email}. Start a project, upload plans, review materials, review the quote, approve the order, and then track delivery.`}
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Who this page is for: Client Flow</span>
@@ -80,12 +89,17 @@ export default async function DashboardPage() {
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold">4-step client flow</h2>
-              <p className="mt-1 text-sm text-slate-500">This dashboard should always point back to the next client step.</p>
+              <h2 className="text-lg font-semibold">6-step client flow</h2>
+              <p className="mt-1 text-sm text-slate-500">This dashboard should always point the client to the next clear step in the full portal journey.</p>
             </div>
           </div>
-          <div className="mt-5">
-            <JourneyStrip activeStep={0} />
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+            {clientSteps.map((step, index) => (
+              <div key={step} className={`rounded-2xl border px-4 py-4 ${index === 0 ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Step {index + 1}</div>
+                <div className="mt-2 text-sm font-semibold text-slate-900">{step}</div>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -96,19 +110,18 @@ export default async function DashboardPage() {
               <p className="mt-1 text-sm text-slate-500">
                 {isPending
                   ? "Pending accounts can view status only. Full approved-client actions stay disabled."
-                  : "Folder / step workflow only. Preview and blocked areas stay visibly limited."}
+                  : "Keep the next client action obvious and keep admin tools out of the main path."}
               </p>
             </div>
-            <Link href="/admin/build-map" className="text-sm font-semibold text-slate-700 underline underline-offset-4">Back to Build Map</Link>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {isPending ? (
               <>
                 <div className={statusButtonClass("Coming Soon", true)}>My Projects</div>
                 <div className={statusButtonClass("Coming Soon", true)}>Upload Plans</div>
-                <div className={statusButtonClass("Coming Soon", true)}>WhatsApp Messages</div>
-                <div className={statusButtonClass("Coming Soon", true)}>Materials</div>
-                <div className={statusButtonClass("Coming Soon", true)}>Orders</div>
+                <div className={statusButtonClass("Coming Soon", true)}>Review Materials</div>
+                <div className={statusButtonClass("Coming Soon", true)}>Review Quote</div>
+                <div className={statusButtonClass("Coming Soon", true)}>Approve Order</div>
                 <div className={statusButtonClass("Preview", true)}>Awaiting Admin Approval</div>
               </>
             ) : (
@@ -116,22 +129,44 @@ export default async function DashboardPage() {
                 <Link href="/projects/new" className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">Start Project</Link>
                 <Link href="/upload" className={statusButtonClass(upload.status)}>Upload Plans</Link>
                 <Link href="/materials" className={statusButtonClass(materials.status)}>Review Materials</Link>
+                <Link href="/quotes" className={statusButtonClass(quotes.status)}>Review Quote</Link>
                 <Link href="/orders" className={statusButtonClass(orders.status)}>Approve Order</Link>
-                <Link href="/projects" className={statusButtonClass(projects.status)}>My Projects</Link>
-                <Link href={profile?.role === "admin" ? "/admin/whatsapp" : "/orders/demo"} className={statusButtonClass(profile?.role === "admin" ? whatsapp.status : orders.status)}>
-                  {profile?.role === "admin" ? "WhatsApp Operations" : "Track Delivery"}
-                </Link>
+                <Link href="/orders/demo" className={statusButtonClass(orders.status)}>Track Delivery</Link>
               </>
             )}
           </div>
         </section>
 
-        <ProgressMiniCards specs={[projects, upload, materials, orders]} />
+        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold">Journey compass</h2>
+              <p className="mt-1 text-sm text-slate-500">Keep one obvious next step visible from the dashboard at all times.</p>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+            {clientSteps.map((step, index) => {
+              const hrefs = ["/projects/new", "/upload", "/materials", "/quotes", "/orders", "/orders/demo"] as const;
+              return (
+                <Link
+                  key={step}
+                  href={hrefs[index]}
+                  className={`rounded-2xl border px-4 py-4 transition ${index === 0 ? "border-emerald-300 bg-emerald-50 hover:bg-emerald-100" : "border-slate-200 bg-slate-50 hover:bg-white"}`}
+                >
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Step {index + 1}</div>
+                  <div className="mt-2 text-sm font-semibold text-slate-900">{step}</div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+
+        <ProgressMiniCards specs={[projects, upload, materials, quotes, orders]} />
 
         <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold">Status panels</h2>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               <div className={`rounded-3xl border p-5 ${statusClasses(projects.status).card}`}>
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Projects</div>
                 <p className="mt-3 text-sm text-slate-700">{isPending ? "Locked until admin approval is complete." : `${projects.progress}% complete. ${projects.nextStep}`}</p>
@@ -143,6 +178,10 @@ export default async function DashboardPage() {
               <div className={`rounded-3xl border p-5 ${statusClasses(materials.status).card}`}>
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Materials</div>
                 <p className="mt-3 text-sm text-slate-700">{isPending ? "Locked until admin approval is complete." : `${materials.progress}% complete. ${materials.nextStep}`}</p>
+              </div>
+              <div className={`rounded-3xl border p-5 ${statusClasses(quotes.status).card}`}>
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Quote Review</div>
+                <p className="mt-3 text-sm text-slate-700">{isPending ? "Locked until admin approval is complete." : `${quotes.progress}% complete. ${quotes.nextStep}`}</p>
               </div>
               <div className={`rounded-3xl border p-5 ${statusClasses(orders.status).card}`}>
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orders</div>
@@ -165,11 +204,10 @@ export default async function DashboardPage() {
                 <li key={item}>• {item}</li>
               ))}
             </ul>
-            {profile?.role === "admin" ? (
-              <Link href="/admin/users" className="mt-5 inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
-                Admin Users
-              </Link>
-            ) : null}
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Wireframe note</div>
+              <p className="mt-2 leading-6">This dashboard rewrite stays UI-only. It should guide the client clearly without changing permissions, data, or runtime behavior.</p>
+            </div>
           </article>
         </section>
       </section>

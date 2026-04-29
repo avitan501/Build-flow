@@ -1,22 +1,34 @@
 import Link from "next/link";
 
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
-import { JourneyStrip, ProgressMiniCards, statusButtonClass, statusClasses } from "@/components/buildflow/wireframe";
+import { ProgressMiniCards, statusButtonClass, statusClasses } from "@/components/buildflow/wireframe";
 import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
+
+const clientSteps = [
+  "Start Project",
+  "Upload Plans",
+  "Review Materials",
+  "Review Quote",
+  "Approve Order",
+  "Track Delivery",
+] as const;
 
 export default function Home() {
   const { specMap } = getBuildflowWireframeData();
   const home = specMap.get("home");
   const dashboard = specMap.get("dashboard");
   const buildMap = specMap.get("admin-build-map");
+  const quotes = specMap.get("quotes");
+  const orders = specMap.get("orders");
 
-  if (!home || !dashboard || !buildMap) {
+  if (!home || !dashboard || !buildMap || !quotes || !orders) {
     throw new Error("Missing BuildFlow wireframe route data.");
   }
 
   const authTone = statusClasses(dashboard.status);
   const whatsappTone = statusClasses(specMap.get("admin-whatsapp")?.status || "Preview");
-  const ordersTone = statusClasses(specMap.get("orders")?.status || "Coming Soon");
+  const quotesTone = statusClasses(quotes.status);
+  const ordersTone = statusClasses(orders.status);
 
   return (
     <main className="min-h-screen bg-[#f5f7fb] text-slate-900">
@@ -26,15 +38,16 @@ export default function Home() {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">BuildFlow</p>
-              <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">Build materials workflow, made easier to follow</h1>
+              <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">A clearer client journey from project start to delivery</h1>
               <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-                Clear first step, clear next step, and no fake promises. Start the project, upload plans, review materials, then approve the order.
+                The client flow should feel linear and calm: start the project, upload plans, review materials, review the quote, approve the order, and track delivery.
               </p>
               <div className="mt-5 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-[0.16em]">
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Public / Client</span>
-                <span className={`rounded-full border px-3 py-1 ${authTone.badge}`}>Client flow live</span>
-                <span className={`rounded-full border px-3 py-1 ${whatsappTone.badge}`}>WhatsApp operations preview</span>
-                <span className={`rounded-full border px-3 py-1 ${ordersTone.badge}`}>Order approval partial</span>
+                <span className={`rounded-full border px-3 py-1 ${authTone.badge}`}>Client dashboard live</span>
+                <span className={`rounded-full border px-3 py-1 ${quotesTone.badge}`}>Quote review preview</span>
+                <span className={`rounded-full border px-3 py-1 ${ordersTone.badge}`}>Orders partial</span>
+                <span className={`rounded-full border px-3 py-1 ${whatsappTone.badge}`}>WhatsApp ops separate</span>
               </div>
             </div>
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 sm:min-w-80">
@@ -51,12 +64,17 @@ export default function Home() {
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold">4-step client flow</h2>
-              <p className="mt-1 text-sm text-slate-500">One obvious path first. Internal tools stay separate.</p>
+              <h2 className="text-lg font-semibold">6-step client flow</h2>
+              <p className="mt-1 text-sm text-slate-500">One obvious path from the first project step to delivery tracking.</p>
             </div>
           </div>
-          <div className="mt-5">
-            <JourneyStrip activeStep={0} />
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+            {clientSteps.map((step, index) => (
+              <div key={step} className={`rounded-2xl border px-4 py-4 ${index === 0 ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Step {index + 1}</div>
+                <div className="mt-2 text-sm font-semibold text-slate-900">{step}</div>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -64,45 +82,61 @@ export default function Home() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold">Start here</h2>
-              <p className="mt-1 text-sm text-slate-500">Primary action first, then the next safe step.</p>
+              <p className="mt-1 text-sm text-slate-500">Primary action first, then the next step in the client portal.</p>
             </div>
-            <Link href="/admin/build-map" className="text-sm font-semibold text-slate-700 underline underline-offset-4">
-              Back to Build Map
-            </Link>
           </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Link href="/projects/new" className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
-              Start Project
-            </Link>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <div className="sm:col-span-2 xl:col-span-2">
+              <Link href="/login" className="inline-flex w-full items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
+                Log in to Start Project
+              </Link>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Login required to create projects, upload plans, and get quotes.
+              </p>
+            </div>
+            <div className="sm:col-span-2 xl:col-span-2">
+              <Link href="/demo/client-flow" className="inline-flex w-full items-center justify-center rounded-2xl border border-sky-300 bg-sky-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-600">
+                View Demo Client Flow
+              </Link>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Public wireframe preview for testing the client journey without login.
+              </p>
+            </div>
             <Link href="/upload" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
               Upload Plans
             </Link>
             <Link href="/materials" className={statusButtonClass(home.actions[2]?.status || "Coming Soon", home.actions[2]?.status === "Coming Soon")}>
               Review Materials
             </Link>
-            <Link href="/orders" className={statusButtonClass(home.actions[3]?.status || "Coming Soon", home.actions[3]?.status === "Coming Soon")}>
+            <Link href="/quotes" className={statusButtonClass(quotes.status, quotes.status === "Coming Soon")}>
+              Review Quote
+            </Link>
+            <Link href="/orders" className={statusButtonClass(orders.status, orders.status === "Coming Soon")}>
               Approve Order
+            </Link>
+            <Link href="/orders/demo" className={statusButtonClass(home.actions[4]?.status || orders.status, (home.actions[4]?.status || orders.status) === "Coming Soon")}>
+              Track Delivery
             </Link>
           </div>
         </section>
 
-        <ProgressMiniCards specs={[dashboard, specMap.get("projects")!, specMap.get("upload")!, specMap.get("orders")!]} />
+        <ProgressMiniCards specs={[dashboard, specMap.get("projects")!, specMap.get("upload")!, quotes, orders]} />
 
         <section className="grid gap-4 lg:grid-cols-3">
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Client Flow</div>
             <h2 className="mt-2 text-lg font-semibold">For customers and project teams</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600">Start a project, upload plans, review draft materials, and move toward order approval.</p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">Every page should clearly point to the next step in the portal journey.</p>
           </article>
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Admin / Ops</div>
-            <h2 className="mt-2 text-lg font-semibold">For internal control and review</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600">User approvals, route visibility, system status, and internal review screens stay protected.</p>
+            <h2 className="mt-2 text-lg font-semibold">Kept separate from the client path</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">Internal control screens should not compete with client onboarding or project actions.</p>
           </article>
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">WhatsApp Operations</div>
-            <h2 className="mt-2 text-lg font-semibold">For inbound message review only</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600">Read-only inbox visibility, importer status, and safe admin-side review. No sending is enabled.</p>
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Delivery tracking</div>
+            <h2 className="mt-2 text-lg font-semibold">The final client reassurance step</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">The journey should end with status clarity, not uncertainty after approval.</p>
           </article>
         </section>
 
@@ -113,14 +147,14 @@ export default function Home() {
               <Link href="/projects/new" className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
                 Start Project
               </Link>
-              <Link href="/upload" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
-                Upload Plans
-              </Link>
               <Link href="/dashboard" className={statusButtonClass(dashboard.status)}>
                 Client Dashboard
               </Link>
-              <Link href="/admin/build-map" className={statusButtonClass(buildMap.status)}>
-                Admin Build Map
+              <Link href="/login" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
+                Log In
+              </Link>
+              <Link href="/signup" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
+                Create Account
               </Link>
             </div>
           </article>
@@ -132,13 +166,9 @@ export default function Home() {
                 <li key={item}>• {item}</li>
               ))}
             </ul>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link href="/login" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
-                Log In
-              </Link>
-              <Link href="/signup" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
-                Create Account
-              </Link>
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Wireframe note</div>
+              <p className="mt-2 leading-6">This remains a safe UI rewrite only. It should clarify the journey without changing auth, database behavior, or admin runtime.</p>
             </div>
           </article>
         </section>
