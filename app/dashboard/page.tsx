@@ -5,12 +5,20 @@ import { requireSignedInProfile } from "@/lib/auth";
 import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
 
 const clientSteps = [
-  "Start Project",
-  "Upload Plans",
-  "Review Materials",
-  "Review Quote",
-  "Approve Order",
-  "Track Delivery",
+  "Dashboard",
+  "Projects",
+  "Upload",
+  "Materials",
+  "Quote",
+  "Orders",
+] as const;
+
+const journeyActions = [
+  { label: "Start New Project", href: "/projects/new", status: "Preview" as const },
+  { label: "Upload Plans", href: "/upload", status: "Coming Soon" as const },
+  { label: "Review Materials", href: "/materials", status: "Coming Soon" as const },
+  { label: "Review Quote", href: "/quotes", status: "Preview" as const },
+  { label: "Track Order", href: "/orders", status: "Preview" as const },
 ] as const;
 
 export default async function DashboardPage() {
@@ -38,12 +46,12 @@ export default async function DashboardPage() {
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Client Flow · signed in</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-                {isPending ? "Pending Approval" : `Welcome${profile?.full_name ? `, ${profile.full_name}` : ""}`}
+                {isPending ? "Pending Approval" : "Your BuildFlow Project Dashboard"}
               </h1>
               <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
                 {isPending
                   ? "Your account is pending approval. Your account is pending admin approval."
-                  : `BuildFlow command center for the client journey. Signed in as ${user.email}. Start a project, upload plans, review materials, review the quote, approve the order, and then track delivery.`}
+                  : `This dashboard is your hub after login. Signed in as ${user.email}. Use it to move from projects into upload, materials, quote review, and final order tracking.`}
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Who this page is for: Client Flow</span>
@@ -89,8 +97,8 @@ export default async function DashboardPage() {
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold">6-step client flow</h2>
-              <p className="mt-1 text-sm text-slate-500">This dashboard should always point the client to the next clear step in the full portal journey.</p>
+              <h2 className="text-lg font-semibold">Continue your project journey</h2>
+              <p className="mt-1 text-sm text-slate-500">Dashboard is the client hub after login, with one clear path into each major step.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
@@ -101,38 +109,24 @@ export default async function DashboardPage() {
               </div>
             ))}
           </div>
-        </section>
-
-        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold">Main actions</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {isPending
-                  ? "Pending accounts can view status only. Full approved-client actions stay disabled."
-                  : "Keep the next client action obvious and keep admin tools out of the main path."}
-              </p>
-            </div>
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {isPending ? (
               <>
-                <div className={statusButtonClass("Coming Soon", true)}>My Projects</div>
+                <div className={statusButtonClass("Coming Soon", true)}>Start New Project</div>
                 <div className={statusButtonClass("Coming Soon", true)}>Upload Plans</div>
                 <div className={statusButtonClass("Coming Soon", true)}>Review Materials</div>
                 <div className={statusButtonClass("Coming Soon", true)}>Review Quote</div>
-                <div className={statusButtonClass("Coming Soon", true)}>Approve Order</div>
-                <div className={statusButtonClass("Preview", true)}>Awaiting Admin Approval</div>
+                <div className={statusButtonClass("Preview", true)}>Track Order</div>
               </>
             ) : (
-              <>
-                <Link href="/projects/new" className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">Start Project</Link>
-                <Link href="/upload" className={statusButtonClass(upload.status)}>Upload Plans</Link>
-                <Link href="/materials" className={statusButtonClass(materials.status)}>Review Materials</Link>
-                <Link href="/quotes" className={statusButtonClass(quotes.status)}>Review Quote</Link>
-                <Link href="/orders" className={statusButtonClass(orders.status)}>Approve Order</Link>
-                <Link href="/orders/demo" className={statusButtonClass(orders.status)}>Track Delivery</Link>
-              </>
+              journeyActions.map((action, index) => {
+                const dynamicStatus = index === 1 ? upload.status : index === 2 ? materials.status : index === 3 ? quotes.status : index === 4 ? orders.status : action.status;
+                return (
+                  <Link key={action.href} href={action.href} className={statusButtonClass(dynamicStatus)}>
+                    {action.label}
+                  </Link>
+                );
+              })
             )}
           </div>
         </section>
@@ -141,12 +135,12 @@ export default async function DashboardPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold">Journey compass</h2>
-              <p className="mt-1 text-sm text-slate-500">Keep one obvious next step visible from the dashboard at all times.</p>
+              <p className="mt-1 text-sm text-slate-500">Use the dashboard as the hub, then move into projects, uploads, materials, quotes, and final order tracking.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
             {clientSteps.map((step, index) => {
-              const hrefs = ["/projects/new", "/upload", "/materials", "/quotes", "/orders", "/orders/demo"] as const;
+              const hrefs = ["/dashboard", "/projects/new", "/upload", "/materials", "/quotes", "/orders"] as const;
               return (
                 <Link
                   key={step}
