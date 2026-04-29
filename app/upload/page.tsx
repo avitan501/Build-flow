@@ -3,5 +3,5 @@ import { requireSignedInProfile } from "@/lib/auth";
 
 export default async function UploadPage() {
   await requireSignedInProfile();
-  return <ClientWireframePage pageKey="upload" />;
+  return <ClientWireframePage pageKey="upload" audienceLabel="Signed-in client" modeLabel="Protected client page" />;
 }
