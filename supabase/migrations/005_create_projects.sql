@@ -10,7 +10,7 @@ create table if not exists public.projects (
 
 create index if not exists projects_owner_id_idx on public.projects(owner_id);
 
-create or replace function public.set_updated_at()
+create or replace function public.set_projects_updated_at()
 returns trigger
 language plpgsql
 as $$
@@ -24,7 +24,7 @@ drop trigger if exists set_projects_updated_at on public.projects;
 create trigger set_projects_updated_at
 before update on public.projects
 for each row
-execute function public.set_updated_at();
+execute function public.set_projects_updated_at();
 
 alter table public.projects enable row level security;
 
