@@ -13,6 +13,7 @@ const steps = [
 ] as const;
 
 type PageKey = "projects" | "projects-new" | "upload" | "materials" | "quotes" | "orders" | "orders-demo";
+type HrefMap = Partial<Record<string, string>>;
 
 type PageMeta = Record<
   PageKey,
@@ -244,7 +245,22 @@ function ClientJourneyStrip({ activeStep }: { activeStep: number }) {
   );
 }
 
-export function ClientWireframePage({ pageKey }: { pageKey: PageKey }) {
+function resolveHref(href: string | undefined, hrefMap: HrefMap) {
+  if (!href) return href;
+  return hrefMap[href] ?? href;
+}
+
+export function ClientWireframePage({
+  pageKey,
+  hrefMap = {},
+  audienceLabel = "Client Flow",
+  modeLabel,
+}: {
+  pageKey: PageKey;
+  hrefMap?: HrefMap;
+  audienceLabel?: string;
+  modeLabel?: string;
+}) {
   const { specMap } = getBuildflowWireframeData();
   const spec = specMap.get(pageKey);
   const meta = pageMeta[pageKey];
@@ -266,9 +282,10 @@ export function ClientWireframePage({ pageKey }: { pageKey: PageKey }) {
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{meta.headline}</h1>
               <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">{meta.summary}</p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Who this page is for: Client Flow</span>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Who this page is for: {audienceLabel}</span>
                 <span className={`rounded-full border px-3 py-1 ${tone.badge}`}>{spec.status}</span>
                 <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">Current step: {steps[meta.step]}</span>
+                {modeLabel ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">{modeLabel}</span> : null}
               </div>
               <div className="mt-5 rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Journey milestone</div>
@@ -300,7 +317,7 @@ export function ClientWireframePage({ pageKey }: { pageKey: PageKey }) {
               <div className="mt-2 text-sm font-semibold text-slate-900">{meta.previousStep ? meta.previousStep.label : "This is the start"}</div>
               <div className="mt-3">
                 {meta.previousStep ? (
-                  <Link href={meta.previousStep.href} className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
+                  <Link href={resolveHref(meta.previousStep.href, hrefMap) || "#"} className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
                     Go to {meta.previousStep.label}
                   </Link>
                 ) : (
@@ -318,7 +335,7 @@ export function ClientWireframePage({ pageKey }: { pageKey: PageKey }) {
               <div className="mt-2 text-sm font-semibold text-slate-900">{meta.nextStep ? meta.nextStep.label : "Journey complete"}</div>
               <div className="mt-3">
                 {meta.nextStep ? (
-                  <Link href={meta.nextStep.href} className={statusButtonClass(meta.nextStep.status, meta.nextStep.status === "Coming Soon")}>
+                  <Link href={resolveHref(meta.nextStep.href, hrefMap) || "#"} className={statusButtonClass(meta.nextStep.status, meta.nextStep.status === "Coming Soon")}>
                     {meta.nextStep.label}
                   </Link>
                 ) : (
@@ -338,18 +355,18 @@ export function ClientWireframePage({ pageKey }: { pageKey: PageKey }) {
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {meta.primaryCta ? (
-              <Link href={meta.primaryCta.href} className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
+              <Link href={resolveHref(meta.primaryCta.href, hrefMap) || "#"} className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
                 {meta.primaryCta.label}
               </Link>
             ) : null}
             {meta.secondaryCta ? (
-              <Link href={meta.secondaryCta.href} className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
+              <Link href={resolveHref(meta.secondaryCta.href, hrefMap) || "#"} className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
                 {meta.secondaryCta.label}
               </Link>
             ) : null}
             {spec.actions.map((action) =>
               action.href ? (
-                <Link key={`${pageKey}-${action.label}`} href={action.href} className={statusButtonClass(action.status || "Coming Soon", action.status === "Coming Soon")}>
+                <Link key={`${pageKey}-${action.label}`} href={resolveHref(action.href, hrefMap) || "#"} className={statusButtonClass(action.status || "Coming Soon", action.status === "Coming Soon")}>
                   {action.label}
                 </Link>
               ) : null,

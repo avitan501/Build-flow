@@ -86,9 +86,22 @@ export default function Home() {
             </div>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-            <Link href="/projects/new" className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
-              Start Project
-            </Link>
+            <div className="sm:col-span-2 xl:col-span-2">
+              <Link href="/login" className="inline-flex w-full items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
+                Log in to Start Project
+              </Link>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Login required to create projects, upload plans, and get quotes.
+              </p>
+            </div>
+            <div className="sm:col-span-2 xl:col-span-2">
+              <Link href="/demo/client-flow" className="inline-flex w-full items-center justify-center rounded-2xl border border-sky-300 bg-sky-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-600">
+                View Demo Client Flow
+              </Link>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Public wireframe preview for testing the client journey without login.
+              </p>
+            </div>
             <Link href="/upload" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
               Upload Plans
             </Link>
