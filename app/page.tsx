@@ -5,12 +5,12 @@ import { ProgressMiniCards, statusButtonClass, statusClasses } from "@/component
 import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
 
 const clientSteps = [
-  "Start Project",
-  "Upload Plans",
-  "Review Materials",
-  "Review Quote",
-  "Approve Order",
-  "Track Delivery",
+  "Dashboard",
+  "Project",
+  "Upload",
+  "Materials",
+  "Quote",
+  "Orders",
 ] as const;
 
 export default function Home() {
@@ -38,9 +38,9 @@ export default function Home() {
           <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">BuildFlow</p>
-              <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">A clearer client journey from project start to delivery</h1>
+              <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">BuildFlow guides every client from login to project setup, uploads, quote review, and final order tracking</h1>
               <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-                The client flow should feel linear and calm: start the project, upload plans, review materials, review the quote, approve the order, and track delivery.
+                Start on the homepage, move into the dashboard hub after login, then continue through project setup, uploads, materials, quote review, and order tracking.
               </p>
               <div className="mt-5 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-[0.16em]">
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Public / Client</span>
@@ -64,8 +64,8 @@ export default function Home() {
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold">6-step client flow</h2>
-              <p className="mt-1 text-sm text-slate-500">One obvious path from the first project step to delivery tracking.</p>
+              <h2 className="text-lg font-semibold">Homepage to order journey</h2>
+              <p className="mt-1 text-sm text-slate-500">Show the full path clearly: Dashboard → Project → Upload → Materials → Quote → Orders.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
@@ -81,8 +81,8 @@ export default function Home() {
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold">Start here</h2>
-              <p className="mt-1 text-sm text-slate-500">Primary action first, then the next step in the client portal.</p>
+              <h2 className="text-lg font-semibold">Continue your project journey</h2>
+              <p className="mt-1 text-sm text-slate-500">The homepage should send clients into the dashboard hub, then into the next clear BuildFlow step.</p>
             </div>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
@@ -102,6 +102,12 @@ export default function Home() {
                 Public wireframe preview for testing the client journey without login.
               </p>
             </div>
+            <Link href="/dashboard" className={statusButtonClass(dashboard.status)}>
+              Dashboard Hub
+            </Link>
+            <Link href="/projects/new" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
+              Start New Project
+            </Link>
             <Link href="/upload" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
               Upload Plans
             </Link>
@@ -112,10 +118,7 @@ export default function Home() {
               Review Quote
             </Link>
             <Link href="/orders" className={statusButtonClass(orders.status, orders.status === "Coming Soon")}>
-              Approve Order
-            </Link>
-            <Link href="/orders/demo" className={statusButtonClass(home.actions[4]?.status || orders.status, (home.actions[4]?.status || orders.status) === "Coming Soon")}>
-              Track Delivery
+              Track Order
             </Link>
           </div>
         </section>
