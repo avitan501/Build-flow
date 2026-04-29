@@ -125,6 +125,7 @@ export function getBuildflowWireframeData() {
         { label: "Start Project", href: "/projects/new", status: projects.status },
         { label: "Upload Plans", href: "/upload", status: uploadPlans.status },
         { label: "Review Materials", href: "/materials", status: quotes.status },
+        { label: "Review Quote", href: "/quotes", status: quotes.status },
         { label: "Approve Order", href: "/orders", status: orders.status },
         { label: "Track Delivery", href: "/orders/demo", status: orders.status },
       ],
@@ -193,11 +194,11 @@ export function getBuildflowWireframeData() {
       category: "Upload Plans",
       status: uploadPlans.status,
       progress: uploadPlans.progress,
-      nextStep: uploadPlans.nextStep,
+      nextStep: "Guide the client from upload confirmation straight into materials review.",
       missing: ["Real file persistence", "Project attachment flow", "QA upload validation"],
       actions: [
         { label: "Back to Projects", href: "/projects", status: projects.status },
-        { label: "Takeoff Review", href: "/takeoff-review", status: aiTakeoff.status },
+        { label: "Review Materials", href: "/materials", status: quotes.status },
       ],
     },
     {
@@ -227,11 +228,11 @@ export function getBuildflowWireframeData() {
       category: "Quotes",
       status: quotes.status,
       progress: clampProgress(quotes.progress + 10, 15),
-      nextStep: "Connect takeoff and quote review states visually.",
+      nextStep: "Make materials review the obvious bridge between uploaded plans and quote approval.",
       missing: ["Grouped materials", "Manual adjustments", "Approval summary"],
       actions: [
-        { label: "Quote Review", href: "/quotes", status: quotes.status },
-        { label: "Back to Takeoff", href: "/takeoff-review", status: aiTakeoff.status },
+        { label: "Review Quote", href: "/quotes", status: quotes.status },
+        { label: "Back to Upload Plans", href: "/upload", status: uploadPlans.status },
       ],
     },
     {
@@ -244,11 +245,11 @@ export function getBuildflowWireframeData() {
       category: "Quotes",
       status: quotes.status,
       progress: clampProgress(quotes.progress + 15, 20),
-      nextStep: quotes.nextStep,
+      nextStep: "Use quote review as the final decision page before order approval.",
       missing: ["Vendor compare grid", "Selection step", "Approved quote handoff"],
       actions: [
-        { label: "Materials", href: "/materials", status: quotes.status },
-        { label: "Orders", href: "/orders", status: orders.status },
+        { label: "Back to Materials", href: "/materials", status: quotes.status },
+        { label: "Approve Order", href: "/orders", status: orders.status },
       ],
     },
     {
@@ -261,11 +262,11 @@ export function getBuildflowWireframeData() {
       category: "Orders",
       status: orders.status,
       progress: orders.progress,
-      nextStep: orders.nextStep,
+      nextStep: "Turn approval into a clear handoff toward delivery tracking.",
       missing: ["Real order records", "Delivery milestones", "Approval history"],
       actions: [
-        { label: "Open Demo Order", href: "/orders/demo", status: orders.status },
-        { label: "Quote Review", href: "/quotes", status: quotes.status },
+        { label: "Track Delivery", href: "/orders/demo", status: orders.status },
+        { label: "Back to Quote Review", href: "/quotes", status: quotes.status },
       ],
     },
     {
@@ -278,11 +279,11 @@ export function getBuildflowWireframeData() {
       category: "Orders",
       status: orders.status,
       progress: clampProgress(orders.progress + 10, 45),
-      nextStep: "Define the minimum order timeline states.",
+      nextStep: "Make the live order timeline easy to scan after approval.",
       missing: ["Real supplier sync", "Delivery updates", "Approval audit"],
       actions: [
         { label: "Back to Orders", href: "/orders", status: orders.status },
-        { label: "Track Next Step", href: "/dashboard", status: auth.status },
+        { label: "Return to Dashboard", href: "/dashboard", status: auth.status },
       ],
     },
     {
