@@ -3,5 +3,5 @@ import { requireSignedInProfile } from "@/lib/auth";
 
 export default async function MaterialsPage() {
   await requireSignedInProfile();
-  return <ClientWireframePage pageKey="materials" audienceLabel="Signed-in client" modeLabel="Protected client page" />;
+  return <ClientWireframePage pageKey="materials" audienceLabel="Signed-in client" modeLabel="Protected client preview" />;
 }

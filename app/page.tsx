@@ -18,10 +18,13 @@ export default function Home() {
   const home = specMap.get("home");
   const dashboard = specMap.get("dashboard");
   const buildMap = specMap.get("admin-build-map");
+  const projects = specMap.get("projects");
+  const upload = specMap.get("upload");
+  const materials = specMap.get("materials");
   const quotes = specMap.get("quotes");
   const orders = specMap.get("orders");
 
-  if (!home || !dashboard || !buildMap || !quotes || !orders) {
+  if (!home || !dashboard || !buildMap || !projects || !upload || !materials || !quotes || !orders) {
     throw new Error("Missing BuildFlow wireframe route data.");
   }
 
@@ -88,42 +91,48 @@ export default function Home() {
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
             <div className="sm:col-span-2 xl:col-span-2">
               <Link href="/login" className="inline-flex w-full items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
-                Log in to Start Project
+                <span>Log in to Start Project</span>
               </Link>
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                Login required to create projects, upload plans, and get quotes.
+                Live access point. Login is required before project setup, uploads, and quote review.
               </p>
             </div>
             <div className="sm:col-span-2 xl:col-span-2">
               <Link href="/demo/client-flow" className="inline-flex w-full items-center justify-center rounded-2xl border border-sky-300 bg-sky-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-600">
-                View Demo Client Flow
+                <span>View Demo Client Flow</span>
               </Link>
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                Public wireframe preview for testing the client journey without login.
+                Demo preview only. Public wireframe for testing the journey without real client data.
               </p>
             </div>
             <Link href="/dashboard" className={statusButtonClass(dashboard.status)}>
-              Dashboard Hub
+              <span>Dashboard Hub</span>
+              <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{dashboard.status}</span>
             </Link>
-            <Link href="/projects/new" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
-              Start New Project
+            <Link href="/projects/new" className={statusButtonClass(projects.status, projects.status === "Coming Soon")}>
+              <span>Start New Project</span>
+              <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{projects.status}</span>
             </Link>
-            <Link href="/upload" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
-              Upload Plans
+            <Link href="/upload" className={statusButtonClass(upload.status, upload.status === "Coming Soon")}>
+              <span>Upload Plans</span>
+              <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{upload.status}</span>
             </Link>
-            <Link href="/materials" className={statusButtonClass(home.actions[2]?.status || "Coming Soon", home.actions[2]?.status === "Coming Soon")}>
-              Review Materials
+            <Link href="/materials" className={statusButtonClass(materials.status, materials.status === "Coming Soon")}>
+              <span>Review Materials</span>
+              <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{materials.status}</span>
             </Link>
             <Link href="/quotes" className={statusButtonClass(quotes.status, quotes.status === "Coming Soon")}>
-              Review Quote
+              <span>Review Quote</span>
+              <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{quotes.status}</span>
             </Link>
             <Link href="/orders" className={statusButtonClass(orders.status, orders.status === "Coming Soon")}>
-              Track Order
+              <span>Track Order</span>
+              <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{orders.status}</span>
             </Link>
           </div>
         </section>
 
-        <ProgressMiniCards specs={[dashboard, specMap.get("projects")!, specMap.get("upload")!, quotes, orders]} />
+        <ProgressMiniCards specs={[dashboard, projects, upload, quotes, orders]} />
 
         <section className="grid gap-4 lg:grid-cols-3">
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">

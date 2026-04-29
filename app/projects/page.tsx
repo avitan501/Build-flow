@@ -1,6 +1,8 @@
 import Link from "next/link";
 
+import { statusButtonClass } from "@/components/buildflow/wireframe";
 import { requireSignedInProfile } from "@/lib/auth";
+import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
 
 const journeySteps = ["Project", "Upload", "Materials", "Quote", "Orders"] as const;
 
@@ -19,6 +21,16 @@ const previewProjects = [
 
 export default async function ProjectsPage() {
   await requireSignedInProfile();
+  const { specMap } = getBuildflowWireframeData();
+  const projects = specMap.get("projects");
+  const upload = specMap.get("upload");
+  const materials = specMap.get("materials");
+  const quotes = specMap.get("quotes");
+  const orders = specMap.get("orders");
+
+  if (!projects || !upload || !materials || !quotes || !orders) {
+    throw new Error("Missing BuildFlow project route data.");
+  }
 
   return (
     <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
@@ -39,13 +51,11 @@ export default async function ProjectsPage() {
             </div>
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 sm:min-w-80">
               <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Primary action</div>
-              <Link
-                href="/projects/new"
-                className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600"
-              >
-                Start New Project
+              <Link href="/projects/new" className={`mt-3 ${statusButtonClass(projects.status, projects.status === "Coming Soon")} w-full`}>
+                <span>Start New Project</span>
+                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{projects.status}</span>
               </Link>
-              <p className="mt-3 text-sm leading-6 text-slate-600">Use this page as the place to start a project or jump into the next step.</p>
+              <p className="mt-3 text-sm leading-6 text-slate-600">Use this page as the place to start a project or jump into the next step without pretending draft features are fully live.</p>
             </div>
           </div>
         </section>
@@ -78,7 +88,7 @@ export default async function ProjectsPage() {
                       <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{project.status}</div>
                     </div>
                     <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
-                      Next: {project.nextStep}
+                      Preview · Next: {project.nextStep}
                     </span>
                   </div>
                 </div>
@@ -89,20 +99,25 @@ export default async function ProjectsPage() {
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold">Next actions</h2>
             <div className="mt-4 grid gap-3">
-              <Link href="/projects/new" className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
-                Start New Project
+              <Link href="/projects/new" className={statusButtonClass(projects.status, projects.status === "Coming Soon")}>
+                <span>Start New Project</span>
+                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{projects.status}</span>
               </Link>
-              <Link href="/upload" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
-                Upload Plans
+              <Link href="/upload" className={statusButtonClass(upload.status, upload.status === "Coming Soon")}>
+                <span>Upload Plans</span>
+                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{upload.status}</span>
               </Link>
-              <Link href="/materials" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
-                Review Materials
+              <Link href="/materials" className={statusButtonClass(materials.status, materials.status === "Coming Soon")}>
+                <span>Review Materials</span>
+                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{materials.status}</span>
               </Link>
-              <Link href="/quotes" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
-                Review Quote
+              <Link href="/quotes" className={statusButtonClass(quotes.status, quotes.status === "Coming Soon")}>
+                <span>Review Quote</span>
+                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{quotes.status}</span>
               </Link>
-              <Link href="/orders" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">
-                Track Orders
+              <Link href="/orders" className={statusButtonClass(orders.status, orders.status === "Coming Soon")}>
+                <span>Track Orders</span>
+                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{orders.status}</span>
               </Link>
             </div>
           </article>

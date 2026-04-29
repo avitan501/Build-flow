@@ -3,5 +3,5 @@ import { requireSignedInProfile } from "@/lib/auth";
 
 export default async function NewProjectPage() {
   await requireSignedInProfile();
-  return <ClientWireframePage pageKey="projects-new" audienceLabel="Signed-in client" modeLabel="Protected client page" />;
+  return <ClientWireframePage pageKey="projects-new" audienceLabel="Signed-in client" modeLabel="Protected client preview" />;
 }

@@ -123,7 +123,8 @@ export default async function DashboardPage() {
                 const dynamicStatus = index === 1 ? upload.status : index === 2 ? materials.status : index === 3 ? quotes.status : index === 4 ? orders.status : action.status;
                 return (
                   <Link key={action.href} href={action.href} className={statusButtonClass(dynamicStatus)}>
-                    {action.label}
+                    <span>{action.label}</span>
+                    <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{dynamicStatus}</span>
                   </Link>
                 );
               })
