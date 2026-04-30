@@ -15,13 +15,5 @@ export type CreateProjectDraftInput = {
   address: string | null;
 };
 
-export const PROJECT_CREATION_STATUS_LABEL = "Preview";
-export const PROJECT_CREATION_ACTIVATION_MESSAGE = "Project creation will activate after database setup.";
-
-export async function prepareProjectDraft(_input: CreateProjectDraftInput) {
-  return {
-    ok: false,
-    status: "coming_soon" as const,
-    message: PROJECT_CREATION_ACTIVATION_MESSAGE,
-  };
-}
+export const PROJECT_CREATION_STATUS_LABEL = "Live";
+export const PROJECT_CREATION_ACTIVATION_MESSAGE = "Project creation is now live. Upload and later workflow steps are still preview or coming soon.";
