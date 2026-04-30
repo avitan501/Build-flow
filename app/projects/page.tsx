@@ -67,9 +67,9 @@ export default async function ProjectsPage() {
             </div>
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 sm:min-w-80">
               <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Primary action</div>
-              <Link href="/projects/new" className={`mt-3 ${statusButtonClass(projects.status, projects.status === "Coming Soon")} w-full`}>
+              <Link href="/projects/new" className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
                 <span>Start New Project</span>
-                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{projects.status}</span>
+                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{PROJECT_CREATION_STATUS_LABEL}</span>
               </Link>
               <p className="mt-3 text-sm leading-6 text-slate-600">Use this page as the place to start a project now or continue with the next step for one of your saved projects.</p>
             </div>
@@ -138,9 +138,9 @@ export default async function ProjectsPage() {
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold">Next actions</h2>
             <div className="mt-4 grid gap-3">
-              <Link href="/projects/new" className={statusButtonClass(projects.status, projects.status === "Coming Soon")}>
+              <Link href="/projects/new" className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
                 <span>Start New Project</span>
-                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{projects.status}</span>
+                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{PROJECT_CREATION_STATUS_LABEL}</span>
               </Link>
               <Link href="/upload" className={statusButtonClass(upload.status, upload.status === "Coming Soon")}>
                 <span>Upload Plans</span>
