@@ -18,8 +18,8 @@ function formatProjectStatus(status: ProjectRecord["status"]) {
   return "Draft";
 }
 
-const nextSteps = [
-  { title: "Upload Plans", status: "Coming Soon", href: "/upload" },
+const nextSteps = (projectId: string) => [
+  { title: "Upload Plans", status: "Coming Soon", href: `/upload?projectId=${projectId}` },
   { title: "Materials", status: "Preview", href: "/materials" },
   { title: "Quote", status: "Preview", href: "/quotes" },
   { title: "Orders", status: "Preview", href: "/orders" },
@@ -96,7 +96,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
             <h2 className="text-lg font-semibold">Next steps</h2>
             <p className="mt-1 text-sm text-slate-500">Keep the journey honest while the later workflow stays in preview.</p>
             <div className="mt-4 grid gap-3">
-              {nextSteps.map((step) => (
+              {nextSteps(project.id).map((step) => (
                 <Link
                   key={step.title}
                   href={step.href}
