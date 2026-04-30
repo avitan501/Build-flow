@@ -65,6 +65,10 @@ export async function uploadProjectFileAction(formData: FormData) {
   });
 
   if (storageError) {
+    console.error("Project upload storage error", {
+      message: storageError.message,
+      name: storageError.name,
+    });
     redirectToUpload(projectId, "error", "storage-upload-failed");
   }
 
@@ -80,6 +84,10 @@ export async function uploadProjectFileAction(formData: FormData) {
   });
 
   if (insertError) {
+    console.error("Project upload metadata insert error", {
+      message: insertError.message,
+      code: insertError.code,
+    });
     await supabase.storage.from(PROJECT_UPLOAD_STORAGE_BUCKET).remove([filePath]);
     redirectToUpload(projectId, "error", "metadata-insert-failed");
   }
