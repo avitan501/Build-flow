@@ -33,6 +33,32 @@ export type CreateProjectDraftInput = {
 export const PROJECT_UPLOAD_STORAGE_PATH_PREFIX = "project-uploads";
 export const PROJECT_UPLOAD_STORAGE_PATH_TEMPLATE =
   "project-uploads/{owner_id}/{project_id}/{upload_id}-{safe_file_name}";
+export const PROJECT_UPLOAD_STORAGE_BUCKET = "project-uploads";
+export const PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+export const PROJECT_UPLOAD_ALLOWED_MIME_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp"] as const;
+
+export function sanitizeProjectUploadFileName(fileName: string) {
+  const trimmed = fileName.trim();
+  const normalized = trimmed.length > 0 ? trimmed : "file";
+  const withoutPath = normalized.split(/[/\\]/).pop() || "file";
+  const sanitized = withoutPath
+    .normalize("NFKD")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return sanitized.length > 0 ? sanitized.toLowerCase() : "file";
+}
+
+export function buildProjectUploadStoragePath(params: {
+  ownerId: string;
+  projectId: string;
+  uploadId: string;
+  fileName: string;
+}) {
+  const safeFileName = sanitizeProjectUploadFileName(params.fileName);
+  return `${params.ownerId}/${params.projectId}/${params.uploadId}-${safeFileName}`;
+}
 
 export const PROJECT_CREATION_STATUS_LABEL = "Live";
 export const PROJECT_CREATION_ACTIVATION_MESSAGE = "Project creation is now live. Upload and later workflow steps are still preview or coming soon.";
