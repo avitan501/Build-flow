@@ -130,7 +130,7 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
                 </div>
               ) : null}
 
-              <form action={uploadProjectFileAction} className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <form action={uploadProjectFileAction} encType="multipart/form-data" className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <input type="hidden" name="projectId" value={project.id} />
                 <div>
                   <label htmlFor="project-file" className="text-sm font-semibold text-slate-900">
