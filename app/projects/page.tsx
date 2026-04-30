@@ -3,21 +3,9 @@ import Link from "next/link";
 import { statusButtonClass } from "@/components/buildflow/wireframe";
 import { requireSignedInProfile } from "@/lib/auth";
 import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
+import { PROJECT_CREATION_ACTIVATION_MESSAGE, PROJECT_CREATION_STATUS_LABEL } from "@/lib/projects";
 
 const journeySteps = ["Project", "Upload", "Materials", "Quote", "Orders"] as const;
-
-const previewProjects = [
-  {
-    name: "Nassau Kitchen Refresh",
-    status: "Preview project",
-    nextStep: "Upload Plans",
-  },
-  {
-    name: "Garden Apartment Buildout",
-    status: "Demo content",
-    nextStep: "Review Materials",
-  },
-] as const;
 
 export default async function ProjectsPage() {
   await requireSignedInProfile();
@@ -46,7 +34,7 @@ export default async function ProjectsPage() {
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Signed-in client</span>
                 <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">Projects hub</span>
-                <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">Protected client page</span>
+                <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">Protected client preview</span>
               </div>
             </div>
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 sm:min-w-80">
@@ -55,7 +43,7 @@ export default async function ProjectsPage() {
                 <span>Start New Project</span>
                 <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{projects.status}</span>
               </Link>
-              <p className="mt-3 text-sm leading-6 text-slate-600">Use this page as the place to start a project or jump into the next step without pretending draft features are fully live.</p>
+              <p className="mt-3 text-sm leading-6 text-slate-600">Use this page as the place to start a project now. The real project list will activate after database setup is approved.</p>
             </div>
           </div>
         </section>
@@ -77,22 +65,20 @@ export default async function ProjectsPage() {
 
         <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">Project list preview</h2>
-            <p className="mt-1 text-sm text-slate-500">Placeholder cards stay clearly marked as preview content until real project data is connected.</p>
-            <div className="mt-5 grid gap-3">
-              {previewProjects.map((project) => (
-                <div key={project.name} className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">{project.name}</div>
-                      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{project.status}</div>
-                    </div>
-                    <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
-                      Preview · Next: {project.nextStep}
-                    </span>
-                  </div>
+            <h2 className="text-lg font-semibold">No projects yet</h2>
+            <p className="mt-1 text-sm text-slate-500">This empty state stays honest until real project records are activated.</p>
+            <div className="mt-5 rounded-3xl border border-orange-200 bg-orange-50 p-5 text-orange-900">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-orange-950">Project list preview</div>
+                  <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-orange-700">{PROJECT_CREATION_STATUS_LABEL}</div>
                 </div>
-              ))}
+                <span className="rounded-full border border-orange-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-orange-700">
+                  No projects yet
+                </span>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-orange-900">{PROJECT_CREATION_ACTIVATION_MESSAGE}</p>
+              <p className="mt-2 text-sm leading-6 text-orange-900">After database activation, this area can show each real project with its next step.</p>
             </div>
           </article>
 
