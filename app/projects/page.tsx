@@ -102,7 +102,7 @@ export default async function ProjectsPage() {
             {hasProjects ? (
               <div className="mt-5 grid gap-3">
                 {projectList.map((project) => (
-                  <div key={project.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                  <Link href={`/projects/${project.id}`} key={project.id} className="block rounded-3xl border border-slate-200 bg-slate-50 p-5 transition hover:border-slate-300 hover:bg-white">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <div className="text-sm font-semibold text-slate-900">{project.name}</div>
@@ -115,13 +115,12 @@ export default async function ProjectsPage() {
                         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
                           {PROJECT_CREATION_STATUS_LABEL}
                         </span>
-                        <Link href="/upload" className={statusButtonClass(upload.status, upload.status === "Coming Soon")}>
-                          <span>Upload Plans</span>
-                          <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{upload.status}</span>
-                        </Link>
+                        <span className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+                          Open Project Workspace
+                        </span>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
