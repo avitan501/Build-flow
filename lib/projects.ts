@@ -29,8 +29,10 @@ export type CreateProjectDraftInput = {
 };
 
 // Planned storage path convention for future real uploads:
-// project-uploads/{owner_id}/{project_id}/{file_name}
+// project-uploads/{owner_id}/{project_id}/{upload_id}-{safe_file_name}
 export const PROJECT_UPLOAD_STORAGE_PATH_PREFIX = "project-uploads";
+export const PROJECT_UPLOAD_STORAGE_PATH_TEMPLATE =
+  "project-uploads/{owner_id}/{project_id}/{upload_id}-{safe_file_name}";
 
 export const PROJECT_CREATION_STATUS_LABEL = "Live";
 export const PROJECT_CREATION_ACTIVATION_MESSAGE = "Project creation is now live. Upload and later workflow steps are still preview or coming soon.";
