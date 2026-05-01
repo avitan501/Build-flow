@@ -1,5 +1,6 @@
 export type ProjectStatus = "draft" | "active" | "archived";
 export type ProjectUploadStatus = "uploaded" | "processing" | "ready" | "archived";
+export type ProjectMaterialStatus = "draft" | "reviewed" | "approved" | "archived";
 
 export type ProjectRecord = {
   id: string;
@@ -21,6 +22,21 @@ export type ProjectUploadRecord = {
   file_size: number | null;
   status: ProjectUploadStatus;
   created_at: string;
+};
+
+export type ProjectMaterialRecord = {
+  id: string;
+  project_id: string;
+  owner_id: string;
+  upload_id: string | null;
+  name: string;
+  category: string | null;
+  quantity: number | null;
+  unit: string | null;
+  status: ProjectMaterialStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type CreateProjectDraftInput = {
