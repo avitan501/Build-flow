@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { createProjectQuoteAction } from "@/app/quotes/actions";
+import { addMaterialsToQuoteAction, createProjectQuoteAction } from "@/app/quotes/actions";
 import { ClientWireframePage } from "@/components/buildflow/client-wireframe-page";
 import { requireSignedInProfile } from "@/lib/auth";
 import type { ProjectQuoteItemRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
@@ -18,6 +18,14 @@ const quoteStatusMessages = {
   "project-not-found": { tone: "error", text: "We could not confirm that project for your account." },
   "quote-create-failed": { tone: "error", text: "Draft quote could not be created. Please try again." },
   "quote-created": { tone: "success", text: "Draft quote created successfully." },
+  "quote-not-found": { tone: "error", text: "We could not confirm that draft quote for this project." },
+  "quote-not-draft": { tone: "error", text: "Only draft quotes can receive project materials." },
+  "quote-items-load-failed": { tone: "error", text: "Existing quote items could not be checked. Please try again." },
+  "materials-load-failed": { tone: "error", text: "Project materials could not be loaded. Please try again." },
+  "materials-not-found": { tone: "error", text: "No project materials were found to add into this quote." },
+  "quote-materials-create-failed": { tone: "error", text: "Materials could not be added to this draft quote. Please try again." },
+  "quote-materials-added": { tone: "success", text: "Project materials added to the draft quote." },
+  "quote-materials-exist": { tone: "success", text: "Materials already added to this quote." },
 } as const;
 
 function formatCurrency(value: number) {
@@ -209,6 +217,26 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
                       </div>
 
                       <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                        <div className="sm:col-span-3">
+                          {quote.status === "draft" ? (
+                            items.length === 0 ? (
+                              <form action={addMaterialsToQuoteAction}>
+                                <input type="hidden" name="projectId" value={project.id} />
+                                <input type="hidden" name="quoteId" value={quote.id} />
+                                <button
+                                  type="submit"
+                                  className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+                                >
+                                  Add Materials to Quote
+                                </button>
+                              </form>
+                            ) : (
+                              <div className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+                                Materials already added
+                              </div>
+                            )
+                          ) : null}
+                        </div>
                         <div className="rounded-2xl border border-slate-200 bg-white p-3">
                           <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Subtotal</div>
                           <div className="mt-2 text-sm font-semibold text-slate-900">{formatCurrency(quote.subtotal)}</div>
