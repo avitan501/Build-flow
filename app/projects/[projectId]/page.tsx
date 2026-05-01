@@ -19,7 +19,7 @@ function formatProjectStatus(status: ProjectRecord["status"]) {
 }
 
 const nextSteps = (projectId: string) => [
-  { title: "Upload Plans", status: "Coming Soon", href: `/upload?projectId=${projectId}` },
+  { title: "Upload Plans", status: "Live", href: `/upload?projectId=${projectId}` },
   { title: "Materials", status: "Preview", href: `/materials?projectId=${projectId}` },
   { title: "Quote", status: "Preview", href: "/quotes" },
   { title: "Orders", status: "Preview", href: "/orders" },
@@ -101,9 +101,9 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
                   key={step.title}
                   href={step.href}
                   className={`inline-flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                    step.status === "Coming Soon"
-                      ? "border-slate-200 bg-slate-100 text-slate-500"
-                      : "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
+                    step.status === "Preview"
+                      ? "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
+                      : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                   }`}
                 >
                   <span>{step.title}</span>
