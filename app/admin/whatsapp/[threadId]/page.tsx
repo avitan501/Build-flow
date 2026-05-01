@@ -19,6 +19,10 @@ function prettyJson(value: unknown) {
   }
 }
 
+function isOpenProjectTag(messageText: string | null) {
+  return messageText?.trim().toLowerCase() === "open project";
+}
+
 export default async function AdminWhatsAppThreadPage({
   params,
 }: {
@@ -33,6 +37,7 @@ export default async function AdminWhatsAppThreadPage({
   }
 
   const { thread, messages, drafts, auditLog, contactNotes } = detail;
+  const hasProjectIntakeTag = messages.some((message) => message.direction === "inbound" && isOpenProjectTag(message.message_text));
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-10 text-white sm:px-8 lg:px-10">
@@ -105,6 +110,21 @@ export default async function AdminWhatsAppThreadPage({
             </div>
 
             <div className="mt-5 grid gap-4">
+              {hasProjectIntakeTag ? (
+                <div className="rounded-[24px] border border-emerald-400/20 bg-emerald-400/10 p-5 text-emerald-50">
+                  <div className="text-sm font-semibold uppercase tracking-[0.16em]">Project intake detected</div>
+                  <p className="mt-2 text-sm leading-6 text-emerald-100">
+                    This thread can later be used to create a project draft after David approval.
+                  </p>
+                  <button
+                    type="button"
+                    disabled
+                    className="mt-4 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-5 py-3 text-sm font-semibold text-emerald-50 opacity-80"
+                  >
+                    Create Project Draft — Coming Soon
+                  </button>
+                </div>
+              ) : null}
               {messages.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-white/15 bg-slate-950/35 p-8 text-center text-sm text-slate-300">
                   No messages yet for this thread.
