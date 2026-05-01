@@ -1,6 +1,7 @@
 export type ProjectStatus = "draft" | "active" | "archived";
 export type ProjectUploadStatus = "uploaded" | "processing" | "ready" | "archived";
 export type ProjectMaterialStatus = "draft" | "reviewed" | "approved" | "archived";
+export type ProjectQuoteStatus = "draft" | "sent" | "approved" | "rejected" | "archived";
 
 export type ProjectRecord = {
   id: string;
@@ -37,6 +38,33 @@ export type ProjectMaterialRecord = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type ProjectQuoteRecord = {
+  id: string;
+  project_id: string;
+  owner_id: string;
+  status: ProjectQuoteStatus;
+  subtotal: number;
+  tax: number;
+  total: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectQuoteItemRecord = {
+  id: string;
+  quote_id: string;
+  project_id: string;
+  owner_id: string;
+  material_id: string | null;
+  name: string;
+  quantity: number | null;
+  unit: string | null;
+  unit_price: number;
+  line_total: number;
+  created_at: string;
 };
 
 export type CreateProjectDraftInput = {
