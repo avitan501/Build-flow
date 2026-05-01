@@ -20,7 +20,7 @@ function formatProjectStatus(status: ProjectRecord["status"]) {
 
 const nextSteps = (projectId: string) => [
   { title: "Upload Plans", status: "Coming Soon", href: `/upload?projectId=${projectId}` },
-  { title: "Materials", status: "Preview", href: "/materials" },
+  { title: "Materials", status: "Preview", href: `/materials?projectId=${projectId}` },
   { title: "Quote", status: "Preview", href: "/quotes" },
   { title: "Orders", status: "Preview", href: "/orders" },
 ] as const;
