@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { createProjectQuoteAction } from "@/app/quotes/actions";
 import { ClientWireframePage } from "@/components/buildflow/client-wireframe-page";
 import { requireSignedInProfile } from "@/lib/auth";
 import type { ProjectQuoteItemRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
@@ -8,8 +9,16 @@ import type { ProjectQuoteItemRecord, ProjectQuoteRecord, ProjectRecord } from "
 type QuotesPageProps = {
   searchParams?: Promise<{
     projectId?: string;
+    error?: string;
+    success?: string;
   }>;
 };
+
+const quoteStatusMessages = {
+  "project-not-found": { tone: "error", text: "We could not confirm that project for your account." },
+  "quote-create-failed": { tone: "error", text: "Draft quote could not be created. Please try again." },
+  "quote-created": { tone: "success", text: "Draft quote created successfully." },
+} as const;
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -31,6 +40,8 @@ function formatQuoteStatus(status: ProjectQuoteRecord["status"]) {
 export default async function QuotesPage({ searchParams }: QuotesPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const projectId = resolvedSearchParams?.projectId?.trim();
+  const errorCode = resolvedSearchParams?.error?.trim();
+  const successCode = resolvedSearchParams?.success?.trim();
 
   if (!projectId) {
     await requireSignedInProfile();
@@ -82,6 +93,8 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
     quoteItems = items ?? [];
   }
 
+  const feedback = (successCode && quoteStatusMessages[successCode as keyof typeof quoteStatusMessages]) || (errorCode && quoteStatusMessages[errorCode as keyof typeof quoteStatusMessages]);
+
   const itemsByQuoteId = new Map<string, ProjectQuoteItemRecord[]>();
   for (const item of quoteItems) {
     const existing = itemsByQuoteId.get(item.quote_id) || [];
@@ -97,7 +110,7 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Quote Review</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{project.name}</h1>
-              <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">Read-only view of prepared quotes for this selected project.</p>
+              <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">Read-only view of prepared quotes for this selected project, with manual draft creation.</p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Signed-in client</span>
                 <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">Project-aware quotes</span>
@@ -113,6 +126,49 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold">Create draft quote</h2>
+            <p className="mt-1 text-sm text-slate-500">Create one draft quote shell for this selected project.</p>
+            <div className="mt-4 grid gap-3">
+              {feedback ? (
+                <div
+                  className={`rounded-2xl border p-4 text-sm ${
+                    feedback.tone === "success"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                      : "border-rose-200 bg-rose-50 text-rose-900"
+                  }`}
+                >
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em]">
+                    {feedback.tone === "success" ? "Saved" : "Quote issue"}
+                  </div>
+                  <p className="mt-2 leading-6">{feedback.text}</p>
+                </div>
+              ) : null}
+
+              <form action={createProjectQuoteAction} className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <input type="hidden" name="projectId" value={project.id} />
+                <div>
+                  <label htmlFor="quote-notes" className="text-sm font-semibold text-slate-900">
+                    Notes
+                  </label>
+                  <textarea
+                    id="quote-notes"
+                    name="notes"
+                    rows={4}
+                    className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900"
+                    placeholder="Optional notes for this draft quote"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+                >
+                  Create Draft Quote
+                </button>
+              </form>
+            </div>
+          </article>
+
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold">Selected project</h2>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -131,7 +187,7 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
             </div>
           </article>
 
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
             <h2 className="text-lg font-semibold">Quotes</h2>
             <p className="mt-1 text-sm text-slate-500">Read-only quote summary for this project.</p>
             {quotes.length === 0 ? (
