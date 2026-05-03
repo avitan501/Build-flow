@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { addMaterialsToQuoteAction, createProjectQuoteAction } from "@/app/quotes/actions";
+import { addMaterialsToQuoteAction, createProjectQuoteAction, updateQuoteItemPricingAction } from "@/app/quotes/actions";
 import { ClientWireframePage } from "@/components/buildflow/client-wireframe-page";
 import { requireSignedInProfile } from "@/lib/auth";
 import type { ProjectQuoteItemRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
@@ -26,6 +26,11 @@ const quoteStatusMessages = {
   "quote-materials-create-failed": { tone: "error", text: "Materials could not be added to this draft quote. Please try again." },
   "quote-materials-added": { tone: "success", text: "Project materials added to the draft quote." },
   "quote-materials-exist": { tone: "success", text: "Materials already added to this quote." },
+  "quote-item-not-found": { tone: "error", text: "We could not confirm that quote item for this draft quote." },
+  "quote-item-price-invalid": { tone: "error", text: "Enter a valid unit price of 0 or more." },
+  "quote-item-update-failed": { tone: "error", text: "Quote item pricing could not be updated. Please try again." },
+  "quote-totals-update-failed": { tone: "error", text: "Quote totals could not be recalculated. Please try again." },
+  "quote-item-price-updated": { tone: "success", text: "Quote item pricing updated successfully." },
 } as const;
 
 function formatCurrency(value: number) {
@@ -261,7 +266,7 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
                           <div className="mt-3 grid gap-3">
                             {items.map((item) => (
                               <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-3">
-                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                   <div>
                                     <div className="text-sm font-semibold text-slate-900">{item.name}</div>
                                     <div className="mt-1 text-sm text-slate-600">
@@ -269,9 +274,33 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
                                       {item.unit ? ` ${item.unit}` : ""}
                                     </div>
                                   </div>
-                                  <div className="text-right text-sm text-slate-600">
+                                  <div className="w-full max-w-sm text-sm text-slate-600 sm:text-right">
                                     <div>{formatCurrency(item.unit_price)} / unit</div>
                                     <div className="mt-1 font-semibold text-slate-900">{formatCurrency(item.line_total)}</div>
+                                    {quote.status === "draft" ? (
+                                      <form action={updateQuoteItemPricingAction} className="mt-3 grid gap-2 sm:justify-items-end">
+                                        <input type="hidden" name="projectId" value={project.id} />
+                                        <input type="hidden" name="quoteId" value={quote.id} />
+                                        <input type="hidden" name="itemId" value={item.id} />
+                                        <label className="grid gap-1 text-left sm:justify-items-end sm:text-right">
+                                          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Unit price</span>
+                                          <input
+                                            type="number"
+                                            name="unitPrice"
+                                            min="0"
+                                            step="0.01"
+                                            defaultValue={item.unit_price}
+                                            className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 sm:w-40"
+                                          />
+                                        </label>
+                                        <button
+                                          type="submit"
+                                          className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                                        >
+                                          Update pricing
+                                        </button>
+                                      </form>
+                                    ) : null}
                                   </div>
                                 </div>
                               </div>

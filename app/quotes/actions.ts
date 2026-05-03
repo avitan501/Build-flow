@@ -58,6 +58,27 @@ export async function createProjectQuoteAction(formData: FormData) {
   redirectToQuotes(projectId, "success", "quote-created");
 }
 
+async function requireOwnedQuote(params: {
+  projectId: string;
+  quoteId: string;
+  ownerId: string;
+  supabase: Awaited<ReturnType<typeof requireSignedInProfile>>["supabase"];
+}) {
+  const { data: quote, error: quoteError } = await params.supabase
+    .from("project_quotes")
+    .select("id, project_id, owner_id, status")
+    .eq("id", params.quoteId)
+    .eq("project_id", params.projectId)
+    .eq("owner_id", params.ownerId)
+    .maybeSingle<Pick<ProjectQuoteRecord, "id" | "project_id" | "owner_id" | "status">>();
+
+  if (quoteError || !quote) {
+    return null;
+  }
+
+  return quote;
+}
+
 export async function addMaterialsToQuoteAction(formData: FormData) {
   const { supabase, user } = await requireSignedInProfile();
 
@@ -78,15 +99,9 @@ export async function addMaterialsToQuoteAction(formData: FormData) {
     redirectToQuotes(projectId, "error", "project-not-found");
   }
 
-  const { data: quote, error: quoteError } = await supabase
-    .from("project_quotes")
-    .select("id, project_id, owner_id, status")
-    .eq("id", quoteId)
-    .eq("project_id", projectId)
-    .eq("owner_id", user.id)
-    .maybeSingle<Pick<ProjectQuoteRecord, "id" | "project_id" | "owner_id" | "status">>();
+  const quote = await requireOwnedQuote({ projectId, quoteId, ownerId: user.id, supabase });
 
-  if (quoteError || !quote) {
+  if (!quote) {
     redirectToQuotes(projectId, "error", "quote-not-found");
   }
 
@@ -147,4 +162,114 @@ export async function addMaterialsToQuoteAction(formData: FormData) {
   }
 
   redirectToQuotes(projectId, "success", "quote-materials-added");
+}
+
+export async function updateQuoteItemPricingAction(formData: FormData) {
+  const { supabase, user } = await requireSignedInProfile();
+
+  const projectId = String(formData.get("projectId") || "").trim();
+  const quoteId = String(formData.get("quoteId") || "").trim();
+  const itemId = String(formData.get("itemId") || "").trim();
+  const unitPriceRaw = String(formData.get("unitPrice") || "").trim();
+
+  if (!projectId) {
+    redirect("/projects?error=missing-project");
+  }
+
+  if (!quoteId) {
+    redirectToQuotes(projectId, "error", "quote-not-found");
+  }
+
+  if (!itemId) {
+    redirectToQuotes(projectId, "error", "quote-item-not-found");
+  }
+
+  const parsedUnitPrice = Number(unitPriceRaw);
+  if (unitPriceRaw.length === 0 || Number.isNaN(parsedUnitPrice) || parsedUnitPrice < 0) {
+    redirectToQuotes(projectId, "error", "quote-item-price-invalid");
+  }
+
+  const unitPrice = Number(parsedUnitPrice.toFixed(2));
+
+  const project = await requireOwnedProject(projectId, user.id, supabase);
+  if (!project) {
+    redirectToQuotes(projectId, "error", "project-not-found");
+  }
+
+  const quote = await requireOwnedQuote({ projectId, quoteId, ownerId: user.id, supabase });
+  if (!quote) {
+    redirectToQuotes(projectId, "error", "quote-not-found");
+  }
+
+  const verifiedQuote = quote as Pick<ProjectQuoteRecord, "id" | "project_id" | "owner_id" | "status">;
+
+  if (verifiedQuote.status !== "draft") {
+    redirectToQuotes(projectId, "error", "quote-not-draft");
+  }
+
+  const { data: item, error: itemError } = await supabase
+    .from("project_quote_items")
+    .select("id, quote_id, project_id, owner_id, quantity")
+    .eq("id", itemId)
+    .eq("quote_id", quoteId)
+    .eq("project_id", projectId)
+    .eq("owner_id", user.id)
+    .maybeSingle<Pick<ProjectQuoteItemRecord, "id" | "quote_id" | "project_id" | "owner_id" | "quantity">>();
+
+  if (itemError || !item) {
+    redirectToQuotes(projectId, "error", "quote-item-not-found");
+  }
+
+  const verifiedItem = item as Pick<ProjectQuoteItemRecord, "id" | "quote_id" | "project_id" | "owner_id" | "quantity">;
+
+  const quantity = verifiedItem.quantity ?? 0;
+  const lineTotal = Number((quantity * unitPrice).toFixed(2));
+
+  const { error: updateItemError } = await supabase
+    .from("project_quote_items")
+    .update({
+      unit_price: unitPrice,
+      line_total: lineTotal,
+    })
+    .eq("id", itemId)
+    .eq("quote_id", quoteId)
+    .eq("project_id", projectId)
+    .eq("owner_id", user.id);
+
+  if (updateItemError) {
+    redirectToQuotes(projectId, "error", "quote-item-update-failed");
+  }
+
+  const { data: quoteItems, error: quoteItemsError } = await supabase
+    .from("project_quote_items")
+    .select("line_total")
+    .eq("quote_id", quoteId)
+    .eq("project_id", projectId)
+    .eq("owner_id", user.id)
+    .returns<Pick<ProjectQuoteItemRecord, "line_total">[]>();
+
+  if (quoteItemsError) {
+    redirectToQuotes(projectId, "error", "quote-items-load-failed");
+  }
+
+  const subtotal = Number(
+    ((quoteItems || []).reduce((sum, quoteItem) => sum + Number(quoteItem.line_total || 0), 0)).toFixed(2),
+  );
+
+  const { error: updateQuoteError } = await supabase
+    .from("project_quotes")
+    .update({
+      subtotal,
+      tax: 0,
+      total: subtotal,
+    })
+    .eq("id", quoteId)
+    .eq("project_id", projectId)
+    .eq("owner_id", user.id);
+
+  if (updateQuoteError) {
+    redirectToQuotes(projectId, "error", "quote-totals-update-failed");
+  }
+
+  redirectToQuotes(projectId, "success", "quote-item-price-updated");
 }
