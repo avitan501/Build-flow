@@ -56,7 +56,7 @@ export default function Home() {
               <p className="mt-1 text-sm text-slate-500">For guests, the first step is account access. Project work begins after login.</p>
             </div>
           </div>
-          <div className="mt-5 grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr]">
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
             <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
               <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Primary action</div>
               <Link href="/start-project" className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
@@ -70,13 +70,6 @@ export default function Home() {
                 Create Account
               </Link>
               <p className="mt-3 text-sm leading-6 text-slate-600">New clients can create an account first, then continue into the same guided project flow.</p>
-            </div>
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Preview</div>
-              <Link href="/demo/client-flow" className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-sky-300 bg-sky-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-600">
-                View Demo Client Flow
-              </Link>
-              <p className="mt-3 text-sm leading-6 text-slate-600">Use the public demo if you want to understand the steps before signing in.</p>
             </div>
           </div>
         </section>
@@ -116,7 +109,7 @@ export default function Home() {
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold">How guests should begin</h2>
             <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-              Use <span className="font-semibold text-slate-900">Log in to Start Project</span> if you already have access, <span className="font-semibold text-slate-900">Create Account</span> if you need a new client login, or <span className="font-semibold text-slate-900">View Demo Client Flow</span> to preview the journey first.
+              Use <span className="font-semibold text-slate-900">Log in to Start Project</span> if you already have access, or <span className="font-semibold text-slate-900">Create Account</span> if you need a new client login before entering the protected workflow.
             </div>
           </article>
         </section>
