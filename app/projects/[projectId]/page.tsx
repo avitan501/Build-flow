@@ -22,7 +22,7 @@ const nextSteps = (projectId: string) => [
   { title: "Upload Plans", status: "Live", href: `/upload?projectId=${projectId}` },
   { title: "Materials", status: "Preview", href: `/materials?projectId=${projectId}` },
   { title: "Quote", status: "Preview", href: `/quotes?projectId=${projectId}` },
-  { title: "Orders", status: "Preview", href: "/orders" },
+  { title: "Orders", status: "Preview", href: `/orders?projectId=${projectId}` },
 ] as const;
 
 export default async function ProjectWorkspacePage({ params }: { params: Promise<{ projectId: string }> }) {
