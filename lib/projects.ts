@@ -2,6 +2,8 @@ export type ProjectStatus = "draft" | "active" | "archived";
 export type ProjectUploadStatus = "uploaded" | "processing" | "ready" | "archived";
 export type ProjectMaterialStatus = "draft" | "reviewed" | "approved" | "archived";
 export type ProjectQuoteStatus = "draft" | "sent" | "approved" | "rejected" | "archived";
+export type ProjectOrderStatus = "draft" | "approved" | "ordered" | "delivered" | "cancelled" | "archived";
+export type ProjectOrderTrackingStatus = "not_started" | "preparing" | "ordered" | "in_delivery" | "delivered";
 
 export type ProjectRecord = {
   id: string;
@@ -65,6 +67,19 @@ export type ProjectQuoteItemRecord = {
   unit_price: number;
   line_total: number;
   created_at: string;
+};
+
+export type ProjectOrderRecord = {
+  id: string;
+  project_id: string;
+  owner_id: string;
+  quote_id: string | null;
+  status: ProjectOrderStatus;
+  tracking_status: ProjectOrderTrackingStatus;
+  total: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type CreateProjectDraftInput = {
