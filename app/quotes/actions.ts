@@ -66,11 +66,11 @@ async function requireOwnedQuote(params: {
 }) {
   const { data: quote, error: quoteError } = await params.supabase
     .from("project_quotes")
-    .select("id, project_id, owner_id, status")
+    .select("id, project_id, owner_id, status, total")
     .eq("id", params.quoteId)
     .eq("project_id", params.projectId)
     .eq("owner_id", params.ownerId)
-    .maybeSingle<Pick<ProjectQuoteRecord, "id" | "project_id" | "owner_id" | "status">>();
+    .maybeSingle<Pick<ProjectQuoteRecord, "id" | "project_id" | "owner_id" | "status" | "total">>();
 
   if (quoteError || !quote) {
     return null;
@@ -105,7 +105,7 @@ export async function addMaterialsToQuoteAction(formData: FormData) {
     redirectToQuotes(projectId, "error", "quote-not-found");
   }
 
-  const verifiedQuote = quote as Pick<ProjectQuoteRecord, "id" | "project_id" | "owner_id" | "status">;
+  const verifiedQuote = quote as Pick<ProjectQuoteRecord, "id" | "project_id" | "owner_id" | "status" | "total">;
 
   if (verifiedQuote.status !== "draft") {
     redirectToQuotes(projectId, "error", "quote-not-draft");
@@ -164,6 +164,54 @@ export async function addMaterialsToQuoteAction(formData: FormData) {
   redirectToQuotes(projectId, "success", "quote-materials-added");
 }
 
+export async function approveQuoteAction(formData: FormData) {
+  const { supabase, user } = await requireSignedInProfile();
+
+  const projectId = String(formData.get("projectId") || "").trim();
+  const quoteId = String(formData.get("quoteId") || "").trim();
+
+  if (!projectId) {
+    redirect("/projects?error=missing-project");
+  }
+
+  if (!quoteId) {
+    redirectToQuotes(projectId, "error", "quote-not-found");
+  }
+
+  const project = await requireOwnedProject(projectId, user.id, supabase);
+  if (!project) {
+    redirectToQuotes(projectId, "error", "project-not-found");
+  }
+
+  const quote = await requireOwnedQuote({ projectId, quoteId, ownerId: user.id, supabase });
+  if (!quote) {
+    redirectToQuotes(projectId, "error", "quote-not-found");
+  }
+
+  const verifiedQuote = quote as Pick<ProjectQuoteRecord, "id" | "project_id" | "owner_id" | "status" | "total">;
+
+  if (verifiedQuote.status !== "draft" && verifiedQuote.status !== "sent") {
+    redirectToQuotes(projectId, "error", "quote-approve-status-invalid");
+  }
+
+  if (Number(verifiedQuote.total || 0) <= 0) {
+    redirectToQuotes(projectId, "error", "quote-approve-total-invalid");
+  }
+
+  const { error: updateQuoteError } = await supabase
+    .from("project_quotes")
+    .update({ status: "approved" })
+    .eq("id", quoteId)
+    .eq("project_id", projectId)
+    .eq("owner_id", user.id);
+
+  if (updateQuoteError) {
+    redirectToQuotes(projectId, "error", "quote-approve-failed");
+  }
+
+  redirectToQuotes(projectId, "success", "quote-approved");
+}
+
 export async function updateQuoteItemPricingAction(formData: FormData) {
   const { supabase, user } = await requireSignedInProfile();
 
@@ -201,7 +249,7 @@ export async function updateQuoteItemPricingAction(formData: FormData) {
     redirectToQuotes(projectId, "error", "quote-not-found");
   }
 
-  const verifiedQuote = quote as Pick<ProjectQuoteRecord, "id" | "project_id" | "owner_id" | "status">;
+  const verifiedQuote = quote as Pick<ProjectQuoteRecord, "id" | "project_id" | "owner_id" | "status" | "total">;
 
   if (verifiedQuote.status !== "draft") {
     redirectToQuotes(projectId, "error", "quote-not-draft");
