@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { addMaterialsToQuoteAction, createProjectQuoteAction, updateQuoteItemPricingAction } from "@/app/quotes/actions";
+import { addMaterialsToQuoteAction, approveQuoteAction, createProjectQuoteAction, updateQuoteItemPricingAction } from "@/app/quotes/actions";
 import { ClientWireframePage } from "@/components/buildflow/client-wireframe-page";
 import { requireSignedInProfile } from "@/lib/auth";
 import type { ProjectQuoteItemRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
@@ -31,6 +31,10 @@ const quoteStatusMessages = {
   "quote-item-update-failed": { tone: "error", text: "Quote item pricing could not be updated. Please try again." },
   "quote-totals-update-failed": { tone: "error", text: "Quote totals could not be recalculated. Please try again." },
   "quote-item-price-updated": { tone: "success", text: "Quote item pricing updated successfully." },
+  "quote-approved": { tone: "success", text: "Quote approved successfully." },
+  "quote-approve-status-invalid": { tone: "error", text: "Only draft or sent quotes can be approved." },
+  "quote-approve-total-invalid": { tone: "error", text: "Add pricing before approval." },
+  "quote-approve-failed": { tone: "error", text: "Quote approval could not be saved. Please try again." },
 } as const;
 
 function formatCurrency(value: number) {
@@ -222,7 +226,7 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
                       </div>
 
                       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                        <div className="sm:col-span-3">
+                        <div className="sm:col-span-3 flex flex-wrap gap-3">
                           {quote.status === "draft" ? (
                             items.length === 0 ? (
                               <form action={addMaterialsToQuoteAction}>
@@ -238,6 +242,25 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
                             ) : (
                               <div className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
                                 Materials already added
+                              </div>
+                            )
+                          ) : null}
+
+                          {quote.status === "draft" || quote.status === "sent" ? (
+                            quote.total > 0 ? (
+                              <form action={approveQuoteAction}>
+                                <input type="hidden" name="projectId" value={project.id} />
+                                <input type="hidden" name="quoteId" value={quote.id} />
+                                <button
+                                  type="submit"
+                                  className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                                >
+                                  Approve Quote
+                                </button>
+                              </form>
+                            ) : (
+                              <div className="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+                                Add pricing before approval
                               </div>
                             )
                           ) : null}
