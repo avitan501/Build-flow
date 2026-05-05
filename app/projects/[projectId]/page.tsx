@@ -18,11 +18,25 @@ function formatProjectStatus(status: ProjectRecord["status"]) {
   return "Draft";
 }
 
+type ProjectStepStatus = "Live" | "Partial Live" | "Coming Soon";
+
+function getStepStatusClass(status: ProjectStepStatus) {
+  if (status === "Partial Live") {
+    return "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100";
+  }
+
+  if (status === "Coming Soon") {
+    return "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100";
+  }
+
+  return "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
+}
+
 const nextSteps = (projectId: string) => [
   { title: "Upload Plans", status: "Live", href: `/upload?projectId=${projectId}` },
-  { title: "Materials", status: "Preview", href: `/materials?projectId=${projectId}` },
-  { title: "Quote", status: "Preview", href: `/quotes?projectId=${projectId}` },
-  { title: "Orders", status: "Preview", href: `/orders?projectId=${projectId}` },
+  { title: "Materials", status: "Live", href: `/materials?projectId=${projectId}` },
+  { title: "Quote", status: "Live", href: `/quotes?projectId=${projectId}` },
+  { title: "Orders", status: "Partial Live", href: `/orders?projectId=${projectId}` },
 ] as const;
 
 export default async function ProjectWorkspacePage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -94,17 +108,13 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
 
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold">Next steps</h2>
-            <p className="mt-1 text-sm text-slate-500">Keep the journey honest while the later workflow stays in preview.</p>
+            <p className="mt-1 text-sm text-slate-500">Project workspace steps now reflect the current MVP rollout status.</p>
             <div className="mt-4 grid gap-3">
               {nextSteps(project.id).map((step) => (
                 <Link
                   key={step.title}
                   href={step.href}
-                  className={`inline-flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                    step.status === "Preview"
-                      ? "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
-                      : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                  }`}
+                  className={`inline-flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-semibold transition ${getStepStatusClass(step.status)}`}
                 >
                   <span>{step.title}</span>
                   <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{step.status}</span>
