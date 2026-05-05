@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { addMaterialsToQuoteAction, approveQuoteAction, createProjectQuoteAction, updateQuoteItemPricingAction } from "@/app/quotes/actions";
-import { ClientWireframePage } from "@/components/buildflow/client-wireframe-page";
 import { requireSignedInProfile } from "@/lib/auth";
 import type { ProjectQuoteItemRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
 
@@ -62,7 +61,25 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
 
   if (!projectId) {
     await requireSignedInProfile();
-    return <ClientWireframePage pageKey="quotes" audienceLabel="Signed-in client" modeLabel="Protected client preview" />;
+    return (
+      <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
+        <section className="mx-auto flex max-w-3xl flex-col gap-6">
+          <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Quote Review</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Quotes</h1>
+            <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">Open this page from a project workspace.</p>
+            <div className="mt-6">
+              <Link
+                href="/projects"
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-white"
+              >
+                Back to Projects
+              </Link>
+            </div>
+          </section>
+        </section>
+      </main>
+    );
   }
 
   const { supabase, user } = await requireSignedInProfile();
