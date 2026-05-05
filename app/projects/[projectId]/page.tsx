@@ -20,9 +20,9 @@ function formatProjectStatus(status: ProjectRecord["status"]) {
 
 const nextSteps = (projectId: string) => [
   { title: "Upload Plans", status: "Live", href: `/upload?projectId=${projectId}` },
-  { title: "Materials", status: "Preview", href: `/materials?projectId=${projectId}` },
-  { title: "Quote", status: "Preview", href: `/quotes?projectId=${projectId}` },
-  { title: "Orders", status: "Preview", href: `/orders?projectId=${projectId}` },
+  { title: "Materials", status: "Live", href: `/materials?projectId=${projectId}` },
+  { title: "Quote", status: "Live", href: `/quotes?projectId=${projectId}` },
+  { title: "Orders", status: "Partial Live", href: `/orders?projectId=${projectId}` },
 ] as const;
 
 export default async function ProjectWorkspacePage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -94,7 +94,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
 
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold">Next steps</h2>
-            <p className="mt-1 text-sm text-slate-500">Keep the journey honest while the later workflow stays in preview.</p>
+            <p className="mt-1 text-sm text-slate-500">Project workspace steps now reflect the current MVP rollout status.</p>
             <div className="mt-4 grid gap-3">
               {nextSteps(project.id).map((step) => (
                 <Link
