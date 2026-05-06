@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { requireSignedInProfile } from "@/lib/auth";
-import type { ProjectRecord } from "@/lib/projects";
+import { createProjectEvent, type ProjectRecord } from "@/lib/projects";
 
 function redirectToMaterials(projectId: string, key: "error" | "success", value: string) {
   const params = new URLSearchParams({ projectId, [key]: value });
@@ -49,20 +49,37 @@ export async function addProjectMaterialAction(formData: FormData) {
     quantity = parsed;
   }
 
-  const { error: insertError } = await supabase.from("project_materials").insert({
-    project_id: projectId,
-    owner_id: user.id,
-    name,
-    category: categoryRaw || null,
-    quantity,
-    unit: unitRaw || null,
-    notes: notesRaw || null,
-    status: "draft",
-  });
+  const { data: material, error: insertError } = await supabase
+    .from("project_materials")
+    .insert({
+      project_id: projectId,
+      owner_id: user.id,
+      name,
+      category: categoryRaw || null,
+      quantity,
+      unit: unitRaw || null,
+      notes: notesRaw || null,
+      status: "draft",
+    })
+    .select("id, name")
+    .single<{ id: string; name: string }>();
 
-  if (insertError) {
+  if (insertError || !material) {
     redirectToMaterials(projectId, "error", "material-create-failed");
   }
+
+  const createdMaterial = material as { id: string; name: string };
+
+  await createProjectEvent({
+    supabase,
+    projectId,
+    ownerId: user.id,
+    eventType: "material_added",
+    source: "materials",
+    title: "Material added",
+    description: `${createdMaterial.name} was added to the materials list.`,
+    metadata: { material_id: createdMaterial.id },
+  });
 
   redirectToMaterials(projectId, "success", "material-added");
 }

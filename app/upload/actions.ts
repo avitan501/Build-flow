@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireSignedInProfile } from "@/lib/auth";
 import {
   buildProjectUploadStoragePath,
+  createProjectEvent,
   PROJECT_UPLOAD_ALLOWED_MIME_TYPES,
   PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES,
   PROJECT_UPLOAD_STORAGE_BUCKET,
@@ -91,6 +92,17 @@ export async function uploadProjectFileAction(formData: FormData) {
     await supabase.storage.from(PROJECT_UPLOAD_STORAGE_BUCKET).remove([filePath]);
     redirectToUpload(projectId, "error", "metadata-insert-failed");
   }
+
+  await createProjectEvent({
+    supabase,
+    projectId,
+    ownerId: user.id,
+    eventType: "file_uploaded",
+    source: "upload",
+    title: "Plan uploaded",
+    description: `${file.name} was uploaded to the project.`,
+    metadata: { upload_id: uploadId, file_name: file.name },
+  });
 
   redirectToUpload(projectId, "success", "upload-complete");
 }
