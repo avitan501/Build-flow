@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { requireSignedInProfile } from "@/lib/auth";
+import { createProjectEvent } from "@/lib/projects";
 
 export async function createProjectAction(formData: FormData) {
   const { supabase, user } = await requireSignedInProfile();
@@ -15,16 +16,33 @@ export async function createProjectAction(formData: FormData) {
     redirect("/projects/new?error=project-name-required");
   }
 
-  const { error } = await supabase.from("projects").insert({
-    owner_id: user.id,
-    name,
-    address,
-    status: "draft",
-  });
+  const { data: project, error } = await supabase
+    .from("projects")
+    .insert({
+      owner_id: user.id,
+      name,
+      address,
+      status: "draft",
+    })
+    .select("id, name")
+    .single<{ id: string; name: string }>();
 
-  if (error) {
+  if (error || !project) {
     redirect("/projects/new?error=create-failed");
   }
+
+  const createdProject = project as { id: string; name: string };
+
+  await createProjectEvent({
+    supabase,
+    projectId: createdProject.id,
+    ownerId: user.id,
+    eventType: "project_opened",
+    source: "website",
+    title: "Project created",
+    description: `Project ${createdProject.name} was created.`,
+    metadata: { project_id: createdProject.id },
+  });
 
   redirect("/projects");
 }

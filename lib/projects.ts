@@ -4,6 +4,18 @@ export type ProjectMaterialStatus = "draft" | "reviewed" | "approved" | "archive
 export type ProjectQuoteStatus = "draft" | "sent" | "approved" | "rejected" | "archived";
 export type ProjectOrderStatus = "draft" | "approved" | "ordered" | "delivered" | "cancelled" | "archived";
 export type ProjectOrderTrackingStatus = "not_started" | "preparing" | "ordered" | "in_delivery" | "delivered";
+export type ProjectEventType =
+  | "project_opened"
+  | "file_uploaded"
+  | "material_added"
+  | "quote_created"
+  | "quote_approved"
+  | "order_created"
+  | "whatsapp_message_received"
+  | "payment_requested"
+  | "status_changed"
+  | "note_added";
+export type ProjectEventSource = "website" | "upload" | "materials" | "quotes" | "orders" | "whatsapp" | "admin" | "payments" | "system";
 
 export type ProjectRecord = {
   id: string;
@@ -86,13 +98,59 @@ export type ProjectEventRecord = {
   id: string;
   project_id: string;
   owner_id: string;
-  event_type: string;
-  source: string;
+  event_type: ProjectEventType;
+  source: ProjectEventSource;
   title: string;
   description: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
 };
+
+type ProjectEventInsertClient = {
+  from: (table: "project_events") => {
+    insert: (values: {
+      project_id: string;
+      owner_id: string;
+      event_type: ProjectEventType;
+      source: ProjectEventSource;
+      title: string;
+      description?: string | null;
+      metadata?: Record<string, unknown>;
+    }) => any;
+  };
+};
+
+export async function createProjectEvent(params: {
+  supabase: ProjectEventInsertClient;
+  projectId: string;
+  ownerId: string;
+  eventType: ProjectEventType;
+  source: ProjectEventSource;
+  title: string;
+  description?: string | null;
+  metadata?: Record<string, unknown>;
+}) {
+  const { error } = await params.supabase.from("project_events").insert({
+    project_id: params.projectId,
+    owner_id: params.ownerId,
+    event_type: params.eventType,
+    source: params.source,
+    title: params.title,
+    description: params.description ?? null,
+    metadata: params.metadata ?? {},
+  });
+
+  if (error) {
+    console.error("Project timeline insert error", {
+      message: error.message,
+      code: error.code,
+      projectId: params.projectId,
+      ownerId: params.ownerId,
+      eventType: params.eventType,
+      source: params.source,
+    });
+  }
+}
 
 export type CreateProjectDraftInput = {
   name: string;

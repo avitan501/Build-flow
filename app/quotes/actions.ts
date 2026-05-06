@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { requireSignedInProfile } from "@/lib/auth";
-import type { ProjectMaterialRecord, ProjectQuoteItemRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
+import { createProjectEvent, type ProjectMaterialRecord, type ProjectQuoteItemRecord, type ProjectQuoteRecord, type ProjectRecord } from "@/lib/projects";
 
 function redirectToQuotes(projectId: string, key: "error" | "success", value: string) {
   const params = new URLSearchParams({ projectId, [key]: value });
@@ -41,19 +41,36 @@ export async function createProjectQuoteAction(formData: FormData) {
     redirectToQuotes(projectId, "error", "project-not-found");
   }
 
-  const { error: insertError } = await supabase.from("project_quotes").insert({
-    project_id: projectId,
-    owner_id: user.id,
-    status: "draft",
-    subtotal: 0,
-    tax: 0,
-    total: 0,
-    notes: notesRaw || null,
-  });
+  const { data: quote, error: insertError } = await supabase
+    .from("project_quotes")
+    .insert({
+      project_id: projectId,
+      owner_id: user.id,
+      status: "draft",
+      subtotal: 0,
+      tax: 0,
+      total: 0,
+      notes: notesRaw || null,
+    })
+    .select("id")
+    .single<{ id: string }>();
 
-  if (insertError) {
+  if (insertError || !quote) {
     redirectToQuotes(projectId, "error", "quote-create-failed");
   }
+
+  const createdQuote = quote as { id: string };
+
+  await createProjectEvent({
+    supabase,
+    projectId,
+    ownerId: user.id,
+    eventType: "quote_created",
+    source: "quotes",
+    title: "Draft quote created",
+    description: "A new draft quote was created for this project.",
+    metadata: { quote_id: createdQuote.id },
+  });
 
   redirectToQuotes(projectId, "success", "quote-created");
 }
@@ -208,6 +225,17 @@ export async function approveQuoteAction(formData: FormData) {
   if (updateQuoteError) {
     redirectToQuotes(projectId, "error", "quote-approve-failed");
   }
+
+  await createProjectEvent({
+    supabase,
+    projectId,
+    ownerId: user.id,
+    eventType: "quote_approved",
+    source: "quotes",
+    title: "Quote approved",
+    description: "A project quote was approved.",
+    metadata: { quote_id: quoteId },
+  });
 
   redirectToQuotes(projectId, "success", "quote-approved");
 }

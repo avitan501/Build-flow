@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { requireSignedInProfile } from "@/lib/auth";
-import type { ProjectOrderRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
+import { createProjectEvent, type ProjectOrderRecord, type ProjectQuoteRecord, type ProjectRecord } from "@/lib/projects";
 
 function redirectToOrders(projectId: string, key: "error" | "success", value: string) {
   const params = new URLSearchParams({ projectId, [key]: value });
@@ -97,19 +97,36 @@ export async function createOrderFromApprovedQuoteAction(formData: FormData) {
     redirectToOrders(projectId, "success", "order-already-exists");
   }
 
-  const { error: insertError } = await supabase.from("project_orders").insert({
-    project_id: projectId,
-    owner_id: user.id,
-    quote_id: verifiedQuote.id,
-    status: "approved",
-    tracking_status: "not_started",
-    total: verifiedQuote.total,
-    notes: notesRaw || verifiedQuote.notes || null,
-  });
+  const { data: order, error: insertError } = await supabase
+    .from("project_orders")
+    .insert({
+      project_id: projectId,
+      owner_id: user.id,
+      quote_id: verifiedQuote.id,
+      status: "approved",
+      tracking_status: "not_started",
+      total: verifiedQuote.total,
+      notes: notesRaw || verifiedQuote.notes || null,
+    })
+    .select("id")
+    .single<{ id: string }>();
 
-  if (insertError) {
+  if (insertError || !order) {
     redirectToOrders(projectId, "error", "order-create-failed");
   }
+
+  const createdOrder = order as { id: string };
+
+  await createProjectEvent({
+    supabase,
+    projectId,
+    ownerId: user.id,
+    eventType: "order_created",
+    source: "orders",
+    title: "Order created",
+    description: "An order was created from an approved quote.",
+    metadata: { order_id: createdOrder.id, quote_id: verifiedQuote.id },
+  });
 
   redirectToOrders(projectId, "success", "order-created");
 }
