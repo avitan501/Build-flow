@@ -82,6 +82,18 @@ export type ProjectOrderRecord = {
   updated_at: string;
 };
 
+export type ProjectEventRecord = {
+  id: string;
+  project_id: string;
+  owner_id: string;
+  event_type: string;
+  source: string;
+  title: string;
+  description: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
 export type CreateProjectDraftInput = {
   name: string;
   address: string | null;

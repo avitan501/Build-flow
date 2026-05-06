@@ -2,13 +2,23 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { requireSignedInProfile } from "@/lib/auth";
-import type { ProjectRecord } from "@/lib/projects";
+import type { ProjectEventRecord, ProjectRecord } from "@/lib/projects";
 
 function formatProjectDate(value: string) {
   return new Date(value).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
+  });
+}
+
+function formatProjectTimelineDate(value: string) {
+  return new Date(value).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 }
 
@@ -53,6 +63,14 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
   if (error || !project) {
     notFound();
   }
+
+  const { data: timelineEvents } = await supabase
+    .from("project_events")
+    .select("id, project_id, owner_id, event_type, source, title, description, metadata, created_at")
+    .eq("project_id", projectId)
+    .eq("owner_id", user.id)
+    .order("created_at", { ascending: false })
+    .returns<ProjectEventRecord[]>();
 
   return (
     <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
@@ -122,6 +140,37 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
               ))}
             </div>
           </article>
+        </section>
+
+        <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg font-semibold">Project Timeline</h2>
+            <p className="text-sm text-slate-500">Recent read-only activity for this project.</p>
+          </div>
+
+          {timelineEvents && timelineEvents.length > 0 ? (
+            <div className="mt-5 grid gap-4">
+              {timelineEvents.map((event) => (
+                <article key={event.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900">{event.title}</h3>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">{event.source}</span>
+                        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">{event.event_type}</span>
+                      </div>
+                    </div>
+                    <div className="text-xs font-medium text-slate-500">{formatProjectTimelineDate(event.created_at)}</div>
+                  </div>
+                  {event.description ? <p className="mt-3 text-sm leading-6 text-slate-600">{event.description}</p> : null}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+              No timeline events yet
+            </div>
+          )}
         </section>
       </section>
     </main>
