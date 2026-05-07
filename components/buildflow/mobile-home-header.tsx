@@ -30,20 +30,6 @@ function ActionOrb({ href, label, tone, children, disabled }: { href: string; la
   );
 }
 
-function WorkflowPill({ number, title, subtitle, icon }: { number: string; title: string; subtitle: string; icon: ReactNode }) {
-  return (
-    <div className="relative flex min-w-0 flex-1 items-center gap-3 rounded-[18px] border border-white/12 bg-[linear-gradient(180deg,rgba(15,23,42,0.58),rgba(15,23,42,0.38))] px-3 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-sm">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/8 text-slate-100">
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-[12px] font-semibold leading-none text-white">{number}. {title}</p>
-        <p className="mt-1 truncate text-[11px] leading-none text-slate-300">{subtitle}</p>
-      </div>
-    </div>
-  );
-}
-
 export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) {
   return (
     <section className="relative overflow-hidden rounded-[34px] border border-[#1c3760] bg-[linear-gradient(180deg,#07162d_0%,#0b1d39_40%,#0d2140_100%)] text-white shadow-[0_30px_80px_rgba(2,8,23,0.45)]">
@@ -53,7 +39,7 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
         className="absolute inset-y-0 right-0 w-[58%] bg-cover bg-center"
         style={{
           backgroundImage:
-            "url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1200&q=80')",
+            "url('https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=1200&q=80')",
         }}
       />
       <div className="absolute inset-y-0 right-0 w-[58%] bg-[linear-gradient(180deg,rgba(7,22,45,0.05),rgba(7,22,45,0.28))]" />
@@ -90,15 +76,16 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
           </div>
         </div>
 
-        <div className="relative mt-6 max-w-[58%] pr-2">
-          <h1 className="text-[2.25rem] font-semibold leading-[0.98] tracking-tight text-white sm:text-[2.6rem]">
-            Start your project with confidence
+        <div className="relative mt-5 max-w-[56%] pr-2 sm:mt-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">Residential project flow</p>
+          <h1 className="mt-2 text-[2.05rem] font-semibold leading-[0.98] tracking-tight text-white sm:text-[2.45rem]">
+            Build with clarity from the first plan
           </h1>
-          <p className="mt-3 max-w-xs text-[1rem] leading-7 text-slate-200">
-            Upload plans, organize materials, review quotes, and track orders in one simple workflow.
+          <p className="mt-2.5 max-w-[15rem] text-[0.95rem] leading-6 text-slate-200">
+            One clean place to upload, review, and approve your home project.
           </p>
 
-          <div className="mt-5 space-y-3">
+          <div className="mt-4 space-y-3">
             <Link href="/start-project" className="inline-flex min-h-14 w-full max-w-[17rem] items-center justify-between gap-3 rounded-[18px] border border-[#e8c26b]/30 bg-[linear-gradient(180deg,#f1ca70_0%,#dca945_100%)] px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_16px_40px_rgba(228,184,95,0.26)] transition active:scale-[0.98]">
               <span className="flex items-center gap-3">
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-950/12">
@@ -116,27 +103,6 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
               <span>Create Account</span>
             </Link>
           </div>
-        </div>
-
-        <div className="relative mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-          <WorkflowPill
-            number="1"
-            title="Upload"
-            subtitle="Plans & documents"
-            icon={<svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V5" /><path d="m7 10 5-5 5 5" /><path d="M5 19h14" /></svg>}
-          />
-          <WorkflowPill
-            number="2"
-            title="Review"
-            subtitle="Materials & quotes"
-            icon={<svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>}
-          />
-          <WorkflowPill
-            number="3"
-            title="Approve"
-            subtitle="Orders with confidence"
-            icon={<svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 12 2 2 4-4" /><path d="M12 3 5 6v6c0 5 3.5 7.5 7 9 3.5-1.5 7-4 7-9V6l-7-3Z" /></svg>}
-          />
         </div>
       </div>
     </section>
