@@ -40,3 +40,26 @@ select,
 textarea {
   -webkit-tap-highlight-color: transparent;
 }
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter-motion {
+  animation: page-enter 220ms ease-out;
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-motion {
+    animation: none;
+  }
+}
