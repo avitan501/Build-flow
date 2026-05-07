@@ -3,93 +3,13 @@ import Link from "next/link";
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
 import { MobileBottomDock } from "@/components/buildflow/mobile-bottom-dock";
 import { MobileHomeHeader } from "@/components/buildflow/mobile-home-header";
-import { MobileSearchDrawer } from "@/components/buildflow/mobile-search-drawer";
 import { getSessionWithProfile } from "@/lib/auth";
-import type { ProjectMaterialRecord, ProjectRecord } from "@/lib/projects";
 
 const journeySteps = ["Project", "Upload", "Materials", "Quote", "Orders"];
 
 export default async function Home() {
-  const { supabase, user } = await getSessionWithProfile();
+  const { user } = await getSessionWithProfile();
   const accountHref = user ? "/dashboard" : "/login";
-
-  let projectRows: ProjectRecord[] = [];
-  let materialRows: Pick<ProjectMaterialRecord, "id" | "project_id" | "name" | "category" | "status">[] = [];
-
-  if (user) {
-    const [{ data: projectsData, error: projectsError }, { data: materialsData, error: materialsError }] = await Promise.all([
-      supabase
-        .from("projects")
-        .select("id, owner_id, name, address, status, created_at, updated_at")
-        .eq("owner_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(12)
-        .returns<ProjectRecord[]>(),
-      supabase
-        .from("project_materials")
-        .select("id, project_id, name, category, status")
-        .eq("owner_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(20)
-        .returns<Pick<ProjectMaterialRecord, "id" | "project_id" | "name" | "category" | "status">[]>(),
-    ]);
-
-    if (projectsError) {
-      throw new Error("Failed to load homepage projects.");
-    }
-
-    if (materialsError) {
-      throw new Error("Failed to load homepage materials.");
-    }
-
-    projectRows = projectsData ?? [];
-    materialRows = materialsData ?? [];
-  }
-
-  const searchItems = [
-    {
-      title: user ? "My Projects" : "Log in to view projects",
-      description: user ? "Open your project list and continue the next step." : "Sign in first to search real project records.",
-      href: user ? "/projects" : "/login",
-      badge: "Projects",
-      keywords: ["project", "job", "address", "client", "workspace"],
-    },
-    {
-      title: "Upload Plans or Photos",
-      description: "Send files, drawings, room photos, or site documents into BuildFlow.",
-      href: user ? "/upload" : "/login",
-      badge: "Upload",
-      keywords: ["upload", "photo", "plan", "drawing", "document", "file"],
-    },
-    {
-      title: user ? "Materials" : "Log in for materials",
-      description: user ? "Search your material list and open the materials review page." : "Sign in to search material items.",
-      href: user ? "/materials" : "/login",
-      badge: "Materials",
-      keywords: ["materials", "products", "supply", "list", "takeoff"],
-    },
-    {
-      title: user ? "Orders" : "Log in for orders",
-      description: "Review approvals, orders, and delivery flow.",
-      href: user ? "/orders" : "/login",
-      badge: "Orders",
-      keywords: ["orders", "delivery", "quote", "approval", "track"],
-    },
-    ...projectRows.map((project) => ({
-      title: project.name,
-      description: project.address || "Open this project workspace.",
-      href: `/projects/${project.id}`,
-      badge: "Project",
-      keywords: ["project", "address", project.status, project.name, project.address || ""],
-    })),
-    ...materialRows.map((material) => ({
-      title: material.name,
-      description: `${material.category || "Material item"} • ${material.status}`,
-      href: `/materials?projectId=${material.project_id}`,
-      badge: "Material",
-      keywords: ["material", material.name, material.category || "", material.status],
-    })),
-  ];
 
   return (
     <main className="min-h-screen overflow-x-clip bg-[#eef3f9] text-slate-900">
@@ -98,7 +18,16 @@ export default async function Home() {
       <section className="mx-auto flex min-h-screen max-w-6xl flex-col gap-5 px-4 pb-28 pt-4 sm:gap-6 sm:px-8 sm:pb-12 sm:pt-8 lg:px-10">
         <MobileHomeHeader accountHref={accountHref} />
         <div className="sm:hidden">
-          <MobileSearchDrawer items={searchItems} />
+          <Link href="/shop" className="block rounded-[28px] border border-[#25446d] bg-[#0e2341] p-5 text-white shadow-[0_18px_40px_rgba(15,23,42,0.22)] active:scale-[0.99]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Search materials</p>
+            <div className="mt-3 flex items-center gap-3 rounded-2xl bg-white px-4 py-3 text-slate-900">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <span className="text-sm text-slate-500">Search materials we supply or have</span>
+            </div>
+          </Link>
         </div>
 
         <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
@@ -180,7 +109,7 @@ export default async function Home() {
         </section>
       </section>
 
-      <MobileBottomDock accountHref={accountHref} searchItems={searchItems} />
+      <MobileBottomDock accountHref={accountHref} />
     </main>
   );
 }
