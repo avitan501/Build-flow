@@ -32,8 +32,8 @@ export function MobileSearchDrawer({ items, mode = "inline", onClose }: MobileSe
 
   const shellClass =
     mode === "floating"
-      ? "rounded-[28px] border border-white/70 bg-white/95 p-4 shadow-[0_24px_50px_rgba(15,23,42,0.2)] backdrop-blur-xl"
-      : "rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm";
+      ? "rounded-[28px] border border-[#25446d] bg-[#0e2341] p-4 text-white shadow-[0_24px_50px_rgba(15,23,42,0.34)] backdrop-blur-xl"
+      : "rounded-[28px] border border-[#25446d] bg-[#10294d] p-4 text-white shadow-[0_18px_40px_rgba(15,23,42,0.22)]";
 
   const scopeText = "Search project name, project address, and material names from your material list.";
 
@@ -41,8 +41,8 @@ export function MobileSearchDrawer({ items, mode = "inline", onClose }: MobileSe
     <div className={shellClass}>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Search BuildFlow</p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">{scopeText}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Search BuildFlow</p>
+          <p className="mt-1 text-xs leading-5 text-slate-200">{scopeText}</p>
         </div>
         {mode === "floating" ? (
           <button
@@ -52,7 +52,7 @@ export function MobileSearchDrawer({ items, mode = "inline", onClose }: MobileSe
               onClose?.();
             }}
             aria-label="Close search"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-600 active:scale-[0.98]"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/14 text-white active:scale-[0.98]"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M18 6 6 18" />
@@ -64,7 +64,7 @@ export function MobileSearchDrawer({ items, mode = "inline", onClose }: MobileSe
             type="button"
             onClick={() => setOpen((value) => !value)}
             aria-label={open ? "Collapse search" : "Open search"}
-            className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 active:scale-[0.98]"
+            className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white active:scale-[0.98]"
           >
             {open ? "Hide" : "Open"}
           </button>
@@ -73,7 +73,7 @@ export function MobileSearchDrawer({ items, mode = "inline", onClose }: MobileSe
 
       {open ? (
         <>
-          <div className="mt-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="mt-3 flex items-center gap-3 rounded-2xl border border-white/12 bg-white px-4 py-3 shadow-sm">
             <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="11" cy="11" r="7" />
               <path d="m20 20-3.5-3.5" />
@@ -87,7 +87,7 @@ export function MobileSearchDrawer({ items, mode = "inline", onClose }: MobileSe
             />
           </div>
 
-          <div className="mt-3 text-xs text-slate-500">
+          <div className="mt-3 text-xs text-slate-200">
             {normalizedQuery ? `${filteredItems.length} result${filteredItems.length === 1 ? "" : "s"}` : "Start typing to search."}
           </div>
 
@@ -101,14 +101,14 @@ export function MobileSearchDrawer({ items, mode = "inline", onClose }: MobileSe
                     setOpen(mode === "inline");
                     if (mode === "floating") onClose?.();
                   }}
-                  className="block rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 transition active:scale-[0.99]"
+                  className="block rounded-2xl border border-white/12 bg-white/12 px-4 py-3 text-sm text-white transition active:scale-[0.99] hover:bg-white/16"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="font-semibold">{item.title}</div>
-                      <div className="mt-1 text-xs leading-5 text-slate-500">{item.description}</div>
+                      <div className="mt-1 text-xs leading-5 text-slate-200">{item.description}</div>
                     </div>
-                    <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0e2341]">
                       {item.badge}
                     </span>
                   </div>
