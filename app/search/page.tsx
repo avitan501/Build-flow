@@ -1,9 +1,88 @@
 import Link from "next/link";
 
+import { SearchPanel } from "@/components/buildflow/search-panel";
 import { getSessionWithProfile } from "@/lib/auth";
+import type { ProjectRecord } from "@/lib/projects";
 
 export default async function SearchPage() {
-  const { user } = await getSessionWithProfile();
+  const { supabase, user } = await getSessionWithProfile();
+  const accountHref = user ? "/dashboard" : "/login";
+
+  let projectRows: ProjectRecord[] = [];
+
+  if (user) {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("id, owner_id, name, address, status, created_at, updated_at")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: false })
+      .returns<ProjectRecord[]>();
+
+    if (error) {
+      throw new Error("Failed to load search projects.");
+    }
+
+    projectRows = data ?? [];
+  }
+
+  const items = [
+    {
+      title: user ? "My Projects" : "Log in to view projects",
+      description: user ? "Open your project list and continue the next step." : "Sign in first to search real project records.",
+      href: user ? "/projects" : "/login",
+      tone: "navy" as const,
+      badge: "Projects",
+      keywords: ["project", "job", "address", "client", "workspace"],
+    },
+    {
+      title: "Upload Plans or Photos",
+      description: "Send files, drawings, room photos, or site documents into BuildFlow.",
+      href: user ? "/upload" : "/login",
+      tone: "emerald" as const,
+      badge: "Upload",
+      keywords: ["upload", "photo", "plan", "drawing", "document", "file"],
+    },
+    {
+      title: user ? "Materials" : "Log in for materials",
+      description: "Review material lists prepared for your project flow.",
+      href: user ? "/materials" : "/login",
+      tone: "slate" as const,
+      badge: "Materials",
+      keywords: ["materials", "products", "supply", "list", "takeoff"],
+    },
+    {
+      title: user ? "Quotes" : "Log in for quotes",
+      description: "Move from materials into quote review before orders.",
+      href: user ? "/quotes" : "/login",
+      tone: "slate" as const,
+      badge: "Quote",
+      keywords: ["quote", "pricing", "estimate", "review"],
+    },
+    {
+      title: user ? "Orders" : "Log in for orders",
+      description: "Review approvals, order flow, and follow-up status.",
+      href: user ? "/orders" : "/login",
+      tone: "slate" as const,
+      badge: "Orders",
+      keywords: ["orders", "approve", "approval", "delivery", "track"],
+    },
+    {
+      title: user ? "Dashboard" : "Client account",
+      description: user ? "Return to your signed-in client dashboard." : "Open login and continue into your account.",
+      href: accountHref,
+      tone: "navy" as const,
+      badge: "Account",
+      keywords: ["dashboard", "account", "login", "profile", "home"],
+    },
+    ...projectRows.map((project) => ({
+      title: project.name,
+      description: project.address || "Open this project workspace.",
+      href: `/projects/${project.id}`,
+      tone: "emerald" as const,
+      badge: "Project",
+      keywords: ["project", "address", project.status, project.name, project.address || ""],
+    })),
+  ];
 
   return (
     <main className="min-h-screen bg-[#eef3f9] px-4 py-6 text-slate-900 sm:px-8 sm:py-10">
@@ -11,27 +90,19 @@ export default async function SearchPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">BuildFlow Search</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Search your project flow</h1>
         <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-          Search is now active. Start from projects, uploads, materials, quotes, and orders from one place.
+          Search now works as a real entry point. Type to find projects, uploads, materials, quotes, orders, and account pages.
         </p>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <Link href={user ? "/projects" : "/login"} className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#0e2341] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#13315a]">
-            {user ? "Open Projects" : "Log in to Search Projects"}
+          <Link href={accountHref} className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#0e2341] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#13315a]">
+            {user ? "Open Dashboard" : "Log in to Continue"}
           </Link>
-          <Link href="/upload" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-white">
-            Upload Plans or Photos
+          <Link href={user ? "/projects" : "/signup"} className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-white">
+            {user ? "Open Projects" : "Create Account"}
           </Link>
         </div>
 
-        <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">What you can search next</p>
-          <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
-            <li>• Project names and addresses</li>
-            <li>• Uploaded plans and site photos</li>
-            <li>• Materials and quote steps</li>
-            <li>• Orders and follow-up status</li>
-          </ul>
-        </div>
+        <SearchPanel items={items} />
       </section>
     </main>
   );
