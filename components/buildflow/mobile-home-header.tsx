@@ -34,7 +34,7 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
   return (
     <section className="relative overflow-hidden rounded-[34px] border border-[#1c3760] bg-[linear-gradient(180deg,#07162d_0%,#0b1d39_40%,#0d2140_100%)] text-white shadow-[0_30px_80px_rgba(2,8,23,0.45)]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_28%),radial-gradient(circle_at_80%_12%,rgba(244,114,182,0.16),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent)]" />
-      <div className="absolute left-0 top-0 h-full w-full bg-[linear-gradient(90deg,rgba(7,22,45,0.96)_0%,rgba(7,22,45,0.88)_34%,rgba(7,22,45,0.34)_64%,rgba(7,22,45,0.15)_100%)]" />
+      <div className="absolute left-0 top-0 h-full w-full bg-[linear-gradient(90deg,rgba(7,22,45,0.98)_0%,rgba(7,22,45,0.94)_38%,rgba(7,22,45,0.62)_58%,rgba(7,22,45,0.22)_100%)]" />
       <div
         className="absolute inset-y-0 right-0 w-[58%] bg-cover bg-center"
         style={{
@@ -42,7 +42,8 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
             "url('https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=1200&q=80')",
         }}
       />
-      <div className="absolute inset-y-0 right-0 w-[58%] bg-[linear-gradient(180deg,rgba(7,22,45,0.05),rgba(7,22,45,0.28))]" />
+      <div className="absolute inset-y-0 right-0 w-[58%] bg-[linear-gradient(180deg,rgba(7,22,45,0.08),rgba(7,22,45,0.3))]" />
+      <div className="absolute left-0 top-[4.75rem] h-[14.5rem] w-[62%] bg-[radial-gradient(circle_at_left,rgba(7,22,45,0.62),rgba(7,22,45,0.16)_72%,transparent)]" />
       <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,rgba(7,22,45,0.55))]" />
 
       <div className="relative px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
@@ -76,12 +77,12 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
           </div>
         </div>
 
-        <div className="relative mt-5 max-w-[56%] pr-2 sm:mt-6">
+        <div className="relative mt-5 max-w-[52%] rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(7,22,45,0.38),rgba(7,22,45,0.18))] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-[2px] sm:mt-6 sm:px-4 sm:py-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">Residential project flow</p>
-          <h1 className="mt-2 text-[2.05rem] font-semibold leading-[0.98] tracking-tight text-white sm:text-[2.45rem]">
+          <h1 className="mt-2 text-[2rem] font-semibold leading-[0.98] tracking-tight text-white drop-shadow-[0_8px_24px_rgba(2,8,23,0.4)] sm:text-[2.35rem]">
             Build with clarity from the first plan
           </h1>
-          <p className="mt-2.5 max-w-[15rem] text-[0.95rem] leading-6 text-slate-200">
+          <p className="mt-2.5 max-w-[14rem] text-[0.92rem] leading-6 text-slate-100/92 drop-shadow-[0_6px_18px_rgba(2,8,23,0.35)]">
             One clean place to upload, review, and approve your home project.
           </p>
 
