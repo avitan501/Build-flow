@@ -17,15 +17,31 @@ function shouldShowDock(pathname: string) {
   return pathname.startsWith("/projects/") || DOCK_PATHS.has(pathname);
 }
 
-function DockItem({ href, label, children }: { href: string; label: string; children: ReactNode }) {
+function isActivePath(pathname: string, href: string) {
+  return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function DockItem({ href, label, active, children }: { href: string; label: string; active: boolean; children: ReactNode }) {
   return (
     <Link
       href={href}
       aria-label={label}
-      className="group flex min-w-[56px] flex-1 flex-col items-center justify-center rounded-3xl transition-transform duration-150 ease-out active:scale-[0.96]"
+      className={`group flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1 transition-all duration-150 ease-out active:scale-[0.96] ${
+        active ? "text-slate-900" : "text-slate-500"
+      }`}
     >
-      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.08)] transition-all duration-150 ease-out group-hover:bg-slate-200/90 group-active:scale-[1.06] group-active:bg-slate-200 group-active:shadow-[0_10px_20px_rgba(15,23,42,0.16)]">{children}</span>
-      <span className="mt-1 text-[11px] font-medium text-slate-600 transition-transform duration-150 ease-out group-active:scale-[1.03]">{label}</span>
+      <span
+        className={`flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-150 ease-out group-active:scale-[1.06] ${
+          active
+            ? "border-slate-200 bg-slate-100/95 text-slate-900 shadow-[0_8px_18px_rgba(37,99,235,0.14)]"
+            : "border-transparent bg-white/70 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.06)] group-hover:bg-slate-100/90 group-active:bg-slate-100 group-active:shadow-[0_8px_18px_rgba(15,23,42,0.12)]"
+        }`}
+      >
+        {children}
+      </span>
+      <span className={`mt-1 text-[10px] font-medium leading-none transition-transform duration-150 ease-out group-active:scale-[1.03] ${active ? "text-slate-800" : "text-slate-500"}`}>
+        {label}
+      </span>
     </Link>
   );
 }
@@ -38,42 +54,48 @@ export function MobileBottomDock({ accountHref, projectsHref, uploadHref, search
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-50 px-4 sm:hidden">
-      <nav aria-label="Mobile homepage" className="pointer-events-auto mx-auto flex max-w-md items-center justify-between gap-1 rounded-full border border-white/70 bg-white/90 px-3 py-2 shadow-[0_20px_45px_rgba(15,23,42,0.18)] backdrop-blur-xl">
-        <DockItem href="/" label="Home">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M3 10.5 12 3l9 7.5" />
-            <path d="M5 9.5V21h14V9.5" />
-          </svg>
-        </DockItem>
-        <DockItem href={projectsHref} label="Projects">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="4" width="7" height="7" rx="1.5" />
-            <rect x="14" y="4" width="7" height="7" rx="1.5" />
-            <rect x="3" y="13" width="7" height="7" rx="1.5" />
-            <rect x="14" y="13" width="7" height="7" rx="1.5" />
-          </svg>
-        </DockItem>
-        <DockItem href={uploadHref} label="Upload">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 16V5" />
-            <path d="m7 10 5-5 5 5" />
-            <path d="M5 19h14" />
-          </svg>
-        </DockItem>
-        <DockItem href={accountHref} label="Account">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M20 21a8 8 0 0 0-16 0" />
-            <circle cx="12" cy="8" r="4" />
-          </svg>
-        </DockItem>
-        <DockItem href={searchHref} label="Search">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
-        </DockItem>
-      </nav>
-    </div>
+    <>
+      <div aria-hidden="true" className="h-24 sm:hidden" />
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-50 px-3 sm:hidden">
+        <nav
+          aria-label="Mobile homepage"
+          className="pointer-events-auto mx-auto flex max-w-[22rem] items-center justify-between gap-0.5 rounded-full border border-slate-200/80 bg-white/90 px-2 py-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.12)] backdrop-blur-xl"
+        >
+          <DockItem href="/" label="Home" active={isActivePath(pathname, "/")}>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 10.5 12 3l9 7.5" />
+              <path d="M5 9.5V21h14V9.5" />
+            </svg>
+          </DockItem>
+          <DockItem href={projectsHref} label="Projects" active={isActivePath(pathname, "/projects")}>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="7" height="7" rx="1.5" />
+              <rect x="14" y="4" width="7" height="7" rx="1.5" />
+              <rect x="3" y="13" width="7" height="7" rx="1.5" />
+              <rect x="14" y="13" width="7" height="7" rx="1.5" />
+            </svg>
+          </DockItem>
+          <DockItem href={uploadHref} label="Upload" active={isActivePath(pathname, "/upload")}>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 16V5" />
+              <path d="m7 10 5-5 5 5" />
+              <path d="M5 19h14" />
+            </svg>
+          </DockItem>
+          <DockItem href={accountHref} label="Account" active={isActivePath(pathname, "/dashboard")}>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M20 21a8 8 0 0 0-16 0" />
+              <circle cx="12" cy="8" r="4" />
+            </svg>
+          </DockItem>
+          <DockItem href={searchHref} label="Search" active={isActivePath(pathname, "/shop") || isActivePath(pathname, "/materials") || isActivePath(pathname, "/quotes") || isActivePath(pathname, "/orders")}>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+          </DockItem>
+        </nav>
+      </div>
+    </>
   );
 }
