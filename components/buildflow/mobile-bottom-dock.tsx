@@ -33,8 +33,8 @@ function DockItem({ href, label, active, children }: { href: string; label: stri
       <span
         className={`flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-150 ease-out group-active:scale-[1.06] ${
           active
-            ? "border-slate-200 bg-slate-100/95 text-slate-900 shadow-[0_8px_18px_rgba(37,99,235,0.14)]"
-            : "border-transparent bg-white/70 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.06)] group-hover:bg-slate-100/90 group-active:bg-slate-100 group-active:shadow-[0_8px_18px_rgba(15,23,42,0.12)]"
+            ? "border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,245,249,0.96))] text-slate-900 shadow-[0_10px_20px_rgba(59,130,246,0.14)] ring-4 ring-sky-100/60"
+            : "border-transparent bg-white/75 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.06)] group-hover:bg-slate-100/90 group-active:bg-slate-100 group-active:shadow-[0_8px_18px_rgba(15,23,42,0.12)]"
         }`}
       >
         {children}
@@ -59,7 +59,7 @@ export function MobileBottomDock({ accountHref, projectsHref, uploadHref, search
       <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-50 px-3 sm:hidden">
         <nav
           aria-label="Mobile homepage"
-          className="pointer-events-auto mx-auto flex max-w-[22rem] items-center justify-between gap-0.5 rounded-full border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(248,250,252,0.9))] px-2 py-1.5 shadow-[0_14px_32px_rgba(15,23,42,0.14)] backdrop-blur-xl"
+          className="pointer-events-auto mx-auto flex max-w-[22rem] items-center justify-between gap-0.5 rounded-full border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] px-2 py-1.5 shadow-[0_18px_36px_rgba(15,23,42,0.14)] backdrop-blur-xl"
         >
           <DockItem href="/" label="Home" active={isActivePath(pathname, "/")}>
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
