@@ -143,30 +143,30 @@ export default async function Home() {
   };
 
   return (
-    <main className="min-h-screen overflow-x-clip bg-[linear-gradient(180deg,#08152b_0%,#0a1932_100%)] text-white">
+    <main className="min-h-screen overflow-x-clip bg-[linear-gradient(180deg,#f4faff_0%,#edf6ff_48%,#ffffff_100%)] text-slate-900">
       <RecoveryLinkHandler />
 
       <section className="mx-auto flex min-h-screen max-w-4xl flex-col gap-5 px-3 pb-28 pt-3 sm:gap-6 sm:px-8 sm:pb-12 sm:pt-8">
         <MobileHomeHeader uploadHref={uploadHref} aiHref="#" />
 
-        <section className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,33,63,0.98),rgba(10,24,46,0.98))] px-4 py-5 shadow-[0_24px_58px_rgba(2,8,23,0.28)] sm:px-6 sm:py-6">
+        <section className="rounded-[30px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(235,245,255,0.92))] px-4 py-5 shadow-[0_24px_58px_rgba(148,163,184,0.14)] sm:px-6 sm:py-6">
           <div className="flex items-center gap-2">
-            <h2 className="text-[1.65rem] font-semibold tracking-tight text-white">How BuildFlow Works</h2>
+            <h2 className="text-[1.65rem] font-semibold tracking-tight text-slate-950">How BuildFlow Works</h2>
             <span className="h-2 w-2 rounded-full bg-sky-400" />
           </div>
 
           <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
             {flowSteps.map((step, index) => (
-              <div key={step.number} className="relative text-center text-white">
-                {index < flowSteps.length - 1 ? <div className="pointer-events-none absolute left-[60%] top-8 hidden h-px w-[80%] border-t border-dashed border-white/25 lg:block" /> : null}
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <div key={step.number} className="relative text-center text-slate-900">
+                {index < flowSteps.length - 1 ? <div className="pointer-events-none absolute left-[60%] top-8 hidden h-px w-[80%] border-t border-dashed border-sky-200 lg:block" /> : null}
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(239,246,255,0.9))] text-sky-700 shadow-[0_12px_26px_rgba(148,163,184,0.14)]">
                   {step.icon}
                 </div>
                 <div className="mx-auto -mt-3 flex h-6 w-6 items-center justify-center rounded-full bg-[linear-gradient(180deg,#f2c86a,#dca445)] text-[11px] font-bold text-slate-950 shadow-[0_8px_18px_rgba(220,164,69,0.26)]">
                   {step.number}
                 </div>
                 <h3 className="mt-3 text-lg font-semibold leading-tight">{step.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-300">{step.text}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{step.text}</p>
               </div>
             ))}
           </div>
@@ -186,25 +186,25 @@ export default async function Home() {
           ))}
         </section>
 
-        <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#112342] shadow-[0_24px_52px_rgba(2,8,23,0.28)]">
+        <section className="relative overflow-hidden rounded-[28px] border border-sky-100/90 bg-[linear-gradient(180deg,#f8fbff_0%,#eaf4ff_100%)] shadow-[0_24px_52px_rgba(148,163,184,0.14)]">
           <div className="absolute inset-0 bg-cover bg-center opacity-90" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1517705008128-361805f42e86?auto=format&fit=crop&w=1400&q=80')" }} />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(10,23,45,0.96)_0%,rgba(10,23,45,0.82)_48%,rgba(10,23,45,0.45)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(248,251,255,0.96)_0%,rgba(234,244,255,0.88)_48%,rgba(234,244,255,0.38)_100%)]" />
           <div className="relative px-4 py-5 sm:px-6 sm:py-6">
             <div className="flex items-center gap-2">
-              <h3 className="text-[1.6rem] font-semibold tracking-tight text-white">Search Materials</h3>
+              <h3 className="text-[1.6rem] font-semibold tracking-tight text-slate-950">Search Materials</h3>
               <span className="h-2 w-2 rounded-full bg-sky-400" />
             </div>
-            <p className="mt-2 text-sm leading-6 text-slate-200">Find the right materials for your project</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Find the right materials for your project</p>
 
-            <div className="mt-4 flex min-h-14 items-center gap-3 rounded-[18px] border border-white/14 bg-[linear-gradient(180deg,rgba(255,255,255,0.2),rgba(255,255,255,0.12))] px-4 text-white shadow-[0_16px_34px_rgba(2,8,23,0.25)] backdrop-blur-md">
-              <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-300" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <div className="mt-4 flex min-h-14 items-center gap-3 rounded-[18px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,246,255,0.92))] px-4 text-slate-900 shadow-[0_16px_34px_rgba(148,163,184,0.12)] backdrop-blur-md">
+              <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="11" cy="11" r="7" />
                 <path d="m20 20-3.5-3.5" />
               </svg>
-              <span className="text-sm text-slate-200/90">Search materials, categories, or brands...</span>
+              <span className="text-sm text-slate-500">Search materials, categories, or brands...</span>
             </div>
 
-            <Link href={shopHref} className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-slate-100 underline underline-offset-4 active:scale-[0.99]">
+            <Link href={shopHref} className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-sky-700 underline underline-offset-4 active:scale-[0.99]">
               Open search after login
             </Link>
           </div>
