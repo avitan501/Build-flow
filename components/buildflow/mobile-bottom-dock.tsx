@@ -5,21 +5,11 @@ type MobileBottomDockProps = {
   accountHref: string;
 };
 
-function DockItem({ href, label, disabled = false, children }: { href: string; label: string; disabled?: boolean; children: ReactNode }) {
-  const content = (
-    <>
-      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700">{children}</span>
-      <span className="mt-1 text-[11px] font-medium text-slate-600">{label}</span>
-    </>
-  );
-
-  if (disabled) {
-    return <span aria-label={label} className="flex min-w-[56px] flex-1 cursor-not-allowed flex-col items-center justify-center opacity-45">{content}</span>;
-  }
-
+function DockItem({ href, label, children }: { href: string; label: string; children: ReactNode }) {
   return (
     <Link href={href} aria-label={label} className="flex min-w-[56px] flex-1 flex-col items-center justify-center">
-      {content}
+      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700">{children}</span>
+      <span className="mt-1 text-[11px] font-medium text-slate-600">{label}</span>
     </Link>
   );
 }
@@ -55,7 +45,7 @@ export function MobileBottomDock({ accountHref }: MobileBottomDockProps) {
             <circle cx="12" cy="8" r="4" />
           </svg>
         </DockItem>
-        <DockItem href="/search" label="Search" disabled>
+        <DockItem href="/search" label="Search">
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-3.5-3.5" />

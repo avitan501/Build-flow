@@ -5,16 +5,8 @@ type MobileHomeHeaderProps = {
   accountHref: string;
 };
 
-function IconButton({ href, label, disabled = false, children }: { href: string; label: string; disabled?: boolean; children: ReactNode }) {
+function IconButton({ href, label, children }: { href: string; label: string; children: ReactNode }) {
   const className = "inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white shadow-sm backdrop-blur transition hover:bg-white/15";
-
-  if (disabled) {
-    return (
-      <span aria-label={label} className={`${className} cursor-not-allowed opacity-60`}>
-        {children}
-      </span>
-    );
-  }
 
   return (
     <Link href={href} aria-label={label} className={className}>
@@ -45,7 +37,7 @@ export function MobileHomeHeader({ accountHref }: MobileHomeHeaderProps) {
               <path d="M5 19h14" />
             </svg>
           </IconButton>
-          <IconButton href="/ai" label="Ask BuildFlow AI" disabled>
+          <IconButton href="/ai" label="Ask BuildFlow AI">
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 3v3" />
               <path d="M12 18v3" />
