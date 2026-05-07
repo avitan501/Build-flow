@@ -87,11 +87,11 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
         </div>
       </div>
 
-      <div className="relative mt-5 overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.07))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_18px_40px_rgba(8,23,47,0.16)] backdrop-blur-md">
+      <div className="relative mt-5 overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.07))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_18px_40px_rgba(8,23,47,0.16)] backdrop-blur-md sm:p-5">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
         <div className="absolute -right-8 bottom-0 h-28 w-28 rounded-full bg-sky-300/10 blur-3xl" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="max-w-md">
+          <div className="max-w-md sm:pr-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">Start here</p>
             <h1 className="mt-2 text-[2rem] font-semibold leading-[1.04] tracking-tight text-white">Start your project with confidence</h1>
             <p className="mt-3 text-sm leading-6 text-slate-200">
@@ -122,11 +122,13 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
         </div>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-          <Link href="/start-project" className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.14)] transition active:scale-[0.99] hover:bg-slate-100">
-            Log in to Start Project
+          <Link href="/start-project" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_12px_28px_rgba(255,255,255,0.14)] transition active:scale-[0.99] hover:bg-slate-100">
+            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="4" /><path d="M10 6v8" /><path d="M7 9.5 10 6l3 3.5" /></svg>
+            <span>Log in to Start Project</span>
           </Link>
-          <Link href="/signup" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.99] hover:bg-white/15">
-            Create Account
+          <Link href="/signup" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.99] hover:bg-white/15">
+            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 4v12" /><path d="M4 10h12" /></svg>
+            <span>Create Account</span>
           </Link>
         </div>
       </div>
