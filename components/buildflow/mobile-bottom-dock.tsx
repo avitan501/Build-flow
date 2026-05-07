@@ -12,9 +12,13 @@ type MobileBottomDockProps = {
 
 function DockItem({ href, label, children }: { href: string; label: string; children: ReactNode }) {
   return (
-    <Link href={href} aria-label={label} className="flex min-w-[56px] flex-1 flex-col items-center justify-center active:scale-[0.98]">
-      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-700">{children}</span>
-      <span className="mt-1 text-[11px] font-medium text-slate-600">{label}</span>
+    <Link
+      href={href}
+      aria-label={label}
+      className="group flex min-w-[56px] flex-1 flex-col items-center justify-center rounded-3xl transition-transform duration-150 ease-out active:scale-[0.96]"
+    >
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.08)] transition-all duration-150 ease-out group-hover:bg-slate-200/90 group-active:scale-[1.06] group-active:bg-slate-200 group-active:shadow-[0_10px_20px_rgba(15,23,42,0.16)]">{children}</span>
+      <span className="mt-1 text-[11px] font-medium text-slate-600 transition-transform duration-150 ease-out group-active:scale-[1.03]">{label}</span>
     </Link>
   );
 }
