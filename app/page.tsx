@@ -4,12 +4,91 @@ import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
 import { MobileBottomDock } from "@/components/buildflow/mobile-bottom-dock";
 import { MobileHomeHeader } from "@/components/buildflow/mobile-home-header";
 import { getSessionWithProfile } from "@/lib/auth";
+import type { ProjectMaterialRecord, ProjectRecord } from "@/lib/projects";
 
 const journeySteps = ["Project", "Upload", "Materials", "Quote", "Orders"];
 
 export default async function Home() {
-  const { user } = await getSessionWithProfile();
+  const { supabase, user } = await getSessionWithProfile();
   const accountHref = user ? "/dashboard" : "/login";
+
+  let projectRows: ProjectRecord[] = [];
+  let materialRows: Pick<ProjectMaterialRecord, "id" | "project_id" | "name" | "category" | "status">[] = [];
+
+  if (user) {
+    const [{ data: projectsData, error: projectsError }, { data: materialsData, error: materialsError }] = await Promise.all([
+      supabase
+        .from("projects")
+        .select("id, owner_id, name, address, status, created_at, updated_at")
+        .eq("owner_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(12)
+        .returns<ProjectRecord[]>(),
+      supabase
+        .from("project_materials")
+        .select("id, project_id, name, category, status")
+        .eq("owner_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(20)
+        .returns<Pick<ProjectMaterialRecord, "id" | "project_id" | "name" | "category" | "status">[]>(),
+    ]);
+
+    if (projectsError) {
+      throw new Error("Failed to load homepage projects.");
+    }
+
+    if (materialsError) {
+      throw new Error("Failed to load homepage materials.");
+    }
+
+    projectRows = projectsData ?? [];
+    materialRows = materialsData ?? [];
+  }
+
+  const searchItems = [
+    {
+      title: user ? "My Projects" : "Log in to view projects",
+      description: user ? "Open your project list and continue the next step." : "Sign in first to search real project records.",
+      href: user ? "/projects" : "/login",
+      badge: "Projects",
+      keywords: ["project", "job", "address", "client", "workspace"],
+    },
+    {
+      title: "Upload Plans or Photos",
+      description: "Send files, drawings, room photos, or site documents into BuildFlow.",
+      href: user ? "/upload" : "/login",
+      badge: "Upload",
+      keywords: ["upload", "photo", "plan", "drawing", "document", "file"],
+    },
+    {
+      title: user ? "Materials" : "Log in for materials",
+      description: user ? "Search your material list and open the materials review page." : "Sign in to search material items.",
+      href: user ? "/materials" : "/login",
+      badge: "Materials",
+      keywords: ["materials", "products", "supply", "list", "takeoff"],
+    },
+    {
+      title: user ? "Orders" : "Log in for orders",
+      description: "Review approvals, orders, and delivery flow.",
+      href: user ? "/orders" : "/login",
+      badge: "Orders",
+      keywords: ["orders", "delivery", "quote", "approval", "track"],
+    },
+    ...projectRows.map((project) => ({
+      title: project.name,
+      description: project.address || "Open this project workspace.",
+      href: `/projects/${project.id}`,
+      badge: "Project",
+      keywords: ["project", "address", project.status, project.name, project.address || ""],
+    })),
+    ...materialRows.map((material) => ({
+      title: material.name,
+      description: `${material.category || "Material item"} • ${material.status}`,
+      href: `/materials?projectId=${material.project_id}`,
+      badge: "Material",
+      keywords: ["material", material.name, material.category || "", material.status],
+    })),
+  ];
 
   return (
     <main className="min-h-screen bg-[#eef3f9] text-slate-900">
@@ -97,7 +176,7 @@ export default async function Home() {
         </section>
       </section>
 
-      <MobileBottomDock accountHref={accountHref} />
+      <MobileBottomDock accountHref={accountHref} searchItems={searchItems} />
     </main>
   );
 }
