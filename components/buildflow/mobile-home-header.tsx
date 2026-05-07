@@ -6,7 +6,7 @@ type MobileHomeHeaderProps = {
 };
 
 function IconButton({ href, label, children }: { href: string; label: string; children: ReactNode }) {
-  const className = "inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white shadow-sm backdrop-blur transition hover:bg-white/15";
+  const className = "inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white shadow-sm backdrop-blur transition active:scale-[0.98] hover:bg-white/15";
 
   return (
     <Link href={href} aria-label={label} className={className}>
@@ -60,13 +60,13 @@ export function MobileHomeHeader({ accountHref }: MobileHomeHeaderProps) {
           Log in first, then move through your BuildFlow project journey with one clear next step at a time.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Link href="/login" className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
+          <Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition active:scale-[0.99] hover:bg-slate-100">
             Log in to Start Project
           </Link>
-          <Link href="/signup" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/15">
+          <Link href="/signup" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.99] hover:bg-white/15">
             Create Account
           </Link>
-          <Link href={accountHref} className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/15 bg-transparent px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+          <Link href={accountHref} className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-white/15 bg-transparent px-4 py-3 text-sm font-semibold text-slate-200 transition active:scale-[0.99] hover:bg-white/10">
             {accountHref === "/dashboard" ? "Open Dashboard" : "Client Account"}
           </Link>
         </div>
