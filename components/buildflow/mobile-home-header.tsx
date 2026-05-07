@@ -17,15 +17,15 @@ function ActionOrb({ href, label, tone, children, disabled }: { href: string; la
       href={href}
       aria-label={label}
       aria-disabled={disabled}
-      className={`group inline-flex flex-col items-center gap-2 text-white ${disabled ? "cursor-default" : ""}`}
+      className={`group inline-flex flex-col items-center gap-1.5 text-white ${disabled ? "cursor-default" : ""}`}
     >
-      <span className={`relative flex h-[4.6rem] w-[4.6rem] items-center justify-center rounded-full p-[1.5px] transition duration-150 active:scale-[0.96] ${tone === "ai" ? "shadow-[0_0_22px_rgba(96,165,250,0.2)]" : ""}`}>
+      <span className={`relative flex h-[3.35rem] w-[3.35rem] items-center justify-center rounded-full p-[1.25px] transition duration-150 active:scale-[0.96] ${tone === "ai" ? "shadow-[0_0_18px_rgba(96,165,250,0.16)]" : ""}`}>
         <span className={`absolute inset-0 rounded-full ${toneClass}`} />
         <span className={`relative flex h-full w-full items-center justify-center rounded-full ${tone === "upload" ? "border border-white/22 bg-[linear-gradient(180deg,rgba(8,21,43,0.92),rgba(8,21,43,0.82))]" : "bg-[linear-gradient(180deg,rgba(8,21,43,0.9),rgba(8,21,43,0.76))]"}`}>
           {children}
         </span>
       </span>
-      <span className="text-[11px] font-medium tracking-[-0.01em] text-white/92 drop-shadow-[0_2px_8px_rgba(2,8,23,0.5)]">{label}</span>
+      <span className="text-[10px] font-medium tracking-[-0.01em] text-white/92 drop-shadow-[0_2px_8px_rgba(2,8,23,0.5)]">{label}</span>
     </Link>
   );
 }
@@ -75,7 +75,7 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
 
           <div className="flex items-start gap-3">
             <ActionOrb href={uploadHref} label="Upload" tone="upload">
-              <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth="1.95" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.95" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 16V5" />
                 <path d="m7 10 5-5 5 5" />
                 <path d="M5 19h14" />
@@ -83,8 +83,8 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
             </ActionOrb>
             <ActionOrb href={aiHref} label="AI Assistant" tone="ai" disabled>
               <div className="relative flex items-center text-white">
-                <span className="text-[1.9rem] font-semibold tracking-[-0.04em]">AI</span>
-                <span className="absolute -right-3 -top-2 text-[0.9rem]">✦</span>
+                <span className="text-[1.35rem] font-semibold tracking-[-0.04em]">AI</span>
+                <span className="absolute -right-2 -top-1.5 text-[0.7rem]">✦</span>
               </div>
             </ActionOrb>
           </div>
