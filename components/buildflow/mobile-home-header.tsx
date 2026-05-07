@@ -33,13 +33,13 @@ function MiniPill({ label }: { label: string }) {
 
 function BlueprintVisual() {
   return (
-    <div className="relative hidden min-[420px]:block h-40 w-36 shrink-0 overflow-hidden rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.1),rgba(255,255,255,0.04))] shadow-[0_16px_34px_rgba(8,23,47,0.18),inset_0_1px_0_rgba(255,255,255,0.08)]">
+    <div className="relative h-44 w-full overflow-hidden rounded-[30px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.05))] shadow-[0_16px_34px_rgba(8,23,47,0.18),inset_0_1px_0_rgba(255,255,255,0.08)] sm:h-40 sm:w-44 sm:shrink-0">
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px)] bg-[size:18px_18px] opacity-40" />
       <div className="absolute left-4 top-4 right-4 bottom-4 rounded-[22px] border border-sky-200/25" />
-      <div className="absolute left-7 top-8 h-10 w-14 rounded-xl border border-white/28" />
-      <div className="absolute right-7 top-8 h-6 w-10 rounded-lg border border-white/22" />
-      <div className="absolute left-7 bottom-8 h-12 w-20 rounded-2xl border border-white/24" />
-      <div className="absolute right-8 bottom-8 flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(145deg,rgba(94,234,212,0.22),rgba(59,130,246,0.18))] text-white shadow-[0_10px_24px_rgba(45,212,191,0.16)]">
+      <div className="absolute left-6 top-7 h-11 w-16 rounded-xl border border-white/28" />
+      <div className="absolute right-6 top-8 h-7 w-12 rounded-lg border border-white/22" />
+      <div className="absolute left-7 bottom-8 h-12 w-24 rounded-2xl border border-white/24" />
+      <div className="absolute right-7 bottom-7 flex h-13 w-13 items-center justify-center rounded-[22px] bg-[linear-gradient(145deg,rgba(94,234,212,0.24),rgba(59,130,246,0.22))] text-white shadow-[0_12px_28px_rgba(45,212,191,0.18)]">
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M4 19h16" />
           <path d="M7 19v-6h10v6" />
@@ -47,6 +47,8 @@ function BlueprintVisual() {
         </svg>
       </div>
       <div className="absolute left-1/2 top-[52%] h-px w-16 -translate-x-1/2 bg-gradient-to-r from-transparent via-sky-200/70 to-transparent" />
+      <div className="absolute bottom-4 left-4 rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[10px] font-medium text-slate-200">Plans</div>
+      <div className="absolute top-4 right-4 rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[10px] font-medium text-slate-200">Approve</div>
     </div>
   );
 }
@@ -88,10 +90,10 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
       <div className="relative mt-5 overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.11),rgba(255,255,255,0.07))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_18px_40px_rgba(8,23,47,0.16)] backdrop-blur-md">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
         <div className="absolute -right-8 bottom-0 h-28 w-28 rounded-full bg-sky-300/10 blur-3xl" />
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-md">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">Start here</p>
-            <h1 className="mt-2 text-[2rem] font-semibold leading-[1.08] tracking-tight text-white">Start your project with confidence</h1>
+            <h1 className="mt-2 text-[2rem] font-semibold leading-[1.04] tracking-tight text-white">Start your project with confidence</h1>
             <p className="mt-3 text-sm leading-6 text-slate-200">
               Upload plans, organize materials, review quotes, and track orders in one simple workflow.
             </p>
@@ -104,7 +106,7 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
           <BlueprintVisual />
         </div>
 
-        <div className="mt-5 grid grid-cols-3 gap-2 rounded-[22px] bg-[linear-gradient(180deg,rgba(8,23,47,0.5),rgba(8,23,47,0.34))] p-2 text-center text-[11px] text-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+        <div className="mt-5 grid grid-cols-3 gap-2 rounded-[22px] bg-[linear-gradient(180deg,rgba(8,23,47,0.52),rgba(8,23,47,0.34))] p-2 text-center text-[11px] text-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
           <div className="rounded-[18px] border border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.1),rgba(255,255,255,0.05))] px-2 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
             <p className="font-semibold text-white">Upload</p>
             <p className="mt-1 text-[10px] text-slate-300">Plans & photos</p>

@@ -12,6 +12,13 @@ const flowSteps = [
     badge: "bg-emerald-500",
     text: "Open the job and keep the basics in one place.",
     accent: "bg-emerald-300/50",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 19h16" />
+        <path d="M5 19V9l7-4 7 4v10" />
+        <path d="M9 19v-5h6v5" />
+      </svg>
+    ),
   },
   {
     title: "Upload Plans",
@@ -20,6 +27,13 @@ const flowSteps = [
     badge: "bg-sky-500",
     text: "Send photos, drawings, and notes from the field.",
     accent: "bg-sky-300/50",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 16V5" />
+        <path d="m7 10 5-5 5 5" />
+        <path d="M5 19h14" />
+      </svg>
+    ),
   },
   {
     title: "Review Materials & Quote",
@@ -28,6 +42,13 @@ const flowSteps = [
     badge: "bg-violet-500",
     text: "See what is needed before anything moves forward.",
     accent: "bg-violet-300/50",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M6 7h12" />
+        <path d="M6 12h12" />
+        <path d="M6 17h8" />
+      </svg>
+    ),
   },
   {
     title: "Approve Order",
@@ -36,6 +57,12 @@ const flowSteps = [
     badge: "bg-amber-500",
     text: "Stay in control before any order is confirmed.",
     accent: "bg-amber-300/50",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="m9 12 2 2 4-4" />
+        <circle cx="12" cy="12" r="8" />
+      </svg>
+    ),
   },
 ];
 
@@ -57,7 +84,7 @@ export default async function Home() {
         <div className="pointer-events-none absolute right-0 top-28 -z-10 h-32 w-32 rounded-full bg-violet-200/20 blur-3xl" />
         <MobileHomeHeader uploadHref={uploadHref} aiHref="#" />
 
-        <section className="relative overflow-hidden rounded-[32px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.86),rgba(255,255,255,0.78))] p-5 shadow-[0_18px_54px_rgba(148,163,184,0.16)] backdrop-blur-sm sm:p-6">
+        <section className="relative overflow-hidden rounded-[34px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(255,255,255,0.8))] p-5 shadow-[0_20px_60px_rgba(148,163,184,0.16)] backdrop-blur-sm sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">How BuildFlow works</p>
@@ -69,9 +96,14 @@ export default async function Home() {
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-[radial-gradient(circle_at_bottom,_rgba(14,35,65,0.04),transparent_65%)]" />
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {flowSteps.map((step) => (
-              <div key={step.number} className={`relative overflow-hidden rounded-[28px] border px-4 py-4 shadow-[0_14px_34px_rgba(148,163,184,0.09)] ${step.tint}`}>
+              <div key={step.number} className={`relative overflow-hidden rounded-[30px] border px-4 py-4 shadow-[0_16px_38px_rgba(148,163,184,0.1)] ${step.tint}`}>
                 <div className={`absolute right-3 top-3 h-10 w-10 rounded-full blur-xl ${step.accent}`} />
-                <div className={`relative flex h-9 w-9 items-center justify-center rounded-[18px] ${step.badge} text-xs font-semibold text-white shadow-[0_8px_18px_rgba(15,23,42,0.12)] ring-4 ring-white/60`}>{step.number}</div>
+                <div className="relative flex items-start justify-between gap-3">
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-[18px] ${step.badge} text-xs font-semibold text-white shadow-[0_8px_18px_rgba(15,23,42,0.12)] ring-4 ring-white/60`}>{step.number}</div>
+                  <div className="flex h-9 w-9 items-center justify-center rounded-[18px] border border-slate-200/70 bg-white/70 text-slate-700 shadow-sm">
+                    {step.icon}
+                  </div>
+                </div>
                 <p className="relative mt-3 text-sm font-semibold text-slate-900">{step.title}</p>
                 <p className="relative mt-1.5 text-xs leading-5 text-slate-600">{step.text}</p>
               </div>
@@ -80,7 +112,8 @@ export default async function Home() {
         </section>
 
         <section className="grid gap-4 lg:grid-cols-3">
-          <article className="relative min-w-0 overflow-hidden rounded-[32px] border border-emerald-200/65 bg-gradient-to-br from-white via-emerald-50/72 to-emerald-100/72 p-5 shadow-[0_18px_42px_rgba(16,185,129,0.08)] sm:p-6">
+          <article className="relative min-w-0 overflow-hidden rounded-[34px] border border-emerald-200/65 bg-[linear-gradient(160deg,rgba(255,255,255,0.98),rgba(236,253,245,0.92),rgba(209,250,229,0.78))] p-5 shadow-[0_20px_46px_rgba(16,185,129,0.08)] sm:p-6">
+            <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-emerald-300/20 blur-2xl" />
             <div className="flex h-12 w-12 items-center justify-center rounded-[20px] border border-emerald-200/60 bg-white/65 text-emerald-700 shadow-[0_10px_24px_rgba(16,185,129,0.08)]">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4 19h16" />
@@ -96,7 +129,8 @@ export default async function Home() {
             </Link>
           </article>
 
-          <article className="relative min-w-0 overflow-hidden rounded-[32px] border border-sky-200/65 bg-gradient-to-br from-white via-sky-50/74 to-cyan-100/70 p-5 shadow-[0_18px_42px_rgba(56,189,248,0.1)] sm:p-6">
+          <article className="relative min-w-0 overflow-hidden rounded-[34px] border border-sky-200/65 bg-[linear-gradient(160deg,rgba(255,255,255,0.98),rgba(240,249,255,0.92),rgba(207,250,254,0.78))] p-5 shadow-[0_20px_46px_rgba(56,189,248,0.09)] sm:p-6">
+            <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-sky-300/20 blur-2xl" />
             <div className="flex h-12 w-12 items-center justify-center rounded-[20px] border border-sky-200/60 bg-white/65 text-sky-700 shadow-[0_10px_24px_rgba(56,189,248,0.09)]">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <rect x="3" y="5" width="18" height="14" rx="3" />
@@ -111,7 +145,8 @@ export default async function Home() {
             </Link>
           </article>
 
-          <article className="relative min-w-0 overflow-hidden rounded-[32px] border border-violet-200/65 bg-gradient-to-br from-white via-violet-50/74 to-fuchsia-100/68 p-5 shadow-[0_18px_42px_rgba(139,92,246,0.09)] sm:p-6">
+          <article className="relative min-w-0 overflow-hidden rounded-[34px] border border-violet-200/65 bg-[linear-gradient(160deg,rgba(255,255,255,0.98),rgba(245,243,255,0.92),rgba(245,208,254,0.76))] p-5 shadow-[0_20px_46px_rgba(139,92,246,0.09)] sm:p-6">
+            <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-violet-300/20 blur-2xl" />
             <div className="flex h-12 w-12 items-center justify-center rounded-[20px] border border-violet-200/60 bg-white/65 text-violet-700 shadow-[0_10px_24px_rgba(139,92,246,0.08)]">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M6 7h12" />
@@ -145,12 +180,13 @@ export default async function Home() {
               </svg>
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-3 rounded-[24px] border border-white/14 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.95))] px-4 py-3 text-slate-900 shadow-[0_14px_30px_rgba(15,23,42,0.14)]">
-            <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
-            <span className="text-sm text-slate-500">Log in to search materials we supply or have</span>
+          <div className="mt-4 flex items-center gap-3 rounded-[24px] border border-white/14 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] px-4 py-3 text-slate-900 shadow-[0_14px_30px_rgba(15,23,42,0.14)]">
+             <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+               <circle cx="11" cy="11" r="7" />
+               <path d="m20 20-3.5-3.5" />
+             </svg>
+            <span className="flex-1 text-sm text-slate-500">Log in to search materials we supply or have</span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Login</span>
           </div>
           <Link href={shopHref} className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-slate-100 underline underline-offset-4 active:scale-[0.99]">
             <span>Open search after login</span>
