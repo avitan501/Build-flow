@@ -3,6 +3,8 @@ import Link from "next/link";
 
 type MobileHomeHeaderProps = {
   accountHref: string;
+  uploadHref: string;
+  aiHref: string;
 };
 
 function IconButton({ href, label, children }: { href: string; label: string; children: ReactNode }) {
@@ -15,7 +17,7 @@ function IconButton({ href, label, children }: { href: string; label: string; ch
   );
 }
 
-export function MobileHomeHeader({ accountHref }: MobileHomeHeaderProps) {
+export function MobileHomeHeader({ accountHref, uploadHref, aiHref }: MobileHomeHeaderProps) {
   return (
     <section className="rounded-[30px] bg-[#0e2341] px-5 py-5 text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)] sm:px-6 sm:py-6">
       <div className="flex items-start justify-between gap-4">
@@ -30,14 +32,14 @@ export function MobileHomeHeader({ accountHref }: MobileHomeHeaderProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          <IconButton href="/upload" label="Upload plans or photo">
+          <IconButton href={uploadHref} label="Upload plans or photo">
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 16V5" />
               <path d="m7 10 5-5 5 5" />
               <path d="M5 19h14" />
             </svg>
           </IconButton>
-          <IconButton href="/ai" label="Ask BuildFlow AI">
+          <IconButton href={aiHref} label="Ask BuildFlow AI">
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 3v3" />
               <path d="M12 18v3" />

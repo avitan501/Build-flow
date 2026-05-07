@@ -9,23 +9,30 @@ const journeySteps = ["Project", "Upload", "Materials", "Quote", "Orders"];
 
 export default async function Home() {
   const { user } = await getSessionWithProfile();
-  const accountHref = user ? "/dashboard" : "/login";
+  const isSignedIn = Boolean(user);
+  const accountHref = isSignedIn ? "/dashboard" : "/login";
+  const gatedHref = isSignedIn ? null : "/login";
+  const projectsHref = gatedHref ?? "/projects";
+  const uploadHref = gatedHref ?? "/upload";
+  const ordersHref = gatedHref ?? "/orders";
+  const shopHref = gatedHref ?? "/shop";
+  const aiHref = gatedHref ?? "/ai";
 
   return (
     <main className="min-h-screen overflow-x-clip bg-[#eef3f9] text-slate-900">
       <RecoveryLinkHandler />
 
       <section className="mx-auto flex min-h-screen max-w-6xl flex-col gap-5 px-4 pb-28 pt-4 sm:gap-6 sm:px-8 sm:pb-12 sm:pt-8 lg:px-10">
-        <MobileHomeHeader accountHref={accountHref} />
+        <MobileHomeHeader accountHref={accountHref} uploadHref={uploadHref} aiHref={aiHref} />
         <div className="sm:hidden">
-          <Link href="/shop" className="block rounded-[28px] border border-[#25446d] bg-[#0e2341] p-5 text-white shadow-[0_18px_40px_rgba(15,23,42,0.22)] active:scale-[0.99]">
+          <Link href={shopHref} className="block rounded-[28px] border border-[#25446d] bg-[#0e2341] p-5 text-white shadow-[0_18px_40px_rgba(15,23,42,0.22)] active:scale-[0.99]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Search materials</p>
             <div className="mt-3 flex items-center gap-3 rounded-2xl bg-white px-4 py-3 text-slate-900">
               <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="11" cy="11" r="7" />
                 <path d="m20 20-3.5-3.5" />
               </svg>
-              <span className="text-sm text-slate-500">Search materials we supply or have</span>
+              <span className="text-sm text-slate-500">{isSignedIn ? "Search materials we supply or have" : "Log in to search materials we supply or have"}</span>
             </div>
           </Link>
         </div>
@@ -84,8 +91,8 @@ export default async function Home() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Projects</p>
             <h3 className="mt-2 text-lg font-semibold">Start with the right job</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">Keep your project address, timeline, and client info organized before any uploads begin.</p>
-            <Link href="/projects" className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-[#0e2341] underline underline-offset-4 active:scale-[0.99]">
-              View projects
+            <Link href={projectsHref} className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-[#0e2341] underline underline-offset-4 active:scale-[0.99]">
+              {isSignedIn ? "View projects" : "Log in to view projects"}
             </Link>
           </article>
 
@@ -93,8 +100,8 @@ export default async function Home() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Uploads</p>
             <h3 className="mt-2 text-lg font-semibold">Send plans or site photos fast</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">Upload drawings, room photos, or field notes so the next material step has the right context.</p>
-            <Link href="/upload" className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-[#0e2341] underline underline-offset-4 active:scale-[0.99]">
-              Go to upload
+            <Link href={uploadHref} className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-[#0e2341] underline underline-offset-4 active:scale-[0.99]">
+              {isSignedIn ? "Go to upload" : "Log in to upload"}
             </Link>
           </article>
 
@@ -102,14 +109,14 @@ export default async function Home() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Orders</p>
             <h3 className="mt-2 text-lg font-semibold">Review and approve with confidence</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">BuildFlow keeps materials, quotes, and order decisions lined up in one clean client path.</p>
-            <Link href="/orders" className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-[#0e2341] underline underline-offset-4 active:scale-[0.99]">
-              See order flow
+            <Link href={ordersHref} className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-[#0e2341] underline underline-offset-4 active:scale-[0.99]">
+              {isSignedIn ? "See order flow" : "Log in to see orders"}
             </Link>
           </article>
         </section>
       </section>
 
-      <MobileBottomDock accountHref={accountHref} />
+      <MobileBottomDock accountHref={accountHref} projectsHref={projectsHref} uploadHref={uploadHref} searchHref={shopHref} />
     </main>
   );
 }
