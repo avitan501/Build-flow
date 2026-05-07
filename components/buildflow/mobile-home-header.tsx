@@ -9,20 +9,23 @@ type MobileHomeHeaderProps = {
 function ActionOrb({ href, label, tone, children, disabled }: { href: string; label: string; tone: "upload" | "ai"; children: ReactNode; disabled?: boolean }) {
   const toneClass =
     tone === "upload"
-      ? "border-white/14 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.06))] shadow-[0_12px_30px_rgba(15,23,42,0.3)]"
-      : "border-fuchsia-300/30 bg-[radial-gradient(circle_at_30%_30%,rgba(244,114,182,0.4),transparent_34%),radial-gradient(circle_at_75%_25%,rgba(96,165,250,0.45),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.06))] shadow-[0_14px_34px_rgba(168,85,247,0.28)]";
+      ? "border-white/28 bg-[radial-gradient(circle_at_50%_20%,rgba(255,255,255,0.1),transparent_48%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_24px_rgba(2,8,23,0.26)]"
+      : "border-transparent bg-[radial-gradient(circle_at_25%_20%,rgba(244,114,182,0.95),transparent_34%),radial-gradient(circle_at_78%_22%,rgba(96,165,250,0.95),transparent_30%),radial-gradient(circle_at_80%_80%,rgba(52,211,153,0.9),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.01))] shadow-[0_14px_32px_rgba(168,85,247,0.2)]";
 
   return (
     <Link
       href={href}
       aria-label={label}
       aria-disabled={disabled}
-      className={`group inline-flex flex-col items-center gap-1 text-white ${disabled ? "cursor-default" : ""}`}
+      className={`group inline-flex flex-col items-center gap-2 text-white ${disabled ? "cursor-default" : ""}`}
     >
-      <span className={`relative flex h-12 w-12 items-center justify-center rounded-full border text-white backdrop-blur-md transition duration-150 active:scale-[0.96] ${toneClass}`}>
-        {children}
+      <span className={`relative flex h-[4.6rem] w-[4.6rem] items-center justify-center rounded-full p-[1.5px] transition duration-150 active:scale-[0.96] ${tone === "ai" ? "shadow-[0_0_22px_rgba(96,165,250,0.2)]" : ""}`}>
+        <span className={`absolute inset-0 rounded-full ${toneClass}`} />
+        <span className={`relative flex h-full w-full items-center justify-center rounded-full ${tone === "upload" ? "border border-white/22 bg-[linear-gradient(180deg,rgba(8,21,43,0.92),rgba(8,21,43,0.82))]" : "bg-[linear-gradient(180deg,rgba(8,21,43,0.9),rgba(8,21,43,0.76))]"}`}>
+          {children}
+        </span>
       </span>
-      <span className="text-[11px] font-medium text-white/88">{label}</span>
+      <span className="text-[11px] font-medium tracking-[-0.01em] text-white/92 drop-shadow-[0_2px_8px_rgba(2,8,23,0.5)]">{label}</span>
     </Link>
   );
 }
@@ -72,16 +75,17 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
 
           <div className="flex items-start gap-3">
             <ActionOrb href={uploadHref} label="Upload" tone="upload">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth="1.95" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 16V5" />
                 <path d="m7 10 5-5 5 5" />
                 <path d="M5 19h14" />
               </svg>
             </ActionOrb>
             <ActionOrb href={aiHref} label="AI Assistant" tone="ai" disabled>
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
-                <path d="M12 2.5l1.65 4.41 4.72.34-3.68 2.98 1.18 4.58L12 12.25 8.13 14.8l1.18-4.58-3.68-2.98 4.72-.34L12 2.5Z" />
-              </svg>
+              <div className="relative flex items-center text-white">
+                <span className="text-[1.9rem] font-semibold tracking-[-0.04em]">AI</span>
+                <span className="absolute -right-3 -top-2 text-[0.9rem]">✦</span>
+              </div>
             </ActionOrb>
           </div>
         </div>
