@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
-import { MobileBottomDock } from "@/components/buildflow/mobile-bottom-dock";
 import { MobileHomeHeader } from "@/components/buildflow/mobile-home-header";
 import { getSessionWithProfile } from "@/lib/auth";
 
@@ -116,7 +115,6 @@ export default async function Home() {
         </section>
       </section>
 
-      <MobileBottomDock accountHref={accountHref} projectsHref={projectsHref} uploadHref={uploadHref} searchHref={shopHref} />
     </main>
   );
 }

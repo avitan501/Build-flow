@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 type MobileBottomDockProps = {
   accountHref: string;
@@ -9,6 +10,12 @@ type MobileBottomDockProps = {
   uploadHref: string;
   searchHref: string;
 };
+
+const DOCK_PATHS = new Set(["/", "/dashboard", "/projects", "/projects/new", "/upload", "/materials", "/quotes", "/orders"]);
+
+function shouldShowDock(pathname: string) {
+  return pathname.startsWith("/projects/") || DOCK_PATHS.has(pathname);
+}
 
 function DockItem({ href, label, children }: { href: string; label: string; children: ReactNode }) {
   return (
@@ -24,8 +31,14 @@ function DockItem({ href, label, children }: { href: string; label: string; chil
 }
 
 export function MobileBottomDock({ accountHref, projectsHref, uploadHref, searchHref }: MobileBottomDockProps) {
+  const pathname = usePathname();
+
+  if (!pathname || !shouldShowDock(pathname)) {
+    return null;
+  }
+
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 px-4 sm:hidden">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-50 px-4 sm:hidden">
       <nav aria-label="Mobile homepage" className="pointer-events-auto mx-auto flex max-w-md items-center justify-between gap-1 rounded-full border border-white/70 bg-white/90 px-3 py-2 shadow-[0_20px_45px_rgba(15,23,42,0.18)] backdrop-blur-xl">
         <DockItem href="/" label="Home">
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
