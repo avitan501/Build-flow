@@ -59,7 +59,7 @@ export function MobileBottomDock({ accountHref, projectsHref, uploadHref, search
       <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-50 px-3 sm:hidden">
         <nav
           aria-label="Mobile homepage"
-          className="pointer-events-auto mx-auto flex max-w-[22rem] items-center justify-between gap-0.5 rounded-full border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] px-2 py-1.5 shadow-[0_18px_36px_rgba(15,23,42,0.14)] backdrop-blur-xl"
+          className="pointer-events-auto mx-auto flex max-w-[22rem] items-center justify-between gap-0.5 rounded-full border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(248,250,252,0.9))] px-2 py-1.5 shadow-[0_20px_40px_rgba(15,23,42,0.16)] backdrop-blur-xl"
         >
           <DockItem href="/" label="Home" active={isActivePath(pathname, "/")}>
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
