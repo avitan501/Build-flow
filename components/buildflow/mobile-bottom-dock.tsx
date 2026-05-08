@@ -21,25 +21,27 @@ function isActivePath(pathname: string, href: string) {
   return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function DockItem({ href, label, active, children }: { href: string; label: string; active: boolean; children: ReactNode }) {
+function DockItem({ href, label, active, children, accent = false }: { href: string; label: string; active: boolean; children: ReactNode; accent?: boolean }) {
   return (
     <Link
       href={href}
       aria-label={label}
-      className={`group flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-1 transition-all duration-150 ease-out active:scale-[0.96] ${
+      className={`group flex min-w-0 flex-1 flex-col items-center justify-end rounded-full px-0.5 py-0.5 text-center transition-all duration-200 ease-out active:scale-[0.95] ${
         active ? "text-slate-900" : "text-slate-500"
       }`}
     >
       <span
-        className={`flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-150 ease-out group-active:scale-[1.06] ${
-          active
-            ? "border-slate-200 bg-slate-100/95 text-slate-900 shadow-[0_8px_18px_rgba(37,99,235,0.14)]"
-            : "border-transparent bg-white/70 text-slate-600 shadow-[0_4px_12px_rgba(15,23,42,0.06)] group-hover:bg-slate-100/90 group-active:bg-slate-100 group-active:shadow-[0_8px_18px_rgba(15,23,42,0.12)]"
+        className={`flex items-center justify-center transition-all duration-200 ease-out group-active:translate-y-[1px] ${
+          accent
+            ? "h-11 w-11 -translate-y-2 rounded-full border border-[#efca75]/35 bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] text-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_14px_24px_rgba(220,168,69,0.24)]"
+            : active
+              ? "h-9 w-9 rounded-[18px] border border-white/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,246,255,0.92))] text-[#0e2341] shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_10px_20px_rgba(148,163,184,0.12)]"
+              : "h-9 w-9 rounded-[18px] border border-transparent bg-[linear-gradient(180deg,rgba(255,255,255,0.45),rgba(255,255,255,0.1))] text-slate-500"
         }`}
       >
         {children}
       </span>
-      <span className={`mt-1 text-[10px] font-medium leading-none transition-transform duration-150 ease-out group-active:scale-[1.03] ${active ? "text-slate-800" : "text-slate-500"}`}>
+      <span className={`mt-0.5 text-[9px] font-medium leading-none ${accent ? "text-slate-800" : active ? "text-slate-800" : "text-slate-500"}`}>
         {label}
       </span>
     </Link>
@@ -55,11 +57,11 @@ export function MobileBottomDock({ accountHref, projectsHref, uploadHref, search
 
   return (
     <>
-      <div aria-hidden="true" className="h-24 sm:hidden" />
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-50 px-3 sm:hidden">
+      <div aria-hidden="true" className="h-20 sm:hidden" />
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.4rem)] z-50 px-3 sm:hidden">
         <nav
           aria-label="Mobile homepage"
-          className="pointer-events-auto mx-auto flex max-w-[22rem] items-center justify-between gap-0.5 rounded-full border border-slate-200/80 bg-white/90 px-2 py-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.12)] backdrop-blur-xl"
+          className="pointer-events-auto mx-auto flex max-w-[21.5rem] items-end justify-between gap-0.5 rounded-[24px] border border-white/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.86),rgba(233,243,255,0.76))] px-2.5 pb-1.5 pt-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_18px_34px_rgba(148,163,184,0.18)] backdrop-blur-[18px]"
         >
           <DockItem href="/" label="Home" active={isActivePath(pathname, "/")}>
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -75,8 +77,8 @@ export function MobileBottomDock({ accountHref, projectsHref, uploadHref, search
               <rect x="14" y="13" width="7" height="7" rx="1.5" />
             </svg>
           </DockItem>
-          <DockItem href={uploadHref} label="Upload" active={isActivePath(pathname, "/upload")}>
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <DockItem href={uploadHref} label="Upload" active={isActivePath(pathname, "/upload")} accent>
+            <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 16V5" />
               <path d="m7 10 5-5 5 5" />
               <path d="M5 19h14" />

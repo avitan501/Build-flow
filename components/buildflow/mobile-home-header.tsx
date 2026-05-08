@@ -6,65 +6,79 @@ type MobileHomeHeaderProps = {
   aiHref: string;
 };
 
-function IconButton({ href, label, disabled, children }: { href: string; label: string; disabled?: boolean; children: ReactNode }) {
-  const className = `inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/10 text-white shadow-sm backdrop-blur transition active:scale-[0.97] ${
-    disabled ? "cursor-default opacity-70" : "hover:bg-white/15"
-  }`;
+function ActionButton({ href, label, tone, disabled, children }: { href: string; label: string; tone: "upload" | "ai"; disabled?: boolean; children: ReactNode }) {
+  const shellClass =
+    tone === "upload"
+      ? "border-white/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,244,255,0.92))] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_12px_24px_rgba(148,163,184,0.16)]"
+      : "border-white/80 bg-[radial-gradient(circle_at_24%_22%,rgba(244,114,182,0.45),transparent_30%),radial-gradient(circle_at_78%_22%,rgba(96,165,250,0.48),transparent_28%),radial-gradient(circle_at_78%_78%,rgba(52,211,153,0.34),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,244,255,0.9))] shadow-[0_12px_24px_rgba(96,165,250,0.16)]";
 
   return (
-    <Link href={href} aria-label={label} aria-disabled={disabled} className={className}>
-      {children}
+    <Link
+      href={href}
+      aria-label={label}
+      aria-disabled={disabled}
+      className={`group inline-flex flex-col items-center gap-1.5 ${disabled ? "cursor-default" : ""}`}
+    >
+      <span className={`relative flex h-[3.2rem] w-[3.2rem] items-center justify-center rounded-full border p-[1.25px] text-slate-800 transition duration-200 ease-out active:translate-y-[1px] active:scale-[0.95] ${shellClass}`}>
+        <span className="absolute inset-[2px] rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.36),rgba(255,255,255,0.06))]" />
+        <span className="relative flex h-full w-full items-center justify-center rounded-full border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.92))] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+          {children}
+        </span>
+      </span>
+      <span className="text-[10px] font-medium tracking-[-0.01em] text-slate-700">{label}</span>
     </Link>
   );
 }
 
 export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) {
   return (
-    <section className="rounded-[30px] bg-[#0e2341] px-5 py-5 text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)] sm:px-6 sm:py-6">
-      <div className="flex items-start justify-between gap-4">
+    <section className="relative overflow-hidden rounded-[32px] border border-sky-100/90 bg-[linear-gradient(180deg,#fafdff_0%,#eef6ff_46%,#f7fbff_100%)] px-4 py-4 text-slate-900 shadow-[0_24px_60px_rgba(148,163,184,0.16)] sm:px-6 sm:py-6">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.3),transparent_28%),radial-gradient(circle_at_85%_10%,rgba(191,219,254,0.26),transparent_20%),linear-gradient(180deg,rgba(255,255,255,0.42),transparent)]" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
+      <div className="absolute right-0 top-10 h-28 w-28 rounded-full bg-sky-100/70 blur-3xl" />
+      <div className="absolute left-0 bottom-0 h-24 w-24 rounded-full bg-blue-50 blur-3xl" />
+
+      <div className="relative flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/12 text-lg font-semibold tracking-tight">BF</div>
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(232,242,255,0.84))] text-base font-semibold tracking-tight text-slate-900 shadow-[0_10px_24px_rgba(148,163,184,0.14)]">
+            BF
+          </div>
           <div>
-            <p className="text-lg font-semibold tracking-tight">BuildFlow</p>
-            <p className="text-xs text-slate-300">Construction materials + project flow</p>
+            <p className="text-[1.15rem] font-semibold tracking-tight text-slate-950">Build<span className="text-sky-600">Flow</span></p>
+            <p className="text-xs text-slate-500">Construction materials + project flow</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <IconButton href={uploadHref} label="Upload plans or photo">
-            <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <div className="flex items-start gap-2.5">
+          <ActionButton href={uploadHref} label="Upload" tone="upload">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.95" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 16V5" />
               <path d="m7 10 5-5 5 5" />
               <path d="M5 19h14" />
             </svg>
-          </IconButton>
-          <IconButton href={aiHref} label="Ask BuildFlow AI" disabled>
-            <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 3v3" />
-              <path d="M12 18v3" />
-              <path d="M4.93 4.93l2.12 2.12" />
-              <path d="M16.95 16.95l2.12 2.12" />
-              <path d="M3 12h3" />
-              <path d="M18 12h3" />
-              <path d="M4.93 19.07l2.12-2.12" />
-              <path d="M16.95 7.05l2.12-2.12" />
-              <circle cx="12" cy="12" r="4" />
-            </svg>
-          </IconButton>
+          </ActionButton>
+          <ActionButton href={aiHref} label="AI" tone="ai" disabled>
+            <div className="relative flex items-center text-slate-900">
+              <span className="text-[1.15rem] font-semibold tracking-[-0.04em]">AI</span>
+              <span className="absolute -right-1.5 -top-1 text-[0.65rem] text-fuchsia-500">✦</span>
+            </div>
+          </ActionButton>
         </div>
       </div>
 
-      <div className="mt-5 rounded-[24px] bg-white/8 p-4 backdrop-blur-sm">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-300">Start here</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Start your project with confidence</h1>
-        <p className="mt-2 max-w-md text-sm leading-6 text-slate-200">
-          Upload plans, organize materials, review quotes, and track orders in one simple workflow.
+      <div className="relative mt-4 rounded-[26px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(239,246,255,0.7))] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_18px_40px_rgba(148,163,184,0.12)] backdrop-blur-sm sm:mt-5 sm:px-5 sm:py-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700/75">Start here</p>
+        <h1 className="mt-2 max-w-[14rem] text-[2rem] font-semibold leading-[0.98] tracking-tight text-slate-950 sm:max-w-md sm:text-[2.3rem]">
+          Start your project with confidence
+        </h1>
+        <p className="mt-2.5 max-w-[16rem] text-sm leading-6 text-slate-600 sm:max-w-md">
+          Upload plans, organize materials, review quotes, and approve orders in one clean workflow.
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-          <Link href="/start-project" className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition active:scale-[0.99] hover:bg-slate-100">
+          <Link href="/start-project" className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_32px_rgba(220,168,69,0.24)] transition active:scale-[0.99]">
             Log in to Start Project
           </Link>
-          <Link href="/signup" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.99] hover:bg-white/15">
+          <Link href="/signup" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.94))] px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_12px_24px_rgba(148,163,184,0.12)] transition active:scale-[0.99]">
             Create Account
           </Link>
         </div>
