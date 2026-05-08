@@ -62,7 +62,7 @@ const featureCards = [
     hrefKey: "projects" as const,
     iconBg: "bg-[#295fc3]",
     image:
-      "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&w=900&q=80",
+      "https://source.unsplash.com/featured/900x900/?lumber-yard,building-materials,usa",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M4 19h16" />
@@ -77,7 +77,7 @@ const featureCards = [
     hrefKey: "upload" as const,
     iconBg: "bg-[#33b3b0]",
     image:
-      "https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=900&q=80",
+      "https://source.unsplash.com/featured/900x900/?construction-materials,pallets,warehouse",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M12 16V5" />
@@ -92,7 +92,7 @@ const featureCards = [
     hrefKey: "orders" as const,
     iconBg: "bg-[#cb7d2c]",
     image:
-      "https://images.unsplash.com/photo-1513828583688-c52646db42da?auto=format&fit=crop&w=900&q=80",
+      "https://source.unsplash.com/featured/900x900/?hardware-store,building-supplies,usa",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M8 6h13" />
@@ -187,7 +187,7 @@ export default async function Home() {
         </section>
 
         <section className="relative overflow-hidden rounded-[28px] border border-sky-100/90 bg-[linear-gradient(180deg,#f8fbff_0%,#eaf4ff_100%)] shadow-[0_24px_52px_rgba(148,163,184,0.14)]">
-          <div className="absolute inset-0 bg-cover bg-center opacity-90" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1517705008128-361805f42e86?auto=format&fit=crop&w=1400&q=80')" }} />
+          <div className="absolute inset-0 bg-cover bg-center opacity-90" style={{ backgroundImage: "url('https://source.unsplash.com/featured/1400x900/?construction-supplies,materials-store,warehouse')" }} />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(248,251,255,0.96)_0%,rgba(234,244,255,0.88)_48%,rgba(234,244,255,0.38)_100%)]" />
           <div className="relative px-4 py-5 sm:px-6 sm:py-6">
             <div className="flex items-center gap-2">

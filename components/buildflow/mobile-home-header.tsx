@@ -39,7 +39,7 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
         className="absolute inset-y-0 right-0 w-[58%] bg-cover bg-center"
         style={{
           backgroundImage:
-            "url('https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=1200&q=80')",
+            "url('https://source.unsplash.com/featured/1200x900/?building-materials,lumber-yard,warehouse')",
         }}
       />
       <div className="absolute inset-y-0 right-0 w-[58%] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(148,163,184,0.14))]" />
