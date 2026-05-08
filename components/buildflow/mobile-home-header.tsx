@@ -7,10 +7,10 @@ type MobileHomeHeaderProps = {
 };
 
 function ActionOrb({ href, label, tone, children, disabled }: { href: string; label: string; tone: "upload" | "ai"; children: ReactNode; disabled?: boolean }) {
-  const toneClass =
+  const shellClass =
     tone === "upload"
-      ? "border-white/28 bg-[radial-gradient(circle_at_50%_20%,rgba(255,255,255,0.1),transparent_48%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_24px_rgba(2,8,23,0.26)]"
-      : "border-transparent bg-[radial-gradient(circle_at_25%_20%,rgba(244,114,182,0.95),transparent_34%),radial-gradient(circle_at_78%_22%,rgba(96,165,250,0.95),transparent_30%),radial-gradient(circle_at_80%_80%,rgba(52,211,153,0.9),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.01))] shadow-[0_14px_32px_rgba(168,85,247,0.2)]";
+      ? "border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(228,240,252,0.8))] shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_16px_28px_rgba(148,163,184,0.2)]"
+      : "border-white/50 bg-[radial-gradient(circle_at_28%_22%,rgba(244,114,182,0.9),transparent_32%),radial-gradient(circle_at_78%_20%,rgba(96,165,250,0.92),transparent_28%),radial-gradient(circle_at_78%_78%,rgba(52,211,153,0.82),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.68),rgba(219,234,254,0.34))] shadow-[0_16px_30px_rgba(96,165,250,0.2)]";
 
   return (
     <Link
@@ -19,9 +19,9 @@ function ActionOrb({ href, label, tone, children, disabled }: { href: string; la
       aria-disabled={disabled}
       className={`group inline-flex flex-col items-center gap-1.5 text-slate-900 ${disabled ? "cursor-default" : ""}`}
     >
-      <span className={`relative flex h-[3.35rem] w-[3.35rem] items-center justify-center rounded-full p-[1.25px] transition duration-150 active:scale-[0.96] ${tone === "ai" ? "shadow-[0_0_18px_rgba(96,165,250,0.16)]" : ""}`}>
-        <span className={`absolute inset-0 rounded-full ${toneClass}`} />
-        <span className={`relative flex h-full w-full items-center justify-center rounded-full ${tone === "upload" ? "border border-white/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,246,255,0.96))] text-slate-700" : "bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(239,246,255,0.88))] text-slate-900"}`}>
+      <span className={`relative flex h-[3.35rem] w-[3.35rem] items-center justify-center rounded-full border p-[1.25px] transition duration-200 ease-out active:scale-[0.94] active:translate-y-[1px] ${shellClass}`}>
+        <span className="absolute inset-[2px] rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.26),rgba(255,255,255,0.04))]" />
+        <span className={`relative flex h-full w-full items-center justify-center rounded-full border shadow-[inset_0_1px_0_rgba(255,255,255,0.55),inset_0_-8px_16px_rgba(148,163,184,0.08)] ${tone === "upload" ? "border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,246,255,0.94))] text-slate-700" : "border-white/30 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(239,246,255,0.78))] text-slate-900"}`}>
           {children}
         </span>
       </span>

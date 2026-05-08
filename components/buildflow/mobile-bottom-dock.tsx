@@ -26,17 +26,17 @@ function DockItem({ href, label, active, children, accent = false }: { href: str
     <Link
       href={href}
       aria-label={label}
-      className={`group flex min-w-0 flex-1 flex-col items-center justify-end rounded-full px-0.5 py-0.5 text-center transition-all duration-150 ease-out active:scale-[0.96] ${
+      className={`group flex min-w-0 flex-1 flex-col items-center justify-end rounded-full px-0.5 py-0.5 text-center transition-all duration-200 ease-out active:scale-[0.95] ${
         active ? "text-slate-900" : "text-slate-500"
       }`}
     >
       <span
-        className={`flex items-center justify-center transition-all duration-150 ease-out group-active:scale-[1.06] ${
+        className={`flex items-center justify-center transition-all duration-200 ease-out group-active:translate-y-[1px] group-active:scale-[0.97] ${
           accent
-            ? "h-12 w-12 -translate-y-3 rounded-full border border-[#efca75]/35 bg-[linear-gradient(180deg,#f2ca70_0%,#dba544_100%)] text-slate-950 shadow-[0_14px_28px_rgba(220,164,69,0.32)]"
+            ? "h-12 w-12 -translate-y-3 rounded-full border border-[#efca75]/35 bg-[linear-gradient(180deg,#f2ca70_0%,#dba544_100%)] text-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_14px_28px_rgba(220,164,69,0.32)]"
             : active
-              ? "h-9.5 w-9.5 rounded-[18px] border border-[#efca75]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,246,255,0.92))] text-[#c68b2c] shadow-[0_10px_20px_rgba(220,164,69,0.08)]"
-              : "h-9.5 w-9.5 rounded-[18px] border border-transparent bg-transparent text-slate-500"
+              ? "h-9.5 w-9.5 rounded-[18px] border border-white/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,246,255,0.92))] text-[#c68b2c] shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_10px_20px_rgba(148,163,184,0.12)]"
+              : "h-9.5 w-9.5 rounded-[18px] border border-transparent bg-[linear-gradient(180deg,rgba(255,255,255,0.36),rgba(255,255,255,0.08))] text-slate-500"
         }`}
       >
         {children}
@@ -61,7 +61,7 @@ export function MobileBottomDock({ accountHref, projectsHref, uploadHref, search
       <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.35rem)] z-50 px-3 sm:hidden">
         <nav
           aria-label="Mobile homepage"
-          className="pointer-events-auto mx-auto flex max-w-[21.75rem] items-end justify-between gap-0.5 rounded-[22px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(239,246,255,0.92))] px-2.5 pb-1.5 pt-2.5 shadow-[0_18px_38px_rgba(148,163,184,0.18)] backdrop-blur-xl"
+          className="pointer-events-auto mx-auto flex max-w-[21.75rem] items-end justify-between gap-0.5 rounded-[24px] border border-white/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(232,242,255,0.58))] px-2.5 pb-1.5 pt-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_18px_38px_rgba(148,163,184,0.18)] backdrop-blur-[18px]"
         >
           <DockItem href="/" label="Home" active={isActivePath(pathname, "/")}>
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
