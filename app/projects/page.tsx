@@ -1,8 +1,7 @@
 import Link from "next/link";
 
-import { statusButtonClass } from "@/components/buildflow/wireframe";
+import { PremiumBadge, PremiumHero, PremiumInfoCard, PremiumPageShell, PremiumPrimaryButton, PremiumSection } from "@/components/buildflow/premium-page";
 import { requireSignedInProfile } from "@/lib/auth";
-import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
 import { PROJECT_CREATION_STATUS_LABEL, type ProjectRecord } from "@/lib/projects";
 
 const journeySteps = ["Project", "Upload", "Materials", "Quote", "Orders"] as const;
@@ -23,16 +22,6 @@ function formatProjectStatus(status: ProjectRecord["status"]) {
 
 export default async function ProjectsPage() {
   const { supabase, user } = await requireSignedInProfile();
-  const { specMap } = getBuildflowWireframeData();
-  const projects = specMap.get("projects");
-  const upload = specMap.get("upload");
-  const materials = specMap.get("materials");
-  const quotes = specMap.get("quotes");
-  const orders = specMap.get("orders");
-
-  if (!projects || !upload || !materials || !quotes || !orders) {
-    throw new Error("Missing BuildFlow project route data.");
-  }
 
   const { data: projectRows, error: projectsError } = await supabase
     .from("projects")
@@ -49,118 +38,99 @@ export default async function ProjectsPage() {
   const hasProjects = projectList.length > 0;
 
   return (
-    <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
-      <section className="mx-auto flex max-w-7xl flex-col gap-6">
-        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Client Projects</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">My BuildFlow Projects</h1>
-              <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-                Manage your projects, upload plans, review materials, approve quotes, and track orders.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Signed-in client</span>
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">Projects hub</span>
-                <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">Protected client page</span>
-              </div>
-            </div>
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 sm:min-w-80">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Primary action</div>
-              <Link href="/projects/new" className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
-                <span>Start New Project</span>
-                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{PROJECT_CREATION_STATUS_LABEL}</span>
-              </Link>
-              <p className="mt-3 text-sm leading-6 text-slate-600">Use this page as the place to start a project now or continue with the next step for one of your saved projects.</p>
-            </div>
+    <PremiumPageShell>
+      <PremiumHero
+        eyebrow="Client Projects"
+        title="My BuildFlow Projects"
+        description="Manage your jobs, keep the next action visible, and move from upload to approval inside one premium workspace."
+        badges={
+          <>
+            <PremiumBadge>Signed-in client</PremiumBadge>
+            <PremiumBadge tone="emerald">Projects hub</PremiumBadge>
+            <PremiumBadge tone="sky">Protected client page</PremiumBadge>
+          </>
+        }
+        aside={
+          <div className="rounded-[28px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.9))] p-5 shadow-[0_16px_36px_rgba(148,163,184,0.12)]">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Primary action</div>
+            <PremiumPrimaryButton href="/projects/new">
+              <span>Start New Project</span>
+              <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-80">{PROJECT_CREATION_STATUS_LABEL}</span>
+            </PremiumPrimaryButton>
+            <p className="mt-3 text-sm leading-6 text-slate-600">Use this page as the clean starting point for a new job or continue into an existing workspace.</p>
           </div>
-        </section>
+        }
+      />
 
-        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-          <div>
-            <h2 className="text-lg font-semibold">Journey reminder</h2>
-            <p className="mt-1 text-sm text-slate-500">Keep the next client step obvious from the projects overview.</p>
-          </div>
-          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            {journeySteps.map((step, index) => (
-              <div key={step} className={`rounded-2xl border px-4 py-4 ${index === 0 ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Step {index + 1}</div>
-                <div className="mt-2 text-sm font-semibold text-slate-900">{step}</div>
-              </div>
-            ))}
-          </div>
-        </section>
+      <PremiumSection title="Journey reminder" description="Keep the next client step obvious from the projects overview.">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {journeySteps.map((step, index) => (
+            <div key={step} className={`rounded-[24px] border px-4 py-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)] ${index === 0 ? "border-emerald-200 bg-emerald-50/80" : "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.82))]"}`}>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Step {index + 1}</div>
+              <div className="mt-2 text-sm font-semibold text-slate-900">{step}</div>
+            </div>
+          ))}
+        </div>
+      </PremiumSection>
 
-        <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">{hasProjects ? "Your projects" : "No projects yet"}</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              {hasProjects
-                ? "These are your real project records. Choose one and continue to the next step."
-                : "Create your first real project to start the BuildFlow journey."}
-            </p>
-            {hasProjects ? (
-              <div className="mt-5 grid gap-3">
-                {projectList.map((project) => (
-                  <Link href={`/projects/${project.id}`} key={project.id} className="block rounded-3xl border border-slate-200 bg-slate-50 p-5 transition hover:border-slate-300 hover:bg-white">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">{project.name}</div>
-                        <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          {formatProjectStatus(project.status)} · Created {formatProjectDate(project.created_at)}
-                        </div>
-                        {project.address ? <p className="mt-3 text-sm leading-6 text-slate-700">{project.address}</p> : null}
+      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <PremiumSection title={hasProjects ? "Your projects" : "No projects yet"} description={hasProjects ? "These are your real project records. Open one and continue to the next step." : "Create your first real project to begin the BuildFlow journey."}>
+          {hasProjects ? (
+            <div className="grid gap-3">
+              {projectList.map((project) => (
+                <Link href={`/projects/${project.id}`} key={project.id} className="block rounded-[26px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.88))] p-5 shadow-[0_12px_28px_rgba(148,163,184,0.1)] transition active:scale-[0.99]">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="text-base font-semibold text-slate-950">{project.name}</div>
+                      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        {formatProjectStatus(project.status)} · Created {formatProjectDate(project.created_at)}
                       </div>
-                      <div className="flex flex-col gap-2 sm:items-end">
-                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                          {PROJECT_CREATION_STATUS_LABEL}
-                        </span>
-                        <span className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
-                          Open Project Workspace
-                        </span>
-                      </div>
+                      {project.address ? <p className="mt-3 text-sm leading-6 text-slate-600">{project.address}</p> : null}
                     </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-5 rounded-3xl border border-orange-200 bg-orange-50 p-5 text-orange-900">
-                <div>
-                  <div className="text-sm font-semibold text-orange-950">Project list</div>
-                  <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-orange-700">Preview state</div>
-                </div>
-                <p className="mt-4 text-sm leading-6 text-orange-900">Start New Project to create your first real project.</p>
-              </div>
-            )}
-          </article>
-
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">Next actions</h2>
-            <div className="mt-4 grid gap-3">
-              <Link href="/projects/new" className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
-                <span>Start New Project</span>
-                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{PROJECT_CREATION_STATUS_LABEL}</span>
-              </Link>
-              <Link href="/upload" className={statusButtonClass(upload.status, upload.status === "Coming Soon")}>
-                <span>Upload Plans</span>
-                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{upload.status}</span>
-              </Link>
-              <Link href="/materials" className={statusButtonClass(materials.status, materials.status === "Coming Soon")}>
-                <span>Review Materials</span>
-                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{materials.status}</span>
-              </Link>
-              <Link href="/quotes" className={statusButtonClass(quotes.status, quotes.status === "Coming Soon")}>
-                <span>Review Quote</span>
-                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{quotes.status}</span>
-              </Link>
-              <Link href="/orders" className={statusButtonClass(orders.status, orders.status === "Coming Soon")}>
-                <span>Track Orders</span>
-                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{orders.status}</span>
-              </Link>
+                    <div className="flex flex-col gap-2 sm:items-end">
+                      <PremiumBadge tone="emerald">{PROJECT_CREATION_STATUS_LABEL}</PremiumBadge>
+                      <span className="inline-flex items-center justify-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+                        Open Project Workspace
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
             </div>
-          </article>
-        </section>
-      </section>
-    </main>
+          ) : (
+            <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-5 text-amber-950">
+              <div className="text-sm font-semibold">Project list</div>
+              <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Preview state</div>
+              <p className="mt-4 text-sm leading-6">Start New Project to create your first real project.</p>
+            </div>
+          )}
+        </PremiumSection>
+
+        <PremiumSection title="Next actions" description="Keep the primary workflow clear and easy to scan.">
+          <div className="grid gap-3">
+            <PremiumPrimaryButton href="/projects/new">
+              <span>Start New Project</span>
+              <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-80">{PROJECT_CREATION_STATUS_LABEL}</span>
+            </PremiumPrimaryButton>
+            <Link href="/upload" className="inline-flex items-center justify-between rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99]">
+              <span>Upload Plans</span>
+              <span className="text-[11px] uppercase tracking-[0.16em] text-sky-700">Live</span>
+            </Link>
+            <Link href="/materials" className="inline-flex items-center justify-between rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99]">
+              <span>Review Materials</span>
+              <span className="text-[11px] uppercase tracking-[0.16em] text-sky-700">Live</span>
+            </Link>
+            <Link href="/quotes" className="inline-flex items-center justify-between rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99]">
+              <span>Review Quote</span>
+              <span className="text-[11px] uppercase tracking-[0.16em] text-sky-700">Live</span>
+            </Link>
+            <Link href="/orders" className="inline-flex items-center justify-between rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99]">
+              <span>Track Orders</span>
+              <span className="text-[11px] uppercase tracking-[0.16em] text-amber-700">Partial Live</span>
+            </Link>
+          </div>
+        </PremiumSection>
+      </div>
+    </PremiumPageShell>
   );
 }

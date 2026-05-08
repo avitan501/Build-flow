@@ -2,9 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { uploadProjectFileAction } from "@/app/upload/actions";
-import { statusButtonClass } from "@/components/buildflow/wireframe";
+import { PremiumBackLink, PremiumBadge, PremiumHero, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumSection } from "@/components/buildflow/premium-page";
 import { requireSignedInProfile } from "@/lib/auth";
-import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
 import { PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES, type ProjectRecord } from "@/lib/projects";
 
 function formatProjectStatus(status: ProjectRecord["status"]) {
@@ -40,34 +39,18 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
   if (!projectId) {
     await requireSignedInProfile();
     return (
-      <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
-        <section className="mx-auto flex max-w-3xl flex-col gap-6">
-          <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Upload Plans</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Upload</h1>
-            <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">Open this page from a project workspace.</p>
-            <div className="mt-6">
-              <Link
-                href="/projects"
-                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-white"
-              >
-                Back to Projects
-              </Link>
-            </div>
-          </section>
-        </section>
-      </main>
+      <PremiumPageShell maxWidth="max-w-3xl">
+        <PremiumHero
+          eyebrow="Upload Plans"
+          title="Upload"
+          description="Open this page from a project workspace so the file stays tied to the correct job."
+          aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>}
+        />
+      </PremiumPageShell>
     );
   }
 
   const { supabase, user } = await requireSignedInProfile();
-  const { specMap } = getBuildflowWireframeData();
-  const upload = specMap.get("upload");
-  const materials = specMap.get("materials");
-
-  if (!upload || !materials) {
-    throw new Error("Missing BuildFlow upload route data.");
-  }
 
   const { data: project, error } = await supabase
     .from("projects")
@@ -84,108 +67,74 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
   const maxFileSizeMb = Math.floor(PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES / (1024 * 1024));
 
   return (
-    <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
-      <section className="mx-auto flex max-w-7xl flex-col gap-6">
-        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Upload Plans</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{project.name}</h1>
-              <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-                This upload step is now tied to the selected project so the client always knows which job the plans belong to.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Signed-in client</span>
-                <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-orange-700">{upload.status}</span>
-                <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">Project-aware upload preview</span>
+    <PremiumPageShell>
+      <PremiumHero
+        eyebrow="Upload Plans"
+        title={project.name}
+        description="A clean upload step tied to the selected project so clients always know where files belong."
+        badges={
+          <>
+            <PremiumBadge>Signed-in client</PremiumBadge>
+            <PremiumBadge tone="amber">Live</PremiumBadge>
+            <PremiumBadge tone="sky">Project-aware upload</PremiumBadge>
+          </>
+        }
+        aside={<PremiumBackLink href={`/projects/${project.id}`}>Back to Project Workspace</PremiumBackLink>}
+      />
+
+      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <PremiumSection title="Selected project" description="Quick project context stays visible while uploading.">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <PremiumInfoCard label="Project name" value={project.name} />
+            <PremiumInfoCard label="Status" value={formatProjectStatus(project.status)} />
+            <PremiumInfoCard label="Address" value={project.address || "No address added yet."} spanTwo />
+          </div>
+        </PremiumSection>
+
+        <PremiumSection title="Upload plans" description="Upload one project file at a time for this selected project.">
+          <div className="grid gap-3">
+            {feedback ? (
+              <PremiumMutedPanel tone={feedback.tone === "success" ? "emerald" : "rose"}>
+                <div className="text-xs font-semibold uppercase tracking-[0.16em]">{feedback.tone === "success" ? "Upload complete" : "Upload issue"}</div>
+                <p className="mt-2 leading-6">{feedback.text}</p>
+              </PremiumMutedPanel>
+            ) : null}
+
+            <form action={uploadProjectFileAction} encType="multipart/form-data" className="grid gap-4 rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+              <input type="hidden" name="projectId" value={project.id} />
+              <div>
+                <label htmlFor="project-file" className="text-sm font-semibold text-slate-900">
+                  Choose file
+                </label>
+                <input
+                  id="project-file"
+                  name="file"
+                  type="file"
+                  required
+                  accept=".pdf,image/png,image/jpeg,image/webp"
+                  className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900 file:mr-4 file:rounded-xl file:border-0 file:bg-[#0e2341] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                />
               </div>
-            </div>
-            <Link
-              href={`/projects/${project.id}`}
-              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-white"
-            >
-              Back to Project Workspace
+              <div className="rounded-2xl border border-sky-100 bg-white p-4 text-sm text-slate-600 shadow-[0_8px_20px_rgba(148,163,184,0.06)]">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Upload rules</div>
+                <ul className="mt-2 grid gap-1 leading-6">
+                  <li>Allowed: PDF, PNG, JPG, JPEG, WEBP</li>
+                  <li>Max size: {maxFileSizeMb} MB</li>
+                  <li>Stored under this selected project only</li>
+                </ul>
+              </div>
+              <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">
+                Upload file
+              </button>
+            </form>
+
+            <Link href={`/materials?projectId=${project.id}`} className="inline-flex items-center justify-between rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99]">
+              <span>Review Materials</span>
+              <PremiumBadge tone="sky">Live</PremiumBadge>
             </Link>
           </div>
-        </section>
-
-        <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">Selected project</h2>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Project name</div>
-                <div className="mt-2 text-sm font-semibold text-slate-900">{project.name}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Status</div>
-                <div className="mt-2 text-sm font-semibold text-slate-900">{formatProjectStatus(project.status)}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Address</div>
-                <div className="mt-2 text-sm font-semibold text-slate-900">{project.address || "No address added yet."}</div>
-              </div>
-            </div>
-          </article>
-
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">Upload plans</h2>
-            <p className="mt-1 text-sm text-slate-500">Upload one project file at a time for this selected project.</p>
-            <div className="mt-4 grid gap-3">
-              {feedback ? (
-                <div
-                  className={`rounded-2xl border p-4 text-sm ${
-                    feedback.tone === "success"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                      : "border-rose-200 bg-rose-50 text-rose-900"
-                  }`}
-                >
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em]">
-                    {feedback.tone === "success" ? "Upload complete" : "Upload issue"}
-                  </div>
-                  <p className="mt-2 leading-6">{feedback.text}</p>
-                </div>
-              ) : null}
-
-              <form action={uploadProjectFileAction} encType="multipart/form-data" className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <input type="hidden" name="projectId" value={project.id} />
-                <div>
-                  <label htmlFor="project-file" className="text-sm font-semibold text-slate-900">
-                    Choose file
-                  </label>
-                  <input
-                    id="project-file"
-                    name="file"
-                    type="file"
-                    required
-                    accept=".pdf,image/png,image/jpeg,image/webp"
-                    className="mt-2 block w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700"
-                  />
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Upload rules</div>
-                  <ul className="mt-2 grid gap-1 leading-6">
-                    <li>Allowed: PDF, PNG, JPG, JPEG, WEBP</li>
-                    <li>Max size: {maxFileSizeMb} MB</li>
-                    <li>Stored under this selected project only</li>
-                  </ul>
-                </div>
-                <button
-                  type="submit"
-                  className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
-                >
-                  Upload file
-                </button>
-              </form>
-
-              <Link href="/materials" className={statusButtonClass(materials.status, materials.status === "Coming Soon")}>
-                <span>Review Materials</span>
-                <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-85">{materials.status}</span>
-              </Link>
-            </div>
-          </article>
-        </section>
-      </section>
-    </main>
+        </PremiumSection>
+      </div>
+    </PremiumPageShell>
   );
 }
