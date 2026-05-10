@@ -1,8 +1,8 @@
-import Link from "next/link";
-
 import {
+  PremiumActionTile,
   PremiumBadge,
   PremiumHero,
+  PremiumIconBadge,
   PremiumInfoCard,
   PremiumMutedPanel,
   PremiumPageShell,
@@ -11,18 +11,6 @@ import {
 } from "@/components/buildflow/premium-page";
 import { requireSignedInProfile } from "@/lib/auth";
 import type { ProjectEventRecord, ProjectRecord } from "@/lib/projects";
-
-function ActionLink({ href, label, status }: { href: string; label: string; status?: "Live" | "Partial Live" }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center justify-between rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99]"
-    >
-      <span>{label}</span>
-      {status ? <PremiumBadge tone={status === "Partial Live" ? "amber" : "sky"}>{status}</PremiumBadge> : null}
-    </Link>
-  );
-}
 
 function formatProjectDate(value: string) {
   return new Date(value).toLocaleDateString("en-US", {
@@ -39,6 +27,13 @@ function formatTimelineDate(value: string) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function DockIcon({ type }: { type: "project" | "upload" | "activity" | "start" }) {
+  if (type === "upload") return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 16V5" /><path d="m7 10 5-5 5 5" /><path d="M5 19h14" /></svg>;
+  if (type === "activity") return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 12h4l2-5 4 10 2-5h4" /></svg>;
+  if (type === "start") return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 5v14" /><path d="M5 12h14" /></svg>;
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></svg>;
 }
 
 export default async function DashboardPage() {
@@ -83,28 +78,22 @@ export default async function DashboardPage() {
   return (
     <PremiumPageShell>
       <PremiumHero
-        eyebrow="Client dashboard"
-        title={`Welcome back${firstName ? `, ${firstName}` : ""}`}
-        description={
-          isPending
-            ? "Your account is almost ready. You can review your dashboard now, and the full project workflow will unlock once approval is complete."
-            : "Keep your active projects, uploads, and next steps in one clean BuildFlow workspace."
-        }
+        eyebrow="Dashboard"
+        title={`Welcome${firstName ? `, ${firstName}` : ""}`}
+        description={isPending ? "Your account is almost ready. You can review your projects now, and the full workflow will open up after approval." : "Use this space as your command center for starting a project, opening a workspace, uploading plans, and checking recent activity."}
         badges={
           <>
-            <PremiumBadge>Signed-in client</PremiumBadge>
+            <PremiumBadge>Client</PremiumBadge>
             <PremiumBadge tone={isPending ? "amber" : "emerald"}>{isPending ? "Approval pending" : "Ready"}</PremiumBadge>
           </>
         }
         aside={
-          <div className="rounded-[28px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.9))] p-5 shadow-[0_16px_36px_rgba(148,163,184,0.12)]">
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">At a glance</div>
+          <div className="rounded-[26px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.9))] p-5 shadow-[0_16px_36px_rgba(148,163,184,0.12)]">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Start here</div>
             <div className="mt-3 text-2xl font-semibold text-slate-950">{recentProjects.length}</div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              {recentProjects.length === 1 ? "Project ready to continue." : `${recentProjects.length} projects ready to review.`}
-            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{recentProjects.length > 0 ? "Open a workspace or upload the next plan set." : "Create your first project to begin."}</p>
             <div className="mt-4">
-              <PremiumPrimaryButton href="/projects/new">Start new project</PremiumPrimaryButton>
+              <PremiumPrimaryButton href="/projects/new">Start Project</PremiumPrimaryButton>
             </div>
           </div>
         }
@@ -113,85 +102,72 @@ export default async function DashboardPage() {
       {isPending ? (
         <PremiumMutedPanel tone="amber">
           <div className="text-xs font-semibold uppercase tracking-[0.16em]">Approval in progress</div>
-          <p className="mt-2 leading-6">You can view your dashboard now. Project actions will open up as soon as your account is approved.</p>
+          <p className="mt-2 leading-6">You can review your dashboard now. More actions will unlock as soon as approval is complete.</p>
         </PremiumMutedPanel>
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <PremiumInfoCard label="Account" value={profile?.approval_status === "approved" ? "Approved client" : "Pending approval"} />
-        <PremiumInfoCard label="Projects" value={recentProjects.length} />
-        <PremiumInfoCard label="Latest upload step" value={recentProjects.length > 0 ? "Ready when you are" : "Start a project first"} />
-        <PremiumInfoCard label="Next best action" value={recentProjects.length > 0 ? "Continue your latest project" : "Create your first project"} />
+        <PremiumInfoCard label="Welcome" value={firstName ? `${firstName}, you're signed in.` : "You are signed in."} />
+        <PremiumInfoCard label="Start project" value="Create a new workspace anytime" />
+        <PremiumInfoCard label="My projects" value={`${recentProjects.length} recent project${recentProjects.length === 1 ? "" : "s"}`} />
+        <PremiumInfoCard label="Upload plans" value={recentProjects.length > 0 ? "Ready for your next file" : "Start a project first"} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-        <PremiumSection title="Continue your projects" description="Open a project workspace, upload plans, or keep moving toward review.">
+      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <PremiumSection title="My projects" description="Open your latest workspace and keep moving.">
           {recentProjects.length > 0 ? (
             <div className="grid gap-3">
               {recentProjects.map((project) => (
-                <Link
+                <PremiumActionTile
                   key={project.id}
                   href={`/projects/${project.id}`}
-                  className="block rounded-[26px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.88))] p-5 shadow-[0_12px_28px_rgba(148,163,184,0.1)] transition active:scale-[0.99]"
-                >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <div className="text-base font-semibold text-slate-950">{project.name}</div>
-                      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Updated {formatProjectDate(project.updated_at)}</div>
-                      {project.address ? <p className="mt-3 text-sm leading-6 text-slate-600">{project.address}</p> : null}
-                    </div>
-                    <div className="flex flex-col gap-2 sm:items-end">
-                      <PremiumBadge tone="emerald">Workspace ready</PremiumBadge>
-                      <span className="inline-flex items-center justify-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
-                        Open project
-                      </span>
-                    </div>
-                  </div>
-                </Link>
+                  title={project.name}
+                  detail={project.address ? `${project.address} · Updated ${formatProjectDate(project.updated_at)}` : `Updated ${formatProjectDate(project.updated_at)}`}
+                  badge={<PremiumBadge tone="emerald">Open</PremiumBadge>}
+                  icon={<PremiumIconBadge tone="sky"><DockIcon type="project" /></PremiumIconBadge>}
+                />
               ))}
             </div>
           ) : (
             <PremiumMutedPanel>
               <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">No projects yet</div>
-              <p className="mt-2 leading-6">Start your first project to unlock uploads, materials, quotes, and orders in one place.</p>
+              <p className="mt-2 leading-6">Create your first project to unlock uploads, materials, quotes, and orders.</p>
             </PremiumMutedPanel>
           )}
         </PremiumSection>
 
-        <PremiumSection title="Quick actions" description="Jump into the next client-facing step.">
+        <PremiumSection title="Quick actions" description="Keep the next step obvious.">
           <div className="grid gap-3">
-            <PremiumPrimaryButton href="/projects/new">Start new project</PremiumPrimaryButton>
-            <ActionLink href="/projects" label="View all projects" />
-            <ActionLink href="/upload" label="Upload plans" status="Live" />
-            <ActionLink href="/materials" label="Review materials" status="Live" />
-            <ActionLink href="/quotes" label="Review quote" status="Live" />
-            <ActionLink href="/orders" label="Track orders" status="Partial Live" />
+            <PremiumActionTile href="/projects/new" title="Start Project" detail="Create a new client project workspace." icon={<PremiumIconBadge tone="amber"><DockIcon type="start" /></PremiumIconBadge>} />
+            <PremiumActionTile href="/projects" title="View My Projects" detail="See every project in one place." icon={<PremiumIconBadge tone="slate"><DockIcon type="project" /></PremiumIconBadge>} />
+            <PremiumActionTile href="/upload" title="Upload Plans" detail="Send a plan set into the right workspace." badge={<PremiumBadge tone="sky">Live</PremiumBadge>} icon={<PremiumIconBadge tone="sky"><DockIcon type="upload" /></PremiumIconBadge>} />
           </div>
         </PremiumSection>
       </div>
 
-      <PremiumSection title="Recent project activity" description="Your latest updates appear here when activity is available.">
+      <PremiumSection title={activity.length > 0 ? "Recent activity" : "Timeline"} description="Latest project updates appear here when available.">
         {activity.length > 0 ? (
           <div className="grid gap-3 md:grid-cols-2">
             {activity.map((event) => (
-              <article
-                key={event.id}
-                className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.84))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]"
-              >
-                <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  <PremiumBadge>{event.source}</PremiumBadge>
+              <article key={event.id} className="rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.84))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <PremiumIconBadge tone="slate"><DockIcon type="activity" /></PremiumIconBadge>
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900">{event.title}</h3>
+                      {event.description ? <p className="mt-1 text-sm leading-6 text-slate-600">{event.description}</p> : null}
+                    </div>
+                  </div>
                   <PremiumBadge tone="sky">{event.event_type}</PremiumBadge>
                 </div>
-                <h3 className="mt-3 text-sm font-semibold text-slate-900">{event.title}</h3>
-                {event.description ? <p className="mt-2 text-sm leading-6 text-slate-600">{event.description}</p> : null}
-                <div className="mt-3 text-xs font-medium text-slate-500">{formatTimelineDate(event.created_at)}</div>
+                <div className="mt-3 text-xs font-medium text-slate-500">{event.source} · {formatTimelineDate(event.created_at)}</div>
               </article>
             ))}
           </div>
         ) : (
           <PremiumMutedPanel>
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">No recent activity yet</div>
-            <p className="mt-2 leading-6">As you upload plans or move through your workflow, updates will appear here.</p>
+            <p className="mt-2 leading-6">As you upload plans or move through a project, updates will land here.</p>
           </PremiumMutedPanel>
         )}
       </PremiumSection>

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { createOrderFromApprovedQuoteAction } from "@/app/orders/actions";
@@ -73,7 +72,6 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
           description="Open this page from a project workspace to create or review orders for a specific project."
           badges={
             <>
-              <PremiumBadge>Signed-in client</PremiumBadge>
               <PremiumBadge tone="amber">Partial Live</PremiumBadge>
             </>
           }
@@ -132,12 +130,11 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
       <PremiumHero
         eyebrow="Orders"
         title={project.name}
-        description="Create an order from an approved quote, then review the latest order status in one clear client workspace."
+        description="Create an order from an approved quote, then review the clearest order status available today."
         badges={
           <>
-            <PremiumBadge>Signed-in client</PremiumBadge>
-            <PremiumBadge tone="sky">Project-aware orders</PremiumBadge>
-            <PremiumBadge tone="amber">Actions: Partial Live</PremiumBadge>
+            <PremiumBadge tone="amber">Partial Live</PremiumBadge>
+            <PremiumBadge>Project linked</PremiumBadge>
           </>
         }
         aside={<PremiumBackLink href={`/projects/${project.id}`}>Back to Project Workspace</PremiumBackLink>}
@@ -159,14 +156,12 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
           </div>
         </PremiumSection>
 
-        <PremiumSection title="Order status" description="See the clearest current state for this project before delivery tracking expands further.">
+        <PremiumSection title="Current order status" description="See the clearest current state before delivery tracking expands further.">
           <PremiumMutedPanel tone={projectOrders.length > 0 ? "emerald" : "amber"}>
             <div className="text-xs font-semibold uppercase tracking-[0.16em]">{projectOrders.length > 0 ? `${projectOrders.length} order${projectOrders.length === 1 ? "" : "s"} created` : "No order created yet"}</div>
-            <p className="mt-3 leading-6">{projectOrders.length > 0 ? "Orders are linked to approved quotes for this project, and the current order state is visible below." : "Order creation becomes available after a quote is approved with pricing in place."}</p>
+            <p className="mt-2 leading-6">{projectOrders.length > 0 ? "Orders linked to approved quotes appear below." : "Order creation becomes available after a quote is approved with pricing in place."}</p>
           </PremiumMutedPanel>
-          <div className="mt-4 rounded-2xl border border-sky-100 bg-white p-4 text-sm text-slate-600 shadow-[0_8px_18px_rgba(148,163,184,0.06)]">
-            {latestApprovedQuote ? `Latest approved quote total: ${formatCurrency(latestApprovedQuote.total)}.` : "No approved quote is available yet for this project."}
-          </div>
+          <div className="mt-4 rounded-2xl border border-sky-100 bg-white p-4 text-sm text-slate-600 shadow-[0_8px_18px_rgba(148,163,184,0.06)]">{latestApprovedQuote ? `Latest approved quote total: ${formatCurrency(latestApprovedQuote.total)}.` : "No approved quote is available yet for this project."}</div>
         </PremiumSection>
       </div>
 
@@ -178,7 +173,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
             {approvedQuotes.map((quote, index) => {
               const order = ordersByQuoteId.get(quote.id);
               return (
-                <div key={quote.id} className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.88))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+                <div key={quote.id} className="rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.88))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-slate-900">Approved Quote {index + 1}</div>
@@ -202,17 +197,9 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                       <input type="hidden" name="quoteId" value={quote.id} />
                       <label className="grid gap-2">
                         <span className="text-sm font-semibold text-slate-900">Order notes</span>
-                        <textarea
-                          name="notes"
-                          rows={3}
-                          className="rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900"
-                          placeholder="Optional notes to carry from this approved quote into the order"
-                          defaultValue={quote.notes || ""}
-                        />
+                        <textarea name="notes" rows={3} className="rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Optional notes to carry into the order" defaultValue={quote.notes || ""} />
                       </label>
-                      <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">
-                        Create Order
-                      </button>
+                      <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">Create Order</button>
                     </form>
                   )}
                 </div>
@@ -220,32 +207,6 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
             })}
           </div>
         )}
-      </PremiumSection>
-
-      <PremiumSection title="What is available today" description="Order creation is live, and tracking details appear once an order exists.">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <div className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.82))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold text-slate-900">Order creation</div>
-              <PremiumBadge tone="emerald">Live</PremiumBadge>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-slate-600">Create an order from an approved quote when pricing has been confirmed.</p>
-          </div>
-          <div className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.82))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold text-slate-900">Order status</div>
-              <PremiumBadge tone="amber">Partial Live</PremiumBadge>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-slate-600">Once an order exists, you can review its current status and linked quote details here.</p>
-          </div>
-          <div className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.82))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold text-slate-900">Delivery tracking</div>
-              <PremiumBadge tone="amber">Partial Live</PremiumBadge>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-slate-600">Delivery updates are still limited, so this page keeps the available order information honest and easy to follow.</p>
-          </div>
-        </div>
       </PremiumSection>
     </PremiumPageShell>
   );

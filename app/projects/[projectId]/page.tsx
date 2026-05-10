@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { PremiumBackLink, PremiumBadge, PremiumHero, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumSection } from "@/components/buildflow/premium-page";
+import { PremiumActionTile, PremiumBackLink, PremiumBadge, PremiumHero, PremiumIconBadge, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumSection } from "@/components/buildflow/premium-page";
 import { requireSignedInProfile } from "@/lib/auth";
 import type { ProjectEventRecord, ProjectRecord } from "@/lib/projects";
 
@@ -35,11 +34,15 @@ function getStepTone(status: ProjectStepStatus) {
   return status === "Partial Live" ? "amber" as const : "emerald" as const;
 }
 
-const nextSteps = (projectId: string) => [
-  { title: "Upload Plans", status: "Live", href: `/upload?projectId=${projectId}` },
-  { title: "Materials", status: "Live", href: `/materials?projectId=${projectId}` },
-  { title: "Quote", status: "Live", href: `/quotes?projectId=${projectId}` },
-  { title: "Orders", status: "Partial Live", href: `/orders?projectId=${projectId}` },
+function StepIcon() {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>;
+}
+
+const workflowSteps = (projectId: string) => [
+  { title: "Upload Plans", status: "Live", href: `/upload?projectId=${projectId}`, detail: "Add plans and supporting files for this project." },
+  { title: "Materials", status: "Live", href: `/materials?projectId=${projectId}`, detail: "Review and add material items tied to this workspace." },
+  { title: "Quote", status: "Live", href: `/quotes?projectId=${projectId}`, detail: "Confirm pricing and approve the quote when it is ready." },
+  { title: "Orders", status: "Partial Live", href: `/orders?projectId=${projectId}`, detail: "Create an order from an approved quote and review the current status." },
 ] as const;
 
 export default async function ProjectWorkspacePage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -70,7 +73,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
       <PremiumHero
         eyebrow="Project workspace"
         title={project.name}
-        description="Review project details, stay aligned on the next step, and move smoothly through your client workflow."
+        description="See project details, take the next client action, and check recent timeline updates from one clear workspace."
         badges={
           <>
             <PremiumBadge>{formatProjectStatus(project.status)}</PremiumBadge>
@@ -80,8 +83,8 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
         aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <PremiumSection title="Project details" description="Core project information stays visible here before you take the next action.">
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+        <PremiumSection title="Project details" description="Core project information stays visible here.">
           <div className="grid gap-4 sm:grid-cols-2">
             <PremiumInfoCard label="Project name" value={project.name} />
             <PremiumInfoCard label="Status" value={formatProjectStatus(project.status)} />
@@ -91,45 +94,31 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
           </div>
         </PremiumSection>
 
-        <PremiumSection title="Next steps" description="Each step below takes you directly into the live client workflow.">
+        <PremiumSection title="Project actions" description="One clear action list for the live client workflow.">
           <div className="grid gap-3">
-            {nextSteps(project.id).map((step) => (
-              <Link key={step.title} href={step.href} className="inline-flex items-center justify-between rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99]">
-                <span>{step.title}</span>
-                <PremiumBadge tone={getStepTone(step.status)}>{step.status}</PremiumBadge>
-              </Link>
+            {workflowSteps(project.id).map((step) => (
+              <PremiumActionTile
+                key={step.title}
+                href={step.href}
+                title={step.title}
+                detail={step.detail}
+                badge={<PremiumBadge tone={getStepTone(step.status)}>{step.status}</PremiumBadge>}
+                icon={<PremiumIconBadge tone={step.status === "Partial Live" ? "amber" : "sky"}><StepIcon /></PremiumIconBadge>}
+              />
             ))}
           </div>
         </PremiumSection>
       </div>
 
-      <PremiumSection title="Workflow overview" description="A simple view of what is available for this project right now.">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {nextSteps(project.id).map((step) => (
-            <div key={step.title} className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.84))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-slate-900">{step.title}</div>
-                <PremiumBadge tone={getStepTone(step.status)}>{step.status}</PremiumBadge>
-              </div>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                {step.title === "Orders"
-                  ? "Order creation is available, while tracking and downstream delivery updates are still being finished."
-                  : `Open ${step.title.toLowerCase()} to continue this project.`}
-              </p>
-            </div>
-          ))}
-        </div>
-      </PremiumSection>
-
-      <PremiumSection title="Project timeline" description="Recent project activity appears here as your workflow moves forward.">
+      <PremiumSection title="Project timeline" description="Recent project activity appears here as the workflow moves forward.">
         {timelineEvents && timelineEvents.length > 0 ? (
           <div className="grid gap-4">
             {timelineEvents.map((event) => (
-              <article key={event.id} className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.84))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+              <article key={event.id} className="rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.84))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-900">{event.title}</h3>
-                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]">
+                    <div className="mt-2 flex flex-wrap gap-2">
                       <PremiumBadge>{event.source}</PremiumBadge>
                       <PremiumBadge tone="sky">{event.event_type}</PremiumBadge>
                     </div>

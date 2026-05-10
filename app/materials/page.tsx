@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { addProjectMaterialAction } from "@/app/materials/actions";
@@ -21,6 +20,12 @@ function formatMaterialStatus(status: ProjectMaterialRecord["status"]) {
   return "Draft";
 }
 
+function formatProjectStatus(status: ProjectRecord["status"]) {
+  if (status === "active") return "Active";
+  if (status === "archived") return "Archived";
+  return "Draft";
+}
+
 const materialStatusMessages = {
   "material-name-required": { tone: "error", text: "Material name is required." },
   "quantity-invalid": { tone: "error", text: "Quantity must be a valid number." },
@@ -39,12 +44,7 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
     await requireSignedInProfile();
     return (
       <PremiumPageShell maxWidth="max-w-3xl">
-        <PremiumHero
-          eyebrow="Materials review"
-          title="Materials"
-          description="Open this page from a project workspace so materials stay linked to the right project."
-          aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>}
-        />
+        <PremiumHero eyebrow="Materials" title="Materials" description="Open this page from a project workspace so materials stay linked to the right project." aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>} />
       </PremiumPageShell>
     );
   }
@@ -79,20 +79,20 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
   return (
     <PremiumPageShell>
       <PremiumHero
-        eyebrow="Materials review"
+        eyebrow="Materials"
         title={project.name}
-        description="Review saved materials and add new items for this project from one clear client workspace."
+        description="Review saved materials and add new items without leaving the project context."
         badges={
           <>
-            <PremiumBadge>Signed-in client</PremiumBadge>
-            <PremiumBadge tone="sky">Project-aware materials</PremiumBadge>
+            <PremiumBadge tone="sky">Live</PremiumBadge>
+            <PremiumBadge>Project linked</PremiumBadge>
           </>
         }
         aside={<PremiumBackLink href={`/projects/${project.id}`}>Back to Project Workspace</PremiumBackLink>}
       />
 
       <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-        <PremiumSection title="Add material" description="Add one material item at a time for this selected project.">
+        <PremiumSection title="Add material" description="Add one item at a time for this project.">
           <div className="grid gap-3">
             {feedback ? (
               <PremiumMutedPanel tone={feedback.tone === "success" ? "emerald" : "rose"}>
@@ -101,7 +101,7 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
               </PremiumMutedPanel>
             ) : null}
 
-            <form action={addProjectMaterialAction} className="grid gap-4 rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+            <form action={addProjectMaterialAction} className="grid gap-4 rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
               <input type="hidden" name="projectId" value={project.id} />
               <div>
                 <label htmlFor="material-name" className="text-sm font-semibold text-slate-900">Material name</label>
@@ -125,9 +125,7 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
                 <label htmlFor="material-notes" className="text-sm font-semibold text-slate-900">Notes</label>
                 <textarea id="material-notes" name="notes" rows={4} className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Optional notes" />
               </div>
-              <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">
-                Add material
-              </button>
+              <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">Add material</button>
             </form>
           </div>
         </PremiumSection>
@@ -135,26 +133,22 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
         <PremiumSection title="Selected project" description="Project context stays visible while you review materials.">
           <div className="grid gap-4 sm:grid-cols-2">
             <PremiumInfoCard label="Project name" value={project.name} />
-            <PremiumInfoCard label="Project status" value={project.status} />
+            <PremiumInfoCard label="Project status" value={formatProjectStatus(project.status)} />
             <PremiumInfoCard label="Address" value={project.address || "No address added yet."} spanTwo />
           </div>
         </PremiumSection>
 
-        <PremiumSection title="Materials list" description="Saved materials for this project appear here." className="lg:col-span-2">
+        <PremiumSection title="Materials list" description="Saved materials for this project." className="lg:col-span-2">
           {materials.length === 0 ? (
-            <PremiumMutedPanel>No materials reviewed yet</PremiumMutedPanel>
+            <PremiumMutedPanel>No materials reviewed yet.</PremiumMutedPanel>
           ) : (
             <div className="grid gap-3">
               {materials.map((material) => (
-                <div key={material.id} className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+                <div key={material.id} className="rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-slate-900">{material.name}</div>
-                      <div className="mt-1 text-sm text-slate-600">
-                        {material.category || "Uncategorized"}
-                        {material.quantity !== null ? ` · ${material.quantity}` : ""}
-                        {material.unit ? ` ${material.unit}` : ""}
-                      </div>
+                      <div className="mt-1 text-sm text-slate-600">{material.category || "Uncategorized"}{material.quantity !== null ? ` · ${material.quantity}` : ""}{material.unit ? ` ${material.unit}` : ""}</div>
                     </div>
                     <PremiumBadge>{formatMaterialStatus(material.status)}</PremiumBadge>
                   </div>

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { addMaterialsToQuoteAction, approveQuoteAction, createProjectQuoteAction, updateQuoteItemPricingAction } from "@/app/quotes/actions";
@@ -126,13 +125,13 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
   return (
     <PremiumPageShell>
       <PremiumHero
-        eyebrow="Quote review"
+        eyebrow="Quote"
         title={project.name}
-        description="Review quote details, confirm pricing, and approve with confidence from one clear client workspace."
+        description="Review pricing, confirm quote details, and approve when everything looks right."
         badges={
           <>
-            <PremiumBadge>Signed-in client</PremiumBadge>
-            <PremiumBadge tone="sky">Project-aware quotes</PremiumBadge>
+            <PremiumBadge tone="sky">Live</PremiumBadge>
+            <PremiumBadge>Project linked</PremiumBadge>
           </>
         }
         aside={<PremiumBackLink href={`/projects/${project.id}`}>Back to Project Workspace</PremiumBackLink>}
@@ -146,16 +145,14 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-        <PremiumSection title="Create draft quote" description="Create a draft quote for this selected project.">
-          <form action={createProjectQuoteAction} className="grid gap-4 rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+        <PremiumSection title="Create draft quote" description="Create a draft quote for this project.">
+          <form action={createProjectQuoteAction} className="grid gap-4 rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
             <input type="hidden" name="projectId" value={project.id} />
             <div>
               <label htmlFor="quote-notes" className="text-sm font-semibold text-slate-900">Notes</label>
               <textarea id="quote-notes" name="notes" rows={4} className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Optional notes for this draft quote" />
             </div>
-            <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">
-              Create Draft Quote
-            </button>
+            <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">Create Draft Quote</button>
           </form>
         </PremiumSection>
 
@@ -169,13 +166,13 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
 
         <PremiumSection title="Quotes" description="Review pricing, materials, and approval status for this project." className="lg:col-span-2">
           {quotes.length === 0 ? (
-            <PremiumMutedPanel>No quote prepared yet</PremiumMutedPanel>
+            <PremiumMutedPanel>No quote prepared yet.</PremiumMutedPanel>
           ) : (
             <div className="grid gap-4">
               {quotes.map((quote, index) => {
                 const items = itemsByQuoteId.get(quote.id) || [];
                 return (
-                  <div key={quote.id} className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.88))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+                  <div key={quote.id} className="rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.88))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <div className="text-sm font-semibold text-slate-900">Quote {index + 1}</div>
@@ -184,40 +181,33 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
                       <PremiumBadge>{items.length} item{items.length === 1 ? "" : "s"}</PremiumBadge>
                     </div>
 
-                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                      <div className="sm:col-span-3 flex flex-wrap gap-3">
-                        {quote.status === "draft" ? (
-                          items.length === 0 ? (
-                            <form action={addMaterialsToQuoteAction}>
-                              <input type="hidden" name="projectId" value={project.id} />
-                              <input type="hidden" name="quoteId" value={quote.id} />
-                              <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[#0e2341] px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.99]">
-                                Add Materials to Quote
-                              </button>
-                            </form>
-                          ) : (
-                            <div className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-                              Materials already added
-                            </div>
-                          )
-                        ) : null}
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      {quote.status === "draft" ? (
+                        items.length === 0 ? (
+                          <form action={addMaterialsToQuoteAction}>
+                            <input type="hidden" name="projectId" value={project.id} />
+                            <input type="hidden" name="quoteId" value={quote.id} />
+                            <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[#0e2341] px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.99]">Add Materials to Quote</button>
+                          </form>
+                        ) : (
+                          <div className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">Materials already added</div>
+                        )
+                      ) : null}
 
-                        {quote.status === "draft" || quote.status === "sent" ? (
-                          quote.total > 0 ? (
-                            <form action={approveQuoteAction}>
-                              <input type="hidden" name="projectId" value={project.id} />
-                              <input type="hidden" name="quoteId" value={quote.id} />
-                              <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_14px_28px_rgba(220,168,69,0.2)] transition active:scale-[0.99]">
-                                Approve Quote
-                              </button>
-                            </form>
-                          ) : (
-                            <div className="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
-                              Add pricing before approval
-                            </div>
-                          )
-                        ) : null}
-                      </div>
+                      {(quote.status === "draft" || quote.status === "sent") && quote.total > 0 ? (
+                        <form action={approveQuoteAction}>
+                          <input type="hidden" name="projectId" value={project.id} />
+                          <input type="hidden" name="quoteId" value={quote.id} />
+                          <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_14px_28px_rgba(220,168,69,0.2)] transition active:scale-[0.99]">Approve Quote</button>
+                        </form>
+                      ) : null}
+
+                      {(quote.status === "draft" || quote.status === "sent") && quote.total <= 0 ? (
+                        <div className="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Add pricing before approval</div>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
                       <PremiumInfoCard label="Subtotal" value={formatCurrency(quote.subtotal)} />
                       <PremiumInfoCard label="Tax" value={formatCurrency(quote.tax)} />
                       <PremiumInfoCard label="Total" value={formatCurrency(quote.total)} />
@@ -228,18 +218,15 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
                     <div className="mt-4">
                       <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Quote items</div>
                       {items.length === 0 ? (
-                        <PremiumMutedPanel>No quote items added yet.</PremiumMutedPanel>
+                        <div className="mt-3"><PremiumMutedPanel>No quote items added yet.</PremiumMutedPanel></div>
                       ) : (
                         <div className="mt-3 grid gap-3">
                           {items.map((item) => (
-                            <div key={item.id} className="rounded-[22px] border border-sky-100 bg-white p-3 shadow-[0_8px_18px_rgba(148,163,184,0.06)]">
+                            <div key={item.id} className="rounded-[20px] border border-sky-100 bg-white p-3 shadow-[0_8px_18px_rgba(148,163,184,0.06)]">
                               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                   <div className="text-sm font-semibold text-slate-900">{item.name}</div>
-                                  <div className="mt-1 text-sm text-slate-600">
-                                    {item.quantity !== null ? item.quantity : "—"}
-                                    {item.unit ? ` ${item.unit}` : ""}
-                                  </div>
+                                  <div className="mt-1 text-sm text-slate-600">{item.quantity !== null ? item.quantity : "—"}{item.unit ? ` ${item.unit}` : ""}</div>
                                 </div>
                                 <div className="w-full max-w-sm text-sm text-slate-600 sm:text-right">
                                   <div>{formatCurrency(item.unit_price)} / unit</div>
@@ -253,9 +240,7 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
                                         <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Unit price</span>
                                         <input type="number" name="unitPrice" min="0" step="0.01" defaultValue={item.unit_price} className="w-full rounded-2xl border border-sky-100 bg-white px-3 py-2 text-sm text-slate-900 sm:w-40" />
                                       </label>
-                                      <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[#0e2341] px-3 py-2 text-sm font-semibold text-white transition active:scale-[0.99]">
-                                        Update pricing
-                                      </button>
+                                      <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[#0e2341] px-3 py-2 text-sm font-semibold text-white transition active:scale-[0.99]">Update pricing</button>
                                     </form>
                                   ) : null}
                                 </div>

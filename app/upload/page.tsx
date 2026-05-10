@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { uploadProjectFileAction } from "@/app/upload/actions";
-import { PremiumBackLink, PremiumBadge, PremiumHero, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumSection } from "@/components/buildflow/premium-page";
+import { PremiumActionTile, PremiumBackLink, PremiumBadge, PremiumHero, PremiumIconBadge, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumSection } from "@/components/buildflow/premium-page";
 import { requireSignedInProfile } from "@/lib/auth";
 import { PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES, type ProjectRecord } from "@/lib/projects";
 
@@ -30,6 +29,10 @@ const uploadStatusMessages = {
   "upload-complete": { tone: "success", text: "Project file uploaded successfully." },
 } as const;
 
+function UploadIcon() {
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 16V5" /><path d="m7 10 5-5 5 5" /><path d="M5 19h14" /></svg>;
+}
+
 export default async function UploadPage({ searchParams }: UploadPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const projectId = resolvedSearchParams?.projectId?.trim();
@@ -40,12 +43,7 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
     await requireSignedInProfile();
     return (
       <PremiumPageShell maxWidth="max-w-3xl">
-        <PremiumHero
-          eyebrow="Upload plans"
-          title="Upload plans"
-          description="Open this page from a project workspace so every file stays linked to the right project."
-          aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>}
-        />
+        <PremiumHero eyebrow="Upload plans" title="Upload plans" description="Open this page from a project workspace so every file stays linked to the right project." aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>} />
       </PremiumPageShell>
     );
   }
@@ -71,27 +69,18 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
       <PremiumHero
         eyebrow="Upload plans"
         title={project.name}
-        description="Upload plans and supporting files for this project in one simple client workspace."
+        description="Keep plan uploads simple and attached to the correct workspace."
         badges={
           <>
-            <PremiumBadge>Signed-in client</PremiumBadge>
             <PremiumBadge tone="emerald">Live</PremiumBadge>
-            <PremiumBadge tone="sky">Project-linked upload</PremiumBadge>
+            <PremiumBadge>Project linked</PremiumBadge>
           </>
         }
         aside={<PremiumBackLink href={`/projects/${project.id}`}>Back to Project Workspace</PremiumBackLink>}
       />
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <PremiumSection title="Selected project" description="Project details stay visible while you upload files.">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <PremiumInfoCard label="Project name" value={project.name} />
-            <PremiumInfoCard label="Status" value={formatProjectStatus(project.status)} />
-            <PremiumInfoCard label="Address" value={project.address || "No address added yet."} spanTwo />
-          </div>
-        </PremiumSection>
-
-        <PremiumSection title="Upload plans" description="Upload one file at a time and keep everything attached to this project.">
+        <PremiumSection title="Upload file" description="Choose one file and send it into this project.">
           <div className="grid gap-3">
             {feedback ? (
               <PremiumMutedPanel tone={feedback.tone === "success" ? "emerald" : "rose"}>
@@ -100,40 +89,38 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
               </PremiumMutedPanel>
             ) : null}
 
-            <form action={uploadProjectFileAction} encType="multipart/form-data" className="grid gap-4 rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+            <form action={uploadProjectFileAction} encType="multipart/form-data" className="grid gap-4 rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
               <input type="hidden" name="projectId" value={project.id} />
               <div>
-                <label htmlFor="project-file" className="text-sm font-semibold text-slate-900">
-                  Choose file
-                </label>
-                <input
-                  id="project-file"
-                  name="file"
-                  type="file"
-                  required
-                  accept=".pdf,image/png,image/jpeg,image/webp"
-                  className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900 file:mr-4 file:rounded-xl file:border-0 file:bg-[#0e2341] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
-                />
+                <label htmlFor="project-file" className="text-sm font-semibold text-slate-900">Choose file</label>
+                <input id="project-file" name="file" type="file" required accept=".pdf,image/png,image/jpeg,image/webp" className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900 file:mr-4 file:rounded-xl file:border-0 file:bg-[#0e2341] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white" />
               </div>
               <div className="rounded-2xl border border-sky-100 bg-white p-4 text-sm text-slate-600 shadow-[0_8px_20px_rgba(148,163,184,0.06)]">
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Upload rules</div>
                 <ul className="mt-2 grid gap-1 leading-6">
                   <li>Allowed: PDF, PNG, JPG, JPEG, WEBP</li>
                   <li>Max size: {maxFileSizeMb} MB</li>
-                  <li>Stored under this selected project only</li>
+                  <li>Saved only to this project</li>
                 </ul>
               </div>
-              <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">
-                Upload file
-              </button>
+              <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">Upload file</button>
             </form>
-
-            <Link href={`/materials?projectId=${project.id}`} className="inline-flex items-center justify-between rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99]">
-              <span>Review Materials</span>
-              <PremiumBadge tone="sky">Live</PremiumBadge>
-            </Link>
           </div>
         </PremiumSection>
+
+        <div className="grid gap-4">
+          <PremiumSection title="Selected project" description="Project context stays visible while you upload.">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <PremiumInfoCard label="Project name" value={project.name} />
+              <PremiumInfoCard label="Status" value={formatProjectStatus(project.status)} />
+              <PremiumInfoCard label="Address" value={project.address || "No address added yet."} spanTwo />
+            </div>
+          </PremiumSection>
+
+          <PremiumSection title="Next step" description="Move straight into material review after upload.">
+            <PremiumActionTile href={`/materials?projectId=${project.id}`} title="Review Materials" detail="Continue with the materials list for this same project." badge={<PremiumBadge tone="sky">Live</PremiumBadge>} icon={<PremiumIconBadge tone="sky"><UploadIcon /></PremiumIconBadge>} />
+          </PremiumSection>
+        </div>
       </div>
     </PremiumPageShell>
   );
