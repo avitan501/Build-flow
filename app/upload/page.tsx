@@ -41,9 +41,9 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
     return (
       <PremiumPageShell maxWidth="max-w-3xl">
         <PremiumHero
-          eyebrow="Upload Plans"
-          title="Upload"
-          description="Open this page from a project workspace so the file stays tied to the correct job."
+          eyebrow="Upload plans"
+          title="Upload plans"
+          description="Open this page from a project workspace so every file stays linked to the right project."
           aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>}
         />
       </PremiumPageShell>
@@ -69,21 +69,21 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
   return (
     <PremiumPageShell>
       <PremiumHero
-        eyebrow="Upload Plans"
+        eyebrow="Upload plans"
         title={project.name}
-        description="A clean upload step tied to the selected project so clients always know where files belong."
+        description="Upload plans and supporting files for this project in one simple client workspace."
         badges={
           <>
             <PremiumBadge>Signed-in client</PremiumBadge>
-            <PremiumBadge tone="amber">Live</PremiumBadge>
-            <PremiumBadge tone="sky">Project-aware upload</PremiumBadge>
+            <PremiumBadge tone="emerald">Live</PremiumBadge>
+            <PremiumBadge tone="sky">Project-linked upload</PremiumBadge>
           </>
         }
         aside={<PremiumBackLink href={`/projects/${project.id}`}>Back to Project Workspace</PremiumBackLink>}
       />
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <PremiumSection title="Selected project" description="Quick project context stays visible while uploading.">
+        <PremiumSection title="Selected project" description="Project details stay visible while you upload files.">
           <div className="grid gap-4 sm:grid-cols-2">
             <PremiumInfoCard label="Project name" value={project.name} />
             <PremiumInfoCard label="Status" value={formatProjectStatus(project.status)} />
@@ -91,7 +91,7 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
           </div>
         </PremiumSection>
 
-        <PremiumSection title="Upload plans" description="Upload one project file at a time for this selected project.">
+        <PremiumSection title="Upload plans" description="Upload one file at a time and keep everything attached to this project.">
           <div className="grid gap-3">
             {feedback ? (
               <PremiumMutedPanel tone={feedback.tone === "success" ? "emerald" : "rose"}>

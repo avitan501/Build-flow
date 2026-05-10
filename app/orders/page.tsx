@@ -6,8 +6,6 @@ import { PremiumBackLink, PremiumBadge, PremiumHero, PremiumInfoCard, PremiumMut
 import { requireSignedInProfile } from "@/lib/auth";
 import type { ProjectOrderRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
 
-const journeySteps = ["Start Project", "Upload Plans", "Review Materials", "Review Quote", "Approve Order", "Track Your Order"] as const;
-
 type OrdersPageProps = {
   searchParams?: Promise<{
     projectId?: string;
@@ -71,27 +69,16 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
       <PremiumPageShell>
         <PremiumHero
           eyebrow="Orders"
-          title="Track Your Order"
-          description="The final client step should keep order progress and delivery clarity easy to scan."
+          title="Orders"
+          description="Open this page from a project workspace to create or review orders for a specific project."
           badges={
             <>
               <PremiumBadge>Signed-in client</PremiumBadge>
-              <PremiumBadge tone="sky">Protected client preview</PremiumBadge>
+              <PremiumBadge tone="amber">Partial Live</PremiumBadge>
             </>
           }
           aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>}
         />
-
-        <PremiumSection title="6-step client journey" description="The signed-in client path ends here with order tracking and progress visibility.">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-            {journeySteps.map((step, index) => (
-              <div key={step} className={`rounded-[24px] border px-4 py-4 ${index === journeySteps.length - 1 ? "border-emerald-200 bg-emerald-50" : "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.82))]"}`}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{index === journeySteps.length - 1 ? "Final step" : `Step ${index + 1}`}</div>
-                <div className="mt-2 text-sm font-semibold text-slate-900">{step}</div>
-              </div>
-            ))}
-          </div>
-        </PremiumSection>
       </PremiumPageShell>
     );
   }
@@ -145,7 +132,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
       <PremiumHero
         eyebrow="Orders"
         title={project.name}
-        description="Create an order from an approved quote, then keep tracking and delivery visibility clean and premium."
+        description="Create an order from an approved quote, then review the latest order status in one clear client workspace."
         badges={
           <>
             <PremiumBadge>Signed-in client</PremiumBadge>
@@ -172,13 +159,13 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
           </div>
         </PremiumSection>
 
-        <PremiumSection title="Order status" description="Show the clearest current state before any delivery features unlock.">
+        <PremiumSection title="Order status" description="See the clearest current state for this project before delivery tracking expands further.">
           <PremiumMutedPanel tone={projectOrders.length > 0 ? "emerald" : "amber"}>
             <div className="text-xs font-semibold uppercase tracking-[0.16em]">{projectOrders.length > 0 ? `${projectOrders.length} order${projectOrders.length === 1 ? "" : "s"} created` : "No order created yet"}</div>
-            <p className="mt-3 leading-6">{projectOrders.length > 0 ? "Orders are now linked to approved quotes for this project. Delivery tracking stays clearly staged." : "Orders activate only from approved quotes with pricing already confirmed."}</p>
+            <p className="mt-3 leading-6">{projectOrders.length > 0 ? "Orders are linked to approved quotes for this project, and the current order state is visible below." : "Order creation becomes available after a quote is approved with pricing in place."}</p>
           </PremiumMutedPanel>
           <div className="mt-4 rounded-2xl border border-sky-100 bg-white p-4 text-sm text-slate-600 shadow-[0_8px_18px_rgba(148,163,184,0.06)]">
-            {latestApprovedQuote ? `Latest approved quote total: ${formatCurrency(latestApprovedQuote.total)}.` : "No approved quote is available yet for this project. Order creation stays disabled until a quote is approved."}
+            {latestApprovedQuote ? `Latest approved quote total: ${formatCurrency(latestApprovedQuote.total)}.` : "No approved quote is available yet for this project."}
           </div>
         </PremiumSection>
       </div>
@@ -235,16 +222,29 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
         )}
       </PremiumSection>
 
-      <PremiumSection title="Delivery tracking actions" description="Order creation is live. Delivery tracking and vendor progress stay visibly staged for later.">
+      <PremiumSection title="What is available today" description="Order creation is live, and tracking details appear once an order exists.">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {['Approve order','Track delivery','Vendor updates'].map((label) => (
-            <div key={label} className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.82))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</div>
-              <button type="button" disabled className="mt-3 inline-flex w-full cursor-not-allowed items-center justify-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-400 opacity-80">
-                Coming Soon
-              </button>
+          <div className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.82))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm font-semibold text-slate-900">Order creation</div>
+              <PremiumBadge tone="emerald">Live</PremiumBadge>
             </div>
-          ))}
+            <p className="mt-3 text-sm leading-6 text-slate-600">Create an order from an approved quote when pricing has been confirmed.</p>
+          </div>
+          <div className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.82))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm font-semibold text-slate-900">Order status</div>
+              <PremiumBadge tone="amber">Partial Live</PremiumBadge>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-600">Once an order exists, you can review its current status and linked quote details here.</p>
+          </div>
+          <div className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.82))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm font-semibold text-slate-900">Delivery tracking</div>
+              <PremiumBadge tone="amber">Partial Live</PremiumBadge>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-600">Delivery updates are still limited, so this page keeps the available order information honest and easy to follow.</p>
+          </div>
         </div>
       </PremiumSection>
     </PremiumPageShell>

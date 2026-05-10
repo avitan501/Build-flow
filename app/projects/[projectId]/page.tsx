@@ -29,12 +29,10 @@ function formatProjectStatus(status: ProjectRecord["status"]) {
   return "Draft";
 }
 
-type ProjectStepStatus = "Live" | "Partial Live" | "Coming Soon";
+type ProjectStepStatus = "Live" | "Partial Live";
 
 function getStepTone(status: ProjectStepStatus) {
-  if (status === "Partial Live") return "amber" as const;
-  if (status === "Coming Soon") return "sky" as const;
-  return "emerald" as const;
+  return status === "Partial Live" ? "amber" as const : "emerald" as const;
 }
 
 const nextSteps = (projectId: string) => [
@@ -70,9 +68,9 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
   return (
     <PremiumPageShell maxWidth="max-w-6xl">
       <PremiumHero
-        eyebrow="Project Workspace"
+        eyebrow="Project workspace"
         title={project.name}
-        description="Review project details and move into the next client steps from one premium control center."
+        description="Review project details, stay aligned on the next step, and move smoothly through your client workflow."
         badges={
           <>
             <PremiumBadge>{formatProjectStatus(project.status)}</PremiumBadge>
@@ -83,16 +81,17 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
       />
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <PremiumSection title="Project details" description="Core project context stays visible here before the next action.">
+        <PremiumSection title="Project details" description="Core project information stays visible here before you take the next action.">
           <div className="grid gap-4 sm:grid-cols-2">
             <PremiumInfoCard label="Project name" value={project.name} />
             <PremiumInfoCard label="Status" value={formatProjectStatus(project.status)} />
             <PremiumInfoCard label="Address" value={project.address || "No address added yet."} spanTwo />
-            <PremiumInfoCard label="Created date" value={formatProjectDate(project.created_at)} spanTwo />
+            <PremiumInfoCard label="Created date" value={formatProjectDate(project.created_at)} />
+            <PremiumInfoCard label="Last updated" value={formatProjectDate(project.updated_at)} />
           </div>
         </PremiumSection>
 
-        <PremiumSection title="Next steps" description="The workspace should always point to the clearest next action.">
+        <PremiumSection title="Next steps" description="Each step below takes you directly into the live client workflow.">
           <div className="grid gap-3">
             {nextSteps(project.id).map((step) => (
               <Link key={step.title} href={step.href} className="inline-flex items-center justify-between rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99]">
@@ -104,7 +103,25 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
         </PremiumSection>
       </div>
 
-      <PremiumSection title="Project timeline" description="Recent read-only activity for this project.">
+      <PremiumSection title="Workflow overview" description="A simple view of what is available for this project right now.">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {nextSteps(project.id).map((step) => (
+            <div key={step.title} className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.84))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-slate-900">{step.title}</div>
+                <PremiumBadge tone={getStepTone(step.status)}>{step.status}</PremiumBadge>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                {step.title === "Orders"
+                  ? "Order creation is available, while tracking and downstream delivery updates are still being finished."
+                  : `Open ${step.title.toLowerCase()} to continue this project.`}
+              </p>
+            </div>
+          ))}
+        </div>
+      </PremiumSection>
+
+      <PremiumSection title="Project timeline" description="Recent project activity appears here as your workflow moves forward.">
         {timelineEvents && timelineEvents.length > 0 ? (
           <div className="grid gap-4">
             {timelineEvents.map((event) => (
@@ -124,7 +141,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
             ))}
           </div>
         ) : (
-          <PremiumMutedPanel>No timeline events yet</PremiumMutedPanel>
+          <PremiumMutedPanel>No timeline events yet.</PremiumMutedPanel>
         )}
       </PremiumSection>
     </PremiumPageShell>

@@ -40,9 +40,9 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
     return (
       <PremiumPageShell maxWidth="max-w-3xl">
         <PremiumHero
-          eyebrow="Materials Review"
+          eyebrow="Materials review"
           title="Materials"
-          description="Open this page from a project workspace so the materials stay linked to the correct job."
+          description="Open this page from a project workspace so materials stay linked to the right project."
           aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>}
         />
       </PremiumPageShell>
@@ -79,9 +79,9 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
   return (
     <PremiumPageShell>
       <PremiumHero
-        eyebrow="Materials Review"
+        eyebrow="Materials review"
         title={project.name}
-        description="Review saved materials and add draft items in a cleaner, more curated materials workspace."
+        description="Review saved materials and add new items for this project from one clear client workspace."
         badges={
           <>
             <PremiumBadge>Signed-in client</PremiumBadge>
@@ -92,7 +92,7 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
       />
 
       <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-        <PremiumSection title="Add material" description="Manually add one draft material item to this selected project.">
+        <PremiumSection title="Add material" description="Add one material item at a time for this selected project.">
           <div className="grid gap-3">
             {feedback ? (
               <PremiumMutedPanel tone={feedback.tone === "success" ? "emerald" : "rose"}>
@@ -132,7 +132,7 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
           </div>
         </PremiumSection>
 
-        <PremiumSection title="Selected project" description="Project context stays visible while reviewing materials.">
+        <PremiumSection title="Selected project" description="Project context stays visible while you review materials.">
           <div className="grid gap-4 sm:grid-cols-2">
             <PremiumInfoCard label="Project name" value={project.name} />
             <PremiumInfoCard label="Project status" value={project.status} />
@@ -140,7 +140,7 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
           </div>
         </PremiumSection>
 
-        <PremiumSection title="Materials list" description="Read-only view of saved materials for this project." className="lg:col-span-2">
+        <PremiumSection title="Materials list" description="Saved materials for this project appear here." className="lg:col-span-2">
           {materials.length === 0 ? (
             <PremiumMutedPanel>No materials reviewed yet</PremiumMutedPanel>
           ) : (

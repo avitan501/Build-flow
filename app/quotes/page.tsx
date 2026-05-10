@@ -64,7 +64,7 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
     await requireSignedInProfile();
     return (
       <PremiumPageShell maxWidth="max-w-3xl">
-        <PremiumHero eyebrow="Quote Review" title="Quotes" description="Open this page from a project workspace." aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>} />
+        <PremiumHero eyebrow="Quote review" title="Quotes" description="Open this page from a project workspace to review pricing for a specific project." aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>} />
       </PremiumPageShell>
     );
   }
@@ -126,9 +126,9 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
   return (
     <PremiumPageShell>
       <PremiumHero
-        eyebrow="Quote Review"
+        eyebrow="Quote review"
         title={project.name}
-        description="Review draft quotes in a cleaner, high-trust workspace with pricing and approval clearly separated."
+        description="Review quote details, confirm pricing, and approve with confidence from one clear client workspace."
         badges={
           <>
             <PremiumBadge>Signed-in client</PremiumBadge>
@@ -146,7 +146,7 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-        <PremiumSection title="Create draft quote" description="Create one draft quote shell for this selected project.">
+        <PremiumSection title="Create draft quote" description="Create a draft quote for this selected project.">
           <form action={createProjectQuoteAction} className="grid gap-4 rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
             <input type="hidden" name="projectId" value={project.id} />
             <div>
@@ -159,7 +159,7 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
           </form>
         </PremiumSection>
 
-        <PremiumSection title="Selected project" description="Keep project context visible while preparing quotes.">
+        <PremiumSection title="Selected project" description="Project context stays visible while you review quotes.">
           <div className="grid gap-4 sm:grid-cols-2">
             <PremiumInfoCard label="Project name" value={project.name} />
             <PremiumInfoCard label="Quotes found" value={quotes.length} />
