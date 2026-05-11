@@ -1,46 +1,51 @@
-import { PremiumActionTile, PremiumBadge, PremiumHero, PremiumIconBadge, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumPrimaryButton, PremiumSection } from "@/components/buildflow/premium-page";
-import { requireSignedInProfile } from "@/lib/auth";
-import { PROJECT_CREATION_STATUS_LABEL, type ProjectRecord } from "@/lib/projects";
+import { PremiumActionTile, PremiumBadge, PremiumEmptyState, PremiumHero, PremiumIconBadge, PremiumInfoCard, PremiumPageShell, PremiumPhotoPanel, PremiumPrimaryButton, PremiumSection } from "@/components/buildflow/premium-page"
+import { requireSignedInProfile } from "@/lib/auth"
+import { PROJECT_CREATION_STATUS_LABEL, type ProjectRecord } from "@/lib/projects"
+
+const projectsImage =
+  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1400&q=80"
+const workspaceImage =
+  "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1400&q=80"
 
 function formatProjectDate(value: string) {
   return new Date(value).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
-  });
+  })
 }
 
 function formatProjectStatus(status: ProjectRecord["status"]) {
-  if (status === "active") return "Active";
-  if (status === "archived") return "Archived";
-  return "Draft";
+  if (status === "active") return "Active"
+  if (status === "archived") return "Archived"
+  return "Draft"
 }
 
 function GridIcon() {
-  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></svg>;
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></svg>
 }
 
 function PlusIcon() {
-  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 5v14" /><path d="M5 12h14" /></svg>;
+  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
 }
 
 export default async function ProjectsPage() {
-  const { supabase, user } = await requireSignedInProfile();
+  const { supabase, user } = await requireSignedInProfile()
 
   const { data: projectRows, error: projectsError } = await supabase
     .from("projects")
     .select("id, owner_id, name, address, status, created_at, updated_at")
     .eq("owner_id", user.id)
     .order("created_at", { ascending: false })
-    .returns<ProjectRecord[]>();
+    .returns<ProjectRecord[]>()
 
   if (projectsError) {
-    throw new Error("Failed to load projects.");
+    throw new Error("Failed to load projects.")
   }
 
-  const projectList = projectRows ?? [];
-  const hasProjects = projectList.length > 0;
-  const activeProjects = projectList.filter((project) => project.status === "active").length;
+  const projectList = projectRows ?? []
+  const hasProjects = projectList.length > 0
+  const activeProjects = projectList.filter((project) => project.status === "active").length
 
   return (
     <PremiumPageShell>
@@ -75,27 +80,40 @@ export default async function ProjectsPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <PremiumSection title={hasProjects ? "Project list" : "Ready to start?"} description={hasProjects ? "Each project opens directly into its workspace." : "Create your first project to begin the client workflow."}>
-          {hasProjects ? (
-            <div className="grid gap-3">
-              {projectList.map((project) => (
-                <PremiumActionTile
-                  key={project.id}
-                  href={`/projects/${project.id}`}
-                  title={project.name}
-                  detail={`${formatProjectStatus(project.status)} · Created ${formatProjectDate(project.created_at)}${project.address ? ` · ${project.address}` : ""}`}
-                  badge={<PremiumBadge tone="emerald">Workspace</PremiumBadge>}
-                  icon={<PremiumIconBadge tone="sky"><GridIcon /></PremiumIconBadge>}
-                />
-              ))}
-            </div>
-          ) : (
-            <PremiumMutedPanel>
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">No projects yet</div>
-              <p className="mt-2 leading-6">Start New Project to create your first workspace and unlock the rest of your workflow.</p>
-            </PremiumMutedPanel>
-          )}
-        </PremiumSection>
+        <div className="grid gap-4">
+          <PremiumPhotoPanel
+            image={projectsImage}
+            eyebrow="Premium workspace"
+            title="See every residential project in a cleaner, more trustworthy view."
+            description="The project hub now feels more grounded in the real work: organized homes, materials, and approvals without clutter."
+            badge={<PremiumBadge tone="amber">Mobile-first</PremiumBadge>}
+          />
+
+          <PremiumSection title={hasProjects ? "Project list" : "Ready to start?"} description={hasProjects ? "Each project opens directly into its workspace." : "Create your first project to begin the client workflow."}>
+            {hasProjects ? (
+              <div className="grid gap-3">
+                {projectList.map((project) => (
+                  <PremiumActionTile
+                    key={project.id}
+                    href={`/projects/${project.id}`}
+                    title={project.name}
+                    detail={`${formatProjectStatus(project.status)} · Created ${formatProjectDate(project.created_at)}${project.address ? ` · ${project.address}` : ""}`}
+                    badge={<PremiumBadge tone="emerald">Workspace</PremiumBadge>}
+                    icon={<PremiumIconBadge tone="sky"><GridIcon /></PremiumIconBadge>}
+                  />
+                ))}
+              </div>
+            ) : (
+              <PremiumEmptyState
+                image={workspaceImage}
+                eyebrow="No projects yet"
+                title="Start your first polished client workspace"
+                description="Create a project to keep plans, materials, quotes, and orders aligned from the very beginning."
+                action={<PremiumPrimaryButton href="/projects/new">Start New Project</PremiumPrimaryButton>}
+              />
+            )}
+          </PremiumSection>
+        </div>
 
         <PremiumSection title="Next actions" description="Keep the path forward short and clear.">
           <div className="grid gap-3">
@@ -108,5 +126,5 @@ export default async function ProjectsPage() {
         </PremiumSection>
       </div>
     </PremiumPageShell>
-  );
+  )
 }

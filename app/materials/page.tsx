@@ -1,29 +1,34 @@
-import { notFound } from "next/navigation";
+import { notFound } from "next/navigation"
 
-import { addProjectMaterialAction } from "@/app/materials/actions";
-import { PremiumBackLink, PremiumBadge, PremiumHero, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumSection } from "@/components/buildflow/premium-page";
-import { requireSignedInProfile } from "@/lib/auth";
-import type { ProjectMaterialRecord, ProjectRecord } from "@/lib/projects";
+import { addProjectMaterialAction } from "@/app/materials/actions"
+import { PremiumBackLink, PremiumBadge, PremiumEmptyState, PremiumHero, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumPhotoPanel, PremiumSection } from "@/components/buildflow/premium-page"
+import { requireSignedInProfile } from "@/lib/auth"
+import type { ProjectMaterialRecord, ProjectRecord } from "@/lib/projects"
+
+const materialsHeroImage =
+  "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1400&q=80"
+const materialsEmptyImage =
+  "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1400&q=80"
 
 type MaterialsPageProps = {
   searchParams?: Promise<{
-    projectId?: string;
-    error?: string;
-    success?: string;
-  }>;
-};
+    projectId?: string
+    error?: string
+    success?: string
+  }>
+}
 
 function formatMaterialStatus(status: ProjectMaterialRecord["status"]) {
-  if (status === "approved") return "Approved";
-  if (status === "reviewed") return "Reviewed";
-  if (status === "archived") return "Archived";
-  return "Draft";
+  if (status === "approved") return "Approved"
+  if (status === "reviewed") return "Reviewed"
+  if (status === "archived") return "Archived"
+  return "Draft"
 }
 
 function formatProjectStatus(status: ProjectRecord["status"]) {
-  if (status === "active") return "Active";
-  if (status === "archived") return "Archived";
-  return "Draft";
+  if (status === "active") return "Active"
+  if (status === "archived") return "Archived"
+  return "Draft"
 }
 
 const materialStatusMessages = {
@@ -32,34 +37,41 @@ const materialStatusMessages = {
   "project-not-found": { tone: "error", text: "We could not confirm that project for your account." },
   "material-create-failed": { tone: "error", text: "Material could not be saved. Please try again." },
   "material-added": { tone: "success", text: "Material added successfully." },
-} as const;
+} as const
 
 export default async function MaterialsPage({ searchParams }: MaterialsPageProps) {
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const projectId = resolvedSearchParams?.projectId?.trim();
-  const errorCode = resolvedSearchParams?.error?.trim();
-  const successCode = resolvedSearchParams?.success?.trim();
+  const resolvedSearchParams = searchParams ? await searchParams : undefined
+  const projectId = resolvedSearchParams?.projectId?.trim()
+  const errorCode = resolvedSearchParams?.error?.trim()
+  const successCode = resolvedSearchParams?.success?.trim()
 
   if (!projectId) {
-    await requireSignedInProfile();
+    await requireSignedInProfile()
     return (
       <PremiumPageShell maxWidth="max-w-3xl">
         <PremiumHero eyebrow="Materials" title="Materials" description="Open this page from a project workspace so materials stay linked to the right project." aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>} />
+        <PremiumEmptyState
+          image={materialsEmptyImage}
+          eyebrow="Project-linked materials"
+          title="Open a workspace before building a materials list"
+          description="That keeps search, quantity notes, quotes, and future orders attached to the correct residential project from the start."
+          action={<PremiumBackLink href="/projects">Open Projects</PremiumBackLink>}
+        />
       </PremiumPageShell>
-    );
+    )
   }
 
-  const { supabase, user } = await requireSignedInProfile();
+  const { supabase, user } = await requireSignedInProfile()
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
     .select("id, owner_id, name, address, status, created_at, updated_at")
     .eq("id", projectId)
     .eq("owner_id", user.id)
-    .maybeSingle<ProjectRecord>();
+    .maybeSingle<ProjectRecord>()
 
   if (projectError || !project) {
-    notFound();
+    notFound()
   }
 
   const { data: materials, error: materialsError } = await supabase
@@ -68,13 +80,13 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
     .eq("project_id", project.id)
     .eq("owner_id", user.id)
     .order("created_at", { ascending: true })
-    .returns<ProjectMaterialRecord[]>();
+    .returns<ProjectMaterialRecord[]>()
 
   if (materialsError) {
-    throw new Error("Failed to load project materials.");
+    throw new Error("Failed to load project materials.")
   }
 
-  const feedback = (successCode && materialStatusMessages[successCode as keyof typeof materialStatusMessages]) || (errorCode && materialStatusMessages[errorCode as keyof typeof materialStatusMessages]);
+  const feedback = (successCode && materialStatusMessages[successCode as keyof typeof materialStatusMessages]) || (errorCode && materialStatusMessages[errorCode as keyof typeof materialStatusMessages])
 
   return (
     <PremiumPageShell>
@@ -92,43 +104,53 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
       />
 
       <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-        <PremiumSection title="Add material" description="Add one item at a time for this project.">
-          <div className="grid gap-3">
-            {feedback ? (
-              <PremiumMutedPanel tone={feedback.tone === "success" ? "emerald" : "rose"}>
-                <div className="text-xs font-semibold uppercase tracking-[0.16em]">{feedback.tone === "success" ? "Saved" : "Material issue"}</div>
-                <p className="mt-2 leading-6">{feedback.text}</p>
-              </PremiumMutedPanel>
-            ) : null}
+        <div className="grid gap-4">
+          <PremiumPhotoPanel
+            image={materialsHeroImage}
+            eyebrow="Materials search"
+            title="A stronger materials surface for real residential product review"
+            description="Use this space to collect lumber, finish, and structural items while keeping the project context visible and premium."
+            badge={<PremiumBadge tone="amber">Feature-led</PremiumBadge>}
+          />
 
-            <form action={addProjectMaterialAction} className="grid gap-4 rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
-              <input type="hidden" name="projectId" value={project.id} />
-              <div>
-                <label htmlFor="material-name" className="text-sm font-semibold text-slate-900">Material name</label>
-                <input id="material-name" name="name" type="text" required className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Example: 2x4 framing lumber" />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
+          <PremiumSection title="Add material" description="Add one item at a time for this project.">
+            <div className="grid gap-3">
+              {feedback ? (
+                <PremiumMutedPanel tone={feedback.tone === "success" ? "emerald" : "rose"}>
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em]">{feedback.tone === "success" ? "Saved" : "Material issue"}</div>
+                  <p className="mt-2 leading-6">{feedback.text}</p>
+                </PremiumMutedPanel>
+              ) : null}
+
+              <form action={addProjectMaterialAction} className="grid gap-4 rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+                <input type="hidden" name="projectId" value={project.id} />
                 <div>
-                  <label htmlFor="material-category" className="text-sm font-semibold text-slate-900">Category</label>
-                  <input id="material-category" name="category" type="text" className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Example: Framing" />
+                  <label htmlFor="material-name" className="text-sm font-semibold text-slate-900">Material name</label>
+                  <input id="material-name" name="name" type="text" required className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Example: 2x4 framing lumber" />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="material-category" className="text-sm font-semibold text-slate-900">Category</label>
+                    <input id="material-category" name="category" type="text" className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Example: Framing" />
+                  </div>
+                  <div>
+                    <label htmlFor="material-unit" className="text-sm font-semibold text-slate-900">Unit</label>
+                    <input id="material-unit" name="unit" type="text" className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Example: pcs" />
+                  </div>
                 </div>
                 <div>
-                  <label htmlFor="material-unit" className="text-sm font-semibold text-slate-900">Unit</label>
-                  <input id="material-unit" name="unit" type="text" className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Example: pcs" />
+                  <label htmlFor="material-quantity" className="text-sm font-semibold text-slate-900">Quantity</label>
+                  <input id="material-quantity" name="quantity" type="number" step="any" className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Example: 24" />
                 </div>
-              </div>
-              <div>
-                <label htmlFor="material-quantity" className="text-sm font-semibold text-slate-900">Quantity</label>
-                <input id="material-quantity" name="quantity" type="number" step="any" className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Example: 24" />
-              </div>
-              <div>
-                <label htmlFor="material-notes" className="text-sm font-semibold text-slate-900">Notes</label>
-                <textarea id="material-notes" name="notes" rows={4} className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Optional notes" />
-              </div>
-              <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">Add material</button>
-            </form>
-          </div>
-        </PremiumSection>
+                <div>
+                  <label htmlFor="material-notes" className="text-sm font-semibold text-slate-900">Notes</label>
+                  <textarea id="material-notes" name="notes" rows={4} className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Optional notes" />
+                </div>
+                <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">Add material</button>
+              </form>
+            </div>
+          </PremiumSection>
+        </div>
 
         <PremiumSection title="Selected project" description="Project context stays visible while you review materials.">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -140,7 +162,12 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
 
         <PremiumSection title="Materials list" description="Saved materials for this project." className="lg:col-span-2">
           {materials.length === 0 ? (
-            <PremiumMutedPanel>No materials reviewed yet.</PremiumMutedPanel>
+            <PremiumEmptyState
+              image={materialsEmptyImage}
+              eyebrow="No materials yet"
+              title="Build the first curated list for this project"
+              description="Add framing, finish, or specialty items here so quote review and approvals have a clean starting point."
+            />
           ) : (
             <div className="grid gap-3">
               {materials.map((material) => (
@@ -160,5 +187,5 @@ export default async function MaterialsPage({ searchParams }: MaterialsPageProps
         </PremiumSection>
       </div>
     </PremiumPageShell>
-  );
+  )
 }

@@ -1,17 +1,22 @@
-import { notFound } from "next/navigation";
+import { notFound } from "next/navigation"
 
-import { createOrderFromApprovedQuoteAction } from "@/app/orders/actions";
-import { PremiumBackLink, PremiumBadge, PremiumHero, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumSection } from "@/components/buildflow/premium-page";
-import { requireSignedInProfile } from "@/lib/auth";
-import type { ProjectOrderRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
+import { createOrderFromApprovedQuoteAction } from "@/app/orders/actions"
+import { PremiumBackLink, PremiumBadge, PremiumEmptyState, PremiumHero, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumPhotoPanel, PremiumSection } from "@/components/buildflow/premium-page"
+import { requireSignedInProfile } from "@/lib/auth"
+import type { ProjectOrderRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects"
+
+const ordersImage =
+  "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1400&q=80"
+const ordersEmptyImage =
+  "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1400&q=80"
 
 type OrdersPageProps = {
   searchParams?: Promise<{
-    projectId?: string;
-    error?: string;
-    success?: string;
-  }>;
-};
+    projectId?: string
+    error?: string
+    success?: string
+  }>
+}
 
 const orderStatusMessages = {
   "project-not-found": { tone: "error", text: "We could not confirm that project for your account." },
@@ -22,29 +27,29 @@ const orderStatusMessages = {
   "order-create-failed": { tone: "error", text: "Order could not be created from this approved quote. Please try again." },
   "order-created": { tone: "success", text: "Order created successfully from the approved quote." },
   "order-already-exists": { tone: "success", text: "An order already exists for this approved quote." },
-} as const;
+} as const
 
 function formatQuoteStatus(status: ProjectQuoteRecord["status"]) {
-  if (status === "approved") return "Approved";
-  if (status === "sent") return "Sent";
-  if (status === "rejected") return "Rejected";
-  if (status === "archived") return "Archived";
-  return "Draft";
+  if (status === "approved") return "Approved"
+  if (status === "sent") return "Sent"
+  if (status === "rejected") return "Rejected"
+  if (status === "archived") return "Archived"
+  return "Draft"
 }
 
 function formatOrderStatus(status: ProjectOrderRecord["status"]) {
-  if (status === "approved") return "Approved";
-  if (status === "ordered") return "Ordered";
-  if (status === "delivered") return "Delivered";
-  if (status === "cancelled") return "Cancelled";
-  if (status === "archived") return "Archived";
-  return "Draft";
+  if (status === "approved") return "Approved"
+  if (status === "ordered") return "Ordered"
+  if (status === "delivered") return "Delivered"
+  if (status === "cancelled") return "Cancelled"
+  if (status === "archived") return "Archived"
+  return "Draft"
 }
 
 function formatTrackingStatus(status: ProjectOrderRecord["tracking_status"]) {
-  if (status === "not_started") return "Not started";
-  if (status === "in_delivery") return "In delivery";
-  return status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  if (status === "not_started") return "Not started"
+  if (status === "in_delivery") return "In delivery"
+  return status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
 function formatCurrency(value: number) {
@@ -53,17 +58,17 @@ function formatCurrency(value: number) {
     currency: "USD",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(value);
+  }).format(value)
 }
 
 export default async function OrdersPage({ searchParams }: OrdersPageProps) {
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const projectId = resolvedSearchParams?.projectId?.trim();
-  const errorCode = resolvedSearchParams?.error?.trim();
-  const successCode = resolvedSearchParams?.success?.trim();
+  const resolvedSearchParams = searchParams ? await searchParams : undefined
+  const projectId = resolvedSearchParams?.projectId?.trim()
+  const errorCode = resolvedSearchParams?.error?.trim()
+  const successCode = resolvedSearchParams?.success?.trim()
 
   if (!projectId) {
-    await requireSignedInProfile();
+    await requireSignedInProfile()
     return (
       <PremiumPageShell>
         <PremiumHero
@@ -77,21 +82,28 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
           }
           aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>}
         />
+        <PremiumEmptyState
+          image={ordersEmptyImage}
+          eyebrow="Project-linked orders"
+          title="Open a project before reviewing approvals and delivery status"
+          description="That keeps every order tied to the right quote, address, and client decisions without losing context."
+          action={<PremiumBackLink href="/projects">Open Projects</PremiumBackLink>}
+        />
       </PremiumPageShell>
-    );
+    )
   }
 
-  const { supabase, user } = await requireSignedInProfile();
+  const { supabase, user } = await requireSignedInProfile()
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
     .select("id, owner_id, name, address, status, created_at, updated_at")
     .eq("id", projectId)
     .eq("owner_id", user.id)
-    .maybeSingle<ProjectRecord>();
+    .maybeSingle<ProjectRecord>()
 
   if (projectError || !project) {
-    notFound();
+    notFound()
   }
 
   const { data: quotesData, error: quotesError } = await supabase
@@ -100,10 +112,10 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     .eq("project_id", project.id)
     .eq("owner_id", user.id)
     .order("created_at", { ascending: true })
-    .returns<ProjectQuoteRecord[]>();
+    .returns<ProjectQuoteRecord[]>()
 
   if (quotesError) {
-    throw new Error("Failed to load project quotes.");
+    throw new Error("Failed to load project quotes.")
   }
 
   const { data: ordersData, error: ordersError } = await supabase
@@ -112,18 +124,18 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
     .eq("project_id", project.id)
     .eq("owner_id", user.id)
     .order("created_at", { ascending: true })
-    .returns<ProjectOrderRecord[]>();
+    .returns<ProjectOrderRecord[]>()
 
   if (ordersError) {
-    throw new Error("Failed to load project orders.");
+    throw new Error("Failed to load project orders.")
   }
 
-  const projectQuotes = quotesData ?? [];
-  const projectOrders = ordersData ?? [];
-  const approvedQuotes = projectQuotes.filter((quote) => quote.status === "approved");
-  const latestApprovedQuote = approvedQuotes.at(-1) ?? null;
-  const ordersByQuoteId = new Map(projectOrders.filter((order) => order.quote_id).map((order) => [order.quote_id as string, order]));
-  const feedback = (successCode && orderStatusMessages[successCode as keyof typeof orderStatusMessages]) || (errorCode && orderStatusMessages[errorCode as keyof typeof orderStatusMessages]);
+  const projectQuotes = quotesData ?? []
+  const projectOrders = ordersData ?? []
+  const approvedQuotes = projectQuotes.filter((quote) => quote.status === "approved")
+  const latestApprovedQuote = approvedQuotes.at(-1) ?? null
+  const ordersByQuoteId = new Map(projectOrders.filter((order) => order.quote_id).map((order) => [order.quote_id as string, order]))
+  const feedback = (successCode && orderStatusMessages[successCode as keyof typeof orderStatusMessages]) || (errorCode && orderStatusMessages[errorCode as keyof typeof orderStatusMessages])
 
   return (
     <PremiumPageShell>
@@ -148,13 +160,23 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <PremiumSection title="Selected project" description="Keep the order context visible while reviewing approvals.">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <PremiumInfoCard label="Project name" value={project.name} />
-            <PremiumInfoCard label="Approved quotes" value={approvedQuotes.length} />
-            <PremiumInfoCard label="Address" value={project.address || "No address added yet."} spanTwo />
-          </div>
-        </PremiumSection>
+        <div className="grid gap-4">
+          <PremiumPhotoPanel
+            image={ordersImage}
+            eyebrow="Order confidence"
+            title="A more premium review step before any order gets created"
+            description="Real-photo context and softer framing make approvals feel deliberate, calm, and easier to trust on mobile."
+            badge={<PremiumBadge tone="amber">Approval-first</PremiumBadge>}
+          />
+
+          <PremiumSection title="Selected project" description="Keep the order context visible while reviewing approvals.">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <PremiumInfoCard label="Project name" value={project.name} />
+              <PremiumInfoCard label="Approved quotes" value={approvedQuotes.length} />
+              <PremiumInfoCard label="Address" value={project.address || "No address added yet."} spanTwo />
+            </div>
+          </PremiumSection>
+        </div>
 
         <PremiumSection title="Current order status" description="See the clearest current state before delivery tracking expands further.">
           <PremiumMutedPanel tone={projectOrders.length > 0 ? "emerald" : "amber"}>
@@ -167,11 +189,16 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 
       <PremiumSection title="Approved quotes" description="Create one order from an approved quote or review the existing linked order." action={<PremiumBackLink href={`/quotes?projectId=${project.id}`}>Back to Quote Review</PremiumBackLink>}>
         {approvedQuotes.length === 0 ? (
-          <PremiumMutedPanel>No approved quote is ready for order creation yet.</PremiumMutedPanel>
+          <PremiumEmptyState
+            image={ordersEmptyImage}
+            eyebrow="No approved quotes yet"
+            title="Approval comes first before the order step opens up"
+            description="Once a quote is approved with pricing in place, this area becomes a cleaner handoff into order creation and status tracking."
+          />
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {approvedQuotes.map((quote, index) => {
-              const order = ordersByQuoteId.get(quote.id);
+              const order = ordersByQuoteId.get(quote.id)
               return (
                 <div key={quote.id} className="rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.88))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -203,11 +230,11 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                     </form>
                   )}
                 </div>
-              );
+              )
             })}
           </div>
         )}
       </PremiumSection>
     </PremiumPageShell>
-  );
+  )
 }

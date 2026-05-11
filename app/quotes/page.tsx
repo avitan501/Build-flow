@@ -1,17 +1,22 @@
-import { notFound } from "next/navigation";
+import { notFound } from "next/navigation"
 
-import { addMaterialsToQuoteAction, approveQuoteAction, createProjectQuoteAction, updateQuoteItemPricingAction } from "@/app/quotes/actions";
-import { PremiumBackLink, PremiumBadge, PremiumHero, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumSection } from "@/components/buildflow/premium-page";
-import { requireSignedInProfile } from "@/lib/auth";
-import type { ProjectQuoteItemRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
+import { addMaterialsToQuoteAction, approveQuoteAction, createProjectQuoteAction, updateQuoteItemPricingAction } from "@/app/quotes/actions"
+import { PremiumBackLink, PremiumBadge, PremiumEmptyState, PremiumHero, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumPhotoPanel, PremiumSection } from "@/components/buildflow/premium-page"
+import { requireSignedInProfile } from "@/lib/auth"
+import type { ProjectQuoteItemRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects"
+
+const quotesImage =
+  "https://images.unsplash.com/photo-1460317442991-0ec209397118?auto=format&fit=crop&w=1400&q=80"
+const quotesEmptyImage =
+  "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1400&q=80"
 
 type QuotesPageProps = {
   searchParams?: Promise<{
-    projectId?: string;
-    error?: string;
-    success?: string;
-  }>;
-};
+    projectId?: string
+    error?: string
+    success?: string
+  }>
+}
 
 const quoteStatusMessages = {
   "project-not-found": { tone: "error", text: "We could not confirm that project for your account." },
@@ -34,7 +39,7 @@ const quoteStatusMessages = {
   "quote-approve-status-invalid": { tone: "error", text: "Only draft or sent quotes can be approved." },
   "quote-approve-total-invalid": { tone: "error", text: "Add pricing before approval." },
   "quote-approve-failed": { tone: "error", text: "Quote approval could not be saved. Please try again." },
-} as const;
+} as const
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -42,43 +47,50 @@ function formatCurrency(value: number) {
     currency: "USD",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(value);
+  }).format(value)
 }
 
 function formatQuoteStatus(status: ProjectQuoteRecord["status"]) {
-  if (status === "approved") return "Approved";
-  if (status === "sent") return "Sent";
-  if (status === "rejected") return "Rejected";
-  if (status === "archived") return "Archived";
-  return "Draft";
+  if (status === "approved") return "Approved"
+  if (status === "sent") return "Sent"
+  if (status === "rejected") return "Rejected"
+  if (status === "archived") return "Archived"
+  return "Draft"
 }
 
 export default async function QuotesPage({ searchParams }: QuotesPageProps) {
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const projectId = resolvedSearchParams?.projectId?.trim();
-  const errorCode = resolvedSearchParams?.error?.trim();
-  const successCode = resolvedSearchParams?.success?.trim();
+  const resolvedSearchParams = searchParams ? await searchParams : undefined
+  const projectId = resolvedSearchParams?.projectId?.trim()
+  const errorCode = resolvedSearchParams?.error?.trim()
+  const successCode = resolvedSearchParams?.success?.trim()
 
   if (!projectId) {
-    await requireSignedInProfile();
+    await requireSignedInProfile()
     return (
       <PremiumPageShell maxWidth="max-w-3xl">
         <PremiumHero eyebrow="Quote review" title="Quotes" description="Open this page from a project workspace to review pricing for a specific project." aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>} />
+        <PremiumEmptyState
+          image={quotesEmptyImage}
+          eyebrow="Project-linked quotes"
+          title="Open a project first so pricing stays tied to the right job"
+          description="That keeps material items, quote totals, approvals, and future orders connected to the same workspace from start to finish."
+          action={<PremiumBackLink href="/projects">Open Projects</PremiumBackLink>}
+        />
       </PremiumPageShell>
-    );
+    )
   }
 
-  const { supabase, user } = await requireSignedInProfile();
+  const { supabase, user } = await requireSignedInProfile()
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
     .select("id, owner_id, name, address, status, created_at, updated_at")
     .eq("id", projectId)
     .eq("owner_id", user.id)
-    .maybeSingle<ProjectRecord>();
+    .maybeSingle<ProjectRecord>()
 
   if (projectError || !project) {
-    notFound();
+    notFound()
   }
 
   const { data: quotes, error: quotesError } = await supabase
@@ -87,14 +99,14 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
     .eq("project_id", project.id)
     .eq("owner_id", user.id)
     .order("created_at", { ascending: true })
-    .returns<ProjectQuoteRecord[]>();
+    .returns<ProjectQuoteRecord[]>()
 
   if (quotesError) {
-    throw new Error("Failed to load project quotes.");
+    throw new Error("Failed to load project quotes.")
   }
 
-  const quoteIds = (quotes ?? []).map((quote) => quote.id);
-  let quoteItems: ProjectQuoteItemRecord[] = [];
+  const quoteIds = (quotes ?? []).map((quote) => quote.id)
+  let quoteItems: ProjectQuoteItemRecord[] = []
 
   if (quoteIds.length > 0) {
     const { data: items, error: itemsError } = await supabase
@@ -104,22 +116,22 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
       .eq("project_id", project.id)
       .eq("owner_id", user.id)
       .order("created_at", { ascending: true })
-      .returns<ProjectQuoteItemRecord[]>();
+      .returns<ProjectQuoteItemRecord[]>()
 
     if (itemsError) {
-      throw new Error("Failed to load project quote items.");
+      throw new Error("Failed to load project quote items.")
     }
 
-    quoteItems = items ?? [];
+    quoteItems = items ?? []
   }
 
-  const feedback = (successCode && quoteStatusMessages[successCode as keyof typeof quoteStatusMessages]) || (errorCode && quoteStatusMessages[errorCode as keyof typeof quoteStatusMessages]);
+  const feedback = (successCode && quoteStatusMessages[successCode as keyof typeof quoteStatusMessages]) || (errorCode && quoteStatusMessages[errorCode as keyof typeof quoteStatusMessages])
 
-  const itemsByQuoteId = new Map<string, ProjectQuoteItemRecord[]>();
+  const itemsByQuoteId = new Map<string, ProjectQuoteItemRecord[]>()
   for (const item of quoteItems) {
-    const existing = itemsByQuoteId.get(item.quote_id) || [];
-    existing.push(item);
-    itemsByQuoteId.set(item.quote_id, existing);
+    const existing = itemsByQuoteId.get(item.quote_id) || []
+    existing.push(item)
+    itemsByQuoteId.set(item.quote_id, existing)
   }
 
   return (
@@ -145,16 +157,26 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-        <PremiumSection title="Create draft quote" description="Create a draft quote for this project.">
-          <form action={createProjectQuoteAction} className="grid gap-4 rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
-            <input type="hidden" name="projectId" value={project.id} />
-            <div>
-              <label htmlFor="quote-notes" className="text-sm font-semibold text-slate-900">Notes</label>
-              <textarea id="quote-notes" name="notes" rows={4} className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Optional notes for this draft quote" />
-            </div>
-            <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">Create Draft Quote</button>
-          </form>
-        </PremiumSection>
+        <div className="grid gap-4">
+          <PremiumPhotoPanel
+            image={quotesImage}
+            eyebrow="Quote review"
+            title="Turn material review into a calmer, more premium approval step"
+            description="The quote experience now feels more intentional, with clean visuals supporting price review instead of competing with it."
+            badge={<PremiumBadge tone="amber">Approval-ready</PremiumBadge>}
+          />
+
+          <PremiumSection title="Create draft quote" description="Create a draft quote for this project.">
+            <form action={createProjectQuoteAction} className="grid gap-4 rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.86))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
+              <input type="hidden" name="projectId" value={project.id} />
+              <div>
+                <label htmlFor="quote-notes" className="text-sm font-semibold text-slate-900">Notes</label>
+                <textarea id="quote-notes" name="notes" rows={4} className="mt-2 block w-full rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm text-slate-900" placeholder="Optional notes for this draft quote" />
+              </div>
+              <button type="submit" className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">Create Draft Quote</button>
+            </form>
+          </PremiumSection>
+        </div>
 
         <PremiumSection title="Selected project" description="Project context stays visible while you review quotes.">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -166,11 +188,16 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
 
         <PremiumSection title="Quotes" description="Review pricing, materials, and approval status for this project." className="lg:col-span-2">
           {quotes.length === 0 ? (
-            <PremiumMutedPanel>No quote prepared yet.</PremiumMutedPanel>
+            <PremiumEmptyState
+              image={quotesEmptyImage}
+              eyebrow="No quotes yet"
+              title="Create the first quote for this project"
+              description="Start with a draft, add project materials, then review pricing in a cleaner space before approval."
+            />
           ) : (
             <div className="grid gap-4">
               {quotes.map((quote, index) => {
-                const items = itemsByQuoteId.get(quote.id) || [];
+                const items = itemsByQuoteId.get(quote.id) || []
                 return (
                   <div key={quote.id} className="rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.88))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -251,12 +278,12 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
                       )}
                     </div>
                   </div>
-                );
+                )
               })}
             </div>
           )}
         </PremiumSection>
       </div>
     </PremiumPageShell>
-  );
+  )
 }
