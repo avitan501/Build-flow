@@ -43,7 +43,7 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
     await requireSignedInProfile();
     return (
       <PremiumPageShell maxWidth="max-w-3xl">
-        <PremiumHero eyebrow="Upload plans" title="Upload plans" description="Open this page from a project workspace so every file stays linked to the right project." aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>} />
+        <PremiumHero eyebrow="Upload plans" title="Upload plans" description="Choose a project first to upload plans." aside={<PremiumBackLink href="/projects">Back to Projects</PremiumBackLink>} />
       </PremiumPageShell>
     );
   }

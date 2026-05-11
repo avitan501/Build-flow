@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 type MobileBottomDockProps = {
   accountHref: string;
@@ -19,6 +19,16 @@ function shouldShowDock(pathname: string) {
 
 function isActivePath(pathname: string, href: string) {
   return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function getProjectIdFromPathname(pathname: string) {
+  const match = pathname.match(/^\/projects\/([^/?#]+)/);
+  if (!match) {
+    return null;
+  }
+
+  const projectId = match[1]?.trim();
+  return projectId && projectId !== "new" ? projectId : null;
 }
 
 function DockItem({ href, label, active, children, accent = false }: { href: string; label: string; active: boolean; children: ReactNode; accent?: boolean }) {
@@ -60,10 +70,20 @@ function DockItem({ href, label, active, children, accent = false }: { href: str
 
 export function MobileBottomDock({ accountHref, projectsHref, uploadHref, searchHref }: MobileBottomDockProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   if (!pathname || !shouldShowDock(pathname)) {
     return null;
   }
+
+  const queryProjectId = searchParams.get("projectId")?.trim();
+  const routeProjectId = getProjectIdFromPathname(pathname);
+  const activeProjectId = queryProjectId || routeProjectId;
+  const resolvedUploadHref = activeProjectId
+    ? `/upload?projectId=${encodeURIComponent(activeProjectId)}`
+    : uploadHref === "/login"
+      ? uploadHref
+      : projectsHref;
 
   return (
     <>
@@ -91,7 +111,7 @@ export function MobileBottomDock({ accountHref, projectsHref, uploadHref, search
               <rect x="14" y="13" width="7" height="7" rx="1.5" />
             </svg>
           </DockItem>
-          <DockItem href={uploadHref} label="Upload" active={isActivePath(pathname, "/upload")} accent>
+          <DockItem href={resolvedUploadHref} label="Upload" active={isActivePath(pathname, "/upload")} accent>
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 16V5" />
               <path d="m7 10 5-5 5 5" />
