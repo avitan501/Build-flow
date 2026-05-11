@@ -26,22 +26,28 @@ function DockItem({ href, label, active, children, accent = false }: { href: str
     <Link
       href={href}
       aria-label={label}
-      className={`group relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-[20px] px-0.5 py-1 text-center transition-all duration-200 ease-out active:scale-[0.96] ${
-        active ? "text-slate-900" : "text-slate-500"
-      } ${active ? "bg-white/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_8px_18px_rgba(148,163,184,0.12)]" : ""}`}
+      className={`group relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-[18px] px-0.5 py-1 text-center transition-all duration-200 ease-out active:scale-[0.96] ${
+        active
+          ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.4),rgba(255,255,255,0.16))] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.58),inset_0_-8px_14px_rgba(255,255,255,0.06),0_8px_18px_rgba(148,163,184,0.1)]"
+          : "text-slate-500/95"
+      }`}
     >
       <span
         className={`relative flex items-center justify-center overflow-hidden transition-all duration-200 ease-out group-active:translate-y-[1px] ${
           accent
-            ? "h-9 w-9 rounded-full border border-[#efca75]/45 bg-[linear-gradient(180deg,#f5d488_0%,#dca845_100%)] text-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),inset_0_-5px_10px_rgba(255,255,255,0.08),0_10px_20px_rgba(220,168,69,0.22),0_0_0_1px_rgba(255,244,214,0.24)]"
+            ? "h-[2.125rem] w-[2.125rem] rounded-[999px] border border-[#f0d18a]/55 bg-[linear-gradient(180deg,rgba(247,215,132,0.96),rgba(220,168,69,0.94))] text-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.62),inset_0_-5px_12px_rgba(255,255,255,0.08),0_10px_20px_rgba(220,168,69,0.18),0_0_0_1px_rgba(255,244,214,0.22)]"
             : active
-              ? "h-8 w-8 rounded-full border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(239,246,255,0.42))] text-[#10233f] shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_8px_18px_rgba(148,163,184,0.14),0_0_0_1px_rgba(255,255,255,0.2)] backdrop-blur-[14px]"
-              : "h-8 w-8 rounded-full border border-white/25 bg-[linear-gradient(180deg,rgba(255,255,255,0.26),rgba(255,255,255,0.08))] text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.34)] backdrop-blur-[10px]"
+              ? "h-[1.875rem] w-[1.875rem] rounded-full border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(239,246,255,0.34))] text-[#10233f] shadow-[inset_0_1px_0_rgba(255,255,255,0.74),inset_0_-8px_12px_rgba(255,255,255,0.05),0_8px_16px_rgba(148,163,184,0.12),0_0_0_1px_rgba(255,255,255,0.2)] backdrop-blur-[16px]"
+              : "h-[1.875rem] w-[1.875rem] rounded-full border border-white/30 bg-[linear-gradient(180deg,rgba(255,255,255,0.26),rgba(255,255,255,0.08))] text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.34),inset_0_-8px_12px_rgba(255,255,255,0.04)] backdrop-blur-[12px]"
         }`}
       >
         <span
           aria-hidden="true"
-          className={`pointer-events-none absolute inset-x-[20%] top-[12%] h-[32%] rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.7),rgba(255,255,255,0.06))] blur-[1px] ${accent ? "opacity-90" : active ? "opacity-80" : "opacity-55"}`}
+          className={`pointer-events-none absolute inset-x-[18%] top-[10%] h-[34%] rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,255,255,0.08))] blur-[0.5px] ${accent ? "opacity-95" : active ? "opacity-85" : "opacity-60"}`}
+        />
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-x-[24%] bottom-[16%] h-[24%] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.22),transparent_72%)] ${accent ? "opacity-80" : active ? "opacity-65" : "opacity-35"}`}
         />
         <span className="relative z-10">{children}</span>
       </span>
@@ -61,13 +67,15 @@ export function MobileBottomDock({ accountHref, projectsHref, uploadHref, search
 
   return (
     <>
-      <div aria-hidden="true" className="h-[4.75rem] sm:hidden" />
+      <div aria-hidden="true" className="h-[4.4rem] sm:hidden" />
       <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.35rem)] z-50 px-3 sm:hidden">
         <nav
           aria-label="Mobile homepage"
-          className="pointer-events-auto relative mx-auto flex max-w-[21rem] items-center justify-between gap-1 overflow-hidden rounded-[24px] border border-white/55 bg-[linear-gradient(180deg,rgba(255,255,255,0.58),rgba(234,243,255,0.22))] px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.58),inset_0_-8px_16px_rgba(255,255,255,0.08),0_14px_30px_rgba(15,23,42,0.1),0_5px_14px_rgba(148,163,184,0.1)] backdrop-blur-[22px]"
+          className="pointer-events-auto relative mx-auto flex max-w-[20.5rem] items-center justify-between gap-0.5 overflow-hidden rounded-[22px] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(240,247,255,0.18))] px-1.5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.68),inset_0_-12px_20px_rgba(255,255,255,0.08),0_18px_34px_rgba(15,23,42,0.12),0_6px_16px_rgba(148,163,184,0.12)] backdrop-blur-[26px] [backdrop-filter:blur(26px)_saturate(145%)]"
         >
-          <span aria-hidden="true" className="pointer-events-none absolute inset-x-5 top-1 h-5 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.75),rgba(255,255,255,0.08))] opacity-80 blur-[1px]" />
+          <span aria-hidden="true" className="pointer-events-none absolute inset-[1px] rounded-[21px] border border-white/35" />
+          <span aria-hidden="true" className="pointer-events-none absolute inset-x-8 top-1 h-4 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,255,255,0.14))] opacity-90 blur-[0.8px]" />
+          <span aria-hidden="true" className="pointer-events-none absolute -top-4 left-10 right-10 h-10 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.35),transparent_72%)] opacity-75" />
           <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.16),transparent_72%)]" />
           <DockItem href="/" label="Home" active={isActivePath(pathname, "/")}>
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
