@@ -167,47 +167,12 @@ export default async function ProjectsPage() {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#eff7ff_0%,#f8fbff_42%,#eef5fc_100%)] px-4 py-4 pb-28 text-slate-900 sm:px-8 sm:pb-10 lg:px-10 lg:pb-12">
       <section className="mx-auto flex max-w-6xl flex-col gap-5">
-        <section className="rounded-[30px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(239,246,255,0.9))] p-4 shadow-[0_20px_50px_rgba(148,163,184,0.12)] sm:p-5">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-100 bg-white text-slate-800 shadow-[0_8px_18px_rgba(15,23,42,0.05)] transition active:scale-[0.98]">
-              <MenuIcon />
-            </Link>
-            <div className="flex min-w-0 flex-1 items-center gap-3 rounded-[22px] border border-sky-100 bg-white px-3 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#173d88_0%,#0e2341_100%)] text-lg font-semibold text-white shadow-[0_10px_20px_rgba(14,35,65,0.18)]">
-                BF
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-[1.05rem] font-semibold tracking-[-0.03em] text-slate-950">BuildFlow</p>
-                <p className="truncate text-[12px] text-slate-500">Construction materials + project flow</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <HeaderAction href="/search">
-                <SearchIcon />
-              </HeaderAction>
-              <HeaderAction href="/dashboard">
-                <UserIcon />
-              </HeaderAction>
-              <HeaderAction href="/ai">
-                <div className="relative flex items-center justify-center">
-                  <span className="text-lg font-semibold text-slate-900">AI</span>
-                  <span className="absolute -right-1 -top-1 text-[10px] text-fuchsia-500">✦</span>
-                </div>
-              </HeaderAction>
-            </div>
-          </div>
-        </section>
-
         <section className="rounded-[32px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(242,248,255,0.94))] p-5 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-7">
           <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-500">Projects</p>
           <h1 className="mt-3 text-[2.2rem] font-semibold tracking-[-0.05em] text-slate-950 sm:text-[3rem]">Your projects</h1>
           <p className="mt-4 max-w-2xl text-base leading-8 text-slate-600">
             Create a new project or open an existing workspace to manage plans, materials, quotes, and orders.
           </p>
-          <div className="mt-5 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-[0.18em]">
-            <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-600 shadow-[0_8px_20px_rgba(148,163,184,0.08)]">Client</span>
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-emerald-700 shadow-[0_8px_20px_rgba(148,163,184,0.08)]">Projects Hub</span>
-          </div>
 
           <div className="mt-6 rounded-[30px] border border-sky-100 bg-white p-5 shadow-[0_16px_36px_rgba(148,163,184,0.12)] sm:p-6">
             <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">Primary Action</p>
