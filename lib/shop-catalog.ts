@@ -11,6 +11,7 @@ export type ShopCatalogProduct = {
   supplierName: string | null
   quoteNumber: string | null
   image: string
+  gallery: string[]
   specLine: string
   availability: string
   featuredLabel: string
@@ -20,9 +21,10 @@ export type ShopCatalogProduct = {
   relatedCategories: string[]
 }
 
-export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
+type ProductSeed = Omit<ShopCatalogProduct, "id">
+
+const PRODUCT_SEEDS: ProductSeed[] = [
   {
-    id: "sample-2x4-premium",
     slug: "2x4-premium-lumber",
     name: "2x4 Premium Lumber",
     description: "Kiln-dried framing lumber for clean residential wall framing and interior structural work.",
@@ -31,7 +33,12 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     price: 7.95,
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-LUM-204",
-    image: "https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?auto=format&fit=crop&w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80",
+    ],
     specLine: "#2 SPF · kiln dried · framing",
     availability: "Ready to quote",
     featuredLabel: "Popular for framing",
@@ -41,7 +48,6 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     relatedCategories: ["Plywood", "Fasteners"],
   },
   {
-    id: "sample-2x8-treated",
     slug: "2x8-treated-lumber",
     name: "2x8 Treated Lumber",
     description: "Pressure-treated board suited for exterior framing, deck bases, and moisture-prone structural areas.",
@@ -50,7 +56,12 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     price: 23.4,
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-TRL-208",
-    image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=1200&q=80",
+    ],
     specLine: "Ground contact rated · exterior use",
     availability: "Ready to quote",
     featuredLabel: "Deck & exterior",
@@ -60,7 +71,6 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     relatedCategories: ["Fasteners", "Hangers"],
   },
   {
-    id: "sample-cdx-plywood",
     slug: "cdx-plywood-sheet",
     name: "CDX Plywood",
     description: "General-purpose structural plywood sheet for roof, wall, and subfloor sheathing applications.",
@@ -69,7 +79,12 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     price: 34.75,
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-PLY-001",
-    image: "https://images.unsplash.com/photo-1581093458791-9f3c3900df4b?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80",
+    ],
     specLine: "5/8 in · structural sheathing",
     availability: "Ready to quote",
     featuredLabel: "Popular for framing",
@@ -79,7 +94,6 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     relatedCategories: ["Lumber", "Adhesives"],
   },
   {
-    id: "sample-lvl-beam",
     slug: "lvl-beam-header",
     name: "LVL Beam",
     description: "Engineered laminated veneer lumber beam for long spans, headers, and high-load framing zones.",
@@ -88,7 +102,12 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     price: 118.2,
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-LVL-118",
-    image: "https://images.unsplash.com/photo-1517581177682-a085bb7ffb15?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1517581177682-a085bb7ffb15?auto=format&fit=crop&w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1517581177682-a085bb7ffb15?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1448630360428-65456885c650?auto=format&fit=crop&w=1200&q=80",
+    ],
     specLine: "Engineered span member · header ready",
     availability: "Ready to quote",
     featuredLabel: "Structural",
@@ -98,7 +117,6 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     relatedCategories: ["Lumber", "Hangers"],
   },
   {
-    id: "sample-simpson-hanger",
     slug: "simpson-joist-hanger",
     name: "Simpson Joist Hanger",
     description: "Heavy-duty galvanized hanger for fastening joists securely into beams or ledger assemblies.",
@@ -107,7 +125,12 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     price: 4.85,
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-HNG-210",
-    image: "https://images.unsplash.com/photo-1599707254554-027aeb4deacd?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1599707254554-027aeb4deacd?auto=format&fit=crop&w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1599707254554-027aeb4deacd?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=1200&q=80",
+    ],
     specLine: "Galvanized steel · ledger/beam mount",
     availability: "Ready to quote",
     featuredLabel: "Framing essential",
@@ -117,7 +140,6 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     relatedCategories: ["Fasteners", "Lumber"],
   },
   {
-    id: "sample-paslode-nails",
     slug: "paslode-framing-nails",
     name: "Paslode Framing Nails",
     description: "Collated framing nails for pneumatic framing tools, sized for efficient structural fastening.",
@@ -126,7 +148,12 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     price: 42.1,
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-FST-501",
-    image: "https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=1200&q=80",
+    ],
     specLine: "Paper tape collated · framing gun ready",
     availability: "Ready to quote",
     featuredLabel: "Popular for framing",
@@ -136,7 +163,6 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     relatedCategories: ["Hangers", "Lumber"],
   },
   {
-    id: "sample-subfloor-adhesive",
     slug: "subfloor-adhesive-tube",
     name: "Subfloor Adhesive",
     description: "High-grab construction adhesive designed to reduce squeaks and improve panel hold on floors.",
@@ -145,7 +171,12 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     price: 6.45,
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-ADH-028",
-    image: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&q=80",
+    ],
     specLine: "High strength bond · subfloor rated",
     availability: "Ready to quote",
     featuredLabel: "Jobsite staple",
@@ -155,7 +186,6 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     relatedCategories: ["Plywood", "Lumber"],
   },
   {
-    id: "sample-stainless-flashing",
     slug: "stainless-flashing-roll",
     name: "Stainless Flashing",
     description: "Corrosion-resistant flashing for clean water management around roofs, walls, and window openings.",
@@ -164,7 +194,12 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     price: 58.9,
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-FLS-050",
-    image: "https://images.unsplash.com/photo-1523413651479-597eb2da0ad6?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1523413651479-597eb2da0ad6?auto=format&fit=crop&w=1200&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1523413651479-597eb2da0ad6?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1448630360428-65456885c650?auto=format&fit=crop&w=1200&q=80",
+    ],
     specLine: "Corrosion resistant · exterior weatherproofing",
     availability: "Ready to quote",
     featuredLabel: "Envelope",
@@ -174,6 +209,11 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
     relatedCategories: ["Adhesives", "Plywood"],
   },
 ]
+
+export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = PRODUCT_SEEDS.map((product, index) => ({
+  id: `sample-${index + 1}`,
+  ...product,
+}))
 
 export function slugifyShopProduct(value: string) {
   return value
@@ -202,8 +242,13 @@ export function fallbackImageForCategory(category: string | null) {
     case "Flashing":
       return SAMPLE_SHOP_PRODUCTS[7].image
     default:
-      return "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=900&q=80"
+      return SAMPLE_SHOP_PRODUCTS[0].image
   }
+}
+
+export function galleryForCategory(category: string | null) {
+  const product = SAMPLE_SHOP_PRODUCTS.find((item) => item.category === category)
+  return product?.gallery ?? SAMPLE_SHOP_PRODUCTS[0].gallery
 }
 
 export function deriveSpecLine(item: ShopItemRecord) {
@@ -230,6 +275,7 @@ export function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[
     supplierName: item.supplier_name,
     quoteNumber: item.quote_number,
     image: fallbackImageForCategory(item.category),
+    gallery: galleryForCategory(item.category),
     specLine: deriveSpecLine(item),
     availability: "Ready to quote",
     featuredLabel: item.category === "Lumber" || item.category === "Plywood" || item.category === "Fasteners" ? "Popular for framing" : "Jobsite pick",

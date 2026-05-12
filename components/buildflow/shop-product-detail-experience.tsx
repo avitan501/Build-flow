@@ -49,6 +49,7 @@ export function ShopProductDetailExperience({ product, relatedProducts, buyMode 
   const [quantity, setQuantity] = useState(1)
   const [saved, setSaved] = useState(() => readSavedIds().includes(product.id))
   const [buyOpen, setBuyOpen] = useState(buyMode)
+  const [activeImage, setActiveImage] = useState(product.gallery[0] || product.image)
   const cartCount = useMemo(() => readCartMap()[product.id] || 0, [product.id, quantity, buyOpen, saved])
 
   function persistCart(next: CartMap) {
@@ -84,9 +85,23 @@ export function ShopProductDetailExperience({ product, relatedProducts, buyMode 
           <span>{product.category}</span>
         </div>
 
-        <section className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="overflow-hidden rounded-[30px] border border-slate-100 bg-white shadow-[0_18px_42px_rgba(148,163,184,0.12)]">
-            <div className="h-[320px] bg-cover bg-center sm:h-[420px]" style={{ backgroundImage: `url(${product.image})` }} />
+        <section className="grid gap-5 lg:grid-cols-[1.02fr_0.98fr]">
+          <div className="rounded-[30px] border border-slate-100 bg-white p-4 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-5">
+            <div className="overflow-hidden rounded-[24px] border border-slate-100 bg-slate-50">
+              <div className="aspect-[1.08/1] bg-cover bg-center" style={{ backgroundImage: `url(${activeImage})` }} />
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-3">
+              {product.gallery.map((image, index) => (
+                <button
+                  key={`${product.id}-image-${index}`}
+                  type="button"
+                  onClick={() => setActiveImage(image)}
+                  className={`overflow-hidden rounded-[18px] border ${activeImage === image ? "border-sky-300" : "border-slate-100"}`}
+                >
+                  <div className="aspect-square bg-cover bg-center" style={{ backgroundImage: `url(${image})` }} />
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="rounded-[30px] border border-slate-100 bg-white p-5 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-6">
@@ -160,7 +175,7 @@ export function ShopProductDetailExperience({ product, relatedProducts, buyMode 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {relatedProducts.map((related) => (
               <Link key={related.id} href={`/shop/${related.slug}`} className="overflow-hidden rounded-[24px] border border-slate-100 bg-white shadow-[0_12px_28px_rgba(148,163,184,0.1)]">
-                <div className="h-32 bg-cover bg-center" style={{ backgroundImage: `url(${related.image})` }} />
+                <div className="aspect-[1.12/1] bg-cover bg-center" style={{ backgroundImage: `url(${related.image})` }} />
                 <div className="p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">{related.category}</div>
                   <div className="mt-2 line-clamp-2 text-sm font-semibold text-slate-950">{related.name}</div>
