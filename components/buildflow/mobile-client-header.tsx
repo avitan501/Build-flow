@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { MobileMenuDrawer, type MobileMenuLink } from "@/components/buildflow/mobile-menu-drawer";
-import { SHOP_CATEGORY_NAMES } from "@/lib/shop";
+import { SHOP_CATEGORY_NAMES, SHOP_POPULAR_SEARCHES } from "@/lib/shop";
 
 type MobileClientHeaderProps = {
   isSignedIn: boolean;
@@ -65,6 +65,27 @@ function CartIcon() {
   );
 }
 
+function readCartCount() {
+  if (typeof window === "undefined") return 0;
+
+  try {
+    const raw = window.localStorage.getItem(SHOP_CART_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+
+    if (Array.isArray(parsed)) {
+      return parsed.length;
+    }
+
+    if (parsed && typeof parsed === "object") {
+      return Object.values(parsed as Record<string, unknown>).reduce<number>((sum, value) => sum + (typeof value === "number" ? value : 0), 0);
+    }
+
+    return 0;
+  } catch {
+    return 0;
+  }
+}
+
 export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHref, aiHref }: MobileClientHeaderProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -76,10 +97,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
   const isShopPage = pathname === "/shop";
 
   useEffect(() => {
-    if (!isShopPage) {
-      return;
-    }
-
+    if (!isShopPage) return;
     setShopQuery(searchParams.get("q") ?? "");
   }, [isShopPage, searchParams]);
 
@@ -88,15 +106,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
       return;
     }
 
-    const syncCartCount = () => {
-      try {
-        const raw = window.localStorage.getItem(SHOP_CART_STORAGE_KEY);
-        const parsed = raw ? (JSON.parse(raw) as string[]) : [];
-        setShopCartCount(Array.isArray(parsed) ? parsed.length : 0);
-      } catch {
-        setShopCartCount(0);
-      }
-    };
+    const syncCartCount = () => setShopCartCount(readCartCount());
 
     syncCartCount();
     window.addEventListener("storage", syncCartCount);
@@ -134,12 +144,18 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
     ];
   }, [isAdmin]);
 
+  const normalizedQuery = shopQuery.trim().toLowerCase();
   const shopSuggestions = useMemo(() => {
-    const normalizedQuery = shopQuery.trim().toLowerCase();
-    if (!shopSearchFocused) return [];
+    if (!shopSearchFocused) return [] as string[];
     if (!normalizedQuery) return [...SHOP_CATEGORY_NAMES];
     return SHOP_CATEGORY_NAMES.filter((category) => category.toLowerCase().includes(normalizedQuery));
-  }, [shopQuery, shopSearchFocused]);
+  }, [normalizedQuery, shopSearchFocused]);
+
+  const popularSearches = useMemo(() => {
+    if (!shopSearchFocused) return [] as string[];
+    if (!normalizedQuery) return [...SHOP_POPULAR_SEARCHES];
+    return SHOP_POPULAR_SEARCHES.filter((term) => term.toLowerCase().includes(normalizedQuery));
+  }, [normalizedQuery, shopSearchFocused]);
 
   if (!pathname || !shouldShowHeader(pathname)) {
     return null;
@@ -168,12 +184,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
     <>
       <div className="sticky top-0 z-[60] border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,255,0.94))] shadow-[0_8px_24px_rgba(148,163,184,0.1)] backdrop-blur">
         <div className="mx-auto flex w-full items-center gap-2 px-3 py-2.5">
-          <button
-            type="button"
-            aria-label="Open navigation menu"
-            onClick={() => setMenuOpen(true)}
-            className="inline-flex"
-          >
+          <button type="button" aria-label="Open navigation menu" onClick={() => setMenuOpen(true)} className="inline-flex">
             <IconShell active={menuOpen}>
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4 7h16" />
@@ -201,33 +212,61 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
               </div>
 
               {shopSearchFocused ? (
-                <div className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-20 rounded-[22px] border border-sky-100 bg-white p-3 shadow-[0_18px_40px_rgba(148,163,184,0.16)]">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Category suggestions</p>
-                    <button type="button" onClick={() => setShopSearchFocused(false)} className="text-xs font-semibold text-slate-500">
-                      Close
-                    </button>
+                <div className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-20 overflow-hidden rounded-[24px] border border-sky-100/90 bg-white shadow-[0_18px_40px_rgba(148,163,184,0.16)]">
+                  <div className="border-b border-slate-100 bg-[linear-gradient(180deg,#f9fcff_0%,#f3f8ff_100%)] px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Shop search</p>
+                        <p className="mt-1 text-sm text-slate-600">Start with a category or a common jobsite search.</p>
+                      </div>
+                      <button type="button" onClick={() => setShopSearchFocused(false)} className="text-xs font-semibold text-slate-500">
+                        Close
+                      </button>
+                    </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {shopSuggestions.length > 0 ? (
-                      shopSuggestions.map((category) => (
-                        <button
-                          key={category}
-                          type="button"
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => {
-                            setShopQuery(category);
-                            updateShopSearch(category, category);
-                            setShopSearchFocused(false);
-                          }}
-                          className="rounded-full border border-sky-100 bg-sky-50/70 px-3 py-2 text-sm font-semibold text-sky-700"
-                        >
-                          {category}
-                        </button>
-                      ))
-                    ) : (
-                      <p className="text-sm text-slate-500">No category suggestions match yet.</p>
-                    )}
+
+                  <div className="grid gap-4 p-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Categories</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {shopSuggestions.length > 0 ? shopSuggestions.map((category) => (
+                          <button
+                            key={category}
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              setShopQuery(category);
+                              updateShopSearch(category, category);
+                              setShopSearchFocused(false);
+                            }}
+                            className="rounded-full border border-sky-100 bg-sky-50/70 px-3 py-2 text-sm font-semibold text-sky-700"
+                          >
+                            {category}
+                          </button>
+                        )) : <p className="text-sm text-slate-500">No category suggestions match yet.</p>}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Popular searches</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {popularSearches.length > 0 ? popularSearches.map((term) => (
+                          <button
+                            key={term}
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              setShopQuery(term);
+                              updateShopSearch(term, null);
+                              setShopSearchFocused(false);
+                            }}
+                            className="rounded-full border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-sm font-semibold text-emerald-700"
+                          >
+                            {term}
+                          </button>
+                        )) : <p className="text-sm text-slate-500">No popular searches match yet.</p>}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : null}
@@ -254,11 +293,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
             <button type="button" aria-label="Cart" className="inline-flex">
               <IconShell active={shopCartCount > 0}>
                 <CartIcon />
-                {shopCartCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-950">
-                    {shopCartCount}
-                  </span>
-                ) : null}
+                {shopCartCount > 0 ? <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-950">{shopCartCount}</span> : null}
               </IconShell>
             </button>
           ) : null}

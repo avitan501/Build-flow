@@ -13,6 +13,10 @@ const SAMPLE_PRODUCTS: ShopCatalogProduct[] = [
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-LUM-204",
     image: "https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?auto=format&fit=crop&w=900&q=80",
+    specLine: "#2 SPF · kiln dried · framing",
+    availability: "Ready to quote",
+    featuredLabel: "Popular for framing",
+    popularUse: "Wall framing",
   },
   {
     id: "sample-2x8-treated",
@@ -24,6 +28,10 @@ const SAMPLE_PRODUCTS: ShopCatalogProduct[] = [
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-TRL-208",
     image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=900&q=80",
+    specLine: "Ground contact rated · exterior use",
+    availability: "Ready to quote",
+    featuredLabel: "Deck & exterior",
+    popularUse: "Deck framing",
   },
   {
     id: "sample-cdx-plywood",
@@ -35,6 +43,10 @@ const SAMPLE_PRODUCTS: ShopCatalogProduct[] = [
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-PLY-001",
     image: "https://images.unsplash.com/photo-1581093458791-9f3c3900df4b?auto=format&fit=crop&w=900&q=80",
+    specLine: "5/8 in · structural sheathing",
+    availability: "Ready to quote",
+    featuredLabel: "Popular for framing",
+    popularUse: "Wall & roof sheathing",
   },
   {
     id: "sample-lvl-beam",
@@ -46,6 +58,10 @@ const SAMPLE_PRODUCTS: ShopCatalogProduct[] = [
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-LVL-118",
     image: "https://images.unsplash.com/photo-1517581177682-a085bb7ffb15?auto=format&fit=crop&w=900&q=80",
+    specLine: "Engineered span member · header ready",
+    availability: "Ready to quote",
+    featuredLabel: "Structural",
+    popularUse: "Headers & long spans",
   },
   {
     id: "sample-simpson-hanger",
@@ -57,6 +73,10 @@ const SAMPLE_PRODUCTS: ShopCatalogProduct[] = [
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-HNG-210",
     image: "https://images.unsplash.com/photo-1599707254554-027aeb4deacd?auto=format&fit=crop&w=900&q=80",
+    specLine: "Galvanized steel · ledger/beam mount",
+    availability: "Ready to quote",
+    featuredLabel: "Framing essential",
+    popularUse: "Joist connections",
   },
   {
     id: "sample-paslode-nails",
@@ -68,6 +88,10 @@ const SAMPLE_PRODUCTS: ShopCatalogProduct[] = [
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-FST-501",
     image: "https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=900&q=80",
+    specLine: "Paper tape collated · framing gun ready",
+    availability: "Ready to quote",
+    featuredLabel: "Popular for framing",
+    popularUse: "Stud and plate fastening",
   },
   {
     id: "sample-subfloor-adhesive",
@@ -79,6 +103,10 @@ const SAMPLE_PRODUCTS: ShopCatalogProduct[] = [
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-ADH-028",
     image: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=900&q=80",
+    specLine: "High strength bond · subfloor rated",
+    availability: "Ready to quote",
+    featuredLabel: "Jobsite staple",
+    popularUse: "Subfloor installs",
   },
   {
     id: "sample-stainless-flashing",
@@ -90,6 +118,10 @@ const SAMPLE_PRODUCTS: ShopCatalogProduct[] = [
     supplierName: "BuildFlow sample catalog",
     quoteNumber: "CAT-FLS-050",
     image: "https://images.unsplash.com/photo-1523413651479-597eb2da0ad6?auto=format&fit=crop&w=900&q=80",
+    specLine: "Corrosion resistant · exterior weatherproofing",
+    availability: "Ready to quote",
+    featuredLabel: "Envelope",
+    popularUse: "Water management",
   },
 ]
 
@@ -116,6 +148,18 @@ function fallbackImageForCategory(category: string | null) {
   }
 }
 
+function deriveSpecLine(item: ShopItemRecord) {
+  if (item.description?.trim()) {
+    return item.description.trim().slice(0, 72)
+  }
+
+  if (item.unit?.trim()) {
+    return `${item.unit.trim()} · supplier catalog item`
+  }
+
+  return "Supplier catalog item ready for quoting"
+}
+
 function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[] {
   return items.map((item) => ({
     id: item.id,
@@ -127,6 +171,10 @@ function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[] {
     supplierName: item.supplier_name,
     quoteNumber: item.quote_number,
     image: fallbackImageForCategory(item.category),
+    specLine: deriveSpecLine(item),
+    availability: "Ready to quote",
+    featuredLabel: item.category === "Lumber" || item.category === "Plywood" || item.category === "Fasteners" ? "Popular for framing" : "Jobsite pick",
+    popularUse: item.category || "General materials",
   }))
 }
 
