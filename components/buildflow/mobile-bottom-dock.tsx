@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 type MobileBottomDockProps = {
@@ -20,16 +20,6 @@ function shouldShowDock(pathname: string) {
 
 function isActivePath(pathname: string, href: string) {
   return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function getProjectIdFromPathname(pathname: string) {
-  const match = pathname.match(/^\/projects\/([^/?#]+)/);
-  if (!match) {
-    return null;
-  }
-
-  const projectId = match[1]?.trim();
-  return projectId && projectId !== "new" ? projectId : null;
 }
 
 function DockItem({ href, label, active, children, accent = false }: { href: string; label: string; active: boolean; children: ReactNode; accent?: boolean }) {
@@ -71,7 +61,6 @@ function DockItem({ href, label, active, children, accent = false }: { href: str
 
 export function MobileBottomDock({ accountHref, projectsHref, uploadHref, searchHref }: MobileBottomDockProps) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -121,14 +110,8 @@ export function MobileBottomDock({ accountHref, projectsHref, uploadHref, search
     return null;
   }
 
-  const queryProjectId = searchParams.get("projectId")?.trim();
-  const routeProjectId = getProjectIdFromPathname(pathname);
-  const activeProjectId = queryProjectId || routeProjectId;
-  const resolvedUploadHref = activeProjectId
-    ? `/upload?projectId=${encodeURIComponent(activeProjectId)}`
-    : uploadHref === "/login"
-      ? uploadHref
-      : projectsHref;
+  const shopHref = "/shop";
+  void uploadHref;
 
   return (
     <>
@@ -156,11 +139,11 @@ export function MobileBottomDock({ accountHref, projectsHref, uploadHref, search
               <rect x="14" y="13" width="7" height="7" rx="1.5" />
             </svg>
           </DockItem>
-          <DockItem href={resolvedUploadHref} label="Upload" active={isActivePath(pathname, "/upload")} accent>
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 16V5" />
-              <path d="m7 10 5-5 5 5" />
-              <path d="M5 19h14" />
+          <DockItem href={shopHref} label="Shop" active={isActivePath(pathname, "/shop")} accent>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 8.5h16" />
+              <path d="M6 8.5V19a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8.5" />
+              <path d="M9 8.5V6.75A2.25 2.25 0 0 1 11.25 4.5h1.5A2.25 2.25 0 0 1 15 6.75V8.5" />
             </svg>
           </DockItem>
           <DockItem href={accountHref} label="Account" active={isActivePath(pathname, "/dashboard")}>
