@@ -200,25 +200,22 @@ export default async function ProjectsPage() {
           </div>
 
           {hasProjects ? (
-            <div className="mt-4 grid gap-2.5 md:grid-cols-3">
+            <div className="mt-4 grid gap-2 md:grid-cols-3">
               {recentProjects.map((project) => (
-                <div key={project.id} className="rounded-[20px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.88))] p-3 shadow-[0_8px_18px_rgba(148,163,184,0.06)]">
-                  <div className="flex items-center gap-2.5">
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 text-sky-700">
+                <div key={project.id} className="rounded-[18px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.88))] px-3 py-2.5 shadow-[0_6px_14px_rgba(148,163,184,0.05)]">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 text-sky-700">
                       <GridIcon />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[15px] font-semibold tracking-[-0.03em] text-slate-950">{project.name}</div>
-                      <div className="mt-0.5 text-[11px] text-slate-500">
+                      <div className="truncate text-[14px] font-semibold tracking-[-0.03em] text-slate-950">{project.name}</div>
+                      <div className="truncate text-[10px] text-slate-500">
                         {formatProjectStatus(project.status)} · {formatProjectDate(project.created_at)}
                       </div>
                     </div>
-                    <Link href={`/projects/${project.id}`} className="inline-flex shrink-0 items-center justify-center rounded-full border border-sky-100 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 shadow-[0_6px_14px_rgba(148,163,184,0.06)] transition active:scale-[0.99]">
+                    <Link href={`/projects/${project.id}`} className="inline-flex shrink-0 items-center justify-center rounded-full border border-sky-100 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 shadow-[0_4px_10px_rgba(148,163,184,0.05)] transition active:scale-[0.99]">
                       Open
                     </Link>
-                  </div>
-                  <div className="mt-2 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                    Workspace
                   </div>
                 </div>
               ))}
