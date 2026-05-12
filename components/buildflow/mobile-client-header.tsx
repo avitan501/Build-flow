@@ -80,8 +80,8 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
 
   return (
     <>
-      <div className="sticky top-0 z-[60] border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,255,0.94))] shadow-[0_8px_24px_rgba(148,163,184,0.1)] backdrop-blur sm:hidden">
-        <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 py-2.5">
+      <div className="sticky top-0 z-[60] border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,255,0.94))] shadow-[0_8px_24px_rgba(148,163,184,0.1)] backdrop-blur">
+        <div className="mx-auto flex w-full items-center gap-2 px-3 py-2.5">
           <button
             type="button"
             aria-label="Open navigation menu"

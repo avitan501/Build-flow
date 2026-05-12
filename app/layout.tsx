@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { BuildFlowClientShell } from "@/components/buildflow/buildflow-client-shell";
 import { MobileBottomDock } from "@/components/buildflow/mobile-bottom-dock";
 import { MobileClientHeader } from "@/components/buildflow/mobile-client-header";
 import { getSessionWithProfile } from "@/lib/auth";
@@ -41,10 +42,12 @@ export default async function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} accountHref={accountHref} searchHref={searchHref} aiHref={aiHref} />
-        {children}
-        <MobileBottomDock accountHref={accountHref} projectsHref={projectsHref} uploadHref={uploadHref} searchHref={searchHref} />
+      <body className="min-h-full">
+        <BuildFlowClientShell>
+          <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} accountHref={accountHref} searchHref={searchHref} aiHref={aiHref} />
+          {children}
+          <MobileBottomDock accountHref={accountHref} projectsHref={projectsHref} uploadHref={uploadHref} searchHref={searchHref} />
+        </BuildFlowClientShell>
       </body>
     </html>
   );

@@ -115,11 +115,11 @@ export function MobileBottomDock({ accountHref, projectsHref, uploadHref, search
 
   return (
     <>
-      <div aria-hidden="true" className="h-[4.4rem] sm:hidden" />
-      <div className={`pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+0.35rem)] z-50 px-3 transition-all duration-200 sm:hidden ${isVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}>
+      <div aria-hidden="true" className="h-[5.25rem]" />
+      <div className={`pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+0.35rem)] left-1/2 z-50 w-[calc(100%-1rem)] max-w-[30.25rem] -translate-x-1/2 px-2 transition-all duration-200 ${isVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}>
         <nav
           aria-label="Mobile homepage"
-          className={`relative mx-auto flex max-w-[20.5rem] items-center justify-between gap-0.5 overflow-hidden rounded-[22px] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(240,247,255,0.18))] px-1.5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.68),inset_0_-12px_20px_rgba(255,255,255,0.08),0_18px_34px_rgba(15,23,42,0.12),0_6px_16px_rgba(148,163,184,0.12)] backdrop-blur-[26px] [backdrop-filter:blur(26px)_saturate(145%)] ${isVisible ? "pointer-events-auto" : "pointer-events-none"}`}
+          className={`relative flex w-full items-center justify-between gap-0.5 overflow-hidden rounded-[22px] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(240,247,255,0.18))] px-1.5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.68),inset_0_-12px_20px_rgba(255,255,255,0.08),0_18px_34px_rgba(15,23,42,0.12),0_6px_16px_rgba(148,163,184,0.12)] backdrop-blur-[26px] [backdrop-filter:blur(26px)_saturate(145%)] ${isVisible ? "pointer-events-auto" : "pointer-events-none"}`}
         >
           <span aria-hidden="true" className="pointer-events-none absolute inset-[1px] rounded-[21px] border border-white/35" />
           <span aria-hidden="true" className="pointer-events-none absolute inset-x-8 top-1 h-4 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,255,255,0.14))] opacity-90 blur-[0.8px]" />

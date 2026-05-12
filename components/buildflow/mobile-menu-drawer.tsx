@@ -33,7 +33,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, adminLinks = [],
       />
       <aside
         aria-hidden={!open}
-        className={`fixed inset-y-0 left-0 z-[71] w-[88vw] max-w-[22rem] overflow-y-auto border-r border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f5f9ff_100%)] px-4 pb-8 pt-5 shadow-[0_24px_60px_rgba(15,23,42,0.18)] transition duration-200 sm:hidden ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-[71] w-[88vw] max-w-[22rem] overflow-y-auto border-r border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f5f9ff_100%)] px-4 pb-8 pt-5 shadow-[0_24px_60px_rgba(15,23,42,0.18)] transition duration-200 ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between gap-3">
           <Link href="/" onClick={onClose} className="flex items-center gap-3">
