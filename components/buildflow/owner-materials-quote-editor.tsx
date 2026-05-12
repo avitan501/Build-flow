@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { buildOwnerQuoteDuplicateKey, ownerQuoteRows, ownerQuoteSummary } from "@/lib/owner-materials-quote";
+import { buildOwnerQuoteDuplicateKey, supplierQuotes, type SupplierQuoteBatch } from "@/lib/owner-materials-quote";
 
 type EditableRow = {
   qty: number;
@@ -16,6 +16,19 @@ type EditableRow = {
   duplicateKey: string;
 };
 
+type EditableBatch = {
+  quoteId: string;
+  supplierName: string;
+  quoteDate: string;
+  quoteNumber: string;
+  effective: string;
+  expires: string;
+  customer: string;
+  jobAddress: string;
+  totals: SupplierQuoteBatch["totals"];
+  rows: EditableRow[];
+};
+
 function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
@@ -24,122 +37,174 @@ function numberInput(value: number) {
   return Number.isFinite(value) ? value.toFixed(2) : "0.00";
 }
 
-const initialRows: EditableRow[] = ownerQuoteRows.map((row) => ({
-  qty: row.qty,
-  itemNo: row.itemNo,
-  description: row.description,
-  unit: row.unit,
-  supplierUnitPrice: row.unitPrice,
-  markupPercent: 0,
-  markupDollar: 0,
-  finalUnitPrice: row.unitPrice,
-  duplicateKey: buildOwnerQuoteDuplicateKey(row),
+const initialBatches: EditableBatch[] = supplierQuotes.map((batch) => ({
+  ...batch,
+  rows: batch.rows.map((row) => ({
+    qty: row.qty,
+    itemNo: row.itemNo,
+    description: row.description,
+    unit: row.unit,
+    supplierUnitPrice: row.unitPrice,
+    markupPercent: 0,
+    markupDollar: 0,
+    finalUnitPrice: row.unitPrice,
+    duplicateKey: buildOwnerQuoteDuplicateKey(batch, row),
+  })),
 }));
 
 export function OwnerMaterialsQuoteEditor() {
-  const [rows, setRows] = useState<EditableRow[]>(initialRows);
-  const [helperMessage] = useState<string | null>("Live publish is blocked on this branch until a protected shop write path exists.");
+  const [batches, setBatches] = useState<EditableBatch[]>(initialBatches);
+  const [activeQuoteId, setActiveQuoteId] = useState<string>(initialBatches[0]?.quoteId ?? "");
 
-  const totals = useMemo(() => {
-    return rows.reduce(
-      (acc, row) => {
-        acc.supplier += row.qty * row.supplierUnitPrice;
-        acc.client += row.qty * row.finalUnitPrice;
-        return acc;
-      },
-      { supplier: 0, client: 0 },
-    );
-  }, [rows]);
+  const activeBatch = batches.find((batch) => batch.quoteId === activeQuoteId) ?? batches[0] ?? null;
 
-  function recalcFromMarkup(index: number, patch: Partial<EditableRow>) {
-    setRows((current) =>
-      current.map((row, rowIndex) => {
-        if (rowIndex !== index) return row;
-        const next = { ...row, ...patch };
-        const finalUnitPrice = next.supplierUnitPrice * (1 + next.markupPercent / 100) + next.markupDollar;
-        return { ...next, finalUnitPrice };
-      }),
-    );
-  }
-
-  function updateFinalPrice(index: number, nextFinal: number) {
-    setRows((current) =>
-      current.map((row, rowIndex) => {
-        if (rowIndex !== index) return row;
-        const baseWithPercent = row.supplierUnitPrice * (1 + row.markupPercent / 100);
+  const batchSummaries = useMemo(
+    () =>
+      batches.map((batch) => {
+        const clientTotal = batch.rows.reduce((sum, row) => sum + row.qty * row.finalUnitPrice, 0);
         return {
-          ...row,
-          finalUnitPrice: nextFinal,
-          markupDollar: nextFinal - baseWithPercent,
+          quoteId: batch.quoteId,
+          supplierName: batch.supplierName,
+          quoteNumber: batch.quoteNumber,
+          quoteDate: batch.quoteDate,
+          itemsCount: batch.rows.length,
+          supplierTotal: batch.totals.total,
+          clientTotal,
+        };
+      }),
+    [batches],
+  );
+
+  function updateBatchRow(quoteId: string, rowIndex: number, updater: (row: EditableRow) => EditableRow) {
+    setBatches((current) =>
+      current.map((batch) => {
+        if (batch.quoteId !== quoteId) return batch;
+        return {
+          ...batch,
+          rows: batch.rows.map((row, index) => (index === rowIndex ? updater(row) : row)),
         };
       }),
     );
   }
+
+  function recalcFromMarkup(rowIndex: number, patch: Partial<EditableRow>) {
+    if (!activeBatch) return;
+    updateBatchRow(activeBatch.quoteId, rowIndex, (row) => {
+      const next = { ...row, ...patch };
+      const finalUnitPrice = next.supplierUnitPrice * (1 + next.markupPercent / 100) + next.markupDollar;
+      return { ...next, finalUnitPrice };
+    });
+  }
+
+  function updateFinalPrice(rowIndex: number, nextFinal: number) {
+    if (!activeBatch) return;
+    updateBatchRow(activeBatch.quoteId, rowIndex, (row) => {
+      const baseWithPercent = row.supplierUnitPrice * (1 + row.markupPercent / 100);
+      return {
+        ...row,
+        finalUnitPrice: nextFinal,
+        markupDollar: nextFinal - baseWithPercent,
+      };
+    });
+  }
+
+  if (!activeBatch) {
+    return null;
+  }
+
+  const activeClientTotal = activeBatch.rows.reduce((sum, row) => sum + row.qty * row.finalUnitPrice, 0);
+  const activeSupplierTotal = activeBatch.rows.reduce((sum, row) => sum + row.qty * row.supplierUnitPrice, 0);
 
   return (
     <div className="space-y-5">
       <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Owner materials quote</p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{ownerQuoteSummary.supplier}</h1>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Open backend quote review page for pricing, markup, and later shop publishing.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Owner Materials Inbox</p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Supplier quote review and shop publishing prep</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">New supplier quote batches can be added here for review. Edit unit price, markup percent/dollar, and final client price before publishing. Live publish to client shop is blocked until protected shop publishing is connected.</p>
           </div>
           <div className="rounded-[22px] border border-sky-100 bg-sky-50/70 px-4 py-3 text-sm text-slate-700">
-            <div>Quote #{ownerQuoteSummary.quoteNumber}</div>
-            <div className="mt-1">Customer: {ownerQuoteSummary.customer}</div>
-            <div className="mt-1">Job: {ownerQuoteSummary.job}</div>
+            <div>Current batch: {activeBatch.supplierName}</div>
+            <div className="mt-1">Quote #{activeBatch.quoteNumber}</div>
+            <div className="mt-1">Customer: {activeBatch.customer}</div>
+            <div className="mt-1">Job: {activeBatch.jobAddress}</div>
           </div>
         </div>
+      </section>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Quote date</div>
-            <div className="mt-1 text-sm font-semibold text-slate-900">{ownerQuoteSummary.quoteDate}</div>
+      <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-950">Quote batches</h2>
+            <p className="mt-1 text-sm text-slate-600">Future supplier quote batches can be appended to the shared quote data array and reviewed here.</p>
           </div>
-          <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Expires</div>
-            <div className="mt-1 text-sm font-semibold text-slate-900">{ownerQuoteSummary.expires}</div>
-          </div>
-          <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Supplier subtotal</div>
-            <div className="mt-1 text-sm font-semibold text-slate-900">{money(ownerQuoteSummary.subtotal)}</div>
-          </div>
-          <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Supplier total</div>
-            <div className="mt-1 text-sm font-semibold text-slate-900">{money(ownerQuoteSummary.total)}</div>
-          </div>
+        </div>
+        <div className="mt-4 grid gap-3">
+          {batchSummaries.map((batch) => (
+            <button
+              key={batch.quoteId}
+              type="button"
+              onClick={() => setActiveQuoteId(batch.quoteId)}
+              className={`rounded-[24px] border p-4 text-left shadow-[0_12px_30px_rgba(15,23,42,0.06)] transition ${batch.quoteId === activeBatch.quoteId ? "border-sky-200 bg-sky-50/80" : "border-slate-200 bg-white"}`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-950">{batch.supplierName}</div>
+                  <div className="mt-1 text-sm text-slate-600">Quote #{batch.quoteNumber} · {batch.quoteDate}</div>
+                </div>
+                <div className="grid gap-1 text-right text-sm text-slate-600 sm:grid-cols-2 sm:gap-x-6">
+                  <div>Items: <span className="font-semibold text-slate-900">{batch.itemsCount}</span></div>
+                  <div>Supplier total: <span className="font-semibold text-slate-900">{money(batch.supplierTotal)}</span></div>
+                  <div className="sm:col-span-2">Client total after markup: <span className="font-semibold text-slate-900">{money(batch.clientTotal)}</span></div>
+                </div>
+              </div>
+            </button>
+          ))}
         </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Quote lines</div>
-          <div className="mt-2 text-2xl font-semibold text-slate-950">{rows.length}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Current quote lines</div>
+          <div className="mt-2 text-2xl font-semibold text-slate-950">{activeBatch.rows.length}</div>
         </div>
         <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Supplier extended total</div>
-          <div className="mt-2 text-2xl font-semibold text-slate-950">{money(totals.supplier)}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Supplier total from edits</div>
+          <div className="mt-2 text-2xl font-semibold text-slate-950">{money(activeSupplierTotal)}</div>
         </div>
         <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Client/shop extended total</div>
-          <div className="mt-2 text-2xl font-semibold text-slate-950">{money(totals.client)}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Client/shop total after markup</div>
+          <div className="mt-2 text-2xl font-semibold text-slate-950">{money(activeClientTotal)}</div>
         </div>
       </section>
 
       <section className="rounded-[28px] border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950 shadow-[0_14px_36px_rgba(220,168,69,0.08)]">
-        <p className="font-semibold">Live publishing is blocked on this branch for safety.</p>
-        <p className="mt-1">Missing pieces: a real <code className="rounded bg-white/70 px-1 py-0.5 text-[0.92em]">shop_items</code> table/schema, a protected server action or admin write path for shop publishing, and a client <code className="rounded bg-white/70 px-1 py-0.5 text-[0.92em]">/shop</code> page that reads the same published source.</p>
+        <p className="font-semibold">Live publishing is still safely blocked.</p>
+        <p className="mt-1">Missing pieces: a real protected shop schema/write path and a connected client shop reader. Until that exists, this inbox is for owner review, markup prep, and quote organization only.</p>
         <p className="mt-1">Duplicate key rule is ready: supplier + quoteDate + itemNo, fallback supplier + normalizedDescription + unit.</p>
-        {helperMessage ? <p className="mt-2 rounded-xl bg-white/70 px-3 py-2 text-slate-700">{helperMessage}</p> : null}
+      </section>
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Active supplier batch</p>
+            <h2 className="mt-2 text-xl font-semibold text-slate-950">{activeBatch.supplierName} · Quote #{activeBatch.quoteNumber}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Effective {activeBatch.effective} · Expires {activeBatch.expires}</p>
+          </div>
+          <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
+            <div className="rounded-[18px] border border-slate-200 bg-slate-50 px-3 py-2">Quote date: <span className="font-semibold text-slate-900">{activeBatch.quoteDate}</span></div>
+            <div className="rounded-[18px] border border-slate-200 bg-slate-50 px-3 py-2">Supplier total: <span className="font-semibold text-slate-900">{money(activeBatch.totals.total)}</span></div>
+          </div>
+        </div>
       </section>
 
       <div className="space-y-4">
-        {rows.map((row, index) => {
+        {activeBatch.rows.map((row, index) => {
           const extendedClientPrice = row.qty * row.finalUnitPrice;
 
           return (
-            <section key={`${row.itemNo}-${index}`} className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
+            <section key={`${activeBatch.quoteId}-${row.itemNo}-${index}`} className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-slate-950">{row.description}</div>
@@ -210,7 +275,7 @@ export function OwnerMaterialsQuoteEditor() {
                 >
                   Add to Client Shop / Publish to Shop
                 </button>
-                <span className="text-sm text-slate-500">Blocked until protected shop schema + write action are added.</span>
+                <span className="text-sm text-slate-500">Blocked until protected shop publishing is connected.</span>
               </div>
             </section>
           );
