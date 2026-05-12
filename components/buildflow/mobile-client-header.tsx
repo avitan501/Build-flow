@@ -94,7 +94,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
   const [shopSearchFocused, setShopSearchFocused] = useState(false);
   const [shopQuery, setShopQuery] = useState("");
   const [shopCartCount, setShopCartCount] = useState(0);
-  const isShopPage = pathname === "/shop";
+  const isShopPage = Boolean(pathname) && pathname.startsWith("/shop");
 
   useEffect(() => {
     if (!isShopPage) return;
@@ -138,6 +138,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
 
     return [
       { href: "/admin/build-map", label: "Admin" },
+      { href: "/owner/materials", label: "Material Admin" },
       { href: "/admin/shop", label: "Shop" },
       { href: "/admin/users", label: "Users" },
       { href: "/admin/whatsapp", label: "WhatsApp" },
