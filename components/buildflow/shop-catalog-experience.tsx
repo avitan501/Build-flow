@@ -114,14 +114,14 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
                 <button
                   key={category.name}
                   onClick={() => setCategory(active ? null : category.name)}
-                  className={`min-w-[140px] shrink-0 overflow-hidden rounded-[24px] border text-left shadow-[0_12px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99] ${active ? "border-sky-300 bg-sky-50" : "border-slate-100 bg-white"}`}
+                  className={`w-[122px] min-w-[122px] shrink-0 overflow-hidden rounded-[22px] border text-left shadow-[0_12px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99] ${active ? "border-sky-300 bg-sky-50" : "border-slate-100 bg-white"}`}
                 >
-                  <div className="aspect-[1.15/1] overflow-hidden bg-slate-100">
+                  <div className="h-[84px] overflow-hidden bg-slate-100">
                     <img src={category.image} alt={category.name} className="h-full w-full object-cover" loading="lazy" />
                   </div>
-                  <div className="p-3.5">
-                    <div className="text-sm font-semibold text-slate-950">{category.name}</div>
-                    <div className="mt-1 text-[12px] text-slate-500">{category.count} items</div>
+                  <div className="p-3">
+                    <div className="line-clamp-2 text-[13px] font-semibold leading-4 text-slate-950">{category.name}</div>
+                    <div className="mt-1 text-[11px] text-slate-500">{category.count} items</div>
                   </div>
                 </button>
               )

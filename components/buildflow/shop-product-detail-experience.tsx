@@ -88,9 +88,9 @@ export function ShopProductDetailExperience({ product, relatedProducts, buyMode 
         <section className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-[30px] border border-slate-100 bg-white p-4 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-5">
             <div className="overflow-hidden rounded-[24px] border border-slate-100 bg-slate-100">
-              <img src={activeImage} alt={product.name} className="aspect-[1.08/1] h-full w-full object-cover" />
+              <img src={activeImage} alt={product.name} className="block h-[320px] w-full object-cover sm:h-[380px] lg:h-[520px]" />
             </div>
-            <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
+            <div className="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-5 lg:grid-cols-4">
               {product.gallery.map((image, index) => (
                 <button
                   key={`${product.id}-image-${index}`}
