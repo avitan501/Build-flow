@@ -117,11 +117,14 @@ export default async function Home() {
           <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Client workflow</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2.4rem]">Residential purchasing made calmer, clearer, and easier to trust.</h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">BuildFlow keeps the full path from project setup to order approval in one premium client experience, with clean visuals and simple review steps on mobile.</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2.4rem]">Start your project with confidence</h1>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">Upload plans, organize materials, review quotes, and approve orders in one clean workflow.</p>
               <div className="mt-5 flex flex-wrap gap-3">
                 <Link href={projectsHref} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] active:scale-[0.99]">
-                  {isSignedIn ? "Open projects" : "Log in to get started"}
+                  Log in to Start Project
+                </Link>
+                <Link href="/signup" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm active:scale-[0.99]">
+                  Create Account
                 </Link>
                 <span className="inline-flex min-h-11 items-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">Nothing moves forward without approval</span>
               </div>
