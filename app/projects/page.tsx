@@ -90,7 +90,7 @@ export default async function ProjectsPage() {
   }
 
   const projectList = projectRows ?? []
-  const recentProjects = projectList.slice(0, 4)
+  const recentProjects = projectList.slice(0, 3)
   const hasProjects = recentProjects.length > 0
 
   return (
@@ -124,42 +124,33 @@ export default async function ProjectsPage() {
 
         <section className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
           <section className="rounded-[26px] border border-sky-100/90 bg-white p-5 shadow-[0_16px_40px_rgba(148,163,184,0.1)]">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-950">My Projects</h2>
-                <p className="mt-1 text-sm leading-6 text-slate-500">
-                  {hasProjects ? "Open one of your recent workspaces and keep the next step obvious." : "Start your first project to create a workspace."}
-                </p>
-              </div>
-              {projectList.length > 4 ? <div className="text-sm font-semibold text-sky-700">View all projects</div> : null}
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-slate-950">My Projects</h2>
+              {projectList.length > 3 ? <div className="text-sm font-semibold text-sky-700">View All Projects</div> : null}
             </div>
 
             {hasProjects ? (
               <div className="mt-4 grid gap-3">
                 {recentProjects.map((project) => (
                   <div key={project.id} className="rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.88))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex items-start gap-3">
-                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 text-sky-700">
-                          <ProjectsIcon />
-                        </span>
-                        <div>
-                          <div className="text-sm font-semibold text-slate-900">{project.name}</div>
-                          <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                            {formatProjectStatus(project.status)} · {formatProjectDate(project.created_at)}
-                          </div>
-                          {project.address ? <p className="mt-2 text-sm leading-6 text-slate-600">{project.address}</p> : null}
+                    <div className="flex items-start gap-3">
+                      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 text-sky-700">
+                        <ProjectsIcon />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-slate-900">{project.name}</div>
+                        <div className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          {formatProjectStatus(project.status)} · {formatProjectDate(project.created_at)}
                         </div>
-                      </div>
-                      <div className="flex flex-col gap-2 sm:items-end">
-                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                          Workspace
-                        </span>
-                        <Link href={`/projects/${project.id}`} className="inline-flex items-center justify-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_20px_rgba(148,163,184,0.08)] transition active:scale-[0.99]">
-                          Open Workspace
-                        </Link>
+                        {project.address ? <p className="mt-1 truncate text-sm text-slate-500">{project.address}</p> : null}
                       </div>
                     </div>
+                    <div className="mt-3 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                      Workspace
+                    </div>
+                    <Link href={`/projects/${project.id}`} className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_20px_rgba(148,163,184,0.08)] transition active:scale-[0.99]">
+                      Open Workspace
+                    </Link>
                   </div>
                 ))}
               </div>
