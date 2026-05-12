@@ -1,7 +1,8 @@
-import { WireframePageByKey } from "@/components/buildflow/wireframe-page-loader";
+import { redirect } from "next/navigation";
+
 import { requireAdminProfile } from "@/lib/auth";
 
 export default async function AdminMaterialsPage() {
   await requireAdminProfile();
-  return <WireframePageByKey pageKey="admin-materials" />;
+  redirect("/owner/materials");
 }

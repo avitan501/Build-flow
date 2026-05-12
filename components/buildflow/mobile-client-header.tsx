@@ -138,7 +138,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
 
     return [
       { href: "/admin/build-map", label: "Admin" },
-      { href: "/admin/materials", label: "Material Admin" },
+      { href: "/owner/materials", label: "Material Admin" },
       { href: "/admin/shop", label: "Shop" },
       { href: "/admin/users", label: "Users" },
       { href: "/admin/whatsapp", label: "WhatsApp" },
