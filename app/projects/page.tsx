@@ -228,7 +228,7 @@ export default async function ProjectsPage() {
           <div className="mt-8 flex items-center justify-between gap-3">
             <h2 className="text-[1.9rem] font-semibold tracking-[-0.04em] text-slate-950 sm:text-[2rem]">My projects</h2>
             {projectList.length > 3 ? (
-              <Link href="/projects" className="inline-flex items-center gap-1 text-sm font-semibold text-sky-700">
+              <Link href="/projects/all" className="inline-flex items-center gap-1 text-sm font-semibold text-sky-700">
                 View all projects <ChevronRightIcon />
               </Link>
             ) : null}
