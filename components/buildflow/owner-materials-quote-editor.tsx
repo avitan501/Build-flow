@@ -38,7 +38,7 @@ const initialRows: EditableRow[] = ownerQuoteRows.map((row) => ({
 
 export function OwnerMaterialsQuoteEditor() {
   const [rows, setRows] = useState<EditableRow[]>(initialRows);
-  const [helperMessage, setHelperMessage] = useState<string | null>(null);
+  const [helperMessage] = useState<string | null>("Live publish is blocked on this branch until a protected shop write path exists.");
 
   const totals = useMemo(() => {
     return rows.reduce(
@@ -50,10 +50,6 @@ export function OwnerMaterialsQuoteEditor() {
       { supplier: 0, client: 0 },
     );
   }, [rows]);
-
-  function updateRow(index: number, patch: Partial<EditableRow>) {
-    setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
-  }
 
   function recalcFromMarkup(index: number, patch: Partial<EditableRow>) {
     setRows((current) =>
@@ -132,8 +128,9 @@ export function OwnerMaterialsQuoteEditor() {
       </section>
 
       <section className="rounded-[28px] border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950 shadow-[0_14px_36px_rgba(220,168,69,0.08)]">
-        <p className="font-semibold">Publishing is not wired to a live shop write action on this page yet.</p>
-        <p className="mt-1">Buttons stay local-only/disabled for safety until the existing shop write action is connected. Duplicate note key pattern: supplier + quoteDate + itemNo, fallback supplier + normalizedDescription + unit.</p>
+        <p className="font-semibold">Live publishing is blocked on this branch for safety.</p>
+        <p className="mt-1">Missing pieces: a real <code className="rounded bg-white/70 px-1 py-0.5 text-[0.92em]">shop_items</code> table/schema, a protected server action or admin write path for shop publishing, and a client <code className="rounded bg-white/70 px-1 py-0.5 text-[0.92em]">/shop</code> page that reads the same published source.</p>
+        <p className="mt-1">Duplicate key rule is ready: supplier + quoteDate + itemNo, fallback supplier + normalizedDescription + unit.</p>
         {helperMessage ? <p className="mt-2 rounded-xl bg-white/70 px-3 py-2 text-slate-700">{helperMessage}</p> : null}
       </section>
 
@@ -148,8 +145,13 @@ export function OwnerMaterialsQuoteEditor() {
                   <div className="text-sm font-semibold text-slate-950">{row.description}</div>
                   <div className="mt-1 text-sm text-slate-600">Item #{row.itemNo} · Qty {row.qty} {row.unit}</div>
                 </div>
-                <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
-                  {row.duplicateKey}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+                    {row.duplicateKey}
+                  </div>
+                  <div className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">
+                    Publish status: blocked
+                  </div>
                 </div>
               </div>
 
@@ -204,15 +206,11 @@ export function OwnerMaterialsQuoteEditor() {
                 <button
                   type="button"
                   disabled
-                  onClick={() => {
-                    updateRow(index, row);
-                    setHelperMessage(`Live shop publishing still needs the shop write action connected for ${row.itemNo}.`);
-                  }}
                   className="inline-flex cursor-not-allowed items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 opacity-60"
                 >
                   Add to Client Shop / Publish to Shop
                 </button>
-                <span className="text-sm text-slate-500">Local pricing preview only for now.</span>
+                <span className="text-sm text-slate-500">Blocked until protected shop schema + write action are added.</span>
               </div>
             </section>
           );
