@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 import { MobileMenuDrawer, type MobileMenuLink } from "@/components/buildflow/mobile-menu-drawer";
+import { SHOP_CATEGORY_NAMES } from "@/lib/shop";
 
 type MobileClientHeaderProps = {
   isSignedIn: boolean;
@@ -15,6 +16,7 @@ type MobileClientHeaderProps = {
 };
 
 const HIDDEN_PATHS = new Set(["/login", "/signup", "/reset-password"]);
+const SHOP_CART_STORAGE_KEY = "buildflow-shop-cart";
 
 function shouldShowHeader(pathname: string) {
   if (HIDDEN_PATHS.has(pathname)) {
@@ -35,7 +37,7 @@ function IconShell({ active, premium = false, children }: { active: boolean; pre
         premium
           ? "border-fuchsia-200/80 bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.28),transparent_34%),radial-gradient(circle_at_top_right,rgba(96,165,250,0.32),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(238,244,255,0.96))] text-slate-950 shadow-[0_12px_26px_rgba(96,165,250,0.14)]"
           : active
-            ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(235,244,255,0.92))] text-slate-950 shadow-[0_10px_24px_rgba(148,163,184,0.14)]"
+            ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))] text-slate-950 shadow-[0_10px_24px_rgba(148,163,184,0.14)]"
             : "border-slate-200/90 bg-white/95 text-slate-700 shadow-sm"
       }`}
     >
@@ -44,9 +46,67 @@ function IconShell({ active, premium = false, children }: { active: boolean; pre
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
+
+function CartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="19" r="1.5" />
+      <circle cx="17" cy="19" r="1.5" />
+      <path d="M3 4h2l2.2 10.2A1 1 0 0 0 8.2 15H18a1 1 0 0 0 1-.8L21 7H6" />
+    </svg>
+  );
+}
+
 export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHref, aiHref }: MobileClientHeaderProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [shopSearchFocused, setShopSearchFocused] = useState(false);
+  const [shopQuery, setShopQuery] = useState("");
+  const [shopCartCount, setShopCartCount] = useState(0);
+  const isShopPage = pathname === "/shop";
+
+  useEffect(() => {
+    if (!isShopPage) {
+      return;
+    }
+
+    setShopQuery(searchParams.get("q") ?? "");
+  }, [isShopPage, searchParams]);
+
+  useEffect(() => {
+    if (!isShopPage || typeof window === "undefined") {
+      return;
+    }
+
+    const syncCartCount = () => {
+      try {
+        const raw = window.localStorage.getItem(SHOP_CART_STORAGE_KEY);
+        const parsed = raw ? (JSON.parse(raw) as string[]) : [];
+        setShopCartCount(Array.isArray(parsed) ? parsed.length : 0);
+      } catch {
+        setShopCartCount(0);
+      }
+    };
+
+    syncCartCount();
+    window.addEventListener("storage", syncCartCount);
+    window.addEventListener("buildflow-shop-cart-updated", syncCartCount as EventListener);
+
+    return () => {
+      window.removeEventListener("storage", syncCartCount);
+      window.removeEventListener("buildflow-shop-cart-updated", syncCartCount as EventListener);
+    };
+  }, [isShopPage]);
 
   const primaryLinks = useMemo<MobileMenuLink[]>(() => [
     { href: "/", label: "Home" },
@@ -74,8 +134,34 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
     ];
   }, [isAdmin]);
 
+  const shopSuggestions = useMemo(() => {
+    const normalizedQuery = shopQuery.trim().toLowerCase();
+    if (!shopSearchFocused) return [];
+    if (!normalizedQuery) return [...SHOP_CATEGORY_NAMES];
+    return SHOP_CATEGORY_NAMES.filter((category) => category.toLowerCase().includes(normalizedQuery));
+  }, [shopQuery, shopSearchFocused]);
+
   if (!pathname || !shouldShowHeader(pathname)) {
     return null;
+  }
+
+  function updateShopSearch(nextQuery: string, nextCategory?: string | null) {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (nextQuery.trim()) {
+      params.set("q", nextQuery);
+    } else {
+      params.delete("q");
+    }
+
+    if (nextCategory && nextCategory.trim()) {
+      params.set("category", nextCategory);
+    } else if (nextCategory === null) {
+      params.delete("category");
+    }
+
+    const queryString = params.toString();
+    router.replace(queryString ? `/shop?${queryString}` : "/shop", { scroll: false });
   }
 
   return (
@@ -97,15 +183,63 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
             </IconShell>
           </button>
 
-          <Link href={searchHref} aria-label="Search materials" className="min-w-0 flex-1">
-            <span className={`flex min-h-10 items-center gap-2 rounded-2xl border px-3 py-2 shadow-sm transition ${isActivePath(pathname, "/search") || isActivePath(pathname, "/shop") || isActivePath(pathname, "/materials") || isActivePath(pathname, "/quotes") || isActivePath(pathname, "/orders") ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))]" : "border-slate-200/90 bg-white/95"}`}>
-              <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" />
-                <path d="m20 20-3.5-3.5" />
-              </svg>
-              <span className="truncate text-sm text-slate-500">Search materials</span>
-            </span>
-          </Link>
+          {isShopPage ? (
+            <div className="relative min-w-0 flex-1">
+              <div className={`flex min-h-10 items-center gap-2 rounded-2xl border px-3 py-2 shadow-sm transition ${shopSearchFocused || isActivePath(pathname, "/shop") ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))]" : "border-slate-200/90 bg-white/95"}`}>
+                <SearchIcon />
+                <input
+                  value={shopQuery}
+                  onChange={(event) => {
+                    const nextQuery = event.target.value;
+                    setShopQuery(nextQuery);
+                    updateShopSearch(nextQuery);
+                  }}
+                  onFocus={() => setShopSearchFocused(true)}
+                  placeholder="Search materials"
+                  className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                />
+              </div>
+
+              {shopSearchFocused ? (
+                <div className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-20 rounded-[22px] border border-sky-100 bg-white p-3 shadow-[0_18px_40px_rgba(148,163,184,0.16)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Category suggestions</p>
+                    <button type="button" onClick={() => setShopSearchFocused(false)} className="text-xs font-semibold text-slate-500">
+                      Close
+                    </button>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {shopSuggestions.length > 0 ? (
+                      shopSuggestions.map((category) => (
+                        <button
+                          key={category}
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setShopQuery(category);
+                            updateShopSearch(category, category);
+                            setShopSearchFocused(false);
+                          }}
+                          className="rounded-full border border-sky-100 bg-sky-50/70 px-3 py-2 text-sm font-semibold text-sky-700"
+                        >
+                          {category}
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-500">No category suggestions match yet.</p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <Link href={searchHref} aria-label="Search materials" className="min-w-0 flex-1">
+              <span className={`flex min-h-10 items-center gap-2 rounded-2xl border px-3 py-2 shadow-sm transition ${isActivePath(pathname, "/search") || isActivePath(pathname, "/shop") || isActivePath(pathname, "/materials") || isActivePath(pathname, "/quotes") || isActivePath(pathname, "/orders") ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))]" : "border-slate-200/90 bg-white/95"}`}>
+                <SearchIcon />
+                <span className="truncate text-sm text-slate-500">Search materials</span>
+              </span>
+            </Link>
+          )}
 
           <Link href={accountHref} aria-label="Account" className="inline-flex">
             <IconShell active={isActivePath(pathname, "/dashboard")}>
@@ -115,6 +249,19 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
               </svg>
             </IconShell>
           </Link>
+
+          {isShopPage ? (
+            <button type="button" aria-label="Cart" className="inline-flex">
+              <IconShell active={shopCartCount > 0}>
+                <CartIcon />
+                {shopCartCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-950">
+                    {shopCartCount}
+                  </span>
+                ) : null}
+              </IconShell>
+            </button>
+          ) : null}
 
           <Link href={aiHref} aria-label="Ask BuildFlow AI" className="inline-flex">
             <IconShell active={isActivePath(pathname, "/ai")} premium>

@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 
 export type ShopCatalogProduct = {
   id: string
@@ -54,52 +54,8 @@ const CATEGORY_CONFIG = [
   },
 ] as const
 
-function MenuIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
-      <path d="M4 7h16" />
-      <path d="M4 12h16" />
-      <path d="M4 17h10" />
-    </svg>
-  )
-}
-
-function SearchIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="6.5" />
-      <path d="m16 16 4 4" />
-    </svg>
-  )
-}
-
-function UserIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 20a8 8 0 0 0-16 0" />
-      <circle cx="12" cy="8" r="4" />
-    </svg>
-  )
-}
-
-function CartIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="9" cy="19" r="1.5" />
-      <circle cx="17" cy="19" r="1.5" />
-      <path d="M3 4h2l2.2 10.2A1 1 0 0 0 8.2 15H18a1 1 0 0 0 1-.8L21 7H6" />
-    </svg>
-  )
-}
-
-function SparkleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" />
-      <path d="m18.5 3 .6 1.9L21 5.5l-1.9.6-.6 1.9-.6-1.9-1.9-.6 1.9-.6.6-1.9Z" />
-    </svg>
-  )
-}
+const SHOP_CART_STORAGE_KEY = "buildflow-shop-cart"
+const SHOP_SAVE_STORAGE_KEY = "buildflow-shop-save"
 
 function ChevronRightIcon() {
   return (
@@ -125,15 +81,32 @@ function formatCurrency(value: number) {
   }).format(value)
 }
 
+function readIdsFromStorage(key: string) {
+  if (typeof window === "undefined") return [] as string[]
+
+  try {
+    const raw = window.localStorage.getItem(key)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return [] as string[]
+  }
+}
+
 export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) {
-  const [query, setQuery] = useState("")
-  const [activeCategory, setActiveCategory] = useState<string | null>(null)
-  const [searchFocused, setSearchFocused] = useState(false)
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [selectedProduct, setSelectedProduct] = useState<ShopCatalogProduct | null>(null)
   const [cartIds, setCartIds] = useState<string[]>([])
   const [savedIds, setSavedIds] = useState<string[]>([])
 
-  const normalizedQuery = query.trim().toLowerCase()
+  const normalizedQuery = (searchParams.get("q") ?? "").trim().toLowerCase()
+  const activeCategory = searchParams.get("category")?.trim() || null
+
+  useEffect(() => {
+    setCartIds(readIdsFromStorage(SHOP_CART_STORAGE_KEY))
+    setSavedIds(readIdsFromStorage(SHOP_SAVE_STORAGE_KEY))
+  }, [])
 
   const categories = useMemo(() => {
     return CATEGORY_CONFIG.map((category) => ({
@@ -141,12 +114,6 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
       count: products.filter((product) => product.category === category.name).length,
     }))
   }, [products])
-
-  const categorySuggestions = useMemo(() => {
-    if (!searchFocused) return []
-    if (!normalizedQuery) return categories
-    return categories.filter((category) => category.name.toLowerCase().includes(normalizedQuery))
-  }, [categories, normalizedQuery, searchFocused])
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -159,86 +126,43 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
     })
   }, [activeCategory, normalizedQuery, products])
 
+  function writeIdsToStorage(key: string, ids: string[], eventName: string) {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(key, JSON.stringify(ids))
+    window.dispatchEvent(new Event(eventName))
+  }
+
   function toggleCart(productId: string) {
-    setCartIds((current) => (current.includes(productId) ? current.filter((id) => id !== productId) : [...current, productId]))
+    setCartIds((current) => {
+      const next = current.includes(productId) ? current.filter((id) => id !== productId) : [...current, productId]
+      writeIdsToStorage(SHOP_CART_STORAGE_KEY, next, "buildflow-shop-cart-updated")
+      return next
+    })
   }
 
   function toggleSaved(productId: string) {
-    setSavedIds((current) => (current.includes(productId) ? current.filter((id) => id !== productId) : [...current, productId]))
+    setSavedIds((current) => {
+      const next = current.includes(productId) ? current.filter((id) => id !== productId) : [...current, productId]
+      writeIdsToStorage(SHOP_SAVE_STORAGE_KEY, next, "buildflow-shop-save-updated")
+      return next
+    })
+  }
+
+  function setCategory(nextCategory: string | null) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (nextCategory) {
+      params.set("category", nextCategory)
+      params.set("q", nextCategory)
+    } else {
+      params.delete("category")
+    }
+    const queryString = params.toString()
+    router.replace(queryString ? `/shop?${queryString}` : "/shop", { scroll: false })
   }
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#eff7ff_0%,#f8fbff_42%,#eef5fc_100%)] px-4 py-4 pb-28 text-slate-900 sm:px-8 sm:pb-10 lg:px-10 lg:pb-12">
       <section className="mx-auto flex max-w-6xl flex-col gap-5">
-        <section className="rounded-[30px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(239,246,255,0.9))] p-4 shadow-[0_20px_50px_rgba(148,163,184,0.12)] sm:p-5">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-white text-slate-800 shadow-[0_8px_18px_rgba(15,23,42,0.05)] transition active:scale-[0.98]">
-              <MenuIcon />
-            </Link>
-
-            <div className="relative min-w-0 flex-1">
-              <div className="flex items-center gap-3 rounded-[22px] border border-sky-100 bg-white px-4 py-3 shadow-[0_8px_18px_rgba(15,23,42,0.05)]">
-                <SearchIcon />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  onFocus={() => setSearchFocused(true)}
-                  placeholder="Search materials or categories"
-                  className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                />
-              </div>
-
-              {searchFocused ? (
-                <div className="absolute left-0 right-0 top-[calc(100%+0.55rem)] z-20 rounded-[24px] border border-sky-100 bg-white p-3 shadow-[0_18px_40px_rgba(148,163,184,0.16)]">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Category suggestions</p>
-                    <button onClick={() => setSearchFocused(false)} className="text-slate-400">
-                      <CloseIcon />
-                    </button>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {categorySuggestions.length > 0 ? (
-                      categorySuggestions.map((category) => (
-                        <button
-                          key={category.name}
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => {
-                            setActiveCategory(category.name)
-                            setQuery(category.name)
-                            setSearchFocused(false)
-                          }}
-                          className="rounded-full border border-sky-100 bg-sky-50/70 px-3 py-2 text-sm font-semibold text-sky-700"
-                        >
-                          {category.name}
-                        </button>
-                      ))
-                    ) : (
-                      <p className="text-sm text-slate-500">No category suggestions match yet.</p>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="flex shrink-0 items-center gap-2">
-              <Link href="/dashboard" className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-100 bg-white text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.05)] transition active:scale-[0.98]">
-                <UserIcon />
-              </Link>
-              <button className="relative flex h-12 w-12 items-center justify-center rounded-full border border-slate-100 bg-white text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.05)] transition active:scale-[0.98]">
-                <CartIcon />
-                {cartIds.length > 0 ? (
-                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-950">
-                    {cartIds.length}
-                  </span>
-                ) : null}
-              </button>
-              <Link href="/ai" className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-100 bg-white text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.05)] transition active:scale-[0.98]">
-                <SparkleIcon />
-              </Link>
-            </div>
-          </div>
-        </section>
-
         <section className="overflow-hidden rounded-[32px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(242,248,255,0.94))] shadow-[0_18px_42px_rgba(148,163,184,0.12)]">
           <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="p-5 sm:p-7">
@@ -254,7 +178,7 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-[1.6rem] font-semibold tracking-[-0.04em] text-slate-950">Categories</h2>
             {activeCategory ? (
-              <button onClick={() => setActiveCategory(null)} className="text-sm font-semibold text-sky-700">
+              <button onClick={() => setCategory(null)} className="text-sm font-semibold text-sky-700">
                 Clear filter
               </button>
             ) : null}
@@ -265,7 +189,7 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
               return (
                 <button
                   key={category.name}
-                  onClick={() => setActiveCategory(active ? null : category.name)}
+                  onClick={() => setCategory(active ? null : category.name)}
                   className={`min-w-[128px] shrink-0 overflow-hidden rounded-[24px] border text-left shadow-[0_10px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99] ${
                     active ? "border-sky-300 bg-sky-50" : "border-sky-100 bg-white"
                   }`}
