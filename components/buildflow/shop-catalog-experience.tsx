@@ -15,7 +15,7 @@ type CollectionMode = "all" | "framing"
 
 const CATEGORY_CONFIG = [
   { name: "Lumber", image: "https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?auto=format&fit=crop&w=800&q=80" },
-  { name: "Plywood", image: "https://images.unsplash.com/photo-1581093458791-9f3c3900df4b?auto=format&fit=crop&w=800&q=80" },
+  { name: "Plywood", image: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80" },
   { name: "Treated Lumber", image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=800&q=80" },
   { name: "LVL Beams", image: "https://images.unsplash.com/photo-1517581177682-a085bb7ffb15?auto=format&fit=crop&w=800&q=80" },
   { name: "Fasteners", image: "https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=800&q=80" },
@@ -116,7 +116,9 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
                   onClick={() => setCategory(active ? null : category.name)}
                   className={`min-w-[140px] shrink-0 overflow-hidden rounded-[24px] border text-left shadow-[0_12px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99] ${active ? "border-sky-300 bg-sky-50" : "border-slate-100 bg-white"}`}
                 >
-                  <div className="aspect-[1.15/1] bg-cover bg-center" style={{ backgroundImage: `url(${category.image})` }} />
+                  <div className="aspect-[1.15/1] overflow-hidden bg-slate-100">
+                    <img src={category.image} alt={category.name} className="h-full w-full object-cover" loading="lazy" />
+                  </div>
                   <div className="p-3.5">
                     <div className="text-sm font-semibold text-slate-950">{category.name}</div>
                     <div className="mt-1 text-[12px] text-slate-500">{category.count} items</div>
@@ -135,7 +137,9 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
           <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {featuredProducts.map((product) => (
               <Link key={product.id} href={`/shop/${product.slug}`} className="min-w-[236px] max-w-[236px] shrink-0 overflow-hidden rounded-[26px] border border-slate-100 bg-white shadow-[0_12px_28px_rgba(148,163,184,0.1)]">
-                <div className="aspect-[1.14/1] bg-cover bg-center" style={{ backgroundImage: `url(${product.image})` }} />
+                <div className="aspect-[1.14/1] overflow-hidden bg-slate-100">
+                  <img src={product.image} alt={product.name} className="h-full w-full object-cover" loading="lazy" />
+                </div>
                 <div className="flex min-h-[168px] flex-col p-4">
                   <div className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]">
                     <span className="text-sky-700">{product.featuredLabel}</span>
@@ -176,7 +180,8 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filteredProducts.map((product) => (
               <Link key={product.id} href={`/shop/${product.slug}`} className="overflow-hidden rounded-[28px] border border-slate-100 bg-white shadow-[0_16px_34px_rgba(148,163,184,0.1)] transition hover:-translate-y-0.5">
-                <div className="relative aspect-[1.12/1] bg-cover bg-center" style={{ backgroundImage: `url(${product.image})` }}>
+                <div className="relative aspect-[1.12/1] overflow-hidden bg-slate-100">
+                  <img src={product.image} alt={product.name} className="h-full w-full object-cover" loading="lazy" />
                   <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700 shadow-sm">{product.category}</div>
                   <div className="absolute bottom-3 right-3 rounded-full bg-emerald-50/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700 shadow-sm">{product.availability}</div>
                 </div>
