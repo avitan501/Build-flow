@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { MobileBottomDock } from "@/components/buildflow/mobile-bottom-dock";
+import { MobileClientHeader } from "@/components/buildflow/mobile-client-header";
 import { getSessionWithProfile } from "@/lib/auth";
 import "./globals.css";
 
@@ -25,13 +26,15 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { user } = await getSessionWithProfile();
+  const { user, profile } = await getSessionWithProfile();
   const isSignedIn = Boolean(user);
+  const isAdmin = profile?.role === "admin";
   const gatedHref = isSignedIn ? null : "/login";
   const accountHref = isSignedIn ? "/dashboard" : "/login";
   const projectsHref = gatedHref ?? "/projects";
   const uploadHref = gatedHref ?? "/upload";
-  const searchHref = gatedHref ?? "/shop";
+  const searchHref = gatedHref ?? "/search";
+  const aiHref = "/ai";
 
   return (
     <html
@@ -39,6 +42,7 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} accountHref={accountHref} searchHref={searchHref} aiHref={aiHref} />
         {children}
         <MobileBottomDock accountHref={accountHref} projectsHref={projectsHref} uploadHref={uploadHref} searchHref={searchHref} />
       </body>

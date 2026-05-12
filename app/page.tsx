@@ -1,7 +1,6 @@
 import Link from "next/link"
 
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler"
-import { MobileHomeHeader } from "@/components/buildflow/mobile-home-header"
 import { getSessionWithProfile } from "@/lib/auth"
 
 const heroImage =
@@ -99,7 +98,7 @@ export default async function Home() {
   const projectsHref = gatedHref ?? "/projects"
   const uploadHref = gatedHref ?? "/upload"
   const ordersHref = gatedHref ?? "/orders"
-  const shopHref = gatedHref ?? "/shop"
+  const shopHref = gatedHref ?? "/search"
 
   const hrefs = {
     projects: projectsHref,
@@ -113,7 +112,6 @@ export default async function Home() {
 
       <section className="relative mx-auto flex min-h-screen max-w-4xl flex-col gap-5 px-4 pb-28 pt-4 sm:gap-6 sm:px-8 sm:pb-12 sm:pt-8">
         <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(circle_at_top,_rgba(125,211,252,0.18),_transparent_58%)]" />
-        <MobileHomeHeader uploadHref={uploadHref} aiHref="#" />
 
         <section className="overflow-hidden rounded-[32px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,247,255,0.92))] shadow-[0_20px_50px_rgba(148,163,184,0.12)]">
           <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
