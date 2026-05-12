@@ -103,10 +103,6 @@ export default async function ProjectsPage() {
             <p className="mt-4 max-w-2xl text-base leading-8 text-slate-600">
               Create a new project or open an existing workspace to manage plans, materials, quotes, and orders.
             </p>
-            <div className="mt-5 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-[0.18em]">
-              <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-600 shadow-[0_8px_20px_rgba(148,163,184,0.08)]">Client</span>
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-emerald-700 shadow-[0_8px_20px_rgba(148,163,184,0.08)]">Projects Hub</span>
-            </div>
           </div>
 
           <div className="mt-6 rounded-[30px] border border-sky-100 bg-white p-5 shadow-[0_16px_36px_rgba(148,163,184,0.12)] sm:p-6">
