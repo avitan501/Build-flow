@@ -1,130 +1,145 @@
-import { PremiumBackLink, PremiumBadge, PremiumEmptyState, PremiumHero, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumPhotoPanel, PremiumPrimaryButton, PremiumSection } from "@/components/buildflow/premium-page";
-import type { ShopItemRecord } from "@/lib/shop";
-import { createClient } from "@/lib/supabase/server";
+import { ShopCatalogExperience, type ShopCatalogProduct } from "@/components/buildflow/shop-catalog-experience"
+import type { ShopItemRecord } from "@/lib/shop"
+import { createClient } from "@/lib/supabase/server"
 
-const shopHeroImage =
-  "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1400&q=80";
-const shopEmptyImage =
-  "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1400&q=80";
+const SAMPLE_PRODUCTS: ShopCatalogProduct[] = [
+  {
+    id: "sample-2x4-premium",
+    name: "2x4 Premium Lumber",
+    description: "Kiln-dried framing lumber for clean residential wall framing and interior structural work.",
+    category: "Lumber",
+    unit: "Each · 8 ft",
+    price: 7.95,
+    supplierName: "BuildFlow sample catalog",
+    quoteNumber: "CAT-LUM-204",
+    image: "https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    id: "sample-2x8-treated",
+    name: "2x8 Treated Lumber",
+    description: "Pressure-treated board suited for exterior framing, deck bases, and moisture-prone structural areas.",
+    category: "Treated Lumber",
+    unit: "Each · 12 ft",
+    price: 23.4,
+    supplierName: "BuildFlow sample catalog",
+    quoteNumber: "CAT-TRL-208",
+    image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    id: "sample-cdx-plywood",
+    name: "CDX Plywood",
+    description: "General-purpose structural plywood sheet for roof, wall, and subfloor sheathing applications.",
+    category: "Plywood",
+    unit: "Sheet · 4x8",
+    price: 34.75,
+    supplierName: "BuildFlow sample catalog",
+    quoteNumber: "CAT-PLY-001",
+    image: "https://images.unsplash.com/photo-1581093458791-9f3c3900df4b?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    id: "sample-lvl-beam",
+    name: "LVL Beam",
+    description: "Engineered laminated veneer lumber beam for long spans, headers, and high-load framing zones.",
+    category: "LVL Beams",
+    unit: "Each · 1-3/4 x 11-7/8 x 16'",
+    price: 118.2,
+    supplierName: "BuildFlow sample catalog",
+    quoteNumber: "CAT-LVL-118",
+    image: "https://images.unsplash.com/photo-1517581177682-a085bb7ffb15?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    id: "sample-simpson-hanger",
+    name: "Simpson Joist Hanger",
+    description: "Heavy-duty galvanized hanger for fastening joists securely into beams or ledger assemblies.",
+    category: "Hangers",
+    unit: "Each",
+    price: 4.85,
+    supplierName: "BuildFlow sample catalog",
+    quoteNumber: "CAT-HNG-210",
+    image: "https://images.unsplash.com/photo-1599707254554-027aeb4deacd?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    id: "sample-paslode-nails",
+    name: "Paslode Framing Nails",
+    description: "Collated framing nails for pneumatic framing tools, sized for efficient structural fastening.",
+    category: "Fasteners",
+    unit: "Box",
+    price: 42.1,
+    supplierName: "BuildFlow sample catalog",
+    quoteNumber: "CAT-FST-501",
+    image: "https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    id: "sample-subfloor-adhesive",
+    name: "Subfloor Adhesive",
+    description: "High-grab construction adhesive designed to reduce squeaks and improve panel hold on floors.",
+    category: "Adhesives",
+    unit: "Tube · 28 oz",
+    price: 6.45,
+    supplierName: "BuildFlow sample catalog",
+    quoteNumber: "CAT-ADH-028",
+    image: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    id: "sample-stainless-flashing",
+    name: "Stainless Flashing",
+    description: "Corrosion-resistant flashing for clean water management around roofs, walls, and window openings.",
+    category: "Flashing",
+    unit: "Roll · 10 in x 50 ft",
+    price: 58.9,
+    supplierName: "BuildFlow sample catalog",
+    quoteNumber: "CAT-FLS-050",
+    image: "https://images.unsplash.com/photo-1523413651479-597eb2da0ad6?auto=format&fit=crop&w=900&q=80",
+  },
+]
 
-function formatCurrency(value: number | null) {
-  if (value == null) {
-    return "—";
+function fallbackImageForCategory(category: string | null) {
+  switch (category) {
+    case "Lumber":
+      return SAMPLE_PRODUCTS[0].image
+    case "Treated Lumber":
+      return SAMPLE_PRODUCTS[1].image
+    case "Plywood":
+      return SAMPLE_PRODUCTS[2].image
+    case "LVL Beams":
+      return SAMPLE_PRODUCTS[3].image
+    case "Hangers":
+      return SAMPLE_PRODUCTS[4].image
+    case "Fasteners":
+      return SAMPLE_PRODUCTS[5].image
+    case "Adhesives":
+      return SAMPLE_PRODUCTS[6].image
+    case "Flashing":
+      return SAMPLE_PRODUCTS[7].image
+    default:
+      return "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=900&q=80"
   }
+}
 
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(value);
+function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[] {
+  return items.map((item) => ({
+    id: item.id,
+    name: item.name,
+    description: item.description || "Saved supplier catalog item ready for later project selection.",
+    category: item.category || "Materials",
+    unit: item.unit || "Unit not specified",
+    price: item.unit_price,
+    supplierName: item.supplier_name,
+    quoteNumber: item.quote_number,
+    image: fallbackImageForCategory(item.category),
+  }))
 }
 
 export default async function ShopPage() {
-  const supabase = await createClient();
+  const supabase = await createClient()
   const { data: itemsData, error } = await supabase
     .from("shop_items")
     .select("id, supplier_estimate_id, supplier_name, quote_number, pricing_date, item_number, name, description, category, quantity, unit, unit_price, extended_price, source, created_at, updated_at")
     .order("created_at", { ascending: false })
     .limit(24)
-    .returns<ShopItemRecord[]>();
+    .returns<ShopItemRecord[]>()
 
-  const items = error ? [] : itemsData ?? [];
+  const products = !error && itemsData && itemsData.length > 0 ? normalizeShopItems(itemsData) : SAMPLE_PRODUCTS
 
-  return (
-    <PremiumPageShell>
-      <PremiumHero
-        eyebrow="BuildFlow Shop"
-        title="Supplier catalog"
-        description="Browse supplier catalog items, search materials, and later add selected items into the right project material list."
-        badges={
-          <>
-            <PremiumBadge tone="sky">Read only</PremiumBadge>
-            <PremiumBadge tone="amber">No cart</PremiumBadge>
-          </>
-        }
-        aside={<PremiumBackLink href="/projects">Open Projects</PremiumBackLink>}
-      />
-
-      <div className="grid gap-4 lg:grid-cols-[1.04fr_0.96fr]">
-        <div className="grid gap-4">
-          <PremiumPhotoPanel
-            image={shopHeroImage}
-            eyebrow="Client catalog"
-            title="A cleaner front door to supplier materials"
-            description="Use Shop to review what is already in the supplier catalog before anything gets tied to a project workflow."
-            badge={<PremiumBadge tone="amber">Catalog view</PremiumBadge>}
-          />
-
-          <PremiumSection title="What this page is for" description="Client-facing catalog browsing only for now.">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <PremiumInfoCard label="Browse supplier catalog items" value="Yes" />
-              <PremiumInfoCard label="Search materials" value="Use Search or Shop" />
-              <PremiumInfoCard label="Add to project later" value="Coming soon" />
-            </div>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <PremiumPrimaryButton href="/search">Search materials</PremiumPrimaryButton>
-              <PremiumBackLink href="/projects">Go to projects</PremiumBackLink>
-            </div>
-          </PremiumSection>
-        </div>
-
-        <PremiumSection title="Current guardrails" description="This page stays intentionally safe and simple.">
-          <PremiumMutedPanel tone="amber">
-            No cart, no checkout, no direct ordering, no payments, and no supplier import actions are available here yet.
-          </PremiumMutedPanel>
-          {error ? (
-            <div className="mt-4">
-              <PremiumMutedPanel>
-                Shop items are not available to this session right now, so the page is falling back to the empty catalog state.
-              </PremiumMutedPanel>
-            </div>
-          ) : null}
-        </PremiumSection>
-      </div>
-
-      <PremiumSection title="Catalog items" description="Read-only supplier catalog items saved by admin import.">
-        {items.length === 0 ? (
-          <PremiumEmptyState
-            image={shopEmptyImage}
-            eyebrow="Shop catalog"
-            title="No shop items available yet"
-            description="Supplier catalog items will appear here after admin import."
-            action={<PremiumBackLink href="/search">Search materials</PremiumBackLink>}
-          />
-        ) : (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {items.map((item) => (
-              <article key={item.id} className="rounded-[24px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.9))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-950">{item.name}</p>
-                    <p className="mt-1 text-sm text-slate-600">{item.supplier_name}</p>
-                  </div>
-                  <PremiumBadge>{item.category || "Catalog item"}</PremiumBadge>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-slate-600">{item.description || "Saved supplier catalog item ready for later project selection."}</p>
-                <dl className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Unit price</dt>
-                    <dd className="mt-1 font-semibold text-slate-900">{formatCurrency(item.unit_price)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Unit</dt>
-                    <dd className="mt-1">{item.unit || "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Item #</dt>
-                    <dd className="mt-1">{item.item_number || "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Quote #</dt>
-                    <dd className="mt-1">{item.quote_number || "—"}</dd>
-                  </div>
-                </dl>
-              </article>
-            ))}
-          </div>
-        )}
-      </PremiumSection>
-    </PremiumPageShell>
-  );
+  return <ShopCatalogExperience products={products} />
 }
