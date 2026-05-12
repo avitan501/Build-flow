@@ -96,38 +96,33 @@ export default async function ProjectsPage() {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#f7fbff_0%,#eef6ff_45%,#ffffff_100%)] px-4 py-5 pb-28 text-slate-900 sm:px-8 sm:pb-10 lg:px-10 lg:pb-12">
       <section className="mx-auto flex max-w-6xl flex-col gap-5">
-        <section className="rounded-[30px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(238,246,255,0.9))] p-5 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Projects</p>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Your Projects</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-                Create a new project or open an existing workspace to manage plans, materials, quotes, and orders.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">Client</span>
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">Projects Hub</span>
-              </div>
+        <section className="rounded-[32px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(242,248,255,0.94))] p-5 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-7">
+          <div className="max-w-3xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-500">Projects</p>
+            <h1 className="mt-3 text-[2.15rem] font-semibold tracking-[-0.04em] text-slate-950 sm:text-[3rem]">Your projects</h1>
+            <p className="mt-4 max-w-2xl text-base leading-8 text-slate-600">
+              Create a new project or open an existing workspace to manage plans, materials, quotes, and orders.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-[0.18em]">
+              <span className="rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-600 shadow-[0_8px_20px_rgba(148,163,184,0.08)]">Client</span>
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-emerald-700 shadow-[0_8px_20px_rgba(148,163,184,0.08)]">Projects Hub</span>
             </div>
+          </div>
 
-            <div className="lg:min-w-[20rem]">
-              <div className="rounded-[26px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.92))] p-5 shadow-[0_16px_36px_rgba(148,163,184,0.12)]">
-                <div className="flex items-center gap-3">
-                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-200 bg-[linear-gradient(180deg,#fff2c6_0%,#ffe29a_100%)] text-amber-800 shadow-[0_10px_20px_rgba(220,168,69,0.16)]">
-                    <PlusIcon />
-                  </span>
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Primary action</div>
-                    <div className="mt-1 text-base font-semibold text-slate-950">Start New Project</div>
-                  </div>
-                </div>
-                <Link href="/projects/new" className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99]">
-                  <span>Start New Project</span>
-                  <span className="ml-2 text-[11px] uppercase tracking-[0.16em] opacity-80">{PROJECT_CREATION_STATUS_LABEL}</span>
-                </Link>
-                <p className="mt-3 text-sm leading-6 text-slate-600">Create a new job and begin your project workspace immediately.</p>
-              </div>
-            </div>
+          <div className="mt-6 rounded-[30px] border border-sky-100 bg-white p-5 shadow-[0_16px_36px_rgba(148,163,184,0.12)] sm:p-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">Primary action</p>
+            <Link href="/projects/new" className="mt-4 flex w-full items-center justify-between gap-3 rounded-[24px] bg-[linear-gradient(180deg,#f6cf69_0%,#e9b846_100%)] px-4 py-4 text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] transition active:scale-[0.99] sm:px-5">
+              <span className="flex items-center gap-3">
+                <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-amber-800 shadow-[0_8px_18px_rgba(15,23,42,0.08)]">
+                  <PlusIcon />
+                </span>
+                <span className="text-lg font-semibold tracking-[-0.03em]">Start New Project</span>
+              </span>
+              <span className="rounded-full bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-800">
+                {PROJECT_CREATION_STATUS_LABEL}
+              </span>
+            </Link>
+            <p className="mt-4 text-base leading-8 text-slate-600">Create a new job or continue from an existing workspace.</p>
           </div>
         </section>
 
