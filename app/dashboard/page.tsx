@@ -1,176 +1,178 @@
-import {
-  PremiumActionTile,
-  PremiumBadge,
-  PremiumHero,
-  PremiumIconBadge,
-  PremiumInfoCard,
-  PremiumMutedPanel,
-  PremiumPageShell,
-  PremiumPrimaryButton,
-  PremiumSection,
-} from "@/components/buildflow/premium-page";
+import Link from "next/link";
+
+import { JourneyStrip, ProgressMiniCards, statusButtonClass, statusClasses } from "@/components/buildflow/wireframe";
 import { requireSignedInProfile } from "@/lib/auth";
-import type { ProjectEventRecord, ProjectRecord } from "@/lib/projects";
-
-function formatProjectDate(value: string) {
-  return new Date(value).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function formatTimelineDate(value: string) {
-  return new Date(value).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function DockIcon({ type }: { type: "project" | "upload" | "activity" | "start" }) {
-  if (type === "upload") return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 16V5" /><path d="m7 10 5-5 5 5" /><path d="M5 19h14" /></svg>;
-  if (type === "activity") return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 12h4l2-5 4 10 2-5h4" /></svg>;
-  if (type === "start") return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 5v14" /><path d="M5 12h14" /></svg>;
-  return <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></svg>;
-}
+import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
 
 export default async function DashboardPage() {
-  const { supabase, user, profile } = await requireSignedInProfile();
+  const { user, profile } = await requireSignedInProfile();
+  const { specMap } = getBuildflowWireframeData();
+  const dashboard = specMap.get("dashboard");
+  const projects = specMap.get("projects");
+  const upload = specMap.get("upload");
+  const materials = specMap.get("materials");
+  const orders = specMap.get("orders");
+  const whatsapp = specMap.get("admin-whatsapp");
 
-  const { data: projectsData, error: projectsError } = await supabase
-    .from("projects")
-    .select("id, owner_id, name, address, status, created_at, updated_at")
-    .eq("owner_id", user.id)
-    .order("updated_at", { ascending: false })
-    .limit(3)
-    .returns<ProjectRecord[]>();
-
-  if (projectsError) {
-    throw new Error("Failed to load projects for dashboard.");
+  if (!dashboard || !projects || !upload || !materials || !orders || !whatsapp) {
+    throw new Error("Missing BuildFlow dashboard route data.");
   }
 
-  const projectIds = (projectsData ?? []).map((project) => project.id);
-  let activity: ProjectEventRecord[] = [];
-
-  if (projectIds.length > 0) {
-    const { data: activityData, error: activityError } = await supabase
-      .from("project_events")
-      .select("id, project_id, owner_id, event_type, source, title, description, metadata, created_at")
-      .in("project_id", projectIds)
-      .eq("owner_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(4)
-      .returns<ProjectEventRecord[]>();
-
-    if (activityError) {
-      throw new Error("Failed to load dashboard activity.");
-    }
-
-    activity = activityData ?? [];
-  }
-
-  const recentProjects = projectsData ?? [];
+  const statusTone = statusClasses(dashboard.status);
   const isPending = profile?.approval_status === "pending";
-  const firstName = profile?.full_name?.split(" ")[0]?.trim();
 
   return (
-    <PremiumPageShell>
-      <PremiumHero
-        eyebrow="Dashboard"
-        title={`Welcome${firstName ? `, ${firstName}` : ""}`}
-        description={isPending ? "Your account is almost ready. You can review your projects now, and the full workflow will open up after approval." : "Use this space as your command center for starting a project, opening a workspace, uploading plans, and checking recent activity."}
-        badges={
-          <>
-            <PremiumBadge>Client</PremiumBadge>
-            <PremiumBadge tone={isPending ? "amber" : "emerald"}>{isPending ? "Approval pending" : "Ready"}</PremiumBadge>
-          </>
-        }
-        aside={
-          <div className="rounded-[26px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.9))] p-5 shadow-[0_16px_36px_rgba(148,163,184,0.12)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Start here</div>
-            <div className="mt-3 text-2xl font-semibold text-slate-950">{recentProjects.length}</div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{recentProjects.length > 0 ? "Open a workspace or upload the next plan set." : "Create your first project to begin."}</p>
-            <div className="mt-4">
-              <PremiumPrimaryButton href="/projects/new">Start Project</PremiumPrimaryButton>
+    <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
+      <section className="mx-auto flex max-w-7xl flex-col gap-6">
+        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Client Flow · signed in</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+                {isPending ? "Pending Approval" : `Welcome${profile?.full_name ? `, ${profile.full_name}` : ""}`}
+              </h1>
+              <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+                {isPending
+                  ? "Your account is pending approval. Your account is pending admin approval."
+                  : `BuildFlow command center for the client journey. Signed in as ${user.email}. Start a project, upload plans, review materials, and move toward order approval.`}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Who this page is for: Client Flow</span>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:min-w-72">
+              <span className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${isPending ? "border-orange-200 bg-orange-50 text-orange-700" : statusTone.badge}`}>
+                {isPending ? "Pending" : dashboard.status}
+              </span>
+              <div className={`rounded-2xl border px-4 py-3 text-sm ${isPending ? "border-orange-200 bg-orange-50 text-orange-700" : statusTone.card}`}>
+                {isPending ? "Pending account state · limited access" : `${dashboard.progress}% complete · ${100 - dashboard.progress}% remaining`}
+              </div>
             </div>
           </div>
-        }
-      />
 
-      {isPending ? (
-        <PremiumMutedPanel tone="amber">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em]">Approval in progress</div>
-          <p className="mt-2 leading-6">You can review your dashboard now. More actions will unlock as soon as approval is complete.</p>
-        </PremiumMutedPanel>
-      ) : null}
+          {isPending ? (
+            <div className="mt-6 rounded-3xl border border-orange-200 bg-orange-50 p-5 text-orange-700">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em]">Next step</div>
+              <p className="mt-3 text-sm leading-6">Pending Approval. Your account is pending approval.</p>
+            </div>
+          ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <PremiumInfoCard label="Welcome" value={firstName ? `${firstName}, you're signed in.` : "You are signed in."} />
-        <PremiumInfoCard label="Start project" value="Create a new workspace anytime" />
-        <PremiumInfoCard label="My projects" value={`${recentProjects.length} recent project${recentProjects.length === 1 ? "" : "s"}`} />
-        <PremiumInfoCard label="Upload plans" value={recentProjects.length > 0 ? "Ready for your next file" : "Start a project first"} />
-      </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Status badge</div>
+              <div className="mt-3 text-sm text-slate-700">{profile?.approval_status ?? "pending"} · role {profile?.role ?? "client"}</div>
+            </article>
+            <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Purpose</div>
+              <div className="mt-3 text-sm text-slate-700">{isPending ? "Show account approval state until admin review is complete." : dashboard.purpose}</div>
+            </article>
+            <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Missing to 100%</div>
+              <div className="mt-3 text-sm text-slate-700">{isPending ? "Admin approval, approved-client actions, and project workflow access" : dashboard.missing[0]}</div>
+            </article>
+            <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Next step</div>
+              <div className="mt-3 text-sm text-slate-700">{isPending ? "Wait for admin approval before full client actions are enabled." : dashboard.nextStep}</div>
+            </article>
+          </div>
+        </section>
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <PremiumSection title="My projects" description="Open your latest workspace and keep moving.">
-          {recentProjects.length > 0 ? (
-            <div className="grid gap-3">
-              {recentProjects.map((project) => (
-                <PremiumActionTile
-                  key={project.id}
-                  href={`/projects/${project.id}`}
-                  title={project.name}
-                  detail={project.address ? `${project.address} · Updated ${formatProjectDate(project.updated_at)}` : `Updated ${formatProjectDate(project.updated_at)}`}
-                  badge={<PremiumBadge tone="emerald">Open</PremiumBadge>}
-                  icon={<PremiumIconBadge tone="sky"><DockIcon type="project" /></PremiumIconBadge>}
-                />
+        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold">4-step client flow</h2>
+              <p className="mt-1 text-sm text-slate-500">This dashboard should always point back to the next client step.</p>
+            </div>
+          </div>
+          <div className="mt-5">
+            <JourneyStrip activeStep={0} />
+          </div>
+        </section>
+
+        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold">Main actions</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {isPending
+                  ? "Pending accounts can view status only. Full approved-client actions stay disabled."
+                  : "Folder / step workflow only. Preview and blocked areas stay visibly limited."}
+              </p>
+            </div>
+            <Link href="/admin/build-map" className="text-sm font-semibold text-slate-700 underline underline-offset-4">Back to Build Map</Link>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {isPending ? (
+              <>
+                <div className={statusButtonClass("Coming Soon", true)}>My Projects</div>
+                <div className={statusButtonClass("Coming Soon", true)}>Upload Plans</div>
+                <div className={statusButtonClass("Coming Soon", true)}>WhatsApp Messages</div>
+                <div className={statusButtonClass("Coming Soon", true)}>Materials</div>
+                <div className={statusButtonClass("Coming Soon", true)}>Orders</div>
+                <div className={statusButtonClass("Preview", true)}>Awaiting Admin Approval</div>
+              </>
+            ) : (
+              <>
+                <Link href="/projects/new" className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">Start Project</Link>
+                <Link href="/upload" className={statusButtonClass(upload.status)}>Upload Plans</Link>
+                <Link href="/materials" className={statusButtonClass(materials.status)}>Review Materials</Link>
+                <Link href="/orders" className={statusButtonClass(orders.status)}>Approve Order</Link>
+                <Link href="/projects" className={statusButtonClass(projects.status)}>My Projects</Link>
+                <Link href={profile?.role === "admin" ? "/admin/whatsapp" : "/orders/demo"} className={statusButtonClass(profile?.role === "admin" ? whatsapp.status : orders.status)}>
+                  {profile?.role === "admin" ? "WhatsApp Operations" : "Track Delivery"}
+                </Link>
+              </>
+            )}
+          </div>
+        </section>
+
+        <ProgressMiniCards specs={[projects, upload, materials, orders]} />
+
+        <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold">Status panels</h2>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className={`rounded-3xl border p-5 ${statusClasses(projects.status).card}`}>
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Projects</div>
+                <p className="mt-3 text-sm text-slate-700">{isPending ? "Locked until admin approval is complete." : `${projects.progress}% complete. ${projects.nextStep}`}</p>
+              </div>
+              <div className={`rounded-3xl border p-5 ${statusClasses(upload.status).card}`}>
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Upload</div>
+                <p className="mt-3 text-sm text-slate-700">{isPending ? "Locked until admin approval is complete." : `${upload.progress}% complete. ${upload.nextStep}`}</p>
+              </div>
+              <div className={`rounded-3xl border p-5 ${statusClasses(materials.status).card}`}>
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Materials</div>
+                <p className="mt-3 text-sm text-slate-700">{isPending ? "Locked until admin approval is complete." : `${materials.progress}% complete. ${materials.nextStep}`}</p>
+              </div>
+              <div className={`rounded-3xl border p-5 ${statusClasses(orders.status).card}`}>
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orders</div>
+                <p className="mt-3 text-sm text-slate-700">{isPending ? "Locked until admin approval is complete." : `${orders.progress}% complete. ${orders.nextStep}`}</p>
+              </div>
+            </div>
+          </article>
+
+          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold">What is missing</h2>
+            <ul className="mt-4 space-y-2 text-sm leading-6 text-slate-600">
+              {(isPending
+                ? [
+                    "Admin approval",
+                    "Approved-client actions",
+                    "Project and order workflow access",
+                  ]
+                : dashboard.missing
+              ).map((item) => (
+                <li key={item}>• {item}</li>
               ))}
-            </div>
-          ) : (
-            <PremiumMutedPanel>
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">No projects yet</div>
-              <p className="mt-2 leading-6">Create your first project to unlock uploads, materials, quotes, and orders.</p>
-            </PremiumMutedPanel>
-          )}
-        </PremiumSection>
-
-        <PremiumSection title="Quick actions" description="Keep the next step obvious.">
-          <div className="grid gap-3">
-            <PremiumActionTile href="/projects/new" title="Start Project" detail="Create a new client project workspace." icon={<PremiumIconBadge tone="amber"><DockIcon type="start" /></PremiumIconBadge>} />
-            <PremiumActionTile href="/projects" title="View My Projects" detail="See every project in one place." icon={<PremiumIconBadge tone="slate"><DockIcon type="project" /></PremiumIconBadge>} />
-            <PremiumActionTile href="/upload" title="Upload Plans" detail="Send a plan set into the right workspace." badge={<PremiumBadge tone="sky">Live</PremiumBadge>} icon={<PremiumIconBadge tone="sky"><DockIcon type="upload" /></PremiumIconBadge>} />
-          </div>
-        </PremiumSection>
-      </div>
-
-      <PremiumSection title={activity.length > 0 ? "Recent activity" : "Timeline"} description="Latest project updates appear here when available.">
-        {activity.length > 0 ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            {activity.map((event) => (
-              <article key={event.id} className="rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,247,255,0.84))] p-4 shadow-[0_10px_24px_rgba(148,163,184,0.08)]">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <PremiumIconBadge tone="slate"><DockIcon type="activity" /></PremiumIconBadge>
-                    <div>
-                      <h3 className="text-sm font-semibold text-slate-900">{event.title}</h3>
-                      {event.description ? <p className="mt-1 text-sm leading-6 text-slate-600">{event.description}</p> : null}
-                    </div>
-                  </div>
-                  <PremiumBadge tone="sky">{event.event_type}</PremiumBadge>
-                </div>
-                <div className="mt-3 text-xs font-medium text-slate-500">{event.source} · {formatTimelineDate(event.created_at)}</div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <PremiumMutedPanel>
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">No recent activity yet</div>
-            <p className="mt-2 leading-6">As you upload plans or move through a project, updates will land here.</p>
-          </PremiumMutedPanel>
-        )}
-      </PremiumSection>
-    </PremiumPageShell>
+            </ul>
+            {profile?.role === "admin" ? (
+              <Link href="/admin/users" className="mt-5 inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
+                Admin Users
+              </Link>
+            ) : null}
+          </article>
+        </section>
+      </section>
+    </main>
   );
 }
