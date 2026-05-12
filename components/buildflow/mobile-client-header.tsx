@@ -97,25 +97,14 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
             </IconShell>
           </button>
 
-          <Link href="/" className="min-w-0 flex-1 rounded-2xl border border-slate-200/80 bg-white/90 px-3 py-2 shadow-sm">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[linear-gradient(180deg,#0e2341_0%,#1a4b86_100%)] text-xs font-semibold tracking-[0.18em] text-white shadow-[0_10px_20px_rgba(14,35,65,0.2)]">
-                BF
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold tracking-tight text-slate-950">BuildFlow</p>
-                <p className="truncate text-[11px] text-slate-500">Projects, materials, approvals</p>
-              </div>
-            </div>
-          </Link>
-
-          <Link href={searchHref} aria-label="Search materials" className="inline-flex">
-            <IconShell active={isActivePath(pathname, "/search") || isActivePath(pathname, "/shop") || isActivePath(pathname, "/materials") || isActivePath(pathname, "/quotes") || isActivePath(pathname, "/orders")}>
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <Link href={searchHref} aria-label="Search materials" className="min-w-0 flex-1">
+            <span className={`flex min-h-10 items-center gap-2 rounded-2xl border px-3 py-2 shadow-sm transition ${isActivePath(pathname, "/search") || isActivePath(pathname, "/shop") || isActivePath(pathname, "/materials") || isActivePath(pathname, "/quotes") || isActivePath(pathname, "/orders") ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))]" : "border-slate-200/90 bg-white/95"}`}>
+              <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="11" cy="11" r="7" />
                 <path d="m20 20-3.5-3.5" />
               </svg>
-            </IconShell>
+              <span className="truncate text-sm text-slate-500">Search materials</span>
+            </span>
           </Link>
 
           <Link href={accountHref} aria-label="Account" className="inline-flex">

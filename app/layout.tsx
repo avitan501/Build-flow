@@ -33,7 +33,7 @@ export default async function RootLayout({
   const accountHref = isSignedIn ? "/dashboard" : "/login";
   const projectsHref = gatedHref ?? "/projects";
   const uploadHref = gatedHref ?? "/upload";
-  const searchHref = gatedHref ?? "/search";
+  const searchHref = "/search";
   const aiHref = "/ai";
 
   return (

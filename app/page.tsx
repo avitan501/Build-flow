@@ -5,8 +5,6 @@ import { getSessionWithProfile } from "@/lib/auth"
 
 const heroImage =
   "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1400&q=80"
-const materialsImage =
-  "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1400&q=80"
 
 const flowSteps = [
   {
@@ -98,7 +96,6 @@ export default async function Home() {
   const projectsHref = gatedHref ?? "/projects"
   const uploadHref = gatedHref ?? "/upload"
   const ordersHref = gatedHref ?? "/orders"
-  const shopHref = gatedHref ?? "/search"
 
   const hrefs = {
     projects: projectsHref,
@@ -116,7 +113,16 @@ export default async function Home() {
         <section className="overflow-hidden rounded-[32px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,247,255,0.92))] shadow-[0_20px_50px_rgba(148,163,184,0.12)]">
           <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Client workflow</p>
+              <div className="inline-flex items-center gap-3 rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,246,255,0.9))] px-3 py-3 shadow-[0_12px_28px_rgba(148,163,184,0.1)]">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#0e2341_0%,#1a4b86_100%)] text-sm font-semibold tracking-[0.18em] text-white shadow-[0_10px_24px_rgba(14,35,65,0.2)]">
+                  BF
+                </span>
+                <div>
+                  <p className="text-base font-semibold tracking-tight text-slate-950">BuildFlow</p>
+                  <p className="text-xs text-slate-500">Construction materials + project flow</p>
+                </div>
+              </div>
+              <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Client workflow</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2.4rem]">Start your project with confidence</h1>
               <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">Upload plans, organize materials, review quotes, and approve orders in one clean workflow.</p>
               <div className="mt-5 flex flex-wrap gap-3">
@@ -126,7 +132,6 @@ export default async function Home() {
                 <Link href="/signup" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm active:scale-[0.99]">
                   Create Account
                 </Link>
-                <span className="inline-flex min-h-11 items-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">Nothing moves forward without approval</span>
               </div>
             </div>
 
@@ -207,43 +212,6 @@ export default async function Home() {
           ))}
         </section>
 
-        <section className="overflow-hidden rounded-[28px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(232,243,255,0.88))] shadow-[0_18px_46px_rgba(148,163,184,0.12)]">
-          <div className="grid gap-0 lg:grid-cols-[1.05fr_0.95fr]">
-            <div className="p-5 sm:p-6">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Search materials</p>
-              <h3 className="mt-2 text-lg font-semibold text-slate-950">Make material search feel like a real buying tool</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Search what you need, keep results tied to the right project, and move forward with more confidence once you sign in.</p>
-              <div className="mt-4 flex min-h-14 items-center gap-3 rounded-[20px] border border-sky-100 bg-white px-4 py-3 text-slate-900 shadow-[0_12px_26px_rgba(148,163,184,0.1)]">
-                <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m20 20-3.5-3.5" />
-                </svg>
-                <span className="text-sm text-slate-500">Search lumber, drywall, insulation, concrete, and finish materials after login</span>
-              </div>
-              <Link href={shopHref} className="mt-4 inline-flex text-sm font-semibold text-sky-700 underline underline-offset-4 active:scale-[0.99]">
-                {isSignedIn ? "Open search" : "Open search after login"}
-              </Link>
-            </div>
-            <div
-              className="relative min-h-[220px] border-t border-sky-100/70 lg:min-h-full lg:border-l lg:border-t-0"
-              style={{
-                backgroundImage: `linear-gradient(180deg, rgba(14,35,65,0.06) 0%, rgba(14,35,65,0.54) 100%), url(${materialsImage})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            >
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(243,203,114,0.24),transparent_38%)]" />
-              <div className="relative flex h-full flex-col justify-end p-5 text-white sm:p-6">
-                <div className="inline-flex max-w-max items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/85 backdrop-blur-sm">Project-linked search</div>
-                <p className="mt-3 max-w-sm text-sm leading-6 text-white/82">Clean imagery, clear contrast, and a stronger feature frame make search feel helpful instead of placeholder.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-[24px] border border-sky-100 bg-white px-5 py-4 text-center shadow-[0_12px_28px_rgba(148,163,184,0.08)]">
-          <p className="text-sm font-medium text-slate-700">Nothing is ordered, charged, or sent without approval.</p>
-        </section>
       </section>
     </main>
   )
