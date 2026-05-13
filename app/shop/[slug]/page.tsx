@@ -2,8 +2,7 @@ import { notFound } from "next/navigation"
 
 import { ShopProductDetailExperience } from "@/components/buildflow/shop-product-detail-experience"
 import { SAMPLE_SHOP_PRODUCTS, buildShopProducts, findShopProductBySlug } from "@/lib/shop-catalog"
-import { SHOP_ITEM_SELECT_FIELDS, type ShopItemRecord } from "@/lib/shop"
-import { createClient } from "@/lib/supabase/server"
+import { loadShopItems } from "@/lib/shop-loader"
 
 function buildRelated(products: ReturnType<typeof buildShopProducts>, productSlug: string, category: string, relatedCategories: string[]) {
   const sameCategory = products.filter((product) => product.slug !== productSlug && product.category === category)
@@ -30,14 +29,7 @@ function buildRelated(products: ReturnType<typeof buildShopProducts>, productSlu
 export default async function ShopProductPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: Promise<{ buy?: string }> }) {
   const resolvedParams = await params
   const resolvedSearch = searchParams ? await searchParams : undefined
-  const supabase = await createClient()
-  const { data: itemsData, error } = await supabase
-    .from("shop_items")
-    .select(SHOP_ITEM_SELECT_FIELDS)
-    .order("created_at", { ascending: false })
-    .limit(24)
-    .returns<ShopItemRecord[]>()
-
+  const { data: itemsData, error } = await loadShopItems({ limit: 120 })
   const products = buildShopProducts(itemsData, error)
   const product = findShopProductBySlug(products, resolvedParams.slug)
 

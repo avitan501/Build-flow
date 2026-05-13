@@ -37,8 +37,8 @@ export default async function OwnerMaterialsPage() {
   ]);
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-5 text-slate-900 sm:px-6 sm:py-8">
-      <section className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+    <main className="min-h-screen bg-slate-50 px-3 py-4 text-slate-900 sm:px-6 sm:py-8 xl:px-8 2xl:px-10">
+      <section className="mx-auto flex w-full max-w-[1700px] flex-col gap-5">
         <OwnerMaterialsQuoteEditor
           savedEstimates={estimates ?? []}
           publishedKeys={(items ?? []).map(shopDuplicateKey)}

@@ -326,6 +326,7 @@ function findExistingItem(candidates: CandidateShopItem[], row: ReturnType<typeo
 
 function revalidateShopPaths() {
   revalidatePath("/shop");
+  revalidatePath("/shop/[slug]", "page");
   revalidatePath("/cart");
   revalidatePath("/admin/shop");
   revalidatePath("/owner/materials");

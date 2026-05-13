@@ -71,15 +71,10 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [shopSearchFocused, setShopSearchFocused] = useState(false);
-  const [shopQuery, setShopQuery] = useState("");
   const [shopCartCount, setShopCartCount] = useState(0);
   const isShopPage = Boolean(pathname) && pathname.startsWith("/shop");
   const isCartPage = pathname === "/cart";
-
-  useEffect(() => {
-    if (!isShopPage) return;
-    setShopQuery(searchParams.get("q") ?? "");
-  }, [isShopPage, searchParams]);
+  const shopQuery = isShopPage ? searchParams.get("q") ?? "" : "";
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -119,7 +114,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
     return [
       { href: "/admin/build-map", label: "Admin" },
       { href: "/owner/materials", label: "Material Admin" },
-      { href: "/admin/shop", label: "Shop" },
+      { href: "/shop", label: "Shop" },
       { href: "/admin/users", label: "Users" },
       { href: "/admin/whatsapp", label: "WhatsApp" },
     ];
@@ -183,7 +178,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
                   value={shopQuery}
                   onChange={(event) => {
                     const nextQuery = event.target.value;
-                    setShopQuery(nextQuery);
                     updateShopSearch(nextQuery);
                   }}
                   onFocus={() => setShopSearchFocused(true)}
@@ -216,7 +210,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
                             type="button"
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => {
-                              setShopQuery(category);
                               updateShopSearch(category, category);
                               setShopSearchFocused(false);
                             }}
@@ -237,7 +230,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
                             type="button"
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => {
-                              setShopQuery(term);
                               updateShopSearch(term, null);
                               setShopSearchFocused(false);
                             }}
