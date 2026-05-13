@@ -1,3 +1,4 @@
+import { MATERIAL_REAL_PHOTOS, realPhotoForMaterialCategory } from "@/lib/material-photo-catalog"
 import type { ShopItemRecord } from "@/lib/shop"
 
 export type ShopProductImage = {
@@ -102,17 +103,21 @@ const CATEGORY_ALIASES: Record<string, (typeof MATERIAL_IMAGE_CATEGORIES)[number
   fastener: "Hardware",
   fasteners: "Hardware",
   flashing: "Roofing",
+  floor: "Flooring",
   flooring: "Flooring",
+  faucet: "Plumbing",
   glass: "Glass",
   hanger: "Hardware",
   hangers: "Hardware",
   hardware: "Hardware",
   insulation: "Insulation",
   lighting: "Lighting",
+  light: "Lighting",
   lumber: "Lumber",
   "lvl beam": "Lumber",
   "lvl beams": "Lumber",
   materials: "Materials",
+  moulding: "Trim",
   plumbing: "Plumbing",
   plywood: "Plywood",
   roofing: "Roofing",
@@ -121,6 +126,7 @@ const CATEGORY_ALIASES: Record<string, (typeof MATERIAL_IMAGE_CATEGORIES)[number
   treated: "Lumber",
   "treated lumber": "Lumber",
   trim: "Trim",
+  toilet: "Plumbing",
   window: "Windows",
   windows: "Windows",
 }
@@ -139,11 +145,13 @@ export function imageCategoryForMaterial(category: string | null | undefined): (
 }
 
 export function fallbackImageForCategory(category: string | null | undefined) {
-  return MATERIAL_PLACEHOLDER_BY_CATEGORY[imageCategoryForMaterial(category)]
+  const imageCategory = imageCategoryForMaterial(category)
+  return MATERIAL_REAL_PHOTOS[imageCategory]?.imageUrl ?? MATERIAL_PLACEHOLDER_BY_CATEGORY[imageCategory]
 }
 
 function isLocalMaterialImageUrl(value: string | null | undefined) {
-  return Boolean(value?.startsWith("/images/materials/"))
+  if (!value?.startsWith("/images/materials/")) return false
+  return !value.trim().endsWith(".svg")
 }
 
 function buildImageMetadata(params: {
@@ -157,16 +165,18 @@ function buildImageMetadata(params: {
   imageCategory?: string | null
 }): ShopProductImage {
   const imageCategory = imageCategoryForMaterial(params.imageCategory || params.category)
-  const fallbackUrl = MATERIAL_PLACEHOLDER_BY_CATEGORY[imageCategory]
-  const imageUrl = isLocalMaterialImageUrl(params.imageUrl) ? params.imageUrl!.trim() : fallbackUrl
+  const fallbackPhoto = realPhotoForMaterialCategory(imageCategory)
+  const fallbackUrl = fallbackPhoto?.imageUrl ?? MATERIAL_PLACEHOLDER_BY_CATEGORY[imageCategory]
+  const hasCustomLocalImage = isLocalMaterialImageUrl(params.imageUrl)
+  const imageUrl = hasCustomLocalImage ? params.imageUrl!.trim() : fallbackUrl
 
   return {
     imageUrl,
-    imageAlt: params.imageAlt?.trim() || `${params.name} material image`,
-    imageSource: params.imageSource?.trim() || LOCAL_IMAGE_SOURCE,
-    imageLicense: params.imageLicense?.trim() || LOCAL_IMAGE_LICENSE,
-    imageCredit: params.imageCredit?.trim() || LOCAL_IMAGE_CREDIT,
-    imageCategory,
+    imageAlt: hasCustomLocalImage ? params.imageAlt?.trim() || fallbackPhoto?.imageAlt || `${params.name} material image` : fallbackPhoto?.imageAlt || `${params.name} material image`,
+    imageSource: hasCustomLocalImage ? params.imageSource?.trim() || fallbackPhoto?.imageSource || LOCAL_IMAGE_SOURCE : fallbackPhoto?.imageSource || LOCAL_IMAGE_SOURCE,
+    imageLicense: hasCustomLocalImage ? params.imageLicense?.trim() || fallbackPhoto?.imageLicense || LOCAL_IMAGE_LICENSE : fallbackPhoto?.imageLicense || LOCAL_IMAGE_LICENSE,
+    imageCredit: hasCustomLocalImage ? params.imageCredit?.trim() || fallbackPhoto?.imageCredit || LOCAL_IMAGE_CREDIT : fallbackPhoto?.imageCredit || LOCAL_IMAGE_CREDIT,
+    imageCategory: hasCustomLocalImage ? params.imageCategory?.trim() || fallbackPhoto?.imageCategory || imageCategory : fallbackPhoto?.imageCategory || imageCategory,
   }
 }
 

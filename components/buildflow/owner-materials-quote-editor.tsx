@@ -235,11 +235,15 @@ function mergeStoredBatches(current: OwnerMaterialsReviewBatch[], stored: OwnerM
   const merged = [...current];
 
   for (const batch of stored) {
-    const index = merged.findIndex((item) => item.quoteId === batch.quoteId);
+    const normalizedBatch = {
+      ...batch,
+      rows: batch.rows.map((row) => withImageMetadata(batch, row)),
+    };
+    const index = merged.findIndex((item) => item.quoteId === normalizedBatch.quoteId);
     if (index >= 0) {
-      merged[index] = { ...merged[index], ...batch };
+      merged[index] = { ...merged[index], ...normalizedBatch };
     } else {
-      merged.unshift(batch);
+      merged.unshift(normalizedBatch);
     }
   }
 
