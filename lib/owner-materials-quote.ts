@@ -7,6 +7,35 @@ export type OwnerQuoteRow = {
   extendedPrice: number;
 };
 
+export type OwnerMaterialsReviewRow = {
+  id: string;
+  qty: number;
+  itemNo: string;
+  description: string;
+  unit: string;
+  supplierUnitPrice: number;
+  markupPercent: number;
+  markupDollar: number;
+  finalUnitPrice: number;
+  category: string;
+  publish: boolean;
+};
+
+export type OwnerMaterialsReviewBatch = {
+  quoteId: string;
+  supplierName: string;
+  quoteDate: string;
+  quoteNumber: string;
+  effective?: string;
+  expires?: string;
+  customer?: string;
+  jobAddress?: string;
+  sourceFileName?: string | null;
+  sourceFileKind?: "csv" | "txt" | "pdf" | "spreadsheet" | "manual";
+  extractionStatus?: "ready" | "parsed" | "manual_review";
+  rows: OwnerMaterialsReviewRow[];
+};
+
 export type SupplierQuoteBatch = {
   quoteId: string;
   supplierName: string;
@@ -79,4 +108,59 @@ export function buildOwnerQuoteDuplicateKey(batch: Pick<SupplierQuoteBatch, "sup
   }
 
   return `${batch.supplierName}|${normalizeOwnerQuoteText(row.description)}|${row.unit.trim().toUpperCase()}`;
+}
+
+export function buildOwnerReviewDuplicateKey(
+  batch: Pick<OwnerMaterialsReviewBatch, "supplierName" | "quoteDate">,
+  row: Pick<OwnerMaterialsReviewRow, "itemNo" | "description" | "unit">,
+) {
+  if (row.itemNo.trim()) {
+    return `${batch.supplierName}|${batch.quoteDate}|${row.itemNo.trim()}`;
+  }
+
+  return `${batch.supplierName}|${normalizeOwnerQuoteText(row.description)}|${row.unit.trim().toUpperCase()}`;
+}
+
+export function inferOwnerMaterialCategory(description: string) {
+  const value = description.toLowerCase();
+
+  if (value.includes("lvl") || value.includes("versa-lam")) return "LVL Beams";
+  if (value.includes("plywood") || value.includes("cdx") || value.includes("4x8")) return "Plywood";
+  if (value.includes("treated") || value.includes("trtd")) return "Treated Lumber";
+  if (value.includes("nail") || value.includes("paslode") || value.includes("screw")) return "Fasteners";
+  if (value.includes("hanger") || value.includes("hurricane") || value.includes("simpson") || value.includes("simp ")) return "Hangers";
+  if (value.includes("adhesive") || value.includes("subfloor")) return "Adhesives";
+  if (value.includes("flash") || value.includes("flsh")) return "Flashing";
+  if (/\b2x|lumber|df|fir|stud/.test(value)) return "Lumber";
+
+  return "Materials";
+}
+
+export function seededOwnerReviewBatches(): OwnerMaterialsReviewBatch[] {
+  return supplierQuotes.map((batch) => ({
+    quoteId: batch.quoteId,
+    supplierName: batch.supplierName,
+    quoteDate: batch.quoteDate,
+    quoteNumber: batch.quoteNumber,
+    effective: batch.effective,
+    expires: batch.expires,
+    customer: batch.customer,
+    jobAddress: batch.jobAddress,
+    sourceFileName: "Seeded Builders FirstSource quote",
+    sourceFileKind: "manual",
+    extractionStatus: "parsed",
+    rows: batch.rows.map((row, index) => ({
+      id: `${batch.quoteId}-${row.itemNo || index}`,
+      qty: row.qty,
+      itemNo: row.itemNo,
+      description: row.description,
+      unit: row.unit,
+      supplierUnitPrice: row.unitPrice,
+      markupPercent: 0,
+      markupDollar: 0,
+      finalUnitPrice: row.unitPrice,
+      category: inferOwnerMaterialCategory(row.description),
+      publish: true,
+    })),
+  }));
 }

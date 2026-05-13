@@ -1,110 +1,337 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 
-import { buildOwnerQuoteDuplicateKey, supplierQuotes, type SupplierQuoteBatch } from "@/lib/owner-materials-quote";
+import {
+  archiveOwnerMaterialsRows,
+  publishOwnerMaterialsRows,
+  saveOwnerMaterialsReview,
+  type OwnerMaterialsActionBatch,
+  type OwnerMaterialsActionResult,
+} from "@/app/owner/materials/actions";
+import {
+  buildOwnerReviewDuplicateKey,
+  inferOwnerMaterialCategory,
+  seededOwnerReviewBatches,
+  type OwnerMaterialsReviewBatch,
+  type OwnerMaterialsReviewRow,
+} from "@/lib/owner-materials-quote";
+import { SHOP_CATEGORY_NAMES, type ShopSupplierEstimateRecord } from "@/lib/shop";
 
-type EditableRow = {
-  qty: number;
-  itemNo: string;
-  description: string;
-  unit: string;
-  supplierUnitPrice: number;
-  markupPercent: number;
-  markupDollar: number;
-  finalUnitPrice: number;
-  duplicateKey: string;
+type Props = {
+  savedEstimates: ShopSupplierEstimateRecord[];
+  publishedKeys: string[];
 };
 
-type EditableBatch = {
-  quoteId: string;
-  supplierName: string;
-  quoteDate: string;
-  quoteNumber: string;
-  effective: string;
-  expires: string;
-  customer: string;
-  jobAddress: string;
-  totals: SupplierQuoteBatch["totals"];
-  rows: EditableRow[];
+type ParseStatus = {
+  tone: "neutral" | "success" | "error";
+  message: string;
 };
+
+const initialBatches = seededOwnerReviewBatches();
 
 function money(value: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
 }
 
-function numberInput(value: number) {
-  return Number.isFinite(value) ? value.toFixed(2) : "0.00";
+function numeric(value: number) {
+  return Number.isFinite(value) ? String(Number(value.toFixed(2))) : "0";
 }
 
-const initialBatches: EditableBatch[] = supplierQuotes.map((batch) => ({
-  ...batch,
-  rows: batch.rows.map((row) => ({
-    qty: row.qty,
-    itemNo: row.itemNo,
-    description: row.description,
-    unit: row.unit,
-    supplierUnitPrice: row.unitPrice,
+function csvSplit(line: string) {
+  const cells: string[] = [];
+  let current = "";
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === '"' && next === '"') {
+      current += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  cells.push(current.trim());
+  return cells.map((cell) => cell.replace(/^"|"$/g, "").trim());
+}
+
+function parseMoney(value: string) {
+  const next = Number(value.replace(/[$,\s]/g, ""));
+  return Number.isFinite(next) ? next : 0;
+}
+
+function headerIndex(headers: string[], patterns: RegExp[]) {
+  return headers.findIndex((header) => patterns.some((pattern) => pattern.test(header)));
+}
+
+function parseDelimitedRows(text: string) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length < 2) {
+    return [];
+  }
+
+  const delimiter = lines[0].includes(",") ? "csv" : "whitespace";
+  const table = lines.map((line) => (delimiter === "csv" ? csvSplit(line) : line.split(/\t|\s{2,}/).map((cell) => cell.trim())));
+  const headers = table[0].map((cell) => cell.toLowerCase().replace(/[^a-z0-9]+/g, " "));
+  const itemIndex = headerIndex(headers, [/item/, /sku/, /part/]);
+  const descriptionIndex = headerIndex(headers, [/description/, /desc/, /name/, /material/]);
+  const qtyIndex = headerIndex(headers, [/qty/, /quantity/]);
+  const unitIndex = headerIndex(headers, [/unit/, /uom/]);
+  const priceIndex = headerIndex(headers, [/unit price/, /price/, /cost/, /rate/]);
+
+  if (descriptionIndex < 0 || priceIndex < 0) {
+    return [];
+  }
+
+  return table.slice(1).flatMap((cells, index) => {
+    const description = cells[descriptionIndex]?.trim() ?? "";
+
+    if (!description) {
+      return [];
+    }
+
+    const qty = qtyIndex >= 0 ? Number(cells[qtyIndex]?.replace(/,/g, "") || 1) : 1;
+    const unit = unitIndex >= 0 ? cells[unitIndex] || "EA" : "EA";
+    const supplierUnitPrice = parseMoney(cells[priceIndex] || "0");
+
+    return [
+      {
+        id: `parsed-${Date.now()}-${index}`,
+        qty: Number.isFinite(qty) && qty > 0 ? qty : 1,
+        itemNo: itemIndex >= 0 ? cells[itemIndex] || "" : "",
+        description,
+        unit,
+        supplierUnitPrice,
+        markupPercent: 0,
+        markupDollar: 0,
+        finalUnitPrice: supplierUnitPrice,
+        category: inferOwnerMaterialCategory(description),
+        publish: true,
+      } satisfies OwnerMaterialsReviewRow,
+    ];
+  });
+}
+
+function fileKind(fileName: string): OwnerMaterialsReviewBatch["sourceFileKind"] {
+  const value = fileName.toLowerCase();
+
+  if (value.endsWith(".csv")) return "csv";
+  if (value.endsWith(".txt")) return "txt";
+  if (value.endsWith(".pdf")) return "pdf";
+  if (value.endsWith(".xls") || value.endsWith(".xlsx")) return "spreadsheet";
+
+  return "manual";
+}
+
+function makeActionBatch(batch: OwnerMaterialsReviewBatch): OwnerMaterialsActionBatch {
+  return {
+    supplierName: batch.supplierName,
+    quoteNumber: batch.quoteNumber,
+    quoteDate: batch.quoteDate,
+    sourceFileName: batch.sourceFileName,
+    rows: batch.rows,
+  };
+}
+
+function cloneManualRow(): OwnerMaterialsReviewRow {
+  return {
+    id: `manual-${Date.now()}`,
+    qty: 1,
+    itemNo: "",
+    description: "",
+    unit: "EA",
+    supplierUnitPrice: 0,
     markupPercent: 0,
     markupDollar: 0,
-    finalUnitPrice: row.unitPrice,
-    duplicateKey: buildOwnerQuoteDuplicateKey(batch, row),
-  })),
-}));
+    finalUnitPrice: 0,
+    category: "Materials",
+    publish: true,
+  };
+}
 
-export function OwnerMaterialsQuoteEditor() {
-  const [batches, setBatches] = useState<EditableBatch[]>(initialBatches);
-  const [activeQuoteId, setActiveQuoteId] = useState<string>(initialBatches[0]?.quoteId ?? "");
+export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Props) {
+  const [batches, setBatches] = useState<OwnerMaterialsReviewBatch[]>(initialBatches);
+  const [activeQuoteId, setActiveQuoteId] = useState(initialBatches[0]?.quoteId ?? "");
+  const [supplierName, setSupplierName] = useState("Builders FirstSource");
+  const [quoteNumber, setQuoteNumber] = useState("");
+  const [quoteDate, setQuoteDate] = useState(new Date().toISOString().slice(0, 10));
+  const [parseStatus, setParseStatus] = useState<ParseStatus>({
+    tone: "neutral",
+    message: "CSV/TXT files can be parsed now. PDF and spreadsheet files can be staged for manual review.",
+  });
+  const [actionResult, setActionResult] = useState<OwnerMaterialsActionResult | null>(null);
+  const [localPublishedKeys, setLocalPublishedKeys] = useState(new Set(publishedKeys));
+  const [isPending, startTransition] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeBatch = batches.find((batch) => batch.quoteId === activeQuoteId) ?? batches[0] ?? null;
 
-  const batchSummaries = useMemo(
+  const summaries = useMemo(
     () =>
       batches.map((batch) => {
-        const clientTotal = batch.rows.reduce((sum, row) => sum + row.qty * row.finalUnitPrice, 0);
-        return {
-          quoteId: batch.quoteId,
-          supplierName: batch.supplierName,
-          quoteNumber: batch.quoteNumber,
-          quoteDate: batch.quoteDate,
-          itemsCount: batch.rows.length,
-          supplierTotal: batch.totals.total,
-          clientTotal,
-        };
+        const selected = batch.rows.filter((row) => row.publish).length;
+        const total = batch.rows.reduce((sum, row) => sum + row.qty * row.finalUnitPrice, 0);
+
+        return { ...batch, selected, total };
       }),
     [batches],
   );
 
-  function updateBatchRow(quoteId: string, rowIndex: number, updater: (row: EditableRow) => EditableRow) {
+  const savedEstimateLabel = savedEstimates.length === 0 ? "No saved estimate metadata yet" : `${savedEstimates.length} saved estimate${savedEstimates.length === 1 ? "" : "s"}`;
+
+  function setActiveBatchPatch(patch: Partial<OwnerMaterialsReviewBatch>) {
+    if (!activeBatch) return;
+    setBatches((current) => current.map((batch) => (batch.quoteId === activeBatch.quoteId ? { ...batch, ...patch } : batch)));
+  }
+
+  function updateRow(rowId: string, patch: Partial<OwnerMaterialsReviewRow>, recalc: "markup" | "final" | "none" = "none") {
+    if (!activeBatch) return;
+
     setBatches((current) =>
       current.map((batch) => {
-        if (batch.quoteId !== quoteId) return batch;
+        if (batch.quoteId !== activeBatch.quoteId) return batch;
+
         return {
           ...batch,
-          rows: batch.rows.map((row, index) => (index === rowIndex ? updater(row) : row)),
+          rows: batch.rows.map((row) => {
+            if (row.id !== rowId) return row;
+            const next = { ...row, ...patch };
+
+            if (recalc === "markup") {
+              next.finalUnitPrice = next.supplierUnitPrice * (1 + next.markupPercent / 100) + next.markupDollar;
+            }
+
+            if (recalc === "final") {
+              next.markupDollar = next.finalUnitPrice - next.supplierUnitPrice * (1 + next.markupPercent / 100);
+            }
+
+            return next;
+          }),
         };
       }),
     );
   }
 
-  function recalcFromMarkup(rowIndex: number, patch: Partial<EditableRow>) {
+  function removeRow(rowId: string) {
     if (!activeBatch) return;
-    updateBatchRow(activeBatch.quoteId, rowIndex, (row) => {
-      const next = { ...row, ...patch };
-      const finalUnitPrice = next.supplierUnitPrice * (1 + next.markupPercent / 100) + next.markupDollar;
-      return { ...next, finalUnitPrice };
-    });
+    setBatches((current) =>
+      current.map((batch) => (batch.quoteId === activeBatch.quoteId ? { ...batch, rows: batch.rows.filter((row) => row.id !== rowId) } : batch)),
+    );
   }
 
-  function updateFinalPrice(rowIndex: number, nextFinal: number) {
+  function addManualRow() {
     if (!activeBatch) return;
-    updateBatchRow(activeBatch.quoteId, rowIndex, (row) => {
-      const baseWithPercent = row.supplierUnitPrice * (1 + row.markupPercent / 100);
-      return {
-        ...row,
-        finalUnitPrice: nextFinal,
-        markupDollar: nextFinal - baseWithPercent,
+    setBatches((current) =>
+      current.map((batch) => (batch.quoteId === activeBatch.quoteId ? { ...batch, rows: [cloneManualRow(), ...batch.rows] } : batch)),
+    );
+  }
+
+  async function prepareReview() {
+    const file = fileInputRef.current?.files?.[0] ?? null;
+
+    if (!file) {
+      const manualBatch: OwnerMaterialsReviewBatch = {
+        quoteId: `manual-${Date.now()}`,
+        supplierName: supplierName.trim() || "Manual Supplier",
+        quoteNumber: quoteNumber.trim(),
+        quoteDate,
+        sourceFileKind: "manual",
+        extractionStatus: "manual_review",
+        rows: [cloneManualRow()],
       };
+      setBatches((current) => [manualBatch, ...current]);
+      setActiveQuoteId(manualBatch.quoteId);
+      setParseStatus({ tone: "success", message: "Manual review batch created. Add line items below." });
+      return;
+    }
+
+    const kind = fileKind(file.name);
+
+    if (kind === "pdf" || kind === "spreadsheet") {
+      const placeholderBatch: OwnerMaterialsReviewBatch = {
+        quoteId: `upload-${Date.now()}`,
+        supplierName: supplierName.trim() || "Uploaded Supplier",
+        quoteNumber: quoteNumber.trim(),
+        quoteDate,
+        sourceFileName: file.name,
+        sourceFileKind: kind,
+        extractionStatus: "manual_review",
+        rows: [cloneManualRow()],
+      };
+      setBatches((current) => [placeholderBatch, ...current]);
+      setActiveQuoteId(placeholderBatch.quoteId);
+      setParseStatus({
+        tone: "neutral",
+        message: `${file.name} is staged for extraction/manual review. Add or paste rows while document extraction is connected.`,
+      });
+      return;
+    }
+
+    const text = await file.text();
+    const parsedRows = parseDelimitedRows(text);
+
+    if (parsedRows.length === 0) {
+      setParseStatus({
+        tone: "error",
+        message: "No usable rows found. CSV/TXT needs columns resembling item no, description/name, qty, unit, and unit price.",
+      });
+      return;
+    }
+
+    const parsedBatch: OwnerMaterialsReviewBatch = {
+      quoteId: `parsed-${Date.now()}`,
+      supplierName: supplierName.trim() || "Uploaded Supplier",
+      quoteNumber: quoteNumber.trim(),
+      quoteDate,
+      sourceFileName: file.name,
+      sourceFileKind: kind,
+      extractionStatus: "parsed",
+      rows: parsedRows,
+    };
+    setBatches((current) => [parsedBatch, ...current]);
+    setActiveQuoteId(parsedBatch.quoteId);
+    setParseStatus({ tone: "success", message: `${parsedRows.length} row${parsedRows.length === 1 ? "" : "s"} parsed from ${file.name}.` });
+  }
+
+  function runAction(action: "save" | "publish" | "archive") {
+    if (!activeBatch) return;
+    setActionResult(null);
+
+    startTransition(async () => {
+      const payload = makeActionBatch(activeBatch);
+      const result =
+        action === "save"
+          ? await saveOwnerMaterialsReview(payload)
+          : action === "publish"
+            ? await publishOwnerMaterialsRows(payload)
+            : await archiveOwnerMaterialsRows(payload);
+
+      setActionResult(result);
+
+      if (result.ok && action === "publish" && result.publishedKeys) {
+        const nextPublishedKeys = result.publishedKeys;
+        setLocalPublishedKeys((current) => new Set([...Array.from(current), ...nextPublishedKeys]));
+      }
+
+      if (result.ok && action === "archive") {
+        const archivedKeys = activeBatch.rows
+          .filter((row) => row.publish)
+          .map((row) => buildOwnerReviewDuplicateKey(activeBatch, row));
+        setLocalPublishedKeys((current) => new Set(Array.from(current).filter((key) => !archivedKeys.includes(key))));
+      }
     });
   }
 
@@ -112,175 +339,214 @@ export function OwnerMaterialsQuoteEditor() {
     return null;
   }
 
-  const activeClientTotal = activeBatch.rows.reduce((sum, row) => sum + row.qty * row.finalUnitPrice, 0);
-  const activeSupplierTotal = activeBatch.rows.reduce((sum, row) => sum + row.qty * row.supplierUnitPrice, 0);
+  const selectedCount = activeBatch.rows.filter((row) => row.publish).length;
+  const supplierTotal = activeBatch.rows.reduce((sum, row) => sum + row.qty * row.supplierUnitPrice, 0);
+  const clientTotal = activeBatch.rows.reduce((sum, row) => sum + row.qty * row.finalUnitPrice, 0);
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
+    <div className="space-y-4">
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Owner Materials Inbox</p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Supplier quote review and shop publishing prep</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">New supplier quote batches can be added here for review. Edit unit price, markup percent/dollar, and final client price before publishing. Live publish to client shop is blocked until protected shop publishing is connected.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Owner Materials</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Material review and shop publishing</h1>
           </div>
-          <div className="rounded-[22px] border border-sky-100 bg-sky-50/70 px-4 py-3 text-sm text-slate-700">
-            <div>Current batch: {activeBatch.supplierName}</div>
-            <div className="mt-1">Quote #{activeBatch.quoteNumber}</div>
-            <div className="mt-1">Customer: {activeBatch.customer}</div>
-            <div className="mt-1">Job: {activeBatch.jobAddress}</div>
+          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+            <div className="rounded-md border border-slate-200 px-3 py-2">
+              <div className="text-xs text-slate-500">Rows</div>
+              <div className="font-semibold">{activeBatch.rows.length}</div>
+            </div>
+            <div className="rounded-md border border-slate-200 px-3 py-2">
+              <div className="text-xs text-slate-500">Selected</div>
+              <div className="font-semibold">{selectedCount}</div>
+            </div>
+            <div className="rounded-md border border-slate-200 px-3 py-2">
+              <div className="text-xs text-slate-500">Supplier</div>
+              <div className="font-semibold">{money(supplierTotal)}</div>
+            </div>
+            <div className="rounded-md border border-slate-200 px-3 py-2">
+              <div className="text-xs text-slate-500">Client</div>
+              <div className="font-semibold">{money(clientTotal)}</div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-950">Quote batches</h2>
-            <p className="mt-1 text-sm text-slate-600">Future supplier quote batches can be appended to the shared quote data array and reviewed here.</p>
+      <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Import material file</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <label className="grid gap-1 text-sm">
+              <span className="font-medium text-slate-700">Supplier</span>
+              <input value={supplierName} onChange={(event) => setSupplierName(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="font-medium text-slate-700">Quote #</span>
+              <input value={quoteNumber} onChange={(event) => setQuoteNumber(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="font-medium text-slate-700">Quote date</span>
+              <input type="date" value={quoteDate} onChange={(event) => setQuoteDate(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" />
+            </label>
           </div>
-        </div>
-        <div className="mt-4 grid gap-3">
-          {batchSummaries.map((batch) => (
-            <button
-              key={batch.quoteId}
-              type="button"
-              onClick={() => setActiveQuoteId(batch.quoteId)}
-              className={`rounded-[24px] border p-4 text-left shadow-[0_12px_30px_rgba(15,23,42,0.06)] transition ${batch.quoteId === activeBatch.quoteId ? "border-sky-200 bg-sky-50/80" : "border-slate-200 bg-white"}`}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-slate-950">{batch.supplierName}</div>
-                  <div className="mt-1 text-sm text-slate-600">Quote #{batch.quoteNumber} · {batch.quoteDate}</div>
-                </div>
-                <div className="grid gap-1 text-right text-sm text-slate-600 sm:grid-cols-2 sm:gap-x-6">
-                  <div>Items: <span className="font-semibold text-slate-900">{batch.itemsCount}</span></div>
-                  <div>Supplier total: <span className="font-semibold text-slate-900">{money(batch.supplierTotal)}</span></div>
-                  <div className="sm:col-span-2">Client total after markup: <span className="font-semibold text-slate-900">{money(batch.clientTotal)}</span></div>
-                </div>
-              </div>
+          <div className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
+            <input ref={fileInputRef} type="file" accept=".csv,.txt,.pdf,.xls,.xlsx" className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white" />
+            <p className={`mt-2 text-sm ${parseStatus.tone === "error" ? "text-red-700" : parseStatus.tone === "success" ? "text-emerald-700" : "text-slate-600"}`}>
+              {parseStatus.message}
+            </p>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={prepareReview} className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
+              Parse file / Prepare review
             </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Current quote lines</div>
-          <div className="mt-2 text-2xl font-semibold text-slate-950">{activeBatch.rows.length}</div>
-        </div>
-        <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Supplier total from edits</div>
-          <div className="mt-2 text-2xl font-semibold text-slate-950">{money(activeSupplierTotal)}</div>
-        </div>
-        <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Client/shop total after markup</div>
-          <div className="mt-2 text-2xl font-semibold text-slate-950">{money(activeClientTotal)}</div>
-        </div>
-      </section>
-
-      <section className="rounded-[28px] border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950 shadow-[0_14px_36px_rgba(220,168,69,0.08)]">
-        <p className="font-semibold">Live publishing is still safely blocked.</p>
-        <p className="mt-1">Missing pieces: a real protected shop schema/write path and a connected client shop reader. Until that exists, this inbox is for owner review, markup prep, and quote organization only.</p>
-        <p className="mt-1">Duplicate key rule is ready: supplier + quoteDate + itemNo, fallback supplier + normalizedDescription + unit.</p>
-      </section>
-
-      <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Active supplier batch</p>
-            <h2 className="mt-2 text-xl font-semibold text-slate-950">{activeBatch.supplierName} · Quote #{activeBatch.quoteNumber}</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Effective {activeBatch.effective} · Expires {activeBatch.expires}</p>
+            <button type="button" onClick={addManualRow} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800">
+              Add manual item
+            </button>
           </div>
-          <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
-            <div className="rounded-[18px] border border-slate-200 bg-slate-50 px-3 py-2">Quote date: <span className="font-semibold text-slate-900">{activeBatch.quoteDate}</span></div>
-            <div className="rounded-[18px] border border-slate-200 bg-slate-50 px-3 py-2">Supplier total: <span className="font-semibold text-slate-900">{money(activeBatch.totals.total)}</span></div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Quote batches</h2>
+            <span className="text-xs font-medium text-slate-500">{savedEstimateLabel}</span>
+          </div>
+          <div className="mt-3 grid max-h-64 gap-2 overflow-y-auto">
+            {summaries.map((batch) => (
+              <button
+                key={batch.quoteId}
+                type="button"
+                onClick={() => setActiveQuoteId(batch.quoteId)}
+                className={`rounded-md border px-3 py-2 text-left text-sm ${batch.quoteId === activeBatch.quoteId ? "border-slate-900 bg-slate-100" : "border-slate-200 bg-white hover:bg-slate-50"}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-slate-950">{batch.supplierName}</div>
+                    <div className="mt-0.5 text-slate-600">Quote {batch.quoteNumber || "—"} · {batch.quoteDate || "No date"}</div>
+                  </div>
+                  <div className="text-right text-slate-600">
+                    <div>{batch.rows.length} rows</div>
+                    <div>{money(batch.total)}</div>
+                  </div>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       </section>
 
-      <div className="space-y-4">
-        {activeBatch.rows.map((row, index) => {
-          const extendedClientPrice = row.qty * row.finalUnitPrice;
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="grid gap-1 text-sm">
+              <span className="font-medium text-slate-700">Supplier name</span>
+              <input value={activeBatch.supplierName} onChange={(event) => setActiveBatchPatch({ supplierName: event.target.value })} className="rounded-md border border-slate-300 px-3 py-2" />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="font-medium text-slate-700">Quote number</span>
+              <input value={activeBatch.quoteNumber} onChange={(event) => setActiveBatchPatch({ quoteNumber: event.target.value })} className="rounded-md border border-slate-300 px-3 py-2" />
+            </label>
+            <label className="grid gap-1 text-sm">
+              <span className="font-medium text-slate-700">Quote/estimate date</span>
+              <input type="date" value={activeBatch.quoteDate} onChange={(event) => setActiveBatchPatch({ quoteDate: event.target.value })} className="rounded-md border border-slate-300 px-3 py-2" />
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => runAction("save")} disabled={isPending} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60">
+              Save edits
+            </button>
+            <button type="button" onClick={() => runAction("publish")} disabled={isPending || selectedCount === 0} className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              Publish selected
+            </button>
+            <button type="button" onClick={() => runAction("archive")} disabled={isPending || selectedCount === 0} className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 disabled:opacity-60">
+              Unpublish/archive
+            </button>
+          </div>
+        </div>
 
-          return (
-            <section key={`${activeBatch.quoteId}-${row.itemNo}-${index}`} className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-slate-950">{row.description}</div>
-                  <div className="mt-1 text-sm text-slate-600">Item #{row.itemNo} · Qty {row.qty} {row.unit}</div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
-                    {row.duplicateKey}
-                  </div>
-                  <div className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">
-                    Publish status: blocked
-                  </div>
-                </div>
-              </div>
+        {actionResult ? (
+          <div className={`mt-3 rounded-md border px-3 py-2 text-sm ${actionResult.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>
+            {actionResult.message}
+          </div>
+        ) : null}
 
-              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                <label className="grid gap-1 text-sm text-slate-700">
-                  <span className="font-medium">Supplier unit price</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={numberInput(row.supplierUnitPrice)}
-                    onChange={(event) => recalcFromMarkup(index, { supplierUnitPrice: Number(event.target.value || 0) })}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-900"
-                  />
-                </label>
-                <label className="grid gap-1 text-sm text-slate-700">
-                  <span className="font-medium">Markup %</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={numberInput(row.markupPercent)}
-                    onChange={(event) => recalcFromMarkup(index, { markupPercent: Number(event.target.value || 0) })}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-900"
-                  />
-                </label>
-                <label className="grid gap-1 text-sm text-slate-700">
-                  <span className="font-medium">Markup $</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={numberInput(row.markupDollar)}
-                    onChange={(event) => recalcFromMarkup(index, { markupDollar: Number(event.target.value || 0) })}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-900"
-                  />
-                </label>
-                <label className="grid gap-1 text-sm text-slate-700">
-                  <span className="font-medium">Final client/shop unit price</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={numberInput(row.finalUnitPrice)}
-                    onChange={(event) => updateFinalPrice(index, Number(event.target.value || 0))}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-900"
-                  />
-                </label>
-                <div className="rounded-[22px] border border-sky-100 bg-sky-50/70 px-4 py-3 text-sm text-slate-700">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Extended client price</div>
-                  <div className="mt-1 text-base font-semibold text-slate-950">{money(extendedClientPrice)}</div>
-                </div>
-              </div>
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-[1180px] w-full border-collapse text-left text-sm">
+            <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+              <tr>
+                <th className="border border-slate-200 px-2 py-2">Publish</th>
+                <th className="border border-slate-200 px-2 py-2">Status</th>
+                <th className="border border-slate-200 px-2 py-2">Item no</th>
+                <th className="border border-slate-200 px-2 py-2">Description/name</th>
+                <th className="border border-slate-200 px-2 py-2">Qty</th>
+                <th className="border border-slate-200 px-2 py-2">Unit</th>
+                <th className="border border-slate-200 px-2 py-2">Supplier unit price</th>
+                <th className="border border-slate-200 px-2 py-2">Markup %</th>
+                <th className="border border-slate-200 px-2 py-2">Markup $</th>
+                <th className="border border-slate-200 px-2 py-2">Final client unit price</th>
+                <th className="border border-slate-200 px-2 py-2">Category</th>
+                <th className="border border-slate-200 px-2 py-2">Extended</th>
+                <th className="border border-slate-200 px-2 py-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeBatch.rows.map((row) => {
+                const key = buildOwnerReviewDuplicateKey(activeBatch, row);
+                const isPublished = localPublishedKeys.has(key);
 
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  disabled
-                  className="inline-flex cursor-not-allowed items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 opacity-60"
-                >
-                  Add to Client Shop / Publish to Shop
-                </button>
-                <span className="text-sm text-slate-500">Blocked until protected shop publishing is connected.</span>
-              </div>
-            </section>
-          );
-        })}
-      </div>
+                return (
+                  <tr key={row.id} className="align-top">
+                    <td className="border border-slate-200 px-2 py-2 text-center">
+                      <input type="checkbox" checked={row.publish} onChange={(event) => updateRow(row.id, { publish: event.target.checked })} />
+                    </td>
+                    <td className="border border-slate-200 px-2 py-2">
+                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${isPublished ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>
+                        {isPublished ? "Published" : "Review"}
+                      </span>
+                    </td>
+                    <td className="border border-slate-200 px-2 py-2">
+                      <input value={row.itemNo} onChange={(event) => updateRow(row.id, { itemNo: event.target.value })} className="w-28 rounded border border-slate-300 px-2 py-1" />
+                    </td>
+                    <td className="border border-slate-200 px-2 py-2">
+                      <textarea value={row.description} onChange={(event) => updateRow(row.id, { description: event.target.value, category: inferOwnerMaterialCategory(event.target.value) })} className="min-h-9 w-72 rounded border border-slate-300 px-2 py-1" />
+                    </td>
+                    <td className="border border-slate-200 px-2 py-2">
+                      <input type="number" step="0.001" value={numeric(row.qty)} onChange={(event) => updateRow(row.id, { qty: Number(event.target.value || 0) })} className="w-20 rounded border border-slate-300 px-2 py-1" />
+                    </td>
+                    <td className="border border-slate-200 px-2 py-2">
+                      <input value={row.unit} onChange={(event) => updateRow(row.id, { unit: event.target.value })} className="w-20 rounded border border-slate-300 px-2 py-1" />
+                    </td>
+                    <td className="border border-slate-200 px-2 py-2">
+                      <input type="number" step="0.01" value={numeric(row.supplierUnitPrice)} onChange={(event) => updateRow(row.id, { supplierUnitPrice: Number(event.target.value || 0) }, "markup")} className="w-28 rounded border border-slate-300 px-2 py-1" />
+                    </td>
+                    <td className="border border-slate-200 px-2 py-2">
+                      <input type="number" step="0.01" value={numeric(row.markupPercent)} onChange={(event) => updateRow(row.id, { markupPercent: Number(event.target.value || 0) }, "markup")} className="w-24 rounded border border-slate-300 px-2 py-1" />
+                    </td>
+                    <td className="border border-slate-200 px-2 py-2">
+                      <input type="number" step="0.01" value={numeric(row.markupDollar)} onChange={(event) => updateRow(row.id, { markupDollar: Number(event.target.value || 0) }, "markup")} className="w-24 rounded border border-slate-300 px-2 py-1" />
+                    </td>
+                    <td className="border border-slate-200 px-2 py-2">
+                      <input type="number" step="0.01" value={numeric(row.finalUnitPrice)} onChange={(event) => updateRow(row.id, { finalUnitPrice: Number(event.target.value || 0) }, "final")} className="w-28 rounded border border-slate-300 px-2 py-1" />
+                    </td>
+                    <td className="border border-slate-200 px-2 py-2">
+                      <select value={row.category} onChange={(event) => updateRow(row.id, { category: event.target.value })} className="w-36 rounded border border-slate-300 px-2 py-1">
+                        {[...SHOP_CATEGORY_NAMES, "Materials"].map((category) => (
+                          <option key={category} value={category}>{category}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="border border-slate-200 px-2 py-2 font-medium text-slate-900">{money(row.qty * row.finalUnitPrice)}</td>
+                    <td className="border border-slate-200 px-2 py-2">
+                      <button type="button" onClick={() => removeRow(row.id)} className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700">
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }
