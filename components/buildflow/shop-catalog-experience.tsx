@@ -1,63 +1,110 @@
 "use client"
 
-import Link from "next/link"
 import Image from "next/image"
+import Link from "next/link"
 import { useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
-import { MATERIAL_IMAGE_CATEGORIES, placeholderImageMetadata, type ShopCatalogProduct } from "@/lib/shop-catalog"
+import { placeholderImageMetadata, type ShopCatalogProduct } from "@/lib/shop-catalog"
 
 type ShopCatalogExperienceProps = {
   products: ShopCatalogProduct[]
 }
 
-type SortMode = "featured" | "price-low" | "price-high" | "unit"
-type CollectionMode = "all" | "framing"
+type SortMode = "featured" | "price-low" | "price-high"
 
-const CATEGORY_CONFIG = MATERIAL_IMAGE_CATEGORIES.map((name) => ({ name, image: placeholderImageMetadata(name).imageUrl }))
+const SHOP_CATEGORIES = [
+  "All",
+  "Lumber",
+  "Plywood",
+  "Drywall",
+  "Concrete",
+  "Roofing",
+  "Insulation",
+  "Hardware",
+  "Electrical",
+  "Plumbing",
+  "Tools",
+  "Doors",
+  "Trim",
+  "Windows",
+  "Flooring",
+  "Appliances",
+  "Glass",
+  "Lighting",
+  "Tile",
+  "Cabinets",
+] as const
 
 const SORT_OPTIONS: { key: SortMode; label: string }[] = [
   { key: "featured", label: "Featured" },
-  { key: "price-low", label: "Price ↑" },
-  { key: "price-high", label: "Price ↓" },
-  { key: "unit", label: "Unit" },
+  { key: "price-low", label: "Price low" },
+  { key: "price-high", label: "Price high" },
 ]
-const FRAMING_CATEGORIES = new Set(["Lumber", "Plywood", "LVL Beams", "Fasteners", "Hangers"])
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
 }
 
+function categoryImage(category: string) {
+  return placeholderImageMetadata(category === "All" ? "Materials" : category, category).imageUrl
+}
+
+function StarIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 fill-current" aria-hidden="true">
+      <path d="m10 1.7 2.4 5 5.5.8-4 3.9.9 5.5-4.8-2.6-4.8 2.6.9-5.5-4-3.9 5.5-.8L10 1.7Z" />
+    </svg>
+  )
+}
+
 function ChevronRightIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="m9 6 6 6-6 6" />
     </svg>
   )
 }
 
-function ShopSimpleCard({ product, compact = false }: { product: ShopCatalogProduct; compact?: boolean }) {
+function ShopProductCard({ product }: { product: ShopCatalogProduct }) {
   return (
     <Link
       href={`/shop/${product.slug}`}
-      className={`group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md active:scale-[0.99] ${compact ? "min-w-[210px] max-w-[210px] shrink-0" : ""}`}
+      className="group flex h-full min-h-[286px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-[0_14px_30px_rgba(15,23,42,0.12)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 active:translate-y-0"
     >
-      <div className="bg-slate-50 p-4">
-        <div className="aspect-square overflow-hidden rounded-md border border-slate-100 bg-white">
-          <Image src={product.imageUrl} alt={product.imageAlt} width={800} height={800} className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.03]" />
+      <div className="border-b border-slate-100 bg-slate-50/70 p-3">
+        <div className="relative aspect-square w-full overflow-hidden rounded-md bg-white">
+          <Image
+            src={product.imageUrl}
+            alt={product.imageAlt}
+            fill
+            sizes="(min-width: 1280px) 22vw, (min-width: 768px) 30vw, 45vw"
+            className="object-contain p-3 transition duration-300 group-hover:scale-[1.04]"
+          />
         </div>
       </div>
-      <div className={`flex flex-col ${compact ? "p-3.5" : "p-4"}`}>
-        <h3 className="line-clamp-2 min-h-12 text-[0.98rem] font-semibold text-slate-950">{product.name}</h3>
-        <div className="mt-3 flex items-end gap-2">
-          <span className="text-lg font-semibold text-slate-950">{formatCurrency(product.price)}</span>
-          <span className="pb-0.5 text-xs text-slate-500">{product.unit}</span>
+
+      <div className="flex flex-1 flex-col p-3.5">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[1.35rem] font-bold leading-none tracking-normal text-slate-950">{formatCurrency(product.price)}</span>
+          <span className="truncate text-[12px] font-medium text-slate-500">/{product.unit}</span>
         </div>
-        <div className="mt-3 h-5 text-xs font-medium text-slate-500">{product.reviewLabel}</div>
-        <div className="mt-4 inline-flex min-h-10 items-center justify-center gap-1 rounded-md border border-sky-100 bg-sky-50 px-3 text-sm font-semibold text-sky-700 transition group-hover:border-sky-200 group-hover:bg-sky-100">
+
+        <h3 className="mt-2 line-clamp-2 min-h-[40px] text-[0.92rem] font-semibold leading-5 tracking-normal text-slate-900">{product.name}</h3>
+
+        <div className="mt-2 flex items-center gap-1 text-[12px] font-medium text-slate-500">
+          <span className="inline-flex items-center gap-0.5 text-amber-500">
+            <StarIcon />
+            {product.rating.toFixed(1)}
+          </span>
+          <span className="text-slate-300">|</span>
+          <span className="truncate">{product.reviewLabel.replace(/^[0-9.]+\s*-\s*/, "")}</span>
+        </div>
+
+        <span className="mt-auto inline-flex min-h-9 items-center justify-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-3 text-sm font-semibold text-sky-700 transition group-hover:border-sky-300 group-hover:bg-sky-100">
           View details
           <ChevronRightIcon />
-        </div>
+        </span>
       </div>
     </Link>
   )
@@ -67,30 +114,26 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
   const searchParams = useSearchParams()
   const router = useRouter()
   const [sortMode, setSortMode] = useState<SortMode>("featured")
-  const [collectionMode, setCollectionMode] = useState<CollectionMode>("all")
 
-  const normalizedQuery = (searchParams.get("q") ?? "").trim().toLowerCase()
-  const activeCategory = searchParams.get("category")?.trim() || null
+  const query = (searchParams.get("q") ?? "").trim()
+  const normalizedQuery = query.toLowerCase()
+  const activeCategory = searchParams.get("category")?.trim() || "All"
 
-  const categories = useMemo(
-    () => CATEGORY_CONFIG.map((category) => ({ ...category, count: products.filter((product) => product.category === category.name).length })),
-    [products],
-  )
-
-  const featuredProducts = useMemo(
-    () => products.filter((product) => product.featuredLabel === "Popular for framing" || FRAMING_CATEGORIES.has(product.category)).slice(0, 6),
-    [products],
-  )
+  const categorySummaries = useMemo(() => {
+    return SHOP_CATEGORIES.map((category) => {
+      const count = category === "All" ? products.length : products.filter((product) => product.imageCategory === category || product.category === category).length
+      return { name: category, image: categoryImage(category), count }
+    })
+  }, [products])
 
   const filteredProducts = useMemo(() => {
     const base = products.filter((product) => {
-      const matchesCategory = !activeCategory || product.category === activeCategory
-      const matchesCollection = collectionMode === "all" || FRAMING_CATEGORIES.has(product.category)
-      const haystack = [product.name, product.category, product.description, product.unit, product.specLine, product.supplierName || "", product.quoteNumber || "", product.popularUse]
+      const matchesCategory = activeCategory === "All" || product.imageCategory === activeCategory || product.category === activeCategory
+      const haystack = [product.name, product.category, product.imageCategory, product.description, product.unit, product.specLine, product.supplierName || "", product.quoteNumber || "", product.popularUse]
         .join(" ")
         .toLowerCase()
       const matchesQuery = !normalizedQuery || haystack.includes(normalizedQuery)
-      return matchesCategory && matchesCollection && matchesQuery
+      return matchesCategory && matchesQuery
     })
 
     switch (sortMode) {
@@ -98,91 +141,91 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
         return [...base].sort((a, b) => a.price - b.price)
       case "price-high":
         return [...base].sort((a, b) => b.price - a.price)
-      case "unit":
-        return [...base].sort((a, b) => a.unit.localeCompare(b.unit))
       default:
-        return [...base].sort((a, b) => Number(b.featuredLabel === "Popular for framing") - Number(a.featuredLabel === "Popular for framing"))
+        return [...base].sort((a, b) => {
+          const featuredDelta = Number(b.featuredLabel.includes("Popular")) - Number(a.featuredLabel.includes("Popular"))
+          return featuredDelta || b.rating - a.rating
+        })
     }
-  }, [activeCategory, collectionMode, normalizedQuery, products, sortMode])
+  }, [activeCategory, normalizedQuery, products, sortMode])
 
-  function setCategory(nextCategory: string | null) {
+  const resultLabel = query ? `Search results for "${query}"` : activeCategory === "All" ? "All materials" : activeCategory
+
+  function setCategory(nextCategory: string) {
     const params = new URLSearchParams(searchParams.toString())
-    if (nextCategory) {
-      params.set("category", nextCategory)
-      params.set("q", nextCategory)
-    } else {
+    if (nextCategory === "All") {
       params.delete("category")
-      params.delete("q")
+    } else {
+      params.set("category", nextCategory)
     }
+
     const queryString = params.toString()
     router.replace(queryString ? `/shop?${queryString}` : "/shop", { scroll: false })
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#eaf4ff_0%,#f7fbff_34%,#eef6ff_100%)] px-4 py-4 pb-28 text-slate-900 sm:px-8 sm:pb-10 lg:px-10 lg:pb-12">
-      <section className="mx-auto flex max-w-6xl flex-col gap-5">
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-[1.1rem] font-semibold tracking-[-0.04em] text-slate-950">Categories</h2>
-            {activeCategory ? <button onClick={() => setCategory(null)} className="text-sm font-semibold text-sky-700">Clear</button> : null}
-          </div>
-          <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {categories.map((category, index) => {
-              const active = activeCategory === category.name
+    <main className="min-h-screen bg-[#f6f8fb] px-3 py-3 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4">
+        <nav aria-label="Shop categories" className="border-b border-slate-200/80 bg-white">
+          <div className="flex gap-2 overflow-x-auto px-1 py-3 [scrollbar-width:none] sm:px-2 [&::-webkit-scrollbar]:hidden">
+            {categorySummaries.map((category) => {
+              const active = activeCategory === category.name || (!searchParams.get("category") && category.name === "All")
               return (
                 <button
                   key={category.name}
-                  onClick={() => setCategory(active ? null : category.name)}
-                  className={`w-[122px] min-w-[122px] shrink-0 overflow-hidden rounded-lg border text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] ${active ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white"}`}
-                  style={{ animationDelay: `${index * 45}ms` }}
+                  type="button"
+                  onClick={() => setCategory(category.name)}
+                  className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition duration-200 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 ${
+                    active ? "border-sky-400 bg-sky-50 text-sky-800 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-sky-200 hover:text-sky-700"
+                  }`}
+                  aria-pressed={active}
                 >
-                  <div className="h-[84px] overflow-hidden bg-slate-50 p-2">
-                    <Image src={category.image} alt={`${category.name} material category`} width={400} height={400} className="h-full w-full object-contain transition duration-300 hover:scale-[1.04]" />
-                  </div>
-                  <div className="p-3">
-                    <div className="line-clamp-2 text-[13px] font-semibold leading-4 text-slate-950">{category.name}</div>
-                    <div className="mt-1 text-[11px] text-slate-500">{category.count} items</div>
-                  </div>
+                  <span className="relative h-7 w-7 overflow-hidden rounded-full border border-slate-100 bg-slate-50">
+                    <Image src={category.image} alt="" fill sizes="28px" className="object-contain p-1" />
+                  </span>
+                  <span>{category.name}</span>
+                  <span className={`text-[11px] font-bold ${active ? "text-sky-600" : "text-slate-400"}`}>{category.count}</span>
                 </button>
               )
             })}
           </div>
-        </section>
+        </nav>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-[1.15rem] font-semibold tracking-[-0.04em] text-slate-950">Popular for framing</h2>
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-500">Top picks</span>
+        <section className="flex flex-col gap-3 border-b border-slate-200/80 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-bold tracking-normal text-slate-950 sm:text-2xl">{resultLabel}</h1>
+            <p className="mt-1 text-sm font-medium text-slate-500">{filteredProducts.length} items</p>
           </div>
-          <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {featuredProducts.map((product) => (
-              <ShopSimpleCard key={product.id} product={product} compact />
-            ))}
-          </div>
-        </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h2 className="text-[1.2rem] font-semibold tracking-[-0.04em] text-slate-950">Products</h2>
-              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-400">{filteredProducts.length} results</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => setCollectionMode("all")} className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${collectionMode === "all" ? "bg-slate-950 text-white shadow-sm" : "border border-slate-200 bg-white text-slate-700 hover:border-sky-200 hover:text-sky-700"}`}>All</button>
-              <button onClick={() => setCollectionMode("framing")} className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${collectionMode === "framing" ? "bg-slate-950 text-white shadow-sm" : "border border-slate-200 bg-white text-slate-700 hover:border-sky-200 hover:text-sky-700"}`}>Framing</button>
+          <label className="flex w-full items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 sm:w-auto">
+            <span className="text-slate-500">Sort</span>
+            <select
+              value={sortMode}
+              onChange={(event) => setSortMode(event.target.value as SortMode)}
+              className="min-w-[132px] bg-transparent text-sm font-semibold text-slate-900 outline-none"
+            >
               {SORT_OPTIONS.map((option) => (
-                <button key={option.key} onClick={() => setSortMode(option.key)} className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${sortMode === option.key ? "bg-sky-600 text-white shadow-sm" : "border border-slate-200 bg-white text-slate-700 hover:border-sky-200 hover:text-sky-700"}`}>{option.label}</button>
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
               ))}
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {filteredProducts.map((product) => (
-              <ShopSimpleCard key={product.id} product={product} />
-            ))}
-          </div>
+            </select>
+          </label>
         </section>
-      </section>
+
+        {filteredProducts.length > 0 ? (
+          <section aria-label="Products" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
+            {filteredProducts.map((product) => (
+              <ShopProductCard key={product.id} product={product} />
+            ))}
+          </section>
+        ) : (
+          <section className="border border-dashed border-slate-300 bg-white px-5 py-12 text-center">
+            <h2 className="text-lg font-semibold text-slate-950">No products found</h2>
+            <p className="mt-2 text-sm text-slate-500">Try another category or update the search in the top bar.</p>
+          </section>
+        )}
+      </div>
     </main>
   )
 }
