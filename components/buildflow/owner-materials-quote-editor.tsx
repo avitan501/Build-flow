@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import {
   archiveOwnerMaterialsRows,
@@ -29,6 +29,7 @@ type ParseStatus = {
 };
 
 const initialBatches = seededOwnerReviewBatches();
+const STORAGE_KEY = "buildflow-owner-material-review-batches-v2";
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
@@ -67,6 +68,11 @@ function csvSplit(line: string) {
 function parseMoney(value: string) {
   const next = Number(value.replace(/[$,\s]/g, ""));
   return Number.isFinite(next) ? next : 0;
+}
+
+function parseQuantity(value: string | undefined) {
+  const next = Number((value ?? "").replace(/,/g, ""));
+  return Number.isFinite(next) && next > 0 ? next : 1;
 }
 
 function headerIndex(headers: string[], patterns: RegExp[]) {
@@ -119,10 +125,65 @@ function parseDelimitedRows(text: string) {
         markupDollar: 0,
         finalUnitPrice: supplierUnitPrice,
         category: inferOwnerMaterialCategory(description),
-        publish: true,
+        publish: false,
       } satisfies OwnerMaterialsReviewRow,
     ];
   });
+}
+
+function parseLooseSupplierRows(text: string, sourceId: string) {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .flatMap((line, index) => {
+      const match = line.match(/^(.+?)\s+(\d+(?:,\d{3})*(?:\.\d+)?)\s+([A-Za-z]{1,8})?\s*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)\s+\$?(\d+(?:,\d{3})*(?:\.\d{2})?)T?$/);
+      if (!match) return [];
+
+      const description = match[1].trim();
+      const qty = parseQuantity(match[2]);
+      const unit = match[3]?.trim() || "EA";
+      const supplierUnitPrice = parseMoney(match[4]);
+
+      if (!description || supplierUnitPrice <= 0) return [];
+
+      return [
+        {
+          id: `loose-${Date.now()}-${index}`,
+          qty,
+          itemNo: `${sourceId.toUpperCase().replace(/[^A-Z0-9]+/g, "-")}-L${String(index + 1).padStart(3, "0")}`,
+          description,
+          unit,
+          supplierUnitPrice,
+          markupPercent: 0,
+          markupDollar: 0,
+          finalUnitPrice: supplierUnitPrice,
+          category: inferOwnerMaterialCategory(description),
+          publish: false,
+        } satisfies OwnerMaterialsReviewRow,
+      ];
+    });
+}
+
+function extractBasicPdfText(buffer: ArrayBuffer) {
+  const raw = new TextDecoder("latin1").decode(buffer);
+  const literalStrings = Array.from(raw.matchAll(/\(([^()]*(?:\\.[^()]*)*)\)\s*Tj/g), (match) => match[1]);
+  const arrayStrings = Array.from(raw.matchAll(/\[((?:\s*\([^()]*(?:\\.[^()]*)*\)\s*)+)\]\s*TJ/g), (match) => match[1]);
+  const parts = [
+    ...literalStrings,
+    ...arrayStrings.flatMap((chunk) => Array.from(chunk.matchAll(/\(([^()]*(?:\\.[^()]*)*)\)/g), (match) => match[1])),
+  ];
+
+  return parts
+    .map((part) =>
+      part
+        .replace(/\\n/g, "\n")
+        .replace(/\\r/g, "\n")
+        .replace(/\\t/g, " ")
+        .replace(/\\([()\\])/g, "$1")
+        .replace(/\\\d{3}/g, " "),
+    )
+    .join("\n");
 }
 
 function fileKind(fileName: string): OwnerMaterialsReviewBatch["sourceFileKind"] {
@@ -146,6 +207,40 @@ function makeActionBatch(batch: OwnerMaterialsReviewBatch): OwnerMaterialsAction
   };
 }
 
+function reviewKey(batch: Pick<OwnerMaterialsReviewBatch, "supplierName" | "quoteDate">, row: Pick<OwnerMaterialsReviewRow, "itemNo" | "description" | "unit">) {
+  return buildOwnerReviewDuplicateKey(batch, row);
+}
+
+function mergeStoredBatches(current: OwnerMaterialsReviewBatch[], stored: OwnerMaterialsReviewBatch[]) {
+  const merged = [...current];
+
+  for (const batch of stored) {
+    const index = merged.findIndex((item) => item.quoteId === batch.quoteId);
+    if (index >= 0) {
+      merged[index] = { ...merged[index], ...batch };
+    } else {
+      merged.unshift(batch);
+    }
+  }
+
+  return merged;
+}
+
+function loadInitialBatches() {
+  if (typeof window === "undefined") return initialBatches;
+
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (!stored) return initialBatches;
+    const parsed = JSON.parse(stored) as OwnerMaterialsReviewBatch[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return initialBatches;
+    return mergeStoredBatches(initialBatches, parsed);
+  } catch {
+    window.localStorage.removeItem(STORAGE_KEY);
+    return initialBatches;
+  }
+}
+
 function cloneManualRow(): OwnerMaterialsReviewRow {
   return {
     id: `manual-${Date.now()}`,
@@ -163,8 +258,8 @@ function cloneManualRow(): OwnerMaterialsReviewRow {
 }
 
 export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Props) {
-  const [batches, setBatches] = useState<OwnerMaterialsReviewBatch[]>(initialBatches);
-  const [activeQuoteId, setActiveQuoteId] = useState(initialBatches[0]?.quoteId ?? "");
+  const [batches, setBatches] = useState<OwnerMaterialsReviewBatch[]>(loadInitialBatches);
+  const [activeQuoteId, setActiveQuoteId] = useState(() => loadInitialBatches()[0]?.quoteId ?? "");
   const [supplierName, setSupplierName] = useState("Builders FirstSource");
   const [quoteNumber, setQuoteNumber] = useState("");
   const [quoteDate, setQuoteDate] = useState(new Date().toISOString().slice(0, 10));
@@ -178,6 +273,10 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeBatch = batches.find((batch) => batch.quoteId === activeQuoteId) ?? batches[0] ?? null;
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(batches));
+  }, [batches]);
 
   const summaries = useMemo(
     () =>
@@ -195,6 +294,37 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
   function setActiveBatchPatch(patch: Partial<OwnerMaterialsReviewBatch>) {
     if (!activeBatch) return;
     setBatches((current) => current.map((batch) => (batch.quoteId === activeBatch.quoteId ? { ...batch, ...patch } : batch)));
+  }
+
+  function addOrUpdateBatch(nextBatch: OwnerMaterialsReviewBatch) {
+    setBatches((current) => {
+      const next = [...current];
+      const existingIndex = next.findIndex(
+        (batch) =>
+          batch.supplierName.trim().toLowerCase() === nextBatch.supplierName.trim().toLowerCase() &&
+          batch.quoteDate === nextBatch.quoteDate &&
+          (batch.quoteNumber || batch.sourceFileName || batch.quoteId) === (nextBatch.quoteNumber || nextBatch.sourceFileName || nextBatch.quoteId),
+      );
+
+      if (existingIndex < 0) {
+        return [nextBatch, ...next];
+      }
+
+      const existing = next[existingIndex];
+      const rowMap = new Map(existing.rows.map((row) => [reviewKey(existing, row), row]));
+
+      for (const row of nextBatch.rows) {
+        rowMap.set(reviewKey(nextBatch, row), row);
+      }
+
+      next[existingIndex] = {
+        ...existing,
+        ...nextBatch,
+        rows: Array.from(rowMap.values()),
+      };
+      return next;
+    });
+    setActiveQuoteId(nextBatch.quoteId);
   }
 
   function updateRow(rowId: string, patch: Partial<OwnerMaterialsReviewRow>, recalc: "markup" | "final" | "none" = "none") {
@@ -252,15 +382,14 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
         extractionStatus: "manual_review",
         rows: [cloneManualRow()],
       };
-      setBatches((current) => [manualBatch, ...current]);
-      setActiveQuoteId(manualBatch.quoteId);
+      addOrUpdateBatch(manualBatch);
       setParseStatus({ tone: "success", message: "Manual review batch created. Add line items below." });
       return;
     }
 
     const kind = fileKind(file.name);
 
-    if (kind === "pdf" || kind === "spreadsheet") {
+    if (kind === "spreadsheet") {
       const placeholderBatch: OwnerMaterialsReviewBatch = {
         quoteId: `upload-${Date.now()}`,
         supplierName: supplierName.trim() || "Uploaded Supplier",
@@ -269,25 +398,40 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
         sourceFileName: file.name,
         sourceFileKind: kind,
         extractionStatus: "manual_review",
-        rows: [cloneManualRow()],
+        rows: [{ ...cloneManualRow(), itemNo: `${file.name.replace(/[^a-z0-9]+/gi, "-").toUpperCase()}-L001`, publish: false }],
       };
-      setBatches((current) => [placeholderBatch, ...current]);
-      setActiveQuoteId(placeholderBatch.quoteId);
+      addOrUpdateBatch(placeholderBatch);
       setParseStatus({
         tone: "neutral",
-        message: `${file.name} is staged for extraction/manual review. Add or paste rows while document extraction is connected.`,
+        message: `${file.name} is accepted and staged for manual review. XLS/XLSX parsing needs a spreadsheet parser dependency before automatic row extraction.`,
       });
       return;
     }
 
-    const text = await file.text();
-    const parsedRows = parseDelimitedRows(text);
+    const text = kind === "pdf" ? extractBasicPdfText(await file.arrayBuffer()) : await file.text();
+    const parsedRows = [...parseDelimitedRows(text), ...parseLooseSupplierRows(text, file.name)];
 
     if (parsedRows.length === 0) {
-      setParseStatus({
-        tone: "error",
-        message: "No usable rows found. CSV/TXT needs columns resembling item no, description/name, qty, unit, and unit price.",
-      });
+      if (kind === "pdf") {
+        const pdfBatch: OwnerMaterialsReviewBatch = {
+          quoteId: `pdf-${Date.now()}`,
+          supplierName: supplierName.trim() || "Uploaded Supplier",
+          quoteNumber: quoteNumber.trim(),
+          quoteDate,
+          sourceFileName: file.name,
+          sourceFileKind: "pdf",
+          extractionStatus: "manual_review",
+          rows: [{ ...cloneManualRow(), itemNo: `${file.name.replace(/[^a-z0-9]+/gi, "-").toUpperCase()}-L001`, publish: false }],
+        };
+        addOrUpdateBatch(pdfBatch);
+        setParseStatus({
+          tone: "neutral",
+          message: `${file.name} is staged. This PDF did not expose embedded text in-browser, so add or paste rows for manual review.`,
+        });
+        return;
+      }
+
+      setParseStatus({ tone: "error", message: "No usable rows found. CSV/TXT needs columns resembling item no, description/name, qty, unit, and unit price." });
       return;
     }
 
@@ -301,8 +445,7 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
       extractionStatus: "parsed",
       rows: parsedRows,
     };
-    setBatches((current) => [parsedBatch, ...current]);
-    setActiveQuoteId(parsedBatch.quoteId);
+    addOrUpdateBatch(parsedBatch);
     setParseStatus({ tone: "success", message: `${parsedRows.length} row${parsedRows.length === 1 ? "" : "s"} parsed from ${file.name}.` });
   }
 
@@ -340,41 +483,65 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
   }
 
   const selectedCount = activeBatch.rows.filter((row) => row.publish).length;
-  const supplierTotal = activeBatch.rows.reduce((sum, row) => sum + row.qty * row.supplierUnitPrice, 0);
+  const activePublishedCount = activeBatch.rows.filter((row) => localPublishedKeys.has(buildOwnerReviewDuplicateKey(activeBatch, row))).length;
+  const activeReviewCount = activeBatch.rows.length - activePublishedCount;
+  const totalRows = batches.reduce((sum, batch) => sum + batch.rows.length, 0);
   const clientTotal = activeBatch.rows.reduce((sum, row) => sum + row.qty * row.finalUnitPrice, 0);
+  const documentSummary = `${activeBatch.supplierName || "No supplier"} / ${activeBatch.quoteNumber || activeBatch.sourceFileName || "No document"} / ${activeBatch.quoteDate || "No date"}`;
 
   return (
     <div className="space-y-4">
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Owner Materials</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Material review and shop publishing</h1>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-950">Material Admin</h1>
+            <p className="mt-1 truncate text-sm text-slate-600">{documentSummary}</p>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
             <div className="rounded-md border border-slate-200 px-3 py-2">
-              <div className="text-xs text-slate-500">Rows</div>
-              <div className="font-semibold">{activeBatch.rows.length}</div>
+              <div className="text-xs text-slate-500">Total rows</div>
+              <div className="font-semibold">{totalRows}</div>
             </div>
             <div className="rounded-md border border-slate-200 px-3 py-2">
               <div className="text-xs text-slate-500">Selected</div>
               <div className="font-semibold">{selectedCount}</div>
             </div>
             <div className="rounded-md border border-slate-200 px-3 py-2">
-              <div className="text-xs text-slate-500">Supplier</div>
-              <div className="font-semibold">{money(supplierTotal)}</div>
+              <div className="text-xs text-slate-500">Review</div>
+              <div className="font-semibold">{activeReviewCount}</div>
             </div>
             <div className="rounded-md border border-slate-200 px-3 py-2">
-              <div className="text-xs text-slate-500">Client</div>
+              <div className="text-xs text-slate-500">Published</div>
+              <div className="font-semibold">{activePublishedCount}</div>
+            </div>
+            <div className="rounded-md border border-slate-200 px-3 py-2">
+              <div className="text-xs text-slate-500">Client total</div>
               <div className="font-semibold">{money(clientTotal)}</div>
             </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={addManualRow} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800">
+              Add item
+            </button>
+            <button type="button" onClick={prepareReview} className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white">
+              Import file
+            </button>
+            <button type="button" onClick={() => runAction("save")} disabled={isPending} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60">
+              Save edits
+            </button>
+            <button type="button" onClick={() => runAction("publish")} disabled={isPending || selectedCount === 0} className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              Publish selected
+            </button>
+            <button type="button" onClick={() => runAction("archive")} disabled={isPending || selectedCount === 0} className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-60">
+              Unpublish/archive
+            </button>
           </div>
         </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Import material file</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Supplier document</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-slate-700">Supplier</span>
@@ -397,10 +564,10 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={prepareReview} className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
-              Parse file / Prepare review
+              Import file
             </button>
             <button type="button" onClick={addManualRow} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800">
-              Add manual item
+              Add item
             </button>
           </div>
         </div>
@@ -451,6 +618,21 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
             </label>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (!activeBatch) return;
+                const allSelected = activeBatch.rows.every((row) => row.publish);
+                setBatches((current) =>
+                  current.map((batch) =>
+                    batch.quoteId === activeBatch.quoteId ? { ...batch, rows: batch.rows.map((row) => ({ ...row, publish: !allSelected })) } : batch,
+                  ),
+                );
+              }}
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
+            >
+              {activeBatch.rows.every((row) => row.publish) ? "Clear selection" : "Select all"}
+            </button>
             <button type="button" onClick={() => runAction("save")} disabled={isPending} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60">
               Save edits
             </button>
@@ -473,17 +655,16 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
           <table className="min-w-[1180px] w-full border-collapse text-left text-sm">
             <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
               <tr>
-                <th className="border border-slate-200 px-2 py-2">Publish</th>
-                <th className="border border-slate-200 px-2 py-2">Status</th>
+                <th className="border border-slate-200 px-2 py-2">Select</th>
                 <th className="border border-slate-200 px-2 py-2">Item no</th>
                 <th className="border border-slate-200 px-2 py-2">Description/name</th>
+                <th className="border border-slate-200 px-2 py-2">Category</th>
                 <th className="border border-slate-200 px-2 py-2">Qty</th>
                 <th className="border border-slate-200 px-2 py-2">Unit</th>
                 <th className="border border-slate-200 px-2 py-2">Supplier unit price</th>
                 <th className="border border-slate-200 px-2 py-2">Markup %</th>
-                <th className="border border-slate-200 px-2 py-2">Markup $</th>
                 <th className="border border-slate-200 px-2 py-2">Final client unit price</th>
-                <th className="border border-slate-200 px-2 py-2">Category</th>
+                <th className="border border-slate-200 px-2 py-2">Status</th>
                 <th className="border border-slate-200 px-2 py-2">Extended</th>
                 <th className="border border-slate-200 px-2 py-2">Actions</th>
               </tr>
@@ -499,15 +680,17 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
                       <input type="checkbox" checked={row.publish} onChange={(event) => updateRow(row.id, { publish: event.target.checked })} />
                     </td>
                     <td className="border border-slate-200 px-2 py-2">
-                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${isPublished ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>
-                        {isPublished ? "Published" : "Review"}
-                      </span>
-                    </td>
-                    <td className="border border-slate-200 px-2 py-2">
                       <input value={row.itemNo} onChange={(event) => updateRow(row.id, { itemNo: event.target.value })} className="w-28 rounded border border-slate-300 px-2 py-1" />
                     </td>
                     <td className="border border-slate-200 px-2 py-2">
                       <textarea value={row.description} onChange={(event) => updateRow(row.id, { description: event.target.value, category: inferOwnerMaterialCategory(event.target.value) })} className="min-h-9 w-72 rounded border border-slate-300 px-2 py-1" />
+                    </td>
+                    <td className="border border-slate-200 px-2 py-2">
+                      <select value={row.category} onChange={(event) => updateRow(row.id, { category: event.target.value })} className="w-36 rounded border border-slate-300 px-2 py-1">
+                        {SHOP_CATEGORY_NAMES.map((category) => (
+                          <option key={category} value={category}>{category}</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="border border-slate-200 px-2 py-2">
                       <input type="number" step="0.001" value={numeric(row.qty)} onChange={(event) => updateRow(row.id, { qty: Number(event.target.value || 0) })} className="w-20 rounded border border-slate-300 px-2 py-1" />
@@ -522,17 +705,12 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
                       <input type="number" step="0.01" value={numeric(row.markupPercent)} onChange={(event) => updateRow(row.id, { markupPercent: Number(event.target.value || 0) }, "markup")} className="w-24 rounded border border-slate-300 px-2 py-1" />
                     </td>
                     <td className="border border-slate-200 px-2 py-2">
-                      <input type="number" step="0.01" value={numeric(row.markupDollar)} onChange={(event) => updateRow(row.id, { markupDollar: Number(event.target.value || 0) }, "markup")} className="w-24 rounded border border-slate-300 px-2 py-1" />
-                    </td>
-                    <td className="border border-slate-200 px-2 py-2">
                       <input type="number" step="0.01" value={numeric(row.finalUnitPrice)} onChange={(event) => updateRow(row.id, { finalUnitPrice: Number(event.target.value || 0) }, "final")} className="w-28 rounded border border-slate-300 px-2 py-1" />
                     </td>
                     <td className="border border-slate-200 px-2 py-2">
-                      <select value={row.category} onChange={(event) => updateRow(row.id, { category: event.target.value })} className="w-36 rounded border border-slate-300 px-2 py-1">
-                        {[...SHOP_CATEGORY_NAMES, "Materials"].map((category) => (
-                          <option key={category} value={category}>{category}</option>
-                        ))}
-                      </select>
+                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${isPublished ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>
+                        {isPublished ? "Published" : "Review"}
+                      </span>
                     </td>
                     <td className="border border-slate-200 px-2 py-2 font-medium text-slate-900">{money(row.qty * row.finalUnitPrice)}</td>
                     <td className="border border-slate-200 px-2 py-2">

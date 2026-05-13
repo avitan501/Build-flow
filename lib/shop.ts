@@ -1,6 +1,27 @@
 export const SHOP_SUPPLIER_ESTIMATE_STATUSES = ["draft", "reviewed", "archived"] as const;
 export const SHOP_ITEM_SOURCES = ["supplier_estimate", "manual"] as const;
-export const SHOP_CATEGORY_NAMES = ["Lumber", "Plywood", "Treated Lumber", "LVL Beams", "Fasteners", "Hangers", "Adhesives", "Flashing"] as const;
+export const SHOP_CATEGORY_NAMES = [
+  "Lumber",
+  "Plywood",
+  "Treated Lumber",
+  "LVL Beams",
+  "Fasteners",
+  "Hangers",
+  "Adhesives",
+  "Flashing",
+  "Doors",
+  "Trim",
+  "Windows",
+  "Flooring",
+  "Appliances",
+  "Glass",
+  "Plumbing",
+  "Electrical",
+  "Lighting",
+  "Tile",
+  "Cabinets",
+  "Materials",
+] as const;
 export const SHOP_POPULAR_SEARCHES = ["2x4 studs", "joist hangers", "subfloor adhesive", "pressure treated", "flashing roll"] as const;
 
 export type ShopSupplierEstimateStatus = (typeof SHOP_SUPPLIER_ESTIMATE_STATUSES)[number];

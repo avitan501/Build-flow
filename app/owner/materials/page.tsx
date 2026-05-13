@@ -32,7 +32,7 @@ export default async function OwnerMaterialsPage() {
       .from("shop_items")
       .select("id, supplier_estimate_id, supplier_name, quote_number, pricing_date, item_number, name, description, category, quantity, unit, unit_price, extended_price, source, created_at, updated_at")
       .order("created_at", { ascending: false })
-      .limit(200)
+      .limit(1000)
       .returns<ShopItemRecord[]>(),
   ]);
 
