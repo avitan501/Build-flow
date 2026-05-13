@@ -30,7 +30,7 @@ export default async function OwnerMaterialsPage() {
       .returns<ShopSupplierEstimateRecord[]>(),
     supabase
       .from("shop_items")
-      .select("id, supplier_estimate_id, supplier_name, quote_number, pricing_date, item_number, name, description, category, quantity, unit, unit_price, extended_price, source, created_at, updated_at")
+      .select("id, supplier_estimate_id, supplier_name, quote_number, pricing_date, item_number, name, description, category, quantity, unit, unit_price, extended_price, source, image_url, image_alt, image_source, image_license, image_credit, image_category, created_at, updated_at")
       .order("created_at", { ascending: false })
       .limit(1000)
       .returns<ShopItemRecord[]>(),

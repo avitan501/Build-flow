@@ -3,6 +3,14 @@ export const SHOP_ITEM_SOURCES = ["supplier_estimate", "manual"] as const;
 export const SHOP_CATEGORY_NAMES = [
   "Lumber",
   "Plywood",
+  "Drywall",
+  "Concrete",
+  "Roofing",
+  "Insulation",
+  "Hardware",
+  "Electrical",
+  "Plumbing",
+  "Tools",
   "Treated Lumber",
   "LVL Beams",
   "Fasteners",
@@ -15,8 +23,6 @@ export const SHOP_CATEGORY_NAMES = [
   "Flooring",
   "Appliances",
   "Glass",
-  "Plumbing",
-  "Electrical",
   "Lighting",
   "Tile",
   "Cabinets",
@@ -55,6 +61,12 @@ export type ShopItemRecord = {
   unit_price: number;
   extended_price: number;
   source: ShopItemSource;
+  image_url?: string | null;
+  image_alt?: string | null;
+  image_source?: string | null;
+  image_license?: string | null;
+  image_credit?: string | null;
+  image_category?: string | null;
   created_at: string;
   updated_at: string;
 };

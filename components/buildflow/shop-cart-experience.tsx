@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
@@ -102,7 +103,7 @@ export function ShopCartExperience({ products }: ShopCartExperienceProps) {
                   >
                     <div className="flex gap-4">
                       <Link href={`/shop/${product.slug}`} className="w-24 shrink-0 overflow-hidden rounded-[18px] border border-slate-100 bg-slate-50 sm:w-28">
-                        <img src={product.image} alt={product.name} className="h-24 w-full object-cover transition duration-300 hover:scale-105 sm:h-28" loading="lazy" />
+                        <Image src={product.imageUrl} alt={product.imageAlt} width={240} height={240} className="h-24 w-full object-contain transition duration-300 hover:scale-105 sm:h-28" />
                       </Link>
                       <div className="min-w-0 flex-1">
                         <Link href={`/shop/${product.slug}`} className="line-clamp-2 text-base font-semibold text-slate-950 hover:text-sky-700">

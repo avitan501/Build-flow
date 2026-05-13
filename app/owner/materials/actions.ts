@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdminProfile } from "@/lib/auth";
+import { placeholderImageMetadata } from "@/lib/shop-catalog";
 import { buildShopDuplicateMatch, type ShopItemRecord, type ShopSupplierEstimateRecord } from "@/lib/shop";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -269,6 +270,7 @@ export async function publishOwnerMaterialsRows(batch: OwnerMaterialsActionBatch
       const existing = findExistingItem(candidates, row, clean);
       const unit = nullableText(row.unit);
       const itemNumber = nullableText(row.itemNo);
+      const image = placeholderImageMetadata(row.category, row.description);
       const payload = {
         supplier_estimate_id: estimateId,
         supplier_name: clean.supplierName,
@@ -283,6 +285,12 @@ export async function publishOwnerMaterialsRows(batch: OwnerMaterialsActionBatch
         unit_price: row.finalUnitPrice,
         extended_price: moneyNumber(row.qty * row.finalUnitPrice),
         source: "supplier_estimate",
+        image_url: image.imageUrl,
+        image_alt: image.imageAlt,
+        image_source: image.imageSource,
+        image_license: image.imageLicense,
+        image_credit: image.imageCredit,
+        image_category: image.imageCategory,
       };
 
       if (existing) {

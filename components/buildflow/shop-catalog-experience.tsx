@@ -1,10 +1,11 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
-import type { ShopCatalogProduct } from "@/lib/shop-catalog"
+import { MATERIAL_IMAGE_CATEGORIES, placeholderImageMetadata, type ShopCatalogProduct } from "@/lib/shop-catalog"
 
 type ShopCatalogExperienceProps = {
   products: ShopCatalogProduct[]
@@ -13,16 +14,7 @@ type ShopCatalogExperienceProps = {
 type SortMode = "featured" | "price-low" | "price-high" | "unit"
 type CollectionMode = "all" | "framing"
 
-const CATEGORY_CONFIG = [
-  { name: "Lumber", image: "https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?auto=format&fit=crop&w=800&q=80" },
-  { name: "Plywood", image: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80" },
-  { name: "Treated Lumber", image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=800&q=80" },
-  { name: "LVL Beams", image: "https://images.unsplash.com/photo-1517581177682-a085bb7ffb15?auto=format&fit=crop&w=800&q=80" },
-  { name: "Fasteners", image: "https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=800&q=80" },
-  { name: "Hangers", image: "https://images.unsplash.com/photo-1599707254554-027aeb4deacd?auto=format&fit=crop&w=800&q=80" },
-  { name: "Adhesives", image: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=800&q=80" },
-  { name: "Flashing", image: "https://images.unsplash.com/photo-1523413651479-597eb2da0ad6?auto=format&fit=crop&w=800&q=80" },
-] as const
+const CATEGORY_CONFIG = MATERIAL_IMAGE_CATEGORIES.map((name) => ({ name, image: placeholderImageMetadata(name).imageUrl }))
 
 const SORT_OPTIONS: { key: SortMode; label: string }[] = [
   { key: "featured", label: "Featured" },
@@ -48,19 +40,21 @@ function ShopSimpleCard({ product, compact = false }: { product: ShopCatalogProd
   return (
     <Link
       href={`/shop/${product.slug}`}
-      className={`group overflow-hidden rounded-[24px] border border-white/90 bg-white/96 shadow-[0_16px_34px_rgba(148,163,184,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_44px_rgba(148,163,184,0.18)] active:scale-[0.99] ${compact ? "min-w-[210px] max-w-[210px] shrink-0" : ""}`}
+      className={`group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md active:scale-[0.99] ${compact ? "min-w-[210px] max-w-[210px] shrink-0" : ""}`}
     >
-      <div className="relative overflow-hidden bg-[linear-gradient(180deg,#f6fbff_0%,#ecf5ff_100%)]">
-        <div className={`${compact ? "aspect-[1.08/1]" : "aspect-[1.08/1]"} overflow-hidden`}>
-          <img src={product.image} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.05]" loading="lazy" />
+      <div className="bg-slate-50 p-4">
+        <div className="aspect-square overflow-hidden rounded-md border border-slate-100 bg-white">
+          <Image src={product.imageUrl} alt={product.imageAlt} width={800} height={800} className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.03]" />
         </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-sky-50/35 to-transparent" />
       </div>
       <div className={`flex flex-col ${compact ? "p-3.5" : "p-4"}`}>
-        <h3 className="line-clamp-2 text-[0.98rem] font-semibold tracking-[-0.03em] text-slate-950">{product.name}</h3>
-        <div className="mt-3 text-lg font-semibold text-slate-950">{formatCurrency(product.price)}</div>
-        <div className="mt-0.5 text-[11px] uppercase tracking-[0.16em] text-slate-400">{product.unit}</div>
-        <div className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-sky-700 transition group-hover:gap-1.5">
+        <h3 className="line-clamp-2 min-h-12 text-[0.98rem] font-semibold text-slate-950">{product.name}</h3>
+        <div className="mt-3 flex items-end gap-2">
+          <span className="text-lg font-semibold text-slate-950">{formatCurrency(product.price)}</span>
+          <span className="pb-0.5 text-xs text-slate-500">{product.unit}</span>
+        </div>
+        <div className="mt-3 h-5 text-xs font-medium text-slate-500">{product.reviewLabel}</div>
+        <div className="mt-4 inline-flex min-h-10 items-center justify-center gap-1 rounded-md border border-sky-100 bg-sky-50 px-3 text-sm font-semibold text-sky-700 transition group-hover:border-sky-200 group-hover:bg-sky-100">
           View details
           <ChevronRightIcon />
         </div>
@@ -127,7 +121,7 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#eaf4ff_0%,#f7fbff_34%,#eef6ff_100%)] px-4 py-4 pb-28 text-slate-900 sm:px-8 sm:pb-10 lg:px-10 lg:pb-12">
       <section className="mx-auto flex max-w-6xl flex-col gap-5">
-        <section className="rounded-[28px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,248,255,0.92))] p-4 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-5">
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-[1.1rem] font-semibold tracking-[-0.04em] text-slate-950">Categories</h2>
             {activeCategory ? <button onClick={() => setCategory(null)} className="text-sm font-semibold text-sky-700">Clear</button> : null}
@@ -139,11 +133,11 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
                 <button
                   key={category.name}
                   onClick={() => setCategory(active ? null : category.name)}
-                  className={`w-[122px] min-w-[122px] shrink-0 overflow-hidden rounded-[22px] border text-left shadow-[0_12px_24px_rgba(148,163,184,0.1)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_28px_rgba(148,163,184,0.16)] active:scale-[0.98] ${active ? "border-sky-300 bg-sky-50" : "border-white/90 bg-white/96"}`}
+                  className={`w-[122px] min-w-[122px] shrink-0 overflow-hidden rounded-lg border text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-[0.98] ${active ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white"}`}
                   style={{ animationDelay: `${index * 45}ms` }}
                 >
-                  <div className="h-[84px] overflow-hidden bg-slate-100">
-                    <img src={category.image} alt={category.name} className="h-full w-full object-cover transition duration-500 hover:scale-[1.06]" loading="lazy" />
+                  <div className="h-[84px] overflow-hidden bg-slate-50 p-2">
+                    <Image src={category.image} alt={`${category.name} material category`} width={400} height={400} className="h-full w-full object-contain transition duration-300 hover:scale-[1.04]" />
                   </div>
                   <div className="p-3">
                     <div className="line-clamp-2 text-[13px] font-semibold leading-4 text-slate-950">{category.name}</div>
@@ -155,7 +149,7 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(232,244,255,0.92))] p-4 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-5">
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-[1.15rem] font-semibold tracking-[-0.04em] text-slate-950">Popular for framing</h2>
             <span className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-500">Top picks</span>
@@ -167,7 +161,7 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-white/80 bg-white/94 p-4 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-5">
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-[1.2rem] font-semibold tracking-[-0.04em] text-slate-950">Products</h2>
