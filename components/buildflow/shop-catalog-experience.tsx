@@ -44,6 +44,31 @@ function ChevronRightIcon() {
   )
 }
 
+function ShopSimpleCard({ product, compact = false }: { product: ShopCatalogProduct; compact?: boolean }) {
+  return (
+    <Link
+      href={`/shop/${product.slug}`}
+      className={`group overflow-hidden rounded-[24px] border border-white/90 bg-white/96 shadow-[0_16px_34px_rgba(148,163,184,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_44px_rgba(148,163,184,0.18)] active:scale-[0.99] ${compact ? "min-w-[210px] max-w-[210px] shrink-0" : ""}`}
+    >
+      <div className="relative overflow-hidden bg-[linear-gradient(180deg,#f6fbff_0%,#ecf5ff_100%)]">
+        <div className={`${compact ? "aspect-[1.08/1]" : "aspect-[1.08/1]"} overflow-hidden`}>
+          <img src={product.image} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.05]" loading="lazy" />
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-sky-50/35 to-transparent" />
+      </div>
+      <div className={`flex flex-col ${compact ? "p-3.5" : "p-4"}`}>
+        <h3 className="line-clamp-2 text-[0.98rem] font-semibold tracking-[-0.03em] text-slate-950">{product.name}</h3>
+        <div className="mt-3 text-lg font-semibold text-slate-950">{formatCurrency(product.price)}</div>
+        <div className="mt-0.5 text-[11px] uppercase tracking-[0.16em] text-slate-400">{product.unit}</div>
+        <div className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-sky-700 transition group-hover:gap-1.5">
+          View details
+          <ChevronRightIcon />
+        </div>
+      </div>
+    </Link>
+  )
+}
+
 export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -100,24 +125,25 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#edf5fb_0%,#f8fbff_36%,#eef5fb_100%)] px-4 py-4 pb-28 text-slate-900 sm:px-8 sm:pb-10 lg:px-10 lg:pb-12">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#eaf4ff_0%,#f7fbff_34%,#eef6ff_100%)] px-4 py-4 pb-28 text-slate-900 sm:px-8 sm:pb-10 lg:px-10 lg:pb-12">
       <section className="mx-auto flex max-w-6xl flex-col gap-5">
-        <section className="rounded-[28px] border border-white/80 bg-white/92 p-4 shadow-[0_18px_42px_rgba(148,163,184,0.1)] sm:p-5">
+        <section className="rounded-[28px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(241,248,255,0.92))] p-4 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-[1.1rem] font-semibold tracking-[-0.04em] text-slate-950">Categories</h2>
             {activeCategory ? <button onClick={() => setCategory(null)} className="text-sm font-semibold text-sky-700">Clear</button> : null}
           </div>
           <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {categories.map((category) => {
+            {categories.map((category, index) => {
               const active = activeCategory === category.name
               return (
                 <button
                   key={category.name}
                   onClick={() => setCategory(active ? null : category.name)}
-                  className={`w-[122px] min-w-[122px] shrink-0 overflow-hidden rounded-[22px] border text-left shadow-[0_12px_24px_rgba(148,163,184,0.08)] transition active:scale-[0.99] ${active ? "border-sky-300 bg-sky-50" : "border-slate-100 bg-white"}`}
+                  className={`w-[122px] min-w-[122px] shrink-0 overflow-hidden rounded-[22px] border text-left shadow-[0_12px_24px_rgba(148,163,184,0.1)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_28px_rgba(148,163,184,0.16)] active:scale-[0.98] ${active ? "border-sky-300 bg-sky-50" : "border-white/90 bg-white/96"}`}
+                  style={{ animationDelay: `${index * 45}ms` }}
                 >
                   <div className="h-[84px] overflow-hidden bg-slate-100">
-                    <img src={category.image} alt={category.name} className="h-full w-full object-cover" loading="lazy" />
+                    <img src={category.image} alt={category.name} className="h-full w-full object-cover transition duration-500 hover:scale-[1.06]" loading="lazy" />
                   </div>
                   <div className="p-3">
                     <div className="line-clamp-2 text-[13px] font-semibold leading-4 text-slate-950">{category.name}</div>
@@ -129,80 +155,36 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(244,250,255,0.96))] p-4 shadow-[0_18px_42px_rgba(148,163,184,0.1)] sm:p-5">
+        <section className="rounded-[28px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(232,244,255,0.92))] p-4 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-[1.15rem] font-semibold tracking-[-0.04em] text-slate-950">Popular for framing</h2>
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Top picks</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-500">Top picks</span>
           </div>
           <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {featuredProducts.map((product) => (
-              <Link key={product.id} href={`/shop/${product.slug}`} className="min-w-[236px] max-w-[236px] shrink-0 overflow-hidden rounded-[26px] border border-slate-100 bg-white shadow-[0_12px_28px_rgba(148,163,184,0.1)]">
-                <div className="aspect-[1.14/1] overflow-hidden bg-slate-100">
-                  <img src={product.image} alt={product.name} className="h-full w-full object-cover" loading="lazy" />
-                </div>
-                <div className="flex min-h-[168px] flex-col p-4">
-                  <div className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]">
-                    <span className="text-sky-700">{product.featuredLabel}</span>
-                    <span className="text-emerald-700">{product.availability}</span>
-                  </div>
-                  <h3 className="mt-2 line-clamp-2 text-sm font-semibold text-slate-950">{product.name}</h3>
-                  <p className="mt-2 text-xs text-slate-500">{product.reviewLabel}</p>
-                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{product.specLine}</p>
-                  <div className="mt-auto pt-3">
-                    <div className="text-base font-semibold text-slate-950">{formatCurrency(product.price)}</div>
-                    <div className="text-[12px] text-slate-500">{product.unit}</div>
-                    <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-slate-700">
-                      View details
-                      <ChevronRightIcon />
-                    </div>
-                  </div>
-                </div>
-              </Link>
+              <ShopSimpleCard key={product.id} product={product} compact />
             ))}
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-white/80 bg-white/92 p-4 shadow-[0_18px_42px_rgba(148,163,184,0.1)] sm:p-5">
+        <section className="rounded-[28px] border border-white/80 bg-white/94 p-4 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h2 className="text-[1.2rem] font-semibold tracking-[-0.04em] text-slate-950">Products</h2>
               <p className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-400">{filteredProducts.length} results</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => setCollectionMode("all")} className={`rounded-full px-3.5 py-2 text-sm font-semibold ${collectionMode === "all" ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-700"}`}>All</button>
-              <button onClick={() => setCollectionMode("framing")} className={`rounded-full px-3.5 py-2 text-sm font-semibold ${collectionMode === "framing" ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-700"}`}>Framing</button>
+              <button onClick={() => setCollectionMode("all")} className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${collectionMode === "all" ? "bg-slate-950 text-white shadow-sm" : "border border-slate-200 bg-white text-slate-700 hover:border-sky-200 hover:text-sky-700"}`}>All</button>
+              <button onClick={() => setCollectionMode("framing")} className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${collectionMode === "framing" ? "bg-slate-950 text-white shadow-sm" : "border border-slate-200 bg-white text-slate-700 hover:border-sky-200 hover:text-sky-700"}`}>Framing</button>
               {SORT_OPTIONS.map((option) => (
-                <button key={option.key} onClick={() => setSortMode(option.key)} className={`rounded-full px-3.5 py-2 text-sm font-semibold ${sortMode === option.key ? "bg-sky-600 text-white" : "border border-slate-200 bg-white text-slate-700"}`}>{option.label}</button>
+                <button key={option.key} onClick={() => setSortMode(option.key)} className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${sortMode === option.key ? "bg-sky-600 text-white shadow-sm" : "border border-slate-200 bg-white text-slate-700 hover:border-sky-200 hover:text-sky-700"}`}>{option.label}</button>
               ))}
             </div>
           </div>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filteredProducts.map((product) => (
-              <Link key={product.id} href={`/shop/${product.slug}`} className="overflow-hidden rounded-[28px] border border-slate-100 bg-white shadow-[0_16px_34px_rgba(148,163,184,0.1)] transition hover:-translate-y-0.5">
-                <div className="relative aspect-[1.12/1] overflow-hidden bg-slate-100">
-                  <img src={product.image} alt={product.name} className="h-full w-full object-cover" loading="lazy" />
-                  <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700 shadow-sm">{product.category}</div>
-                  <div className="absolute bottom-3 right-3 rounded-full bg-emerald-50/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700 shadow-sm">{product.availability}</div>
-                </div>
-                <div className="flex min-h-[172px] flex-col p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="line-clamp-2 text-[1rem] font-semibold tracking-[-0.03em] text-slate-950">{product.name}</h3>
-                      <p className="mt-1 text-sm text-slate-500">{product.reviewLabel}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-semibold text-slate-950">{formatCurrency(product.price)}</div>
-                      <div className="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-400">{product.unit}</div>
-                    </div>
-                  </div>
-                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">{product.specLine}</p>
-                  <div className="mt-auto pt-3 inline-flex items-center gap-1 text-sm font-semibold text-slate-700">
-                    View details
-                    <ChevronRightIcon />
-                  </div>
-                </div>
-              </Link>
+              <ShopSimpleCard key={product.id} product={product} />
             ))}
           </div>
         </section>

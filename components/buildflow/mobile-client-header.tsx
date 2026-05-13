@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { MobileMenuDrawer, type MobileMenuLink } from "@/components/buildflow/mobile-menu-drawer";
 import { SHOP_CATEGORY_NAMES, SHOP_POPULAR_SEARCHES } from "@/lib/shop";
+import { SHOP_CART_UPDATED_EVENT, readShopCartCount } from "@/lib/shop-cart";
 
 type MobileClientHeaderProps = {
   isSignedIn: boolean;
@@ -16,7 +17,6 @@ type MobileClientHeaderProps = {
 };
 
 const HIDDEN_PATHS = new Set(["/login", "/signup", "/reset-password"]);
-const SHOP_CART_STORAGE_KEY = "buildflow-shop-cart";
 
 function shouldShowHeader(pathname: string) {
   if (HIDDEN_PATHS.has(pathname)) {
@@ -65,27 +65,6 @@ function CartIcon() {
   );
 }
 
-function readCartCount() {
-  if (typeof window === "undefined") return 0;
-
-  try {
-    const raw = window.localStorage.getItem(SHOP_CART_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-
-    if (Array.isArray(parsed)) {
-      return parsed.length;
-    }
-
-    if (parsed && typeof parsed === "object") {
-      return Object.values(parsed as Record<string, unknown>).reduce<number>((sum, value) => sum + (typeof value === "number" ? value : 0), 0);
-    }
-
-    return 0;
-  } catch {
-    return 0;
-  }
-}
-
 export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHref, aiHref }: MobileClientHeaderProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -95,6 +74,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
   const [shopQuery, setShopQuery] = useState("");
   const [shopCartCount, setShopCartCount] = useState(0);
   const isShopPage = Boolean(pathname) && pathname.startsWith("/shop");
+  const isCartPage = pathname === "/cart";
 
   useEffect(() => {
     if (!isShopPage) return;
@@ -102,21 +82,21 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
   }, [isShopPage, searchParams]);
 
   useEffect(() => {
-    if (!isShopPage || typeof window === "undefined") {
+    if (typeof window === "undefined") {
       return;
     }
 
-    const syncCartCount = () => setShopCartCount(readCartCount());
+    const syncCartCount = () => setShopCartCount(readShopCartCount());
 
     syncCartCount();
     window.addEventListener("storage", syncCartCount);
-    window.addEventListener("buildflow-shop-cart-updated", syncCartCount as EventListener);
+    window.addEventListener(SHOP_CART_UPDATED_EVENT, syncCartCount as EventListener);
 
     return () => {
       window.removeEventListener("storage", syncCartCount);
-      window.removeEventListener("buildflow-shop-cart-updated", syncCartCount as EventListener);
+      window.removeEventListener(SHOP_CART_UPDATED_EVENT, syncCartCount as EventListener);
     };
-  }, [isShopPage]);
+  }, []);
 
   const primaryLinks = useMemo<MobileMenuLink[]>(() => [
     { href: "/", label: "Home" },
@@ -290,13 +270,13 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
             </IconShell>
           </Link>
 
-          {isShopPage ? (
-            <button type="button" aria-label="Cart" className="inline-flex">
-              <IconShell active={shopCartCount > 0}>
+          {isShopPage || isCartPage ? (
+            <Link href="/cart" aria-label="Cart" className="inline-flex">
+              <IconShell active={isCartPage || shopCartCount > 0}>
                 <CartIcon />
                 {shopCartCount > 0 ? <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-950">{shopCartCount}</span> : null}
               </IconShell>
-            </button>
+            </Link>
           ) : null}
 
           <Link href={aiHref} aria-label="Ask BuildFlow AI" className="inline-flex">

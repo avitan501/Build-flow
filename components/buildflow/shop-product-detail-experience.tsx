@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useMemo, useState } from "react"
 
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
+import { readShopCartMap, readShopSavedIds, writeShopCartMap, writeShopSavedIds } from "@/lib/shop-cart"
 
 type ShopProductDetailExperienceProps = {
   product: ShopCatalogProduct
@@ -13,36 +14,11 @@ type ShopProductDetailExperienceProps = {
 
 type CartMap = Record<string, number>
 
-const SHOP_CART_STORAGE_KEY = "buildflow-shop-cart"
-const SHOP_SAVE_STORAGE_KEY = "buildflow-shop-save"
-
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
   }).format(value)
-}
-
-function readCartMap(): CartMap {
-  if (typeof window === "undefined") return {}
-  try {
-    const raw = window.localStorage.getItem(SHOP_CART_STORAGE_KEY)
-    const parsed = raw ? JSON.parse(raw) : null
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as CartMap) : {}
-  } catch {
-    return {}
-  }
-}
-
-function readSavedIds(): string[] {
-  if (typeof window === "undefined") return []
-  try {
-    const raw = window.localStorage.getItem(SHOP_SAVE_STORAGE_KEY)
-    const parsed = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : []
-  } catch {
-    return []
-  }
 }
 
 function renderStars(rating: number) {
@@ -52,33 +28,21 @@ function renderStars(rating: number) {
 
 export function ShopProductDetailExperience({ product, relatedProducts, buyMode = false }: ShopProductDetailExperienceProps) {
   const [quantity, setQuantity] = useState(1)
-  const [saved, setSaved] = useState(() => readSavedIds().includes(product.id))
+  const [saved, setSaved] = useState(() => readShopSavedIds().includes(product.id))
   const [buyOpen, setBuyOpen] = useState(buyMode)
   const [activeImage, setActiveImage] = useState(product.gallery[0] || product.image)
-  const cartCount = useMemo(() => readCartMap()[product.id] || 0, [product.id, quantity, buyOpen, saved])
-
-  function persistCart(next: CartMap) {
-    if (typeof window === "undefined") return
-    window.localStorage.setItem(SHOP_CART_STORAGE_KEY, JSON.stringify(next))
-    window.dispatchEvent(new Event("buildflow-shop-cart-updated"))
-  }
-
-  function persistSaved(next: string[]) {
-    if (typeof window === "undefined") return
-    window.localStorage.setItem(SHOP_SAVE_STORAGE_KEY, JSON.stringify(next))
-    window.dispatchEvent(new Event("buildflow-shop-save-updated"))
-  }
+  const cartCount = useMemo(() => readShopCartMap()[product.id] || 0, [product.id, quantity, buyOpen, saved])
 
   function addToCart() {
-    const current = readCartMap()
-    persistCart({ ...current, [product.id]: quantity })
+    const current = readShopCartMap()
+    writeShopCartMap({ ...current, [product.id]: quantity })
   }
 
   function toggleSaved() {
-    const current = readSavedIds()
+    const current = readShopSavedIds()
     const next = current.includes(product.id) ? current.filter((id) => id !== product.id) : [...current, product.id]
     setSaved(next.includes(product.id))
-    persistSaved(next)
+    writeShopSavedIds(next)
   }
 
   return (
