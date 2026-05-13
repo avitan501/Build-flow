@@ -26,6 +26,7 @@ export type OwnerMaterialsReviewRow = {
   imageLicense: string;
   imageCredit: string;
   imageCategory: string;
+  photoGallery: ShopProductImage[];
   publish: boolean;
 };
 
@@ -554,6 +555,7 @@ export function seededOwnerReviewBatches(): OwnerMaterialsReviewBatch[] {
         imageLicense: image.imageLicense,
         imageCredit: image.imageCredit,
         imageCategory: image.imageCategory,
+        photoGallery: [image],
         publish: false,
       };
     }),

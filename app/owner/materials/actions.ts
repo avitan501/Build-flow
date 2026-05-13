@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdminProfile } from "@/lib/auth";
-import { placeholderImageMetadata } from "@/lib/shop-catalog";
-import { buildShopDuplicateMatch, type ShopItemRecord, type ShopSupplierEstimateRecord } from "@/lib/shop";
+import { placeholderImageMetadata, type ShopProductImage } from "@/lib/shop-catalog";
+import { buildShopDuplicateMatch, type ShopItemImageRecord, type ShopItemRecord, type ShopSupplierEstimateRecord } from "@/lib/shop";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type OwnerMaterialsActionRow = {
@@ -24,6 +24,7 @@ export type OwnerMaterialsActionRow = {
   imageLicense?: string;
   imageCredit?: string;
   imageCategory?: string;
+  photoGallery?: ShopProductImage[];
   publish: boolean;
 };
 
@@ -83,6 +84,75 @@ function duplicateKey(input: {
   return `${input.supplierName}|${input.description.trim().toLowerCase().replace(/[^a-z0-9]+/g, "")}|${(input.unit ?? "").toUpperCase()}`;
 }
 
+function normalizePhotoGallery(gallery: ShopProductImage[] | undefined, fallback: ShopProductImage) {
+  const entries = (gallery ?? [])
+    .map((photo) => ({
+      imageUrl: cleanText(photo.imageUrl) || fallback.imageUrl,
+      imageAlt: cleanText(photo.imageAlt) || fallback.imageAlt,
+      imageSource: cleanText(photo.imageSource) || fallback.imageSource,
+      imageLicense: cleanText(photo.imageLicense) || fallback.imageLicense,
+      imageCredit: cleanText(photo.imageCredit) || fallback.imageCredit,
+      imageCategory: cleanText(photo.imageCategory) || fallback.imageCategory,
+    }))
+    .filter((photo) => photo.imageUrl);
+
+  if (entries.length === 0) {
+    return [fallback];
+  }
+
+  return entries.filter((photo, index, all) => all.findIndex((candidate) => candidate.imageUrl === photo.imageUrl) === index);
+}
+
+function schemaCacheMissingColumn(error: { message?: string } | null | undefined) {
+  return Boolean(error?.message && /schema cache/i.test(error.message) && /shop_items/i.test(error.message));
+}
+
+function payloadWithoutImageColumns<T extends Record<string, unknown>>(payload: T) {
+  const next = { ...payload };
+  delete next.image_url;
+  delete next.image_alt;
+  delete next.image_source;
+  delete next.image_license;
+  delete next.image_credit;
+  delete next.image_category;
+  delete next.image_gallery;
+  return next;
+}
+
+async function writeShopItemWithFallback(params: {
+  admin: ReturnType<typeof createAdminClient>;
+  existingId?: string;
+  payload: Record<string, unknown>;
+}): Promise<{ data: CandidateShopItem | null; error: { message?: string } | null }> {
+  if (params.existingId) {
+    const { error } = await params.admin.from("shop_items").update(params.payload).eq("id", params.existingId);
+
+    if (error && schemaCacheMissingColumn(error)) {
+      const { error: fallbackError } = await params.admin.from("shop_items").update(payloadWithoutImageColumns(params.payload)).eq("id", params.existingId);
+      return { data: null, error: fallbackError };
+    }
+
+    return { data: null, error };
+  }
+
+  const insert = await params.admin
+    .from("shop_items")
+    .insert(params.payload)
+    .select("id, supplier_name, pricing_date, item_number, name, description, unit")
+    .single<CandidateShopItem>();
+
+  if (insert.error && schemaCacheMissingColumn(insert.error)) {
+    const fallbackInsert = await params.admin
+      .from("shop_items")
+      .insert(payloadWithoutImageColumns(params.payload))
+      .select("id, supplier_name, pricing_date, item_number, name, description, unit")
+      .single<CandidateShopItem>();
+    return { data: fallbackInsert.data ?? null, error: fallbackInsert.error };
+  }
+
+  return { data: insert.data ?? null, error: insert.error };
+}
+
 function validateBatch(batch: OwnerMaterialsActionBatch) {
   const supplierName = cleanText(batch.supplierName);
 
@@ -111,6 +181,14 @@ function validateBatch(batch: OwnerMaterialsActionBatch) {
         imageLicense: cleanText(row.imageLicense) || fallbackImage.imageLicense,
         imageCredit: cleanText(row.imageCredit) || fallbackImage.imageCredit,
         imageCategory: cleanText(row.imageCategory) || fallbackImage.imageCategory,
+        photoGallery: normalizePhotoGallery(row.photoGallery, {
+          imageUrl: cleanText(row.imageUrl) || fallbackImage.imageUrl,
+          imageAlt: cleanText(row.imageAlt) || fallbackImage.imageAlt,
+          imageSource: cleanText(row.imageSource) || fallbackImage.imageSource,
+          imageLicense: cleanText(row.imageLicense) || fallbackImage.imageLicense,
+          imageCredit: cleanText(row.imageCredit) || fallbackImage.imageCredit,
+          imageCategory: cleanText(row.imageCategory) || fallbackImage.imageCategory,
+        }),
       };
     })
     .filter((row) => row.description);
@@ -289,6 +367,22 @@ export async function publishOwnerMaterialsRows(batch: OwnerMaterialsActionBatch
       const unit = nullableText(row.unit);
       const itemNumber = nullableText(row.itemNo);
       const image = placeholderImageMetadata(row.imageCategory || row.category, row.description);
+      const primaryImage: ShopItemImageRecord = {
+        imageUrl: row.imageUrl || image.imageUrl,
+        imageAlt: row.imageAlt || image.imageAlt,
+        imageSource: row.imageSource || image.imageSource,
+        imageLicense: row.imageLicense || image.imageLicense,
+        imageCredit: row.imageCredit || image.imageCredit,
+        imageCategory: row.imageCategory || image.imageCategory,
+      };
+      const imageGallery = normalizePhotoGallery(row.photoGallery, {
+        imageUrl: primaryImage.imageUrl || image.imageUrl,
+        imageAlt: primaryImage.imageAlt || image.imageAlt,
+        imageSource: primaryImage.imageSource || image.imageSource,
+        imageLicense: primaryImage.imageLicense || image.imageLicense,
+        imageCredit: primaryImage.imageCredit || image.imageCredit,
+        imageCategory: primaryImage.imageCategory || image.imageCategory,
+      });
       const payload = {
         supplier_estimate_id: estimateId,
         supplier_name: clean.supplierName,
@@ -303,31 +397,26 @@ export async function publishOwnerMaterialsRows(batch: OwnerMaterialsActionBatch
         unit_price: row.finalUnitPrice,
         extended_price: moneyNumber(row.qty * row.finalUnitPrice),
         source: "supplier_estimate",
-        image_url: row.imageUrl || image.imageUrl,
-        image_alt: row.imageAlt || image.imageAlt,
-        image_source: row.imageSource || image.imageSource,
-        image_license: row.imageLicense || image.imageLicense,
-        image_credit: row.imageCredit || image.imageCredit,
-        image_category: row.imageCategory || image.imageCategory,
+        image_url: primaryImage.imageUrl,
+        image_alt: primaryImage.imageAlt,
+        image_source: primaryImage.imageSource,
+        image_license: primaryImage.imageLicense,
+        image_credit: primaryImage.imageCredit,
+        image_category: primaryImage.imageCategory,
+        image_gallery: imageGallery,
       };
 
-      if (existing) {
-        const { error } = await admin.from("shop_items").update(payload).eq("id", existing.id);
+      const { data: inserted, error } = await writeShopItemWithFallback({
+        admin,
+        existingId: existing?.id,
+        payload,
+      });
 
-        if (error) {
-          throw new Error(error.message || `Failed to update ${row.description}.`);
-        }
-      } else {
-        const { data: inserted, error } = await admin
-          .from("shop_items")
-          .insert(payload)
-          .select("id, supplier_name, pricing_date, item_number, name, description, unit")
-          .single<CandidateShopItem>();
+      if (error) {
+        throw new Error(error.message || `Failed to publish ${row.description}.`);
+      }
 
-        if (error || !inserted) {
-          throw new Error(error?.message || `Failed to publish ${row.description}.`);
-        }
-
+      if (!existing && inserted) {
         candidates.push(inserted);
       }
 

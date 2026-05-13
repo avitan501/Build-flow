@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { PremiumBackLink, PremiumBadge, PremiumHero, PremiumInfoCard, PremiumMutedPanel, PremiumPageShell, PremiumSection } from "@/components/buildflow/premium-page";
 import { requireAdminProfile } from "@/lib/auth";
-import type { ShopItemRecord, ShopSupplierEstimateRecord } from "@/lib/shop";
+import { SHOP_ITEM_SELECT_FIELDS, type ShopItemRecord, type ShopSupplierEstimateRecord } from "@/lib/shop";
 import { createClient } from "@/lib/supabase/server";
 
 const SUPPLIER_ESTIMATE_LIMIT = 24;
@@ -49,7 +49,7 @@ async function loadShopCatalogData() {
       .returns<ShopSupplierEstimateRecord[]>(),
     supabase
       .from("shop_items")
-      .select("id, supplier_estimate_id, supplier_name, quote_number, pricing_date, item_number, name, description, category, quantity, unit, unit_price, extended_price, source, image_url, image_alt, image_source, image_license, image_credit, image_category, created_at, updated_at")
+      .select(SHOP_ITEM_SELECT_FIELDS)
       .order("created_at", { ascending: false })
       .limit(SHOP_ITEM_LIMIT)
       .returns<ShopItemRecord[]>(),

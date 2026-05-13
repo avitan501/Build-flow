@@ -1,5 +1,5 @@
 import { MATERIAL_REAL_PHOTOS, realPhotoForMaterialCategory } from "@/lib/material-photo-catalog"
-import type { ShopItemRecord } from "@/lib/shop"
+import type { ShopItemImageRecord, ShopItemRecord } from "@/lib/shop"
 
 export type ShopProductImage = {
   imageUrl: string
@@ -149,9 +149,18 @@ export function fallbackImageForCategory(category: string | null | undefined) {
   return MATERIAL_REAL_PHOTOS[imageCategory]?.imageUrl ?? MATERIAL_PLACEHOLDER_BY_CATEGORY[imageCategory]
 }
 
-function isLocalMaterialImageUrl(value: string | null | undefined) {
-  if (!value?.startsWith("/images/materials/")) return false
-  return !value.trim().endsWith(".svg")
+export const MATERIAL_REAL_PHOTO_OPTIONS = Object.entries(MATERIAL_REAL_PHOTOS).map(([category, image]) => ({
+  category,
+  ...image,
+}))
+
+function isSupportedMaterialImageUrl(value: string | null | undefined) {
+  const next = value?.trim() || ""
+  if (!next) return false
+  if (next.startsWith("data:image/")) return true
+  if (/^https?:\/\//i.test(next)) return true
+  if (!next.startsWith("/images/materials/")) return false
+  return !next.endsWith(".svg")
 }
 
 function buildImageMetadata(params: {
@@ -167,16 +176,16 @@ function buildImageMetadata(params: {
   const imageCategory = imageCategoryForMaterial(params.imageCategory || params.category)
   const fallbackPhoto = realPhotoForMaterialCategory(imageCategory)
   const fallbackUrl = fallbackPhoto?.imageUrl ?? MATERIAL_PLACEHOLDER_BY_CATEGORY[imageCategory]
-  const hasCustomLocalImage = isLocalMaterialImageUrl(params.imageUrl)
-  const imageUrl = hasCustomLocalImage ? params.imageUrl!.trim() : fallbackUrl
+  const hasSupportedImage = isSupportedMaterialImageUrl(params.imageUrl)
+  const imageUrl = hasSupportedImage ? params.imageUrl!.trim() : fallbackUrl
 
   return {
     imageUrl,
-    imageAlt: hasCustomLocalImage ? params.imageAlt?.trim() || fallbackPhoto?.imageAlt || `${params.name} material image` : fallbackPhoto?.imageAlt || `${params.name} material image`,
-    imageSource: hasCustomLocalImage ? params.imageSource?.trim() || fallbackPhoto?.imageSource || LOCAL_IMAGE_SOURCE : fallbackPhoto?.imageSource || LOCAL_IMAGE_SOURCE,
-    imageLicense: hasCustomLocalImage ? params.imageLicense?.trim() || fallbackPhoto?.imageLicense || LOCAL_IMAGE_LICENSE : fallbackPhoto?.imageLicense || LOCAL_IMAGE_LICENSE,
-    imageCredit: hasCustomLocalImage ? params.imageCredit?.trim() || fallbackPhoto?.imageCredit || LOCAL_IMAGE_CREDIT : fallbackPhoto?.imageCredit || LOCAL_IMAGE_CREDIT,
-    imageCategory: hasCustomLocalImage ? params.imageCategory?.trim() || fallbackPhoto?.imageCategory || imageCategory : fallbackPhoto?.imageCategory || imageCategory,
+    imageAlt: hasSupportedImage ? params.imageAlt?.trim() || fallbackPhoto?.imageAlt || `${params.name} material image` : fallbackPhoto?.imageAlt || `${params.name} material image`,
+    imageSource: hasSupportedImage ? params.imageSource?.trim() || fallbackPhoto?.imageSource || LOCAL_IMAGE_SOURCE : fallbackPhoto?.imageSource || LOCAL_IMAGE_SOURCE,
+    imageLicense: hasSupportedImage ? params.imageLicense?.trim() || fallbackPhoto?.imageLicense || LOCAL_IMAGE_LICENSE : fallbackPhoto?.imageLicense || LOCAL_IMAGE_LICENSE,
+    imageCredit: hasSupportedImage ? params.imageCredit?.trim() || fallbackPhoto?.imageCredit || LOCAL_IMAGE_CREDIT : fallbackPhoto?.imageCredit || LOCAL_IMAGE_CREDIT,
+    imageCategory: hasSupportedImage ? params.imageCategory?.trim() || fallbackPhoto?.imageCategory || imageCategory : fallbackPhoto?.imageCategory || imageCategory,
   }
 }
 
@@ -184,11 +193,28 @@ export function placeholderImageMetadata(category: string | null | undefined, na
   return buildImageMetadata({ name, category })
 }
 
-function galleryForProduct(primary: ShopProductImage, category: string | null | undefined) {
+function normalizeGalleryImages(images: Array<ShopItemImageRecord | Partial<ShopProductImage> | null | undefined>, fallbackName: string, fallbackCategory: string | null | undefined) {
+  return images
+    .filter(Boolean)
+    .map((image) =>
+      buildImageMetadata({
+        name: fallbackName,
+        category: fallbackCategory,
+        imageUrl: image?.imageUrl ?? null,
+        imageAlt: image?.imageAlt ?? null,
+        imageSource: image?.imageSource ?? null,
+        imageLicense: image?.imageLicense ?? null,
+        imageCredit: image?.imageCredit ?? null,
+        imageCategory: image?.imageCategory ?? null,
+      }),
+    )
+}
+
+function galleryForProduct(primary: ShopProductImage, category: string | null | undefined, extraImages: Array<ShopItemImageRecord | Partial<ShopProductImage> | null | undefined> = [], fallbackName = category || "Materials") {
   const imageCategory = imageCategoryForMaterial(category)
   const categoryPlaceholder = placeholderImageMetadata(imageCategory, imageCategory)
   const materialsPlaceholder = placeholderImageMetadata("Materials", "Materials")
-  const images = [primary, categoryPlaceholder, materialsPlaceholder]
+  const images = [primary, ...normalizeGalleryImages(extraImages, fallbackName, category), categoryPlaceholder, materialsPlaceholder]
 
   return images.filter((image, index, all) => all.findIndex((candidate) => candidate.imageUrl === image.imageUrl) === index)
 }
@@ -374,6 +400,7 @@ export function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[
       imageCredit: item.image_credit,
       imageCategory: item.image_category,
     })
+    const extraGallery = Array.isArray(item.image_gallery) ? item.image_gallery : []
 
     return {
       id: item.id,
@@ -392,7 +419,7 @@ export function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[
       imageLicense: image.imageLicense,
       imageCredit: image.imageCredit,
       imageCategory: image.imageCategory,
-      gallery: galleryForProduct(image, item.category),
+      gallery: galleryForProduct(image, item.category, extraGallery, item.name),
       specLine: deriveSpecLine(item),
       availability: "Ready to quote",
       featuredLabel: item.category === "Lumber" || item.category === "Plywood" || item.category === "Fasteners" ? "Popular for framing" : "Jobsite pick",

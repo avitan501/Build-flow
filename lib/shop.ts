@@ -46,6 +46,15 @@ export type ShopSupplierEstimateRecord = {
   updated_at: string;
 };
 
+export type ShopItemImageRecord = {
+  imageUrl?: string | null;
+  imageAlt?: string | null;
+  imageSource?: string | null;
+  imageLicense?: string | null;
+  imageCredit?: string | null;
+  imageCategory?: string | null;
+};
+
 export type ShopItemRecord = {
   id: string;
   supplier_estimate_id: string | null;
@@ -67,9 +76,12 @@ export type ShopItemRecord = {
   image_license?: string | null;
   image_credit?: string | null;
   image_category?: string | null;
+  image_gallery?: ShopItemImageRecord[] | null;
   created_at: string;
   updated_at: string;
 };
+
+export const SHOP_ITEM_SELECT_FIELDS = "id, supplier_estimate_id, supplier_name, quote_number, pricing_date, item_number, name, description, category, quantity, unit, unit_price, extended_price, source, image_url, image_alt, image_source, image_license, image_credit, image_category, image_gallery, created_at, updated_at";
 
 export function normalizeShopText(value: string | null | undefined) {
   return (value ?? "")

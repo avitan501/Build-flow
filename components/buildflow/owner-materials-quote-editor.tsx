@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import {
   archiveOwnerMaterialsRows,
@@ -17,6 +17,7 @@ import {
   type OwnerMaterialsReviewBatch,
   type OwnerMaterialsReviewRow,
 } from "@/lib/owner-materials-quote";
+import { MATERIAL_REAL_PHOTO_OPTIONS, type ShopProductImage } from "@/lib/shop-catalog";
 import { SHOP_CATEGORY_NAMES, type ShopSupplierEstimateRecord } from "@/lib/shop";
 
 type Props = {
@@ -30,7 +31,7 @@ type ParseStatus = {
 };
 
 const initialBatches = seededOwnerReviewBatches();
-const STORAGE_KEY = "buildflow-owner-material-review-batches-v2";
+const STORAGE_KEY = "buildflow-owner-material-review-batches-v3";
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
@@ -127,6 +128,7 @@ function parseDelimitedRows(text: string) {
         finalUnitPrice: supplierUnitPrice,
         category: inferOwnerMaterialCategory(description),
         ...imageMetadataForOwnerMaterial({ supplierName: "Uploaded Supplier" }, { description, category: inferOwnerMaterialCategory(description) }),
+        photoGallery: [imageMetadataForOwnerMaterial({ supplierName: "Uploaded Supplier" }, { description, category: inferOwnerMaterialCategory(description) })],
         publish: false,
       } satisfies OwnerMaterialsReviewRow,
     ];
@@ -162,6 +164,7 @@ function parseLooseSupplierRows(text: string, sourceId: string) {
           finalUnitPrice: supplierUnitPrice,
           category: inferOwnerMaterialCategory(description),
           ...imageMetadataForOwnerMaterial({ supplierName: "Uploaded Supplier" }, { description, category: inferOwnerMaterialCategory(description) }),
+          photoGallery: [imageMetadataForOwnerMaterial({ supplierName: "Uploaded Supplier" }, { description, category: inferOwnerMaterialCategory(description) })],
           publish: false,
         } satisfies OwnerMaterialsReviewRow,
       ];
@@ -210,20 +213,36 @@ function makeActionBatch(batch: OwnerMaterialsReviewBatch): OwnerMaterialsAction
   };
 }
 
-type OwnerMaterialsReviewRowInput = Omit<OwnerMaterialsReviewRow, "imageUrl" | "imageAlt" | "imageSource" | "imageLicense" | "imageCredit" | "imageCategory"> &
-  Partial<Pick<OwnerMaterialsReviewRow, "imageUrl" | "imageAlt" | "imageSource" | "imageLicense" | "imageCredit" | "imageCategory">>;
+type OwnerMaterialsReviewRowInput = Omit<OwnerMaterialsReviewRow, "imageUrl" | "imageAlt" | "imageSource" | "imageLicense" | "imageCredit" | "imageCategory" | "photoGallery"> &
+  Partial<Pick<OwnerMaterialsReviewRow, "imageUrl" | "imageAlt" | "imageSource" | "imageLicense" | "imageCredit" | "imageCategory" | "photoGallery">>;
+
+function dedupeGallery(images: ShopProductImage[]) {
+  return images.filter((image, index, all) => all.findIndex((candidate) => candidate.imageUrl === image.imageUrl) === index);
+}
 
 function withImageMetadata(batch: Pick<OwnerMaterialsReviewBatch, "supplierName">, row: OwnerMaterialsReviewRowInput): OwnerMaterialsReviewRow {
   const image = imageMetadataForOwnerMaterial(batch, row);
+  const primaryImage: ShopProductImage = {
+    imageUrl: row.imageUrl || image.imageUrl,
+    imageAlt: row.imageAlt || image.imageAlt,
+    imageSource: row.imageSource || image.imageSource,
+    imageLicense: row.imageLicense || image.imageLicense,
+    imageCredit: row.imageCredit || image.imageCredit,
+    imageCategory: row.imageCategory || image.imageCategory,
+  };
+  const existingGallery = row.photoGallery ?? [];
+  const usesOnlyAutoImage = existingGallery.length <= 1 && (!existingGallery[0] || existingGallery[0].imageUrl === row.imageUrl || existingGallery[0].imageUrl === image.imageUrl);
+  const photoGallery = usesOnlyAutoImage ? [primaryImage] : dedupeGallery([primaryImage, ...existingGallery]);
 
   return {
     ...row,
-    imageUrl: image.imageUrl,
-    imageAlt: image.imageAlt,
-    imageSource: image.imageSource,
-    imageLicense: image.imageLicense,
-    imageCredit: image.imageCredit,
-    imageCategory: image.imageCategory,
+    imageUrl: primaryImage.imageUrl,
+    imageAlt: primaryImage.imageAlt,
+    imageSource: primaryImage.imageSource,
+    imageLicense: primaryImage.imageLicense,
+    imageCredit: primaryImage.imageCredit,
+    imageCategory: primaryImage.imageCategory,
+    photoGallery,
   };
 }
 
@@ -293,6 +312,7 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
   });
   const [actionResult, setActionResult] = useState<OwnerMaterialsActionResult | null>(null);
   const [localPublishedKeys, setLocalPublishedKeys] = useState(new Set(publishedKeys));
+  const [photoUrlDrafts, setPhotoUrlDrafts] = useState<Record<string, string>>({});
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -381,6 +401,144 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
         };
       }),
     );
+  }
+
+  function setPrimaryPhoto(rowId: string, photo: ShopProductImage) {
+    if (!activeBatch) return;
+
+    setBatches((current) =>
+      current.map((batch) => {
+        if (batch.quoteId !== activeBatch.quoteId) return batch;
+
+        return {
+          ...batch,
+          rows: batch.rows.map((row) => {
+            if (row.id !== rowId) return row;
+            const nextGallery = dedupeGallery([photo, ...(row.photoGallery ?? []).filter((entry) => entry.imageUrl !== photo.imageUrl)]);
+            return withImageMetadata(batch, {
+              ...row,
+              imageUrl: photo.imageUrl,
+              imageAlt: photo.imageAlt,
+              imageSource: photo.imageSource,
+              imageLicense: photo.imageLicense,
+              imageCredit: photo.imageCredit,
+              imageCategory: photo.imageCategory,
+              photoGallery: nextGallery,
+            });
+          }),
+        };
+      }),
+    );
+  }
+
+  function addPhotoToRow(rowId: string, photo: ShopProductImage) {
+    if (!activeBatch) return;
+
+    setBatches((current) =>
+      current.map((batch) => {
+        if (batch.quoteId !== activeBatch.quoteId) return batch;
+
+        return {
+          ...batch,
+          rows: batch.rows.map((row) => {
+            if (row.id !== rowId) return row;
+            const nextGallery = dedupeGallery([...(row.photoGallery ?? []), photo]);
+            const primary = nextGallery[0] ?? photo;
+            return withImageMetadata(batch, {
+              ...row,
+              imageUrl: primary.imageUrl,
+              imageAlt: primary.imageAlt,
+              imageSource: primary.imageSource,
+              imageLicense: primary.imageLicense,
+              imageCredit: primary.imageCredit,
+              imageCategory: primary.imageCategory,
+              photoGallery: nextGallery,
+            });
+          }),
+        };
+      }),
+    );
+  }
+
+  function removePhotoFromRow(rowId: string, imageUrl: string) {
+    if (!activeBatch) return;
+
+    setBatches((current) =>
+      current.map((batch) => {
+        if (batch.quoteId !== activeBatch.quoteId) return batch;
+
+        return {
+          ...batch,
+          rows: batch.rows.map((row) => {
+            if (row.id !== rowId) return row;
+            const fallback = imageMetadataForOwnerMaterial(batch, row);
+            const nextGallery = (row.photoGallery ?? []).filter((photo) => photo.imageUrl !== imageUrl);
+            const primary = nextGallery[0] ?? fallback;
+            return withImageMetadata(batch, {
+              ...row,
+              imageUrl: primary.imageUrl,
+              imageAlt: primary.imageAlt,
+              imageSource: primary.imageSource,
+              imageLicense: primary.imageLicense,
+              imageCredit: primary.imageCredit,
+              imageCategory: primary.imageCategory,
+              photoGallery: nextGallery.length > 0 ? nextGallery : [fallback],
+            });
+          }),
+        };
+      }),
+    );
+  }
+
+  async function handlePhotoUpload(rowId: string, files: FileList | null) {
+    if (!files || files.length === 0) return;
+
+    const allowed = new Set(["image/jpeg", "image/png", "image/webp"]);
+    const uploads = await Promise.all(
+      Array.from(files)
+        .filter((file) => allowed.has(file.type))
+        .map(
+          (file) =>
+            new Promise<ShopProductImage>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () =>
+                resolve({
+                  imageUrl: String(reader.result || ""),
+                  imageAlt: `${file.name.replace(/\.[^.]+$/, "")} material photo`,
+                  imageSource: `Owner upload (staged in browser) – ${file.name}`,
+                  imageLicense: "Owner-provided upload",
+                  imageCredit: "Owner upload",
+                  imageCategory: "Materials",
+                });
+              reader.onerror = () => reject(new Error(`Failed to read ${file.name}.`));
+              reader.readAsDataURL(file);
+            }),
+        ),
+    );
+
+    uploads.forEach((photo) => addPhotoToRow(rowId, photo));
+    setActionResult({ ok: true, message: `${uploads.length} photo${uploads.length === 1 ? "" : "s"} staged for this material.`, publishedKeys: [] });
+  }
+
+  function addPhotoUrl(rowId: string) {
+    const nextUrl = (photoUrlDrafts[rowId] ?? "").trim();
+    if (!nextUrl) return;
+
+    addPhotoToRow(rowId, {
+      imageUrl: nextUrl,
+      imageAlt: "Material photo",
+      imageSource: `Manual URL – ${nextUrl}`,
+      imageLicense: "Manual URL (verify rights before publish)",
+      imageCredit: "Manual URL",
+      imageCategory: "Materials",
+    });
+    setPhotoUrlDrafts((current) => ({ ...current, [rowId]: "" }));
+  }
+
+  function applyCatalogPhoto(rowId: string, imageUrl: string) {
+    const photo = MATERIAL_REAL_PHOTO_OPTIONS.find((entry) => entry.imageUrl === imageUrl);
+    if (!photo) return;
+    addPhotoToRow(rowId, photo);
   }
 
   function removeRow(rowId: string) {
@@ -703,50 +861,110 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
                 const isPublished = localPublishedKeys.has(key);
 
                 return (
-                  <tr key={row.id} className="align-top">
-                    <td className="border border-slate-200 px-2 py-2 text-center">
-                      <input type="checkbox" checked={row.publish} onChange={(event) => updateRow(row.id, { publish: event.target.checked })} />
-                    </td>
-                    <td className="border border-slate-200 px-2 py-2">
-                      <input value={row.itemNo} onChange={(event) => updateRow(row.id, { itemNo: event.target.value })} className="w-28 rounded border border-slate-300 px-2 py-1" />
-                    </td>
-                    <td className="border border-slate-200 px-2 py-2">
-                      <textarea value={row.description} onChange={(event) => updateRow(row.id, { description: event.target.value, category: inferOwnerMaterialCategory(event.target.value) })} className="min-h-9 w-72 rounded border border-slate-300 px-2 py-1" />
-                    </td>
-                    <td className="border border-slate-200 px-2 py-2">
-                      <select value={row.category} onChange={(event) => updateRow(row.id, { category: event.target.value })} className="w-36 rounded border border-slate-300 px-2 py-1">
-                        {SHOP_CATEGORY_NAMES.map((category) => (
-                          <option key={category} value={category}>{category}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="border border-slate-200 px-2 py-2">
-                      <input type="number" step="0.001" value={numeric(row.qty)} onChange={(event) => updateRow(row.id, { qty: Number(event.target.value || 0) })} className="w-20 rounded border border-slate-300 px-2 py-1" />
-                    </td>
-                    <td className="border border-slate-200 px-2 py-2">
-                      <input value={row.unit} onChange={(event) => updateRow(row.id, { unit: event.target.value })} className="w-20 rounded border border-slate-300 px-2 py-1" />
-                    </td>
-                    <td className="border border-slate-200 px-2 py-2">
-                      <input type="number" step="0.01" value={numeric(row.supplierUnitPrice)} onChange={(event) => updateRow(row.id, { supplierUnitPrice: Number(event.target.value || 0) }, "markup")} className="w-28 rounded border border-slate-300 px-2 py-1" />
-                    </td>
-                    <td className="border border-slate-200 px-2 py-2">
-                      <input type="number" step="0.01" value={numeric(row.markupPercent)} onChange={(event) => updateRow(row.id, { markupPercent: Number(event.target.value || 0) }, "markup")} className="w-24 rounded border border-slate-300 px-2 py-1" />
-                    </td>
-                    <td className="border border-slate-200 px-2 py-2">
-                      <input type="number" step="0.01" value={numeric(row.finalUnitPrice)} onChange={(event) => updateRow(row.id, { finalUnitPrice: Number(event.target.value || 0) }, "final")} className="w-28 rounded border border-slate-300 px-2 py-1" />
-                    </td>
-                    <td className="border border-slate-200 px-2 py-2">
-                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${isPublished ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>
-                        {isPublished ? "Published" : "Review"}
-                      </span>
-                    </td>
-                    <td className="border border-slate-200 px-2 py-2 font-medium text-slate-900">{money(row.qty * row.finalUnitPrice)}</td>
-                    <td className="border border-slate-200 px-2 py-2">
-                      <button type="button" onClick={() => removeRow(row.id)} className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700">
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
+                  <Fragment key={row.id}>
+                    <tr className="align-top">
+                      <td className="border border-slate-200 px-2 py-2 text-center">
+                        <input type="checkbox" checked={row.publish} onChange={(event) => updateRow(row.id, { publish: event.target.checked })} />
+                      </td>
+                      <td className="border border-slate-200 px-2 py-2">
+                        <input value={row.itemNo} onChange={(event) => updateRow(row.id, { itemNo: event.target.value })} className="w-28 rounded border border-slate-300 px-2 py-1" />
+                      </td>
+                      <td className="border border-slate-200 px-2 py-2">
+                        <textarea value={row.description} onChange={(event) => updateRow(row.id, { description: event.target.value, category: inferOwnerMaterialCategory(event.target.value) })} className="min-h-9 w-72 rounded border border-slate-300 px-2 py-1" />
+                      </td>
+                      <td className="border border-slate-200 px-2 py-2">
+                        <select value={row.category} onChange={(event) => updateRow(row.id, { category: event.target.value })} className="w-36 rounded border border-slate-300 px-2 py-1">
+                          {SHOP_CATEGORY_NAMES.map((category) => (
+                            <option key={category} value={category}>{category}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="border border-slate-200 px-2 py-2">
+                        <input type="number" step="0.001" value={numeric(row.qty)} onChange={(event) => updateRow(row.id, { qty: Number(event.target.value || 0) })} className="w-20 rounded border border-slate-300 px-2 py-1" />
+                      </td>
+                      <td className="border border-slate-200 px-2 py-2">
+                        <input value={row.unit} onChange={(event) => updateRow(row.id, { unit: event.target.value })} className="w-20 rounded border border-slate-300 px-2 py-1" />
+                      </td>
+                      <td className="border border-slate-200 px-2 py-2">
+                        <input type="number" step="0.01" value={numeric(row.supplierUnitPrice)} onChange={(event) => updateRow(row.id, { supplierUnitPrice: Number(event.target.value || 0) }, "markup")} className="w-28 rounded border border-slate-300 px-2 py-1" />
+                      </td>
+                      <td className="border border-slate-200 px-2 py-2">
+                        <input type="number" step="0.01" value={numeric(row.markupPercent)} onChange={(event) => updateRow(row.id, { markupPercent: Number(event.target.value || 0) }, "markup")} className="w-24 rounded border border-slate-300 px-2 py-1" />
+                      </td>
+                      <td className="border border-slate-200 px-2 py-2">
+                        <input type="number" step="0.01" value={numeric(row.finalUnitPrice)} onChange={(event) => updateRow(row.id, { finalUnitPrice: Number(event.target.value || 0) }, "final")} className="w-28 rounded border border-slate-300 px-2 py-1" />
+                      </td>
+                      <td className="border border-slate-200 px-2 py-2">
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${isPublished ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>
+                          {isPublished ? "Published" : "Review"}
+                        </span>
+                      </td>
+                      <td className="border border-slate-200 px-2 py-2 font-medium text-slate-900">{money(row.qty * row.finalUnitPrice)}</td>
+                      <td className="border border-slate-200 px-2 py-2">
+                        <button type="button" onClick={() => removeRow(row.id)} className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700">
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={12} className="border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <div className="text-sm font-semibold text-slate-900">Photos</div>
+                                <div className="text-xs text-slate-500">Primary image powers the shop card. Additional photos appear in product detail thumbnails.</div>
+                              </div>
+                              <div className="text-xs text-slate-500">{row.photoGallery.length} photo{row.photoGallery.length === 1 ? "" : "s"}</div>
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                              {row.photoGallery.map((photo, index) => (
+                                <div key={`${row.id}-${photo.imageUrl}-${index}`} className="w-28 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
+                                  <img src={photo.imageUrl} alt={photo.imageAlt} className="h-20 w-full rounded object-cover" />
+                                  <div className="mt-2 line-clamp-2 text-[11px] text-slate-600">{photo.imageAlt}</div>
+                                  <div className="mt-2 flex flex-wrap gap-1">
+                                    <button type="button" onClick={() => setPrimaryPhoto(row.id, photo)} className="rounded border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                                      {index === 0 ? "Primary" : "Make primary"}
+                                    </button>
+                                    <button type="button" onClick={() => removePhotoFromRow(row.id, photo.imageUrl)} className="rounded border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-700">
+                                      Remove
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+                            <label className="grid gap-1 text-sm">
+                              <span className="font-medium text-slate-700">Upload photos</span>
+                              <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => void handlePhotoUpload(row.id, event.target.files)} className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white" />
+                              <span className="text-xs text-slate-500">Staged in-browser for now if storage is not configured.</span>
+                            </label>
+                            <label className="grid gap-1 text-sm">
+                              <span className="font-medium text-slate-700">Add public image URL</span>
+                              <div className="flex gap-2">
+                                <input value={photoUrlDrafts[row.id] ?? ""} onChange={(event) => setPhotoUrlDrafts((current) => ({ ...current, [row.id]: event.target.value }))} placeholder="https://..." className="flex-1 rounded-md border border-slate-300 px-3 py-2" />
+                                <button type="button" onClick={() => addPhotoUrl(row.id)} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800">Add</button>
+                              </div>
+                            </label>
+                            <label className="grid gap-1 text-sm">
+                              <span className="font-medium text-slate-700">Use existing local material photo</span>
+                              <select defaultValue="" onChange={(event) => {
+                                if (!event.target.value) return;
+                                applyCatalogPhoto(row.id, event.target.value);
+                                event.target.value = "";
+                              }} className="rounded-md border border-slate-300 px-3 py-2">
+                                <option value="">Choose a local photo…</option>
+                                {MATERIAL_REAL_PHOTO_OPTIONS.map((photo) => (
+                                  <option key={`${row.id}-${photo.imageUrl}`} value={photo.imageUrl}>{photo.category} · {photo.imageCredit}</option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </Fragment>
                 );
               })}
             </tbody>
