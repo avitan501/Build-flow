@@ -18,6 +18,12 @@ export type OwnerMaterialsActionRow = {
   markupDollar: number;
   finalUnitPrice: number;
   category: string;
+  imageUrl?: string;
+  imageAlt?: string;
+  imageSource?: string;
+  imageLicense?: string;
+  imageCredit?: string;
+  imageCategory?: string;
   publish: boolean;
 };
 
@@ -85,16 +91,28 @@ function validateBatch(batch: OwnerMaterialsActionBatch) {
   }
 
   const rows = batch.rows
-    .map((row) => ({
-      ...row,
-      description: cleanText(row.description),
-      itemNo: cleanText(row.itemNo),
-      unit: cleanText(row.unit),
-      category: cleanText(row.category) || "Materials",
-      qty: quantityNumber(row.qty),
-      supplierUnitPrice: moneyNumber(row.supplierUnitPrice),
-      finalUnitPrice: moneyNumber(row.finalUnitPrice),
-    }))
+    .map((row) => {
+      const description = cleanText(row.description);
+      const category = cleanText(row.category) || "Materials";
+      const fallbackImage = placeholderImageMetadata(category, description || category);
+
+      return {
+        ...row,
+        description,
+        itemNo: cleanText(row.itemNo),
+        unit: cleanText(row.unit),
+        category,
+        qty: quantityNumber(row.qty),
+        supplierUnitPrice: moneyNumber(row.supplierUnitPrice),
+        finalUnitPrice: moneyNumber(row.finalUnitPrice),
+        imageUrl: cleanText(row.imageUrl) || fallbackImage.imageUrl,
+        imageAlt: cleanText(row.imageAlt) || fallbackImage.imageAlt,
+        imageSource: cleanText(row.imageSource) || fallbackImage.imageSource,
+        imageLicense: cleanText(row.imageLicense) || fallbackImage.imageLicense,
+        imageCredit: cleanText(row.imageCredit) || fallbackImage.imageCredit,
+        imageCategory: cleanText(row.imageCategory) || fallbackImage.imageCategory,
+      };
+    })
     .filter((row) => row.description);
 
   if (rows.length === 0) {
@@ -270,7 +288,7 @@ export async function publishOwnerMaterialsRows(batch: OwnerMaterialsActionBatch
       const existing = findExistingItem(candidates, row, clean);
       const unit = nullableText(row.unit);
       const itemNumber = nullableText(row.itemNo);
-      const image = placeholderImageMetadata(row.category, row.description);
+      const image = placeholderImageMetadata(row.imageCategory || row.category, row.description);
       const payload = {
         supplier_estimate_id: estimateId,
         supplier_name: clean.supplierName,
@@ -285,12 +303,12 @@ export async function publishOwnerMaterialsRows(batch: OwnerMaterialsActionBatch
         unit_price: row.finalUnitPrice,
         extended_price: moneyNumber(row.qty * row.finalUnitPrice),
         source: "supplier_estimate",
-        image_url: image.imageUrl,
-        image_alt: image.imageAlt,
-        image_source: image.imageSource,
-        image_license: image.imageLicense,
-        image_credit: image.imageCredit,
-        image_category: image.imageCategory,
+        image_url: row.imageUrl || image.imageUrl,
+        image_alt: row.imageAlt || image.imageAlt,
+        image_source: row.imageSource || image.imageSource,
+        image_license: row.imageLicense || image.imageLicense,
+        image_credit: row.imageCredit || image.imageCredit,
+        image_category: row.imageCategory || image.imageCategory,
       };
 
       if (existing) {

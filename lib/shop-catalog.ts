@@ -38,8 +38,8 @@ export type ShopCatalogProduct = {
 
 type ProductSeed = Omit<ShopCatalogProduct, "id">
 
-const LOCAL_IMAGE_SOURCE = "BuildFlow local static asset"
-const LOCAL_IMAGE_LICENSE = "BuildFlow internal placeholder"
+const LOCAL_IMAGE_SOURCE = "BuildFlow local placeholder"
+const LOCAL_IMAGE_LICENSE = "BuildFlow placeholder asset"
 const LOCAL_IMAGE_CREDIT = "BuildFlow"
 
 export const MATERIAL_IMAGE_CATEGORIES = [

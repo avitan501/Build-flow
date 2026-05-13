@@ -1,3 +1,5 @@
+import { placeholderImageMetadata, type ShopProductImage } from "@/lib/shop-catalog";
+
 export type OwnerQuoteRow = {
   qty: number;
   itemNo: string;
@@ -18,6 +20,12 @@ export type OwnerMaterialsReviewRow = {
   markupDollar: number;
   finalUnitPrice: number;
   category: string;
+  imageUrl: string;
+  imageAlt: string;
+  imageSource: string;
+  imageLicense: string;
+  imageCredit: string;
+  imageCategory: string;
   publish: boolean;
 };
 
@@ -450,6 +458,68 @@ export function inferOwnerMaterialCategory(description: string) {
   return "Materials";
 }
 
+function sourceFileNameForQuote(batch: Pick<SupplierQuoteBatch, "quoteId">) {
+  const sourceFileNames: Record<string, string> = {
+    "builders-firstsource-87545229-2026-04-23": "Seeded Builders FirstSource quote",
+    "elite-doors-33282-2025-03-12": "imgm 1.pdf",
+    "elite-doors-33284-2025-03-12": "imgm 2 .pdf",
+    "sierra-pacific-1850437-2024-11-15": "imgm 3 .pdf",
+    "source-wood-18379-2022-09-01": "imgm 4.pdf",
+    "designer-home-appliances-96490-2025-07-23": "imgm 5 .pdf",
+    "dundy-glass-i0092370-2025-07-17": "imgm 6 .pdf",
+    "prospect-hardware-117797-2025-06-23": "imgm 7 .pdf",
+    "queens-blvd-electrical-118406-2025-03-12": "imgm 8.pdf",
+    "lighting-selections-imgm9": "imgm 9.pdf",
+    "lmg-tile-s477340-2024-12-19": "imgm 10.pdf",
+    "todays-kitchen-imgm11-2025-06-04": "imgm 11.pdf",
+  };
+
+  return sourceFileNames[batch.quoteId] ?? "Seeded supplier quote";
+}
+
+function imageCategoryForReviewRow(batch: Pick<SupplierQuoteBatch, "supplierName">, category: string, description: string) {
+  const supplier = batch.supplierName.toLowerCase();
+
+  if (supplier.includes("dundy glass")) return "Glass";
+  if (supplier.includes("elite doors")) return category === "Trim" ? "Trim" : "Doors";
+  if (supplier.includes("sierra pacific")) return "Windows";
+  if (supplier.includes("source wood")) return "Flooring";
+  if (supplier.includes("designer home")) return "Appliances";
+  if (supplier.includes("prospect hardware") || supplier.includes("p. hardware")) return "Plumbing";
+  if (supplier.includes("electrical")) return description.toLowerCase().includes("led") || description.toLowerCase().includes("light") ? "Lighting" : "Electrical";
+  if (supplier.includes("lighting selections")) return "Lighting";
+  if (supplier.includes("lmg tile")) return "Tile";
+  if (supplier.includes("today's kitchen")) return "Cabinets";
+
+  return category;
+}
+
+function reviewCategoryForQuoteRow(batch: Pick<SupplierQuoteBatch, "supplierName">, row: Pick<OwnerQuoteRow, "description">) {
+  const supplier = batch.supplierName.toLowerCase();
+  const inferred = inferOwnerMaterialCategory(row.description);
+
+  if (supplier.includes("dundy glass")) return "Glass";
+  if (supplier.includes("elite doors")) return inferred === "Trim" ? "Trim" : "Doors";
+  if (supplier.includes("sierra pacific")) return "Windows";
+  if (supplier.includes("source wood")) return row.description.toLowerCase().includes("delivery") ? "Materials" : "Flooring";
+  if (supplier.includes("designer home")) return row.description.toLowerCase().includes("delivery") ? "Materials" : "Appliances";
+  if (supplier.includes("prospect hardware") || supplier.includes("p. hardware")) return row.description.toLowerCase().includes("discount") ? "Materials" : "Plumbing";
+  if (supplier.includes("electrical")) return row.description.toLowerCase().includes("led") || row.description.toLowerCase().includes("light") ? "Lighting" : "Electrical";
+  if (supplier.includes("lighting selections")) return "Lighting";
+  if (supplier.includes("lmg tile")) return row.description.toLowerCase().includes("delivery") ? "Materials" : "Tile";
+  if (supplier.includes("today's kitchen")) return "Cabinets";
+
+  return inferred;
+}
+
+export function imageMetadataForOwnerMaterial(
+  batch: Pick<SupplierQuoteBatch, "supplierName">,
+  row: Pick<OwnerQuoteRow, "description"> & { category?: string },
+): ShopProductImage {
+  const category = row.category || inferOwnerMaterialCategory(row.description);
+  return placeholderImageMetadata(imageCategoryForReviewRow(batch, category, row.description), row.description);
+}
+
 export function seededOwnerReviewBatches(): OwnerMaterialsReviewBatch[] {
   return [...supplierQuotes, ...importedSupplierQuotes].map((batch) => ({
     quoteId: batch.quoteId,
@@ -460,21 +530,32 @@ export function seededOwnerReviewBatches(): OwnerMaterialsReviewBatch[] {
     expires: batch.expires,
     customer: batch.customer,
     jobAddress: batch.jobAddress,
-    sourceFileName: "Seeded Builders FirstSource quote",
-    sourceFileKind: "manual",
+    sourceFileName: sourceFileNameForQuote(batch),
+    sourceFileKind: sourceFileNameForQuote(batch).toLowerCase().endsWith(".pdf") ? "pdf" : "manual",
     extractionStatus: "parsed",
-    rows: batch.rows.map((row, index) => ({
-      id: `${batch.quoteId}-${row.itemNo || index}`,
-      qty: row.qty,
-      itemNo: row.itemNo,
-      description: row.description,
-      unit: row.unit,
-      supplierUnitPrice: row.unitPrice,
-      markupPercent: 0,
-      markupDollar: 0,
-      finalUnitPrice: row.unitPrice,
-      category: inferOwnerMaterialCategory(row.description),
-      publish: false,
-    })),
+    rows: batch.rows.map((row, index) => {
+      const category = reviewCategoryForQuoteRow(batch, row);
+      const image = imageMetadataForOwnerMaterial(batch, { ...row, category });
+
+      return {
+        id: `${batch.quoteId}-${row.itemNo || index}`,
+        qty: row.qty,
+        itemNo: row.itemNo,
+        description: row.description,
+        unit: row.unit,
+        supplierUnitPrice: row.unitPrice,
+        markupPercent: 0,
+        markupDollar: 0,
+        finalUnitPrice: row.unitPrice,
+        category,
+        imageUrl: image.imageUrl,
+        imageAlt: image.imageAlt,
+        imageSource: image.imageSource,
+        imageLicense: image.imageLicense,
+        imageCredit: image.imageCredit,
+        imageCategory: image.imageCategory,
+        publish: false,
+      };
+    }),
   }));
 }

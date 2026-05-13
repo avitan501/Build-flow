@@ -11,6 +11,7 @@ import {
 } from "@/app/owner/materials/actions";
 import {
   buildOwnerReviewDuplicateKey,
+  imageMetadataForOwnerMaterial,
   inferOwnerMaterialCategory,
   seededOwnerReviewBatches,
   type OwnerMaterialsReviewBatch,
@@ -125,6 +126,7 @@ function parseDelimitedRows(text: string) {
         markupDollar: 0,
         finalUnitPrice: supplierUnitPrice,
         category: inferOwnerMaterialCategory(description),
+        ...imageMetadataForOwnerMaterial({ supplierName: "Uploaded Supplier" }, { description, category: inferOwnerMaterialCategory(description) }),
         publish: false,
       } satisfies OwnerMaterialsReviewRow,
     ];
@@ -159,6 +161,7 @@ function parseLooseSupplierRows(text: string, sourceId: string) {
           markupDollar: 0,
           finalUnitPrice: supplierUnitPrice,
           category: inferOwnerMaterialCategory(description),
+          ...imageMetadataForOwnerMaterial({ supplierName: "Uploaded Supplier" }, { description, category: inferOwnerMaterialCategory(description) }),
           publish: false,
         } satisfies OwnerMaterialsReviewRow,
       ];
@@ -207,6 +210,23 @@ function makeActionBatch(batch: OwnerMaterialsReviewBatch): OwnerMaterialsAction
   };
 }
 
+type OwnerMaterialsReviewRowInput = Omit<OwnerMaterialsReviewRow, "imageUrl" | "imageAlt" | "imageSource" | "imageLicense" | "imageCredit" | "imageCategory"> &
+  Partial<Pick<OwnerMaterialsReviewRow, "imageUrl" | "imageAlt" | "imageSource" | "imageLicense" | "imageCredit" | "imageCategory">>;
+
+function withImageMetadata(batch: Pick<OwnerMaterialsReviewBatch, "supplierName">, row: OwnerMaterialsReviewRowInput): OwnerMaterialsReviewRow {
+  const image = imageMetadataForOwnerMaterial(batch, row);
+
+  return {
+    ...row,
+    imageUrl: image.imageUrl,
+    imageAlt: image.imageAlt,
+    imageSource: image.imageSource,
+    imageLicense: image.imageLicense,
+    imageCredit: image.imageCredit,
+    imageCategory: image.imageCategory,
+  };
+}
+
 function reviewKey(batch: Pick<OwnerMaterialsReviewBatch, "supplierName" | "quoteDate">, row: Pick<OwnerMaterialsReviewRow, "itemNo" | "description" | "unit">) {
   return buildOwnerReviewDuplicateKey(batch, row);
 }
@@ -242,7 +262,7 @@ function loadInitialBatches() {
 }
 
 function cloneManualRow(): OwnerMaterialsReviewRow {
-  return {
+  return withImageMetadata({ supplierName: "Manual Supplier" }, {
     id: `manual-${Date.now()}`,
     qty: 1,
     itemNo: "",
@@ -253,8 +273,8 @@ function cloneManualRow(): OwnerMaterialsReviewRow {
     markupDollar: 0,
     finalUnitPrice: 0,
     category: "Materials",
-    publish: true,
-  };
+    publish: false,
+  });
 }
 
 export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Props) {
@@ -307,14 +327,14 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
       );
 
       if (existingIndex < 0) {
-        return [nextBatch, ...next];
+        return [{ ...nextBatch, rows: nextBatch.rows.map((row) => withImageMetadata(nextBatch, row)) }, ...next];
       }
 
       const existing = next[existingIndex];
-      const rowMap = new Map(existing.rows.map((row) => [reviewKey(existing, row), row]));
+      const rowMap = new Map(existing.rows.map((row) => [reviewKey(existing, row), withImageMetadata(existing, row)]));
 
       for (const row of nextBatch.rows) {
-        rowMap.set(reviewKey(nextBatch, row), row);
+        rowMap.set(reviewKey(nextBatch, row), withImageMetadata(nextBatch, row));
       }
 
       next[existingIndex] = {
@@ -346,6 +366,10 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
 
             if (recalc === "final") {
               next.markupDollar = next.finalUnitPrice - next.supplierUnitPrice * (1 + next.markupPercent / 100);
+            }
+
+            if (patch.description !== undefined || patch.category !== undefined) {
+              return withImageMetadata(batch, next);
             }
 
             return next;
