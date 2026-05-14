@@ -54,10 +54,6 @@ function formatCurrency(value: number) {
   return { dollars, cents: cents ?? "00" }
 }
 
-function categoryImage(category: string) {
-  return placeholderImageMetadata(category === "All" ? "Materials" : category, category).imageUrl
-}
-
 function MaterialsIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -286,11 +282,6 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
     trackActivity({ eventType: "category_select", category: activeCategory })
   }, [activeCategory])
 
-  const categorySummaries = SHOP_CATEGORIES.map((category) => {
-    const count = category === "All" ? products.length : products.filter((product) => product.imageCategory === category || product.category === category).length
-    return { name: category, image: categoryImage(category), count }
-  })
-
   const supplierSummaries = Object.values(
     products.reduce<Record<string, { name: string; count: number; image: string }>>((acc, product) => {
       const key = product.supplierName || product.category
@@ -461,30 +452,26 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
           </div>
         </section>
 
-        <nav aria-label="Shop categories" className="rounded-[28px] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
-          <div className="flex gap-2 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {categorySummaries.map((category) => {
-              const active = activeCategory === category.name || (!searchParams.get("category") && category.name === "All")
-              return (
-                <button
-                  key={category.name}
-                  type="button"
-                  onClick={() => setCategory(category.name)}
-                  className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition duration-200 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 ${
-                    active ? "border-sky-400 bg-sky-50 text-sky-800 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-sky-200 hover:text-sky-700"
-                  }`}
-                  aria-pressed={active}
-                >
-                  <span className="relative h-7 w-7 overflow-hidden rounded-full border border-slate-100 bg-slate-50">
-                    <Image src={category.image} alt="" fill sizes="28px" className="object-contain p-1" />
-                  </span>
-                  <span>{category.name}</span>
-                  <span className={`text-[11px] font-bold ${active ? "text-sky-600" : "text-slate-400"}`}>{category.count}</span>
-                </button>
-              )
-            })}
-          </div>
-        </nav>
+        {featuredProducts.length > 0 && !query && browseTab === "materials" ? (
+          <section className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-lg font-bold text-slate-950">Featured materials</div>
+                <div className="mt-1 text-sm text-slate-500">Popular picks for framing, finish, and rough-in work</div>
+              </div>
+              <button type="button" onClick={() => setBrowseTab("materials")} className="shrink-0 text-sm font-semibold text-sky-700">
+                View all
+              </button>
+            </div>
+            <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {featuredProducts.map((product) => (
+                <div key={`featured-${product.id}`} className="w-[220px] shrink-0">
+                  <ShopProductCard product={product} onQuickAdd={quickAdd} />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="rounded-[24px] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-4">
           <div className="mb-2 flex items-center justify-between gap-3">
@@ -620,27 +607,6 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
             </select>
           </label>
         </section>
-
-        {featuredProducts.length > 0 && !query && browseTab === "materials" ? (
-          <section className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-lg font-bold text-slate-950">Featured materials</div>
-                <div className="mt-1 text-sm text-slate-500">Popular picks for framing, finish, and rough-in work</div>
-              </div>
-              <button type="button" onClick={() => setBrowseTab("materials")} className="shrink-0 text-sm font-semibold text-sky-700">
-                View all
-              </button>
-            </div>
-            <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {featuredProducts.map((product) => (
-                <div key={`featured-${product.id}`} className="w-[220px] shrink-0">
-                  <ShopProductCard product={product} onQuickAdd={quickAdd} />
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
 
         {materialFilteredProducts.length > 0 ? (
           <section aria-label="Products" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
