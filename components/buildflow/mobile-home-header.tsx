@@ -57,7 +57,7 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
               <path d="M5 19h14" />
             </svg>
           </ActionButton>
-          <ActionButton href={aiHref} label="AI" tone="ai">
+          <ActionButton href={aiHref} label="AI" tone="ai" disabled>
             <div className="relative flex items-center text-slate-900">
               <span className="text-[1.15rem] font-semibold tracking-[-0.04em]">AI</span>
               <span className="absolute -right-1.5 -top-1 text-[0.65rem] text-fuchsia-500">✦</span>
