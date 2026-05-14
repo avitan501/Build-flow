@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { MobileMenuDrawer, type MobileMenuLink } from "@/components/buildflow/mobile-menu-drawer";
+import { placeholderImageMetadata } from "@/lib/shop-catalog";
 import { SHOP_CATEGORY_NAMES, SHOP_POPULAR_SEARCHES } from "@/lib/shop";
 import { SHOP_CART_UPDATED_EVENT, readShopCartCount } from "@/lib/shop-cart";
 
@@ -55,6 +57,15 @@ function SearchIcon() {
   );
 }
 
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
+}
+
 function CartIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -71,10 +82,27 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [shopSearchFocused, setShopSearchFocused] = useState(false);
+  const [shopSearchOpen, setShopSearchOpen] = useState(false);
+  const [draftQuery, setDraftQuery] = useState("");
   const [shopCartCount, setShopCartCount] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const isShopPage = Boolean(pathname) && pathname.startsWith("/shop");
   const isCartPage = pathname === "/cart";
   const shopQuery = isShopPage ? searchParams.get("q") ?? "" : "";
+
+  useEffect(() => {
+    if (shopSearchOpen) {
+      setDraftQuery(shopQuery);
+      const timeout = window.setTimeout(() => searchInputRef.current?.focus(), 60);
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+
+      return () => {
+        window.clearTimeout(timeout);
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [shopQuery, shopSearchOpen]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -120,18 +148,16 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
     ];
   }, [isAdmin]);
 
-  const normalizedQuery = shopQuery.trim().toLowerCase();
+  const normalizedQuery = draftQuery.trim().toLowerCase();
   const shopSuggestions = useMemo(() => {
-    if (!shopSearchFocused) return [] as string[];
     if (!normalizedQuery) return [...SHOP_CATEGORY_NAMES];
     return SHOP_CATEGORY_NAMES.filter((category) => category.toLowerCase().includes(normalizedQuery));
-  }, [normalizedQuery, shopSearchFocused]);
+  }, [normalizedQuery]);
 
   const popularSearches = useMemo(() => {
-    if (!shopSearchFocused) return [] as string[];
     if (!normalizedQuery) return [...SHOP_POPULAR_SEARCHES];
     return SHOP_POPULAR_SEARCHES.filter((term) => term.toLowerCase().includes(normalizedQuery));
-  }, [normalizedQuery, shopSearchFocused]);
+  }, [normalizedQuery]);
 
   if (!pathname || !shouldShowHeader(pathname)) {
     return null;
@@ -156,6 +182,11 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
     router.replace(queryString ? `/shop?${queryString}` : "/shop", { scroll: false });
   }
 
+  function submitShopSearch() {
+    updateShopSearch(draftQuery, undefined);
+    setShopSearchOpen(false);
+  }
+
   return (
     <>
       <div className="sticky top-0 z-[60] border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,255,0.94))] shadow-[0_8px_24px_rgba(148,163,184,0.1)] backdrop-blur">
@@ -171,79 +202,20 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
           </button>
 
           {isShopPage ? (
-            <div className="relative min-w-0 flex-1">
-              <div className={`flex min-h-10 items-center gap-2 rounded-2xl border px-3 py-2 shadow-sm transition ${shopSearchFocused || isActivePath(pathname, "/shop") ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))]" : "border-slate-200/90 bg-white/95"}`}>
-                <SearchIcon />
-                <input
-                  value={shopQuery}
-                  onChange={(event) => {
-                    const nextQuery = event.target.value;
-                    updateShopSearch(nextQuery);
-                  }}
-                  onFocus={() => setShopSearchFocused(true)}
-                  placeholder="Search materials"
-                  className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                />
-              </div>
-
-              {shopSearchFocused ? (
-                <div className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-20 overflow-hidden rounded-[24px] border border-sky-100/90 bg-white shadow-[0_18px_40px_rgba(148,163,184,0.16)]">
-                  <div className="border-b border-slate-100 bg-[linear-gradient(180deg,#f9fcff_0%,#f3f8ff_100%)] px-4 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Shop search</p>
-                        <p className="mt-1 text-sm text-slate-600">Start with a category or a common jobsite search.</p>
-                      </div>
-                      <button type="button" onClick={() => setShopSearchFocused(false)} className="text-xs font-semibold text-slate-500">
-                        Close
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 p-4 sm:grid-cols-2">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Categories</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {shopSuggestions.length > 0 ? shopSuggestions.map((category) => (
-                          <button
-                            key={category}
-                            type="button"
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => {
-                              updateShopSearch(category, category);
-                              setShopSearchFocused(false);
-                            }}
-                            className="rounded-full border border-sky-100 bg-sky-50/70 px-3 py-2 text-sm font-semibold text-sky-700"
-                          >
-                            {category}
-                          </button>
-                        )) : <p className="text-sm text-slate-500">No category suggestions match yet.</p>}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Popular searches</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {popularSearches.length > 0 ? popularSearches.map((term) => (
-                          <button
-                            key={term}
-                            type="button"
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => {
-                              updateShopSearch(term, null);
-                              setShopSearchFocused(false);
-                            }}
-                            className="rounded-full border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-sm font-semibold text-emerald-700"
-                          >
-                            {term}
-                          </button>
-                        )) : <p className="text-sm text-slate-500">No popular searches match yet.</p>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShopSearchFocused(true);
+                setShopSearchOpen(true);
+              }}
+              className={`flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-2xl border px-3 py-2 text-left shadow-sm transition ${shopSearchOpen || isActivePath(pathname, "/shop") ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))]" : "border-slate-200/90 bg-white/95"}`}
+              aria-haspopup="dialog"
+              aria-expanded={shopSearchOpen}
+              aria-controls="shop-search-overlay"
+            >
+              <SearchIcon />
+              <span className="truncate text-sm text-slate-500">{shopQuery || "Search materials"}</span>
+            </button>
           ) : (
             <Link href={searchHref} aria-label="Search materials" className="min-w-0 flex-1">
               <span className={`flex min-h-10 items-center gap-2 rounded-2xl border px-3 py-2 shadow-sm transition ${isActivePath(pathname, "/search") || isActivePath(pathname, "/shop") || isActivePath(pathname, "/materials") || isActivePath(pathname, "/quotes") || isActivePath(pathname, "/orders") ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))]" : "border-slate-200/90 bg-white/95"}`}>
@@ -283,6 +255,150 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
       </div>
 
       <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} primaryLinks={primaryLinks} adminLinks={adminLinks} isSignedIn={isSignedIn} />
+
+      {shopSearchOpen ? (
+        <div id="shop-search-overlay" role="dialog" aria-modal="true" className="fixed inset-0 z-[80] bg-white/96 backdrop-blur-sm">
+          <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-4 pb-6 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6">
+            <div className="mb-4 grid grid-cols-[48px_1fr_48px] items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setShopSearchOpen(false);
+                  setShopSearchFocused(false);
+                }}
+                className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm"
+                aria-label="Close search"
+              >
+                <CloseIcon />
+              </button>
+              <div className="text-center text-sm font-semibold tracking-[0.18em] text-slate-900">BUILDFLOW</div>
+              <div />
+            </div>
+
+            <div className="rounded-[28px] border border-slate-200 bg-white p-3 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+              <label htmlFor="shop-search-input" className="sr-only">Search materials</label>
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+                <SearchIcon />
+                <input
+                  id="shop-search-input"
+                  ref={searchInputRef}
+                  value={draftQuery}
+                  onChange={(event) => setDraftQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      submitShopSearch();
+                    }
+                  }}
+                  placeholder="Search materials"
+                  className="flex-1 bg-transparent text-base text-slate-900 outline-none placeholder:text-slate-400"
+                  autoComplete="off"
+                  enterKeyHint="search"
+                />
+                {draftQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftQuery("");
+                      searchInputRef.current?.focus();
+                    }}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500"
+                    aria-label="Clear search"
+                  >
+                    <CloseIcon />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mt-5 min-h-0 flex-1 overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
+              <div className="grid gap-4 p-2 sm:grid-cols-2">
+                <div>
+                  <div className="px-2 pb-2 pt-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Categories</div>
+                  <div className="space-y-1">
+                    {shopSuggestions.map((category) => {
+                      const image = placeholderImageMetadata(category, category).imageUrl;
+                      return (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() => {
+                            updateShopSearch(category, category);
+                            setShopSearchOpen(false);
+                            setShopSearchFocused(false);
+                          }}
+                          className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                        >
+                          <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                            <Image src={image} alt="" fill sizes="48px" className="object-contain p-1.5" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-slate-900">{category}</span>
+                            <span className="block truncate text-xs text-slate-500">Browse {category.toLowerCase()} materials</span>
+                          </span>
+                          <span className="text-slate-400"><SearchIcon /></span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="px-2 pb-2 pt-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Popular searches</div>
+                  <div className="space-y-1">
+                    {popularSearches.map((term) => {
+                      const image = placeholderImageMetadata("Materials", term).imageUrl;
+                      return (
+                        <button
+                          key={term}
+                          type="button"
+                          onClick={() => {
+                            updateShopSearch(term, null);
+                            setShopSearchOpen(false);
+                            setShopSearchFocused(false);
+                          }}
+                          className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                        >
+                          <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                            <Image src={image} alt="" fill sizes="48px" className="object-contain p-1.5" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-slate-900">{term}</span>
+                            <span className="block truncate text-xs text-slate-500">Search this material</span>
+                          </span>
+                          <span className="text-slate-400"><SearchIcon /></span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftQuery("");
+                  updateShopSearch("", null);
+                  setShopSearchOpen(false);
+                  setShopSearchFocused(false);
+                }}
+                className="flex-1 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={submitShopSearch}
+                className="flex-1 rounded-full bg-sky-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(2,132,199,0.25)] transition hover:bg-sky-700"
+              >
+                Search
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
