@@ -1,117 +1,140 @@
 import Link from "next/link";
 
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
-import { JourneyStrip, statusButtonClass, statusClasses } from "@/components/buildflow/wireframe";
-import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
+import { MobileHomeHeader } from "@/components/buildflow/mobile-home-header";
+import { getSessionWithProfile } from "@/lib/auth";
 
-export default function Home() {
-  const { specMap } = getBuildflowWireframeData();
-  const home = specMap.get("home");
-  const dashboard = specMap.get("dashboard");
+const flowSteps = [
+  {
+    title: "Create Project",
+    number: "1",
+    text: "Open the project and keep the basics in one place.",
+  },
+  {
+    title: "Upload Plans",
+    number: "2",
+    text: "Send drawings, photos, and notes from the field.",
+  },
+  {
+    title: "Review Materials & Quote",
+    number: "3",
+    text: "See what is needed before anything moves forward.",
+  },
+  {
+    title: "Approve Order",
+    number: "4",
+    text: "Stay in control before any order is confirmed.",
+  },
+];
 
-  if (!home || !dashboard) {
-    throw new Error("Missing BuildFlow wireframe route data.");
-  }
+const featureCards = [
+  {
+    eyebrow: "Projects",
+    title: "Organize jobs clearly",
+    body: "Keep job details, address, timeline, and client info ready before uploads begin.",
+    hrefKey: "projects" as const,
+    accent: "from-sky-100 via-white to-blue-50",
+    iconBg: "bg-sky-600",
+  },
+  {
+    eyebrow: "Uploads",
+    title: "Collect plans fast",
+    body: "Send plans, photos, and documents so the next material step has the right context.",
+    hrefKey: "upload" as const,
+    accent: "from-cyan-50 via-white to-sky-50",
+    iconBg: "bg-cyan-500",
+  },
+  {
+    eyebrow: "Orders",
+    title: "Review with confidence",
+    body: "Review quotes, approve orders, and keep project decisions lined up in one flow.",
+    hrefKey: "orders" as const,
+    accent: "from-amber-50 via-white to-orange-50",
+    iconBg: "bg-amber-500",
+  },
+];
 
-  const authTone = statusClasses(dashboard.status);
-  const whatsappTone = statusClasses(specMap.get("admin-whatsapp")?.status || "Preview");
-  const ordersTone = statusClasses(specMap.get("orders")?.status || "Coming Soon");
+export default async function Home() {
+  const { user } = await getSessionWithProfile();
+  const isSignedIn = Boolean(user);
+  const gatedHref = isSignedIn ? null : "/login";
+  const projectsHref = gatedHref ?? "/projects";
+  const uploadHref = gatedHref ?? "/upload";
+  const ordersHref = gatedHref ?? "/orders";
+  const shopHref = gatedHref ?? "/shop";
+
+  const hrefs = {
+    projects: projectsHref,
+    upload: uploadHref,
+    orders: ordersHref,
+  };
 
   return (
-    <main className="min-h-screen bg-[#f5f7fb] text-slate-900">
+    <main className="min-h-screen overflow-x-clip bg-[linear-gradient(180deg,#f7fbff_0%,#eef6ff_45%,#ffffff_100%)] text-slate-900">
       <RecoveryLinkHandler />
-      <section className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-10 sm:px-8 lg:px-10">
-        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <div className="max-w-4xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">BuildFlow</p>
-            <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">A clear client entry point for projects, plans, and materials</h1>
-            <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-              Start with account access first. Once you log in or create an account, BuildFlow guides you through project setup, plan upload, materials review, quote review, order approval, and delivery tracking.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-[0.16em]">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Public / Client</span>
-              <span className={`rounded-full border px-3 py-1 ${authTone.badge}`}>Login-first client flow</span>
-              <span className={`rounded-full border px-3 py-1 ${ordersTone.badge}`}>Protected project journey</span>
-              <span className={`rounded-full border px-3 py-1 ${whatsappTone.badge}`}>Internal ops kept separate</span>
-            </div>
-          </div>
-        </section>
 
-        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold">After login journey overview</h2>
-              <p className="mt-1 text-sm text-slate-500">Guests start with account access first, then move through the protected client workflow.</p>
-            </div>
-          </div>
-          <div className="mt-5">
-            <JourneyStrip activeStep={0} />
-          </div>
-        </section>
+      <section className="relative mx-auto flex min-h-screen max-w-4xl flex-col gap-5 px-4 pb-28 pt-4 sm:gap-6 sm:px-8 sm:pb-12 sm:pt-8">
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(circle_at_top,_rgba(125,211,252,0.18),_transparent_58%)]" />
+        <MobileHomeHeader uploadHref={uploadHref} aiHref="/ai" />
 
-        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
+        <section className="rounded-[30px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,247,255,0.92))] px-5 py-5 shadow-[0_20px_50px_rgba(148,163,184,0.12)] sm:px-6 sm:py-6">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">Start here</h2>
-              <p className="mt-1 text-sm text-slate-500">For guests, the first step is account access. Project work begins after login.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">How BuildFlow works</p>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">One clear path from project setup to approval</h2>
             </div>
+            <span className="shrink-0 rounded-full border border-sky-100 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 shadow-sm">4 steps</span>
           </div>
-          <div className="mt-5 grid gap-3 lg:grid-cols-2">
-            <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Primary action</div>
-              <Link href="/start-project" className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
-                Log in to Start Project
-              </Link>
-              <p className="mt-3 text-sm leading-6 text-emerald-900">Guests are routed into the protected client flow before creating projects or uploading plans.</p>
-            </div>
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Need access?</div>
-              <Link href="/signup" className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100">
-                Create Account
-              </Link>
-              <p className="mt-3 text-sm leading-6 text-slate-600">New clients can create an account first, then continue into the same guided project flow.</p>
-            </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {flowSteps.map((step) => (
+              <div key={step.number} className="rounded-[26px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(241,247,255,0.82))] px-4 py-4 shadow-[0_12px_28px_rgba(148,163,184,0.08)]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[linear-gradient(180deg,#0f315f_0%,#17457b_100%)] text-xs font-semibold text-white shadow-[0_10px_20px_rgba(14,35,65,0.18)]">{step.number}</div>
+                <p className="mt-3 text-sm font-semibold text-slate-900">{step.title}</p>
+                <p className="mt-1.5 text-xs leading-5 text-slate-600">{step.text}</p>
+              </div>
+            ))}
           </div>
         </section>
 
         <section className="grid gap-4 lg:grid-cols-3">
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Client entry</div>
-            <h2 className="mt-2 text-lg font-semibold">For guests starting the process</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600">The homepage should explain how to get access first, then continue into the protected project workflow.</p>
-          </article>
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">After login</div>
-            <h2 className="mt-2 text-lg font-semibold">For the actual working client journey</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600">Project setup, uploads, materials, quotes, and orders belong inside the signed-in client flow.</p>
-          </article>
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Protected operations</div>
-            <h2 className="mt-2 text-lg font-semibold">Kept separate from public onboarding</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600">Internal tools and operations stay out of the public homepage so the client entry path stays calm and clear.</p>
-          </article>
+          {featureCards.map((card) => (
+            <article key={card.title} className={`min-w-0 rounded-[28px] border border-sky-100 bg-gradient-to-br ${card.accent} p-5 shadow-[0_18px_40px_rgba(148,163,184,0.1)] sm:p-6`}>
+              <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${card.iconBg} text-white shadow-[0_12px_24px_rgba(148,163,184,0.16)]`}>
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 19h16" />
+                  <path d="M5 19V9l7-4 7 4v10" />
+                  <path d="M9 19v-5h6v5" />
+                </svg>
+              </div>
+              <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{card.eyebrow}</p>
+              <h3 className="mt-2 text-lg font-semibold text-slate-950">{card.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{card.body}</p>
+              <Link href={hrefs[card.hrefKey]} className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-[#0e2341] underline underline-offset-4 active:scale-[0.99]">
+                Log in to view {card.eyebrow.toLowerCase()}
+              </Link>
+            </article>
+          ))}
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">After login steps</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">These steps are part of the signed-in client journey and are shown here only as a simple overview.</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <div className={statusButtonClass("Preview", true)}>Start Project</div>
-              <div className={statusButtonClass("Coming Soon", true)}>Upload Plans</div>
-              <div className={statusButtonClass("Coming Soon", true)}>Review Materials</div>
-              <div className={statusButtonClass("Coming Soon", true)}>Review Quote</div>
-              <div className={statusButtonClass(home.actions[3]?.status || "Coming Soon", true)}>Approve Order</div>
-              <div className={statusButtonClass("Preview", true)}>Track Delivery</div>
-            </div>
-          </article>
+        <section className="rounded-[28px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(232,243,255,0.88))] p-5 shadow-[0_18px_46px_rgba(148,163,184,0.12)] sm:p-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Search materials</p>
+          <h3 className="mt-2 text-lg font-semibold text-slate-950">Find what you need after login</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Search materials we supply or have, then keep your selections connected to the project flow.</p>
+          <div className="mt-4 flex min-h-14 items-center gap-3 rounded-[20px] border border-sky-100 bg-white px-4 py-3 text-slate-900 shadow-[0_12px_26px_rgba(148,163,184,0.1)]">
+            <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <span className="text-sm text-slate-500">Log in to search materials we supply or have</span>
+          </div>
+          <Link href={shopHref} className="mt-4 inline-flex text-sm font-semibold text-sky-700 underline underline-offset-4 active:scale-[0.99]">
+            Open search after login
+          </Link>
+        </section>
 
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">How guests should begin</h2>
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-              Use <span className="font-semibold text-slate-900">Log in to Start Project</span> if you already have access, or <span className="font-semibold text-slate-900">Create Account</span> if you need a new client login before entering the protected workflow.
-            </div>
-          </article>
+        <section className="rounded-[24px] border border-sky-100 bg-white px-5 py-4 text-center shadow-[0_12px_28px_rgba(148,163,184,0.08)]">
+          <p className="text-sm font-medium text-slate-700">Nothing is ordered, charged, or sent without approval.</p>
         </section>
       </section>
     </main>
