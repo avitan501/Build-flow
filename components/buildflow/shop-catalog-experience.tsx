@@ -428,6 +428,39 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   return (
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
+        <section className="rounded-[24px] bg-white p-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-3">
+          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {[
+              { key: "materials", label: "Materials", icon: MaterialsIcon },
+              { key: "services", label: "Services", icon: ServiceIcon },
+              { key: "deals", label: "Deals", icon: TagIcon },
+              { key: "suppliers", label: "Suppliers", icon: TruckIcon },
+              { key: "saved", label: "Saved", icon: BookmarkIcon },
+              { key: "cart", label: "Cart", icon: CartIcon },
+            ].map((tab) => {
+              const active = browseTab === tab.key
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => activateTab(tab.key as BrowseTab)}
+                  className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${
+                    active ? "border-sky-300 bg-sky-50 text-sky-800" : "border-slate-200 bg-white text-slate-700 shadow-sm"
+                  }`}
+                >
+                  <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${active ? "bg-sky-100 text-sky-700" : "bg-slate-100 text-slate-700"}`}>
+                    <Icon {...(tab.key === "saved" ? { filled: active || savedIds.length > 0 } : {})} />
+                  </span>
+                  <span>{tab.label}</span>
+                  {tab.key === "cart" ? <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-600">{cartCount}</span> : null}
+                  {tab.key === "saved" && savedIds.length > 0 ? <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-600">{savedIds.length}</span> : null}
+                </button>
+              )
+            })}
+          </div>
+        </section>
+
         <nav aria-label="Shop categories" className="rounded-[28px] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
           <div className="flex gap-2 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {categorySummaries.map((category) => {
@@ -459,6 +492,9 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
               <div className="text-sm font-semibold text-slate-900">Suggested for you</div>
               <div className="text-xs text-slate-500">Based on your recent shop activity</div>
             </div>
+            <button type="button" onClick={() => setBrowseTab("materials")} className="shrink-0 text-sm font-semibold text-sky-700">
+              Browse all
+            </button>
           </div>
           <div className="flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {suggestedProducts.slice(0, 4).map((product) => (
@@ -587,8 +623,15 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
 
         {featuredProducts.length > 0 && !query && browseTab === "materials" ? (
           <section className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
-            <div className="text-lg font-bold text-slate-950">Featured materials</div>
-            <div className="mt-1 text-sm text-slate-500">Popular picks for framing, finish, and rough-in work</div>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-lg font-bold text-slate-950">Featured materials</div>
+                <div className="mt-1 text-sm text-slate-500">Popular picks for framing, finish, and rough-in work</div>
+              </div>
+              <button type="button" onClick={() => setBrowseTab("materials")} className="shrink-0 text-sm font-semibold text-sky-700">
+                View all
+              </button>
+            </div>
             <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {featuredProducts.map((product) => (
                 <div key={`featured-${product.id}`} className="w-[220px] shrink-0">
