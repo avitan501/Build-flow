@@ -676,94 +676,103 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
   const documentSummary = `${activeBatch.supplierName || "No supplier"} / ${activeBatch.quoteNumber || activeBatch.sourceFileName || "No document"} / ${activeBatch.quoteDate || "No date"}`;
 
   return (
-    <div className="space-y-4">
-      <section className="sticky top-20 z-20 rounded-lg border border-slate-200 bg-white p-4 shadow-sm xl:p-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight text-slate-950">Material Admin</h1>
-            <p className="mt-1 truncate text-sm text-slate-600">{documentSummary}</p>
+    <div className="space-y-3">
+      <section className="sticky top-20 z-20 rounded-lg border border-slate-200 bg-white p-3 shadow-sm xl:p-4">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-lg font-semibold tracking-tight text-slate-950">Material Admin</h1>
+              <p className="mt-0.5 truncate text-xs text-slate-500">{documentSummary}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5 xl:min-w-[520px]">
+              <div className="rounded-md border border-slate-200 px-3 py-2">
+                <div className="text-[11px] text-slate-500">Draft</div>
+                <div className="font-semibold">{activeReviewCount}</div>
+              </div>
+              <div className="rounded-md border border-slate-200 px-3 py-2">
+                <div className="text-[11px] text-slate-500">Published</div>
+                <div className="font-semibold">{activePublishedCount}</div>
+              </div>
+              <div className="rounded-md border border-slate-200 px-3 py-2">
+                <div className="text-[11px] text-slate-500">Selected</div>
+                <div className="font-semibold">{selectedCount}</div>
+              </div>
+              <div className="rounded-md border border-slate-200 px-3 py-2">
+                <div className="text-[11px] text-slate-500">Rows</div>
+                <div className="font-semibold">{totalRows}</div>
+              </div>
+              <div className="rounded-md border border-slate-200 px-3 py-2">
+                <div className="text-[11px] text-slate-500">Client total</div>
+                <div className="font-semibold">{money(clientTotal)}</div>
+              </div>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
-            <div className="rounded-md border border-slate-200 px-3 py-2">
-              <div className="text-xs text-slate-500">Total rows</div>
-              <div className="font-semibold">{totalRows}</div>
+
+          <div className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr_auto] xl:items-end">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <label className="grid gap-1 text-sm">
+                <span className="text-xs font-medium text-slate-600">Supplier</span>
+                <input value={supplierName} onChange={(event) => setSupplierName(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" />
+              </label>
+              <label className="grid gap-1 text-sm">
+                <span className="text-xs font-medium text-slate-600">Quote #</span>
+                <input value={quoteNumber} onChange={(event) => setQuoteNumber(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" />
+              </label>
+              <label className="grid gap-1 text-sm">
+                <span className="text-xs font-medium text-slate-600">Quote date</span>
+                <input type="date" value={quoteDate} onChange={(event) => setQuoteDate(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" />
+              </label>
             </div>
-            <div className="rounded-md border border-slate-200 px-3 py-2">
-              <div className="text-xs text-slate-500">Selected</div>
-              <div className="font-semibold">{selectedCount}</div>
+
+            <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-2.5">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input ref={fileInputRef} type="file" accept=".csv,.txt,.pdf,.xls,.xlsx" className="block w-full text-xs text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white" />
+                <button type="button" onClick={prepareReview} className="rounded-md bg-slate-950 px-3 py-2 text-xs font-semibold text-white">
+                  Import file
+                </button>
+              </div>
+              <p className={`mt-2 text-xs ${parseStatus.tone === "error" ? "text-red-700" : parseStatus.tone === "success" ? "text-emerald-700" : "text-slate-600"}`}>
+                {parseStatus.message}
+              </p>
             </div>
-            <div className="rounded-md border border-slate-200 px-3 py-2">
-              <div className="text-xs text-slate-500">Review</div>
-              <div className="font-semibold">{activeReviewCount}</div>
+
+            <div className="flex flex-wrap gap-2 xl:justify-end">
+              <button type="button" onClick={addManualRow} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800">
+                Add item
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!activeBatch) return;
+                  const allSelected = activeBatch.rows.every((row) => row.publish);
+                  setBatches((current) =>
+                    current.map((batch) =>
+                      batch.quoteId === activeBatch.quoteId ? { ...batch, rows: batch.rows.map((row) => ({ ...row, publish: !allSelected })) } : batch,
+                    ),
+                  );
+                }}
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+              >
+                {activeBatch.rows.every((row) => row.publish) ? "Clear" : "Select all"}
+              </button>
+              <button type="button" onClick={() => runAction("save")} disabled={isPending} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60">
+                Save
+              </button>
+              <button type="button" onClick={() => runAction("publish")} disabled={isPending || selectedCount === 0} className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                Publish selected
+              </button>
             </div>
-            <div className="rounded-md border border-slate-200 px-3 py-2">
-              <div className="text-xs text-slate-500">Published</div>
-              <div className="font-semibold">{activePublishedCount}</div>
-            </div>
-            <div className="rounded-md border border-slate-200 px-3 py-2">
-              <div className="text-xs text-slate-500">Client total</div>
-              <div className="font-semibold">{money(clientTotal)}</div>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={addManualRow} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800">
-              Add item
-            </button>
-            <button type="button" onClick={prepareReview} className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white">
-              Import file
-            </button>
-            <button type="button" onClick={() => runAction("save")} disabled={isPending} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60">
-              Save edits
-            </button>
-            <button type="button" onClick={() => runAction("publish")} disabled={isPending || selectedCount === 0} className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
-              Publish selected
-            </button>
-            <button type="button" onClick={() => runAction("archive")} disabled={isPending || selectedCount === 0} className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-60">
-              Unpublish/archive
-            </button>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[0.82fr_1.18fr]">
-        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Supplier document</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <label className="grid gap-1 text-sm">
-              <span className="font-medium text-slate-700">Supplier</span>
-              <input value={supplierName} onChange={(event) => setSupplierName(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" />
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-medium text-slate-700">Quote #</span>
-              <input value={quoteNumber} onChange={(event) => setQuoteNumber(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" />
-            </label>
-            <label className="grid gap-1 text-sm">
-              <span className="font-medium text-slate-700">Quote date</span>
-              <input type="date" value={quoteDate} onChange={(event) => setQuoteDate(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2" />
-            </label>
-          </div>
-          <div className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
-            <input ref={fileInputRef} type="file" accept=".csv,.txt,.pdf,.xls,.xlsx" className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white" />
-            <p className={`mt-2 text-sm ${parseStatus.tone === "error" ? "text-red-700" : parseStatus.tone === "success" ? "text-emerald-700" : "text-slate-600"}`}>
-              {parseStatus.message}
-            </p>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={prepareReview} className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
-              Import file
-            </button>
-            <button type="button" onClick={addManualRow} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800">
-              Add item
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="grid gap-3 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Quote batches</h2>
-            <span className="text-xs font-medium text-slate-500">{savedEstimateLabel}</span>
+            <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Quote batches</h2>
+            <span className="text-[11px] font-medium text-slate-500">{savedEstimateLabel}</span>
           </div>
-          <div className="mt-3 grid max-h-64 gap-2 overflow-y-auto">
+          <div className="mt-3 grid max-h-[60vh] gap-2 overflow-y-auto">
             {summaries.map((batch) => (
               <button
                 key={batch.quoteId}
@@ -772,11 +781,11 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
                 className={`rounded-md border px-3 py-2 text-left text-sm ${batch.quoteId === activeBatch.quoteId ? "border-slate-900 bg-slate-100" : "border-slate-200 bg-white hover:bg-slate-50"}`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="font-semibold text-slate-950">{batch.supplierName}</div>
-                    <div className="mt-0.5 text-slate-600">Quote {batch.quoteNumber || "—"} · {batch.quoteDate || "No date"}</div>
+                  <div className="min-w-0">
+                    <div className="truncate font-semibold text-slate-950">{batch.supplierName}</div>
+                    <div className="mt-0.5 truncate text-xs text-slate-600">Quote {batch.quoteNumber || "—"} · {batch.quoteDate || "No date"}</div>
                   </div>
-                  <div className="text-right text-slate-600">
+                  <div className="text-right text-xs text-slate-600">
                     <div>{batch.rows.length} rows</div>
                     <div>{money(batch.total)}</div>
                   </div>
@@ -785,51 +794,22 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
             ))}
           </div>
         </div>
-      </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm xl:p-5">
-        <div className="flex flex-wrap items-end justify-between gap-3 xl:sticky xl:top-[10.5rem] xl:z-10 xl:mb-4 xl:rounded-xl xl:border xl:border-slate-200 xl:bg-white xl:p-4 xl:shadow-sm">
-          <div className="grid gap-3 sm:grid-cols-3 xl:flex-1 xl:grid-cols-3">
+        <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm xl:p-4">
+          <div className="mb-3 grid gap-2 sm:grid-cols-3">
             <label className="grid gap-1 text-sm">
-              <span className="font-medium text-slate-700">Supplier name</span>
+              <span className="text-xs font-medium text-slate-600">Supplier name</span>
               <input value={activeBatch.supplierName} onChange={(event) => setActiveBatchPatch({ supplierName: event.target.value })} className="rounded-md border border-slate-300 px-3 py-2" />
             </label>
             <label className="grid gap-1 text-sm">
-              <span className="font-medium text-slate-700">Quote number</span>
+              <span className="text-xs font-medium text-slate-600">Quote number</span>
               <input value={activeBatch.quoteNumber} onChange={(event) => setActiveBatchPatch({ quoteNumber: event.target.value })} className="rounded-md border border-slate-300 px-3 py-2" />
             </label>
             <label className="grid gap-1 text-sm">
-              <span className="font-medium text-slate-700">Quote/estimate date</span>
+              <span className="text-xs font-medium text-slate-600">Quote/estimate date</span>
               <input type="date" value={activeBatch.quoteDate} onChange={(event) => setActiveBatchPatch({ quoteDate: event.target.value })} className="rounded-md border border-slate-300 px-3 py-2" />
             </label>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (!activeBatch) return;
-                const allSelected = activeBatch.rows.every((row) => row.publish);
-                setBatches((current) =>
-                  current.map((batch) =>
-                    batch.quoteId === activeBatch.quoteId ? { ...batch, rows: batch.rows.map((row) => ({ ...row, publish: !allSelected })) } : batch,
-                  ),
-                );
-              }}
-              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
-            >
-              {activeBatch.rows.every((row) => row.publish) ? "Clear selection" : "Select all"}
-            </button>
-            <button type="button" onClick={() => runAction("save")} disabled={isPending} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-60">
-              Save edits
-            </button>
-            <button type="button" onClick={() => runAction("publish")} disabled={isPending || selectedCount === 0} className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-              Publish selected
-            </button>
-            <button type="button" onClick={() => runAction("archive")} disabled={isPending || selectedCount === 0} className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 disabled:opacity-60">
-              Unpublish/archive
-            </button>
-          </div>
-        </div>
 
         {actionResult ? (
           <div className={`mt-3 rounded-md border px-3 py-2 text-sm ${actionResult.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>
@@ -837,9 +817,9 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
           </div>
         ) : null}
 
-        <div className="mt-4 overflow-x-auto xl:overflow-x-auto">
-          <table className="min-w-[1380px] w-full border-collapse text-left text-sm xl:min-w-[1500px]">
-            <thead className="bg-slate-100 text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+        <div className="overflow-x-auto xl:overflow-x-auto">
+          <table className="min-w-[1240px] w-full border-collapse text-left text-sm xl:min-w-[1360px]">
+            <thead className="bg-slate-100 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
               <tr>
                 <th className="border border-slate-200 px-2 py-2">Select</th>
                 <th className="border border-slate-200 px-2 py-2">Item no</th>
@@ -863,104 +843,102 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
                 return (
                   <Fragment key={row.id}>
                     <tr className="align-top">
-                      <td className="border border-slate-200 px-2 py-2 text-center">
+                      <td className="border border-slate-200 px-2 py-1.5 text-center">
                         <input type="checkbox" checked={row.publish} onChange={(event) => updateRow(row.id, { publish: event.target.checked })} />
                       </td>
-                      <td className="border border-slate-200 px-2 py-2">
-                        <input value={row.itemNo} onChange={(event) => updateRow(row.id, { itemNo: event.target.value })} className="w-28 rounded border border-slate-300 px-2 py-1" />
+                      <td className="border border-slate-200 px-2 py-1.5">
+                        <input value={row.itemNo} onChange={(event) => updateRow(row.id, { itemNo: event.target.value })} className="w-24 rounded border border-slate-300 px-2 py-1" />
                       </td>
-                      <td className="border border-slate-200 px-2 py-2">
-                        <textarea value={row.description} onChange={(event) => updateRow(row.id, { description: event.target.value, category: inferOwnerMaterialCategory(event.target.value) })} className="min-h-9 w-72 rounded border border-slate-300 px-2 py-1" />
+                      <td className="border border-slate-200 px-2 py-1.5">
+                        <textarea value={row.description} onChange={(event) => updateRow(row.id, { description: event.target.value, category: inferOwnerMaterialCategory(event.target.value) })} className="min-h-8 w-64 rounded border border-slate-300 px-2 py-1 leading-5" />
                       </td>
-                      <td className="border border-slate-200 px-2 py-2">
-                        <select value={row.category} onChange={(event) => updateRow(row.id, { category: event.target.value })} className="w-36 rounded border border-slate-300 px-2 py-1">
+                      <td className="border border-slate-200 px-2 py-1.5">
+                        <select value={row.category} onChange={(event) => updateRow(row.id, { category: event.target.value })} className="w-32 rounded border border-slate-300 px-2 py-1">
                           {SHOP_CATEGORY_NAMES.map((category) => (
                             <option key={category} value={category}>{category}</option>
                           ))}
                         </select>
                       </td>
-                      <td className="border border-slate-200 px-2 py-2">
-                        <input type="number" step="0.001" value={numeric(row.qty)} onChange={(event) => updateRow(row.id, { qty: Number(event.target.value || 0) })} className="w-20 rounded border border-slate-300 px-2 py-1" />
+                      <td className="border border-slate-200 px-2 py-1.5">
+                        <input type="number" step="0.001" value={numeric(row.qty)} onChange={(event) => updateRow(row.id, { qty: Number(event.target.value || 0) })} className="w-16 rounded border border-slate-300 px-2 py-1" />
                       </td>
-                      <td className="border border-slate-200 px-2 py-2">
-                        <input value={row.unit} onChange={(event) => updateRow(row.id, { unit: event.target.value })} className="w-20 rounded border border-slate-300 px-2 py-1" />
+                      <td className="border border-slate-200 px-2 py-1.5">
+                        <input value={row.unit} onChange={(event) => updateRow(row.id, { unit: event.target.value })} className="w-16 rounded border border-slate-300 px-2 py-1" />
                       </td>
-                      <td className="border border-slate-200 px-2 py-2">
-                        <input type="number" step="0.01" value={numeric(row.supplierUnitPrice)} onChange={(event) => updateRow(row.id, { supplierUnitPrice: Number(event.target.value || 0) }, "markup")} className="w-28 rounded border border-slate-300 px-2 py-1" />
+                      <td className="border border-slate-200 px-2 py-1.5">
+                        <input type="number" step="0.01" value={numeric(row.supplierUnitPrice)} onChange={(event) => updateRow(row.id, { supplierUnitPrice: Number(event.target.value || 0) }, "markup")} className="w-24 rounded border border-slate-300 px-2 py-1" />
                       </td>
-                      <td className="border border-slate-200 px-2 py-2">
-                        <input type="number" step="0.01" value={numeric(row.markupPercent)} onChange={(event) => updateRow(row.id, { markupPercent: Number(event.target.value || 0) }, "markup")} className="w-24 rounded border border-slate-300 px-2 py-1" />
+                      <td className="border border-slate-200 px-2 py-1.5">
+                        <input type="number" step="0.01" value={numeric(row.markupPercent)} onChange={(event) => updateRow(row.id, { markupPercent: Number(event.target.value || 0) }, "markup")} className="w-20 rounded border border-slate-300 px-2 py-1" />
                       </td>
-                      <td className="border border-slate-200 px-2 py-2">
-                        <input type="number" step="0.01" value={numeric(row.finalUnitPrice)} onChange={(event) => updateRow(row.id, { finalUnitPrice: Number(event.target.value || 0) }, "final")} className="w-28 rounded border border-slate-300 px-2 py-1" />
+                      <td className="border border-slate-200 px-2 py-1.5">
+                        <input type="number" step="0.01" value={numeric(row.finalUnitPrice)} onChange={(event) => updateRow(row.id, { finalUnitPrice: Number(event.target.value || 0) }, "final")} className="w-24 rounded border border-slate-300 px-2 py-1" />
                       </td>
-                      <td className="border border-slate-200 px-2 py-2">
+                      <td className="border border-slate-200 px-2 py-1.5">
                         <span className={`rounded-full px-2 py-1 text-xs font-semibold ${isPublished ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>
                           {isPublished ? "Published" : "Review"}
                         </span>
                       </td>
-                      <td className="border border-slate-200 px-2 py-2 font-medium text-slate-900">{money(row.qty * row.finalUnitPrice)}</td>
-                      <td className="border border-slate-200 px-2 py-2">
-                        <button type="button" onClick={() => removeRow(row.id)} className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700">
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td colSpan={12} className="border border-slate-200 bg-slate-50 px-3 py-3">
-                        <div className="grid gap-3 xl:grid-cols-[1.35fr_0.65fr]">
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-semibold text-slate-900">Photos</div>
-                                <div className="text-xs text-slate-500">Primary image powers the shop card. Additional photos appear in product detail thumbnails.</div>
-                              </div>
-                              <div className="text-xs text-slate-500">{row.photoGallery.length} photo{row.photoGallery.length === 1 ? "" : "s"}</div>
-                            </div>
-                            <div className="flex flex-wrap gap-3">
-                              {row.photoGallery.map((photo, index) => (
-                                <div key={`${row.id}-${photo.imageUrl}-${index}`} className="w-28 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
-                                  <img src={photo.imageUrl} alt={photo.imageAlt} className="h-20 w-full rounded object-cover" />
-                                  <div className="mt-2 line-clamp-2 text-[11px] text-slate-600">{photo.imageAlt}</div>
-                                  <div className="mt-2 flex flex-wrap gap-1">
-                                    <button type="button" onClick={() => setPrimaryPhoto(row.id, photo)} className="rounded border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700">
-                                      {index === 0 ? "Primary" : "Make primary"}
-                                    </button>
-                                    <button type="button" onClick={() => removePhotoFromRow(row.id, photo.imageUrl)} className="rounded border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-700">
-                                      Remove
-                                    </button>
+                      <td className="border border-slate-200 px-2 py-1.5 font-medium text-slate-900">{money(row.qty * row.finalUnitPrice)}</td>
+                      <td className="border border-slate-200 px-2 py-1.5">
+                        <div className="flex flex-wrap gap-1.5">
+                          <details className="group">
+                            <summary className="cursor-pointer list-none rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700">Edit</summary>
+                            <div className="mt-2 w-[520px] max-w-[70vw] rounded-lg border border-slate-200 bg-slate-50 p-3 shadow-lg">
+                              <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                                <div>
+                                  <div className="mb-2 flex items-center justify-between gap-3">
+                                    <div className="text-sm font-semibold text-slate-900">Photos</div>
+                                    <div className="text-xs text-slate-500">{row.photoGallery.length} photo{row.photoGallery.length === 1 ? "" : "s"}</div>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {row.photoGallery.map((photo, index) => (
+                                      <div key={`${row.id}-${photo.imageUrl}-${index}`} className="w-[72px] rounded-md border border-slate-200 bg-white p-1.5">
+                                        <img src={photo.imageUrl} alt={photo.imageAlt} className="h-14 w-full rounded object-cover" />
+                                        <div className="mt-1 flex flex-col gap-1">
+                                          <button type="button" onClick={() => setPrimaryPhoto(row.id, photo)} className="rounded border border-slate-300 px-1 py-0.5 text-[10px] font-semibold text-slate-700">
+                                            {index === 0 ? "Primary" : "Primary"}
+                                          </button>
+                                          <button type="button" onClick={() => removePhotoFromRow(row.id, photo.imageUrl)} className="rounded border border-red-200 px-1 py-0.5 text-[10px] font-semibold text-red-700">
+                                            Remove
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
-                            <label className="grid gap-1 text-sm">
-                              <span className="font-medium text-slate-700">Upload photos</span>
-                              <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => void handlePhotoUpload(row.id, event.target.files)} className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white" />
-                              <span className="text-xs text-slate-500">Staged in-browser for now if storage is not configured.</span>
-                            </label>
-                            <label className="grid gap-1 text-sm">
-                              <span className="font-medium text-slate-700">Add public image URL</span>
-                              <div className="flex gap-2">
-                                <input value={photoUrlDrafts[row.id] ?? ""} onChange={(event) => setPhotoUrlDrafts((current) => ({ ...current, [row.id]: event.target.value }))} placeholder="https://..." className="flex-1 rounded-md border border-slate-300 px-3 py-2" />
-                                <button type="button" onClick={() => addPhotoUrl(row.id)} className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800">Add</button>
+                                <div className="space-y-2 rounded-md border border-slate-200 bg-white p-2.5">
+                                  <label className="grid gap-1 text-xs">
+                                    <span className="font-medium text-slate-700">Upload</span>
+                                    <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => void handlePhotoUpload(row.id, event.target.files)} className="block w-full text-[11px] text-slate-700 file:mr-2 file:rounded-md file:border-0 file:bg-slate-900 file:px-2 file:py-1.5 file:text-[11px] file:font-semibold file:text-white" />
+                                  </label>
+                                  <label className="grid gap-1 text-xs">
+                                    <span className="font-medium text-slate-700">Image URL</span>
+                                    <div className="flex gap-2">
+                                      <input value={photoUrlDrafts[row.id] ?? ""} onChange={(event) => setPhotoUrlDrafts((current) => ({ ...current, [row.id]: event.target.value }))} placeholder="https://..." className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1.5" />
+                                      <button type="button" onClick={() => addPhotoUrl(row.id)} className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800">Add</button>
+                                    </div>
+                                  </label>
+                                  <label className="grid gap-1 text-xs">
+                                    <span className="font-medium text-slate-700">Local photo</span>
+                                    <select defaultValue="" onChange={(event) => {
+                                      if (!event.target.value) return;
+                                      applyCatalogPhoto(row.id, event.target.value);
+                                      event.target.value = "";
+                                    }} className="rounded-md border border-slate-300 px-2 py-1.5">
+                                      <option value="">Choose…</option>
+                                      {MATERIAL_REAL_PHOTO_OPTIONS.map((photo) => (
+                                        <option key={`${row.id}-${photo.imageUrl}`} value={photo.imageUrl}>{photo.category} · {photo.imageCredit}</option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                </div>
                               </div>
-                            </label>
-                            <label className="grid gap-1 text-sm">
-                              <span className="font-medium text-slate-700">Use existing local material photo</span>
-                              <select defaultValue="" onChange={(event) => {
-                                if (!event.target.value) return;
-                                applyCatalogPhoto(row.id, event.target.value);
-                                event.target.value = "";
-                              }} className="rounded-md border border-slate-300 px-3 py-2">
-                                <option value="">Choose a local photo…</option>
-                                {MATERIAL_REAL_PHOTO_OPTIONS.map((photo) => (
-                                  <option key={`${row.id}-${photo.imageUrl}`} value={photo.imageUrl}>{photo.category} · {photo.imageCredit}</option>
-                                ))}
-                              </select>
-                            </label>
-                          </div>
+                            </div>
+                          </details>
+                          <button type="button" onClick={() => removeRow(row.id)} className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700">
+                            Remove
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -970,6 +948,7 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
             </tbody>
           </table>
         </div>
+        </section>
       </section>
     </div>
   );
