@@ -45,6 +45,68 @@ type ProductSeed = Omit<ShopCatalogProduct, "id">
 const LOCAL_IMAGE_SOURCE = "BuildFlow local placeholder"
 const LOCAL_IMAGE_LICENSE = "BuildFlow placeholder asset"
 const LOCAL_IMAGE_CREDIT = "BuildFlow"
+const LOCAL_PRODUCT_IMAGE_SOURCE = "BuildFlow generated catalog illustration"
+const LOCAL_PRODUCT_IMAGE_LICENSE = "BuildFlow original in-repo asset"
+
+type ProductImageOverride = {
+  imageUrl: string
+  imageAlt: string
+  imageCategory: string
+}
+
+const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
+  "2x4-premium-lumber": {
+    imageUrl: "/images/materials/products/2x4-premium-lumber.svg",
+    imageAlt: "Single 2x4 premium lumber board on white background",
+    imageCategory: "Lumber",
+  },
+  "2x8-treated-lumber": {
+    imageUrl: "/images/materials/products/2x8-treated-lumber.svg",
+    imageAlt: "Single pressure-treated 2x8 lumber board on white background",
+    imageCategory: "Lumber",
+  },
+  "cdx-plywood-sheet": {
+    imageUrl: "/images/materials/products/cdx-plywood-sheet.svg",
+    imageAlt: "CDX plywood sheet on white background",
+    imageCategory: "Plywood",
+  },
+  "lvl-beam-header": {
+    imageUrl: "/images/materials/products/lvl-beam-header.svg",
+    imageAlt: "LVL beam header on white background",
+    imageCategory: "Lumber",
+  },
+  "galvanized-joist-hanger": {
+    imageUrl: "/images/materials/products/galvanized-joist-hanger.svg",
+    imageAlt: "Galvanized U-shaped joist hanger on white background",
+    imageCategory: "Hardware",
+  },
+  "collated-framing-nails": {
+    imageUrl: "/images/materials/products/collated-framing-nails.svg",
+    imageAlt: "Collated framing nail strip on white background",
+    imageCategory: "Hardware",
+  },
+  "subfloor-adhesive-tube": {
+    imageUrl: "/images/materials/products/subfloor-adhesive-tube.svg",
+    imageAlt: "Subfloor adhesive tube on white background",
+    imageCategory: "Hardware",
+  },
+  "flashing-roll": {
+    imageUrl: "/images/materials/products/flashing-roll.svg",
+    imageAlt: "Metal flashing roll on white background",
+    imageCategory: "Roofing",
+  },
+}
+
+const PRODUCT_IMAGE_OVERRIDES_BY_NAME: Record<string, ProductImageOverride> = {
+  "2x4 premium lumber": PRODUCT_IMAGE_OVERRIDES_BY_SLUG["2x4-premium-lumber"],
+  "2x8 treated lumber": PRODUCT_IMAGE_OVERRIDES_BY_SLUG["2x8-treated-lumber"],
+  "cdx plywood": PRODUCT_IMAGE_OVERRIDES_BY_SLUG["cdx-plywood-sheet"],
+  "lvl beam": PRODUCT_IMAGE_OVERRIDES_BY_SLUG["lvl-beam-header"],
+  "galvanized joist hanger": PRODUCT_IMAGE_OVERRIDES_BY_SLUG["galvanized-joist-hanger"],
+  "collated framing nails": PRODUCT_IMAGE_OVERRIDES_BY_SLUG["collated-framing-nails"],
+  "subfloor adhesive": PRODUCT_IMAGE_OVERRIDES_BY_SLUG["subfloor-adhesive-tube"],
+  "flashing roll": PRODUCT_IMAGE_OVERRIDES_BY_SLUG["flashing-roll"],
+}
 
 export const MATERIAL_IMAGE_CATEGORIES = [
   "Services",
@@ -169,6 +231,7 @@ function isSupportedMaterialImageUrl(value: string | null | undefined) {
   if (!next) return false
   if (next.startsWith("data:image/")) return true
   if (/^https?:\/\//i.test(next)) return true
+  if (next.startsWith("/images/materials/products/")) return true
   if (!next.startsWith("/images/materials/")) return false
   return !next.endsWith(".svg")
 }
@@ -201,6 +264,32 @@ function buildImageMetadata(params: {
 
 export function placeholderImageMetadata(category: string | null | undefined, name = category || "Materials"): ShopProductImage {
   return buildImageMetadata({ name, category })
+}
+
+function normalizeProductImageOverrideKey(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase()
+}
+
+function productSpecificImageOverride(params: { slug?: string | null; name?: string | null }) {
+  const bySlug = params.slug ? PRODUCT_IMAGE_OVERRIDES_BY_SLUG[params.slug] : undefined
+  if (bySlug) return bySlug
+  return PRODUCT_IMAGE_OVERRIDES_BY_NAME[normalizeProductImageOverrideKey(params.name)]
+}
+
+function productSpecificImageMetadata(params: { slug?: string | null; name: string; category: string | null | undefined }) {
+  const override = productSpecificImageOverride(params)
+  if (!override) return null
+
+  return buildImageMetadata({
+    name: params.name,
+    category: params.category,
+    imageUrl: override.imageUrl,
+    imageAlt: override.imageAlt,
+    imageSource: LOCAL_PRODUCT_IMAGE_SOURCE,
+    imageLicense: LOCAL_PRODUCT_IMAGE_LICENSE,
+    imageCredit: LOCAL_IMAGE_CREDIT,
+    imageCategory: override.imageCategory,
+  })
 }
 
 function normalizeGalleryImages(images: Array<ShopItemImageRecord | Partial<ShopProductImage> | null | undefined>, fallbackName: string, fallbackCategory: string | null | undefined) {
@@ -430,7 +519,7 @@ const PRODUCT_SEED_INPUTS = [
 ] satisfies Array<Omit<ProductSeed, "image" | "imageUrl" | "imageAlt" | "imageSource" | "imageLicense" | "imageCredit" | "imageCategory" | "gallery" | "availability">>
 
 export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = PRODUCT_SEED_INPUTS.map((product, index) => {
-  const image = placeholderImageMetadata(product.category, product.name)
+  const image = productSpecificImageMetadata({ slug: product.slug, name: product.name, category: product.category }) ?? placeholderImageMetadata(product.category, product.name)
 
   return {
     id: `sample-${index + 1}`,
@@ -471,16 +560,20 @@ export function deriveSpecLine(item: ShopItemRecord) {
 
 export function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[] {
   return items.map((item, index) => {
-    const image = buildImageMetadata({
-      name: item.name,
-      category: item.category,
-      imageUrl: item.image_url,
-      imageAlt: item.image_alt,
-      imageSource: item.image_source,
-      imageLicense: item.image_license,
-      imageCredit: item.image_credit,
-      imageCategory: item.image_category,
-    })
+    const productOverride = productSpecificImageMetadata({ name: item.name, category: item.category })
+    const imageLooksGeneric = !item.image_url || item.image_url.startsWith("/images/materials/photos/") || (item.image_url.startsWith("/images/materials/") && !item.image_url.startsWith("/images/materials/products/"))
+    const image = productOverride && imageLooksGeneric
+      ? productOverride
+      : buildImageMetadata({
+          name: item.name,
+          category: item.category,
+          imageUrl: item.image_url,
+          imageAlt: item.image_alt,
+          imageSource: item.image_source,
+          imageLicense: item.image_license,
+          imageCredit: item.image_credit,
+          imageCategory: item.image_category,
+        })
     const extraGallery = Array.isArray(item.image_gallery) ? item.image_gallery : []
 
     return {
