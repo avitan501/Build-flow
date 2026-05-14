@@ -443,7 +443,7 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = PRODUCT_SEED_INPUTS.ma
     imageCredit: image.imageCredit,
     imageCategory: image.imageCategory,
     gallery: galleryForProduct(image, product.category),
-    availability: product.productType === "service" ? "Ready to schedule" : "Ready to quote",
+    availability: product.productType === "service" ? "Available" : "Available",
     productType: product.productType ?? "material",
     detailBullets: product.detailBullets ?? [],
   }
@@ -503,7 +503,7 @@ export function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[
       imageCategory: image.imageCategory,
       gallery: galleryForProduct(image, item.category, extraGallery, item.name),
       specLine: deriveSpecLine(item),
-      availability: "Ready to quote",
+      availability: "Available",
       featuredLabel: item.category === "Lumber" || item.category === "Plywood" || item.category === "Fasteners" ? "Popular for framing" : "Jobsite pick",
       popularUse: item.category || "General materials",
       reviewLabel: `${(4.6 + (index % 4) * 0.1).toFixed(1)} - ${48 + index * 13} reviews`,

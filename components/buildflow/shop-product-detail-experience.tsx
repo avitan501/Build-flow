@@ -194,10 +194,8 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
             <section className="p-4 sm:p-6">
               <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:rounded-[28px] sm:p-5">
                 <h1 className="text-[1.45rem] font-bold leading-7 text-slate-950 sm:text-[2.1rem] sm:leading-9">{product.name}</h1>
-                <div className="mt-2 flex flex-wrap gap-2 text-sm text-slate-500">
+                <div className="mt-2 text-sm text-slate-500">
                   <span>{product.unit}</span>
-                  <span className="text-slate-300">•</span>
-                  <span>{isService ? "Ready to schedule" : "Ready to quote"}</span>
                 </div>
 
                 <div className="mt-4 flex items-end gap-1 text-slate-950">
@@ -293,7 +291,6 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                       <Image src={related.imageUrl} alt={related.imageAlt} width={320} height={320} className="h-[116px] w-full object-contain bg-white sm:h-[140px]" />
                     </div>
                     <div className="mt-3 line-clamp-2 text-sm font-semibold text-slate-900">{related.name}</div>
-                    <div className="mt-1 text-xs font-medium text-slate-500">{related.productType === "service" ? "Ready to schedule" : "Ready to quote"}</div>
                     <div className="mt-2 flex items-start gap-0.5 text-slate-950">
                       <span className="text-base font-bold">{relatedPrice.dollars}</span>
                       <span className="pt-0.5 text-[10px] font-bold">.{relatedPrice.cents}</span>
