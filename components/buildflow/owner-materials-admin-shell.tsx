@@ -60,6 +60,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
   const [editingRowId, setEditingRowId] = useState<string | null>(initialState.batches[0]?.rows[0]?.id ?? null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [noticeTone, setNoticeTone] = useState<"info" | "success" | "error">("info");
   const [isPending, startTransition] = useTransition();
 
   const batches = state.batches;
@@ -100,6 +101,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
   }, [activeTab, categoryFilter, rows, search, statusFilter, supplierFilter]);
 
   const editingRow = rows.find((row) => row.id === editingRowId) ?? filteredRows[0] ?? rows[0] ?? null;
+  const allDocuments = useMemo(() => Array.from(new Set(batches.flatMap((batch) => batch.documents))), [batches]);
 
   function updateState(mutator: (current: OwnerMaterialsAdminState) => OwnerMaterialsAdminState) {
     setState((current) => mutator(cloneState(current)));
@@ -135,6 +137,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
     setEditingRowId(null);
     setState((current) => ({ ...current, selectedBatchId: batchId }));
     setNotice(null);
+    setNoticeTone("info");
   }
 
   function toggleSelectedRow(rowId: string) {
@@ -162,6 +165,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
       batches: current.batches.map((batch) => (batch.id === activeBatch.id ? { ...batch, rows: [nextRow, ...batch.rows] } : batch)),
     }));
     setEditingRowId(nextRow.id);
+    setNoticeTone("success");
     setNotice("New material added to the current batch.");
   }
 
@@ -175,6 +179,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
       batches: current.batches.map((batch) => (batch.id === activeBatch.id ? { ...batch, rows: [nextRow, ...batch.rows] } : batch)),
     }));
     setEditingRowId(nextRow.id);
+    setNoticeTone("success");
     setNotice("Material duplicated.");
   }
 
@@ -187,6 +192,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
     }));
     setSelectedRowIds((current) => current.filter((id) => id !== rowId));
     if (editingRowId === rowId) setEditingRowId(null);
+    setNoticeTone("success");
     setNotice("Material removed from the current batch.");
   }
 
@@ -201,11 +207,13 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
       imageLicense: nextUrl.trim() ? "Owner provided" : "Pending",
       imageCredit: nextUrl.trim() ? "Owner upload" : "Pending",
     });
+    setNoticeTone("success");
     setNotice(nextUrl.trim() ? "Photo attached to material." : "Photo cleared.");
   }
 
   function handleRemovePhoto(rowId: string) {
     updateRow(rowId, { imageUrl: "", photoCount: 0, galleryCount: 0, imageSource: "Not added", imageLicense: "Pending", imageCredit: "Pending" });
+    setNoticeTone("success");
     setNotice("Photo removed.");
   }
 
@@ -224,41 +232,46 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
     link.download = `${activeBatch?.supplier ?? "materials"}-${activeBatch?.quoteNumber ?? "export"}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
+    setNoticeTone("success");
     setNotice("CSV export downloaded.");
   }
 
   function saveStateToServer() {
     startTransition(async () => {
-      const saved = await saveOwnerMaterialsAdmin(state);
-      setState(saved);
-      setNotice("Materials admin changes saved.");
+      const result = await saveOwnerMaterialsAdmin(state);
+      setState(result.state);
+      setNoticeTone(result.ok ? "success" : "error");
+      setNotice(result.message);
     });
   }
 
   function restoreBatches() {
     startTransition(async () => {
-      const restored = await restoreOwnerMaterialsAdminBatches();
-      setState(restored);
-      setSelectedRowIds([]);
-      setEditingRowId(restored.batches.find((batch) => batch.id === restored.selectedBatchId)?.rows[0]?.id ?? null);
-      setNotice(`Restored ${restored.batches.length} quote batches and ${ownerSupplierDocuments.length} supplier documents.`);
+      const result = await restoreOwnerMaterialsAdminBatches();
+      if (result.state) {
+        setState(result.state);
+        setSelectedRowIds([]);
+        setEditingRowId(result.state.batches.find((batch) => batch.id === result.state.selectedBatchId)?.rows[0]?.id ?? null);
+      }
+      setNoticeTone(result.ok ? "success" : "error");
+      setNotice(result.ok ? `Restored ${result.state?.batches.length ?? 0} quote batches and ${ownerSupplierDocuments.length} supplier documents.` : result.message);
     });
   }
 
   function publishSelection(rowIds: string[]) {
     if (!activeBatch || rowIds.length === 0) {
+      setNoticeTone("error");
       setNotice("Select at least one material to publish.");
       return;
     }
     startTransition(async () => {
       const result = await publishOwnerMaterialsSelection(state, activeBatch.id, rowIds);
       setState(result.state);
-      if (result.error) {
-        setNotice(result.error);
-      } else {
+      setNoticeTone(result.ok ? "success" : "error");
+      if (result.ok) {
         setSelectedRowIds((current) => current.filter((id) => !rowIds.includes(id)));
-        setNotice(`${result.publishedCount} material(s) published to shop.`);
       }
+      setNotice(result.message);
     });
   }
 
@@ -268,7 +281,8 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
       const result = await unpublishOwnerMaterialsSelection(state, activeBatch.id, rowIds);
       setState(result.state);
       setSelectedRowIds((current) => current.filter((id) => !rowIds.includes(id)));
-      setNotice(`${result.unpublishedCount} material(s) moved back to draft.`);
+      setNoticeTone(result.ok ? "success" : "error");
+      setNotice(result.message);
     });
   }
 
@@ -297,7 +311,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
             <div className="mt-8 rounded-[22px] border border-white/10 bg-white/5 p-4 text-sm text-slate-200">
               <div className="font-semibold text-white">Imported supplier documents</div>
               <div className="mt-3 flex flex-wrap gap-2">
-                {ownerSupplierDocuments.map((document) => (
+                {allDocuments.map((document) => (
                   <span key={document} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-100">{document}</span>
                 ))}
               </div>
@@ -409,11 +423,42 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
               <div className="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600">{selectedRowIds.length} selected</div>
             </div>
 
-            {notice ? <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{notice}</div> : null}
+            {notice ? <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${noticeTone === "error" ? "border border-rose-200 bg-rose-50 text-rose-900" : noticeTone === "success" ? "border border-emerald-200 bg-emerald-50 text-emerald-900" : "border border-sky-200 bg-sky-50 text-sky-900"}`}>{notice}</div> : null}
           </section>
 
-          <section className="grid gap-4 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.9fr)]">
-            <div className="rounded-[30px] border border-[#d7e2f2] bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <section className="grid gap-4 xl:grid-cols-[minmax(260px,0.62fr)_minmax(0,1fr)] 2xl:grid-cols-[minmax(260px,0.62fr)_minmax(0,1.55fr)_minmax(320px,0.9fr)]">
+            <article className="rounded-[30px] border border-[#d7e2f2] bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Quote batches</div>
+              <h2 className="mt-2 text-xl font-semibold text-slate-950">Restored supplier documents & batches</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">All restored supplier documents and quote batches stay visible here even if the original PDFs are unavailable.</p>
+              <div className="mt-4 space-y-3">
+                {batches.map((batch) => {
+                  const isActive = batch.id === activeBatch?.id;
+                  return (
+                    <button
+                      key={batch.id}
+                      type="button"
+                      onClick={() => setSelectedBatch(batch.id)}
+                      className={`w-full rounded-[22px] border p-4 text-left transition ${isActive ? "border-slate-900 bg-slate-950 text-white" : "border-slate-200 bg-slate-50 text-slate-900 hover:bg-white"}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold">{batch.supplier}</div>
+                          <div className={`mt-1 text-xs ${isActive ? "text-slate-300" : "text-slate-500"}`}>Quote {batch.quoteNumber} • {batch.quoteDate}</div>
+                        </div>
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${isActive ? "bg-white/10 text-white" : "bg-white text-slate-700"}`}>{batch.rows.length} rows</span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {batch.documents.map((document) => (
+                          <span key={document} className={`rounded-full px-2.5 py-1 text-[11px] ${isActive ? "bg-white/10 text-slate-100" : "border border-slate-200 bg-white text-slate-600"}`}>{document}</span>
+                        ))}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </article>
+            <div className="rounded-[30px] border border-[#d7e2f2] bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] 2xl:col-start-2">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-950">{activeBatch?.supplier} batch</h2>
@@ -439,7 +484,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
               />
             </div>
 
-            <section className="rounded-[30px] border border-[#d7e2f2] bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+            <section className="rounded-[30px] border border-[#d7e2f2] bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] 2xl:col-start-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Editor</div>

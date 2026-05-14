@@ -65,7 +65,7 @@ function normalizeRow(row: OwnerMaterialRowState): OwnerMaterialRowState {
 function normalizeBatch(batch: OwnerMaterialBatchState): OwnerMaterialBatchState {
   return {
     ...batch,
-    documents: Array.from(new Set(batch.documents.filter(Boolean))),
+    documents: Array.from(new Set(batch.documents.filter(Boolean))).sort((left, right) => left.localeCompare(right, undefined, { numeric: true })),
     rows: batch.rows.map(normalizeRow),
   };
 }
@@ -113,9 +113,10 @@ export async function saveOwnerMaterialsAdminState(nextState: OwnerMaterialsAdmi
   return merged;
 }
 
-function buildPublishedItem(row: OwnerMaterialRowState, batch: OwnerMaterialBatchState): ShopItemRecord {
+function buildPublishedItem(row: OwnerMaterialRowState, batch: OwnerMaterialBatchState, existingItem?: ShopItemRecord | null): ShopItemRecord {
   const slugBase = slugify(`${batch.supplier}-${batch.quoteNumber}-${row.itemNo || row.description}`);
-  const createdAt = new Date().toISOString();
+  const createdAt = existingItem?.created_at ?? new Date().toISOString();
+  const updatedAt = new Date().toISOString();
 
   return {
     id: `owner-${slugBase}`,
@@ -152,8 +153,12 @@ function buildPublishedItem(row: OwnerMaterialRowState, batch: OwnerMaterialBatc
           ]
         : null,
     created_at: createdAt,
-    updated_at: createdAt,
+    updated_at: updatedAt,
   };
+}
+
+function validatePublishableRows(rows: OwnerMaterialRowState[]) {
+  return rows.filter((row) => !row.description.trim() || !row.category.trim() || !row.unit.trim() || row.finalUnitPrice <= 0);
 }
 
 export async function getLocalPublishedShopItems() {
@@ -173,7 +178,7 @@ export async function publishOwnerMaterialsRows(nextState: OwnerMaterialsAdminSt
 
   const selectedIds = new Set(options.rowIds);
   const rowsToPublish = batch.rows.filter((row) => selectedIds.has(row.id));
-  const invalidRows = rowsToPublish.filter((row) => !row.description.trim() || !row.category.trim() || !row.unit.trim() || row.finalUnitPrice <= 0);
+  const invalidRows = validatePublishableRows(rowsToPublish);
 
   if (invalidRows.length > 0) {
     const errorIds = new Set(invalidRows.map((row) => row.id));
@@ -197,7 +202,9 @@ export async function publishOwnerMaterialsRows(nextState: OwnerMaterialsAdminSt
   const publishedItems = await getLocalPublishedShopItems();
   const publishedMap = new Map(publishedItems.map((item) => [item.id, item]));
   rowsToPublish.forEach((row) => {
-    publishedMap.set(buildPublishedItem(row, batch).id, buildPublishedItem(row, batch));
+    const nextId = `owner-${slugify(`${batch.supplier}-${batch.quoteNumber}-${row.itemNo || row.description}`)}`;
+    const nextItem = buildPublishedItem(row, batch, publishedMap.get(nextId) ?? null);
+    publishedMap.set(nextItem.id, nextItem);
   });
   await saveLocalPublishedShopItems(Array.from(publishedMap.values()));
 
