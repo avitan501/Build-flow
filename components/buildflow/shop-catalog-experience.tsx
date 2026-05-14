@@ -149,20 +149,22 @@ function ServiceListCard({ product }: { product: ShopCatalogProduct }) {
   return (
     <Link
       href={`/shop/${product.slug}`}
-      className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-white px-3 py-3 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
+      className="flex min-w-0 flex-col gap-3 rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
     >
-      <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 text-sky-700">
-        <ServiceIcon />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="mb-1 inline-flex rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700">Service</span>
-        <span className="block truncate text-sm font-semibold text-slate-950">{product.name}</span>
-        <span className="mt-1 block line-clamp-2 text-[12px] leading-5 text-slate-600">{product.shortDescription || product.description}</span>
-      </span>
-      <span className="shrink-0 text-right">
-        <span className="block text-base font-bold text-slate-950">{price.dollars}<span className="text-[10px] align-top">.{price.cents}</span></span>
-        <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">View details</span>
-      </span>
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 text-sky-700">
+          <ServiceIcon />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="mb-1 inline-flex rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">Service</span>
+          <span className="block text-sm font-semibold leading-5 text-slate-950 break-words">{product.name}</span>
+          <span className="mt-1 block line-clamp-2 text-[12px] leading-5 text-slate-600">{product.shortDescription || product.description}</span>
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2">
+        <span className="min-w-0 text-base font-bold text-slate-950">{price.dollars}<span className="text-[10px] align-top">.{price.cents}</span></span>
+        <span className="shrink-0 text-[11px] font-semibold text-sky-700">View details</span>
+      </div>
     </Link>
   )
 }
@@ -426,8 +428,8 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   return (
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        <section className="rounded-[24px] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-4">
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        <section className="rounded-[24px] bg-white p-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-3">
+          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {[
               { key: "materials", label: "Materials", icon: MaterialsIcon },
               { key: "services", label: "Services", icon: ServiceIcon },
@@ -443,14 +445,16 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
                   key={tab.key}
                   type="button"
                   onClick={() => activateTab(tab.key as BrowseTab)}
-                  className={`flex min-h-[64px] flex-col items-center justify-center gap-2 rounded-2xl border px-2 py-2.5 text-center text-[11px] font-semibold transition sm:min-h-[76px] sm:text-xs ${
-                    active ? "border-sky-300 bg-sky-50 text-sky-800" : "border-white bg-white text-slate-600 shadow-sm"
+                  className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${
+                    active ? "border-sky-300 bg-sky-50 text-sky-800" : "border-slate-200 bg-white text-slate-700 shadow-sm"
                   }`}
                 >
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-700">
+                  <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${active ? "bg-sky-100 text-sky-700" : "bg-slate-100 text-slate-700"}`}>
                     <Icon {...(tab.key === "saved" ? { filled: active || savedIds.length > 0 } : {})} />
                   </span>
                   <span>{tab.label}</span>
+                  {tab.key === "cart" ? <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-600">{cartCount}</span> : null}
+                  {tab.key === "saved" && savedIds.length > 0 ? <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-600">{savedIds.length}</span> : null}
                 </button>
               )
             })}
@@ -472,16 +476,19 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
         </section>
 
         {serviceProducts.length > 0 ? (
-          <section ref={serviceSectionRef} className="rounded-[24px] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-4">
+          <section ref={serviceSectionRef} className="overflow-hidden rounded-[24px] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Services</div>
+              <div>
+                <div className="text-lg font-bold text-slate-950">Services</div>
+                <div className="text-sm text-slate-500">Professional field support alongside your materials catalog</div>
+              </div>
               {browseTab !== "services" ? (
-                <button type="button" onClick={() => activateTab("services")} className="text-sm font-semibold text-sky-700">
+                <button type="button" onClick={() => activateTab("services")} className="shrink-0 text-sm font-semibold text-sky-700">
                   View all
                 </button>
               ) : null}
             </div>
-            <div className="grid gap-2.5 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-3">
               {(browseTab === "services" || activeCategory === "Services" ? serviceProducts : serviceProducts.slice(0, 3)).map((product) => (
                 <ServiceListCard key={`service-${product.id}`} product={product} />
               ))}
