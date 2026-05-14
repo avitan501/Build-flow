@@ -15,12 +15,6 @@ type ShopCatalogExperienceProps = {
 type SortMode = "featured" | "price-low" | "price-high"
 type BrowseTab = "materials" | "deals" | "suppliers" | "saved" | "cart"
 
-type SearchSuggestion = {
-  label: string
-  category: string
-  image: string
-}
-
 const SHOP_CATEGORIES = [
   "All",
   "Lumber",
@@ -44,29 +38,6 @@ const SHOP_CATEGORIES = [
   "Cabinets",
 ] as const
 
-const SEARCH_SUGGESTIONS: SearchSuggestion[] = [
-  "Lumber",
-  "Plywood",
-  "Drywall",
-  "Doors",
-  "Trim",
-  "Windows",
-  "Tile",
-  "Cabinets",
-  "Plumbing",
-  "Electrical",
-  "Glass",
-  "Lighting",
-  "Tools",
-  "Concrete",
-  "Roofing",
-  "Insulation",
-].map((label) => ({
-  label,
-  category: label,
-  image: placeholderImageMetadata(label, label).imageUrl,
-}))
-
 const SORT_OPTIONS: { key: SortMode; label: string }[] = [
   { key: "featured", label: "Featured" },
   { key: "price-low", label: "Price low" },
@@ -82,24 +53,12 @@ function categoryImage(category: string) {
   return placeholderImageMetadata(category === "All" ? "Materials" : category, category).imageUrl
 }
 
-function normalize(value: string) {
-  return value.trim().toLowerCase()
-}
-
-function SearchIcon() {
+function MaterialsIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-    </svg>
-  )
-}
-
-function CloseIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <path d="m3.3 7 8.7 5 8.7-5" />
+      <path d="M12 22V12" />
     </svg>
   )
 }
@@ -201,12 +160,9 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
   const searchParams = useSearchParams()
   const router = useRouter()
   const [sortMode, setSortMode] = useState<SortMode>("featured")
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const [draftQuery, setDraftQuery] = useState("")
   const [cartCount, setCartCount] = useState(0)
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [browseTab, setBrowseTab] = useState<BrowseTab>("materials")
-  const searchInputRef = useRef<HTMLInputElement>(null)
   const supplierSectionRef = useRef<HTMLElement>(null)
 
   const query = (searchParams.get("q") ?? "").trim()
@@ -227,18 +183,6 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
       window.removeEventListener(SHOP_SAVE_UPDATED_EVENT, sync)
     }
   }, [])
-
-  useEffect(() => {
-    if (!isSearchOpen) return
-    const timeout = window.setTimeout(() => searchInputRef.current?.focus(), 60)
-    const originalOverflow = document.body.style.overflow
-    document.body.style.overflow = "hidden"
-
-    return () => {
-      window.clearTimeout(timeout)
-      document.body.style.overflow = originalOverflow
-    }
-  }, [isSearchOpen])
 
   const categorySummaries = SHOP_CATEGORIES.map((category) => {
     const count = category === "All" ? products.length : products.filter((product) => product.imageCategory === category || product.category === category).length
@@ -296,12 +240,6 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
     }
   })()
 
-  const visibleSuggestions = (() => {
-    const term = normalize(draftQuery)
-    if (!term) return SEARCH_SUGGESTIONS
-    return SEARCH_SUGGESTIONS.filter((suggestion) => normalize(`${suggestion.label} ${suggestion.category}`).includes(term))
-  })()
-
   const resultLabel = query ? `Search results for "${query}"` : browseTab === "saved" ? "Saved materials" : activeCategory === "All" ? "All materials" : activeCategory
 
   function applyFilters(next: { query?: string; category?: string; close?: boolean }) {
@@ -324,25 +262,11 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
     const queryString = params.toString()
     router.replace(queryString ? `/shop?${queryString}` : "/shop", { scroll: false })
 
-    if (next.close) {
-      setIsSearchOpen(false)
-    }
   }
 
   function setCategory(nextCategory: string) {
     setBrowseTab("materials")
     applyFilters({ category: nextCategory })
-  }
-
-  function submitSearch() {
-    setBrowseTab("materials")
-    applyFilters({ query: draftQuery, close: true })
-  }
-
-  function applySuggestion(suggestion: SearchSuggestion) {
-    setBrowseTab("materials")
-    setDraftQuery(suggestion.label)
-    applyFilters({ query: suggestion.label, category: suggestion.category, close: true })
   }
 
   function quickAdd(productId: string) {
@@ -383,50 +307,10 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
   return (
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        <section className="overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,#ffffff_0%,#f6fbff_100%)] p-4 shadow-[0_16px_40px_rgba(15,23,42,0.08)] sm:p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600">BuildFlow Shop</div>
-              <h1 className="mt-1 text-2xl font-bold text-slate-950">Materials</h1>
-            </div>
-            <Link href="/cart" className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm">
-              <CartIcon />
-              <span>Cart</span>
-              <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-emerald-500 px-1.5 py-0.5 text-xs text-white">{cartCount}</span>
-            </Link>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 shadow-sm">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Project view</div>
-            <div className="mt-1 flex items-center justify-between gap-3">
-              <div>
-                <div className="text-base font-semibold text-slate-950">Materials</div>
-                <div className="text-sm text-slate-500">Browse products, suppliers, and deals</div>
-              </div>
-              <TruckIcon />
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setDraftQuery(query)
-              setIsSearchOpen(true)
-            }}
-            className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-full border border-slate-200 bg-slate-100/95 px-4 text-left text-slate-500 transition hover:border-sky-200 hover:bg-sky-50/80 hover:text-slate-700"
-            aria-haspopup="dialog"
-            aria-expanded={isSearchOpen}
-            aria-controls="shop-search-overlay"
-          >
-            <span className="text-slate-400">
-              <SearchIcon />
-            </span>
-            <span className="min-w-0 flex-1 truncate text-sm font-medium sm:text-[15px]">{query || "Search materials and products"}</span>
-          </button>
-
-          <div className="mt-4 grid grid-cols-5 gap-2">
+        <section className="rounded-[24px] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-4">
+          <div className="grid grid-cols-5 gap-2">
             {[
-              { key: "materials", label: "Materials", icon: SearchIcon },
+              { key: "materials", label: "Materials", icon: MaterialsIcon },
               { key: "deals", label: "Deals", icon: TagIcon },
               { key: "suppliers", label: "Suppliers", icon: TruckIcon },
               { key: "saved", label: "Saved", icon: BookmarkIcon },
@@ -439,7 +323,7 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
                   key={tab.key}
                   type="button"
                   onClick={() => activateTab(tab.key as BrowseTab)}
-                  className={`flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-2xl border px-2 py-3 text-center text-xs font-semibold transition ${
+                  className={`flex min-h-[64px] flex-col items-center justify-center gap-2 rounded-2xl border px-2 py-2.5 text-center text-[11px] font-semibold transition sm:min-h-[76px] sm:text-xs ${
                     active ? "border-sky-300 bg-sky-50 text-sky-800" : "border-white bg-white text-slate-600 shadow-sm"
                   }`}
                 >
@@ -601,112 +485,6 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
         )}
       </div>
 
-      {isSearchOpen ? (
-        <div id="shop-search-overlay" role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-white/96 backdrop-blur-sm">
-          <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-4 pb-6 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6">
-            <div className="mb-4 grid grid-cols-[48px_1fr_48px] items-center">
-              <button
-                type="button"
-                onClick={() => setIsSearchOpen(false)}
-                className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm"
-                aria-label="Close search"
-              >
-                <CloseIcon />
-              </button>
-              <div className="text-center text-sm font-semibold tracking-[0.18em] text-slate-900">BUILDFLOW</div>
-              <div />
-            </div>
-
-            <div className="rounded-[28px] border border-slate-200 bg-white p-3 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
-              <label htmlFor="shop-search-input" className="sr-only">
-                Search materials and products
-              </label>
-              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
-                <span className="text-slate-400">
-                  <SearchIcon />
-                </span>
-                <input
-                  id="shop-search-input"
-                  ref={searchInputRef}
-                  value={draftQuery}
-                  onChange={(event) => setDraftQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault()
-                      submitSearch()
-                    }
-                  }}
-                  placeholder="Search materials and products"
-                  className="flex-1 bg-transparent text-base text-slate-900 outline-none placeholder:text-slate-400"
-                  autoComplete="off"
-                  enterKeyHint="search"
-                />
-                {draftQuery ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDraftQuery("")
-                      searchInputRef.current?.focus()
-                    }}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500"
-                    aria-label="Clear search"
-                  >
-                    <CloseIcon />
-                  </button>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="mt-5 min-h-0 flex-1 overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
-              <div className="px-3 pb-2 pt-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Suggestions</div>
-              <div className="space-y-1">
-                {visibleSuggestions.map((suggestion) => (
-                  <button
-                    key={suggestion.label}
-                    type="button"
-                    onClick={() => applySuggestion(suggestion)}
-                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
-                  >
-                    <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                      <Image src={suggestion.image} alt="" fill sizes="48px" className="object-contain p-1.5" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-slate-900">{suggestion.label}</span>
-                      <span className="block truncate text-xs text-slate-500">Browse {suggestion.label.toLowerCase()} materials</span>
-                    </span>
-                    <span className="text-slate-400">
-                      <SearchIcon />
-                    </span>
-                  </button>
-                ))}
-                {visibleSuggestions.length === 0 ? (
-                  <div className="px-3 py-8 text-center text-sm text-slate-500">No quick suggestions match yet. Press search to filter the catalog.</div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="mt-4 flex gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setBrowseTab("materials")
-                  applyFilters({ query: "", category: "All", close: true })
-                }}
-                className="flex-1 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
-              >
-                Reset
-              </button>
-              <button
-                type="button"
-                onClick={submitSearch}
-                className="flex-1 rounded-full bg-sky-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(2,132,199,0.25)] transition hover:bg-sky-700"
-              >
-                Search
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </main>
   )
 }
