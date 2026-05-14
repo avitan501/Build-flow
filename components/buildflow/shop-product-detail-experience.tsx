@@ -30,11 +30,6 @@ function formatCurrencyParts(value: number) {
   return { dollars, cents: cents ?? "00" }
 }
 
-function renderStars(rating: number) {
-  const filledStars = Math.round(rating)
-  return "★★★★★".slice(0, filledStars) + "☆☆☆☆☆".slice(0, 5 - filledStars)
-}
-
 function SearchIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -103,7 +98,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
   return (
     <main className="min-h-screen bg-[#f4f7fb] pb-28 text-slate-950">
       <section className="mx-auto max-w-6xl px-3 py-3 sm:px-6 sm:py-5 lg:px-8">
-        <div className="overflow-hidden rounded-[30px] bg-white shadow-[0_16px_44px_rgba(15,23,42,0.08)]">
+        <div className="overflow-hidden rounded-[24px] bg-white shadow-[0_16px_44px_rgba(15,23,42,0.08)] sm:rounded-[30px]">
           <div className="border-b border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] px-4 py-4 sm:px-6">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -122,15 +117,12 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
             </div>
           </div>
 
-          <div className="grid gap-0 lg:grid-cols-[1.02fr_0.98fr]">
+          <div className="grid gap-0 lg:grid-cols-[0.94fr_1.06fr]">
             <section className="border-b border-slate-100 bg-[#fbfdff] p-4 sm:p-6 lg:border-b-0 lg:border-r">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600">{product.category}</div>
-                  <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
-                    <span className="font-medium text-amber-500">{renderStars(product.rating)}</span>
-                    <span>{product.reviewLabel}</span>
-                  </div>
+                  <div className="mt-2 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">New catalog item</div>
                 </div>
                 <button
                   type="button"
@@ -142,19 +134,19 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                 </button>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
-                <Image src={activeImage} alt={product.imageAlt} width={1200} height={1200} className="block h-[320px] w-full object-contain bg-white sm:h-[420px] lg:h-[520px]" priority />
+              <div className="mt-4 overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm sm:rounded-[28px] sm:p-4">
+                <Image src={activeImage} alt={product.imageAlt} width={1200} height={1200} className="block h-[240px] w-full object-contain bg-white sm:h-[320px] lg:h-[420px]" priority />
               </div>
 
-              <div className="mt-3 flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-3">
                 {product.gallery.map((image, index) => (
                   <button
                     key={`${product.id}-image-${index}`}
                     type="button"
                     onClick={() => setActiveImage(image.imageUrl)}
-                    className={`shrink-0 overflow-hidden rounded-2xl border bg-white p-1.5 shadow-sm transition ${activeImage === image.imageUrl ? "border-sky-400 ring-2 ring-sky-100" : "border-slate-200 hover:border-sky-200"}`}
+                    className={`shrink-0 overflow-hidden rounded-xl border bg-white p-1 shadow-sm transition sm:rounded-2xl sm:p-1.5 ${activeImage === image.imageUrl ? "border-sky-400 ring-2 ring-sky-100" : "border-slate-200 hover:border-sky-200"}`}
                   >
-                    <Image src={image.imageUrl} alt={image.imageAlt} width={180} height={180} className="h-16 w-16 object-contain sm:h-20 sm:w-20" />
+                    <Image src={image.imageUrl} alt={image.imageAlt} width={180} height={180} className="h-12 w-12 object-contain sm:h-16 sm:w-16 lg:h-20 lg:w-20" />
                   </button>
                 ))}
               </div>
@@ -167,18 +159,22 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
             </section>
 
             <section className="p-4 sm:p-6">
-              <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                <h1 className="text-[1.8rem] font-bold leading-8 text-slate-950 sm:text-[2.1rem] sm:leading-9">{product.name}</h1>
-                <div className="mt-2 text-sm text-slate-500">{product.unit} • {product.supplierName || "BuildFlow sample catalog"}</div>
+              <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:rounded-[28px] sm:p-5">
+                <h1 className="text-[1.45rem] font-bold leading-7 text-slate-950 sm:text-[2.1rem] sm:leading-9">{product.name}</h1>
+                <div className="mt-2 flex flex-wrap gap-2 text-sm text-slate-500">
+                  <span>{product.unit}</span>
+                  <span className="text-slate-300">•</span>
+                  <span>Ready to quote</span>
+                </div>
 
-                <div className="mt-5 flex items-end gap-1 text-slate-950">
+                <div className="mt-4 flex items-end gap-1 text-slate-950">
                   <span className="text-[2.4rem] font-bold leading-none tracking-[-0.05em]">{price.dollars}</span>
                   <span className="pb-1 text-sm font-bold leading-none">.{price.cents}</span>
                 </div>
 
-                <div className="mt-4 rounded-[24px] bg-slate-50 p-4 text-sm leading-6 text-slate-700">{product.description}</div>
+                <div className="mt-4 rounded-[20px] bg-slate-50 p-4 text-sm leading-6 text-slate-700 sm:rounded-[24px]">{product.description}</div>
 
-                <div className="mt-5 rounded-[24px] border border-slate-200 bg-[#f8fbff] p-4">
+                <div className="mt-4 rounded-[20px] border border-slate-200 bg-[#f8fbff] p-4 sm:rounded-[24px]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Quantity</div>
@@ -192,7 +188,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                   </div>
                 </div>
 
-                <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+                <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
                   <button
                     type="button"
                     onClick={addToCart}
@@ -201,7 +197,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                     Add to cart
                   </button>
                   <Link href="/cart" className="inline-flex min-h-14 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-base font-semibold text-slate-800 shadow-sm">
-                    View cart
+                    Continue request
                   </Link>
                 </div>
 
@@ -216,20 +212,19 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                   <div className="border-t border-slate-100 px-5 py-4 text-sm text-slate-700">
                     <div className="leading-6">{product.description}</div>
                     <div className="mt-4 grid gap-2">
-                      <div><span className="font-medium text-slate-500">Spec:</span> {product.specLine}</div>
-                      <div><span className="font-medium text-slate-500">Category:</span> {product.category}</div>
+                      <div><span className="font-medium text-slate-500">Product specs:</span> {product.specLine}</div>
+                      <div><span className="font-medium text-slate-500">Unit:</span> {product.unit}</div>
                       <div><span className="font-medium text-slate-500">Best use:</span> {product.popularUse}</div>
                       <div><span className="font-medium text-slate-500">Supplier:</span> {product.supplierName || "BuildFlow sample catalog"}</div>
                       <div><span className="font-medium text-slate-500">Source:</span> {product.quoteNumber || "Catalog reference"}</div>
-                      <div><span className="font-medium text-slate-500">Image source:</span> {product.imageSource}</div>
                     </div>
                   </div>
                 </details>
               </div>
 
-              <div className="mt-4 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="text-base font-semibold text-slate-950">Quality snapshot</div>
-                <div className="mt-2 text-sm text-slate-600">{product.rating.toFixed(1)} average rating based on current catalog presentation. Use this page to compare finish, unit, supplier, and intended use.</div>
+              <div className="mt-4 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:rounded-[28px]">
+                <div className="text-base font-semibold text-slate-950">Catalog status</div>
+                <div className="mt-2 text-sm text-slate-600">Ready to quote. Use this page to compare finish, unit, supplier, and intended use before adding the item to your request.</div>
               </div>
             </section>
           </div>
@@ -240,20 +235,20 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
               <Link href="/shop" className="text-sm font-semibold text-sky-700">Back to shop</Link>
             </div>
 
-            <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-4 lg:overflow-visible">
               {relatedProducts.map((related) => {
                 const relatedPrice = formatCurrencyParts(related.price)
                 return (
                   <Link
                     key={related.id}
                     href={`/shop/${related.slug}`}
-                    className="w-[188px] shrink-0 rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                    className="w-[176px] shrink-0 rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:w-[188px] lg:w-auto"
                   >
                     <div className="overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 p-2">
-                      <Image src={related.imageUrl} alt={related.imageAlt} width={320} height={320} className="h-[140px] w-full object-contain bg-white" />
+                      <Image src={related.imageUrl} alt={related.imageAlt} width={320} height={320} className="h-[116px] w-full object-contain bg-white sm:h-[140px]" />
                     </div>
                     <div className="mt-3 line-clamp-2 text-sm font-semibold text-slate-900">{related.name}</div>
-                    <div className="mt-1 text-xs text-amber-500">{renderStars(related.rating)} <span className="text-slate-500">{related.reviewLabel}</span></div>
+                    <div className="mt-1 text-xs font-medium text-slate-500">Ready to quote</div>
                     <div className="mt-2 flex items-start gap-0.5 text-slate-950">
                       <span className="text-base font-bold">{relatedPrice.dollars}</span>
                       <span className="pt-0.5 text-[10px] font-bold">.{relatedPrice.cents}</span>

@@ -142,14 +142,6 @@ function CartIcon() {
   )
 }
 
-function StarIcon() {
-  return (
-    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 fill-current" aria-hidden="true">
-      <path d="m10 1.7 2.4 5 5.5.8-4 3.9.9 5.5-4.8-2.6-4.8 2.6.9-5.5-4-3.9 5.5-.8L10 1.7Z" />
-    </svg>
-  )
-}
-
 function PlusIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -199,14 +191,7 @@ function ShopProductCard({ product, onQuickAdd }: { product: ShopCatalogProduct;
           <span className="line-clamp-2">{product.name}</span>
         </Link>
 
-        <div className="mt-2 flex items-center gap-1 text-[12px] font-medium text-slate-500">
-          <span className="inline-flex items-center gap-0.5 text-amber-500">
-            <StarIcon />
-            {product.rating.toFixed(1)}
-          </span>
-          <span className="text-slate-300">•</span>
-          <span className="truncate">{product.reviewLabel.replace(/^[0-9.]+\s*-\s*/, "")}</span>
-        </div>
+        <div className="mt-2 text-[12px] font-medium text-slate-500">Ready to quote</div>
       </div>
     </article>
   )
