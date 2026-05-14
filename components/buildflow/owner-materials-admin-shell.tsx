@@ -1,96 +1,90 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 
+import { publishOwnerMaterialsSelection, restoreOwnerMaterialsAdminBatches, saveOwnerMaterialsAdmin, unpublishOwnerMaterialsSelection } from "@/app/owner/materials/actions";
 import { OwnerMaterialsAdminTable, type EditableOwnerMaterialRow } from "@/components/buildflow/owner-materials-admin-table";
-import { buildOwnerQuoteDuplicateKey, ownerQuoteRows, ownerQuoteSummary } from "@/lib/owner-materials-quote";
+import type { OwnerMaterialBatchState, OwnerMaterialsAdminState } from "@/lib/owner-materials-admin-data";
+import { ownerSupplierDocuments } from "@/lib/owner-materials-admin-data";
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
-const initialRows: EditableOwnerMaterialRow[] = ownerQuoteRows.map((row, index) => ({
-  id: index,
-  qty: row.qty,
-  itemNo: row.itemNo,
-  sku: `BF-${row.itemNo}`,
-  description: row.description,
-  category: row.unit === "LF" ? "Engineered lumber" : row.description.includes("SIMP") || row.description.includes("HANGER") ? "Hardware" : "Framing",
-  unit: row.unit,
-  supplier: ownerQuoteSummary.supplier,
-  supplierUnitPrice: row.unitPrice,
-  markupPercent: 0,
-  markupDollar: 0,
-  finalUnitPrice: row.unitPrice,
-  duplicateKey: buildOwnerQuoteDuplicateKey(row),
-  publishStatus: "Blocked",
-  reviewStatus: row.unitPrice > 80 ? "Needs review" : "Prep only",
-  photoCount: 0,
-  imageAlt: `${row.description} photo`,
-  imageSource: "Not added",
-  imageLicense: "Pending",
-  imageCredit: "Pending",
-  imageCategory: "Material",
-  galleryCount: 0,
-}));
-
-const sidebarItems = [
-  { label: "Dashboard" },
-  { label: "Materials", active: true },
-  { label: "Quote Batches" },
-  { label: "Published" },
-  { label: "Suppliers" },
-  { label: "Images" },
-  { label: "Settings" },
-];
-
+const sidebarItems = ["Dashboard", "Materials", "Quote Batches", "Published", "Suppliers", "Images", "Settings"];
 const tabs = ["All Materials", "Published", "Unpublished", "Needs Review", "Missing Images"] as const;
-
 type TabKey = (typeof tabs)[number];
 
-export function OwnerMaterialsAdminShell() {
-  const [rows, setRows] = useState(initialRows);
+function cloneState<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function makeBlankRow(batch: OwnerMaterialBatchState): EditableOwnerMaterialRow {
+  const id = `${batch.id}:manual-${Date.now()}`;
+  return {
+    id,
+    qty: 1,
+    itemNo: `NEW-${batch.rows.length + 1}`,
+    sku: `${batch.supplier.slice(0, 3).toUpperCase()}-NEW-${batch.rows.length + 1}`,
+    description: "New material",
+    category: "Materials",
+    unit: "EA",
+    supplier: batch.supplier,
+    supplierUnitPrice: 0,
+    markupPercent: 0,
+    markupDollar: 0,
+    finalUnitPrice: 0,
+    duplicateKey: `${batch.id}-manual-${Date.now()}`,
+    publishStatus: "Draft",
+    reviewStatus: "Needs review",
+    photoCount: 0,
+    imageUrl: "",
+    imageAlt: "New material photo",
+    imageSource: "Not added",
+    imageLicense: "Pending",
+    imageCredit: "Pending",
+    imageCategory: "Materials",
+    galleryCount: 0,
+    notes: "",
+  };
+}
+
+export function OwnerMaterialsAdminShell({ initialState }: { initialState: OwnerMaterialsAdminState }) {
+  const [state, setState] = useState(initialState);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All categories");
   const [supplierFilter, setSupplierFilter] = useState("All suppliers");
   const [statusFilter, setStatusFilter] = useState("All statuses");
-  const [stockFilter, setStockFilter] = useState("All stock states");
   const [activeTab, setActiveTab] = useState<TabKey>("All Materials");
-  const [selectedRowIds, setSelectedRowIds] = useState<number[]>([]);
-  const [editingRowId, setEditingRowId] = useState<number | null>(rows[0]?.id ?? null);
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [editingRowId, setEditingRowId] = useState<string | null>(initialState.batches[0]?.rows[0]?.id ?? null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
+  const batches = state.batches;
+  const activeBatch = batches.find((batch) => batch.id === state.selectedBatchId) ?? batches[0];
+  const rows = activeBatch?.rows ?? [];
   const categories = useMemo(() => ["All categories", ...Array.from(new Set(rows.map((row) => row.category)))], [rows]);
-  const suppliers = useMemo(() => ["All suppliers", ...Array.from(new Set(rows.map((row) => row.supplier)))], [rows]);
-  const statuses = ["All statuses", "Blocked", "Needs review", "Prep only"];
-  const stockStates = ["All stock states", "Needs review", "Ready"];
+  const suppliers = useMemo(() => ["All suppliers", ...Array.from(new Set(batches.map((batch) => batch.supplier)))], [batches]);
+  const statuses = ["All statuses", "Published", "Draft", "Needs review", "Missing image", "Ready"];
 
   const counts = useMemo(() => {
-    const missingImages = rows.filter((row) => row.photoCount === 0).length;
-    const needsReview = rows.filter((row) => row.reviewStatus === "Needs review").length;
-    const published = rows.filter((row) => row.publishStatus === "Published").length;
-    const unpublished = rows.length - published;
-
-    return { missingImages, needsReview, published, unpublished };
-  }, [rows]);
+    const allRows = batches.flatMap((batch) => batch.rows);
+    const missingImages = allRows.filter((row) => row.photoCount === 0).length;
+    const needsReview = allRows.filter((row) => row.reviewStatus === "Needs review" || row.reviewStatus === "Missing image").length;
+    const published = allRows.filter((row) => row.publishStatus === "Published").length;
+    return { missingImages, needsReview, published, unpublished: allRows.length - published, total: allRows.length };
+  }, [batches]);
 
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase();
-
     return rows.filter((row) => {
-      const matchesSearch =
-        !query ||
-        row.itemNo.toLowerCase().includes(query) ||
-        row.sku.toLowerCase().includes(query) ||
-        row.description.toLowerCase().includes(query) ||
-        row.supplier.toLowerCase().includes(query);
+      const matchesSearch = !query || [row.itemNo, row.sku, row.description, row.supplier].some((value) => value.toLowerCase().includes(query));
       const matchesCategory = categoryFilter === "All categories" || row.category === categoryFilter;
       const matchesSupplier = supplierFilter === "All suppliers" || row.supplier === supplierFilter;
       const matchesStatus =
-        statusFilter === "All statuses" ||
-        row.publishStatus === statusFilter ||
-        row.reviewStatus === statusFilter;
-      const matchesStock =
-        stockFilter === "All stock states" || (stockFilter === "Needs review" ? row.reviewStatus === "Needs review" : row.reviewStatus !== "Needs review");
+        statusFilter === "All statuses" || row.publishStatus === statusFilter || row.reviewStatus === statusFilter;
       const matchesTab =
         activeTab === "All Materials"
           ? true
@@ -101,56 +95,49 @@ export function OwnerMaterialsAdminShell() {
               : activeTab === "Needs Review"
                 ? row.reviewStatus === "Needs review"
                 : row.photoCount === 0;
-
-      return matchesSearch && matchesCategory && matchesSupplier && matchesStatus && matchesStock && matchesTab;
+      return matchesSearch && matchesCategory && matchesSupplier && matchesStatus && matchesTab;
     });
-  }, [activeTab, categoryFilter, rows, search, statusFilter, stockFilter, supplierFilter]);
+  }, [activeTab, categoryFilter, rows, search, statusFilter, supplierFilter]);
 
-  const totals = useMemo(() => {
-    return rows.reduce(
-      (acc, row) => {
-        acc.quoteValue += row.qty * row.supplierUnitPrice;
-        acc.clientValue += row.qty * row.finalUnitPrice;
-        if (row.publishStatus === "Blocked") acc.blocked += 1;
-        if (row.publishStatus === "Published") acc.ready += 1;
-        return acc;
-      },
-      { quoteValue: 0, clientValue: 0, blocked: 0, ready: 0 },
-    );
-  }, [rows]);
+  const editingRow = rows.find((row) => row.id === editingRowId) ?? filteredRows[0] ?? rows[0] ?? null;
 
-  const editingRow = rows.find((row) => row.id === editingRowId) ?? rows[0] ?? null;
-
-  function recalcFromMarkup(index: number, patch: Partial<EditableOwnerMaterialRow>) {
-    setRows((current) =>
-      current.map((row) => {
-        if (row.id !== index) return row;
-        const next = { ...row, ...patch };
-        const finalUnitPrice = next.supplierUnitPrice * (1 + next.markupPercent / 100) + next.markupDollar;
-        return { ...next, finalUnitPrice };
-      }),
-    );
+  function updateState(mutator: (current: OwnerMaterialsAdminState) => OwnerMaterialsAdminState) {
+    setState((current) => mutator(cloneState(current)));
   }
 
-  function updateFinalPrice(index: number, nextFinal: number) {
-    setRows((current) =>
-      current.map((row) => {
-        if (row.id !== index) return row;
-        const baseWithPercent = row.supplierUnitPrice * (1 + row.markupPercent / 100);
-        return {
-          ...row,
-          finalUnitPrice: nextFinal,
-          markupDollar: nextFinal - baseWithPercent,
-        };
-      }),
-    );
+  function updateRow(rowId: string, patch: Partial<EditableOwnerMaterialRow>) {
+    updateState((current) => ({
+      ...current,
+      batches: current.batches.map((batch) =>
+        batch.id !== current.selectedBatchId
+          ? batch
+          : {
+              ...batch,
+              rows: batch.rows.map((row) => {
+                if (row.id !== rowId) return row;
+                const next = { ...row, ...patch };
+                const finalUnitPrice = Number(next.finalUnitPrice || 0);
+                const photoCount = next.photoCount || 0;
+                return {
+                  ...next,
+                  finalUnitPrice,
+                  reviewStatus: photoCount > 0 && finalUnitPrice > 0 ? "Ready" : finalUnitPrice > 0 ? "Missing image" : "Needs review",
+                  error: undefined,
+                };
+              }),
+            },
+      ),
+    }));
   }
 
-  function updateRow(index: number, patch: Partial<EditableOwnerMaterialRow>) {
-    setRows((current) => current.map((row) => (row.id === index ? { ...row, ...patch } : row)));
+  function setSelectedBatch(batchId: string) {
+    setSelectedRowIds([]);
+    setEditingRowId(null);
+    setState((current) => ({ ...current, selectedBatchId: batchId }));
+    setNotice(null);
   }
 
-  function toggleSelectedRow(rowId: number) {
+  function toggleSelectedRow(rowId: string) {
     setSelectedRowIds((current) => (current.includes(rowId) ? current.filter((id) => id !== rowId) : [...current, rowId]));
   }
 
@@ -164,61 +151,177 @@ export function OwnerMaterialsAdminShell() {
     setCategoryFilter("All categories");
     setSupplierFilter("All suppliers");
     setStatusFilter("All statuses");
-    setStockFilter("All stock states");
     setActiveTab("All Materials");
   }
 
+  function handleAddMaterial() {
+    if (!activeBatch) return;
+    const nextRow = makeBlankRow(activeBatch);
+    updateState((current) => ({
+      ...current,
+      batches: current.batches.map((batch) => (batch.id === activeBatch.id ? { ...batch, rows: [nextRow, ...batch.rows] } : batch)),
+    }));
+    setEditingRowId(nextRow.id);
+    setNotice("New material added to the current batch.");
+  }
+
+  function handleDuplicateRow(rowId: string) {
+    if (!activeBatch) return;
+    const sourceRow = rows.find((row) => row.id === rowId);
+    if (!sourceRow) return;
+    const nextRow = { ...sourceRow, id: `${sourceRow.id}-copy-${Date.now()}`, itemNo: `${sourceRow.itemNo}-COPY`, publishStatus: "Draft" as const, error: undefined };
+    updateState((current) => ({
+      ...current,
+      batches: current.batches.map((batch) => (batch.id === activeBatch.id ? { ...batch, rows: [nextRow, ...batch.rows] } : batch)),
+    }));
+    setEditingRowId(nextRow.id);
+    setNotice("Material duplicated.");
+  }
+
+  function handleRemoveRow(rowId: string) {
+    updateState((current) => ({
+      ...current,
+      batches: current.batches.map((batch) =>
+        batch.id !== current.selectedBatchId ? batch : { ...batch, rows: batch.rows.filter((row) => row.id !== rowId) },
+      ),
+    }));
+    setSelectedRowIds((current) => current.filter((id) => id !== rowId));
+    if (editingRowId === rowId) setEditingRowId(null);
+    setNotice("Material removed from the current batch.");
+  }
+
+  function handleAddPhoto(rowId: string) {
+    const nextUrl = window.prompt("Paste an image URL or file label for this material", editingRow?.imageUrl || "");
+    if (nextUrl === null) return;
+    updateRow(rowId, {
+      imageUrl: nextUrl.trim(),
+      photoCount: nextUrl.trim() ? 1 : 0,
+      galleryCount: nextUrl.trim() ? 1 : 0,
+      imageSource: nextUrl.trim() ? "Owner upload" : "Not added",
+      imageLicense: nextUrl.trim() ? "Owner provided" : "Pending",
+      imageCredit: nextUrl.trim() ? "Owner upload" : "Pending",
+    });
+    setNotice(nextUrl.trim() ? "Photo attached to material." : "Photo cleared.");
+  }
+
+  function handleRemovePhoto(rowId: string) {
+    updateRow(rowId, { imageUrl: "", photoCount: 0, galleryCount: 0, imageSource: "Not added", imageLicense: "Pending", imageCredit: "Pending" });
+    setNotice("Photo removed.");
+  }
+
+  function exportCsv() {
+    const header = ["batch", "supplier", "quote", "item_no", "sku", "description", "category", "unit", "qty", "cost", "sell", "status"];
+    const lines = [header.join(",")].concat(
+      rows.map((row) =>
+        [activeBatch?.id, row.supplier, activeBatch?.quoteNumber, row.itemNo, row.sku, row.description, row.category, row.unit, row.qty, row.supplierUnitPrice, row.finalUnitPrice, row.publishStatus]
+          .map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`)
+          .join(","),
+      ),
+    );
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${activeBatch?.supplier ?? "materials"}-${activeBatch?.quoteNumber ?? "export"}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    setNotice("CSV export downloaded.");
+  }
+
+  function saveStateToServer() {
+    startTransition(async () => {
+      const saved = await saveOwnerMaterialsAdmin(state);
+      setState(saved);
+      setNotice("Materials admin changes saved.");
+    });
+  }
+
+  function restoreBatches() {
+    startTransition(async () => {
+      const restored = await restoreOwnerMaterialsAdminBatches();
+      setState(restored);
+      setSelectedRowIds([]);
+      setEditingRowId(restored.batches.find((batch) => batch.id === restored.selectedBatchId)?.rows[0]?.id ?? null);
+      setNotice(`Restored ${restored.batches.length} quote batches and ${ownerSupplierDocuments.length} supplier documents.`);
+    });
+  }
+
+  function publishSelection(rowIds: string[]) {
+    if (!activeBatch || rowIds.length === 0) {
+      setNotice("Select at least one material to publish.");
+      return;
+    }
+    startTransition(async () => {
+      const result = await publishOwnerMaterialsSelection(state, activeBatch.id, rowIds);
+      setState(result.state);
+      if (result.error) {
+        setNotice(result.error);
+      } else {
+        setSelectedRowIds((current) => current.filter((id) => !rowIds.includes(id)));
+        setNotice(`${result.publishedCount} material(s) published to shop.`);
+      }
+    });
+  }
+
+  function unpublishSelection(rowIds: string[]) {
+    if (!activeBatch || rowIds.length === 0) return;
+    startTransition(async () => {
+      const result = await unpublishOwnerMaterialsSelection(state, activeBatch.id, rowIds);
+      setState(result.state);
+      setSelectedRowIds((current) => current.filter((id) => !rowIds.includes(id)));
+      setNotice(`${result.unpublishedCount} material(s) moved back to draft.`);
+    });
+  }
+
   return (
-    <main className="min-h-screen bg-[#f3f6fb] px-4 py-5 text-slate-900 sm:px-6 sm:py-8">
-      <section className="mx-auto grid w-full max-w-[1700px] gap-5 xl:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="rounded-[32px] border border-[#d7e2f2] bg-[linear-gradient(180deg,#0f172a_0%,#16233d_100%)] p-5 text-white shadow-[0_22px_70px_rgba(15,23,42,0.28)]">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200/80">BuildFlow</div>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight">Materials admin</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-300">Admin-only dashboard for quote review, photos, and shop prep.</p>
-          </div>
-
-          <nav className="mt-8 space-y-2">
-            {sidebarItems.map((item) => (
-              <div
-                key={item.label}
-                className={`rounded-2xl px-4 py-3 text-sm font-medium ${
-                  item.active ? "bg-white text-slate-950 shadow-[0_10px_30px_rgba(255,255,255,0.16)]" : "text-slate-300"
-                }`}
-              >
-                {item.label}
+    <main className="min-h-screen bg-[#f3f6fb] px-3 py-4 text-slate-900 sm:px-6 sm:py-8">
+      <section className="mx-auto grid w-full max-w-[1720px] gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className={`${isSidebarOpen ? "block" : "hidden"} xl:block`}>
+          <div className="rounded-[30px] border border-[#d7e2f2] bg-[linear-gradient(180deg,#0f172a_0%,#16233d_100%)] p-5 text-white shadow-[0_22px_70px_rgba(15,23,42,0.28)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200/80">BuildFlow</div>
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight">Materials admin</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-300">Quote review, image cleanup, staging, and publish to shop.</p>
               </div>
-            ))}
-          </nav>
+              <button type="button" onClick={() => setIsSidebarOpen(false)} className="rounded-full border border-white/15 px-3 py-1 text-xs xl:hidden">Close</button>
+            </div>
 
-          <div className="mt-8 rounded-[22px] border border-white/10 bg-white/5 p-4 text-sm text-slate-200">
-            <div className="font-semibold text-white">Quote batch</div>
-            <p className="mt-2 text-slate-300">{ownerQuoteSummary.supplier}</p>
-            <p className="mt-1 text-slate-300">Quote {ownerQuoteSummary.quoteNumber}</p>
-            <p className="mt-1 text-slate-300">Date {ownerQuoteSummary.quoteDate}</p>
-          </div>
+            <nav className="mt-8 space-y-2">
+              {sidebarItems.map((item) => (
+                <div key={item} className={`rounded-2xl px-4 py-3 text-sm font-medium ${item === "Materials" ? "bg-white text-slate-950 shadow-[0_10px_30px_rgba(255,255,255,0.16)]" : "text-slate-300"}`}>
+                  {item}
+                </div>
+              ))}
+            </nav>
 
-          <div className="mt-4 rounded-[22px] border border-amber-300/20 bg-amber-400/10 p-4 text-sm text-amber-50">
-            <div className="font-semibold">Publish to shop is still blocked</div>
-            <p className="mt-2 leading-6 text-amber-100/90">Protected write action is not connected yet, so publish controls stay visible but disabled.</p>
+            <div className="mt-8 rounded-[22px] border border-white/10 bg-white/5 p-4 text-sm text-slate-200">
+              <div className="font-semibold text-white">Imported supplier documents</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {ownerSupplierDocuments.map((document) => (
+                  <span key={document} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-100">{document}</span>
+                ))}
+              </div>
+            </div>
           </div>
         </aside>
 
-        <div className="space-y-5">
-          <section className="rounded-[30px] border border-[#d7e2f2] bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+        <div className="space-y-4">
+          <section className="rounded-[28px] border border-[#d7e2f2] bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-1 items-center gap-3 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
-                <span className="text-slate-400">⌕</span>
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search materials, SKU, or supplier"
-                  className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                />
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => setIsSidebarOpen((current) => !current)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 xl:hidden">Menu</button>
+                <div className="flex flex-1 items-center gap-3 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3 lg:min-w-[360px]">
+                  <span className="text-slate-400">⌕</span>
+                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search materials, SKU, or supplier" className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400" />
+                </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="hidden rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 md:block">Owner workspace</div>
+              <div className="flex flex-wrap items-center gap-3">
+                <select value={state.selectedBatchId} onChange={(event) => setSelectedBatch(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none">
+                  {batches.map((batch) => (
+                    <option key={batch.id} value={batch.id}>{batch.supplier} • {batch.quoteNumber} • {batch.quoteDate}</option>
+                  ))}
+                </select>
                 <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">BF</div>
                   <div>
@@ -230,27 +333,27 @@ export function OwnerMaterialsAdminShell() {
             </div>
           </section>
 
-          <section className="rounded-[30px] border border-[#d7e2f2] bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <section className="rounded-[30px] border border-[#d7e2f2] bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">Materials</p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Materials</h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage and publish shop materials.</p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Owner materials dashboard</h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Review imported supplier batches, edit rows, attach photos, and publish selected materials into the shop feed.</p>
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button type="button" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Export</button>
-                <button type="button" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Import</button>
-                <button type="button" className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white">Add Material</button>
+                <button type="button" onClick={exportCsv} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Export CSV</button>
+                <button type="button" onClick={restoreBatches} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Import / Restore batches</button>
+                <button type="button" onClick={handleAddMaterial} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white">Add Material</button>
               </div>
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               {[
-                { label: "All materials", value: rows.length, tone: "bg-slate-50" },
+                { label: "All materials", value: counts.total, tone: "bg-slate-50" },
                 { label: "Published", value: counts.published, tone: "bg-emerald-50" },
                 { label: "Unpublished / Draft", value: counts.unpublished, tone: "bg-slate-50" },
-                { label: "Missing price or image", value: counts.missingImages, tone: "bg-amber-50" },
+                { label: "Missing image", value: counts.missingImages, tone: "bg-amber-50" },
                 { label: "Needs review", value: counts.needsReview, tone: "bg-rose-50" },
               ].map((card) => (
                 <div key={card.label} className={`rounded-[22px] border border-slate-200 px-4 py-4 ${card.tone}`}>
@@ -266,184 +369,127 @@ export function OwnerMaterialsAdminShell() {
               {tabs.map((tab) => {
                 const isActive = activeTab === tab;
                 return (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setActiveTab(tab)}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                      isActive ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"
-                    }`}
-                  >
+                  <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`rounded-full px-4 py-2 text-sm font-semibold ${isActive ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>
                     {tab}
                   </button>
                 );
               })}
             </div>
 
-            <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(260px,1.5fr)_repeat(4,minmax(0,1fr))_auto]">
+            <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(220px,1.6fr)_repeat(3,minmax(0,1fr))_auto]">
               <label className="grid gap-2 text-sm text-slate-700">
-                <span className="font-medium">Search by name / item no / SKU</span>
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search materials"
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none placeholder:text-slate-400"
-                />
+                <span className="font-medium">Search</span>
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search materials" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none placeholder:text-slate-400" />
               </label>
               <label className="grid gap-2 text-sm text-slate-700">
                 <span className="font-medium">Category</span>
                 <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
-                  {categories.map((option) => (
-                    <option key={option}>{option}</option>
-                  ))}
+                  {categories.map((option) => <option key={option}>{option}</option>)}
                 </select>
               </label>
               <label className="grid gap-2 text-sm text-slate-700">
                 <span className="font-medium">Supplier</span>
                 <select value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
-                  {suppliers.map((option) => (
-                    <option key={option}>{option}</option>
-                  ))}
+                  {suppliers.map((option) => <option key={option}>{option}</option>)}
                 </select>
               </label>
               <label className="grid gap-2 text-sm text-slate-700">
                 <span className="font-medium">Status</span>
                 <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
-                  {statuses.map((option) => (
-                    <option key={option}>{option}</option>
-                  ))}
+                  {statuses.map((option) => <option key={option}>{option}</option>)}
                 </select>
               </label>
-              <label className="grid gap-2 text-sm text-slate-700">
-                <span className="font-medium">Stock / review</span>
-                <select value={stockFilter} onChange={(event) => setStockFilter(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
-                  {stockStates.map((option) => (
-                    <option key={option}>{option}</option>
-                  ))}
-                </select>
-              </label>
-              <div className="flex items-end">
-                <button type="button" onClick={resetFilters} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 xl:w-auto">Reset</button>
-              </div>
+              <button type="button" onClick={resetFilters} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 xl:self-end">Reset filters</button>
             </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" onClick={saveStateToServer} disabled={isPending} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Save</button>
+              <button type="button" onClick={() => publishSelection(selectedRowIds)} disabled={isPending || selectedRowIds.length === 0} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Publish selected</button>
+              <button type="button" onClick={() => unpublishSelection(selectedRowIds)} disabled={isPending || selectedRowIds.length === 0} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-60">Unpublish selected</button>
+              <div className="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600">{selectedRowIds.length} selected</div>
+            </div>
+
+            {notice ? <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{notice}</div> : null}
           </section>
 
-          <section className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_340px]">
-            <div className="space-y-5">
-              <section className="rounded-[26px] border border-[#d7e2f2] bg-white px-5 py-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-950">Bulk actions</div>
-                    <p className="mt-1 text-sm text-slate-500">{selectedRowIds.length} selected · Publish controls remain visible but blocked.</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700">Save</button>
-                    <button type="button" disabled className="cursor-not-allowed rounded-2xl bg-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-500">Publish selected</button>
-                  </div>
+          <section className="grid gap-4 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.9fr)]">
+            <div className="rounded-[30px] border border-[#d7e2f2] bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-950">{activeBatch?.supplier} batch</h2>
+                  <p className="text-sm text-slate-500">Quote {activeBatch?.quoteNumber} • {activeBatch?.quoteDate} • {filteredRows.length} visible rows</p>
                 </div>
-              </section>
-
+                <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                  {activeBatch?.documents.map((document) => <span key={document} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">{document}</span>)}
+                </div>
+              </div>
               <OwnerMaterialsAdminTable
                 rows={filteredRows}
                 selectedRowIds={selectedRowIds}
-                onToggleSelectedRow={toggleSelectedRow}
-                onToggleSelectAll={toggleSelectAll}
-                allVisibleSelected={filteredRows.length > 0 && filteredRows.every((row) => selectedRowIds.includes(row.id))}
-                onMarkupChange={recalcFromMarkup}
-                onFinalPriceChange={updateFinalPrice}
+                onToggleRow={toggleSelectedRow}
+                onToggleAll={toggleSelectAll}
                 onEditRow={setEditingRowId}
+                onPublishRow={(rowId) => publishSelection([rowId])}
+                onUnpublishRow={(rowId) => unpublishSelection([rowId])}
+                onDuplicateRow={handleDuplicateRow}
+                onRemoveRow={handleRemoveRow}
+                onAddPhoto={handleAddPhoto}
+                onRemovePhoto={handleRemovePhoto}
                 editingRowId={editingRowId}
               />
-
-              <section className="rounded-[26px] border border-[#d7e2f2] bg-white px-5 py-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-950">Showing {filteredRows.length} materials</div>
-                    <p className="mt-1 text-sm text-slate-500">Quote batch {ownerQuoteSummary.quoteNumber} · Supplier value {money(totals.quoteValue)} · Client value {money(totals.clientValue)}</p>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-                    <button type="button" className="rounded-xl border border-slate-200 px-3 py-2">Prev</button>
-                    <span className="rounded-xl bg-slate-50 px-3 py-2">Page 1 of 1</span>
-                    <button type="button" className="rounded-xl border border-slate-200 px-3 py-2">Next</button>
-                  </div>
-                </div>
-              </section>
             </div>
 
-            <aside className="rounded-[30px] border border-[#d7e2f2] bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-              <div className="flex items-center justify-between gap-3">
+            <section className="rounded-[30px] border border-[#d7e2f2] bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-slate-950">Edit material</div>
-                  <p className="mt-1 text-sm text-slate-500">Compact side panel for the selected row.</p>
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Editor</div>
+                  <h2 className="mt-2 text-xl font-semibold text-slate-950">{editingRow?.description ?? "Select a material"}</h2>
                 </div>
-                {editingRow ? (
-                  <button type="button" onClick={() => toggleSelectedRow(editingRow.id)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
-                    {selectedRowIds.includes(editingRow.id) ? "Selected" : "Select"}
-                  </button>
-                ) : null}
+                {editingRow?.publishStatus ? <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">{editingRow.publishStatus}</span> : null}
               </div>
 
               {editingRow ? (
-                <div className="mt-5 space-y-4">
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Item</div>
-                    <div className="mt-2 text-lg font-semibold text-slate-950">{editingRow.description}</div>
-                    <div className="mt-1 text-sm text-slate-600">{editingRow.itemNo} · {editingRow.sku}</div>
+                <div className="mt-5 grid gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Item no / SKU</span><input value={editingRow.itemNo} onChange={(event) => updateRow(editingRow.id, { itemNo: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">SKU</span><input value={editingRow.sku} onChange={(event) => updateRow(editingRow.id, { sku: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                  </div>
+                  <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Description / Name</span><input value={editingRow.description} onChange={(event) => updateRow(editingRow.id, { description: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Category</span><input value={editingRow.category} onChange={(event) => updateRow(editingRow.id, { category: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Supplier</span><input value={editingRow.supplier} onChange={(event) => updateRow(editingRow.id, { supplier: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Unit</span><input value={editingRow.unit} onChange={(event) => updateRow(editingRow.id, { unit: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Qty</span><input type="number" value={editingRow.qty} onChange={(event) => updateRow(editingRow.id, { qty: Number(event.target.value) })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Cost</span><input type="number" step="0.01" value={editingRow.supplierUnitPrice} onChange={(event) => updateRow(editingRow.id, { supplierUnitPrice: Number(event.target.value) })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Markup %</span><input type="number" step="0.01" value={editingRow.markupPercent} onChange={(event) => { const markupPercent = Number(event.target.value); const finalUnitPrice = editingRow.supplierUnitPrice * (1 + markupPercent / 100) + editingRow.markupDollar; updateRow(editingRow.id, { markupPercent, finalUnitPrice }); }} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Markup $</span><input type="number" step="0.01" value={editingRow.markupDollar} onChange={(event) => { const markupDollar = Number(event.target.value); const finalUnitPrice = editingRow.supplierUnitPrice * (1 + editingRow.markupPercent / 100) + markupDollar; updateRow(editingRow.id, { markupDollar, finalUnitPrice }); }} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Sell price</span><input type="number" step="0.01" value={editingRow.finalUnitPrice} onChange={(event) => updateRow(editingRow.id, { finalUnitPrice: Number(event.target.value) })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                  </div>
+                  <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Photo URL / label</span><input value={editingRow.imageUrl} onChange={(event) => updateRow(editingRow.id, { imageUrl: event.target.value, photoCount: event.target.value.trim() ? 1 : 0, galleryCount: event.target.value.trim() ? 1 : 0 })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                  <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Notes</span><textarea value={editingRow.notes ?? ""} onChange={(event) => updateRow(editingRow.id, { notes: event.target.value })} rows={4} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+
+                  <div className="grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    <div className="flex flex-wrap items-center justify-between gap-3"><span>Extended cost</span><strong className="text-slate-950">{money(editingRow.qty * editingRow.supplierUnitPrice)}</strong></div>
+                    <div className="flex flex-wrap items-center justify-between gap-3"><span>Extended sell</span><strong className="text-slate-950">{money(editingRow.qty * editingRow.finalUnitPrice)}</strong></div>
+                    <div className="flex flex-wrap items-center justify-between gap-3"><span>Review status</span><strong className="text-slate-950">{editingRow.reviewStatus}</strong></div>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                    <label className="grid gap-2 text-sm text-slate-700">
-                      <span className="font-medium">Category</span>
-                      <input value={editingRow.category} onChange={(event) => updateRow(editingRow.id, { category: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900" />
-                    </label>
-                    <label className="grid gap-2 text-sm text-slate-700">
-                      <span className="font-medium">Supplier</span>
-                      <input value={editingRow.supplier} onChange={(event) => updateRow(editingRow.id, { supplier: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900" />
-                    </label>
-                    <label className="grid gap-2 text-sm text-slate-700">
-                      <span className="font-medium">Unit</span>
-                      <input value={editingRow.unit} onChange={(event) => updateRow(editingRow.id, { unit: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900" />
-                    </label>
-                    <label className="grid gap-2 text-sm text-slate-700">
-                      <span className="font-medium">Markup %</span>
-                      <input type="number" step="0.01" value={editingRow.markupPercent} onChange={(event) => recalcFromMarkup(editingRow.id, { markupPercent: Number(event.target.value || 0) })} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900" />
-                    </label>
-                  </div>
-
-                  <div className="rounded-[24px] border border-slate-200 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-950">Photo controls</div>
-                        <p className="mt-1 text-xs text-slate-500">Compact image UI only.</p>
-                      </div>
-                      <button type="button" className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">Add photo</button>
-                    </div>
-                    <div className="mt-4 flex items-center gap-3">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-[11px] font-medium text-slate-500">No image</div>
-                      <div className="text-sm text-slate-600">
-                        <div>{editingRow.photoCount} photos</div>
-                        <div className="mt-1">Primary image: not set</div>
-                      </div>
-                    </div>
-                    <div className="mt-4 grid gap-2 text-sm text-slate-600">
-                      <div>imageAlt: {editingRow.imageAlt}</div>
-                      <div>imageSource: {editingRow.imageSource}</div>
-                      <div>imageLicense: {editingRow.imageLicense}</div>
-                      <div>imageCredit: {editingRow.imageCredit}</div>
-                      <div>imageCategory: {editingRow.imageCategory}</div>
-                      <div>gallery fields: {editingRow.galleryCount}</div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-                    <div className="font-semibold">Publish status: Blocked</div>
-                    <p className="mt-2 leading-6">Publishing will be enabled after protected shop write action is connected.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={saveStateToServer} disabled={isPending} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Save</button>
+                    <button type="button" onClick={() => publishSelection([editingRow.id])} disabled={isPending} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Publish item</button>
+                    {editingRow.publishStatus === "Published" ? <button type="button" onClick={() => unpublishSelection([editingRow.id])} disabled={isPending} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-60">Unpublish item</button> : null}
+                    <button type="button" onClick={() => handleAddPhoto(editingRow.id)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">{editingRow.photoCount > 0 ? "Replace photo" : "Add photo"}</button>
+                    {editingRow.photoCount > 0 ? <button type="button" onClick={() => handleRemovePhoto(editingRow.id)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Remove photo</button> : null}
                   </div>
                 </div>
               ) : (
-                <div className="mt-6 text-sm text-slate-500">Select a material row to edit it here.</div>
+                <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-sm text-slate-500">Select a material row to edit it here.</div>
               )}
-            </aside>
+            </section>
           </section>
         </div>
       </section>

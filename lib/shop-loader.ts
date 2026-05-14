@@ -1,6 +1,7 @@
 import "server-only";
 
 import { SHOP_ITEM_SELECT_FIELDS, type ShopItemRecord } from "@/lib/shop";
+import { getLocalPublishedShopItems } from "@/lib/owner-materials-admin-store";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -8,7 +9,13 @@ type LoadShopItemsOptions = {
   limit?: number;
 };
 
+function mergeUniqueShopItems(primary: ShopItemRecord[] | null | undefined, fallback: ShopItemRecord[]) {
+  const merged = [...fallback, ...(primary ?? [])];
+  return merged.filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index);
+}
+
 export async function loadShopItems({ limit = 24 }: LoadShopItemsOptions = {}) {
+  const localItems = await getLocalPublishedShopItems();
   const supabase = await createClient();
   const publicResult = await supabase
     .from("shop_items")
@@ -18,7 +25,10 @@ export async function loadShopItems({ limit = 24 }: LoadShopItemsOptions = {}) {
     .returns<ShopItemRecord[]>();
 
   if (!publicResult.error && (publicResult.data?.length ?? 0) > 0) {
-    return publicResult;
+    return {
+      ...publicResult,
+      data: mergeUniqueShopItems(publicResult.data, localItems).slice(0, limit),
+    };
   }
 
   const admin = createAdminClient();
@@ -30,8 +40,14 @@ export async function loadShopItems({ limit = 24 }: LoadShopItemsOptions = {}) {
     .returns<ShopItemRecord[]>();
 
   if ((adminResult.data?.length ?? 0) > 0 || publicResult.error) {
-    return adminResult;
+    return {
+      ...adminResult,
+      data: mergeUniqueShopItems(adminResult.data, localItems).slice(0, limit),
+    };
   }
 
-  return publicResult;
+  return {
+    ...publicResult,
+    data: localItems.slice(0, limit),
+  };
 }
