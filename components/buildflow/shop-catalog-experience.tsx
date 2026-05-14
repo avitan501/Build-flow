@@ -13,7 +13,7 @@ type ShopCatalogExperienceProps = {
 }
 
 type SortMode = "featured" | "price-low" | "price-high"
-type BrowseTab = "materials" | "deals" | "suppliers" | "saved" | "cart"
+type BrowseTab = "materials" | "services" | "deals" | "suppliers" | "saved" | "cart"
 
 const SHOP_CATEGORIES = [
   "All",
@@ -64,6 +64,17 @@ function MaterialsIcon() {
   )
 }
 
+function ServiceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 6h16" />
+      <path d="M4 12h10" />
+      <path d="M4 18h8" />
+      <path d="m17 10 3 3-3 3" />
+    </svg>
+  )
+}
+
 function TagIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -108,6 +119,30 @@ function PlusIcon() {
       <path d="M12 5v14" />
       <path d="M5 12h14" />
     </svg>
+  )
+}
+
+function ServiceListCard({ product }: { product: ShopCatalogProduct }) {
+  const price = formatCurrency(product.price)
+
+  return (
+    <Link
+      href={`/shop/${product.slug}`}
+      className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-white px-3 py-3 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
+    >
+      <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 text-sky-700">
+        <ServiceIcon />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="mb-1 inline-flex rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700">Service</span>
+        <span className="block truncate text-sm font-semibold text-slate-950">{product.name}</span>
+        <span className="mt-1 block line-clamp-2 text-[12px] leading-5 text-slate-600">{product.shortDescription || product.description}</span>
+      </span>
+      <span className="shrink-0 text-right">
+        <span className="block text-base font-bold text-slate-950">{price.dollars}<span className="text-[10px] align-top">.{price.cents}</span></span>
+        <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">View details</span>
+      </span>
+    </Link>
   )
 }
 
@@ -177,6 +212,7 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [browseTab, setBrowseTab] = useState<BrowseTab>("materials")
   const supplierSectionRef = useRef<HTMLElement>(null)
+  const serviceSectionRef = useRef<HTMLElement>(null)
 
   const query = (searchParams.get("q") ?? "").trim()
   const normalizedQuery = query.toLowerCase()
@@ -230,6 +266,7 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
     .slice(0, 8)
 
   const savedProducts = products.filter((product) => savedIds.includes(product.id))
+  const serviceProducts = products.filter((product) => product.productType === "service")
 
   const filteredProducts = (() => {
     const base = products.filter((product) => {
@@ -254,6 +291,8 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
         })
     }
   })()
+
+  const materialFilteredProducts = filteredProducts.filter((product) => product.productType !== "service")
 
   const resultLabel = query ? `Search results for "${query}"` : browseTab === "saved" ? "Saved materials" : activeCategory === "All" ? "All materials" : activeCategory
 
@@ -300,6 +339,13 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
 
     setBrowseTab(tab)
 
+    if (tab === "services") {
+      setSortMode("featured")
+      applyFilters({ category: "Services" })
+      setTimeout(() => serviceSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0)
+      return
+    }
+
     if (tab === "suppliers") {
       supplierSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
       return
@@ -323,9 +369,10 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
         <section className="rounded-[24px] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-4">
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             {[
               { key: "materials", label: "Materials", icon: MaterialsIcon },
+              { key: "services", label: "Services", icon: ServiceIcon },
               { key: "deals", label: "Deals", icon: TagIcon },
               { key: "suppliers", label: "Suppliers", icon: TruckIcon },
               { key: "saved", label: "Saved", icon: BookmarkIcon },
@@ -352,20 +399,19 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
           </div>
         </section>
 
-        {filteredProducts.some((product) => product.productType === "service") ? (
-          <section className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-lg font-bold text-slate-950">Survey services</div>
-                <div className="text-sm text-slate-500">Professional field survey options alongside your materials catalog</div>
-              </div>
-              <button type="button" onClick={() => setCategory("Services")} className="text-sm font-semibold text-sky-700">
-                View services
-              </button>
+        {serviceProducts.length > 0 ? (
+          <section ref={serviceSectionRef} className="rounded-[24px] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Services</div>
+              {browseTab !== "services" ? (
+                <button type="button" onClick={() => activateTab("services")} className="text-sm font-semibold text-sky-700">
+                  View all
+                </button>
+              ) : null}
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {products.filter((product) => product.productType === "service").map((product) => (
-                <ShopProductCard key={`service-${product.id}`} product={product} onQuickAdd={quickAdd} />
+            <div className="grid gap-2.5 md:grid-cols-3">
+              {(browseTab === "services" || activeCategory === "Services" ? serviceProducts : serviceProducts.slice(0, 3)).map((product) => (
+                <ServiceListCard key={`service-${product.id}`} product={product} />
               ))}
             </div>
           </section>
@@ -505,9 +551,9 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
           </section>
         ) : null}
 
-        {filteredProducts.length > 0 ? (
+        {materialFilteredProducts.length > 0 ? (
           <section aria-label="Products" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
-            {filteredProducts.map((product) => (
+            {materialFilteredProducts.map((product) => (
               <ShopProductCard key={product.id} product={product} onQuickAdd={quickAdd} />
             ))}
           </section>
