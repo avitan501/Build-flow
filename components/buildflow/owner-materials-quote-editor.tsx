@@ -817,7 +817,97 @@ export function OwnerMaterialsQuoteEditor({ savedEstimates, publishedKeys }: Pro
           </div>
         ) : null}
 
-        <div className="overflow-x-auto xl:overflow-x-auto">
+        <div className="space-y-3 md:hidden">
+          {activeBatch.rows.map((row) => {
+            const key = buildOwnerReviewDuplicateKey(activeBatch, row);
+            const isPublished = localPublishedKeys.has(key);
+
+            return (
+              <article key={row.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <input type="checkbox" checked={row.publish} onChange={(event) => updateRow(row.id, { publish: event.target.checked })} />
+                    Select
+                  </label>
+                  <span className={`rounded-full px-2 py-1 text-xs font-semibold ${isPublished ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>
+                    {isPublished ? "Published" : "Review"}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <label className="grid gap-1 text-sm">
+                    <span className="text-xs font-medium text-slate-600">Item no</span>
+                    <input value={row.itemNo} onChange={(event) => updateRow(row.id, { itemNo: event.target.value })} className="rounded border border-slate-300 px-2 py-2" />
+                  </label>
+                  <label className="grid gap-1 text-sm sm:col-span-2">
+                    <span className="text-xs font-medium text-slate-600">Description</span>
+                    <textarea value={row.description} onChange={(event) => updateRow(row.id, { description: event.target.value, category: inferOwnerMaterialCategory(event.target.value) })} className="min-h-20 rounded border border-slate-300 px-2 py-2 leading-5" />
+                  </label>
+                  <label className="grid gap-1 text-sm">
+                    <span className="text-xs font-medium text-slate-600">Category</span>
+                    <select value={row.category} onChange={(event) => updateRow(row.id, { category: event.target.value })} className="rounded border border-slate-300 px-2 py-2">
+                      {SHOP_CATEGORY_NAMES.map((category) => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-1 text-sm">
+                    <span className="text-xs font-medium text-slate-600">Unit</span>
+                    <input value={row.unit} onChange={(event) => updateRow(row.id, { unit: event.target.value })} className="rounded border border-slate-300 px-2 py-2" />
+                  </label>
+                  <label className="grid gap-1 text-sm">
+                    <span className="text-xs font-medium text-slate-600">Qty</span>
+                    <input type="number" step="0.001" value={numeric(row.qty)} onChange={(event) => updateRow(row.id, { qty: Number(event.target.value || 0) })} className="rounded border border-slate-300 px-2 py-2" />
+                  </label>
+                  <label className="grid gap-1 text-sm">
+                    <span className="text-xs font-medium text-slate-600">Cost</span>
+                    <input type="number" step="0.01" value={numeric(row.supplierUnitPrice)} onChange={(event) => updateRow(row.id, { supplierUnitPrice: Number(event.target.value || 0) }, "markup")} className="rounded border border-slate-300 px-2 py-2" />
+                  </label>
+                  <label className="grid gap-1 text-sm">
+                    <span className="text-xs font-medium text-slate-600">Markup %</span>
+                    <input type="number" step="0.01" value={numeric(row.markupPercent)} onChange={(event) => updateRow(row.id, { markupPercent: Number(event.target.value || 0) }, "markup")} className="rounded border border-slate-300 px-2 py-2" />
+                  </label>
+                  <label className="grid gap-1 text-sm">
+                    <span className="text-xs font-medium text-slate-600">Sell price</span>
+                    <input type="number" step="0.01" value={numeric(row.finalUnitPrice)} onChange={(event) => updateRow(row.id, { finalUnitPrice: Number(event.target.value || 0) }, "final")} className="rounded border border-slate-300 px-2 py-2" />
+                  </label>
+                </div>
+
+                <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2.5">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="text-xs font-medium text-slate-600">Photos</div>
+                    <div className="text-xs text-slate-500">{row.photoGallery.length} photo{row.photoGallery.length === 1 ? "" : "s"}</div>
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {row.photoGallery.map((photo, index) => (
+                      <div key={`${row.id}-${photo.imageUrl}-${index}`} className="w-[72px] shrink-0 rounded-md border border-slate-200 bg-white p-1.5">
+                        <img src={photo.imageUrl} alt={photo.imageAlt} className="h-14 w-full rounded object-cover" />
+                        <div className="mt-1 flex flex-col gap-1">
+                          <button type="button" onClick={() => setPrimaryPhoto(row.id, photo)} className="rounded border border-slate-300 px-1 py-0.5 text-[10px] font-semibold text-slate-700">Primary</button>
+                          <button type="button" onClick={() => removePhotoFromRow(row.id, photo.imageUrl)} className="rounded border border-red-200 px-1 py-0.5 text-[10px] font-semibold text-red-700">Remove</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 grid gap-2">
+                    <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => void handlePhotoUpload(row.id, event.target.files)} className="block w-full text-[11px] text-slate-700 file:mr-2 file:rounded-md file:border-0 file:bg-slate-900 file:px-2 file:py-1.5 file:text-[11px] file:font-semibold file:text-white" />
+                    <div className="flex gap-2">
+                      <input value={photoUrlDrafts[row.id] ?? ""} onChange={(event) => setPhotoUrlDrafts((current) => ({ ...current, [row.id]: event.target.value }))} placeholder="https://..." className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm" />
+                      <button type="button" onClick={() => addPhotoUrl(row.id)} className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800">Add URL</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-slate-900">Extended {money(row.qty * row.finalUnitPrice)}</div>
+                  <button type="button" onClick={() => removeRow(row.id)} className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700">Remove</button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block xl:overflow-x-auto">
           <table className="min-w-[1240px] w-full border-collapse text-left text-sm xl:min-w-[1360px]">
             <thead className="bg-slate-100 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
               <tr>

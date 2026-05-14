@@ -17,15 +17,21 @@ export async function loadShopItems({ limit = 24 }: LoadShopItemsOptions = {}) {
     .limit(limit)
     .returns<ShopItemRecord[]>();
 
-  if (!publicResult.error) {
+  if (!publicResult.error && (publicResult.data?.length ?? 0) > 0) {
     return publicResult;
   }
 
   const admin = createAdminClient();
-  return admin
+  const adminResult = await admin
     .from("shop_items")
     .select(SHOP_ITEM_SELECT_FIELDS)
     .order("created_at", { ascending: false })
     .limit(limit)
     .returns<ShopItemRecord[]>();
+
+  if ((adminResult.data?.length ?? 0) > 0 || publicResult.error) {
+    return adminResult;
+  }
+
+  return publicResult;
 }
