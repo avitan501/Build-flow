@@ -15,6 +15,7 @@ export type ShopCatalogProduct = {
   slug: string
   name: string
   description: string
+  shortDescription?: string
   category: string
   unit: string
   price: number
@@ -35,6 +36,8 @@ export type ShopCatalogProduct = {
   reviewLabel: string
   rating: number
   relatedCategories: string[]
+  productType?: "material" | "service"
+  detailBullets?: string[]
 }
 
 type ProductSeed = Omit<ShopCatalogProduct, "id">
@@ -44,6 +47,7 @@ const LOCAL_IMAGE_LICENSE = "BuildFlow placeholder asset"
 const LOCAL_IMAGE_CREDIT = "BuildFlow"
 
 export const MATERIAL_IMAGE_CATEGORIES = [
+  "Services",
   "Lumber",
   "Plywood",
   "Drywall",
@@ -67,6 +71,7 @@ export const MATERIAL_IMAGE_CATEGORIES = [
 ] as const
 
 const MATERIAL_PLACEHOLDER_BY_CATEGORY: Record<(typeof MATERIAL_IMAGE_CATEGORIES)[number], string> = {
+  Services: "/images/materials/services.svg",
   Lumber: "/images/materials/lumber.svg",
   Plywood: "/images/materials/plywood.svg",
   Drywall: "/images/materials/drywall.svg",
@@ -90,6 +95,11 @@ const MATERIAL_PLACEHOLDER_BY_CATEGORY: Record<(typeof MATERIAL_IMAGE_CATEGORIES
 }
 
 const CATEGORY_ALIASES: Record<string, (typeof MATERIAL_IMAGE_CATEGORIES)[number]> = {
+  service: "Services",
+  services: "Services",
+  survey: "Services",
+  surveys: "Services",
+  stakeout: "Services",
   adhesive: "Hardware",
   adhesives: "Hardware",
   cabinet: "Cabinets",
@@ -220,6 +230,75 @@ function galleryForProduct(primary: ShopProductImage, category: string | null | 
 }
 
 const PRODUCT_SEED_INPUTS = [
+  {
+    slug: "stakeout-foundations",
+    name: "Stakeout Foundations",
+    description: "We mark the exact foundation location on site before construction begins, helping the builder place footings, walls, and foundation work according to the approved plans.",
+    shortDescription: "Marks the foundation location on site before construction starts.",
+    category: "Services",
+    unit: "Per service",
+    price: 850,
+    supplierName: "BuildFlow survey services",
+    quoteNumber: "SRV-STK-001",
+    specLine: "Foundation stakeout before concrete and footing work begins",
+    featuredLabel: "Field layout service",
+    popularUse: "Foundation layout",
+    reviewLabel: "Service",
+    rating: 5,
+    relatedCategories: ["Services", "Concrete"],
+    productType: "service",
+    detailBullets: [
+      "Foundation corners and primary layout points marked on site",
+      "Helps footings and walls start in the approved location",
+      "Useful before excavation, formwork, and concrete placement",
+    ],
+  },
+  {
+    slug: "under-construction-survey-for-structures",
+    name: "Under Construction Survey for Structures",
+    description: "A progress survey performed while the structure is being built to confirm location, layout, and construction alignment before the project continues too far.",
+    shortDescription: "Confirms the structure is being built in the correct location during construction.",
+    category: "Services",
+    unit: "Per service",
+    price: 800,
+    supplierName: "BuildFlow survey services",
+    quoteNumber: "SRV-UCS-002",
+    specLine: "Mid-project alignment and location check during active construction",
+    featuredLabel: "Progress verification",
+    popularUse: "Structure layout confirmation",
+    reviewLabel: "Service",
+    rating: 5,
+    relatedCategories: ["Services", "Lumber"],
+    productType: "service",
+    detailBullets: [
+      "Confirms structure location before the project advances too far",
+      "Helps catch layout drift while corrections are still manageable",
+      "Useful during framing or structural progress milestones",
+    ],
+  },
+  {
+    slug: "final-survey",
+    name: "Final Survey",
+    description: "A completed as-built survey showing the final location of the structure and site improvements after construction is finished, often needed for closing, permits, or final approvals.",
+    shortDescription: "Shows the completed structure and site improvements after the work is finished.",
+    category: "Services",
+    unit: "Per service",
+    price: 950,
+    supplierName: "BuildFlow survey services",
+    quoteNumber: "SRV-FNL-003",
+    specLine: "As-built survey for final approvals, permits, and closing needs",
+    featuredLabel: "Closing ready",
+    popularUse: "Final approvals",
+    reviewLabel: "Service",
+    rating: 5,
+    relatedCategories: ["Services", "Concrete"],
+    productType: "service",
+    detailBullets: [
+      "Documents final structure and site improvement locations",
+      "Useful for permit closeout, lender requests, and final approvals",
+      "Presents a clean end-of-project site position record",
+    ],
+  },
   {
     slug: "2x4-premium-lumber",
     name: "2x4 Premium Lumber",
@@ -364,7 +443,9 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = PRODUCT_SEED_INPUTS.ma
     imageCredit: image.imageCredit,
     imageCategory: image.imageCategory,
     gallery: galleryForProduct(image, product.category),
-    availability: "Ready to quote",
+    availability: product.productType === "service" ? "Ready to schedule" : "Ready to quote",
+    productType: product.productType ?? "material",
+    detailBullets: product.detailBullets ?? [],
   }
 })
 
@@ -407,6 +488,7 @@ export function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[
       slug: slugifyShopProduct(`${item.name}-${item.id.slice(0, 6)}`),
       name: item.name,
       description: item.description || "Supplier catalog item ready for project quoting.",
+      shortDescription: item.description || "Supplier catalog item ready for project quoting.",
       category: item.category || "Materials",
       unit: item.unit || "Unit not specified",
       price: item.unit_price,
@@ -427,12 +509,17 @@ export function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[
       reviewLabel: `${(4.6 + (index % 4) * 0.1).toFixed(1)} - ${48 + index * 13} reviews`,
       rating: 4.6 + (index % 4) * 0.1,
       relatedCategories: [item.category || "Materials", image.imageCategory],
+      productType: "material",
+      detailBullets: [],
     }
   })
 }
 
 export function buildShopProducts(itemsData: ShopItemRecord[] | null | undefined, error: unknown) {
-  return !error && itemsData && itemsData.length > 0 ? normalizeShopItems(itemsData) : SAMPLE_SHOP_PRODUCTS
+  const dynamicProducts = !error && itemsData && itemsData.length > 0 ? normalizeShopItems(itemsData) : SAMPLE_SHOP_PRODUCTS.filter((product) => product.productType !== "service")
+  const serviceProducts = SAMPLE_SHOP_PRODUCTS.filter((product) => product.productType === "service")
+
+  return [...serviceProducts, ...dynamicProducts]
 }
 
 export function findShopProductBySlug(products: ShopCatalogProduct[], slug: string) {

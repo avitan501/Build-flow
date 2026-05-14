@@ -59,6 +59,7 @@ function BookmarkIcon({ filled = false }: { filled?: boolean }) {
 
 export function ShopProductDetailExperience({ product, relatedProducts }: ShopProductDetailExperienceProps) {
   const [quantity, setQuantity] = useState(1)
+  const isService = product.productType === "service"
   const [activeImage, setActiveImage] = useState(product.gallery[0]?.imageUrl || product.imageUrl)
   const [cartCount, setCartCount] = useState(0)
   const [saved, setSaved] = useState(false)
@@ -94,6 +95,8 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
   }
 
   const price = formatCurrencyParts(product.price)
+  const infoTitle = isService ? "Service information" : "Product information"
+  const relatedTitle = isService ? "Related shop items" : "Related materials"
 
   return (
     <main className="min-h-screen bg-[#f4f7fb] pb-28 text-slate-950">
@@ -122,7 +125,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600">{product.category}</div>
-                  <div className="mt-2 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">New catalog item</div>
+                  <div className="mt-2 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">{isService ? "Professional service" : "New catalog item"}</div>
                 </div>
                 <button
                   type="button"
@@ -164,7 +167,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                 <div className="mt-2 flex flex-wrap gap-2 text-sm text-slate-500">
                   <span>{product.unit}</span>
                   <span className="text-slate-300">•</span>
-                  <span>Ready to quote</span>
+                  <span>{isService ? "Ready to schedule" : "Ready to quote"}</span>
                 </div>
 
                 <div className="mt-4 flex items-end gap-1 text-slate-950">
@@ -173,6 +176,17 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                 </div>
 
                 <div className="mt-4 rounded-[20px] bg-slate-50 p-4 text-sm leading-6 text-slate-700 sm:rounded-[24px]">{product.description}</div>
+
+                {product.detailBullets && product.detailBullets.length > 0 ? (
+                  <div className="mt-4 rounded-[20px] border border-slate-200 bg-white p-4 sm:rounded-[24px]">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">What is included</div>
+                    <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+                      {product.detailBullets.map((bullet) => (
+                        <li key={bullet} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-sky-500" /> <span>{bullet}</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
 
                 <div className="mt-4 rounded-[20px] border border-slate-200 bg-[#f8fbff] p-4 sm:rounded-[24px]">
                   <div className="flex items-center justify-between gap-3">
@@ -188,7 +202,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <button
                     type="button"
                     onClick={addToCart}
@@ -196,23 +210,26 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                   >
                     Add to cart
                   </button>
-                  <Link href="/cart" className="inline-flex min-h-14 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-base font-semibold text-slate-800 shadow-sm">
-                    Continue request
-                  </Link>
+                  <button
+                    type="button"
+                    className="inline-flex min-h-14 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-base font-semibold text-slate-800 shadow-sm"
+                  >
+                    Buy now
+                  </button>
                 </div>
 
                 <div className={`mt-4 rounded-[18px] border px-4 py-3 text-sm ${addedMessage ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-sky-100 bg-sky-50 text-slate-600"}`}>
-                  {addedMessage ?? "Ready to add to cart. Saved items appear in the shop saved section."}
+                  {addedMessage ?? (isService ? "Ready to add this service to your cart. Buy now is visual only while payments stay inactive." : "Ready to add to cart. Saved items appear in the shop saved section.")}
                 </div>
               </div>
 
               <div className="mt-4 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
                 <details open>
-                  <summary className="cursor-pointer list-none px-5 py-4 text-base font-semibold text-slate-950">Product information</summary>
+                  <summary className="cursor-pointer list-none px-5 py-4 text-base font-semibold text-slate-950">{infoTitle}</summary>
                   <div className="border-t border-slate-100 px-5 py-4 text-sm text-slate-700">
                     <div className="leading-6">{product.description}</div>
                     <div className="mt-4 grid gap-2">
-                      <div><span className="font-medium text-slate-500">Product specs:</span> {product.specLine}</div>
+                      <div><span className="font-medium text-slate-500">{isService ? "Service scope:" : "Product specs:"}</span> {product.specLine}</div>
                       <div><span className="font-medium text-slate-500">Unit:</span> {product.unit}</div>
                       <div><span className="font-medium text-slate-500">Best use:</span> {product.popularUse}</div>
                       <div><span className="font-medium text-slate-500">Supplier:</span> {product.supplierName || "BuildFlow sample catalog"}</div>
@@ -224,14 +241,14 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
 
               <div className="mt-4 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:rounded-[28px]">
                 <div className="text-base font-semibold text-slate-950">Catalog status</div>
-                <div className="mt-2 text-sm text-slate-600">Ready to quote. Use this page to compare finish, unit, supplier, and intended use before adding the item to your request.</div>
+                <div className="mt-2 text-sm text-slate-600">{isService ? "Ready to schedule. Review scope, timing, and service fit before adding it to your cart." : "Ready to quote. Use this page to compare finish, unit, supplier, and intended use before adding the item to your request."}</div>
               </div>
             </section>
           </div>
 
           <section className="border-t border-slate-100 bg-[#fbfdff] px-4 py-5 sm:px-6">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-slate-950">Related materials</h2>
+              <h2 className="text-lg font-semibold text-slate-950">{relatedTitle}</h2>
               <Link href="/shop" className="text-sm font-semibold text-sky-700">Back to shop</Link>
             </div>
 
@@ -248,7 +265,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                       <Image src={related.imageUrl} alt={related.imageAlt} width={320} height={320} className="h-[116px] w-full object-contain bg-white sm:h-[140px]" />
                     </div>
                     <div className="mt-3 line-clamp-2 text-sm font-semibold text-slate-900">{related.name}</div>
-                    <div className="mt-1 text-xs font-medium text-slate-500">Ready to quote</div>
+                    <div className="mt-1 text-xs font-medium text-slate-500">{related.productType === "service" ? "Ready to schedule" : "Ready to quote"}</div>
                     <div className="mt-2 flex items-start gap-0.5 text-slate-950">
                       <span className="text-base font-bold">{relatedPrice.dollars}</span>
                       <span className="pt-0.5 text-[10px] font-bold">.{relatedPrice.cents}</span>

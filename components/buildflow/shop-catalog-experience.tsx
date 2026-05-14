@@ -17,6 +17,7 @@ type BrowseTab = "materials" | "deals" | "suppliers" | "saved" | "cart"
 
 const SHOP_CATEGORIES = [
   "All",
+  "Services",
   "Lumber",
   "Plywood",
   "Drywall",
@@ -112,6 +113,7 @@ function PlusIcon() {
 
 function ShopProductCard({ product, onQuickAdd }: { product: ShopCatalogProduct; onQuickAdd: (productId: string) => number }) {
   const price = formatCurrency(product.price)
+  const isService = product.productType === "service"
 
   return (
     <article className="group flex h-full min-h-[292px] flex-col overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-[0_18px_36px_rgba(15,23,42,0.10)]">
@@ -136,21 +138,34 @@ function ShopProductCard({ product, onQuickAdd }: { product: ShopCatalogProduct;
             </div>
             <div className="mt-0.5 text-[12px] font-medium text-slate-500">{product.unit}</div>
           </div>
-          <button
-            type="button"
-            onClick={() => onQuickAdd(product.id)}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_12px_24px_rgba(34,197,94,0.28)] transition hover:bg-emerald-600"
-            aria-label={`Add ${product.name} to cart`}
-          >
-            <PlusIcon />
-          </button>
+          {isService ? (
+            <div className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+              Service
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onQuickAdd(product.id)}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_12px_24px_rgba(34,197,94,0.28)] transition hover:bg-emerald-600"
+              aria-label={`Add ${product.name} to cart`}
+            >
+              <PlusIcon />
+            </button>
+          )}
         </div>
 
-        <Link href={`/shop/${product.slug}`} className="mt-3 block min-h-[44px] text-[0.96rem] font-semibold leading-5 text-slate-900">
+        <Link href={`/shop/${product.slug}`} className="mt-3 block text-[0.96rem] font-semibold leading-5 text-slate-900">
           <span className="line-clamp-2">{product.name}</span>
         </Link>
 
-        <div className="mt-2 text-[12px] font-medium text-slate-500">Ready to quote</div>
+        {isService ? (
+          <>
+            <div className="mt-2 line-clamp-3 text-[13px] leading-5 text-slate-600">{product.shortDescription || product.description}</div>
+            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">View details</div>
+          </>
+        ) : (
+          <div className="mt-2 text-[12px] font-medium text-slate-500">Ready to quote</div>
+        )}
       </div>
     </article>
   )
@@ -207,10 +222,12 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
     .slice(0, 8)
 
   const featuredProducts = [...products]
+    .filter((product) => product.productType !== "service")
     .sort((a, b) => b.rating - a.rating || a.price - b.price)
     .slice(0, 8)
 
   const dealProducts = [...products]
+    .filter((product) => product.productType !== "service")
     .sort((a, b) => a.price - b.price || b.rating - a.rating)
     .slice(0, 8)
 
@@ -336,6 +353,25 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
             })}
           </div>
         </section>
+
+        {filteredProducts.some((product) => product.productType === "service") ? (
+          <section className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-lg font-bold text-slate-950">Survey services</div>
+                <div className="text-sm text-slate-500">Professional field survey options alongside your materials catalog</div>
+              </div>
+              <button type="button" onClick={() => setCategory("Services")} className="text-sm font-semibold text-sky-700">
+                View services
+              </button>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {products.filter((product) => product.productType === "service").map((product) => (
+                <ShopProductCard key={`service-${product.id}`} product={product} onQuickAdd={quickAdd} />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
           <div className="flex items-center justify-between gap-3">
