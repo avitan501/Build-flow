@@ -5,11 +5,15 @@ import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
+import { recordShopActivity } from "@/app/shop/actions"
 import { placeholderImageMetadata, type ShopCatalogProduct } from "@/lib/shop-catalog"
+import type { ShopActivityEvent } from "@/lib/shop-activity"
+import { buildSuggestedProducts, getShopActivitySessionId, readLocalShopActivity, writeLocalShopActivity } from "@/lib/shop-activity"
 import { SHOP_CART_UPDATED_EVENT, SHOP_SAVE_UPDATED_EVENT, readShopCartCount, readShopSavedIds, readShopCartMap, writeShopCartMap } from "@/lib/shop-cart"
 
 type ShopCatalogExperienceProps = {
   products: ShopCatalogProduct[]
+  recentActivity?: ShopActivityEvent[]
 }
 
 type SortMode = "featured" | "price-low" | "price-high"
@@ -122,6 +126,23 @@ function PlusIcon() {
   )
 }
 
+function SuggestedProductCard({ product }: { product: ShopCatalogProduct }) {
+  const price = formatCurrency(product.price)
+
+  return (
+    <Link href={`/shop/${product.slug}`} className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition hover:border-sky-200 hover:shadow-md">
+      <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+        <Image src={product.imageUrl} alt={product.imageAlt} fill sizes="48px" className="object-contain p-1.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-slate-900">{product.name}</span>
+        <span className="block text-[11px] text-slate-500">{product.unit}</span>
+      </span>
+      <span className="text-sm font-bold text-slate-950">{price.dollars}<span className="text-[10px] align-top">.{price.cents}</span></span>
+    </Link>
+  )
+}
+
 function ServiceListCard({ product }: { product: ShopCatalogProduct }) {
   const price = formatCurrency(product.price)
 
@@ -204,15 +225,18 @@ function ShopProductCard({ product, onQuickAdd }: { product: ShopCatalogProduct;
   )
 }
 
-export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) {
+export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCatalogExperienceProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [sortMode, setSortMode] = useState<SortMode>("featured")
   const [cartCount, setCartCount] = useState(0)
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [browseTab, setBrowseTab] = useState<BrowseTab>("materials")
+  const [localActivity, setLocalActivity] = useState<ShopActivityEvent[]>([])
   const supplierSectionRef = useRef<HTMLElement>(null)
   const serviceSectionRef = useRef<HTMLElement>(null)
+  const lastSearchRef = useRef("")
+  const lastCategoryRef = useRef("")
 
   const query = (searchParams.get("q") ?? "").trim()
   const normalizedQuery = query.toLowerCase()
@@ -222,6 +246,7 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
     const sync = () => {
       setCartCount(readShopCartCount())
       setSavedIds(readShopSavedIds())
+      setLocalActivity(readLocalShopActivity())
     }
 
     sync()
@@ -232,6 +257,32 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
       window.removeEventListener(SHOP_SAVE_UPDATED_EVENT, sync)
     }
   }, [])
+
+  function trackActivity(event: ShopActivityEvent) {
+    writeLocalShopActivity(event)
+    setLocalActivity(readLocalShopActivity())
+    void recordShopActivity({
+      eventType: event.eventType,
+      sessionId: getShopActivitySessionId(),
+      query: event.query,
+      productSlug: event.productSlug,
+      productName: event.productName,
+      category: event.category,
+      metadata: null,
+    })
+  }
+
+  useEffect(() => {
+    if (!query || lastSearchRef.current === query) return
+    lastSearchRef.current = query
+    trackActivity({ eventType: "search", query })
+  }, [query])
+
+  useEffect(() => {
+    if (!activeCategory || activeCategory === "All" || lastCategoryRef.current === activeCategory) return
+    lastCategoryRef.current = activeCategory
+    trackActivity({ eventType: "category_select", category: activeCategory })
+  }, [activeCategory])
 
   const categorySummaries = SHOP_CATEGORIES.map((category) => {
     const count = category === "All" ? products.length : products.filter((product) => product.imageCategory === category || product.category === category).length
@@ -267,6 +318,8 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
 
   const savedProducts = products.filter((product) => savedIds.includes(product.id))
   const serviceProducts = products.filter((product) => product.productType === "service")
+  const mergedActivity = [...localActivity, ...recentActivity]
+  const suggestedProducts = buildSuggestedProducts(products, mergedActivity, 6)
 
   const filteredProducts = (() => {
     const base = products.filter((product) => {
@@ -319,8 +372,9 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
   }
 
   function setCategory(nextCategory: string) {
-    setBrowseTab("materials")
+    setBrowseTab(nextCategory === "Services" ? "services" : "materials")
     applyFilters({ category: nextCategory })
+    trackActivity({ eventType: "category_select", category: nextCategory })
   }
 
   function quickAdd(productId: string) {
@@ -328,6 +382,10 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
     const nextQty = (current[productId] || 0) + 1
     writeShopCartMap({ ...current, [productId]: nextQty })
     setCartCount(readShopCartCount())
+    const product = products.find((entry) => entry.id === productId)
+    if (product) {
+      trackActivity({ eventType: "add_to_cart", productSlug: product.slug, productName: product.name, category: product.category })
+    }
     return nextQty
   }
 
@@ -396,6 +454,20 @@ export function ShopCatalogExperience({ products }: ShopCatalogExperienceProps) 
                 </button>
               )
             })}
+          </div>
+        </section>
+
+        <section className="rounded-[24px] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Suggested for you</div>
+              <div className="text-xs text-slate-500">Based on your recent shop activity</div>
+            </div>
+          </div>
+          <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+            {suggestedProducts.map((product) => (
+              <SuggestedProductCard key={`suggested-${product.slug}`} product={product} />
+            ))}
           </div>
         </section>
 

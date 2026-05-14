@@ -4,7 +4,9 @@ import Link from "next/link"
 import Image from "next/image"
 import { useEffect, useRef, useState } from "react"
 
+import { recordShopActivity } from "@/app/shop/actions"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
+import { getShopActivitySessionId, writeLocalShopActivity } from "@/lib/shop-activity"
 import {
   SHOP_CART_UPDATED_EVENT,
   SHOP_SAVE_UPDATED_EVENT,
@@ -73,6 +75,16 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
     }
 
     sync()
+
+    writeLocalShopActivity({ eventType: "product_view", productSlug: product.slug, productName: product.name, category: product.category })
+    void recordShopActivity({
+      eventType: "product_view",
+      sessionId: getShopActivitySessionId(),
+      productSlug: product.slug,
+      productName: product.name,
+      category: product.category,
+      metadata: { productType: product.productType || "material" },
+    })
     window.addEventListener(SHOP_CART_UPDATED_EVENT, sync)
     window.addEventListener(SHOP_SAVE_UPDATED_EVENT, sync)
     return () => {
@@ -85,6 +97,15 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
     const current = readShopCartMap()
     writeShopCartMap({ ...current, [product.id]: quantity })
     setCartCount(readShopCartCount())
+    writeLocalShopActivity({ eventType: "add_to_cart", productSlug: product.slug, productName: product.name, category: product.category })
+    void recordShopActivity({
+      eventType: "add_to_cart",
+      sessionId: getShopActivitySessionId(),
+      productSlug: product.slug,
+      productName: product.name,
+      category: product.category,
+      metadata: { quantity },
+    })
     setAddedMessage(`Added ${quantity} to cart`)
   }
 
