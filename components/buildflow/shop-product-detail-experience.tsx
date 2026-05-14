@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import {
@@ -61,6 +61,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
   const [quantity, setQuantity] = useState(1)
   const isService = product.productType === "service"
   const [activeImage, setActiveImage] = useState(product.gallery[0]?.imageUrl || product.imageUrl)
+  const galleryScrollRef = useRef<HTMLDivElement>(null)
   const [cartCount, setCartCount] = useState(0)
   const [saved, setSaved] = useState(false)
   const [addedMessage, setAddedMessage] = useState<string | null>(null)
@@ -97,6 +98,13 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
   const price = formatCurrencyParts(product.price)
   const infoTitle = isService ? "Service information" : "Product information"
   const relatedTitle = isService ? "Related shop items" : "Related materials"
+
+  function scrollToImage(index: number) {
+    const container = galleryScrollRef.current
+    if (!container) return
+    const target = container.children[index] as HTMLElement | undefined
+    target?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" })
+  }
 
   return (
     <main className="min-h-screen bg-[#f4f7fb] pb-28 text-slate-950">
@@ -137,8 +145,27 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                 </button>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm sm:rounded-[28px] sm:p-4">
-                <Image src={activeImage} alt={product.imageAlt} width={1200} height={1200} className="block h-[240px] w-full object-contain bg-white sm:h-[320px] lg:h-[420px]" priority />
+              <div
+                ref={galleryScrollRef}
+                className="mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:rounded-[28px] sm:p-4"
+                onScroll={(event) => {
+                  const container = event.currentTarget
+                  const children = Array.from(container.children) as HTMLElement[]
+                  const next = children.reduce(
+                    (closest, child, index) => {
+                      const delta = Math.abs(child.offsetLeft - container.scrollLeft)
+                      return delta < closest.delta ? { index, delta } : closest
+                    },
+                    { index: 0, delta: Number.POSITIVE_INFINITY },
+                  )
+                  setActiveImage(product.gallery[next.index]?.imageUrl || product.imageUrl)
+                }}
+              >
+                {product.gallery.map((image, index) => (
+                  <div key={`${product.id}-slide-${index}`} className="relative h-[240px] w-full shrink-0 snap-center overflow-hidden rounded-[20px] bg-white sm:h-[320px] lg:h-[420px]">
+                    <Image src={image.imageUrl} alt={image.imageAlt} fill sizes="(min-width: 1024px) 42vw, 100vw" className="object-contain" priority={index === 0} />
+                  </div>
+                ))}
               </div>
 
               <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-3">
@@ -146,7 +173,10 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                   <button
                     key={`${product.id}-image-${index}`}
                     type="button"
-                    onClick={() => setActiveImage(image.imageUrl)}
+                    onClick={() => {
+                      setActiveImage(image.imageUrl)
+                      scrollToImage(index)
+                    }}
                     className={`shrink-0 overflow-hidden rounded-xl border bg-white p-1 shadow-sm transition sm:rounded-2xl sm:p-1.5 ${activeImage === image.imageUrl ? "border-sky-400 ring-2 ring-sky-100" : "border-slate-200 hover:border-sky-200"}`}
                   >
                     <Image src={image.imageUrl} alt={image.imageAlt} width={180} height={180} className="h-12 w-12 object-contain sm:h-16 sm:w-16 lg:h-20 lg:w-20" />
@@ -218,9 +248,11 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                   </button>
                 </div>
 
-                <div className={`mt-4 rounded-[18px] border px-4 py-3 text-sm ${addedMessage ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-sky-100 bg-sky-50 text-slate-600"}`}>
-                  {addedMessage ?? (isService ? "Ready to add this service to your cart. Buy now is visual only while payments stay inactive." : "Ready to add to cart. Saved items appear in the shop saved section.")}
-                </div>
+                {addedMessage ? (
+                  <div className="mt-4 rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                    {addedMessage}
+                  </div>
+                ) : null}
               </div>
 
               <div className="mt-4 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
@@ -239,10 +271,6 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                 </details>
               </div>
 
-              <div className="mt-4 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:rounded-[28px]">
-                <div className="text-base font-semibold text-slate-950">Catalog status</div>
-                <div className="mt-2 text-sm text-slate-600">{isService ? "Ready to schedule. Review scope, timing, and service fit before adding it to your cart." : "Ready to quote. Use this page to compare finish, unit, supplier, and intended use before adding the item to your request."}</div>
-              </div>
             </section>
           </div>
 

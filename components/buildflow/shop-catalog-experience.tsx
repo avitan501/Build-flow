@@ -116,27 +116,27 @@ function ShopProductCard({ product, onQuickAdd }: { product: ShopCatalogProduct;
   const isService = product.productType === "service"
 
   return (
-    <article className="group flex h-full min-h-[292px] flex-col overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-[0_18px_36px_rgba(15,23,42,0.10)]">
-      <Link href={`/shop/${product.slug}`} className="block border-b border-slate-100 bg-slate-50/70 p-4">
-        <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-white">
+    <article className="group flex h-full min-h-[228px] flex-col overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-[0_18px_36px_rgba(15,23,42,0.10)]">
+      <Link href={`/shop/${product.slug}`} className="block border-b border-slate-100 bg-slate-50/70 p-2.5 sm:p-3">
+        <div className="relative aspect-square w-full overflow-hidden rounded-[18px] bg-white">
           <Image
             src={product.imageUrl}
             alt={product.imageAlt}
             fill
-            sizes="(min-width: 1280px) 20vw, (min-width: 768px) 28vw, 44vw"
-            className="object-contain p-3 transition duration-300 group-hover:scale-[1.04]"
+            sizes="(min-width: 1280px) 18vw, (min-width: 768px) 24vw, 42vw"
+            className="object-contain p-2 transition duration-300 group-hover:scale-[1.03]"
           />
         </div>
       </Link>
 
-      <div className="flex flex-1 flex-col p-4">
+      <div className="flex flex-1 flex-col p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-start gap-0.5 text-slate-950">
-              <span className="text-[1.28rem] font-bold leading-none">{price.dollars}</span>
-              <span className="pt-0.5 text-xs font-bold leading-none">.{price.cents}</span>
+              <span className="text-[1.15rem] font-bold leading-none">{price.dollars}</span>
+              <span className="pt-0.5 text-[11px] font-bold leading-none">.{price.cents}</span>
             </div>
-            <div className="mt-0.5 text-[12px] font-medium text-slate-500">{product.unit}</div>
+            <div className="mt-0.5 text-[11px] font-medium text-slate-500">{product.unit}</div>
           </div>
           {isService ? (
             <div className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
@@ -146,7 +146,7 @@ function ShopProductCard({ product, onQuickAdd }: { product: ShopCatalogProduct;
             <button
               type="button"
               onClick={() => onQuickAdd(product.id)}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_12px_24px_rgba(34,197,94,0.28)] transition hover:bg-emerald-600"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_12px_24px_rgba(34,197,94,0.28)] transition hover:bg-emerald-600"
               aria-label={`Add ${product.name} to cart`}
             >
               <PlusIcon />
@@ -154,18 +154,16 @@ function ShopProductCard({ product, onQuickAdd }: { product: ShopCatalogProduct;
           )}
         </div>
 
-        <Link href={`/shop/${product.slug}`} className="mt-3 block text-[0.96rem] font-semibold leading-5 text-slate-900">
+        <Link href={`/shop/${product.slug}`} className="mt-2.5 block text-[0.92rem] font-semibold leading-5 text-slate-900">
           <span className="line-clamp-2">{product.name}</span>
         </Link>
 
         {isService ? (
           <>
-            <div className="mt-2 line-clamp-3 text-[13px] leading-5 text-slate-600">{product.shortDescription || product.description}</div>
-            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">View details</div>
+            <div className="mt-2 line-clamp-2 text-[12px] leading-5 text-slate-600">{product.shortDescription || product.description}</div>
+            <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">View details</div>
           </>
-        ) : (
-          <div className="mt-2 text-[12px] font-medium text-slate-500">Ready to quote</div>
-        )}
+        ) : null}
       </div>
     </article>
   )
