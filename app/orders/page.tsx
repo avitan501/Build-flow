@@ -58,6 +58,14 @@ function formatTrackingStatus(status: ProjectOrderRecord["tracking_status"]) {
   return status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function formatOrderDate(value: string) {
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -222,118 +230,216 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   const latestApprovedQuote = approvedQuotes.at(-1) ?? null;
   const ordersByQuoteId = new Map(projectOrders.filter((order) => order.quote_id).map((order) => [order.quote_id as string, order]));
   const feedback = (successCode && orderStatusMessages[successCode as keyof typeof orderStatusMessages]) || (errorCode && orderStatusMessages[errorCode as keyof typeof orderStatusMessages]);
+  const activeOrders = projectOrders.filter((order) => order.status !== "delivered" && order.status !== "cancelled" && order.status !== "archived");
+  const pastOrders = projectOrders.filter((order) => !activeOrders.includes(order));
 
   return (
-    <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
-      <section className="mx-auto flex max-w-7xl flex-col gap-6">
-        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#eef6ff_0%,#f8fbff_45%,#eef4fb_100%)] px-4 py-4 pb-28 text-slate-900 sm:px-8 sm:py-6 sm:pb-10 lg:px-10">
+      <section className="mx-auto flex max-w-7xl flex-col gap-4">
+        <section className="rounded-[30px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(243,248,255,0.94))] p-5 shadow-[0_18px_40px_rgba(148,163,184,0.12)] sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Orders</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{project.name}</h1>
-              <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">Create one order from an approved quote, then keep delivery tracking actions clearly disabled until the next activation step.</p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Signed-in client</span>
-                <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">Project-aware orders</span>
-                <span className={`rounded-full border px-3 py-1 ${statusTone.badge}`}>Actions: {orders.status}</span>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">Orders</p>
+              <h1 className="mt-2 text-[2rem] font-semibold tracking-[-0.05em] text-slate-950 sm:text-[2.7rem]">{project.name}</h1>
+              <p className="mt-3 text-sm leading-6 text-slate-600">Track active orders, review past ones, and create a new order from an approved quote when needed.</p>
+              <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]">
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700">{projectOrders.length} order{projectOrders.length === 1 ? "" : "s"}</span>
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">{activeOrders.length} active</span>
+                <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">Project orders</span>
               </div>
             </div>
             <Link
               href={`/projects/${project.id}`}
-              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-white"
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(148,163,184,0.08)] transition hover:bg-slate-50"
             >
-              Back to Project Workspace
+              Back to Project
             </Link>
           </div>
         </section>
 
         {feedback ? (
           <section
-            className={`rounded-[28px] border p-4 text-sm ${
+            className={`rounded-[24px] border p-4 text-sm ${
               feedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-rose-200 bg-rose-50 text-rose-900"
             }`}
           >
-            <div className="text-xs font-semibold uppercase tracking-[0.16em]">{feedback.tone === "success" ? "Saved" : "Order issue"}</div>
-            <p className="mt-2 leading-6">{feedback.text}</p>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em]">{feedback.tone === "success" ? "Saved" : "Order issue"}</div>
+            <p className="mt-1.5 leading-6">{feedback.text}</p>
           </section>
         ) : null}
 
         <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">Selected project</h2>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Project name</div>
-                <div className="mt-2 text-sm font-semibold text-slate-900">{project.name}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <article className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-slate-950">Overview</h2>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Project</span>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Approved quotes</div>
                 <div className="mt-2 text-sm font-semibold text-slate-900">{approvedQuotes.length}</div>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+              <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Latest approved total</div>
+                <div className="mt-2 text-sm font-semibold text-slate-900">{latestApprovedQuote ? formatCurrency(latestApprovedQuote.total) : "Not available"}</div>
+              </div>
+              <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4 sm:col-span-2">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Address</div>
-                <div className="mt-2 text-sm font-semibold text-slate-900">{project.address || "No address added yet."}</div>
+                <div className="mt-2 text-sm leading-6 font-semibold text-slate-900">{project.address || "No address added yet."}</div>
               </div>
             </div>
           </article>
 
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">Order status</h2>
-            <div className={`mt-4 rounded-3xl border p-5 ${projectOrders.length > 0 ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-amber-200 bg-amber-50 text-amber-950"}`}>
-              <div className="text-xs font-semibold uppercase tracking-[0.16em]">{projectOrders.length > 0 ? `${projectOrders.length} order${projectOrders.length === 1 ? "" : "s"} created` : "No order created yet"}</div>
-              <p className="mt-3 text-sm leading-6">{projectOrders.length > 0 ? "Orders are now linked to approved quotes for this project. Delivery tracking stays coming soon." : "Orders activate only from approved quotes with pricing already confirmed."}</p>
+          <article className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-slate-950">Tracking</h2>
+              <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${statusTone.badge}`}>{orders.status}</span>
             </div>
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-              {latestApprovedQuote
-                ? `Latest approved quote total: ${formatCurrency(latestApprovedQuote.total)}.`
-                : "No approved quote is available yet for this project. Order creation stays disabled until a quote is approved."}
+            <div className="mt-4 space-y-3">
+              {activeOrders.length > 0 ? activeOrders.slice(0, 2).map((order, index) => (
+                <div key={order.id} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Order {index + 1}</div>
+                      <div className="mt-1 text-sm text-slate-600">{formatTrackingStatus(order.tracking_status)}</div>
+                    </div>
+                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">{formatOrderStatus(order.status)}</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <a href="#active-orders" className="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">Track order</a>
+                    <Link href={`/quotes?projectId=${project.id}`} className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">View details</Link>
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">Active orders will appear here once an order is created.</div>
+              )}
             </div>
           </article>
         </section>
 
-        <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <section id="active-orders" className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-slate-950">Active orders</h2>
+              <p className="text-sm text-slate-500">Current and in-progress orders.</p>
+            </div>
+          </div>
+
+          {activeOrders.length === 0 ? (
+            <div className="mt-4 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">No active orders yet.</div>
+          ) : (
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              {activeOrders.map((order, index) => (
+                <article key={order.id} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Order {index + 1}</div>
+                      <div className="mt-1 text-sm text-slate-600">Created {formatOrderDate(order.created_at)}</div>
+                    </div>
+                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">{formatOrderStatus(order.status)}</span>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Tracking</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">{formatTrackingStatus(order.tracking_status)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Total</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">{formatCurrency(order.total)}</div>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Summary</div>
+                      <div className="mt-1 text-sm leading-6 text-slate-700">{order.notes?.trim() ? order.notes : "Order created from an approved quote. Details will expand here as more order data becomes available."}</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <a href="#tracking-actions" className="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">Track order</a>
+                    <Link href={`/quotes?projectId=${project.id}`} className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">View details</Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">Approved quotes</h2>
-              <p className="mt-1 text-sm text-slate-500">Create one order from an approved quote or review the existing order status already linked to that quote.</p>
+              <h2 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-slate-950">Past orders</h2>
+              <p className="text-sm text-slate-500">Completed and archived orders.</p>
             </div>
             <Link
               href={`/quotes?projectId=${project.id}`}
-              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-white"
+              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               Back to Quote Review
             </Link>
           </div>
 
+          {pastOrders.length === 0 ? (
+            <div className="mt-4 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">Past orders will appear here after delivery or completion.</div>
+          ) : (
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              {pastOrders.map((order, index) => (
+                <article key={order.id} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Past order {index + 1}</div>
+                      <div className="mt-1 text-sm text-slate-600">{formatOrderDate(order.updated_at)}</div>
+                    </div>
+                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">{formatOrderStatus(order.status)}</span>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Tracking</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">{formatTrackingStatus(order.tracking_status)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Total</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">{formatCurrency(order.total)}</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Link href={`/quotes?projectId=${project.id}`} className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Reorder</Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-slate-950">Create from approved quote</h2>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Quotes</span>
+          </div>
+
           {approvedQuotes.length === 0 ? (
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">No approved quote is ready for order creation yet.</div>
+            <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-600">No approved quote is ready for order creation yet.</div>
           ) : (
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               {approvedQuotes.map((quote, index) => {
                 const order = ordersByQuoteId.get(quote.id);
                 return (
-                  <div key={quote.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div key={quote.id} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-slate-900">Approved Quote {index + 1}</div>
-                        <div className="mt-1 text-sm text-slate-600">Status: {formatQuoteStatus(quote.status)}</div>
+                        <div className="text-sm font-semibold text-slate-900">Approved quote {index + 1}</div>
+                        <div className="mt-1 text-sm text-slate-600">{formatQuoteStatus(quote.status)}</div>
                       </div>
-                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
-                        {formatCurrency(quote.total)}
-                      </span>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">{formatCurrency(quote.total)}</span>
                     </div>
 
-                    <div className="mt-3 text-sm text-slate-600">{quote.notes?.trim() ? quote.notes : "No quote notes added yet."}</div>
+                    <div className="mt-3 text-sm leading-6 text-slate-600">{quote.notes?.trim() ? quote.notes : "Approved quote ready for order creation."}</div>
 
                     {order ? (
-                      <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
-                        <div className="text-xs font-semibold uppercase tracking-[0.16em]">Order already created</div>
-                        <div className="mt-2">Order status: {formatOrderStatus(order.status)}</div>
+                      <div className="mt-4 rounded-[20px] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em]">Order already created</div>
+                        <div className="mt-1.5">Status: {formatOrderStatus(order.status)}</div>
                         <div className="mt-1">Tracking: {formatTrackingStatus(order.tracking_status)}</div>
-                        <div className="mt-1">Order total: {formatCurrency(order.total)}</div>
                       </div>
                     ) : (
-                      <form action={createOrderFromApprovedQuoteAction} className="mt-4 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+                      <form action={createOrderFromApprovedQuoteAction} className="mt-4 grid gap-3 rounded-[20px] border border-slate-200 bg-white p-4">
                         <input type="hidden" name="projectId" value={project.id} />
                         <input type="hidden" name="quoteId" value={quote.id} />
                         <label className="grid gap-2">
@@ -342,7 +448,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                             name="notes"
                             rows={3}
                             className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900"
-                            placeholder="Optional notes to carry from this approved quote into the order"
+                            placeholder="Optional notes"
                             defaultValue={quote.notes || ""}
                           />
                         </label>
@@ -350,7 +456,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                           type="submit"
                           className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600"
                         >
-                          Create Order
+                          Create order
                         </button>
                       </form>
                     )}
@@ -361,39 +467,22 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
           )}
         </section>
 
-        <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">Delivery tracking actions</h2>
-          <p className="mt-1 text-sm text-slate-500">Order creation is live from approved quotes. Delivery tracking and order-progress actions still stay clearly marked as coming soon.</p>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Approve order</div>
-              <button
-                type="button"
-                disabled
-                className="mt-3 inline-flex w-full cursor-not-allowed items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-400 opacity-80"
-              >
-                Coming Soon
-              </button>
+        <section id="tracking-actions" className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
+          <h2 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-slate-950">Tracking actions</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Track order</div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Use the active order cards above to review current delivery status.</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Track delivery</div>
-              <button
-                type="button"
-                disabled
-                className="mt-3 inline-flex w-full cursor-not-allowed items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-400 opacity-80"
-              >
-                Coming Soon
-              </button>
+            <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">View details</div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Open the related quote view for pricing and source details.</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Vendor updates</div>
-              <button
-                type="button"
-                disabled
-                className="mt-3 inline-flex w-full cursor-not-allowed items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-400 opacity-80"
-              >
-                Coming Soon
-              </button>
+            <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Contact support</div>
+              <Link href={`/projects/${project.id}`} className="mt-3 inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                Back to project
+              </Link>
             </div>
           </div>
         </section>
