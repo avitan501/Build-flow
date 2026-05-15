@@ -130,7 +130,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
     { href: isSignedIn ? "/quotes" : "/login", label: "Quotes", gated: !isSignedIn },
     { href: isSignedIn ? "/orders" : "/login", label: "Orders", gated: !isSignedIn },
     { href: searchHref, label: "Search Materials", gated: !isSignedIn },
-    { href: accountHref, label: "Account", gated: !isSignedIn },
+    { href: accountHref, label: "Account & Settings", gated: !isSignedIn },
     { href: aiHref, label: "Ask AI" },
   ], [accountHref, aiHref, isSignedIn, searchHref]);
 
@@ -226,7 +226,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
           )}
 
           <Link href={accountHref} aria-label="Account" className="inline-flex">
-            <IconShell active={isActivePath(pathname, "/dashboard")}>
+            <IconShell active={isActivePath(pathname, "/account")}>
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M20 21a8 8 0 0 0-16 0" />
                 <circle cx="12" cy="8" r="4" />

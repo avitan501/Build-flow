@@ -31,9 +31,8 @@ export default async function RootLayout({
   const isSignedIn = Boolean(user);
   const isAdmin = profile?.role === "admin";
   const gatedHref = isSignedIn ? null : "/login";
-  const accountHref = isSignedIn ? "/dashboard" : "/login";
+  const accountHref = isSignedIn ? "/account" : "/login";
   const projectsHref = gatedHref ?? "/projects";
-  const uploadHref = gatedHref ?? "/upload";
   const searchHref = "/search";
   const aiHref = "/ai";
 
@@ -46,7 +45,7 @@ export default async function RootLayout({
         <BuildFlowClientShell>
           <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} accountHref={accountHref} searchHref={searchHref} aiHref={aiHref} />
           {children}
-          <MobileBottomDock accountHref={accountHref} projectsHref={projectsHref} uploadHref={uploadHref} searchHref={searchHref} />
+          <MobileBottomDock projectsHref={projectsHref} searchHref={searchHref} />
         </BuildFlowClientShell>
       </body>
     </html>
