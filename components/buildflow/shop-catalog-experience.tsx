@@ -398,23 +398,27 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   return (
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        <section className="rounded-[24px] bg-white p-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-3">
-          <div className="flex flex-wrap gap-2">
-            {SHOP_CATEGORIES.map((category) => {
-              const active = activeCategory === category
-              return (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => setCategory(active ? "All" : category)}
-                  className={`inline-flex h-11 shrink-0 items-center rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                    active ? "border-sky-300 bg-sky-50 text-sky-800" : "border-slate-200 bg-white text-slate-700 shadow-sm"
-                  }`}
-                >
-                  {category}
-                </button>
-              )
-            })}
+        <section className="rounded-[24px] border border-white/70 bg-white/90 p-2 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-2.5">
+          <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex w-max min-w-full gap-2 rounded-[20px] border border-slate-200/80 bg-slate-50/85 p-1.5">
+              {SHOP_CATEGORIES.map((category) => {
+                const active = activeCategory === category
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => setCategory(active ? "All" : category)}
+                    className={`inline-flex h-10 shrink-0 snap-start items-center justify-center whitespace-nowrap rounded-2xl border px-4 py-2 text-[13px] font-semibold tracking-[0.01em] transition sm:h-11 sm:px-5 sm:text-sm ${
+                      active
+                        ? "border-sky-200 bg-white text-sky-800 shadow-[0_10px_24px_rgba(14,116,244,0.14)] ring-1 ring-sky-100"
+                        : "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-900 hover:shadow-sm"
+                    }`}
+                  >
+                    {category}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </section>
 
