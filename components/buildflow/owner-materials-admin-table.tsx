@@ -42,17 +42,15 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
     <div className="space-y-4">
       <div className="hidden overflow-hidden rounded-[24px] border border-slate-200 lg:block">
         <div className="max-h-[70vh] overflow-auto">
-          <table className="min-w-[1240px] w-full border-separate border-spacing-0 text-left text-sm">
+          <table className="min-w-[1120px] w-full border-separate border-spacing-0 text-left text-sm">
             <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600">
               <tr>
                 <th className="px-4 py-3"><input type="checkbox" checked={allSelected} onChange={props.onToggleAll} /></th>
-                <th className="px-4 py-3">Item</th>
+                <th className="px-4 py-3">Item no</th>
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Supplier</th>
                 <th className="px-4 py-3">Unit</th>
-                <th className="px-4 py-3">Cost</th>
-                <th className="px-4 py-3">Sell</th>
+                <th className="px-4 py-3">Unit price</th>
                 <th className="px-4 py-3">Photo</th>
                 <th className="px-4 py-3">Publish</th>
                 <th className="px-4 py-3">Actions</th>
@@ -64,7 +62,7 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
                   <td className="px-4 py-4 align-top"><input type="checkbox" checked={props.selectedRowIds.includes(row.id)} onChange={() => props.onToggleRow(row.id)} /></td>
                   <td className="px-4 py-4 align-top">
                     <div className="font-semibold text-slate-950">{row.itemNo || "—"}</div>
-                    <div className="text-xs text-slate-500">{row.sku}</div>
+                    <div className="text-xs text-slate-500">{row.supplier}</div>
                   </td>
                   <td className="px-4 py-4 align-top">
                     <div className="font-medium text-slate-950">{row.description}</div>
@@ -79,9 +77,7 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
                       {props.categoryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                     </select>
                   </td>
-                  <td className="px-4 py-4 align-top">{row.supplier}</td>
                   <td className="px-4 py-4 align-top">{row.unit}</td>
-                  <td className="px-4 py-4 align-top">${row.supplierUnitPrice.toFixed(2)}</td>
                   <td className="px-4 py-4 align-top">${row.finalUnitPrice.toFixed(2)}</td>
                   <td className="px-4 py-4 align-top">
                     <div className="space-y-2">
@@ -105,8 +101,6 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
                       ) : (
                         <button type="button" onClick={() => props.onPublishRow(row.id)} className="rounded-xl bg-slate-950 px-2.5 py-1 text-xs font-medium text-white">Publish</button>
                       )}
-                      <button type="button" onClick={() => props.onDuplicateRow(row.id)} className="rounded-xl border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">Duplicate</button>
-                      <button type="button" onClick={() => props.onRemoveRow(row.id)} className="rounded-xl border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-700">Remove</button>
                     </div>
                   </td>
                 </tr>
@@ -153,7 +147,7 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
               </div>
               <div><dt className="text-xs uppercase tracking-wide text-slate-500">Supplier</dt><dd className="mt-1 font-medium text-slate-900">{row.supplier}</dd></div>
               <div><dt className="text-xs uppercase tracking-wide text-slate-500">Unit</dt><dd className="mt-1 font-medium text-slate-900">{row.unit}</dd></div>
-              <div><dt className="text-xs uppercase tracking-wide text-slate-500">Cost / Sell</dt><dd className="mt-1 font-medium text-slate-900">${row.supplierUnitPrice.toFixed(2)} / ${row.finalUnitPrice.toFixed(2)}</dd></div>
+              <div><dt className="text-xs uppercase tracking-wide text-slate-500">Unit price</dt><dd className="mt-1 font-medium text-slate-900">${row.finalUnitPrice.toFixed(2)}</dd></div>
               <div><dt className="text-xs uppercase tracking-wide text-slate-500">Photo</dt><dd className="mt-1 font-medium text-slate-900">{row.photoCount > 0 ? `${row.photoCount} photo` : "Missing image"}</dd></div>
               <div><dt className="text-xs uppercase tracking-wide text-slate-500">Review</dt><dd className="mt-1 font-medium text-slate-900">{row.reviewStatus}</dd></div>
             </dl>
@@ -169,8 +163,6 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
               )}
               <button type="button" onClick={() => props.onAddPhoto(row.id)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700">{row.photoCount > 0 ? "Replace photo" : "Add photo"}</button>
               {row.photoCount > 0 ? <button type="button" onClick={() => props.onRemovePhoto(row.id)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700">Remove photo</button> : null}
-              <button type="button" onClick={() => props.onDuplicateRow(row.id)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700">Duplicate</button>
-              <button type="button" onClick={() => props.onRemoveRow(row.id)} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-medium text-rose-700">Remove</button>
             </div>
           </article>
         ))}

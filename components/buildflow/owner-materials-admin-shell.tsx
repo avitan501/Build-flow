@@ -328,112 +328,71 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
 
   return (
     <main className="min-h-screen bg-[#f3f6fb] px-3 py-4 text-slate-900 sm:px-6 sm:py-8">
-      <section className="mx-auto grid w-full max-w-[1720px] gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className={`${isSidebarOpen ? "block" : "hidden"} xl:block`}>
-          <div className="rounded-[30px] border border-[#d7e2f2] bg-[linear-gradient(180deg,#0f172a_0%,#16233d_100%)] p-5 text-white shadow-[0_22px_70px_rgba(15,23,42,0.28)]">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-200/80">BuildFlow</div>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight">Materials admin</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-300">Quote review, image cleanup, staging, and publish to shop.</p>
-              </div>
-              <button type="button" onClick={() => setIsSidebarOpen(false)} className="rounded-full border border-white/15 px-3 py-1 text-xs xl:hidden">Close</button>
+      <section className="mx-auto w-full max-w-[1720px] space-y-4">
+        <section className="rounded-[30px] border border-[#d7e2f2] bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">Material Admin</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">PDF → review items → edit → publish</h1>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Upload supplier PDFs, review extracted items, edit what matters, and publish ready materials to the shop.</p>
             </div>
+            <div className="flex flex-wrap gap-2">
+              <label className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                Add / upload PDF
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    setNoticeTone("info")
+                    setNotice(file ? `${file.name} added. PDF import is ready for review workflow.` : "PDF import is ready for review workflow.")
+                  }}
+                />
+              </label>
+              <button type="button" onClick={restoreBatches} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Restore batches</button>
+              <button type="button" onClick={saveStateToServer} disabled={isPending} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Save</button>
+              <button type="button" onClick={() => publishSelection(selectedRowIds)} disabled={isPending} aria-disabled={isPending || selectedRowIds.length === 0} className={`rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white ${isPending || selectedRowIds.length === 0 ? "opacity-60" : ""}`}>Publish selected</button>
+            </div>
+          </div>
 
-            <nav className="mt-8 space-y-2">
-              {sidebarItems.map((item) => (
-                <div key={item} className={`rounded-2xl px-4 py-3 text-sm font-medium ${item === "Materials" ? "bg-white text-slate-950 shadow-[0_10px_30px_rgba(255,255,255,0.16)]" : "text-slate-300"}`}>
-                  {item}
-                </div>
-              ))}
-            </nav>
-
-            <div className="mt-8 rounded-[22px] border border-white/10 bg-white/5 p-4 text-sm text-slate-200">
-              <div className="font-semibold text-white">Imported supplier documents</div>
+          <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]">
+            <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Restored PDFs</div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {allDocuments.map((document) => (
-                  <span key={document} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-100">{document}</span>
+                  <span key={document} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700">{document}</span>
                 ))}
               </div>
             </div>
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4"><div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Items</div><div className="mt-2 text-2xl font-semibold text-slate-950">{counts.total}</div></div>
+              <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 p-4"><div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Published</div><div className="mt-2 text-2xl font-semibold text-slate-950">{counts.published}</div></div>
+              <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-4"><div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Needs review</div><div className="mt-2 text-2xl font-semibold text-slate-950">{counts.needsReview}</div></div>
+            </div>
           </div>
-        </aside>
 
-        <div className="space-y-4">
-          <section className="rounded-[28px] border border-[#d7e2f2] bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={() => setIsSidebarOpen((current) => !current)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 xl:hidden">Menu</button>
-                <div className="flex flex-1 items-center gap-3 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3 lg:min-w-[360px]">
-                  <span className="text-slate-400">⌕</span>
-                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search materials, SKU, or supplier" className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400" />
-                </div>
-              </div>
+          {notice ? <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${noticeTone === "error" ? "border border-rose-200 bg-rose-50 text-rose-900" : noticeTone === "success" ? "border border-emerald-200 bg-emerald-50 text-emerald-900" : "border border-sky-200 bg-sky-50 text-sky-900"}`}>{notice}</div> : null}
+        </section>
 
-              <div className="flex flex-wrap items-center gap-3">
+        <section className="rounded-[30px] border border-[#d7e2f2] bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-950">Quote batches</h2>
+              <p className="mt-1 text-sm text-slate-500">Select a restored quote batch to review its extracted material items.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-4">
+              <label className="grid gap-2 text-sm text-slate-700">
+                <span className="font-medium">Batch</span>
                 <select value={state.selectedBatchId} onChange={(event) => setSelectedBatch(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none">
                   {batches.map((batch) => (
-                    <option key={batch.id} value={batch.id}>{batch.supplier} • {batch.quoteNumber} • {batch.quoteDate}</option>
+                    <option key={batch.id} value={batch.id}>{batch.supplier} • {batch.quoteNumber}</option>
                   ))}
                 </select>
-                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">BF</div>
-                  <div>
-                    <div className="text-sm font-semibold text-slate-950">BuildFlow Admin</div>
-                    <div className="text-xs text-slate-500">owner@buildflow</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-[30px] border border-[#d7e2f2] bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">Materials</p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Owner materials dashboard</h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Review imported supplier batches, edit rows, attach photos, and publish selected materials into the shop feed.</p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={exportCsv} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Export CSV</button>
-                <button type="button" onClick={restoreBatches} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Import / Restore batches</button>
-                <button type="button" onClick={handleAddMaterial} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white">Add Material</button>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              {[
-                { label: "All materials", value: counts.total, tone: "bg-slate-50" },
-                { label: "Published", value: counts.published, tone: "bg-emerald-50" },
-                { label: "Unpublished / Draft", value: counts.unpublished, tone: "bg-slate-50" },
-                { label: "Missing image", value: counts.missingImages, tone: "bg-amber-50" },
-                { label: "Needs review", value: counts.needsReview, tone: "bg-rose-50" },
-              ].map((card) => (
-                <div key={card.label} className={`rounded-[22px] border border-slate-200 px-4 py-4 ${card.tone}`}>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{card.label}</div>
-                  <div className="mt-2 text-2xl font-semibold text-slate-950">{card.value}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-[30px] border border-[#d7e2f2] bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-            <div className="flex flex-wrap gap-2">
-              {tabs.map((tab) => {
-                const isActive = activeTab === tab;
-                return (
-                  <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`rounded-full px-4 py-2 text-sm font-semibold ${isActive ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>
-                    {tab}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(220px,1.6fr)_repeat(3,minmax(0,1fr))_auto]">
+              </label>
               <label className="grid gap-2 text-sm text-slate-700">
                 <span className="font-medium">Search</span>
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search materials" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none placeholder:text-slate-400" />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search items" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none placeholder:text-slate-400" />
               </label>
               <label className="grid gap-2 text-sm text-slate-700">
                 <span className="font-medium">Category</span>
@@ -442,55 +401,45 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
                 </select>
               </label>
               <label className="grid gap-2 text-sm text-slate-700">
-                <span className="font-medium">Supplier</span>
-                <select value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
-                  {suppliers.map((option) => <option key={option}>{option}</option>)}
-                </select>
-              </label>
-              <label className="grid gap-2 text-sm text-slate-700">
                 <span className="font-medium">Status</span>
                 <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
                   {statuses.map((option) => <option key={option}>{option}</option>)}
                 </select>
               </label>
-              <button type="button" onClick={resetFilters} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 xl:self-end">Reset filters</button>
             </div>
+          </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button type="button" onClick={saveStateToServer} disabled={isPending} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Save</button>
-              <button type="button" onClick={() => publishSelection(selectedRowIds)} disabled={isPending} aria-disabled={isPending || selectedRowIds.length === 0} className={`rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white ${isPending || selectedRowIds.length === 0 ? "opacity-60" : ""}`}>Publish selected</button>
-              <button type="button" onClick={() => unpublishSelection(selectedRowIds)} disabled={isPending} aria-disabled={isPending || selectedRowIds.length === 0} className={`rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 ${isPending || selectedRowIds.length === 0 ? "opacity-60" : ""}`}>Unpublish selected</button>
-              <div className="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600">{selectedRowIds.length} selected</div>
-            </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab;
+              return (
+                <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`rounded-full px-4 py-2 text-sm font-semibold ${isActive ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>
+                  {tab}
+                </button>
+              );
+            })}
+            <button type="button" onClick={resetFilters} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600">Reset</button>
+            <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-600">{selectedRowIds.length} selected</div>
+          </div>
 
-            {notice ? <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${noticeTone === "error" ? "border border-rose-200 bg-rose-50 text-rose-900" : noticeTone === "success" ? "border border-emerald-200 bg-emerald-50 text-emerald-900" : "border border-sky-200 bg-sky-50 text-sky-900"}`}>{notice}</div> : null}
-          </section>
-
-          <section className="grid gap-4 xl:grid-cols-[minmax(260px,0.62fr)_minmax(0,1fr)] 2xl:grid-cols-[minmax(260px,0.62fr)_minmax(0,1.55fr)_minmax(320px,0.9fr)]">
-            <article className="rounded-[30px] border border-[#d7e2f2] bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Quote batches</div>
-              <h2 className="mt-2 text-xl font-semibold text-slate-950">Restored supplier documents & batches</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">All restored supplier documents and quote batches stay visible here even if the original PDFs are unavailable.</p>
-              <div className="mt-4 space-y-3">
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(280px,0.7fr)_minmax(0,1.4fr)_minmax(320px,0.9fr)]">
+            <article className="rounded-[24px] border border-slate-200 bg-slate-50/60 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">Restored batches</div>
+              <div className="mt-3 space-y-3">
                 {batches.map((batch) => {
                   const isActive = batch.id === activeBatch?.id;
                   return (
-                    <button
-                      key={batch.id}
-                      type="button"
-                      onClick={() => setSelectedBatch(batch.id)}
-                      className={`w-full rounded-[22px] border p-4 text-left transition ${isActive ? "border-slate-900 bg-slate-950 text-white" : "border-slate-200 bg-slate-50 text-slate-900 hover:bg-white"}`}
-                    >
+                    <button key={batch.id} type="button" onClick={() => setSelectedBatch(batch.id)} className={`w-full rounded-[20px] border p-4 text-left transition ${isActive ? "border-slate-900 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-900"}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-semibold">{batch.supplier}</div>
-                          <div className={`mt-1 text-xs ${isActive ? "text-slate-300" : "text-slate-500"}`}>Quote {batch.quoteNumber} • {batch.quoteDate}</div>
+                          <div className={`mt-1 text-xs ${isActive ? "text-slate-300" : "text-slate-500"}`}>{batch.quoteNumber} • {batch.quoteDate}</div>
                         </div>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${isActive ? "bg-white/10 text-white" : "bg-white text-slate-700"}`}>{batch.rows.length} rows</span>
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${isActive ? "bg-white/10 text-white" : "bg-slate-50 text-slate-700"}`}>{batch.rows.length} items</span>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {batch.documents.map((document) => (
-                          <span key={document} className={`rounded-full px-2.5 py-1 text-[11px] ${isActive ? "bg-white/10 text-slate-100" : "border border-slate-200 bg-white text-slate-600"}`}>{document}</span>
+                          <span key={document} className={`rounded-full px-2.5 py-1 text-[11px] ${isActive ? "bg-white/10 text-slate-100" : "border border-slate-200 bg-slate-50 text-slate-600"}`}>{document}</span>
                         ))}
                       </div>
                     </button>
@@ -498,14 +447,12 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
                 })}
               </div>
             </article>
-            <div className="rounded-[30px] border border-[#d7e2f2] bg-white p-4 shadow-[0_18px_60px_rgba(15,23,42,0.08)] 2xl:col-start-2">
+
+            <div className="rounded-[24px] border border-slate-200 bg-white p-4">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-950">{activeBatch?.supplier} batch</h2>
-                  <p className="text-sm text-slate-500">Quote {activeBatch?.quoteNumber} • {activeBatch?.quoteDate} • {filteredRows.length} visible rows</p>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs text-slate-500">
-                  {activeBatch?.documents.map((document) => <span key={document} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">{document}</span>)}
+                  <h2 className="text-lg font-semibold text-slate-950">{activeBatch?.supplier} items</h2>
+                  <p className="text-sm text-slate-500">{filteredRows.length} visible rows ready for review and publishing.</p>
                 </div>
               </div>
               <OwnerMaterialsAdminTable
@@ -526,10 +473,10 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
               />
             </div>
 
-            <section className="rounded-[30px] border border-[#d7e2f2] bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] 2xl:col-start-3">
+            <section className="rounded-[24px] border border-slate-200 bg-white p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Editor</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Edit item</div>
                   <h2 className="mt-2 text-xl font-semibold text-slate-950">{editingRow?.description ?? "Select a material"}</h2>
                 </div>
                 {editingRow?.publishStatus ? <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">{editingRow.publishStatus}</span> : null}
@@ -538,29 +485,18 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
               {editingRow ? (
                 <div className="mt-5 grid gap-4">
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Item no / SKU</span><input value={editingRow.itemNo} onChange={(event) => updateRow(editingRow.id, { itemNo: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">SKU</span><input value={editingRow.sku} onChange={(event) => updateRow(editingRow.id, { sku: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Item no</span><input value={editingRow.itemNo} onChange={(event) => updateRow(editingRow.id, { itemNo: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Unit</span><input value={editingRow.unit} onChange={(event) => updateRow(editingRow.id, { unit: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
                   </div>
                   <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Description / Name</span><input value={editingRow.description} onChange={(event) => updateRow(editingRow.id, { description: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Category</span><select value={editingRow.category} onChange={(event) => updateRow(editingRow.id, { category: event.target.value as ShopCategoryName })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">{SHOP_CATEGORY_NAMES.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Supplier</span><input value={editingRow.supplier} onChange={(event) => updateRow(editingRow.id, { supplier: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Unit</span><input value={editingRow.unit} onChange={(event) => updateRow(editingRow.id, { unit: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Qty</span><input type="number" value={editingRow.qty} onChange={(event) => updateRow(editingRow.id, { qty: Number(event.target.value) })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Cost</span><input type="number" step="0.01" value={editingRow.supplierUnitPrice} onChange={(event) => updateRow(editingRow.id, { supplierUnitPrice: Number(event.target.value) })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Markup %</span><input type="number" step="0.01" value={editingRow.markupPercent} onChange={(event) => { const markupPercent = Number(event.target.value); const finalUnitPrice = editingRow.supplierUnitPrice * (1 + markupPercent / 100) + editingRow.markupDollar; updateRow(editingRow.id, { markupPercent, finalUnitPrice }); }} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Markup $</span><input type="number" step="0.01" value={editingRow.markupDollar} onChange={(event) => { const markupDollar = Number(event.target.value); const finalUnitPrice = editingRow.supplierUnitPrice * (1 + editingRow.markupPercent / 100) + markupDollar; updateRow(editingRow.id, { markupDollar, finalUnitPrice }); }} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Sell price</span><input type="number" step="0.01" value={editingRow.finalUnitPrice} onChange={(event) => updateRow(editingRow.id, { finalUnitPrice: Number(event.target.value) })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Unit price</span><input type="number" step="0.01" value={editingRow.finalUnitPrice} onChange={(event) => updateRow(editingRow.id, { finalUnitPrice: Number(event.target.value) })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
                   </div>
                   <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Photo URL / label</span><input value={editingRow.imageUrl} onChange={(event) => updateRow(editingRow.id, { imageUrl: event.target.value, photoCount: event.target.value.trim() ? 1 : 0, galleryCount: event.target.value.trim() ? 1 : 0 })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
                   <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Notes</span><textarea value={editingRow.notes ?? ""} onChange={(event) => updateRow(editingRow.id, { notes: event.target.value })} rows={4} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
 
                   <div className="grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                    <div className="flex flex-wrap items-center justify-between gap-3"><span>Extended cost</span><strong className="text-slate-950">{money(editingRow.qty * editingRow.supplierUnitPrice)}</strong></div>
                     <div className="flex flex-wrap items-center justify-between gap-3"><span>Extended sell</span><strong className="text-slate-950">{money(editingRow.qty * editingRow.finalUnitPrice)}</strong></div>
                     <div className="flex flex-wrap items-center justify-between gap-3"><span>Review status</span><strong className="text-slate-950">{editingRow.reviewStatus}</strong></div>
                   </div>
@@ -568,7 +504,6 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
                   <div className="flex flex-wrap gap-2">
                     <button type="button" onClick={saveStateToServer} disabled={isPending} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Save</button>
                     <button type="button" onClick={() => publishSelection([editingRow.id])} disabled={isPending} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Publish item</button>
-                    {editingRow.publishStatus === "Published" ? <button type="button" onClick={() => unpublishSelection([editingRow.id])} disabled={isPending} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-60">Unpublish item</button> : null}
                     <button type="button" onClick={() => handleAddPhoto(editingRow.id)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">{editingRow.photoCount > 0 ? "Replace photo" : "Add photo"}</button>
                     {editingRow.photoCount > 0 ? <button type="button" onClick={() => handleRemovePhoto(editingRow.id)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Remove photo</button> : null}
                   </div>
@@ -577,8 +512,8 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
                 <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-sm text-slate-500">Select a material row to edit it here.</div>
               )}
             </section>
-          </section>
-        </div>
+          </div>
+        </section>
       </section>
     </main>
   );
