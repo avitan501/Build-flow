@@ -429,9 +429,9 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
                 <div className="text-lg font-bold text-slate-950">Featured materials</div>
                 <div className="mt-1 text-sm text-slate-500">Popular picks for framing, finish, and rough-in work</div>
               </div>
-              <button type="button" onClick={() => setBrowseTab("materials")} className="shrink-0 text-sm font-semibold text-sky-700">
+              <Link href="/shop/materials" className="shrink-0 text-sm font-semibold text-sky-700">
                 View all
-              </button>
+              </Link>
             </div>
             <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {featuredProducts.map((product) => (
