@@ -219,7 +219,12 @@ function normalizeCategoryKey(category: string | null | undefined) {
 
 export function imageCategoryForMaterial(category: string | null | undefined): (typeof MATERIAL_IMAGE_CATEGORIES)[number] {
   const normalized = normalizeCategoryKey(category)
-  return CATEGORY_ALIASES[normalized] ?? "Materials"
+  if (CATEGORY_ALIASES[normalized]) {
+    return CATEGORY_ALIASES[normalized]
+  }
+
+  const mappedCategory = mapExistingCategoryToShopCategory(category)
+  return CATEGORY_ALIASES[normalizeCategoryKey(mappedCategory)] ?? "Materials"
 }
 
 export function fallbackImageForCategory(category: string | null | undefined) {

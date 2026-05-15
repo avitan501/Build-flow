@@ -9,6 +9,15 @@ export type ShopItemSource = (typeof SHOP_ITEM_SOURCES)[number];
 export type ShopCategoryName = (typeof SHOP_CATEGORY_NAMES)[number];
 
 const SHOP_CATEGORY_SET = new Set<string>(SHOP_CATEGORY_NAMES);
+const SHOP_CATEGORY_KEYWORDS: Record<ShopCategoryName, RegExp> = {
+  Services: /\b(survey|surveys|stakeout|final survey|under construction survey)\b/,
+  Framing: /\b(2x4|2x6|2x8|2x10|2x12|lvl|joist|joists|hanger|hangers|tie|ties|nail|nails|strap|straps|bridging|treated lumber|plywood)\b/,
+  "Tile work": /\b(tile|tiles|grout|thinset|thin set|mortar|schluter)\b/,
+  "Sheet rock": /\b(sheetrock|sheet rock|drywall|gypsum|compound|corner bead)\b/,
+  Carpentry: /\b(trim|casing|baseboard|door|doors|cabinet|cabinets|finish wood|stair|stairs|rail|rails)\b/,
+  Exterior: /\b(flashing|exterior|siding|housewrap|house wrap|waterproof|roofing|window|windows)\b/,
+  Miscellaneous: /$^/,
+};
 
 function normalizeCategoryInput(value: string | null | undefined) {
   return (value ?? "")
@@ -38,12 +47,12 @@ export function suggestShopCategory(input: {
 }): ShopCategoryName {
   const haystack = buildCategoryHaystack(input);
 
-  if (/\b(survey|stakeout|final survey|under construction survey)\b/.test(haystack)) return "Services";
-  if (/\b(tile|grout|thinset|mortar|schluter)\b/.test(haystack)) return "Tile work";
-  if (/\b(sheetrock|drywall|gypsum|compound|corner bead)\b/.test(haystack)) return "Sheet rock";
-  if (/\b(trim|casing|baseboard|door|cabinet|finish wood|stair|rail)\b/.test(haystack)) return "Carpentry";
-  if (/\b(flashing|exterior|siding|housewrap|waterproof|roofing|window)\b/.test(haystack)) return "Exterior";
-  if (/\b(2x4|2x6|2x8|2x10|2x12|lvl|joist|hanger|tie|nail|strap|bridging|treated lumber|plywood)\b/.test(haystack)) return "Framing";
+  if (SHOP_CATEGORY_KEYWORDS.Services.test(haystack)) return "Services";
+  if (SHOP_CATEGORY_KEYWORDS.Framing.test(haystack)) return "Framing";
+  if (SHOP_CATEGORY_KEYWORDS["Tile work"].test(haystack)) return "Tile work";
+  if (SHOP_CATEGORY_KEYWORDS["Sheet rock"].test(haystack)) return "Sheet rock";
+  if (SHOP_CATEGORY_KEYWORDS.Carpentry.test(haystack)) return "Carpentry";
+  if (SHOP_CATEGORY_KEYWORDS.Exterior.test(haystack)) return "Exterior";
 
   return "Miscellaneous";
 }
