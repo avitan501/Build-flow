@@ -44,7 +44,7 @@ function getStepStatusClass(status: ProjectStepStatus) {
 
 const nextSteps = (projectId: string) => [
   { title: "Upload Plans", status: "Live", href: `/upload?projectId=${projectId}` },
-  { title: "Materials", status: "Live", href: `/materials?projectId=${projectId}` },
+  { title: "Materials", status: "Live", href: "/shop" },
   { title: "Quote", status: "Live", href: `/quotes?projectId=${projectId}` },
   { title: "Orders", status: "Partial Live", href: `/orders?projectId=${projectId}` },
 ] as const;
