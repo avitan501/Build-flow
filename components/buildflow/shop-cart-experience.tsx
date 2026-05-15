@@ -67,29 +67,28 @@ export function ShopCartExperience({ products }: ShopCartExperienceProps) {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#eaf4ff_0%,#f8fbff_42%,#ffffff_100%)] px-4 py-4 pb-28 text-slate-950 sm:px-8 sm:pb-10 lg:px-10 lg:pb-12">
       <section className="mx-auto flex max-w-6xl flex-col gap-5">
-        <div className="rounded-[24px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,247,255,0.95))] p-5 shadow-[0_18px_44px_rgba(148,163,184,0.14)]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Client cart</div>
-              <h1 className="mt-2 text-[1.7rem] font-semibold tracking-[-0.04em] text-slate-950">Review your order request</h1>
-              <p className="mt-2 text-sm text-slate-600">Preview quantities, remove items, and send a clean order request when ready.</p>
-            </div>
-            <Link href="/shop" className="inline-flex items-center rounded-full border border-sky-100 bg-white px-4 py-2 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-              Continue shopping
-            </Link>
-          </div>
-        </div>
-
         {cartLines.length === 0 ? (
           <section className="rounded-[28px] border border-dashed border-sky-200 bg-white/92 p-8 text-center shadow-[0_18px_42px_rgba(148,163,184,0.1)]">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sky-50 text-3xl">🛒</div>
-            <h2 className="mt-4 text-xl font-semibold text-slate-950">Your cart is empty</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Add materials from the shop to build an order request preview.</p>
-            <Link href="/shop" className="mt-5 inline-flex items-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(14,116,244,0.2)] transition hover:-translate-y-0.5 hover:bg-sky-700">
+            <h1 className="text-xl font-semibold text-slate-950">Your cart is empty</h1>
+            <Link href="/shop/materials" className="mt-5 inline-flex items-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(14,116,244,0.2)] transition hover:-translate-y-0.5 hover:bg-sky-700">
               Browse materials
             </Link>
           </section>
         ) : (
+          <>
+            <div className="rounded-[24px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,247,255,0.95))] p-5 shadow-[0_18px_44px_rgba(148,163,184,0.14)]">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Client cart</div>
+                  <h1 className="mt-2 text-[1.7rem] font-semibold tracking-[-0.04em] text-slate-950">Review your order request</h1>
+                  <p className="mt-2 text-sm text-slate-600">Preview quantities, remove items, and send a clean order request when ready.</p>
+                </div>
+                <Link href="/shop" className="inline-flex items-center rounded-full border border-sky-100 bg-white px-4 py-2 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                  Continue shopping
+                </Link>
+              </div>
+            </div>
+
           <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
             <section className="space-y-4">
               {cartLines.map(({ product, quantity }, index) => {
@@ -168,6 +167,7 @@ export function ShopCartExperience({ products }: ShopCartExperienceProps) {
               </div>
             </aside>
           </div>
+          </>
         )}
       </section>
     </main>
