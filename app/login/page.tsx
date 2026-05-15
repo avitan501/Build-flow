@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 
@@ -16,12 +16,42 @@ const initialState: LoginState = {
   password: "",
 };
 
+function sanitizeNextPath(value: string | null) {
+  if (!value) return "/dashboard";
+  if (!value.startsWith("/")) return "/dashboard";
+  if (value.startsWith("//")) return "/dashboard";
+  return value;
+}
+
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const [form, setForm] = useState<LoginState>(initialState);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const redirectPath = sanitizeNextPath(searchParams.get("next"));
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function redirectIfSignedIn() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!cancelled && session) {
+        router.replace(redirectPath);
+        router.refresh();
+      }
+    }
+
+    redirectIfSignedIn();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [redirectPath, router, supabase]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,7 +69,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/dashboard");
+      router.replace(redirectPath);
       router.refresh();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Login request failed.");
@@ -91,6 +121,8 @@ export default function LoginPage() {
                 placeholder="Enter your password"
               />
             </label>
+
+            <p className="text-sm text-slate-500">Your session stays active on this device until it expires or you log out.</p>
 
             {error ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
