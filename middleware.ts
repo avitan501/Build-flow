@@ -14,6 +14,8 @@ const PROTECTED_PATH_PREFIXES = [
   "/admin",
 ];
 
+const CLIENT_HOME_REDIRECT_PATHS = new Set(["/dashboard"]);
+
 const AUTH_PAGES = new Set(["/login", "/signup"]);
 
 function isProtectedPath(pathname: string) {
@@ -64,7 +66,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && AUTH_PAGES.has(pathname)) {
-    const nextPath = sanitizeNextPath(request.nextUrl.searchParams.get("next")) ?? "/dashboard";
+    const nextPath = sanitizeNextPath(request.nextUrl.searchParams.get("next")) ?? "/";
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = nextPath;
     redirectUrl.search = "";
@@ -75,6 +77,13 @@ export async function middleware(request: NextRequest) {
       redirectUrl.search = targetSearch ? `?${targetSearch}` : "";
     }
 
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  if (user && CLIENT_HOME_REDIRECT_PATHS.has(pathname)) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/";
+    redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }
 

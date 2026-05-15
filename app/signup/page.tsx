@@ -92,7 +92,7 @@ export default function SignupPage() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push("/");
       router.refresh();
     } catch (signupRequestError) {
       setError(signupRequestError instanceof Error ? signupRequestError.message : "Signup request failed.");

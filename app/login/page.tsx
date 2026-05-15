@@ -17,9 +17,9 @@ const initialState: LoginState = {
 };
 
 function sanitizeNextPath(value: string | null) {
-  if (!value) return "/dashboard";
-  if (!value.startsWith("/")) return "/dashboard";
-  if (value.startsWith("//")) return "/dashboard";
+  if (!value) return "/";
+  if (!value.startsWith("/")) return "/";
+  if (value.startsWith("//")) return "/";
   return value;
 }
 
