@@ -10,6 +10,7 @@ import { placeholderImageMetadata, type ShopCatalogProduct } from "@/lib/shop-ca
 import type { ShopActivityEvent } from "@/lib/shop-activity"
 import { buildSuggestedProducts, getShopActivitySessionId, readLocalShopActivity, writeLocalShopActivity } from "@/lib/shop-activity"
 import { SHOP_CART_UPDATED_EVENT, SHOP_SAVE_UPDATED_EVENT, readShopCartCount, readShopSavedIds, readShopCartMap, writeShopCartMap } from "@/lib/shop-cart"
+import { SHOP_CATEGORY_CHIPS } from "@/lib/shop"
 
 type ShopCatalogExperienceProps = {
   products: ShopCatalogProduct[]
@@ -19,29 +20,7 @@ type ShopCatalogExperienceProps = {
 type SortMode = "featured" | "price-low" | "price-high"
 type BrowseTab = "materials" | "services" | "deals" | "suppliers" | "saved" | "cart"
 
-const SHOP_CATEGORIES = [
-  "All",
-  "Services",
-  "Lumber",
-  "Plywood",
-  "Drywall",
-  "Concrete",
-  "Roofing",
-  "Insulation",
-  "Hardware",
-  "Electrical",
-  "Plumbing",
-  "Tools",
-  "Doors",
-  "Trim",
-  "Windows",
-  "Flooring",
-  "Appliances",
-  "Glass",
-  "Lighting",
-  "Tile",
-  "Cabinets",
-] as const
+const SHOP_CATEGORIES = SHOP_CATEGORY_CHIPS
 
 const SORT_OPTIONS: { key: SortMode; label: string }[] = [
   { key: "featured", label: "Featured" },
@@ -420,32 +399,19 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
         <section className="rounded-[24px] bg-white p-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-3">
-          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {[
-              { key: "materials", label: "Materials", icon: MaterialsIcon },
-              { key: "services", label: "Services", icon: ServiceIcon },
-              { key: "deals", label: "Deals", icon: TagIcon },
-              { key: "suppliers", label: "Suppliers", icon: TruckIcon },
-              { key: "saved", label: "Saved", icon: BookmarkIcon },
-              { key: "cart", label: "Cart", icon: CartIcon },
-            ].map((tab) => {
-              const active = browseTab === tab.key
-              const Icon = tab.icon
+          <div className="flex flex-wrap gap-2">
+            {SHOP_CATEGORIES.map((category) => {
+              const active = activeCategory === category
               return (
                 <button
-                  key={tab.key}
+                  key={category}
                   type="button"
-                  onClick={() => activateTab(tab.key as BrowseTab)}
-                  className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${
+                  onClick={() => setCategory(active ? "All" : category)}
+                  className={`inline-flex h-11 shrink-0 items-center rounded-full border px-4 py-2 text-sm font-semibold transition ${
                     active ? "border-sky-300 bg-sky-50 text-sky-800" : "border-slate-200 bg-white text-slate-700 shadow-sm"
                   }`}
                 >
-                  <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${active ? "bg-sky-100 text-sky-700" : "bg-slate-100 text-slate-700"}`}>
-                    <Icon {...(tab.key === "saved" ? { filled: active || savedIds.length > 0 } : {})} />
-                  </span>
-                  <span>{tab.label}</span>
-                  {tab.key === "cart" ? <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-600">{cartCount}</span> : null}
-                  {tab.key === "saved" && savedIds.length > 0 ? <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-600">{savedIds.length}</span> : null}
+                  {category}
                 </button>
               )
             })}

@@ -1,5 +1,5 @@
 import { MATERIAL_REAL_PHOTOS, realPhotoForMaterialCategory } from "@/lib/material-photo-catalog"
-import type { ShopItemImageRecord, ShopItemRecord } from "@/lib/shop"
+import { mapExistingCategoryToShopCategory, suggestShopCategory, type ShopCategoryName, type ShopItemImageRecord, type ShopItemRecord } from "@/lib/shop"
 
 export type ShopProductImage = {
   imageUrl: string
@@ -189,11 +189,13 @@ const CATEGORY_ALIASES: Record<string, (typeof MATERIAL_IMAGE_CATEGORIES)[number
   "lvl beam": "Lumber",
   "lvl beams": "Lumber",
   materials: "Materials",
+  miscellaneous: "Materials",
   moulding: "Trim",
   plumbing: "Plumbing",
   plywood: "Plywood",
   roofing: "Roofing",
   tile: "Tile",
+  "tile work": "Tile",
   tools: "Tools",
   treated: "Lumber",
   "treated lumber": "Lumber",
@@ -201,6 +203,10 @@ const CATEGORY_ALIASES: Record<string, (typeof MATERIAL_IMAGE_CATEGORIES)[number
   toilet: "Plumbing",
   window: "Windows",
   windows: "Windows",
+  framing: "Lumber",
+  "sheet rock": "Drywall",
+  carpentry: "Trim",
+  exterior: "Roofing",
 }
 
 function normalizeCategoryKey(category: string | null | undefined) {
@@ -262,7 +268,7 @@ function buildImageMetadata(params: {
   }
 }
 
-export function placeholderImageMetadata(category: string | null | undefined, name = category || "Materials"): ShopProductImage {
+export function placeholderImageMetadata(category: string | null | undefined, name = category || "Miscellaneous"): ShopProductImage {
   return buildImageMetadata({ name, category })
 }
 
@@ -309,10 +315,29 @@ function normalizeGalleryImages(images: Array<ShopItemImageRecord | Partial<Shop
     )
 }
 
-function galleryForProduct(primary: ShopProductImage, category: string | null | undefined, extraImages: Array<ShopItemImageRecord | Partial<ShopProductImage> | null | undefined> = [], fallbackName = category || "Materials") {
+function galleryForProduct(primary: ShopProductImage, category: string | null | undefined, extraImages: Array<ShopItemImageRecord | Partial<ShopProductImage> | null | undefined> = [], fallbackName = category || "Miscellaneous") {
   const images = [primary, ...normalizeGalleryImages(extraImages, fallbackName, category)]
 
   return images.filter((image, index, all) => all.findIndex((candidate) => candidate.imageUrl === image.imageUrl) === index)
+}
+
+function relatedCategoriesFor(category: ShopCategoryName) {
+  switch (category) {
+    case "Services":
+      return ["Services", "Framing"]
+    case "Framing":
+      return ["Framing", "Exterior", "Carpentry"]
+    case "Tile work":
+      return ["Tile work", "Carpentry", "Miscellaneous"]
+    case "Sheet rock":
+      return ["Sheet rock", "Carpentry", "Miscellaneous"]
+    case "Carpentry":
+      return ["Carpentry", "Exterior", "Tile work"]
+    case "Exterior":
+      return ["Exterior", "Framing", "Carpentry"]
+    default:
+      return ["Miscellaneous", "Framing", "Carpentry"]
+  }
 }
 
 const PRODUCT_SEED_INPUTS = [
@@ -331,7 +356,7 @@ const PRODUCT_SEED_INPUTS = [
     popularUse: "Foundation layout",
     reviewLabel: "Service",
     rating: 5,
-    relatedCategories: ["Services", "Concrete"],
+    relatedCategories: ["Services", "Framing"],
     productType: "service",
     detailBullets: [
       "Foundation corners and primary layout points marked on site",
@@ -354,7 +379,7 @@ const PRODUCT_SEED_INPUTS = [
     popularUse: "Structure layout confirmation",
     reviewLabel: "Service",
     rating: 5,
-    relatedCategories: ["Services", "Lumber"],
+    relatedCategories: ["Services", "Framing"],
     productType: "service",
     detailBullets: [
       "Confirms structure location before the project advances too far",
@@ -377,7 +402,7 @@ const PRODUCT_SEED_INPUTS = [
     popularUse: "Final approvals",
     reviewLabel: "Service",
     rating: 5,
-    relatedCategories: ["Services", "Concrete"],
+    relatedCategories: ["Services", "Framing"],
     productType: "service",
     detailBullets: [
       "Documents final structure and site improvement locations",
@@ -389,7 +414,7 @@ const PRODUCT_SEED_INPUTS = [
     slug: "2x4-premium-lumber",
     name: "2x4 Premium Lumber",
     description: "Kiln-dried framing lumber for clean residential wall framing and interior structural work.",
-    category: "Lumber",
+    category: "Framing",
     unit: "Each - 8 ft",
     price: 7.95,
     supplierName: "BuildFlow sample catalog",
@@ -399,13 +424,13 @@ const PRODUCT_SEED_INPUTS = [
     popularUse: "Wall framing",
     reviewLabel: "4.8 - 124 reviews",
     rating: 4.8,
-    relatedCategories: ["Plywood", "Hardware"],
+    relatedCategories: ["Framing", "Exterior"],
   },
   {
     slug: "2x8-treated-lumber",
     name: "2x8 Treated Lumber",
     description: "Pressure-treated board suited for exterior framing, deck bases, and moisture-prone structural areas.",
-    category: "Treated Lumber",
+    category: "Framing",
     unit: "Each - 12 ft",
     price: 23.4,
     supplierName: "BuildFlow sample catalog",
@@ -415,13 +440,13 @@ const PRODUCT_SEED_INPUTS = [
     popularUse: "Deck framing",
     reviewLabel: "4.7 - 89 reviews",
     rating: 4.7,
-    relatedCategories: ["Hardware", "Lumber"],
+    relatedCategories: ["Framing", "Exterior"],
   },
   {
     slug: "cdx-plywood-sheet",
     name: "CDX Plywood",
     description: "General-purpose structural plywood sheet for roof, wall, and subfloor sheathing applications.",
-    category: "Plywood",
+    category: "Framing",
     unit: "Sheet - 4x8",
     price: 34.75,
     supplierName: "BuildFlow sample catalog",
@@ -431,13 +456,13 @@ const PRODUCT_SEED_INPUTS = [
     popularUse: "Wall & roof sheathing",
     reviewLabel: "4.9 - 201 reviews",
     rating: 4.9,
-    relatedCategories: ["Lumber", "Hardware"],
+    relatedCategories: ["Framing", "Carpentry"],
   },
   {
     slug: "lvl-beam-header",
     name: "LVL Beam",
     description: "Engineered laminated veneer lumber beam for long spans, headers, and high-load framing zones.",
-    category: "LVL Beams",
+    category: "Framing",
     unit: "Each - 1-3/4 x 11-7/8 x 16 ft",
     price: 118.2,
     supplierName: "BuildFlow sample catalog",
@@ -447,13 +472,13 @@ const PRODUCT_SEED_INPUTS = [
     popularUse: "Headers & long spans",
     reviewLabel: "4.9 - 54 reviews",
     rating: 4.9,
-    relatedCategories: ["Lumber", "Hardware"],
+    relatedCategories: ["Framing", "Carpentry"],
   },
   {
     slug: "galvanized-joist-hanger",
     name: "Galvanized Joist Hanger",
     description: "Heavy-duty galvanized hanger for fastening joists securely into beams or ledger assemblies.",
-    category: "Hangers",
+    category: "Framing",
     unit: "Each",
     price: 4.85,
     supplierName: "BuildFlow sample catalog",
@@ -463,13 +488,13 @@ const PRODUCT_SEED_INPUTS = [
     popularUse: "Joist connections",
     reviewLabel: "4.8 - 77 reviews",
     rating: 4.8,
-    relatedCategories: ["Hardware", "Lumber"],
+    relatedCategories: ["Framing", "Exterior"],
   },
   {
     slug: "collated-framing-nails",
     name: "Collated Framing Nails",
     description: "Collated framing nails for pneumatic framing tools, sized for efficient structural fastening.",
-    category: "Fasteners",
+    category: "Framing",
     unit: "Box",
     price: 42.1,
     supplierName: "BuildFlow sample catalog",
@@ -479,13 +504,13 @@ const PRODUCT_SEED_INPUTS = [
     popularUse: "Stud and plate fastening",
     reviewLabel: "4.7 - 148 reviews",
     rating: 4.7,
-    relatedCategories: ["Hardware", "Lumber"],
+    relatedCategories: ["Framing", "Exterior"],
   },
   {
     slug: "subfloor-adhesive-tube",
     name: "Subfloor Adhesive",
     description: "High-grab construction adhesive designed to reduce squeaks and improve panel hold on floors.",
-    category: "Adhesives",
+    category: "Framing",
     unit: "Tube - 28 oz",
     price: 6.45,
     supplierName: "BuildFlow sample catalog",
@@ -495,13 +520,13 @@ const PRODUCT_SEED_INPUTS = [
     popularUse: "Subfloor installs",
     reviewLabel: "4.6 - 63 reviews",
     rating: 4.6,
-    relatedCategories: ["Plywood", "Lumber"],
+    relatedCategories: ["Framing", "Tile work"],
   },
   {
     slug: "flashing-roll",
     name: "Flashing Roll",
     description: "Corrosion-resistant flashing for clean water management around roofs, walls, and window openings.",
-    category: "Flashing",
+    category: "Exterior",
     unit: "Roll - 10 in x 50 ft",
     price: 58.9,
     supplierName: "BuildFlow sample catalog",
@@ -511,7 +536,7 @@ const PRODUCT_SEED_INPUTS = [
     popularUse: "Water management",
     reviewLabel: "4.8 - 42 reviews",
     rating: 4.8,
-    relatedCategories: ["Roofing", "Plywood"],
+    relatedCategories: ["Exterior", "Framing"],
   },
 ] satisfies Array<Omit<ProductSeed, "image" | "imageUrl" | "imageAlt" | "imageSource" | "imageLicense" | "imageCredit" | "imageCategory" | "gallery" | "availability">>
 
@@ -557,13 +582,18 @@ export function deriveSpecLine(item: ShopItemRecord) {
 
 export function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[] {
   return items.map((item, index) => {
-    const productOverride = productSpecificImageMetadata({ name: item.name, category: item.category })
+    const mappedCategory = mapExistingCategoryToShopCategory(item.category, {
+      name: item.name,
+      description: item.description,
+      itemNo: item.item_number,
+    })
+    const productOverride = productSpecificImageMetadata({ name: item.name, category: mappedCategory })
     const imageLooksGeneric = !item.image_url || item.image_url.startsWith("/images/materials/photos/") || (item.image_url.startsWith("/images/materials/") && !item.image_url.startsWith("/images/materials/products/") && !item.image_url.startsWith("/images/materials/products-real/"))
     const image = productOverride && imageLooksGeneric
       ? productOverride
       : buildImageMetadata({
           name: item.name,
-          category: item.category,
+          category: mappedCategory,
           imageUrl: item.image_url,
           imageAlt: item.image_alt,
           imageSource: item.image_source,
@@ -579,7 +609,7 @@ export function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[
       name: item.name,
       description: item.description || "Supplier catalog item ready for project quoting.",
       shortDescription: item.description || "Supplier catalog item ready for project quoting.",
-      category: item.category || "Materials",
+      category: mappedCategory,
       unit: item.unit || "Unit not specified",
       price: item.unit_price,
       supplierName: item.supplier_name,
@@ -591,14 +621,14 @@ export function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[
       imageLicense: image.imageLicense,
       imageCredit: image.imageCredit,
       imageCategory: image.imageCategory,
-      gallery: galleryForProduct(image, item.category, extraGallery, item.name),
+      gallery: galleryForProduct(image, mappedCategory, extraGallery, item.name),
       specLine: deriveSpecLine(item),
       availability: "Available",
-      featuredLabel: item.category === "Lumber" || item.category === "Plywood" || item.category === "Fasteners" ? "Popular for framing" : "Jobsite pick",
-      popularUse: item.category || "General materials",
+      featuredLabel: mappedCategory === "Framing" ? "Popular for framing" : mappedCategory === "Exterior" ? "Exterior pick" : "Jobsite pick",
+      popularUse: mappedCategory || suggestShopCategory({ name: item.name, description: item.description, itemNo: item.item_number }),
       reviewLabel: `${(4.6 + (index % 4) * 0.1).toFixed(1)} - ${48 + index * 13} reviews`,
       rating: 4.6 + (index % 4) * 0.1,
-      relatedCategories: [item.category || "Materials", image.imageCategory],
+      relatedCategories: relatedCategoriesFor(mappedCategory),
       productType: "material",
       detailBullets: [],
     }

@@ -1,4 +1,5 @@
 import { buildOwnerQuoteDuplicateKey, ownerQuoteRows, ownerQuoteSummary } from "@/lib/owner-materials-quote";
+import { mapExistingCategoryToShopCategory, type ShopCategoryName } from "@/lib/shop";
 
 export type OwnerMaterialRowState = {
   id: string;
@@ -6,7 +7,7 @@ export type OwnerMaterialRowState = {
   itemNo: string;
   sku: string;
   description: string;
-  category: string;
+  category: ShopCategoryName;
   unit: string;
   supplier: string;
   supplierUnitPrice: number;
@@ -72,7 +73,7 @@ function makeRow(batchId: string, input: {
   supplier: string;
   quoteDate: string;
   supplierUnitPrice: number;
-  category: string;
+  category?: string;
   imageCategory?: string;
 }) : OwnerMaterialRowState {
   const markupPercent = 0;
@@ -86,6 +87,11 @@ function makeRow(batchId: string, input: {
     unitPrice: input.supplierUnitPrice,
     extendedPrice: input.qty * input.supplierUnitPrice,
   });
+  const category = mapExistingCategoryToShopCategory(input.category, {
+    name: input.description,
+    description: input.description,
+    itemNo: input.itemNo,
+  });
 
   return {
     id: `${batchId}:${input.itemNo || slugify(input.description)}`,
@@ -93,7 +99,7 @@ function makeRow(batchId: string, input: {
     itemNo: input.itemNo,
     sku: `${slugify(input.supplier).slice(0, 3).toUpperCase()}-${input.itemNo || slugify(input.description).toUpperCase()}`,
     description: input.description,
-    category: input.category,
+    category,
     unit: input.unit,
     supplier: input.supplier,
     supplierUnitPrice: input.supplierUnitPrice,
@@ -109,7 +115,7 @@ function makeRow(batchId: string, input: {
     imageSource: "Not added",
     imageLicense: "Pending",
     imageCredit: "Pending",
-    imageCategory: input.imageCategory ?? input.category,
+    imageCategory: input.imageCategory ?? category,
     galleryCount: 0,
   };
 }

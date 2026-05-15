@@ -1,38 +1,116 @@
 export const SHOP_SUPPLIER_ESTIMATE_STATUSES = ["draft", "reviewed", "archived"] as const;
 export const SHOP_ITEM_SOURCES = ["supplier_estimate", "manual"] as const;
-export const SHOP_CATEGORY_NAMES = [
-  "Services",
-  "Lumber",
-  "Plywood",
-  "Drywall",
-  "Concrete",
-  "Roofing",
-  "Insulation",
-  "Hardware",
-  "Electrical",
-  "Plumbing",
-  "Tools",
-  "Treated Lumber",
-  "LVL Beams",
-  "Fasteners",
-  "Hangers",
-  "Adhesives",
-  "Flashing",
-  "Doors",
-  "Trim",
-  "Windows",
-  "Flooring",
-  "Appliances",
-  "Glass",
-  "Lighting",
-  "Tile",
-  "Cabinets",
-  "Materials",
-] as const;
+export const SHOP_CATEGORY_NAMES = ["Services", "Framing", "Tile work", "Sheet rock", "Carpentry", "Exterior", "Miscellaneous"] as const;
+export const SHOP_CATEGORY_CHIPS = SHOP_CATEGORY_NAMES;
 export const SHOP_POPULAR_SEARCHES = ["2x4 studs", "joist hangers", "subfloor adhesive", "pressure treated", "flashing roll", "final survey", "stakeout foundations"] as const;
 
 export type ShopSupplierEstimateStatus = (typeof SHOP_SUPPLIER_ESTIMATE_STATUSES)[number];
 export type ShopItemSource = (typeof SHOP_ITEM_SOURCES)[number];
+export type ShopCategoryName = (typeof SHOP_CATEGORY_NAMES)[number];
+
+const SHOP_CATEGORY_SET = new Set<string>(SHOP_CATEGORY_NAMES);
+
+function normalizeCategoryInput(value: string | null | undefined) {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function buildCategoryHaystack(input: {
+  category?: string | null;
+  name?: string | null;
+  description?: string | null;
+  itemNo?: string | null;
+}) {
+  return [input.category, input.name, input.description, input.itemNo]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+export function suggestShopCategory(input: {
+  category?: string | null;
+  name?: string | null;
+  description?: string | null;
+  itemNo?: string | null;
+}): ShopCategoryName {
+  const haystack = buildCategoryHaystack(input);
+
+  if (/\b(survey|stakeout|final survey|under construction survey)\b/.test(haystack)) return "Services";
+  if (/\b(tile|grout|thinset|mortar|schluter)\b/.test(haystack)) return "Tile work";
+  if (/\b(sheetrock|drywall|gypsum|compound|corner bead)\b/.test(haystack)) return "Sheet rock";
+  if (/\b(trim|casing|baseboard|door|cabinet|finish wood|stair|rail)\b/.test(haystack)) return "Carpentry";
+  if (/\b(flashing|exterior|siding|housewrap|waterproof|roofing|window)\b/.test(haystack)) return "Exterior";
+  if (/\b(2x4|2x6|2x8|2x10|2x12|lvl|joist|hanger|tie|nail|strap|bridging|treated lumber|plywood)\b/.test(haystack)) return "Framing";
+
+  return "Miscellaneous";
+}
+
+export function mapExistingCategoryToShopCategory(
+  category: string | null | undefined,
+  context: { name?: string | null; description?: string | null; itemNo?: string | null } = {},
+): ShopCategoryName {
+  const normalized = normalizeCategoryInput(category);
+
+  if (SHOP_CATEGORY_SET.has(category?.trim() || "")) {
+    return category!.trim() as ShopCategoryName;
+  }
+
+  switch (normalized) {
+    case "services":
+    case "service":
+      return "Services";
+    case "lumber":
+    case "treated lumber":
+    case "lvl beams":
+    case "lvl beam":
+    case "engineered lumber":
+    case "plywood":
+    case "hangers":
+    case "hanger":
+    case "fasteners":
+    case "fastener":
+      return "Framing";
+    case "adhesives":
+    case "adhesive": {
+      const suggested = suggestShopCategory({ category, ...context });
+      return suggested === "Miscellaneous" ? "Framing" : suggested;
+    }
+    case "tile":
+      return "Tile work";
+    case "drywall":
+      return "Sheet rock";
+    case "doors":
+    case "door":
+    case "trim":
+    case "cabinets":
+    case "cabinet":
+      return "Carpentry";
+    case "flooring":
+      return suggestShopCategory({ category, ...context }) === "Tile work" ? "Tile work" : "Carpentry";
+    case "flashing":
+    case "roofing":
+    case "windows":
+    case "window":
+      return "Exterior";
+    case "glass":
+      return suggestShopCategory({ category, ...context }) === "Exterior" ? "Exterior" : "Miscellaneous";
+    case "hardware":
+    case "materials":
+    case "appliances":
+    case "lighting":
+    case "electrical":
+    case "plumbing":
+    case "tools":
+    case "concrete":
+    case "insulation":
+      return "Miscellaneous";
+    default:
+      return suggestShopCategory({ category, ...context });
+  }
+}
 
 export type ShopSupplierEstimateRecord = {
   id: string;

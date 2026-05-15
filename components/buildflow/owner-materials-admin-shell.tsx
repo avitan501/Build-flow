@@ -6,6 +6,7 @@ import { publishOwnerMaterialsSelection, restoreOwnerMaterialsAdminBatches, save
 import { OwnerMaterialsAdminTable, type EditableOwnerMaterialRow } from "@/components/buildflow/owner-materials-admin-table";
 import type { OwnerMaterialBatchState, OwnerMaterialsAdminState } from "@/lib/owner-materials-admin-data";
 import { ownerSupplierDocuments } from "@/lib/owner-materials-admin-data";
+import { SHOP_CATEGORY_NAMES, mapExistingCategoryToShopCategory, suggestShopCategory, type ShopCategoryName } from "@/lib/shop";
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
@@ -19,6 +20,27 @@ function cloneState<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function nextSuggestedCategory(row: Pick<EditableOwnerMaterialRow, "category" | "description" | "itemNo">, patch: Partial<EditableOwnerMaterialRow>) {
+  const previousSuggested = mapExistingCategoryToShopCategory(row.category, {
+    name: row.description,
+    description: row.description,
+    itemNo: row.itemNo,
+  });
+  const nextDescription = typeof patch.description === "string" ? patch.description : row.description;
+  const nextItemNo = typeof patch.itemNo === "string" ? patch.itemNo : row.itemNo;
+  const suggested = suggestShopCategory({ category: patch.category ?? row.category, name: nextDescription, description: nextDescription, itemNo: nextItemNo });
+
+  if (patch.category) {
+    return mapExistingCategoryToShopCategory(patch.category, { name: nextDescription, description: nextDescription, itemNo: nextItemNo });
+  }
+
+  if (row.category === previousSuggested || !row.category?.trim()) {
+    return suggested;
+  }
+
+  return mapExistingCategoryToShopCategory(row.category, { name: nextDescription, description: nextDescription, itemNo: nextItemNo });
+}
+
 function makeBlankRow(batch: OwnerMaterialBatchState): EditableOwnerMaterialRow {
   const id = `${batch.id}:manual-${Date.now()}`;
   return {
@@ -27,7 +49,7 @@ function makeBlankRow(batch: OwnerMaterialBatchState): EditableOwnerMaterialRow 
     itemNo: `NEW-${batch.rows.length + 1}`,
     sku: `${batch.supplier.slice(0, 3).toUpperCase()}-NEW-${batch.rows.length + 1}`,
     description: "New material",
-    category: "Materials",
+    category: "Miscellaneous",
     unit: "EA",
     supplier: batch.supplier,
     supplierUnitPrice: 0,
@@ -43,7 +65,7 @@ function makeBlankRow(batch: OwnerMaterialBatchState): EditableOwnerMaterialRow 
     imageSource: "Not added",
     imageLicense: "Pending",
     imageCredit: "Pending",
-    imageCategory: "Materials",
+    imageCategory: "Miscellaneous",
     galleryCount: 0,
     notes: "",
   };
@@ -66,7 +88,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
   const batches = state.batches;
   const activeBatch = batches.find((batch) => batch.id === state.selectedBatchId) ?? batches[0];
   const rows = activeBatch?.rows ?? [];
-  const categories = useMemo(() => ["All categories", ...Array.from(new Set(rows.map((row) => row.category)))], [rows]);
+  const categories = useMemo(() => ["All categories", ...SHOP_CATEGORY_NAMES], []);
   const suppliers = useMemo(() => ["All suppliers", ...Array.from(new Set(batches.map((batch) => batch.supplier)))], [batches]);
   const statuses = ["All statuses", "Published", "Draft", "Needs review", "Missing image", "Ready"];
 
@@ -117,7 +139,8 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
               ...batch,
               rows: batch.rows.map((row) => {
                 if (row.id !== rowId) return row;
-                const next = { ...row, ...patch };
+                const category = nextSuggestedCategory(row, patch);
+                const next = { ...row, ...patch, category, imageCategory: category };
                 const finalUnitPrice = Number(next.finalUnitPrice || 0);
                 const photoCount = next.photoCount || 0;
                 return {
@@ -498,6 +521,8 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
                 onAddPhoto={handleAddPhoto}
                 onRemovePhoto={handleRemovePhoto}
                 editingRowId={editingRowId}
+                categoryOptions={SHOP_CATEGORY_NAMES}
+                onChangeCategory={(rowId, category) => updateRow(rowId, { category })}
               />
             </div>
 
@@ -518,7 +543,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
                   </div>
                   <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Description / Name</span><input value={editingRow.description} onChange={(event) => updateRow(editingRow.id, { description: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Category</span><input value={editingRow.category} onChange={(event) => updateRow(editingRow.id, { category: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Category</span><select value={editingRow.category} onChange={(event) => updateRow(editingRow.id, { category: event.target.value as ShopCategoryName })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">{SHOP_CATEGORY_NAMES.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
                     <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Supplier</span><input value={editingRow.supplier} onChange={(event) => updateRow(editingRow.id, { supplier: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-3">

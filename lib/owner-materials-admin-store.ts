@@ -3,7 +3,7 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import type { ShopItemRecord } from "@/lib/shop";
+import { mapExistingCategoryToShopCategory, type ShopItemRecord } from "@/lib/shop";
 import { cloneOwnerMaterialsState, ownerMaterialsSeedState, type OwnerMaterialBatchState, type OwnerMaterialRowState, type OwnerMaterialsAdminState } from "@/lib/owner-materials-admin-data";
 
 const dataDir = path.join(process.cwd(), "data");
@@ -40,6 +40,7 @@ async function writeJsonFile(filePath: string, value: unknown) {
 function normalizeRow(row: OwnerMaterialRowState): OwnerMaterialRowState {
   const finalUnitPrice = Number.isFinite(row.finalUnitPrice) ? row.finalUnitPrice : row.supplierUnitPrice;
   const reviewStatus = row.photoCount > 0 ? (row.finalUnitPrice > 0 ? "Ready" : "Needs review") : row.finalUnitPrice > 0 ? "Missing image" : "Needs review";
+  const category = mapExistingCategoryToShopCategory(row.category, { name: row.description, description: row.description, itemNo: row.itemNo });
 
   return {
     ...row,
@@ -51,13 +52,14 @@ function normalizeRow(row: OwnerMaterialRowState): OwnerMaterialRowState {
     photoCount: Number(row.photoCount) || 0,
     galleryCount: Number(row.galleryCount) || 0,
     reviewStatus,
+    category,
     publishStatus: row.publishStatus === "Published" ? "Published" : "Draft",
     imageUrl: row.imageUrl || "",
     imageAlt: row.imageAlt || `${row.description} photo`,
     imageSource: row.imageSource || "Not added",
     imageLicense: row.imageLicense || "Pending",
     imageCredit: row.imageCredit || "Pending",
-    imageCategory: row.imageCategory || row.category || "Materials",
+    imageCategory: row.imageCategory || category,
     error: undefined,
   };
 }
@@ -118,6 +120,8 @@ function buildPublishedItem(row: OwnerMaterialRowState, batch: OwnerMaterialBatc
   const createdAt = existingItem?.created_at ?? new Date().toISOString();
   const updatedAt = new Date().toISOString();
 
+  const category = mapExistingCategoryToShopCategory(row.category, { name: row.description, description: row.description, itemNo: row.itemNo });
+
   return {
     id: `owner-${slugBase}`,
     supplier_estimate_id: batch.id,
@@ -127,7 +131,7 @@ function buildPublishedItem(row: OwnerMaterialRowState, batch: OwnerMaterialBatc
     item_number: row.itemNo,
     name: row.description,
     description: row.notes?.trim() || row.description,
-    category: row.category,
+    category,
     quantity: row.qty,
     unit: row.unit,
     unit_price: row.finalUnitPrice,
@@ -138,7 +142,7 @@ function buildPublishedItem(row: OwnerMaterialRowState, batch: OwnerMaterialBatc
     image_source: row.imageSource || null,
     image_license: row.imageLicense || null,
     image_credit: row.imageCredit || null,
-    image_category: row.imageCategory || null,
+    image_category: row.imageCategory || category,
     image_gallery:
       row.imageUrl && row.photoCount > 0
         ? [

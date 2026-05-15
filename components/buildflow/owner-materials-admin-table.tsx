@@ -1,6 +1,7 @@
 "use client";
 
 import type { OwnerMaterialRowState } from "@/lib/owner-materials-admin-data";
+import type { ShopCategoryName } from "@/lib/shop";
 
 export type EditableOwnerMaterialRow = OwnerMaterialRowState;
 
@@ -17,6 +18,8 @@ type OwnerMaterialsAdminTableProps = {
   onAddPhoto: (rowId: string) => void;
   onRemovePhoto: (rowId: string) => void;
   editingRowId: string | null;
+  categoryOptions: readonly ShopCategoryName[];
+  onChangeCategory: (rowId: string, category: ShopCategoryName) => void;
 };
 
 function statusTone(status: EditableOwnerMaterialRow["publishStatus"] | EditableOwnerMaterialRow["reviewStatus"]) {
@@ -67,7 +70,15 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
                     <div className="font-medium text-slate-950">{row.description}</div>
                     {row.error ? <div className="mt-1 text-xs text-rose-600">{row.error}</div> : null}
                   </td>
-                  <td className="px-4 py-4 align-top">{row.category}</td>
+                  <td className="px-4 py-4 align-top">
+                    <select
+                      value={row.category}
+                      onChange={(event) => props.onChangeCategory(row.id, event.target.value as ShopCategoryName)}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-900"
+                    >
+                      {props.categoryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </td>
                   <td className="px-4 py-4 align-top">{row.supplier}</td>
                   <td className="px-4 py-4 align-top">{row.unit}</td>
                   <td className="px-4 py-4 align-top">${row.supplierUnitPrice.toFixed(2)}</td>
@@ -128,7 +139,18 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
             </div>
 
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div><dt className="text-xs uppercase tracking-wide text-slate-500">Category</dt><dd className="mt-1 font-medium text-slate-900">{row.category}</dd></div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-500">Category</dt>
+                <dd className="mt-1 font-medium text-slate-900">
+                  <select
+                    value={row.category}
+                    onChange={(event) => props.onChangeCategory(row.id, event.target.value as ShopCategoryName)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-900"
+                  >
+                    {props.categoryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </dd>
+              </div>
               <div><dt className="text-xs uppercase tracking-wide text-slate-500">Supplier</dt><dd className="mt-1 font-medium text-slate-900">{row.supplier}</dd></div>
               <div><dt className="text-xs uppercase tracking-wide text-slate-500">Unit</dt><dd className="mt-1 font-medium text-slate-900">{row.unit}</dd></div>
               <div><dt className="text-xs uppercase tracking-wide text-slate-500">Cost / Sell</dt><dd className="mt-1 font-medium text-slate-900">${row.supplierUnitPrice.toFixed(2)} / ${row.finalUnitPrice.toFixed(2)}</dd></div>
