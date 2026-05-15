@@ -146,7 +146,14 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
 
   function toggleSelectAll() {
     const visibleIds = filteredRows.map((row) => row.id);
+    if (visibleIds.length === 0) {
+      setNoticeTone("error");
+      setNotice("No visible materials match the current filters.");
+      return;
+    }
     setSelectedRowIds((current) => (visibleIds.every((id) => current.includes(id)) ? current.filter((id) => !visibleIds.includes(id)) : Array.from(new Set([...current, ...visibleIds]))));
+    setNoticeTone("info");
+    setNotice(visibleIds.every((id) => selectedRowIds.includes(id)) ? "Visible materials unselected." : "Visible materials selected.");
   }
 
   function resetFilters() {
@@ -276,7 +283,11 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
   }
 
   function unpublishSelection(rowIds: string[]) {
-    if (!activeBatch || rowIds.length === 0) return;
+    if (!activeBatch || rowIds.length === 0) {
+      setNoticeTone("error");
+      setNotice("Select at least one material to unpublish.");
+      return;
+    }
     startTransition(async () => {
       const result = await unpublishOwnerMaterialsSelection(state, activeBatch.id, rowIds);
       setState(result.state);
@@ -284,6 +295,12 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
       setNoticeTone(result.ok ? "success" : "error");
       setNotice(result.message);
     });
+  }
+
+  function handleEditRow(rowId: string) {
+    setEditingRowId(rowId);
+    setNoticeTone("info");
+    setNotice("Material loaded into the editor.");
   }
 
   return (
@@ -418,8 +435,8 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
 
             <div className="mt-4 flex flex-wrap gap-2">
               <button type="button" onClick={saveStateToServer} disabled={isPending} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Save</button>
-              <button type="button" onClick={() => publishSelection(selectedRowIds)} disabled={isPending || selectedRowIds.length === 0} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Publish selected</button>
-              <button type="button" onClick={() => unpublishSelection(selectedRowIds)} disabled={isPending || selectedRowIds.length === 0} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-60">Unpublish selected</button>
+              <button type="button" onClick={() => publishSelection(selectedRowIds)} disabled={isPending} aria-disabled={isPending || selectedRowIds.length === 0} className={`rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white ${isPending || selectedRowIds.length === 0 ? "opacity-60" : ""}`}>Publish selected</button>
+              <button type="button" onClick={() => unpublishSelection(selectedRowIds)} disabled={isPending} aria-disabled={isPending || selectedRowIds.length === 0} className={`rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 ${isPending || selectedRowIds.length === 0 ? "opacity-60" : ""}`}>Unpublish selected</button>
               <div className="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600">{selectedRowIds.length} selected</div>
             </div>
 
@@ -473,7 +490,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
                 selectedRowIds={selectedRowIds}
                 onToggleRow={toggleSelectedRow}
                 onToggleAll={toggleSelectAll}
-                onEditRow={setEditingRowId}
+                onEditRow={handleEditRow}
                 onPublishRow={(rowId) => publishSelection([rowId])}
                 onUnpublishRow={(rowId) => unpublishSelection([rowId])}
                 onDuplicateRow={handleDuplicateRow}
