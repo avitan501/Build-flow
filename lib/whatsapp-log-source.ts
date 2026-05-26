@@ -49,6 +49,27 @@ function logDateFromFilename(filePath: string) {
   return match[1];
 }
 
+function withoutSortTimestamp(candidate: EventCandidate): ParsedWhatsAppLogEvent {
+  return {
+    sourceFile: candidate.sourceFile,
+    sourceLine: candidate.sourceLine,
+    importedAt: candidate.importedAt,
+    providerMessageId: candidate.providerMessageId,
+    stableMessageId: candidate.stableMessageId,
+    senderPhone: candidate.senderPhone,
+    receiverPhone: candidate.receiverPhone,
+    messageText: candidate.messageText,
+    mediaType: candidate.mediaType,
+    mediaPath: candidate.mediaPath,
+    mediaUrl: candidate.mediaUrl,
+    rawLogTime: candidate.rawLogTime,
+    rawBody: candidate.rawBody,
+    threadKey: candidate.threadKey,
+    contactPhone: candidate.contactPhone,
+    displayName: candidate.displayName,
+  };
+}
+
 async function resolveLogFiles(filters: WhatsAppLogSourceFilters) {
   if (filters.logFiles && filters.logFiles.length > 0) {
     return [...new Set(filters.logFiles.map((file) => path.resolve(file)))];
@@ -112,7 +133,7 @@ export async function readInboundWhatsAppLogEvents(filters: WhatsAppLogSourceFil
     .sort((a, b) => b.timestampMs - a.timestampMs)
     .slice(0, maxMessages)
     .sort((a, b) => a.timestampMs - b.timestampMs)
-    .map(({ timestampMs: _timestampMs, ...event }) => event);
+    .map(withoutSortTimestamp);
 
   return {
     filesScanned,
