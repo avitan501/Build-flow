@@ -91,7 +91,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
       window.removeEventListener(SHOP_CART_UPDATED_EVENT, sync)
       window.removeEventListener(SHOP_SAVE_UPDATED_EVENT, sync)
     }
-  }, [product.id])
+  }, [product.category, product.id, product.name, product.productType, product.slug])
 
   function addToCart() {
     const current = readShopCartMap()
@@ -119,6 +119,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
   const price = formatCurrencyParts(product.price)
   const infoTitle = isService ? "Service information" : "Product information"
   const relatedTitle = isService ? "Related shop items" : "Related materials"
+  const quoteHref = product.quoteNumber?.startsWith("http") ? product.quoteNumber : null
 
   function scrollToImage(index: number) {
     const container = galleryScrollRef.current
@@ -219,10 +220,14 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                   <span>{product.unit}</span>
                 </div>
 
-                <div className="mt-4 flex items-end gap-1 text-slate-950">
-                  <span className="text-[2.4rem] font-bold leading-none tracking-[-0.05em]">{price.dollars}</span>
-                  <span className="pb-1 text-sm font-bold leading-none">.{price.cents}</span>
-                </div>
+                {product.price > 0 ? (
+                  <div className="mt-4 flex items-end gap-1 text-slate-950">
+                    <span className="text-[2.4rem] font-bold leading-none tracking-[-0.05em]">{price.dollars}</span>
+                    <span className="pb-1 text-sm font-bold leading-none">.{price.cents}</span>
+                  </div>
+                ) : (
+                  <div className="mt-4 text-[2rem] font-bold leading-none text-slate-950">Get pricing</div>
+                )}
 
                 <div className="mt-4 rounded-[20px] bg-slate-50 p-4 text-sm leading-6 text-slate-700 sm:rounded-[24px]">{product.description}</div>
 
@@ -237,35 +242,50 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                   </div>
                 ) : null}
 
-                <div className="mt-4 rounded-[20px] border border-slate-200 bg-[#f8fbff] p-4 sm:rounded-[24px]">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Quantity</div>
-                      <div className="mt-1 text-sm text-slate-600">Adjust before adding to cart</div>
+                {product.price > 0 ? (
+                  <>
+                    <div className="mt-4 rounded-[20px] border border-slate-200 bg-[#f8fbff] p-4 sm:rounded-[24px]">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Quantity</div>
+                          <div className="mt-1 text-sm text-slate-600">Adjust before adding to cart</div>
+                        </div>
+                        <div className="flex items-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
+                          <button type="button" onClick={() => setQuantity((current) => Math.max(1, current - 1))} className="h-11 w-11 text-lg text-slate-700" aria-label="Decrease quantity">−</button>
+                          <span className="min-w-10 text-center text-sm font-semibold text-slate-950">{quantity}</span>
+                          <button type="button" onClick={() => setQuantity((current) => current + 1)} className="h-11 w-11 text-lg text-slate-700" aria-label="Increase quantity">+</button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
-                      <button type="button" onClick={() => setQuantity((current) => Math.max(1, current - 1))} className="h-11 w-11 text-lg text-slate-700" aria-label="Decrease quantity">−</button>
-                      <span className="min-w-10 text-center text-sm font-semibold text-slate-950">{quantity}</span>
-                      <button type="button" onClick={() => setQuantity((current) => current + 1)} className="h-11 w-11 text-lg text-slate-700" aria-label="Increase quantity">+</button>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={addToCart}
-                    className="inline-flex min-h-14 items-center justify-center rounded-full bg-emerald-500 px-5 text-base font-semibold text-white shadow-[0_18px_34px_rgba(34,197,94,0.28)] transition hover:bg-emerald-600"
-                  >
-                    Add to cart
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex min-h-14 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-base font-semibold text-slate-800 shadow-sm"
-                  >
-                    Buy now
-                  </button>
-                </div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={addToCart}
+                        className="inline-flex min-h-14 items-center justify-center rounded-full bg-emerald-500 px-5 text-base font-semibold text-white shadow-[0_18px_34px_rgba(34,197,94,0.28)] transition hover:bg-emerald-600"
+                      >
+                        Add to cart
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex min-h-14 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-base font-semibold text-slate-800 shadow-sm"
+                      >
+                        Buy now
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-4 rounded-[20px] border border-sky-100 bg-sky-50 p-4 sm:rounded-[24px]">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Custom priced service</div>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">This service is quoted by project scope, property type, deliverables, and timeline.</p>
+                    <a
+                      href={quoteHref || "/shop"}
+                      className="mt-4 inline-flex min-h-12 items-center justify-center rounded-full bg-sky-600 px-5 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(2,132,199,0.22)] transition hover:bg-sky-700"
+                    >
+                      Request quote
+                    </a>
+                  </div>
+                )}
 
                 {addedMessage ? (
                   <div className="mt-4 rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
@@ -301,7 +321,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
 
             <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-4 lg:overflow-visible">
               {relatedProducts.map((related) => {
-                const relatedPrice = formatCurrencyParts(related.price)
+                const relatedPrice = related.price > 0 ? formatCurrencyParts(related.price) : null
                 return (
                   <Link
                     key={related.id}
@@ -312,10 +332,14 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                       <Image src={related.imageUrl} alt={related.imageAlt} width={320} height={320} className="h-[116px] w-full object-contain bg-white sm:h-[140px]" />
                     </div>
                     <div className="mt-3 line-clamp-2 text-sm font-semibold text-slate-900">{related.name}</div>
-                    <div className="mt-2 flex items-start gap-0.5 text-slate-950">
-                      <span className="text-base font-bold">{relatedPrice.dollars}</span>
-                      <span className="pt-0.5 text-[10px] font-bold">.{relatedPrice.cents}</span>
-                    </div>
+                    {relatedPrice ? (
+                      <div className="mt-2 flex items-start gap-0.5 text-slate-950">
+                        <span className="text-base font-bold">{relatedPrice.dollars}</span>
+                        <span className="pt-0.5 text-[10px] font-bold">.{relatedPrice.cents}</span>
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-base font-bold text-slate-950">Get pricing</div>
+                    )}
                     <div className="text-xs text-slate-500">{related.unit}</div>
                     <div className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">View details</div>
                   </Link>

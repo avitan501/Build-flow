@@ -81,7 +81,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
   const searchParams = useSearchParams();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [shopSearchFocused, setShopSearchFocused] = useState(false);
   const [shopSearchOpen, setShopSearchOpen] = useState(false);
   const [draftQuery, setDraftQuery] = useState("");
   const [shopCartCount, setShopCartCount] = useState(0);
@@ -92,7 +91,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
 
   useEffect(() => {
     if (shopSearchOpen) {
-      setDraftQuery(shopQuery);
       const timeout = window.setTimeout(() => searchInputRef.current?.focus(), 60);
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
@@ -205,7 +203,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
             <button
               type="button"
               onClick={() => {
-                setShopSearchFocused(true);
+                setDraftQuery(shopQuery);
                 setShopSearchOpen(true);
               }}
               className={`flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-2xl border px-3 py-2 text-left shadow-sm transition ${shopSearchOpen || isActivePath(pathname, "/shop") ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))]" : "border-slate-200/90 bg-white/95"}`}
@@ -264,7 +262,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
                 type="button"
                 onClick={() => {
                   setShopSearchOpen(false);
-                  setShopSearchFocused(false);
                 }}
                 className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm"
                 aria-label="Close search"
@@ -325,7 +322,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
                           onClick={() => {
                             updateShopSearch(category, category);
                             setShopSearchOpen(false);
-                            setShopSearchFocused(false);
                           }}
                           className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
                         >
@@ -355,7 +351,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
                           onClick={() => {
                             updateShopSearch(term, null);
                             setShopSearchOpen(false);
-                            setShopSearchFocused(false);
                           }}
                           className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
                         >
@@ -382,7 +377,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
                   setDraftQuery("");
                   updateShopSearch("", null);
                   setShopSearchOpen(false);
-                  setShopSearchFocused(false);
                 }}
                 className="flex-1 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
               >

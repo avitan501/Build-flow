@@ -52,6 +52,9 @@ type ProductImageOverride = {
   imageUrl: string
   imageAlt: string
   imageCategory: string
+  imageSource?: string
+  imageLicense?: string
+  imageCredit?: string
 }
 
 const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
@@ -94,6 +97,14 @@ const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
     imageUrl: "/images/materials/products-real/flashing-roll.jpg",
     imageAlt: "Flashing roll on white background",
     imageCategory: "Roofing",
+  },
+  "view-as-built-lidar-capture": {
+    imageUrl: "/images/materials/products/view-as-built-lidar-capture.svg",
+    imageAlt: "LiDAR scanner icon projecting a floor plan and point cloud",
+    imageCategory: "Services",
+    imageSource: "BuildFlow local SVG icon",
+    imageLicense: "BuildFlow original icon",
+    imageCredit: "BuildFlow",
   },
 }
 
@@ -296,9 +307,9 @@ function productSpecificImageMetadata(params: { slug?: string | null; name: stri
     category: params.category,
     imageUrl: override.imageUrl,
     imageAlt: override.imageAlt,
-    imageSource: LOCAL_PRODUCT_IMAGE_SOURCE,
-    imageLicense: LOCAL_PRODUCT_IMAGE_LICENSE,
-    imageCredit: LOCAL_IMAGE_CREDIT,
+    imageSource: override.imageSource ?? LOCAL_PRODUCT_IMAGE_SOURCE,
+    imageLicense: override.imageLicense ?? LOCAL_PRODUCT_IMAGE_LICENSE,
+    imageCredit: override.imageCredit ?? LOCAL_IMAGE_CREDIT,
     imageCategory: override.imageCategory,
   })
 }
@@ -416,6 +427,29 @@ const PRODUCT_SEED_INPUTS = [
     ],
   },
   {
+    slug: "view-as-built-lidar-capture",
+    name: "View As-Built LiDAR Capture",
+    description: "Professional LiDAR capture for active construction, renovations, commercial spaces, showrooms, and facilities. One site visit can produce a hosted 3D tour, 2D floor plans, AutoCAD .DWG, Revit .RVT, and E57 point cloud files.",
+    shortDescription: "LiDAR site capture for 3D tours, floor plans, CAD, BIM, and point cloud files.",
+    category: "Services",
+    unit: "Custom quote",
+    price: 0,
+    supplierName: "View As-Built",
+    quoteNumber: "https://viewasbuilt.com",
+    specLine: "LiDAR as-built documentation package with tour, plans, CAD, BIM, and point cloud options",
+    featuredLabel: "3D site capture",
+    popularUse: "As-built documentation",
+    reviewLabel: "Service",
+    rating: 5,
+    relatedCategories: ["Services", "Framing"],
+    productType: "service",
+    detailBullets: [
+      "Captures job-site conditions for construction, remodel, commercial, retail, facility, and real estate workflows",
+      "Deliverables can include hosted 3D tours, 2D plans, AutoCAD .DWG, Revit .RVT, E57 point cloud data, and 4K stills",
+      "Useful for pre-drywall documentation, existing-condition records, design coordination, and long-term as-built access",
+    ],
+  },
+  {
     slug: "2x4-premium-lumber",
     name: "2x4 Premium Lumber",
     description: "Kiln-dried framing lumber for clean residential wall framing and interior structural work.",
@@ -526,6 +560,183 @@ const PRODUCT_SEED_INPUTS = [
     reviewLabel: "4.6 - 63 reviews",
     rating: 4.6,
     relatedCategories: ["Framing", "Tile work"],
+  },
+  {
+    slug: "mapei-ultraflex-1-white-thinset-tile-mortar",
+    name: "MAPEI UltraFlex 1 White Thinset Tile Mortar",
+    description: "50 lb white polymer-modified thinset tile mortar. For ceramic and most natural stone; use on floors and walls; mix with water.",
+    shortDescription: "50 lb white polymer-modified thinset mortar for tile work.",
+    category: "Tile work",
+    unit: "50 lb bag",
+    price: 0,
+    supplierName: "Lowe's",
+    quoteNumber: "Item #193422 / Model #2905736",
+    specLine: "50 lb - white - polymer-modified thinset",
+    featuredLabel: "Thinset mortar",
+    popularUse: "Tile setting",
+    reviewLabel: "4.7 - 547 reviews",
+    rating: 4.7,
+    relatedCategories: ["Tile work", "Carpentry"],
+    detailBullets: [
+      "For use with ceramic and most natural stone",
+      "Mix with water; no additive required",
+      "Use on floors and walls",
+      "Exceeds ANSI A118.4 and ANSI A118.11 bond strength requirements",
+    ],
+  },
+  {
+    slug: "half-inch-drywall-board-4x8",
+    name: "1/2 in. Drywall Board",
+    description: "Standard 1/2 in. gypsum drywall panel for interior walls and ceilings in common residential work.",
+    shortDescription: "Standard 1/2 in. drywall panel for walls and ceilings.",
+    category: "Sheet rock",
+    unit: "Sheet - 4x8",
+    price: 16.68,
+    supplierName: "11515 retail baseline",
+    quoteNumber: "HD 14113411708",
+    specLine: "1/2 in. x 4 ft. x 8 ft. gypsum board",
+    featuredLabel: "Most common",
+    popularUse: "Interior walls",
+    reviewLabel: "Common item",
+    rating: 4.8,
+    relatedCategories: ["Sheet rock", "Carpentry"],
+    detailBullets: [
+      "Common interior wall and ceiling board",
+      "Used for most standard residential drywall areas",
+      "Confirm moisture, fire, and thickness requirements before ordering",
+    ],
+  },
+  {
+    slug: "five-eighths-fire-rated-drywall-board-4x8",
+    name: "5/8 in. Fire-Rated Drywall Board",
+    description: "Type X fire-rated drywall panel commonly used where fire resistance or added stiffness is required.",
+    shortDescription: "Type X 5/8 in. drywall panel for fire-rated areas.",
+    category: "Sheet rock",
+    unit: "Sheet - 4x8",
+    price: 18.88,
+    supplierName: "11515 retail baseline",
+    quoteNumber: "USG Firecode X baseline",
+    specLine: "5/8 in. Type X - 4 ft. x 8 ft.",
+    featuredLabel: "Fire-rated",
+    popularUse: "Garage and rated walls",
+    reviewLabel: "Common item",
+    rating: 4.8,
+    relatedCategories: ["Sheet rock", "Carpentry"],
+    detailBullets: [
+      "Common for garage walls, ceilings, and rated assemblies",
+      "Adds stiffness compared with standard 1/2 in. board",
+      "Match local code and plan requirements before ordering",
+    ],
+  },
+  {
+    slug: "moisture-resistant-drywall-board-4x8",
+    name: "Moisture-Resistant Drywall Board",
+    description: "Moisture-resistant drywall panel for bathrooms, laundry rooms, and other damp interior locations.",
+    shortDescription: "Moisture-resistant board for damp interior rooms.",
+    category: "Sheet rock",
+    unit: "Sheet - 4x8",
+    price: 23.58,
+    supplierName: "11515 retail baseline",
+    quoteNumber: "HD 14302111708",
+    specLine: "Moisture-resistant gypsum board - 4 ft. x 8 ft.",
+    featuredLabel: "Damp areas",
+    popularUse: "Bathrooms and laundry",
+    reviewLabel: "Common item",
+    rating: 4.7,
+    relatedCategories: ["Sheet rock", "Tile work"],
+    detailBullets: [
+      "Useful for bathrooms, laundry rooms, and damp interior spaces",
+      "Not a replacement for cement board in wet tile assemblies",
+      "Confirm exact room use before selecting the board type",
+    ],
+  },
+  {
+    slug: "lightweight-joint-compound",
+    name: "Lightweight Joint Compound",
+    description: "Ready-mix lightweight joint compound for taping, filling, and finishing drywall seams.",
+    shortDescription: "Ready-mix compound for taping and finishing seams.",
+    category: "Sheet rock",
+    unit: "Bucket - 4.5 gal",
+    price: 23.65,
+    supplierName: "11515 retail baseline",
+    quoteNumber: "HD RURLW45P",
+    specLine: "Ready-mix lightweight joint compound",
+    featuredLabel: "Finishing",
+    popularUse: "Drywall seams",
+    reviewLabel: "Common item",
+    rating: 4.7,
+    relatedCategories: ["Sheet rock", "Carpentry"],
+    detailBullets: [
+      "Used for bedding tape and finishing drywall joints",
+      "Common bucket size for residential patch and room work",
+      "Check coat sequence and drying time with the finisher",
+    ],
+  },
+  {
+    slug: "drywall-paper-joint-tape",
+    name: "Drywall Paper Joint Tape",
+    description: "Paper joint tape for reinforcing drywall seams and inside corners before finishing compound.",
+    shortDescription: "Paper tape for seams and inside corners.",
+    category: "Sheet rock",
+    unit: "Roll - 250 ft",
+    price: 4.57,
+    supplierName: "11515 retail baseline",
+    quoteNumber: "HD 382175",
+    specLine: "Paper joint tape - 250 ft roll",
+    featuredLabel: "Taping",
+    popularUse: "Seams and corners",
+    reviewLabel: "Common item",
+    rating: 4.7,
+    relatedCategories: ["Sheet rock", "Carpentry"],
+    detailBullets: [
+      "Reinforces flat seams and inside corners",
+      "Used with joint compound during taping",
+      "Common roll size for small and medium jobs",
+    ],
+  },
+  {
+    slug: "coarse-thread-drywall-screws",
+    name: "Coarse Thread Drywall Screws",
+    description: "Coarse thread drywall screws for fastening gypsum board to wood studs and framing.",
+    shortDescription: "Drywall screws for fastening board to wood framing.",
+    category: "Sheet rock",
+    unit: "Box - 5 lb",
+    price: 24.98,
+    supplierName: "11515 retail baseline",
+    quoteNumber: "HD 158CDWS5",
+    specLine: "Coarse thread - drywall to wood framing",
+    featuredLabel: "Fasteners",
+    popularUse: "Board fastening",
+    reviewLabel: "Common item",
+    rating: 4.8,
+    relatedCategories: ["Sheet rock", "Framing"],
+    detailBullets: [
+      "Used to fasten drywall panels to wood framing",
+      "Select length by board thickness and substrate",
+      "Confirm screw spacing from plans or local requirements",
+    ],
+  },
+  {
+    slug: "metal-drywall-corner-bead",
+    name: "Metal Drywall Corner Bead",
+    description: "Metal corner bead for protecting and finishing outside drywall corners cleanly.",
+    shortDescription: "Corner bead for clean outside drywall corners.",
+    category: "Sheet rock",
+    unit: "Each - 8 ft",
+    price: 4.47,
+    supplierName: "11515 retail baseline",
+    quoteNumber: "HD 741339",
+    specLine: "Metal outside corner bead - 8 ft",
+    featuredLabel: "Corners",
+    popularUse: "Outside corners",
+    reviewLabel: "Common item",
+    rating: 4.7,
+    relatedCategories: ["Sheet rock", "Carpentry"],
+    detailBullets: [
+      "Protects outside corners before finishing",
+      "Common for rooms, closets, returns, and openings",
+      "Confirm metal, vinyl, or paper-faced preference with installer",
+    ],
   },
   {
     slug: "flashing-roll",
@@ -641,10 +852,14 @@ export function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[
 }
 
 export function buildShopProducts(itemsData: ShopItemRecord[] | null | undefined, error: unknown) {
+  const alwaysIncludedProducts = SAMPLE_SHOP_PRODUCTS.filter((product) => product.slug === "mapei-ultraflex-1-white-thinset-tile-mortar" || product.category === "Sheet rock")
   const dynamicProducts = !error && itemsData && itemsData.length > 0 ? normalizeShopItems(itemsData) : SAMPLE_SHOP_PRODUCTS.filter((product) => product.productType !== "service")
-  const serviceProducts = SAMPLE_SHOP_PRODUCTS.filter((product) => product.productType === "service")
+  const serviceProducts = SAMPLE_SHOP_PRODUCTS.filter((product) => product.productType === "service").sort(
+    (a, b) => Number(b.slug === "view-as-built-lidar-capture") - Number(a.slug === "view-as-built-lidar-capture"),
+  )
+  const materialProducts = [...alwaysIncludedProducts, ...dynamicProducts].filter((product, index, all) => all.findIndex((candidate) => candidate.slug === product.slug) === index)
 
-  return [...serviceProducts, ...dynamicProducts]
+  return [...serviceProducts, ...materialProducts]
 }
 
 export function findShopProductBySlug(products: ShopCatalogProduct[], slug: string) {

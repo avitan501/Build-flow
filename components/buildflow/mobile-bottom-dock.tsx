@@ -7,13 +7,12 @@ import { useEffect, useRef, useState } from "react";
 
 type MobileBottomDockProps = {
   projectsHref: string;
-  searchHref: string;
 };
 
 const DOCK_PATHS = new Set(["/", "/dashboard", "/projects", "/projects/new", "/upload", "/materials", "/quotes", "/orders", "/search", "/shop", "/account"]);
 
 function shouldShowDock(pathname: string) {
-  return pathname.startsWith("/projects/") || DOCK_PATHS.has(pathname);
+  return pathname.startsWith("/projects/") || pathname.startsWith("/shop/") || DOCK_PATHS.has(pathname);
 }
 
 function isActivePath(pathname: string, href: string) {
@@ -25,7 +24,7 @@ function DockItem({ href, label, active, children, accent = false }: { href: str
     <Link
       href={href}
       aria-label={label}
-      className={`group relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-[18px] px-1 py-1.5 text-center transition-all duration-200 ease-out active:scale-[0.96] ${
+      className={`group relative flex min-w-0 ${accent ? "flex-[1.28]" : "flex-1"} flex-col items-center justify-center rounded-[18px] px-1 py-1.5 text-center transition-all duration-200 ease-out active:scale-[0.96] ${
         active
           ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.4),rgba(255,255,255,0.16))] text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.58),inset_0_-8px_14px_rgba(255,255,255,0.06),0_8px_18px_rgba(148,163,184,0.1)]"
           : "text-slate-500/95"
@@ -57,7 +56,7 @@ function DockItem({ href, label, active, children, accent = false }: { href: str
   );
 }
 
-export function MobileBottomDock({ projectsHref, searchHref }: MobileBottomDockProps) {
+export function MobileBottomDock({ projectsHref }: MobileBottomDockProps) {
   const pathname = usePathname();
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
@@ -128,25 +127,22 @@ export function MobileBottomDock({ projectsHref, searchHref }: MobileBottomDockP
               <path d="M5 9.5V21h14V9.5" />
             </svg>
           </DockItem>
-          <DockItem href={projectsHref} label="Projects" active={isActivePath(pathname, "/projects")}>
+          <DockItem href={shopHref} label="Shop" active={isActivePath(pathname, "/shop")} accent>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3.5 11 12 4l8.5 7" />
+              <path d="M5.5 10.5V20h13v-9.5" />
+              <path d="M9 20v-6h6v6" />
+              <path d="M7 7.5V4h3" />
+              <path d="M16.5 7.5h3" />
+              <path d="M18 6v3" />
+            </svg>
+          </DockItem>
+          <DockItem href={projectsHref} label="My Projects" active={isActivePath(pathname, "/projects")}>
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <rect x="3" y="4" width="7" height="7" rx="1.5" />
               <rect x="14" y="4" width="7" height="7" rx="1.5" />
               <rect x="3" y="13" width="7" height="7" rx="1.5" />
               <rect x="14" y="13" width="7" height="7" rx="1.5" />
-            </svg>
-          </DockItem>
-          <DockItem href={shopHref} label="Shop" active={isActivePath(pathname, "/shop")} accent>
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 10.5 5.5 5h13L20 10.5" />
-              <path d="M5 10.5h14V19a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8.5Z" />
-              <path d="M9 14h6" />
-            </svg>
-          </DockItem>
-          <DockItem href={searchHref} label="Search" active={isActivePath(pathname, "/search") || isActivePath(pathname, "/shop") || isActivePath(pathname, "/materials") || isActivePath(pathname, "/quotes") || isActivePath(pathname, "/orders")}>
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
             </svg>
           </DockItem>
         </nav>

@@ -6,10 +6,10 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import { recordShopActivity } from "@/app/shop/actions"
-import { placeholderImageMetadata, type ShopCatalogProduct } from "@/lib/shop-catalog"
+import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import type { ShopActivityEvent } from "@/lib/shop-activity"
 import { buildSuggestedProducts, getShopActivitySessionId, readLocalShopActivity, writeLocalShopActivity } from "@/lib/shop-activity"
-import { SHOP_CART_UPDATED_EVENT, SHOP_SAVE_UPDATED_EVENT, readShopCartCount, readShopSavedIds, readShopCartMap, writeShopCartMap } from "@/lib/shop-cart"
+import { SHOP_SAVE_UPDATED_EVENT, readShopSavedIds, readShopCartMap, writeShopCartMap } from "@/lib/shop-cart"
 import { SHOP_CATEGORY_CHIPS } from "@/lib/shop"
 
 type ShopCatalogExperienceProps = {
@@ -33,65 +33,6 @@ function formatCurrency(value: number) {
   return { dollars, cents: cents ?? "00" }
 }
 
-function MaterialsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <path d="m3.3 7 8.7 5 8.7-5" />
-      <path d="M12 22V12" />
-    </svg>
-  )
-}
-
-function ServiceIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 6h16" />
-      <path d="M4 12h10" />
-      <path d="M4 18h8" />
-      <path d="m17 10 3 3-3 3" />
-    </svg>
-  )
-}
-
-function TagIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20.59 13.41 11 3H4v7l9.59 9.59a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82Z" />
-      <path d="M7 7h.01" />
-    </svg>
-  )
-}
-
-function TruckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M10 17h4V5H2v12h3" />
-      <path d="M14 8h4l4 4v5h-3" />
-      <circle cx="7.5" cy="17.5" r="2.5" />
-      <circle cx="17.5" cy="17.5" r="2.5" />
-    </svg>
-  )
-}
-
-function BookmarkIcon({ filled = false }: { filled?: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M19 21 12 16 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-    </svg>
-  )
-}
-
-function CartIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="8" cy="21" r="1" />
-      <circle cx="19" cy="21" r="1" />
-      <path d="M2.05 2.05h2l2.66 12.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.69L22 7H6" />
-    </svg>
-  )
-}
-
 function PlusIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -102,7 +43,7 @@ function PlusIcon() {
 }
 
 function SuggestedProductCard({ product }: { product: ShopCatalogProduct }) {
-  const price = formatCurrency(product.price)
+  const price = product.price > 0 ? formatCurrency(product.price) : null
 
   return (
     <Link href={`/shop/${product.slug}`} className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition hover:border-sky-200 hover:shadow-md">
@@ -113,13 +54,13 @@ function SuggestedProductCard({ product }: { product: ShopCatalogProduct }) {
         <span className="block truncate text-sm font-semibold text-slate-900">{product.name}</span>
         <span className="block text-[11px] text-slate-500">{product.unit}</span>
       </span>
-      <span className="text-sm font-bold text-slate-950">{price.dollars}<span className="text-[10px] align-top">.{price.cents}</span></span>
+      <span className="text-sm font-bold text-slate-950">{price ? <>{price.dollars}<span className="text-[10px] align-top">.{price.cents}</span></> : "Get pricing"}</span>
     </Link>
   )
 }
 
 function ServiceListCard({ product }: { product: ShopCatalogProduct }) {
-  const price = formatCurrency(product.price)
+  const price = product.price > 0 ? formatCurrency(product.price) : null
 
   return (
     <Link
@@ -127,8 +68,8 @@ function ServiceListCard({ product }: { product: ShopCatalogProduct }) {
       className="flex min-w-0 flex-col gap-3 rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
     >
       <div className="flex min-w-0 items-start gap-3">
-        <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 text-sky-700">
-          <ServiceIcon />
+        <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border border-sky-100 bg-sky-50">
+          <Image src={product.imageUrl} alt={product.imageAlt} fill sizes="44px" className="object-contain p-1.5" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="mb-1 inline-flex rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">Service</span>
@@ -137,7 +78,7 @@ function ServiceListCard({ product }: { product: ShopCatalogProduct }) {
         </span>
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2">
-        <span className="min-w-0 text-base font-bold text-slate-950">{price.dollars}<span className="text-[10px] align-top">.{price.cents}</span></span>
+        <span className="min-w-0 text-base font-bold text-slate-950">{price ? <>{price.dollars}<span className="text-[10px] align-top">.{price.cents}</span></> : "Get pricing"}</span>
         <span className="shrink-0 text-[11px] font-semibold text-sky-700">View details</span>
       </div>
     </Link>
@@ -145,7 +86,7 @@ function ServiceListCard({ product }: { product: ShopCatalogProduct }) {
 }
 
 function ShopProductCard({ product, onQuickAdd }: { product: ShopCatalogProduct; onQuickAdd: (productId: string) => number }) {
-  const price = formatCurrency(product.price)
+  const price = product.price > 0 ? formatCurrency(product.price) : null
   const isService = product.productType === "service"
 
   return (
@@ -165,10 +106,14 @@ function ShopProductCard({ product, onQuickAdd }: { product: ShopCatalogProduct;
       <div className="flex flex-1 flex-col p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-0.5 text-slate-950">
-              <span className="text-[1.15rem] font-bold leading-none">{price.dollars}</span>
-              <span className="pt-0.5 text-[11px] font-bold leading-none">.{price.cents}</span>
-            </div>
+            {price ? (
+              <div className="flex items-start gap-0.5 text-slate-950">
+                <span className="text-[1.15rem] font-bold leading-none">{price.dollars}</span>
+                <span className="pt-0.5 text-[11px] font-bold leading-none">.{price.cents}</span>
+              </div>
+            ) : (
+              <div className="text-[1.05rem] font-bold leading-none text-slate-950">Get pricing</div>
+            )}
             <div className="mt-0.5 text-[11px] font-medium text-slate-500">{product.unit}</div>
           </div>
           {isService ? (
@@ -206,7 +151,6 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   const searchParams = useSearchParams()
   const router = useRouter()
   const [sortMode, setSortMode] = useState<SortMode>("featured")
-  const [cartCount, setCartCount] = useState(0)
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [browseTab, setBrowseTab] = useState<BrowseTab>("materials")
   const [localActivity, setLocalActivity] = useState<ShopActivityEvent[]>([])
@@ -221,16 +165,13 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
 
   useEffect(() => {
     const sync = () => {
-      setCartCount(readShopCartCount())
       setSavedIds(readShopSavedIds())
       setLocalActivity(readLocalShopActivity())
     }
 
     sync()
-    window.addEventListener(SHOP_CART_UPDATED_EVENT, sync)
     window.addEventListener(SHOP_SAVE_UPDATED_EVENT, sync)
     return () => {
-      window.removeEventListener(SHOP_CART_UPDATED_EVENT, sync)
       window.removeEventListener(SHOP_SAVE_UPDATED_EVENT, sync)
     }
   }, [])
@@ -319,7 +260,9 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
 
   const materialFilteredProducts = filteredProducts.filter((product) => product.productType !== "service")
 
-  const resultLabel = query ? `Search results for "${query}"` : browseTab === "saved" ? "Saved materials" : activeCategory === "All" ? "All materials" : activeCategory
+  const isCategoryFiltered = activeCategory !== "All"
+  const resultLabel = query ? `Search results for "${query}"` : browseTab === "saved" ? "Saved tools" : isCategoryFiltered ? `${activeCategory} tools` : "All tools"
+  const activeCategoryProducts = activeCategory === "Services" ? serviceProducts : materialFilteredProducts
 
   function applyFilters(next: { query?: string; category?: string; close?: boolean }) {
     const params = new URLSearchParams(searchParams.toString())
@@ -349,11 +292,16 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
     trackActivity({ eventType: "category_select", category: nextCategory })
   }
 
+  function clearFilters() {
+    setBrowseTab("materials")
+    setSortMode("featured")
+    applyFilters({ query: "", category: "All" })
+  }
+
   function quickAdd(productId: string) {
     const current = readShopCartMap()
     const nextQty = (current[productId] || 0) + 1
     writeShopCartMap({ ...current, [productId]: nextQty })
-    setCartCount(readShopCartCount())
     const product = products.find((entry) => entry.id === productId)
     if (product) {
       trackActivity({ eventType: "add_to_cart", productSlug: product.slug, productName: product.name, category: product.category })
@@ -398,8 +346,15 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   return (
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        <section className="rounded-[24px] border border-white/70 bg-white/90 p-2 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-2.5">
-          <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
+          <div className="flex flex-col gap-1">
+            <div className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Tools</div>
+            <h1 className="text-2xl font-bold tracking-normal text-slate-950 sm:text-3xl">Choose a work section</h1>
+            <p className="max-w-2xl text-sm leading-6 text-slate-600">
+              Pick one section to focus the catalog. Framing materials stay under Framing, field services stay under Services, and the rest stays separated.
+            </p>
+          </div>
+          <div className="mt-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="flex w-max min-w-full gap-2 rounded-[20px] border border-slate-200/80 bg-slate-50/85 p-1.5">
               {SHOP_CATEGORIES.map((category) => {
                 const active = activeCategory === category
@@ -422,7 +377,24 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
           </div>
         </section>
 
-        {featuredProducts.length > 0 && !query && browseTab === "materials" ? (
+        {isCategoryFiltered ? (
+          <section className="rounded-[30px] border-2 border-sky-200 bg-sky-50 p-4 shadow-[0_16px_40px_rgba(14,116,244,0.12)] sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-sky-800 shadow-sm">Filtered view</div>
+                <h2 className="mt-3 text-2xl font-bold tracking-normal text-slate-950">{activeCategory}</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Showing only {activeCategory.toLowerCase()} items. Use the section buttons above to switch focus.
+                </p>
+              </div>
+              <button type="button" onClick={clearFilters} className="inline-flex h-11 items-center justify-center rounded-2xl bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-slate-800">
+                Show all tools
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {featuredProducts.length > 0 && !query && browseTab === "materials" && !isCategoryFiltered ? (
           <section className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -443,11 +415,12 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
           </section>
         ) : null}
 
+        {!isCategoryFiltered ? (
         <section className="rounded-[24px] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-4">
           <div className="mb-2 flex items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-slate-900">Suggested for you</div>
-              <div className="text-xs text-slate-500">Based on your recent shop activity</div>
+              <div className="text-xs text-slate-500">Based on your recent tools activity</div>
             </div>
             <button type="button" onClick={() => setBrowseTab("materials")} className="shrink-0 text-sm font-semibold text-sky-700">
               Browse all
@@ -461,8 +434,9 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
             ))}
           </div>
         </section>
+        ) : null}
 
-        {serviceProducts.length > 0 ? (
+        {serviceProducts.length > 0 && (!isCategoryFiltered || activeCategory === "Services") ? (
           <section ref={serviceSectionRef} className="overflow-hidden rounded-[24px] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
@@ -483,14 +457,15 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
           </section>
         ) : null}
 
+        {!isCategoryFiltered ? (
         <section className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-lg font-bold text-slate-950">Deals on materials</div>
+              <div className="text-lg font-bold text-slate-950">Deals on tools</div>
               <div className="text-sm text-slate-500">Fast picks with strong value and clean local images</div>
             </div>
             <button type="button" onClick={() => activateTab("deals")} className="text-sm font-semibold text-sky-700">
-              Shop deals
+              View deals
             </button>
           </div>
           <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -501,7 +476,9 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
             ))}
           </div>
         </section>
+        ) : null}
 
+        {!isCategoryFiltered ? (
         <section ref={supplierSectionRef} className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -534,12 +511,13 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
             ))}
           </div>
         </section>
+        ) : null}
 
         {savedProducts.length > 0 && browseTab !== "saved" ? (
           <section className="rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-lg font-bold text-slate-950">Saved materials</div>
+                <div className="text-lg font-bold text-slate-950">Saved tools</div>
                 <div className="text-sm text-slate-500">Quick access to items you bookmarked on product pages</div>
               </div>
               <button type="button" onClick={() => activateTab("saved")} className="text-sm font-semibold text-sky-700">
@@ -559,7 +537,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
         <section className="flex flex-col gap-3 rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="min-w-0">
             <h2 className="truncate text-xl font-bold tracking-normal text-slate-950 sm:text-2xl">{resultLabel}</h2>
-            <p className="mt-1 text-sm font-medium text-slate-500">{filteredProducts.length} items ready to browse</p>
+            <p className="mt-1 text-sm font-medium text-slate-500">{activeCategoryProducts.length} items ready to browse</p>
           </div>
 
           <label className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 sm:w-auto">
@@ -578,10 +556,14 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
           </label>
         </section>
 
-        {materialFilteredProducts.length > 0 ? (
+        {activeCategoryProducts.length > 0 ? (
           <section aria-label="Products" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
-            {materialFilteredProducts.map((product) => (
-              <ShopProductCard key={product.id} product={product} onQuickAdd={quickAdd} />
+            {activeCategoryProducts.map((product) => (
+              product.productType === "service" ? (
+                <ServiceListCard key={product.id} product={product} />
+              ) : (
+                <ShopProductCard key={product.id} product={product} onQuickAdd={quickAdd} />
+              )
             ))}
           </section>
         ) : (

@@ -4,30 +4,7 @@ import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler"
 import { getSessionWithProfile } from "@/lib/auth"
 
 const heroImage =
-  "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1400&q=80"
-
-const flowSteps = [
-  {
-    title: "Create Project",
-    number: "1",
-    text: "Open the project and keep the basics in one place.",
-  },
-  {
-    title: "Upload Plans",
-    number: "2",
-    text: "Send drawings, photos, and notes from the field.",
-  },
-  {
-    title: "Review Materials & Quote",
-    number: "3",
-    text: "See what is needed before anything moves forward.",
-  },
-  {
-    title: "Approve Order",
-    number: "4",
-    text: "Stay in control before any order is confirmed.",
-  },
-]
+  "/images/buildflow-retail/hero.jpg"
 
 const featureCards = [
   {
@@ -35,7 +12,7 @@ const featureCards = [
     title: "Organize jobs clearly",
     body: "Keep job details, address, timeline, and client info ready before uploads begin.",
     hrefKey: "projects" as const,
-    image: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80",
+    image: "/images/buildflow-retail/projects.jpg",
     iconBg: "bg-sky-600",
     icon: "grid" as const,
   },
@@ -44,7 +21,7 @@ const featureCards = [
     title: "Collect plans fast",
     body: "Send plans, photos, and documents so the next material step has the right context.",
     hrefKey: "upload" as const,
-    image: "https://images.unsplash.com/photo-1523413651479-597eb2da0ad6?auto=format&fit=crop&w=1200&q=80",
+    image: "/images/buildflow-retail/uploads.jpg",
     iconBg: "bg-cyan-500",
     icon: "upload" as const,
   },
@@ -53,7 +30,7 @@ const featureCards = [
     title: "Review with confidence",
     body: "Review quotes, approve orders, and keep project decisions lined up in one flow.",
     hrefKey: "orders" as const,
-    image: "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80",
+    image: "/images/buildflow-retail/orders.jpg",
     iconBg: "bg-amber-500",
     icon: "shield" as const,
   },
@@ -92,6 +69,7 @@ function FeatureIcon({ type }: { type: (typeof featureCards)[number]["icon"] }) 
 export default async function Home() {
   const { user } = await getSessionWithProfile()
   const isSignedIn = Boolean(user)
+  const startHref = isSignedIn ? "/shop" : "/login"
   const gatedHref = isSignedIn ? null : "/login"
   const projectsHref = gatedHref ?? "/projects"
   const uploadHref = gatedHref ?? "/upload"
@@ -115,22 +93,30 @@ export default async function Home() {
             <div>
               <div className="inline-flex items-center gap-3 rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,246,255,0.9))] px-3 py-3 shadow-[0_12px_28px_rgba(148,163,184,0.1)]">
                 <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#0e2341_0%,#1a4b86_100%)] text-sm font-semibold tracking-[0.18em] text-white shadow-[0_10px_24px_rgba(14,35,65,0.2)]">
-                  BF
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4 19h16" />
+                    <path d="M5 19V9l7-4 7 4v10" />
+                    <path d="M9 19v-5h6v5" />
+                  </svg>
                 </span>
                 <div>
-                  <p className="text-base font-semibold tracking-tight text-slate-950">BuildFlow</p>
-                  <p className="text-xs text-slate-500">Construction materials + project flow</p>
+                  <p className="text-base font-semibold tracking-tight text-slate-950">instabuild.ca</p>
+                  <p className="text-xs text-slate-500">Builder command center</p>
                 </div>
               </div>
-              <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Client workflow</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2.4rem]">Start your project with confidence</h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">Upload plans, organize materials, review quotes, and approve orders in one clean workflow.</p>
+              <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Built for builders</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2.4rem]">
+                The problem solver for the builder
+              </h1>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">
+                A cleaner way to start a job, choose materials by trade, keep the project address connected, and move decisions forward.
+              </p>
               <div className="mt-5 flex flex-wrap gap-3">
-                <Link href={projectsHref} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] active:scale-[0.99]">
-                  Log in to Start Project
+                <Link href={startHref} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] active:scale-[0.99]">
+                  Start Building
                 </Link>
-                <Link href="/signup" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm active:scale-[0.99]">
-                  Create Account
+                <Link href="/shop" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm active:scale-[0.99]">
+                  Open Shop
                 </Link>
               </div>
             </div>
@@ -146,7 +132,7 @@ export default async function Home() {
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(243,203,114,0.26),transparent_36%)]" />
               <div className="relative flex h-full flex-col justify-between p-5 text-white sm:p-6">
                 <div className="flex justify-end">
-                  <span className="inline-flex items-center rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/88 backdrop-blur-sm">Premium client view</span>
+                  <span className="inline-flex items-center rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/88 backdrop-blur-sm">Job ready</span>
                 </div>
                 <div>
                   <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white/12 text-white shadow-[0_10px_24px_rgba(15,23,42,0.2)] backdrop-blur-sm">
@@ -156,31 +142,11 @@ export default async function Home() {
                       <path d="M9 19v-5h6v5" />
                     </svg>
                   </div>
-                  <h2 className="mt-4 text-xl font-semibold tracking-tight text-white">A cleaner front door for projects, materials, quotes, and approvals.</h2>
-                  <p className="mt-2 max-w-sm text-sm leading-6 text-white/82">Professional residential imagery keeps the product feeling real, while overlays and compact cards keep every next action easy to read.</p>
+                  <h2 className="mt-4 text-xl font-semibold tracking-tight text-white">Project setup, departments, and buying decisions in one place.</h2>
+                  <p className="mt-2 max-w-sm text-sm leading-6 text-white/82">Keep the experience practical for the field while the page still feels clean and professional.</p>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
-
-        <section className="rounded-[30px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,247,255,0.92))] px-5 py-5 shadow-[0_20px_50px_rgba(148,163,184,0.12)] sm:px-6 sm:py-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">How BuildFlow works</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">One clear path from project setup to approval</h2>
-            </div>
-            <span className="shrink-0 rounded-full border border-sky-100 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 shadow-sm">4 steps</span>
-          </div>
-
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {flowSteps.map((step) => (
-              <div key={step.number} className="rounded-[26px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(241,247,255,0.82))] px-4 py-4 shadow-[0_12px_28px_rgba(148,163,184,0.08)]">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[linear-gradient(180deg,#0f315f_0%,#17457b_100%)] text-xs font-semibold text-white shadow-[0_10px_20px_rgba(14,35,65,0.18)]">{step.number}</div>
-                <p className="mt-3 text-sm font-semibold text-slate-900">{step.title}</p>
-                <p className="mt-1.5 text-xs leading-5 text-slate-600">{step.text}</p>
-              </div>
-            ))}
           </div>
         </section>
 
@@ -211,7 +177,6 @@ export default async function Home() {
             </article>
           ))}
         </section>
-
       </section>
     </main>
   )
