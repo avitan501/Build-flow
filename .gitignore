@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/playwright-report
+/test-results
 
 # next.js
 /.next/
@@ -29,12 +31,27 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+preview-*.log
+
+# local generated lead/report artifacts
+/downloads/
+/designer_*.csv
+/designer_*.html
+/designer_*.pdf
+/five_towns_*.csv
+/five_towns_*.html
+/five_towns_*.pdf
+/five_towns_*.tar.gz
 
 # env files (can opt-in for committing if needed)
 .env*
 
 # vercel
 .vercel
+
+# local agent worktrees
+/.worktrees
+/.codex
 
 # typescript
 *.tsbuildinfo

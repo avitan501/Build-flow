@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.worktrees/
+.codex/
+.agents/
+downloads/
+tsconfig.tsbuildinfo
+.env*
+/.DS_Store
+/designer_*.csv
+/designer_*.html
+/designer_*.pdf
+/five_towns_*.csv

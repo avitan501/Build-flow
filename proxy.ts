@@ -19,6 +19,7 @@ const CLIENT_HOME_REDIRECT_PATHS = new Set(["/dashboard"]);
 const AUTH_PAGES = new Set(["/login", "/signup"]);
 
 function isProtectedPath(pathname: string) {
+  if (pathname === "/projects") return false;
   return PROTECTED_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
@@ -29,7 +30,7 @@ function sanitizeNextPath(value: string | null | undefined) {
   return value;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const response = NextResponse.next({
     request: {
       headers: request.headers,
