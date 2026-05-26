@@ -4,11 +4,18 @@ import Link from "next/link"
 import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 
+import { createQuoteFromCartAction } from "@/app/cart/actions"
+import type { ProjectRecord } from "@/lib/projects"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
+import { calculateShopCartTax } from "@/lib/shop-checkout"
 import { SHOP_CART_UPDATED_EVENT, readShopCartMap, writeShopCartMap } from "@/lib/shop-cart"
 
 type ShopCartExperienceProps = {
   products: ShopCatalogProduct[]
+  projects: Pick<ProjectRecord, "id" | "name" | "address" | "status">[]
+  isSignedIn: boolean
+  feedbackCode: string | null
+  feedbackTone: "success" | "error" | null
 }
 
 type CartLine = {
@@ -23,9 +30,20 @@ function formatCurrency(value: number) {
   }).format(value)
 }
 
-export function ShopCartExperience({ products }: ShopCartExperienceProps) {
+const cartStatusMessages = {
+  "project-required": { tone: "error", text: "Choose a project before sending the quote request." },
+  "project-not-found": { tone: "error", text: "We could not confirm that project for your account." },
+  "cart-empty": { tone: "error", text: "Add at least one item before requesting a quote." },
+  "cart-items-load-failed": { tone: "error", text: "Cart items could not be checked. Please try again." },
+  "cart-items-invalid": { tone: "error", text: "The cart items are no longer available in the shop catalog." },
+  "cart-total-invalid": { tone: "error", text: "The cart total must be greater than zero before creating a quote." },
+  "cart-quote-create-failed": { tone: "error", text: "The quote could not be created. Please try again." },
+  "cart-quote-items-create-failed": { tone: "error", text: "The quote was not completed because its items could not be saved." },
+} as const
+
+export function ShopCartExperience({ products, projects, isSignedIn, feedbackCode, feedbackTone }: ShopCartExperienceProps) {
   const [cartMap, setCartMap] = useState<Record<string, number>>({})
-  const [checkoutReady, setCheckoutReady] = useState(false)
+  const [selectedProjectId, setSelectedProjectId] = useState(projects[0]?.id ?? "")
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -50,8 +68,13 @@ export function ShopCartExperience({ products }: ShopCartExperienceProps) {
 
   const itemCount = cartLines.reduce((sum, line) => sum + line.quantity, 0)
   const subtotal = cartLines.reduce((sum, line) => sum + line.product.price * line.quantity, 0)
-  const estimatedFees = subtotal > 0 ? subtotal * 0.085 : 0
+  const estimatedFees = subtotal > 0 ? calculateShopCartTax(subtotal) : 0
   const total = subtotal + estimatedFees
+  const cartLinesPayload = JSON.stringify(cartLines.map((line) => ({ productId: line.product.id, quantity: line.quantity })))
+  const feedback: { tone: "success" | "error"; text: string } | null =
+    feedbackCode && feedbackTone
+      ? cartStatusMessages[feedbackCode as keyof typeof cartStatusMessages] || { tone: feedbackTone, text: feedbackTone === "success" ? "Saved successfully." : "The request could not be completed." }
+      : null
 
   function updateQuantity(productId: string, quantity: number) {
     const next = { ...readShopCartMap() }
@@ -133,6 +156,13 @@ export function ShopCartExperience({ products }: ShopCartExperienceProps) {
 
             <aside className="rounded-[28px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,247,255,0.95))] p-5 shadow-[0_18px_44px_rgba(148,163,184,0.14)] lg:sticky lg:top-24 lg:self-start">
               <h2 className="text-xl font-semibold text-slate-950">Order summary</h2>
+
+              {feedback ? (
+                <div className={`mt-4 rounded-[18px] border px-4 py-3 text-sm ${feedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-900"}`}>
+                  {feedback.text}
+                </div>
+              ) : null}
+
               <div className="mt-4 space-y-3 text-sm">
                 <div className="flex items-center justify-between text-slate-600">
                   <span>Items</span>
@@ -154,16 +184,48 @@ export function ShopCartExperience({ products }: ShopCartExperienceProps) {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setCheckoutReady(true)}
-                className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#FFD814] px-4 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:bg-[#f7ca00]"
-              >
-                Checkout preview — send order request
-              </button>
+              <form action={createQuoteFromCartAction} className="mt-5 grid gap-4">
+                <input type="hidden" name="cartLines" value={cartLinesPayload} />
 
-              <div className={`mt-4 rounded-[18px] border px-4 py-3 text-sm ${checkoutReady ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white/80 text-slate-600"}`}>
-                {checkoutReady ? "Order request ready. This is a preview flow only until live checkout is connected." : "This cart stays local for now. Finalizing prepares a clean order request, not a payment."}
+                {isSignedIn ? (
+                  projects.length > 0 ? (
+                    <label className="grid gap-2 text-sm font-semibold text-slate-900">
+                      <span>Project</span>
+                      <select
+                        name="projectId"
+                        value={selectedProjectId}
+                        onChange={(event) => setSelectedProjectId(event.target.value)}
+                        className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+                      >
+                        {projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <Link href="/projects/new" className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-sky-200 bg-white px-4 text-sm font-semibold text-sky-700">
+                      Create project first
+                    </Link>
+                  )
+                ) : (
+                  <Link href="/login" className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-sky-200 bg-white px-4 text-sm font-semibold text-sky-700">
+                    Sign in to request quote
+                  </Link>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={!isSignedIn || projects.length === 0 || cartLines.length === 0}
+                  className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#FFD814] px-4 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:bg-[#f7ca00] disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0"
+                >
+                  Request quote
+                </button>
+              </form>
+
+              <div className="mt-4 rounded-[18px] border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-600">
+                Request quote saves this cart as a draft project quote. After approval, it can become an order with a saved PDF.
               </div>
             </aside>
           </div>

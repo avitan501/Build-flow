@@ -116,7 +116,19 @@ type ProjectEventInsertClient = {
       title: string;
       description?: string | null;
       metadata?: Record<string, unknown>;
-    }) => any;
+    }) =>
+      | {
+          error: {
+            code?: string;
+            message?: string;
+          } | null;
+        }
+      | PromiseLike<{
+          error: {
+            code?: string;
+            message?: string;
+          } | null;
+        }>;
   };
 };
 

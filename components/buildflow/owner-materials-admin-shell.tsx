@@ -12,7 +12,6 @@ function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
-const sidebarItems = ["Dashboard", "Materials", "Quote Batches", "Published", "Suppliers", "Images", "Settings"];
 const tabs = ["All Materials", "Published", "Unpublished", "Needs Review", "Missing Images"] as const;
 type TabKey = (typeof tabs)[number];
 
@@ -80,14 +79,13 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
   const [activeTab, setActiveTab] = useState<TabKey>("All Materials");
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [editingRowId, setEditingRowId] = useState<string | null>(initialState.batches[0]?.rows[0]?.id ?? null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeTone, setNoticeTone] = useState<"info" | "success" | "error">("info");
   const [isPending, startTransition] = useTransition();
 
   const batches = state.batches;
   const activeBatch = batches.find((batch) => batch.id === state.selectedBatchId) ?? batches[0];
-  const rows = activeBatch?.rows ?? [];
+  const rows = useMemo(() => activeBatch?.rows ?? [], [activeBatch]);
   const categories = useMemo(() => ["All categories", ...SHOP_CATEGORY_NAMES], []);
   const suppliers = useMemo(() => ["All suppliers", ...Array.from(new Set(batches.map((batch) => batch.supplier)))], [batches]);
   const statuses = ["All statuses", "Published", "Draft", "Needs review", "Missing image", "Ready"];
@@ -350,6 +348,8 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
                   }}
                 />
               </label>
+              <button type="button" onClick={handleAddMaterial} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Add material</button>
+              <button type="button" onClick={exportCsv} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Export CSV</button>
               <button type="button" onClick={restoreBatches} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Restore batches</button>
               <button type="button" onClick={saveStateToServer} disabled={isPending} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Save</button>
               <button type="button" onClick={() => publishSelection(selectedRowIds)} disabled={isPending} aria-disabled={isPending || selectedRowIds.length === 0} className={`rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white ${isPending || selectedRowIds.length === 0 ? "opacity-60" : ""}`}>Publish selected</button>
@@ -381,7 +381,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
               <h2 className="text-xl font-semibold text-slate-950">Quote batches</h2>
               <p className="mt-1 text-sm text-slate-500">Select a restored quote batch to review its extracted material items.</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-5">
               <label className="grid gap-2 text-sm text-slate-700">
                 <span className="font-medium">Batch</span>
                 <select value={state.selectedBatchId} onChange={(event) => setSelectedBatch(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none">
@@ -398,6 +398,12 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
                 <span className="font-medium">Category</span>
                 <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
                   {categories.map((option) => <option key={option}>{option}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm text-slate-700">
+                <span className="font-medium">Supplier</span>
+                <select value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
+                  {suppliers.map((option) => <option key={option}>{option}</option>)}
                 </select>
               </label>
               <label className="grid gap-2 text-sm text-slate-700">

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { createOrderFromApprovedQuoteAction } from "@/app/orders/actions";
 import { addMaterialsToQuoteAction, approveQuoteAction, createProjectQuoteAction, updateQuoteItemPricingAction } from "@/app/quotes/actions";
 import { requireSignedInProfile } from "@/lib/auth";
-import type { ProjectQuoteItemRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
+import type { ProjectOrderRecord, ProjectQuoteItemRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
 
 type QuotesPageProps = {
   searchParams?: Promise<{
@@ -17,6 +18,7 @@ const quoteStatusMessages = {
   "project-not-found": { tone: "error", text: "We could not confirm that project for your account." },
   "quote-create-failed": { tone: "error", text: "Draft quote could not be created. Please try again." },
   "quote-created": { tone: "success", text: "Draft quote created successfully." },
+  "cart-quote-created": { tone: "success", text: "Cart quote created successfully. Review and approve it when ready." },
   "quote-not-found": { tone: "error", text: "We could not confirm that draft quote for this project." },
   "quote-not-draft": { tone: "error", text: "Only draft quotes can receive project materials." },
   "quote-items-load-failed": { tone: "error", text: "Existing quote items could not be checked. Please try again." },
@@ -30,7 +32,7 @@ const quoteStatusMessages = {
   "quote-item-update-failed": { tone: "error", text: "Quote item pricing could not be updated. Please try again." },
   "quote-totals-update-failed": { tone: "error", text: "Quote totals could not be recalculated. Please try again." },
   "quote-item-price-updated": { tone: "success", text: "Quote item pricing updated successfully." },
-  "quote-approved": { tone: "success", text: "Quote approved successfully." },
+  "quote-approved": { tone: "success", text: "Quote approved. Next step: create the order and save the PDF copy." },
   "quote-approve-status-invalid": { tone: "error", text: "Only draft or sent quotes can be approved." },
   "quote-approve-total-invalid": { tone: "error", text: "Add pricing before approval." },
   "quote-approve-failed": { tone: "error", text: "Quote approval could not be saved. Please try again." },
@@ -109,6 +111,7 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
 
   const quoteIds = (quotes ?? []).map((quote) => quote.id);
   let quoteItems: ProjectQuoteItemRecord[] = [];
+  let quoteOrders: Pick<ProjectOrderRecord, "id" | "quote_id" | "status" | "tracking_status" | "total">[] = [];
 
   if (quoteIds.length > 0) {
     const { data: items, error: itemsError } = await supabase
@@ -125,9 +128,24 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
     }
 
     quoteItems = items ?? [];
+
+    const { data: orders, error: ordersError } = await supabase
+      .from("project_orders")
+      .select("id, quote_id, status, tracking_status, total")
+      .in("quote_id", quoteIds)
+      .eq("project_id", project.id)
+      .eq("owner_id", user.id)
+      .returns<Pick<ProjectOrderRecord, "id" | "quote_id" | "status" | "tracking_status" | "total">[]>();
+
+    if (ordersError) {
+      throw new Error("Failed to load project quote orders.");
+    }
+
+    quoteOrders = orders ?? [];
   }
 
   const feedback = (successCode && quoteStatusMessages[successCode as keyof typeof quoteStatusMessages]) || (errorCode && quoteStatusMessages[errorCode as keyof typeof quoteStatusMessages]);
+  const approvedQuotes = (quotes ?? []).filter((quote) => quote.status === "approved");
 
   const itemsByQuoteId = new Map<string, ProjectQuoteItemRecord[]>();
   for (const item of quoteItems) {
@@ -135,6 +153,7 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
     existing.push(item);
     itemsByQuoteId.set(item.quote_id, existing);
   }
+  const ordersByQuoteId = new Map(quoteOrders.filter((order) => order.quote_id).map((order) => [order.quote_id as string, order]));
 
   return (
     <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
@@ -158,6 +177,26 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
             </Link>
           </div>
         </section>
+
+        {approvedQuotes.length > 0 ? (
+          <section className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5 shadow-sm sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Ready for order</div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Quote approved</h2>
+                <p className="mt-2 text-sm leading-6 text-emerald-950">
+                  The next step is to create the order. That will generate the order PDF and save a copy in the project documents.
+                </p>
+              </div>
+              <Link
+                href={`/orders?projectId=${project.id}#create-order`}
+                className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+              >
+                Continue to order
+              </Link>
+            </div>
+          </section>
+        ) : null}
 
         <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
@@ -230,6 +269,7 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
               <div className="mt-4 grid gap-4">
                 {quotes.map((quote, index) => {
                   const items = itemsByQuoteId.get(quote.id) || [];
+                  const order = ordersByQuoteId.get(quote.id);
                   return (
                     <div key={quote.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -279,6 +319,28 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
                               <div className="inline-flex items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
                                 Add pricing before approval
                               </div>
+                            )
+                          ) : null}
+
+                          {quote.status === "approved" ? (
+                            order ? (
+                              <Link
+                                href={`/orders?projectId=${project.id}#active-orders`}
+                                className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100"
+                              >
+                                Order already created
+                              </Link>
+                            ) : (
+                              <form action={createOrderFromApprovedQuoteAction}>
+                                <input type="hidden" name="projectId" value={project.id} />
+                                <input type="hidden" name="quoteId" value={quote.id} />
+                                <button
+                                  type="submit"
+                                  className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                                >
+                                  Create order and save PDF
+                                </button>
+                              </form>
                             )
                           ) : null}
                         </div>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { requireSignedInProfile } from "@/lib/auth";
-import type { ProjectEventRecord, ProjectRecord } from "@/lib/projects";
+import { PROJECT_UPLOAD_STORAGE_BUCKET, type ProjectEventRecord, type ProjectRecord, type ProjectUploadRecord } from "@/lib/projects";
 
 function formatProjectDate(value: string) {
   return new Date(value).toLocaleDateString("en-US", {
@@ -20,6 +20,12 @@ function formatProjectTimelineDate(value: string) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function formatFileSize(value: number | null) {
+  if (!value || value <= 0) return "File";
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function formatProjectStatus(status: ProjectRecord["status"]) {
@@ -44,6 +50,7 @@ function getStepStatusClass(status: ProjectStepStatus) {
 
 const nextSteps = (projectId: string) => [
   { title: "Upload Plans", status: "Live", href: `/upload?projectId=${projectId}` },
+  { title: "Drywall Takeoff", status: "Live", href: `/shop/sheet-rock/drywall-calculator?projectId=${projectId}` },
   { title: "Materials", status: "Live", href: "/shop" },
   { title: "Quote", status: "Live", href: `/quotes?projectId=${projectId}` },
   { title: "Orders", status: "Partial Live", href: `/orders?projectId=${projectId}` },
@@ -71,6 +78,28 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
     .eq("owner_id", user.id)
     .order("created_at", { ascending: false })
     .returns<ProjectEventRecord[]>();
+
+  const { data: projectUploads, error: uploadsError } = await supabase
+    .from("project_uploads")
+    .select("id, project_id, owner_id, file_name, file_path, file_type, file_size, status, created_at")
+    .eq("project_id", projectId)
+    .eq("owner_id", user.id)
+    .order("created_at", { ascending: false })
+    .returns<ProjectUploadRecord[]>();
+
+  if (uploadsError) {
+    throw new Error("Failed to load project documents.");
+  }
+
+  const documents = await Promise.all(
+    (projectUploads ?? []).map(async (upload) => {
+      const { data } = await supabase.storage.from(PROJECT_UPLOAD_STORAGE_BUCKET).createSignedUrl(upload.file_path, 60 * 30);
+      return {
+        ...upload,
+        signedUrl: data?.signedUrl ?? null,
+      };
+    }),
+  );
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#eef6ff_0%,#f8fbff_45%,#eef4fb_100%)] px-4 py-4 pb-28 text-slate-900 sm:px-8 sm:py-6 sm:pb-10 lg:px-10">
@@ -150,6 +179,63 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
               </div>
             </article>
           </aside>
+        </section>
+
+        <section id="documents" className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-slate-950">Documents</h2>
+              <p className="text-sm text-slate-500">Project files and generated order PDFs.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/shop/sheet-rock/drywall-calculator?projectId=${project.id}`} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                Recalculate takeoff
+              </Link>
+              <Link href={`/upload?projectId=${project.id}`} className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                Upload file
+              </Link>
+            </div>
+          </div>
+
+          {documents.length > 0 ? (
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {documents.map((document) => (
+                <article key={document.id} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-semibold text-slate-900">{document.file_name}</h3>
+                      <p className="mt-1.5 text-xs font-medium text-slate-500">
+                        {document.file_type || "Document"} · {formatFileSize(document.file_size)}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                      {document.status}
+                    </span>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {document.signedUrl ? (
+                      <a
+                        href={document.signedUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50"
+                      >
+                        Open PDF
+                      </a>
+                    ) : (
+                      <span className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-500">
+                        Link unavailable
+                      </span>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+              No project documents yet. Generated order PDFs will appear here.
+            </div>
+          )}
         </section>
 
         <section className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">

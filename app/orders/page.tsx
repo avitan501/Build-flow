@@ -31,8 +31,11 @@ const orderStatusMessages = {
   "quote-total-invalid": { tone: "error", text: "Approved quote total must be greater than zero before creating an order." },
   "order-check-failed": { tone: "error", text: "Existing order status could not be checked. Please try again." },
   "order-create-failed": { tone: "error", text: "Order could not be created from this approved quote. Please try again." },
-  "order-created": { tone: "success", text: "Order created successfully from the approved quote." },
-  "order-already-exists": { tone: "success", text: "An order already exists for this approved quote." },
+  "order-pdf-items-failed": { tone: "error", text: "Quote items could not be loaded for the order PDF. Please try again." },
+  "order-pdf-upload-failed": { tone: "error", text: "Order was not completed because the PDF copy could not be uploaded. Please try again." },
+  "order-pdf-record-failed": { tone: "error", text: "Order was not completed because the project PDF record could not be saved. Please try again." },
+  "order-created": { tone: "success", text: "Order created successfully. A PDF copy was saved in the project documents." },
+  "order-already-exists": { tone: "success", text: "An order already exists for this approved quote. The project documents contain the saved PDF copy." },
 } as const;
 
 function formatQuoteStatus(status: ProjectQuoteRecord["status"]) {
@@ -265,6 +268,14 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
           >
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em]">{feedback.tone === "success" ? "Saved" : "Order issue"}</div>
             <p className="mt-1.5 leading-6">{feedback.text}</p>
+            {feedback.tone === "success" && (successCode === "order-created" || successCode === "order-already-exists") ? (
+              <Link
+                href={`/projects/${project.id}#documents`}
+                className="mt-3 inline-flex min-h-11 items-center justify-center rounded-2xl border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100"
+              >
+                Open saved PDF
+              </Link>
+            ) : null}
           </section>
         ) : null}
 
@@ -308,6 +319,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <a href="#active-orders" className="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">Track order</a>
                     <Link href={`/quotes?projectId=${project.id}`} className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">View details</Link>
+                    <Link href={`/projects/${project.id}#documents`} className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50">Open PDF</Link>
                   </div>
                 </div>
               )) : (
@@ -355,6 +367,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
                   <div className="mt-4 flex flex-wrap gap-2">
                     <a href="#tracking-actions" className="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">Track order</a>
                     <Link href={`/quotes?projectId=${project.id}`} className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">View details</Link>
+                    <Link href={`/projects/${project.id}#documents`} className="inline-flex items-center justify-center rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50">Open PDF</Link>
                   </div>
                 </article>
               ))}
@@ -362,7 +375,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
           )}
         </section>
 
-        <section className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
+        <section id="create-order" className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-slate-950">Past orders</h2>
