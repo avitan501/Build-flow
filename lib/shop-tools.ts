@@ -6,6 +6,8 @@ export type ShopToolSlug =
   | "framing"
   | "tile-work"
   | "sheet-rock"
+  | "kitchen"
+  | "eitan"
   | "door-and-molding"
   | "wood-floor"
   | "exterior"
@@ -47,6 +49,20 @@ export const SHOP_TOOL_CATEGORIES: ShopToolCategory[] = [
     description: "Drywall, sheetrock, compound, and wall board materials.",
     imageUrl: "/images/materials/photos/drywall.jpg",
     imageAlt: "Sheet rock material",
+  },
+  {
+    slug: "kitchen",
+    label: "Kitchen",
+    description: "Kitchen cabinets, design specs, plans, and cabinet package review.",
+    imageUrl: "/images/materials/photos/kitchen.jpg",
+    imageAlt: "Kitchen cabinet showroom with cabinet door samples and island display",
+  },
+  {
+    slug: "eitan",
+    label: "Eitan",
+    description: "Window schedule upload and renovation material quote requests.",
+    imageUrl: "/images/buildflow-retail/eitan-renovation.png",
+    imageAlt: "Residential renovation jobsite with window plans and materials",
   },
   {
     slug: "door-and-molding",
@@ -111,6 +127,11 @@ function isWindowProduct(product: ShopCatalogProduct) {
   return /\b(window|windows)\b/.test(haystack)
 }
 
+function isKitchenProduct(product: ShopCatalogProduct) {
+  const haystack = productHaystack(product)
+  return product.category === "Kitchen" || /\b(kitchen|cabinet|cabinets|cabinetry|countertop|countertops|shaker)\b/.test(haystack)
+}
+
 export function filterProductsForShopTool(products: ShopCatalogProduct[], slug: ShopToolSlug) {
   return products.filter((product) => {
     if (slug === "services" || slug === "paper-work") {
@@ -129,8 +150,16 @@ export function filterProductsForShopTool(products: ShopCatalogProduct[], slug: 
       return product.productType !== "service" && product.category === "Sheet rock"
     }
 
+    if (slug === "kitchen") {
+      return product.productType !== "service" && isKitchenProduct(product)
+    }
+
+    if (slug === "eitan") {
+      return product.productType !== "service" && product.category === "Eitan"
+    }
+
     if (slug === "door-and-molding") {
-      return product.productType !== "service" && product.category === "Carpentry" && !isWoodFloorProduct(product)
+      return product.productType !== "service" && product.category === "Carpentry" && !isWoodFloorProduct(product) && !isKitchenProduct(product)
     }
 
     if (slug === "wood-floor") {

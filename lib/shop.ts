@@ -1,6 +1,6 @@
 export const SHOP_SUPPLIER_ESTIMATE_STATUSES = ["draft", "reviewed", "archived"] as const;
 export const SHOP_ITEM_SOURCES = ["supplier_estimate", "manual"] as const;
-export const SHOP_CATEGORY_NAMES = ["Services", "Framing", "Tile work", "Sheet rock", "Carpentry", "Exterior", "Miscellaneous"] as const;
+export const SHOP_CATEGORY_NAMES = ["Services", "Framing", "Tile work", "Sheet rock", "Kitchen", "Eitan", "Carpentry", "Exterior", "Miscellaneous"] as const;
 export const SHOP_CATEGORY_CHIPS = SHOP_CATEGORY_NAMES;
 export const SHOP_POPULAR_SEARCHES = ["2x4 studs", "joist hangers", "subfloor adhesive", "pressure treated", "flashing roll", "final survey", "stakeout foundations"] as const;
 
@@ -12,8 +12,10 @@ const SHOP_CATEGORY_SET = new Set<string>(SHOP_CATEGORY_NAMES);
 const SHOP_CATEGORY_KEYWORDS: Record<ShopCategoryName, RegExp> = {
   Services: /\b(survey|surveys|stakeout|final survey|under construction survey)\b/,
   Framing: /\b(2x4|2x6|2x8|2x10|2x12|lvl|joist|joists|hanger|hangers|tie|ties|nail|nails|strap|straps|bridging|treated lumber|plywood)\b/,
-  "Tile work": /\b(tile|tiles|grout|thinset|thin set|mortar|schluter)\b/,
+  "Tile work": /\b(tile|tiles|grout|thinset|thin set|mortar|schluter|cement board|backer board|backerboard|underlayment|tile paper|wire mesh|mesh|portland cement|fine sand)\b/,
   "Sheet rock": /\b(sheetrock|sheet rock|drywall|gypsum|compound|corner bead)\b/,
+  Kitchen: /\b(kitchen|cabinet|cabinets|cabinetry|countertop|countertops|shaker|slab doors)\b/,
+  Eitan: /\b(eitan)\b/,
   Carpentry: /\b(trim|casing|baseboard|door|doors|cabinet|cabinets|finish wood|stair|stairs|rail|rails)\b/,
   Exterior: /\b(flashing|exterior|siding|housewrap|house wrap|waterproof|roofing|window|windows)\b/,
   Miscellaneous: /$^/,
@@ -51,6 +53,8 @@ export function suggestShopCategory(input: {
   if (SHOP_CATEGORY_KEYWORDS.Framing.test(haystack)) return "Framing";
   if (SHOP_CATEGORY_KEYWORDS["Tile work"].test(haystack)) return "Tile work";
   if (SHOP_CATEGORY_KEYWORDS["Sheet rock"].test(haystack)) return "Sheet rock";
+  if (SHOP_CATEGORY_KEYWORDS.Kitchen.test(haystack)) return "Kitchen";
+  if (SHOP_CATEGORY_KEYWORDS.Eitan.test(haystack)) return "Eitan";
   if (SHOP_CATEGORY_KEYWORDS.Carpentry.test(haystack)) return "Carpentry";
   if (SHOP_CATEGORY_KEYWORDS.Exterior.test(haystack)) return "Exterior";
 
@@ -94,9 +98,14 @@ export function mapExistingCategoryToShopCategory(
     case "doors":
     case "door":
     case "trim":
+      return "Carpentry";
+    case "kitchen":
+    case "cabinetry":
     case "cabinets":
     case "cabinet":
-      return "Carpentry";
+      return "Kitchen";
+    case "eitan":
+      return "Eitan";
     case "flooring":
       return suggestShopCategory({ category, ...context }) === "Tile work" ? "Tile work" : "Carpentry";
     case "flashing":

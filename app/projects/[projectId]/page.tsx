@@ -51,6 +51,7 @@ function getStepStatusClass(status: ProjectStepStatus) {
 const nextSteps = (projectId: string) => [
   { title: "Upload Plans", status: "Live", href: `/upload?projectId=${projectId}` },
   { title: "Drywall Takeoff", status: "Live", href: `/shop/sheet-rock/drywall-calculator?projectId=${projectId}` },
+  { title: "Wood Floor Takeoff", status: "Live", href: `/shop/wood-floor/flooring-calculator?projectId=${projectId}` },
   { title: "Materials", status: "Live", href: "/shop" },
   { title: "Quote", status: "Live", href: `/quotes?projectId=${projectId}` },
   { title: "Orders", status: "Partial Live", href: `/orders?projectId=${projectId}` },
@@ -189,7 +190,10 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href={`/shop/sheet-rock/drywall-calculator?projectId=${project.id}`} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
-                Recalculate takeoff
+                Drywall takeoff
+              </Link>
+              <Link href={`/shop/wood-floor/flooring-calculator?projectId=${project.id}`} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600">
+                Wood floor takeoff
               </Link>
               <Link href={`/upload?projectId=${project.id}`} className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
                 Upload file

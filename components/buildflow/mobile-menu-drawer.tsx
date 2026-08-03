@@ -65,7 +65,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, adminLinks = [],
               const active = Boolean(pathname) && isActivePath(pathname, link.href);
               return (
                 <Link
-                  key={link.href}
+                  key={`${link.label}-${link.href}`}
                   href={link.href}
                   onClick={onClose}
                   className={`flex items-center justify-between rounded-2xl px-3 py-3 text-sm font-medium transition active:scale-[0.99] ${
@@ -90,7 +90,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, adminLinks = [],
                 const active = Boolean(pathname) && isActivePath(pathname, link.href);
                 return (
                   <Link
-                    key={link.href}
+                    key={`${link.label}-${link.href}`}
                     href={link.href}
                     onClick={onClose}
                     className={`rounded-2xl px-3 py-3 text-sm font-medium transition active:scale-[0.99] ${active ? "bg-white/85 text-slate-950" : "text-slate-700 hover:bg-white/65"}`}

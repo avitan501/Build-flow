@@ -93,7 +93,7 @@ export const MATERIAL_REAL_PHOTOS: Record<string, MaterialCategoryPhoto> = {
     imageCategory: 'Tile',
   },
   Cabinets: {
-    imageUrl: '/images/materials/photos/cabinets.jpg',
+    imageUrl: '/images/materials/photos/kitchen.jpg',
     imageAlt: 'Home improvement showroom aisle with tile, flooring, cabinets, and appliance displays.',
     imageSource: GENERATED_IMAGE_SOURCE,
     imageLicense: GENERATED_IMAGE_LICENSE,

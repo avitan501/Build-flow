@@ -30,6 +30,8 @@ type OpenAIResponse = {
   }>;
 };
 
+const OPENAI_EXTRACTION_TIMEOUT_MS = 35_000;
+
 function normalizeText(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
@@ -93,6 +95,74 @@ function isImageMimeType(mimeType: string) {
   return mimeType === "image/png" || mimeType === "image/jpeg" || mimeType === "image/webp";
 }
 
+const WINDOW_SCHEDULE_EXTRACTION_PROMPT =
+  "Search every page of this construction file for the actual WINDOW SCHEDULE table. The table may be titled Window Schedule, Windows, Window & Door Schedule, Fenestration Schedule, Exterior Openings, or similar. Extract ONLY rows from that schedule/table. Do not extract framing, doors, room finish schedules, general notes, materials lists, dimensions drawn on plans, elevations, legends, or any non-window material. Return only JSON with this shape: " +
+  '{"items":[{"mark":"W1","location":"Bedroom","quantity":1,"windowType":"double hung","width":"30 in","height":"50 in","roughOpeningWidth":null,"roughOpeningHeight":null,"glass":"tempered","operation":"operable","notes":"egress","confidence":0.85}],"notes":"short extraction note"}. ' +
+  "Keep the row values exactly as shown where possible. If dimensions or fields are unclear, use null. Do not invent values. If no window schedule table is visible anywhere in the file, return an empty items array and explain that the window schedule table was not found.";
+
+async function callOpenAIForWindowSchedule(content: Array<Record<string, unknown>>): Promise<WindowScheduleExtractionResult> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return {
+      items: [],
+      notes: "AI extraction is not configured. Add OPENAI_API_KEY to enable automatic window schedule extraction.",
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OPENAI_EXTRACTION_TIMEOUT_MS);
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    signal: controller.signal,
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: process.env.OPENAI_WINDOW_SCHEDULE_MODEL || "gpt-4o-mini",
+      input: [
+        {
+          role: "user",
+          content,
+        },
+      ],
+    }),
+  }).finally(() => clearTimeout(timeout));
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`OpenAI extraction failed: ${response.status} ${detail.slice(0, 500)}`);
+  }
+
+  const payload = (await response.json()) as OpenAIResponse;
+  const outputText = extractResponseText(payload);
+  const parsed = parseJsonObject(outputText);
+  const items = normalizeItems(parsed.items || []);
+
+  return {
+    items,
+    notes: normalizeText(parsed.notes) || (items.length > 0 ? "Window schedule extracted. Review before quoting." : "No window schedule rows were found."),
+  };
+}
+
+export async function extractWindowScheduleFromText(text: string, sourceName: string): Promise<WindowScheduleExtractionResult> {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return {
+      items: [],
+      notes: "No readable text was extracted from the uploaded file.",
+    };
+  }
+
+  return callOpenAIForWindowSchedule([
+    {
+      type: "input_text",
+      text: `${WINDOW_SCHEDULE_EXTRACTION_PROMPT}\n\nSource file: ${sourceName}\n\nExtracted plan text:\n${trimmed.slice(0, 120_000)}`,
+    },
+  ]);
+}
+
 export async function extractWindowScheduleFromFile(file: File): Promise<WindowScheduleExtractionResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -109,44 +179,11 @@ export async function extractWindowScheduleFromFile(file: File): Promise<WindowS
     ? { type: "input_image", image_url: dataUrl }
     : { type: "input_file", filename: file.name, file_data: dataUrl };
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+  return callOpenAIForWindowSchedule([
+    {
+      type: "input_text",
+      text: WINDOW_SCHEDULE_EXTRACTION_PROMPT,
     },
-    body: JSON.stringify({
-      model: process.env.OPENAI_WINDOW_SCHEDULE_MODEL || "gpt-4o-mini",
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text:
-                "Extract the window schedule from this construction blueprint, window schedule, takeoff, or supplier quote. Return only JSON with this shape: " +
-                '{"items":[{"mark":"W1","location":"Bedroom","quantity":1,"windowType":"double hung","width":"30 in","height":"50 in","roughOpeningWidth":null,"roughOpeningHeight":null,"glass":"tempered","operation":"operable","notes":"egress","confidence":0.85}],"notes":"short extraction note"}. ' +
-                "If dimensions or fields are unclear, use null. Do not invent values. If no window schedule is visible, return an empty items array and explain in notes.",
-            },
-            fileContent,
-          ],
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`OpenAI extraction failed: ${response.status} ${detail.slice(0, 500)}`);
-  }
-
-  const payload = (await response.json()) as OpenAIResponse;
-  const outputText = extractResponseText(payload);
-  const parsed = parseJsonObject(outputText);
-  const items = normalizeItems(parsed.items || []);
-
-  return {
-    items,
-    notes: normalizeText(parsed.notes) || (items.length > 0 ? "Window schedule extracted. Review before quoting." : "No window schedule rows were found."),
-  };
+    fileContent,
+  ]);
 }

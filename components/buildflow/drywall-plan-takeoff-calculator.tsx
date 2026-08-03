@@ -564,7 +564,7 @@ export function DrywallPlanTakeoffCalculator({
             </div>
           </div>
 
-          <form action={planFormAction} encType="multipart/form-data" className="mt-5 grid gap-3">
+          <form action={planFormAction} className="mt-5 grid gap-3">
             {isSignedIn && projects.length > 0 ? (
               <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                 Save to project

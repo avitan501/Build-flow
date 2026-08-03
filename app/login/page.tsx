@@ -125,17 +125,15 @@ export default function LoginPage() {
 
     try {
       if (phoneStep === "request") {
-        const { error: otpError } = await supabase.auth.signInWithOtp({
-          phone,
-          options: {
-            data: {
-              phone,
-            },
-          },
+        const response = await fetch("/api/auth/phone/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone }),
         });
+        const result = (await response.json().catch(() => null)) as { error?: string } | null;
 
-        if (otpError) {
-          setError(otpError.message);
+        if (!response.ok) {
+          setError(result?.error || "Could not send the SMS code.");
           return;
         }
 
@@ -152,14 +150,15 @@ export default function LoginPage() {
         return;
       }
 
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        phone,
-        token,
-        type: "sms",
+      const response = await fetch("/api/auth/phone/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, token }),
       });
+      const result = (await response.json().catch(() => null)) as { error?: string } | null;
 
-      if (verifyError) {
-        setError(verifyError.message);
+      if (!response.ok) {
+        setError(result?.error || "Could not verify the SMS code.");
         return;
       }
 
