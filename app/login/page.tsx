@@ -171,6 +171,31 @@ export default function LoginPage() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    setError(null);
+    setMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const next = redirectPath === "/" ? "" : `?next=${encodeURIComponent(redirectPath)}`;
+      const redirectTo = `${window.location.origin}/auth/callback${next}`;
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+        },
+      });
+
+      if (oauthError) {
+        setError(oauthError.message);
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Google sign-in request failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#eff6ff_0%,#f8fbff_48%,#ffffff_100%)] px-6 py-10 sm:px-8 sm:py-14">
       <section className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-md items-center">
@@ -327,13 +352,12 @@ export default function LoginPage() {
           <div className="mt-4">
             <button
               type="button"
-              disabled
-              aria-disabled="true"
-              className="w-full rounded-full border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-400"
+              onClick={handleGoogleSignIn}
+              disabled={isSubmitting}
+              className="w-full rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              Continue with Google
+              {isSubmitting ? "Opening Google..." : "Continue with Google"}
             </button>
-            <p className="mt-2 text-center text-xs text-slate-500">Google sign-in coming soon</p>
           </div>
 
           <div className="mt-6 flex items-center justify-between gap-4 text-sm">

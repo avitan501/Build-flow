@@ -6,6 +6,14 @@ type SendPhoneOtpBody = {
   phone?: string;
 };
 
+function getPhoneAuthErrorMessage(message: string) {
+  if (message.toLowerCase().includes("unsupported phone provider")) {
+    return "Phone login is not enabled in Supabase yet. Enable Phone Auth and configure an SMS provider in Supabase.";
+  }
+
+  return message;
+}
+
 export async function POST(request: Request) {
   let body: SendPhoneOtpBody;
 
@@ -32,7 +40,7 @@ export async function POST(request: Request) {
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: getPhoneAuthErrorMessage(error.message) }, { status: 400 });
   }
 
   return NextResponse.json({ ok: true });
