@@ -106,6 +106,13 @@ export type ProjectEventRecord = {
   created_at: string;
 };
 
+type ProjectEventInsertResult = PromiseLike<{
+  error: {
+    message?: string;
+    code?: string;
+  } | null;
+}>;
+
 type ProjectEventInsertClient = {
   from: (table: "project_events") => {
     insert: (values: {
@@ -116,7 +123,7 @@ type ProjectEventInsertClient = {
       title: string;
       description?: string | null;
       metadata?: Record<string, unknown>;
-    }) => any;
+    }) => ProjectEventInsertResult;
   };
 };
 
