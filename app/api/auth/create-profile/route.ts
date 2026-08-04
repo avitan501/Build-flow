@@ -24,6 +24,7 @@ export async function POST(request: Request) {
     }
 
     const userId = body.userId?.trim();
+    const requestedEmail = body.email?.trim();
     const fullName = body.fullName?.trim();
     const companyName = body.companyName?.trim();
     const phone = body.phone?.trim();
@@ -52,17 +53,19 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!userData.user?.id || !userData.user.email) {
+    if (!userData.user?.id) {
       return NextResponse.json(
         { error: "Missing user for profile creation." },
         { status: 400 },
       );
     }
 
+    const email = userData.user.email || requestedEmail || "";
+
     const { error: profileError } = await admin.from("profiles").upsert(
       {
         id: userData.user.id,
-        email: userData.user.email,
+        email,
         full_name: fullName,
         phone,
         company_name: companyName,

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 
+import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { createClient } from "@/lib/supabase/client";
 
 type FormState = {
@@ -20,27 +21,74 @@ const initialState: FormState = {
   password: "",
 };
 
+type SignupMode = "email" | "phone";
+
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const [form, setForm] = useState<FormState>(initialState);
+  const [mode, setMode] = useState<SignupMode>(searchParams.get("mode") === "phone" ? "phone" : "email");
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setMessage(null);
     setIsSubmitting(true);
 
     try {
+      const phone = normalizePhoneNumber(form.phone);
+      const email = mode === "phone" ? phoneLoginEmailForPhone(phone) : form.email.trim();
+
+      if (!email) {
+        setError(mode === "phone" ? "Enter a valid phone number." : "Enter a valid email.");
+        return;
+      }
+
+      if (mode === "phone") {
+        const response = await fetch("/api/auth/phone-password/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fullName: form.fullName,
+            phone,
+            password: form.password,
+          }),
+        });
+        const result = (await response.json().catch(() => null)) as { error?: string } | null;
+
+        if (!response.ok) {
+          setError(result?.error || "Phone account creation failed.");
+          return;
+        }
+
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password: form.password,
+        });
+
+        if (signInError) {
+          setMessage("Phone login created. Go back to login and sign in with your phone number.");
+          return;
+        }
+
+        router.push("/");
+        router.refresh();
+        return;
+      }
+
       const { data, error: signUpError } = await supabase.auth.signUp({
-        email: form.email,
+        email,
         password: form.password,
         options: {
           data: {
             full_name: form.fullName,
             company_name: form.fullName,
-            phone: form.phone,
+            phone,
+            login_type: mode,
           },
         },
       });
@@ -55,10 +103,56 @@ export default function SignupPage() {
         return;
       }
 
-      router.push("/");
-      router.refresh();
+      const profileResponse = await fetch("/api/auth/create-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: data.user.id,
+          email,
+          fullName: form.fullName,
+          companyName: form.fullName,
+          phone,
+        }),
+      });
+      const profileResult = (await profileResponse.json().catch(() => null)) as { error?: string } | null;
+
+      if (!profileResponse.ok) {
+        setError(profileResult?.error || "Account was created, but profile setup failed.");
+        return;
+      }
+
+      if (data.session) {
+        router.push("/");
+        router.refresh();
+        return;
+      }
+
+      setMessage("Account created. Check your email if Supabase asks you to confirm it, then log in.");
     } catch (signupRequestError) {
       setError(signupRequestError instanceof Error ? signupRequestError.message : "Signup request failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setError(null);
+    setMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (oauthError) {
+        setError(oauthError.message);
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Google sign-in request failed.");
     } finally {
       setIsSubmitting(false);
     }
@@ -80,10 +174,35 @@ export default function SignupPage() {
 
           <div className="mt-8 space-y-2">
             <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Create account</h1>
-            <p className="text-sm text-slate-500">Phone-only signup is not currently supported by existing auth.</p>
+            <p className="text-sm text-slate-500">Create an email account or a free phone-number password login.</p>
           </div>
 
-          <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+          <div className="mt-8 grid grid-cols-2 gap-2 rounded-full bg-slate-100 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("email");
+                setError(null);
+                setMessage(null);
+              }}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${mode === "email" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}
+            >
+              Email
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("phone");
+                setError(null);
+                setMessage(null);
+              }}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${mode === "phone" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}
+            >
+              Phone
+            </button>
+          </div>
+
+          <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
             <label className="block text-sm font-medium text-slate-700">
               <span className="mb-2 block">Name</span>
               <input
@@ -98,25 +217,29 @@ export default function SignupPage() {
             <label className="block text-sm font-medium text-slate-700">
               <span className="mb-2 block">Phone number</span>
               <input
-                required
+                required={mode === "phone"}
+                type="tel"
+                inputMode="tel"
                 value={form.phone}
                 onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                placeholder="+1 555 123 4567"
+                placeholder="347 567 5077"
               />
             </label>
 
-            <label className="block text-sm font-medium text-slate-700">
-              <span className="mb-2 block">Email</span>
-              <input
-                required
-                type="email"
-                value={form.email}
-                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                placeholder="name@company.com"
-              />
-            </label>
+            {mode === "email" ? (
+              <label className="block text-sm font-medium text-slate-700">
+                <span className="mb-2 block">Email</span>
+                <input
+                  required
+                  type="email"
+                  value={form.email}
+                  onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                  placeholder="name@company.com"
+                />
+              </label>
+            ) : null}
 
             <label className="block text-sm font-medium text-slate-700">
               <span className="mb-2 block">Password</span>
@@ -134,6 +257,9 @@ export default function SignupPage() {
             {error ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
             ) : null}
+            {message ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div>
+            ) : null}
 
             <button
               type="submit"
@@ -147,13 +273,12 @@ export default function SignupPage() {
           <div className="mt-4">
             <button
               type="button"
-              disabled
-              aria-disabled="true"
-              className="w-full rounded-full border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-400"
+              onClick={handleGoogleSignIn}
+              disabled={isSubmitting}
+              className="w-full rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              Continue with Google
+              {isSubmitting ? "Opening Google..." : "Continue with Google"}
             </button>
-            <p className="mt-2 text-center text-xs text-slate-500">Google sign-in coming soon</p>
           </div>
 
           <div className="mt-6 flex items-center justify-between gap-4 text-sm">

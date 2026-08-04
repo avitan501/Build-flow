@@ -4,50 +4,30 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
+import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { createClient } from "@/lib/supabase/client";
 
 type LoginState = {
   email: string;
   password: string;
   phone: string;
-  otp: string;
+  phonePassword: string;
 };
 
 const initialState: LoginState = {
   email: "",
   password: "",
   phone: "",
-  otp: "",
+  phonePassword: "",
 };
 
 type LoginMode = "email" | "phone";
-type PhoneStep = "request" | "verify";
 
 function sanitizeNextPath(value: string | null) {
   if (!value) return "/";
   if (!value.startsWith("/")) return "/";
   if (value.startsWith("//")) return "/";
   return value;
-}
-
-function normalizePhoneNumber(value: string) {
-  const trimmed = value.trim();
-
-  if (trimmed.startsWith("+")) {
-    return `+${trimmed.slice(1).replace(/\D/g, "")}`;
-  }
-
-  const digits = trimmed.replace(/\D/g, "");
-
-  if (digits.length === 10) {
-    return `+1${digits}`;
-  }
-
-  if (digits.length === 11 && digits.startsWith("1")) {
-    return `+${digits}`;
-  }
-
-  return digits ? `+${digits}` : "";
 }
 
 export default function LoginPage() {
@@ -57,7 +37,6 @@ export default function LoginPage() {
   const callbackError = searchParams.get("error");
   const [form, setForm] = useState<LoginState>(initialState);
   const [mode, setMode] = useState<LoginMode>("email");
-  const [phoneStep, setPhoneStep] = useState<PhoneStep>("request");
   const [error, setError] = useState<string | null>(callbackError);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,6 +89,41 @@ export default function LoginPage() {
     }
   }
 
+  async function handleMagicLink() {
+    setError(null);
+    setMessage(null);
+
+    const email = form.email.trim();
+
+    if (!email) {
+      setError("Enter your email first.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const next = redirectPath === "/" ? "" : `?next=${encodeURIComponent(redirectPath)}`;
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback${next}`,
+        },
+      });
+
+      if (otpError) {
+        setError(otpError.message);
+        return;
+      }
+
+      setMessage("Login link sent. Check your email to continue.");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not send the login link.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   async function handlePhoneSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -117,56 +131,35 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     const phone = normalizePhoneNumber(form.phone);
+    const email = phoneLoginEmailForPhone(phone);
 
-    if (!phone || phone.length < 8) {
+    if (!phone || !email || phone.length < 8) {
       setError("Enter a valid phone number.");
       setIsSubmitting(false);
       return;
     }
 
+    if (!form.phonePassword) {
+      setError("Enter your password.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
-      if (phoneStep === "request") {
-        const response = await fetch("/api/auth/phone/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone }),
-        });
-        const result = (await response.json().catch(() => null)) as { error?: string } | null;
-
-        if (!response.ok) {
-          setError(result?.error || "Could not send the SMS code.");
-          return;
-        }
-
-        setForm((current) => ({ ...current, phone }));
-        setPhoneStep("verify");
-        setMessage(`Code sent to ${phone}.`);
-        return;
-      }
-
-      const token = form.otp.trim();
-
-      if (token.length < 4) {
-        setError("Enter the code sent to your phone.");
-        return;
-      }
-
-      const response = await fetch("/api/auth/phone/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, token }),
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: form.phonePassword,
       });
-      const result = (await response.json().catch(() => null)) as { error?: string } | null;
 
-      if (!response.ok) {
-        setError(result?.error || "Could not verify the SMS code.");
+      if (signInError) {
+        setError(signInError.message);
         return;
       }
 
       router.replace(redirectPath);
       router.refresh();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Phone login request failed.");
+      setError(requestError instanceof Error ? requestError.message : "Phone password login failed.");
     } finally {
       setIsSubmitting(false);
     }
@@ -213,7 +206,7 @@ export default function LoginPage() {
 
           <div className="mt-8 space-y-2">
             <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Log in to BuildFlow</h1>
-            <p className="text-sm text-slate-500">Use your email or get a one-time code by phone.</p>
+            <p className="text-sm text-slate-500">Use email, Google, or phone number with a password.</p>
           </div>
 
           <div className="mt-8 grid grid-cols-2 gap-2 rounded-full bg-slate-100 p-1">
@@ -283,6 +276,15 @@ export default function LoginPage() {
               >
                 {isSubmitting ? "Logging in..." : "Log in"}
               </button>
+
+              <button
+                type="button"
+                onClick={handleMagicLink}
+                disabled={isSubmitting}
+                className="w-full rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSubmitting ? "Sending..." : "Email me a login link"}
+              </button>
             </form>
           ) : (
             <form className="mt-6 space-y-4" onSubmit={handlePhoneSubmit}>
@@ -299,24 +301,20 @@ export default function LoginPage() {
                 />
               </label>
 
-              {phoneStep === "verify" ? (
-                <label className="block text-sm font-medium text-slate-700">
-                  <span className="mb-2 block">Code</span>
-                  <input
-                    required
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    value={form.otp}
-                    onChange={(event) => setForm((current) => ({ ...current, otp: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                    placeholder="Enter SMS code"
-                  />
-                </label>
-              ) : null}
+              <label className="block text-sm font-medium text-slate-700">
+                <span className="mb-2 block">Password</span>
+                <input
+                  required
+                  type="password"
+                  autoComplete="current-password"
+                  value={form.phonePassword}
+                  onChange={(event) => setForm((current) => ({ ...current, phonePassword: event.target.value }))}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                  placeholder="Enter your password"
+                />
+              </label>
 
-              <p className="text-sm text-slate-500">
-                {phoneStep === "request" ? "We will send a one-time SMS code to this phone." : "Enter the code from your text message to finish login."}
-              </p>
+              <p className="text-sm text-slate-500">No SMS provider needed. This uses your phone number and password.</p>
 
               {error ? (
                 <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
@@ -330,23 +328,12 @@ export default function LoginPage() {
                 disabled={isSubmitting}
                 className="w-full rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(2,132,199,0.22)] transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {isSubmitting ? "Working..." : phoneStep === "request" ? "Send code" : "Verify and log in"}
+                {isSubmitting ? "Logging in..." : "Log in with phone"}
               </button>
 
-              {phoneStep === "verify" ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPhoneStep("request");
-                    setForm((current) => ({ ...current, otp: "" }));
-                    setError(null);
-                    setMessage(null);
-                  }}
-                  className="w-full rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                  Use a different number
-                </button>
-              ) : null}
+              <Link href="/signup?mode=phone" className="block text-center text-sm font-medium text-sky-700 hover:text-sky-800">
+                Create a phone login
+              </Link>
             </form>
           )}
 
