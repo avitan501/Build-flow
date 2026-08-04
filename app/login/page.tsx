@@ -41,6 +41,8 @@ export default function LoginPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const redirectPath = sanitizeNextPath(searchParams.get("next"));
+  const nextQuery = redirectPath === "/" ? "" : `?next=${encodeURIComponent(redirectPath)}`;
+  const phoneSignupQuery = redirectPath === "/" ? "?mode=phone" : `?mode=phone&next=${encodeURIComponent(redirectPath)}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -331,7 +333,7 @@ export default function LoginPage() {
                 {isSubmitting ? "Logging in..." : "Log in with phone"}
               </button>
 
-              <Link href="/signup?mode=phone" className="block text-center text-sm font-medium text-sky-700 hover:text-sky-800">
+              <Link href={`/signup${phoneSignupQuery}`} className="block text-center text-sm font-medium text-sky-700 hover:text-sky-800">
                 Create a phone login
               </Link>
             </form>
@@ -355,7 +357,7 @@ export default function LoginPage() {
             <Link href="/reset-password" className="font-medium text-sky-700 hover:text-sky-800">
               Forgot password?
             </Link>
-            <Link href="/signup" className="font-medium text-slate-700 hover:text-slate-950">
+            <Link href={`/signup${nextQuery}`} className="font-medium text-slate-700 hover:text-slate-950">
               Create account
             </Link>
           </div>

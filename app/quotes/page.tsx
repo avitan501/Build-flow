@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { createOrderFromApprovedQuoteAction } from "@/app/orders/actions";
 import { addMaterialsToQuoteAction, approveQuoteAction, createProjectQuoteAction, updateQuoteItemPricingAction } from "@/app/quotes/actions";
+import { ShopCartSuccessCleanup } from "@/components/buildflow/shop-cart-success-cleanup";
 import { requireSignedInProfile } from "@/lib/auth";
 import type { ProjectOrderRecord, ProjectQuoteItemRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
 
@@ -157,6 +158,7 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
 
   return (
     <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
+      <ShopCartSuccessCleanup shouldClear={successCode === "cart-quote-created"} />
       <section className="mx-auto flex max-w-7xl flex-col gap-6">
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">

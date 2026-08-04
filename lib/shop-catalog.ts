@@ -326,7 +326,7 @@ function isSupportedMaterialImageUrl(value: string | null | undefined) {
   const next = value?.trim() || ""
   if (!next) return false
   if (next.startsWith("data:image/")) return true
-  if (/^https?:\/\//i.test(next)) return true
+  if (/^https?:\/\//i.test(next)) return false
   if (next.startsWith("/images/materials/products/") || next.startsWith("/images/materials/products-real/")) return true
   if (!next.startsWith("/images/materials/")) return false
   return !next.endsWith(".svg")

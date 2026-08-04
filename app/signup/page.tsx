@@ -23,6 +23,12 @@ const initialState: FormState = {
 
 type SignupMode = "email" | "phone";
 
+function sanitizeNextPath(value: string | null) {
+  if (!value) return "/";
+  if (!value.startsWith("/") || value.startsWith("//")) return "/";
+  return value;
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,6 +38,8 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const redirectPath = sanitizeNextPath(searchParams.get("next"));
+  const nextQuery = redirectPath === "/" ? "" : `?next=${encodeURIComponent(redirectPath)}`;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,7 +83,7 @@ export default function SignupPage() {
           return;
         }
 
-        router.push("/");
+        router.push(redirectPath);
         router.refresh();
         return;
       }
@@ -122,7 +130,7 @@ export default function SignupPage() {
       }
 
       if (data.session) {
-        router.push("/");
+        router.push(redirectPath);
         router.refresh();
         return;
       }
@@ -141,10 +149,11 @@ export default function SignupPage() {
     setIsSubmitting(true);
 
     try {
+      const next = redirectPath === "/" ? "" : `?next=${encodeURIComponent(redirectPath)}`;
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback${next}`,
         },
       });
 
@@ -282,7 +291,7 @@ export default function SignupPage() {
           </div>
 
           <div className="mt-6 flex items-center justify-between gap-4 text-sm">
-            <Link href="/login" className="font-medium text-sky-700 hover:text-sky-800">
+            <Link href={`/login${nextQuery}`} className="font-medium text-sky-700 hover:text-sky-800">
               Back to login
             </Link>
             <Link href="/reset-password" className="font-medium text-slate-700 hover:text-slate-950">

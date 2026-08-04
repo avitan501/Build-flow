@@ -205,12 +205,12 @@ export function ShopCartExperience({ products, projects, isSignedIn, feedbackCod
                       </select>
                     </label>
                   ) : (
-                    <Link href="/projects/new" className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-sky-200 bg-white px-4 text-sm font-semibold text-sky-700">
+                    <Link href="/projects/new?next=%2Fcart" className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-sky-200 bg-white px-4 text-sm font-semibold text-sky-700">
                       Create project first
                     </Link>
                   )
                 ) : (
-                  <Link href="/login" className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-sky-200 bg-white px-4 text-sm font-semibold text-sky-700">
+                  <Link href="/login?next=%2Fcart" className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-sky-200 bg-white px-4 text-sm font-semibold text-sky-700">
                     Sign in to request quote
                   </Link>
                 )}

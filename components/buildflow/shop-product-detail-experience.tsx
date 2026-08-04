@@ -3,6 +3,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 
 import { recordShopActivity } from "@/app/shop/actions"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
@@ -60,6 +61,7 @@ function BookmarkIcon({ filled = false }: { filled?: boolean }) {
 }
 
 export function ShopProductDetailExperience({ product, relatedProducts }: ShopProductDetailExperienceProps) {
+  const router = useRouter()
   const [quantity, setQuantity] = useState(1)
   const isService = product.productType === "service"
   const [activeImage, setActiveImage] = useState(product.gallery[0]?.imageUrl || product.imageUrl)
@@ -107,6 +109,11 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
       metadata: { quantity },
     })
     setAddedMessage(`Added ${quantity} to cart`)
+  }
+
+  function buyNow() {
+    addToCart()
+    router.push("/cart")
   }
 
   function toggleSaved() {
@@ -268,6 +275,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                       </button>
                       <button
                         type="button"
+                        onClick={buyNow}
                         className="inline-flex min-h-14 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-base font-semibold text-slate-800 shadow-sm"
                       >
                         Buy now
@@ -351,7 +359,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
       </section>
 
       {cartCount > 0 ? (
-        <Link href="/cart" className="fixed bottom-4 left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-3 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_rgba(15,23,42,0.28)]">
+        <Link href="/cart" className="fixed bottom-[calc(env(safe-area-inset-bottom)+6.25rem)] left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-3 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_rgba(15,23,42,0.28)] lg:bottom-4">
           <CartIcon />
           <span>{cartCount} item{cartCount === 1 ? "" : "s"} in cart</span>
         </Link>

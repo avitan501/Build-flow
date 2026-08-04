@@ -5,12 +5,19 @@ import { redirect } from "next/navigation";
 import { requireSignedInProfile } from "@/lib/auth";
 import { createProjectEvent } from "@/lib/projects";
 
+function sanitizeNextPath(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return "/projects";
+  if (!value.startsWith("/") || value.startsWith("//")) return "/projects";
+  return value;
+}
+
 export async function createProjectAction(formData: FormData) {
   const { supabase, user } = await requireSignedInProfile();
 
   const name = String(formData.get("name") || "").trim();
   const rawAddress = String(formData.get("address") || "").trim();
   const address = rawAddress.length > 0 ? rawAddress : null;
+  const nextPath = sanitizeNextPath(formData.get("next"));
 
   if (!name) {
     redirect("/projects/new?error=project-name-required");
@@ -44,5 +51,5 @@ export async function createProjectAction(formData: FormData) {
     metadata: { project_id: createdProject.id },
   });
 
-  redirect("/projects");
+  redirect(nextPath);
 }
