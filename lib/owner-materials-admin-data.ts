@@ -15,7 +15,7 @@ export type OwnerMaterialRowState = {
   markupDollar: number;
   finalUnitPrice: number;
   duplicateKey: string;
-  publishStatus: "Draft" | "Published";
+  publishStatus: "Draft" | "Published" | "Skipped";
   reviewStatus: "Ready" | "Needs review" | "Missing image";
   photoCount: number;
   imageUrl: string;

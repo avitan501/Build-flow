@@ -14,6 +14,10 @@ function mergeUniqueShopItems(primary: ShopItemRecord[] | null | undefined, fall
   return merged.filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index);
 }
 
+function emptyShopResult(data: ShopItemRecord[]) {
+  return { data, error: null, count: null, status: 200, statusText: "OK" };
+}
+
 export async function loadShopItems({ limit = 24 }: LoadShopItemsOptions = {}) {
   const localItems = await getLocalPublishedShopItems();
   const supabase = await createClient();
@@ -31,19 +35,23 @@ export async function loadShopItems({ limit = 24 }: LoadShopItemsOptions = {}) {
     };
   }
 
-  const admin = createAdminClient();
-  const adminResult = await admin
-    .from("shop_items")
-    .select(SHOP_ITEM_SELECT_FIELDS)
-    .order("created_at", { ascending: false })
-    .limit(limit)
-    .returns<ShopItemRecord[]>();
+  try {
+    const admin = createAdminClient();
+    const adminResult = await admin
+      .from("shop_items")
+      .select(SHOP_ITEM_SELECT_FIELDS)
+      .order("created_at", { ascending: false })
+      .limit(limit)
+      .returns<ShopItemRecord[]>();
 
-  if ((adminResult.data?.length ?? 0) > 0 || publicResult.error) {
-    return {
-      ...adminResult,
-      data: mergeUniqueShopItems(adminResult.data, localItems).slice(0, limit),
-    };
+    if ((adminResult.data?.length ?? 0) > 0 || publicResult.error) {
+      return {
+        ...adminResult,
+        data: mergeUniqueShopItems(adminResult.data, localItems).slice(0, limit),
+      };
+    }
+  } catch {
+    if (localItems.length > 0) return emptyShopResult(localItems.slice(0, limit));
   }
 
   return {

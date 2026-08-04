@@ -1,11 +1,35 @@
 import { OwnerMaterialsAdminShell } from "@/components/buildflow/owner-materials-admin-shell";
 import { requireOwnerAccess } from "@/lib/owner-access";
-import { getOwnerMaterialsAdminState } from "@/lib/owner-materials-admin-store";
+import { getOwnerMaterialsAdminState, getOwnerMaterialsStorageStatus } from "@/lib/owner-materials-admin-store";
 
-export default async function OwnerMaterialsPage() {
+type OwnerMaterialsPageProps = {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
+
+function firstSearchValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function OwnerMaterialsPage({ searchParams }: OwnerMaterialsPageProps) {
   await requireOwnerAccess();
 
-  const initialState = await getOwnerMaterialsAdminState();
+  const query = await searchParams;
+  const [initialState, storageStatus] = await Promise.all([
+    getOwnerMaterialsAdminState(),
+    getOwnerMaterialsStorageStatus(),
+  ]);
 
-  return <OwnerMaterialsAdminShell initialState={initialState} />;
+  return (
+    <OwnerMaterialsAdminShell
+      initialState={initialState}
+      storageStatus={storageStatus}
+      initialUrlState={{
+        mode: firstSearchValue(query.mode),
+        batch: firstSearchValue(query.batch),
+        filter: firstSearchValue(query.filter),
+        q: firstSearchValue(query.q),
+        item: firstSearchValue(query.item),
+      }}
+    />
+  );
 }

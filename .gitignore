@@ -35,6 +35,12 @@ preview-*.log
 
 # local generated lead/report artifacts
 /downloads/
+/*.csv
+/*.html
+/*.pdf
+/*.log
+/*.tar
+/*.tar.gz
 /designer_*.csv
 /designer_*.html
 /designer_*.pdf
