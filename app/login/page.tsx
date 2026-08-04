@@ -54,10 +54,11 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
+  const callbackError = searchParams.get("error");
   const [form, setForm] = useState<LoginState>(initialState);
   const [mode, setMode] = useState<LoginMode>("email");
   const [phoneStep, setPhoneStep] = useState<PhoneStep>("request");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(callbackError);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const redirectPath = sanitizeNextPath(searchParams.get("next"));
@@ -350,6 +351,9 @@ export default function LoginPage() {
           )}
 
           <div className="mt-4">
+            {mode !== "email" && error ? (
+              <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+            ) : null}
             <button
               type="button"
               onClick={handleGoogleSignIn}

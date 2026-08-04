@@ -9,10 +9,26 @@ function sanitizeNextPath(value: string | null) {
   return value;
 }
 
+function buildLoginRedirect(origin: string, next: string, errorMessage: string) {
+  const loginUrl = new URL("/login", origin);
+
+  if (next !== "/") {
+    loginUrl.searchParams.set("next", next);
+  }
+
+  loginUrl.searchParams.set("error", errorMessage);
+  return loginUrl;
+}
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const next = sanitizeNextPath(requestUrl.searchParams.get("next"));
+  const oauthError = requestUrl.searchParams.get("error_description") || requestUrl.searchParams.get("error");
+
+  if (oauthError) {
+    return NextResponse.redirect(buildLoginRedirect(requestUrl.origin, next, oauthError));
+  }
 
   if (code) {
     const supabase = await createClient();
@@ -21,7 +37,9 @@ export async function GET(request: Request) {
     if (!error) {
       return NextResponse.redirect(new URL(next, requestUrl.origin));
     }
+
+    return NextResponse.redirect(buildLoginRedirect(requestUrl.origin, next, error.message));
   }
 
-  return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent(next)}`, requestUrl.origin));
+  return NextResponse.redirect(buildLoginRedirect(requestUrl.origin, next, "Missing Google sign-in code. Please try again."));
 }
