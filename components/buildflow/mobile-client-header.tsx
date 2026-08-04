@@ -131,7 +131,10 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
           { href: "/orders", label: "Orders" },
           { href: "/account", label: "Account & Settings" },
         ]
-      : []),
+      : [
+          { href: "/login", label: "Log in" },
+          { href: "/signup", label: "Create account" },
+        ]),
   ], [isPreviewAdminEnabled, isSignedIn]);
 
   const adminLinks = useMemo<MobileMenuLink[]>(() => {
@@ -235,6 +238,12 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
                 <CartIcon />
                 {shopCartCount > 0 ? <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-950">{shopCartCount}</span> : null}
               </IconShell>
+            </Link>
+          ) : null}
+
+          {!isSignedIn && !isShopPage ? (
+            <Link href="/login" prefetch={false} className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200/90 bg-white/95 px-3 text-xs font-bold text-[#0E2A4A] shadow-sm transition active:scale-[0.98]">
+              Log in
             </Link>
           ) : null}
 

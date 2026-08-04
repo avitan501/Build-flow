@@ -7,6 +7,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { createClient } from "@/lib/supabase/client";
+import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 
 type FormState = {
   fullName: string;
@@ -33,7 +34,8 @@ function sanitizeNextPath(value: string | null) {
 export default function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const supabase = useMemo(() => createClient(), []);
+  const hasAuthConfig = hasSupabasePublicEnv();
+  const supabase = useMemo(() => (hasAuthConfig ? createClient() : null), [hasAuthConfig]);
   const [form, setForm] = useState<FormState>(initialState);
   const [mode, setMode] = useState<SignupMode>(searchParams.get("mode") === "phone" ? "phone" : "email");
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +49,12 @@ export default function SignupPage() {
     setError(null);
     setMessage(null);
     setIsSubmitting(true);
+
+    if (!supabase) {
+      setError("Signup is not connected on this preview yet. Add the public Supabase URL and anon key to enable authentication.");
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const phone = normalizePhoneNumber(form.phone);
@@ -149,6 +157,12 @@ export default function SignupPage() {
     setMessage(null);
     setIsSubmitting(true);
 
+    if (!supabase) {
+      setError("Google sign-in is not connected on this preview yet. Add the public Supabase URL and anon key to enable authentication.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const next = redirectPath === "/" ? "" : `?next=${encodeURIComponent(redirectPath)}`;
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
@@ -180,6 +194,12 @@ export default function SignupPage() {
             <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Create account</h1>
             <p className="text-sm text-slate-500">Create an email account or a free phone-number password login.</p>
           </div>
+
+          {!hasAuthConfig ? (
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800">
+              Auth is not connected on this preview yet. The page is visible, but signup needs the public Supabase URL and anon key.
+            </div>
+          ) : null}
 
           <div className="mt-8 grid grid-cols-2 gap-2 rounded-full bg-slate-100 p-1">
             <button

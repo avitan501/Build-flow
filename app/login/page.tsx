@@ -7,6 +7,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { createClient } from "@/lib/supabase/client";
+import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 
 type LoginState = {
   email: string;
@@ -34,7 +35,8 @@ function sanitizeNextPath(value: string | null) {
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const supabase = useMemo(() => createClient(), []);
+  const hasAuthConfig = hasSupabasePublicEnv();
+  const supabase = useMemo(() => (hasAuthConfig ? createClient() : null), [hasAuthConfig]);
   const callbackError = searchParams.get("error");
   const [form, setForm] = useState<LoginState>(initialState);
   const [mode, setMode] = useState<LoginMode>("email");
@@ -49,6 +51,10 @@ export default function LoginPage() {
     let cancelled = false;
 
     async function redirectIfSignedIn() {
+      if (!supabase) {
+        return;
+      }
+
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -71,6 +77,12 @@ export default function LoginPage() {
     setError(null);
     setMessage(null);
     setIsSubmitting(true);
+
+    if (!supabase) {
+      setError("Login is not connected on this preview yet. Add the public Supabase URL and anon key to enable authentication.");
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -103,6 +115,11 @@ export default function LoginPage() {
       return;
     }
 
+    if (!supabase) {
+      setError("Login is not connected on this preview yet. Add the public Supabase URL and anon key to enable authentication.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -132,6 +149,12 @@ export default function LoginPage() {
     setError(null);
     setMessage(null);
     setIsSubmitting(true);
+
+    if (!supabase) {
+      setError("Login is not connected on this preview yet. Add the public Supabase URL and anon key to enable authentication.");
+      setIsSubmitting(false);
+      return;
+    }
 
     const phone = normalizePhoneNumber(form.phone);
     const email = phoneLoginEmailForPhone(phone);
@@ -173,6 +196,12 @@ export default function LoginPage() {
     setMessage(null);
     setIsSubmitting(true);
 
+    if (!supabase) {
+      setError("Google sign-in is not connected on this preview yet. Add the public Supabase URL and anon key to enable authentication.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const next = redirectPath === "/" ? "" : `?next=${encodeURIComponent(redirectPath)}`;
       const redirectTo = `${window.location.origin}/auth/callback${next}`;
@@ -205,6 +234,12 @@ export default function LoginPage() {
             <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Log in to Avantia Build</h1>
             <p className="text-sm text-slate-500">Use email, Google, or phone number with a password.</p>
           </div>
+
+          {!hasAuthConfig ? (
+            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800">
+              Auth is not connected on this preview yet. The page is visible, but login needs the public Supabase URL and anon key.
+            </div>
+          ) : null}
 
           <div className="mt-8 grid grid-cols-2 gap-2 rounded-full bg-slate-100 p-1">
             <button

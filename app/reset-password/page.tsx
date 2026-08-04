@@ -6,12 +6,14 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { createClient } from "@/lib/supabase/client";
+import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 
 type ResetState = "loading" | "request" | "ready" | "success" | "error";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
+  const hasAuthConfig = hasSupabasePublicEnv();
+  const supabase = useMemo(() => (hasAuthConfig ? createClient() : null), [hasAuthConfig]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -23,6 +25,14 @@ export default function ResetPasswordPage() {
     let cancelled = false;
 
     async function initializeRecovery() {
+      if (!supabase) {
+        if (!cancelled) {
+          setStatus("request");
+          setMessage("Password reset is not connected on this preview yet. Add the public Supabase URL and anon key to enable authentication.");
+        }
+        return;
+      }
+
       try {
         const hash = window.location.hash;
         const params = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
@@ -86,6 +96,13 @@ export default function ResetPasswordPage() {
     setIsSubmitting(true);
     setMessage(null);
 
+    if (!supabase) {
+      setStatus("error");
+      setMessage("Password reset is not connected on this preview yet. Add the public Supabase URL and anon key to enable authentication.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
@@ -122,6 +139,13 @@ export default function ResetPasswordPage() {
 
     setIsSubmitting(true);
     setMessage(null);
+
+    if (!supabase) {
+      setStatus("error");
+      setMessage("Password reset is not connected on this preview yet. Add the public Supabase URL and anon key to enable authentication.");
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const { error } = await supabase.auth.updateUser({ password });

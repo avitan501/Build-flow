@@ -70,6 +70,7 @@ function FeatureIcon({ type }: { type: (typeof featureCards)[number]["icon"] }) 
 
 export default async function Home() {
   const { user, profile } = await getSessionWithProfile()
+  const isSignedIn = Boolean(user)
   const isOwner = Boolean(
     user &&
       isOwnerIdentity({
@@ -115,6 +116,16 @@ export default async function Home() {
                 <Link href="/shop" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-100 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm active:scale-[0.99]">
                   Open Shop
                 </Link>
+                {!isSignedIn ? (
+                  <>
+                    <Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-[#0E2A4A] shadow-sm active:scale-[0.99]">
+                      Log in
+                    </Link>
+                    <Link href="/signup" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.94))] px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm active:scale-[0.99]">
+                      Create account
+                    </Link>
+                  </>
+                ) : null}
                 {isOwner ? (
                   <Link href="/owner/materials" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-[#0e2341] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(14,35,65,0.18)] active:scale-[0.99]">
                     Add Materials
