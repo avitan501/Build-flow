@@ -1,11 +1,23 @@
 import Link from "next/link";
 
+import { updateAccountPhone } from "@/app/account/actions";
 import type { ProfileRecord } from "@/lib/auth";
 import { AccountSignOutButton } from "@/components/buildflow/account-sign-out-button";
 
 type AccountSettingsProps = {
   email: string | null;
   profile: ProfileRecord | null;
+  feedbackCode?: string | null;
+  feedbackTone?: "success" | "error" | null;
+};
+
+const errorMessages: Record<string, string> = {
+  phone: "Enter a valid phone number.",
+  profile: "Phone number could not be saved. Please try again.",
+};
+
+const successMessages: Record<string, string> = {
+  phone: "Phone number saved.",
 };
 
 function SectionCard({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
@@ -43,10 +55,59 @@ function ToggleRow({ label, description }: { label: string; description: string 
   );
 }
 
-export function AccountSettings({ email, profile }: AccountSettingsProps) {
+function PaymentMethodOption({ title, description, details, icon }: { title: string; description: string; details: string; icon: React.ReactNode }) {
+  return (
+    <div className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-4">
+      <div className="flex items-start gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-sky-700 shadow-sm">
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+          <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
+          <p className="mt-2 text-xs leading-5 text-slate-500">{details}</p>
+        </div>
+      </div>
+      <button type="button" disabled className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-400 shadow-sm">
+        Secure setup pending
+      </button>
+    </div>
+  );
+}
+
+function CardIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <path d="M3 10h18" />
+      <path d="M7 15h3" />
+    </svg>
+  );
+}
+
+function BankIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 10h16" />
+      <path d="M6 10v8" />
+      <path d="M10 10v8" />
+      <path d="M14 10v8" />
+      <path d="M18 10v8" />
+      <path d="M3 18h18" />
+      <path d="M12 4 4 8h16l-8-4Z" />
+    </svg>
+  );
+}
+
+export function AccountSettings({ email, profile, feedbackCode, feedbackTone }: AccountSettingsProps) {
   const displayName = profile?.full_name || "BuildFlow client";
   const phone = profile?.phone || "Not added yet";
   const emailValue = email || profile?.email || "Not available";
+  const feedbackText = feedbackCode
+    ? feedbackTone === "error"
+      ? errorMessages[feedbackCode] || "Account could not be updated."
+      : successMessages[feedbackCode] || "Account updated."
+    : null;
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#eff6ff_0%,#f8fbff_48%,#ffffff_100%)] px-4 py-6 sm:px-6 sm:py-8">
@@ -70,6 +131,12 @@ export function AccountSettings({ email, profile }: AccountSettingsProps) {
           </div>
         </section>
 
+        {feedbackText ? (
+          <div className={`rounded-[24px] border px-4 py-3 text-sm font-semibold ${feedbackTone === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+            {feedbackText}
+          </div>
+        ) : null}
+
         <div className="grid gap-4 lg:grid-cols-2">
           <SectionCard title="My Account" description="Overview and quick access to your BuildFlow workspace.">
             <div className="space-y-3">
@@ -79,12 +146,27 @@ export function AccountSettings({ email, profile }: AccountSettingsProps) {
             </div>
           </SectionCard>
 
-          <SectionCard title="Personal Information" description="Your existing account details, without changing auth behavior.">
-            <div className="space-y-3">
+          <SectionCard title="Personal Information" description="Save the phone number used for project and delivery coordination.">
+            <form action={updateAccountPhone} className="space-y-3">
               <ItemRow label="Full name" value={displayName} />
-              <ItemRow label="Phone number" value={phone} />
               <ItemRow label="Email" value={emailValue} />
-            </div>
+              <div>
+                <label htmlFor="phone" className="text-sm font-semibold text-slate-900">Phone number</label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  defaultValue={profile?.phone || ""}
+                  placeholder="+1 555 123 4567"
+                  autoComplete="tel"
+                  className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                />
+                <p className="mt-2 text-xs leading-5 text-slate-500">We normalize phone numbers for account display and project contact records.</p>
+              </div>
+              <button type="submit" className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(2,132,199,0.18)] transition hover:bg-sky-700">
+                Save phone number
+              </button>
+            </form>
           </SectionCard>
 
           <SectionCard title="Addresses" description="Save project and job addresses here later for quick project setup.">
@@ -110,9 +192,23 @@ export function AccountSettings({ email, profile }: AccountSettingsProps) {
             </div>
           </SectionCard>
 
-          <SectionCard title="Payment Methods / Wallet" description="Payments stay off until a protected provider is approved and connected.">
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-4 text-sm text-slate-600">
-              Secure payment methods will be connected through a protected payment provider.
+          <SectionCard title="Payment Methods / Wallet" description="Choose how this account should set up secure payments.">
+            <div className="space-y-3">
+              <PaymentMethodOption
+                title="Credit card"
+                description="Add a card for material orders and approved project charges."
+                details="Card entry must happen in a secure provider form. BuildFlow should only save the provider token and last 4 digits."
+                icon={<CardIcon />}
+              />
+              <PaymentMethodOption
+                title="ACH bank account"
+                description="Add a bank account option for larger orders or account billing."
+                details="Bank details must be verified through a provider flow. BuildFlow should not store full account or routing numbers."
+                icon={<BankIcon />}
+              />
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+                Payment setup is visible now, but secure entry is disabled until Stripe SetupIntents or another approved payment provider is connected.
+              </div>
             </div>
           </SectionCard>
 
