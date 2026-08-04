@@ -27,6 +27,7 @@ export async function GET(request: Request) {
   const oauthError = requestUrl.searchParams.get("error_description") || requestUrl.searchParams.get("error");
 
   if (oauthError) {
+    console.warn("Google OAuth callback returned an error", { error: oauthError, next });
     return NextResponse.redirect(buildLoginRedirect(requestUrl.origin, next, oauthError));
   }
 
@@ -38,8 +39,10 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(next, requestUrl.origin));
     }
 
+    console.warn("Google OAuth session exchange failed", { error: error.message, next });
     return NextResponse.redirect(buildLoginRedirect(requestUrl.origin, next, error.message));
   }
 
+  console.warn("Google OAuth callback missing code", { next });
   return NextResponse.redirect(buildLoginRedirect(requestUrl.origin, next, "Missing Google sign-in code. Please try again."));
 }
