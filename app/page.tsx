@@ -93,12 +93,12 @@ export default async function Home() {
     <main className="min-h-screen overflow-x-clip bg-[linear-gradient(180deg,#f7fbff_0%,#eef6ff_45%,#ffffff_100%)] text-slate-900">
       <RecoveryLinkHandler />
 
-      <section className="relative mx-auto flex min-h-screen max-w-4xl flex-col gap-5 px-4 pb-28 pt-4 sm:gap-6 sm:px-8 sm:pb-12 sm:pt-8">
+      <section className="relative mx-auto flex min-h-screen max-w-6xl flex-col gap-5 px-4 pb-32 pt-4 sm:gap-6 sm:px-8 sm:pb-14 sm:pt-8 lg:gap-7 lg:px-10 lg:pb-14 lg:pt-10">
         <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(circle_at_top,_rgba(125,211,252,0.18),_transparent_58%)]" />
 
-        <section className="overflow-hidden rounded-[32px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,247,255,0.92))] shadow-[0_20px_50px_rgba(148,163,184,0.12)]">
-          <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-            <div>
+        <section className="overflow-hidden rounded-[32px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(239,247,255,0.94))] shadow-[0_24px_60px_rgba(148,163,184,0.14)] lg:rounded-[34px]">
+          <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch lg:gap-8 lg:p-8 xl:p-10">
+            <div className="flex flex-col justify-center">
               <div className="inline-flex items-center gap-3 rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,246,255,0.9))] px-3 py-3 shadow-[0_12px_28px_rgba(148,163,184,0.1)]">
                 <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#0e2341_0%,#1a4b86_100%)] text-sm font-semibold tracking-[0.18em] text-white shadow-[0_10px_24px_rgba(14,35,65,0.2)]">
                   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -113,29 +113,41 @@ export default async function Home() {
                 </div>
               </div>
               <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Built for builders</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2.4rem]">
+              <h1 className="mt-3 max-w-2xl text-4xl font-semibold leading-[1.02] tracking-tight text-slate-950 sm:text-[3.2rem] lg:text-[4.35rem]">
                 The problem solver for the builder
               </h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">
+              <p className="mt-4 max-w-xl text-base leading-7 text-slate-600 lg:text-lg lg:leading-8">
                 A cleaner way to start a job, choose materials by trade, keep the project address connected, and move decisions forward.
               </p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <Link href={startHref} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] active:scale-[0.99]">
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link href={startHref} className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-5 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] active:scale-[0.99]">
                   Start Building
                 </Link>
-                <Link href="/shop" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm active:scale-[0.99]">
+                <Link href="/shop" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-100 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm active:scale-[0.99]">
                   Open Shop
                 </Link>
                 {isOwner ? (
-                  <Link href="/owner/materials" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-[#0e2341] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(14,35,65,0.18)] active:scale-[0.99]">
+                  <Link href="/owner/materials" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-[#0e2341] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(14,35,65,0.18)] active:scale-[0.99]">
                     Add Materials
                   </Link>
                 ) : null}
               </div>
+              <div className="mt-8 grid max-w-2xl gap-3 sm:grid-cols-3">
+                {[
+                  ["01", "Start the project"],
+                  ["02", "Pick materials"],
+                  ["03", "Approve and order"],
+                ].map(([step, label]) => (
+                  <div key={step} className="rounded-[22px] border border-sky-100 bg-white/75 px-4 py-3 shadow-[0_12px_28px_rgba(148,163,184,0.08)]">
+                    <p className="text-xs font-semibold text-sky-700">{step}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">{label}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div
-              className="relative min-h-[260px] overflow-hidden rounded-[28px] border border-sky-100/80 shadow-[0_18px_42px_rgba(15,23,42,0.16)]"
+              className="relative min-h-[280px] overflow-hidden rounded-[28px] border border-sky-100/80 shadow-[0_18px_42px_rgba(15,23,42,0.16)] lg:min-h-[430px]"
               style={{
                 backgroundImage: `linear-gradient(180deg, rgba(14,35,65,0.08) 0%, rgba(14,35,65,0.34) 48%, rgba(14,35,65,0.76) 100%), url(${heroImage})`,
                 backgroundSize: "cover",
@@ -167,7 +179,7 @@ export default async function Home() {
           {featureCards.map((card) => (
             <article key={card.title} className="overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
               <div
-                className="relative min-h-[148px]"
+                className="relative min-h-[168px] lg:min-h-[190px]"
                 style={{
                   backgroundImage: `linear-gradient(180deg, rgba(14,35,65,0.08) 0%, rgba(14,35,65,0.5) 100%), url(${card.image})`,
                   backgroundSize: "cover",

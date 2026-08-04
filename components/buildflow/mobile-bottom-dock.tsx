@@ -111,8 +111,8 @@ export function MobileBottomDock({ projectsHref }: MobileBottomDockProps) {
 
   return (
     <>
-      <div aria-hidden="true" className="h-[5.25rem]" />
-      <div className={`pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+0.35rem)] left-1/2 z-50 w-[calc(100%-1rem)] max-w-[29rem] -translate-x-1/2 px-2 transition-all duration-200 ${isVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}>
+      <div aria-hidden="true" className="h-[6.5rem] lg:hidden" />
+      <div className={`pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+0.35rem)] left-1/2 z-50 w-[calc(100%-1rem)] max-w-[29rem] -translate-x-1/2 px-2 transition-all duration-200 lg:hidden ${isVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}>
         <nav
           aria-label="Mobile homepage"
           className={`relative flex w-full items-center justify-between gap-1 overflow-hidden rounded-[24px] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(240,247,255,0.18))] px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.68),inset_0_-12px_20px_rgba(255,255,255,0.08),0_18px_34px_rgba(15,23,42,0.12),0_6px_16px_rgba(148,163,184,0.12)] backdrop-blur-[26px] [backdrop-filter:blur(26px)_saturate(145%)] ${isVisible ? "pointer-events-auto" : "pointer-events-none"}`}
