@@ -39,7 +39,7 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
   const allSelected = props.rows.length > 0 && props.rows.every((row) => props.selectedRowIds.includes(row.id));
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <div className="hidden overflow-hidden rounded-[24px] border border-slate-200 lg:block">
         <div className="max-h-[70vh] overflow-auto">
           <table className="min-w-[1120px] w-full border-separate border-spacing-0 text-left text-sm">
@@ -49,8 +49,10 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
                 <th className="px-4 py-3">Item no</th>
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3">Category</th>
+                <th className="px-4 py-3">Qty</th>
                 <th className="px-4 py-3">Unit</th>
-                <th className="px-4 py-3">Unit price</th>
+                <th className="px-4 py-3">Cost</th>
+                <th className="px-4 py-3">Sell</th>
                 <th className="px-4 py-3">Photo</th>
                 <th className="px-4 py-3">Publish</th>
                 <th className="px-4 py-3">Actions</th>
@@ -65,7 +67,7 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
                     <div className="text-xs text-slate-500">{row.supplier}</div>
                   </td>
                   <td className="px-4 py-4 align-top">
-                    <div className="font-medium text-slate-950">{row.description}</div>
+                    <div className="max-w-[320px] break-words font-medium text-slate-950">{row.description}</div>
                     {row.error ? <div className="mt-1 text-xs text-rose-600">{row.error}</div> : null}
                   </td>
                   <td className="px-4 py-4 align-top">
@@ -77,8 +79,10 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
                       {props.categoryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                     </select>
                   </td>
+                  <td className="px-4 py-4 align-top tabular-nums">{row.qty}</td>
                   <td className="px-4 py-4 align-top">{row.unit}</td>
-                  <td className="px-4 py-4 align-top">${row.finalUnitPrice.toFixed(2)}</td>
+                  <td className="px-4 py-4 align-top tabular-nums">${row.supplierUnitPrice.toFixed(2)}</td>
+                  <td className="px-4 py-4 align-top tabular-nums">${row.finalUnitPrice.toFixed(2)}</td>
                   <td className="px-4 py-4 align-top">
                     <div className="space-y-2">
                       <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusTone(row.photoCount > 0 ? "Ready" : "Missing image")}`}>
@@ -122,14 +126,14 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
         {props.rows.map((row) => (
           <article key={row.id} className={`rounded-[24px] border p-4 shadow-sm ${props.editingRowId === row.id ? "border-sky-300 bg-sky-50/60" : "border-slate-200 bg-white"}`}>
             <div className="flex items-start justify-between gap-3">
-              <label className="flex items-start gap-3">
+              <label className="flex min-w-0 items-start gap-3">
                 <input type="checkbox" checked={props.selectedRowIds.includes(row.id)} onChange={() => props.onToggleRow(row.id)} className="mt-1" />
-                <div>
-                  <div className="text-sm font-semibold text-slate-950">{row.description}</div>
-                  <div className="text-xs text-slate-500">{row.itemNo || "—"} • {row.sku}</div>
+                <div className="min-w-0">
+                  <div className="break-words text-sm font-semibold text-slate-950">{row.description}</div>
+                  <div className="mt-1 break-words text-xs text-slate-500">{row.itemNo || "—"} • {row.sku}</div>
                 </div>
               </label>
-              <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusTone(row.publishStatus)}`}>{row.publishStatus}</span>
+              <span className={`inline-flex shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${statusTone(row.publishStatus)}`}>{row.publishStatus}</span>
             </div>
 
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -146,8 +150,10 @@ export function OwnerMaterialsAdminTable(props: OwnerMaterialsAdminTableProps) {
                 </dd>
               </div>
               <div><dt className="text-xs uppercase tracking-wide text-slate-500">Supplier</dt><dd className="mt-1 font-medium text-slate-900">{row.supplier}</dd></div>
+              <div><dt className="text-xs uppercase tracking-wide text-slate-500">Qty</dt><dd className="mt-1 font-medium text-slate-900">{row.qty}</dd></div>
               <div><dt className="text-xs uppercase tracking-wide text-slate-500">Unit</dt><dd className="mt-1 font-medium text-slate-900">{row.unit}</dd></div>
-              <div><dt className="text-xs uppercase tracking-wide text-slate-500">Unit price</dt><dd className="mt-1 font-medium text-slate-900">${row.finalUnitPrice.toFixed(2)}</dd></div>
+              <div><dt className="text-xs uppercase tracking-wide text-slate-500">Cost</dt><dd className="mt-1 font-medium text-slate-900">${row.supplierUnitPrice.toFixed(2)}</dd></div>
+              <div><dt className="text-xs uppercase tracking-wide text-slate-500">Sell</dt><dd className="mt-1 font-medium text-slate-900">${row.finalUnitPrice.toFixed(2)}</dd></div>
               <div><dt className="text-xs uppercase tracking-wide text-slate-500">Photo</dt><dd className="mt-1 font-medium text-slate-900">{row.photoCount > 0 ? `${row.photoCount} photo` : "Missing image"}</dd></div>
               <div><dt className="text-xs uppercase tracking-wide text-slate-500">Review</dt><dd className="mt-1 font-medium text-slate-900">{row.reviewStatus}</dd></div>
             </dl>

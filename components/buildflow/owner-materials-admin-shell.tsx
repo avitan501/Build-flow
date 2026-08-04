@@ -12,6 +12,14 @@ function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
+function roundCurrency(value: number) {
+  return Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
+}
+
+function isPlaceholderImageUrl(value: string) {
+  return /(^|\.)example\.com\//i.test(value.trim());
+}
+
 const tabs = ["All Materials", "Published", "Unpublished", "Needs Review", "Missing Images"] as const;
 type TabKey = (typeof tabs)[number];
 
@@ -138,11 +146,30 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
               rows: batch.rows.map((row) => {
                 if (row.id !== rowId) return row;
                 const category = nextSuggestedCategory(row, patch);
-                const next = { ...row, ...patch, category, imageCategory: category };
-                const finalUnitPrice = Number(next.finalUnitPrice || 0);
-                const photoCount = next.photoCount || 0;
+                const patched = { ...row, ...patch, category, imageCategory: category };
+                const supplierUnitPrice = Number(patched.supplierUnitPrice || 0);
+                const markupPercent = Number(patched.markupPercent || 0);
+                let markupDollar = Number(patched.markupDollar || 0);
+                let finalUnitPrice = Number(patched.finalUnitPrice || 0);
+
+                if (
+                  ("supplierUnitPrice" in patch || "markupPercent" in patch || "markupDollar" in patch) &&
+                  !("finalUnitPrice" in patch)
+                ) {
+                  finalUnitPrice = roundCurrency(supplierUnitPrice * (1 + markupPercent / 100) + markupDollar);
+                }
+
+                if ("finalUnitPrice" in patch && !("markupDollar" in patch)) {
+                  markupDollar = roundCurrency(finalUnitPrice - supplierUnitPrice * (1 + markupPercent / 100));
+                }
+
+                finalUnitPrice = roundCurrency(finalUnitPrice);
+                const photoCount = patched.photoCount || 0;
                 return {
-                  ...next,
+                  ...patched,
+                  supplierUnitPrice,
+                  markupPercent,
+                  markupDollar,
                   finalUnitPrice,
                   reviewStatus: photoCount > 0 && finalUnitPrice > 0 ? "Ready" : finalUnitPrice > 0 ? "Missing image" : "Needs review",
                   error: undefined,
@@ -292,6 +319,15 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
       setNotice("Select at least one material to publish.");
       return;
     }
+
+    const selectedRows = rows.filter((row) => rowIds.includes(row.id));
+    const placeholderImages = selectedRows.filter((row) => row.imageUrl && isPlaceholderImageUrl(row.imageUrl));
+    if (placeholderImages.length > 0) {
+      setNoticeTone("error");
+      setNotice(`${placeholderImages.length} item(s) still use a placeholder image URL. Replace or clear the image before publishing.`);
+      return;
+    }
+
     startTransition(async () => {
       const result = await publishOwnerMaterialsSelection(state, activeBatch.id, rowIds);
       setState(result.state);
@@ -324,30 +360,33 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
     setNotice("Material loaded into the editor.");
   }
 
+  const editingIssues = editingRow
+    ? [
+        !editingRow.description.trim() ? "Add a description." : null,
+        !editingRow.category.trim() ? "Choose a category." : null,
+        !editingRow.unit.trim() ? "Add a unit." : null,
+        editingRow.qty <= 0 ? "Quantity must be more than 0." : null,
+        editingRow.finalUnitPrice <= 0 ? "Sell price must be more than $0." : null,
+        editingRow.imageUrl && isPlaceholderImageUrl(editingRow.imageUrl) ? "Replace the placeholder image URL." : null,
+      ].filter((issue): issue is string => Boolean(issue))
+    : [];
+
+  const canPublishEditingRow = editingRow ? editingIssues.length === 0 : false;
+
   return (
-    <main className="min-h-screen bg-[#f3f6fb] px-3 py-4 text-slate-900 sm:px-6 sm:py-8">
-      <section className="mx-auto w-full max-w-[1720px] space-y-4">
+    <main className="min-h-screen overflow-x-hidden bg-[#f3f6fb] px-3 py-4 text-slate-900 sm:px-6 sm:py-8">
+      <section className="mx-auto w-full max-w-[1720px] min-w-0 space-y-4">
         <section className="rounded-[30px] border border-[#d7e2f2] bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">Material Admin</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">PDF → review items → edit → publish</h1>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Upload supplier PDFs, review extracted items, edit what matters, and publish ready materials to the shop.</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Add materials, review, publish</h1>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Create or clean up material items, add pricing and images, then publish ready rows to the shop.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <label className="inline-flex cursor-pointer items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-                Add / upload PDF
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0]
-                    setNoticeTone("info")
-                    setNotice(file ? `${file.name} added. PDF import is ready for review workflow.` : "PDF import is ready for review workflow.")
-                  }}
-                />
-              </label>
+              <button type="button" disabled className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-400" title="PDF extraction is not connected yet.">
+                PDF import pending
+              </button>
               <button type="button" onClick={handleAddMaterial} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Add material</button>
               <button type="button" onClick={exportCsv} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Export CSV</button>
               <button type="button" onClick={restoreBatches} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Restore batches</button>
@@ -365,7 +404,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
                 ))}
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+            <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3">
               <div className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4"><div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Items</div><div className="mt-2 text-2xl font-semibold text-slate-950">{counts.total}</div></div>
               <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 p-4"><div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Published</div><div className="mt-2 text-2xl font-semibold text-slate-950">{counts.published}</div></div>
               <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-4"><div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Needs review</div><div className="mt-2 text-2xl font-semibold text-slate-950">{counts.needsReview}</div></div>
@@ -381,10 +420,10 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
               <h2 className="text-xl font-semibold text-slate-950">Quote batches</h2>
               <p className="mt-1 text-sm text-slate-500">Select a restored quote batch to review its extracted material items.</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-5">
+            <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
               <label className="grid gap-2 text-sm text-slate-700">
                 <span className="font-medium">Batch</span>
-                <select value={state.selectedBatchId} onChange={(event) => setSelectedBatch(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none">
+                <select value={state.selectedBatchId} onChange={(event) => setSelectedBatch(event.target.value)} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none">
                   {batches.map((batch) => (
                     <option key={batch.id} value={batch.id}>{batch.supplier} • {batch.quoteNumber}</option>
                   ))}
@@ -392,23 +431,23 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
               </label>
               <label className="grid gap-2 text-sm text-slate-700">
                 <span className="font-medium">Search</span>
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search items" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none placeholder:text-slate-400" />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search items" className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none placeholder:text-slate-400" />
               </label>
               <label className="grid gap-2 text-sm text-slate-700">
                 <span className="font-medium">Category</span>
-                <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
+                <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
                   {categories.map((option) => <option key={option}>{option}</option>)}
                 </select>
               </label>
               <label className="grid gap-2 text-sm text-slate-700">
                 <span className="font-medium">Supplier</span>
-                <select value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
+                <select value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
                   {suppliers.map((option) => <option key={option}>{option}</option>)}
                 </select>
               </label>
               <label className="grid gap-2 text-sm text-slate-700">
                 <span className="font-medium">Status</span>
-                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
+                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none">
                   {statuses.map((option) => <option key={option}>{option}</option>)}
                 </select>
               </label>
@@ -428,7 +467,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
             <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-600">{selectedRowIds.length} selected</div>
           </div>
 
-          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(280px,0.7fr)_minmax(0,1.4fr)_minmax(320px,0.9fr)]">
+          <div className="mt-4 grid min-w-0 gap-4 2xl:grid-cols-[minmax(280px,0.7fr)_minmax(0,1.4fr)_minmax(320px,0.9fr)]">
             <article className="rounded-[24px] border border-slate-200 bg-slate-50/60 p-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">Restored batches</div>
               <div className="mt-3 space-y-3">
@@ -454,7 +493,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
               </div>
             </article>
 
-            <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+            <div className="min-w-0 rounded-[24px] border border-slate-200 bg-white p-4">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-950">{activeBatch?.supplier} items</h2>
@@ -479,7 +518,7 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
               />
             </div>
 
-            <section className="rounded-[24px] border border-slate-200 bg-white p-5">
+            <section className="min-w-0 rounded-[24px] border border-slate-200 bg-white p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Edit item</div>
@@ -490,26 +529,46 @@ export function OwnerMaterialsAdminShell({ initialState }: { initialState: Owner
 
               {editingRow ? (
                 <div className="mt-5 grid gap-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Item no</span><input value={editingRow.itemNo} onChange={(event) => updateRow(editingRow.id, { itemNo: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Unit</span><input value={editingRow.unit} onChange={(event) => updateRow(editingRow.id, { unit: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                  {editingIssues.length > 0 ? (
+                    <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      <div className="font-semibold">Before publishing</div>
+                      <ul className="mt-2 list-disc space-y-1 pl-5">
+                        {editingIssues.map((issue) => <li key={issue}>{issue}</li>)}
+                      </ul>
+                    </div>
+                  ) : (
+                    <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">This item is ready to publish.</div>
+                  )}
+
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Item no</span><input value={editingRow.itemNo} onChange={(event) => updateRow(editingRow.id, { itemNo: event.target.value })} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Quantity</span><input type="number" min="0" step="0.01" value={editingRow.qty} onChange={(event) => updateRow(editingRow.id, { qty: Number(event.target.value) })} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Unit</span><input value={editingRow.unit} onChange={(event) => updateRow(editingRow.id, { unit: event.target.value })} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
                   </div>
-                  <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Description / Name</span><input value={editingRow.description} onChange={(event) => updateRow(editingRow.id, { description: event.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                  <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Description / Name</span><input value={editingRow.description} onChange={(event) => updateRow(editingRow.id, { description: event.target.value })} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Category</span><select value={editingRow.category} onChange={(event) => updateRow(editingRow.id, { category: event.target.value as ShopCategoryName })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">{SHOP_CATEGORY_NAMES.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Unit price</span><input type="number" step="0.01" value={editingRow.finalUnitPrice} onChange={(event) => updateRow(editingRow.id, { finalUnitPrice: Number(event.target.value) })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Category</span><select value={editingRow.category} onChange={(event) => updateRow(editingRow.id, { category: event.target.value as ShopCategoryName })} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">{SHOP_CATEGORY_NAMES.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Supplier</span><input value={editingRow.supplier} onChange={(event) => updateRow(editingRow.id, { supplier: event.target.value })} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
                   </div>
-                  <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Photo URL / label</span><input value={editingRow.imageUrl} onChange={(event) => updateRow(editingRow.id, { imageUrl: event.target.value, photoCount: event.target.value.trim() ? 1 : 0, galleryCount: event.target.value.trim() ? 1 : 0 })} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
-                  <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Notes</span><textarea value={editingRow.notes ?? ""} onChange={(event) => updateRow(editingRow.id, { notes: event.target.value })} rows={4} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                  <div className="grid gap-4 sm:grid-cols-4">
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Supplier cost</span><input type="number" min="0" step="0.01" value={editingRow.supplierUnitPrice} onChange={(event) => updateRow(editingRow.id, { supplierUnitPrice: Number(event.target.value) })} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Markup %</span><input type="number" step="0.01" value={editingRow.markupPercent} onChange={(event) => updateRow(editingRow.id, { markupPercent: Number(event.target.value) })} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Markup $</span><input type="number" step="0.01" value={editingRow.markupDollar} onChange={(event) => updateRow(editingRow.id, { markupDollar: Number(event.target.value) })} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                    <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Sell price</span><input type="number" min="0" step="0.01" value={editingRow.finalUnitPrice} onChange={(event) => updateRow(editingRow.id, { finalUnitPrice: Number(event.target.value) })} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                  </div>
+                  <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Photo URL / label</span><input value={editingRow.imageUrl} onChange={(event) => updateRow(editingRow.id, { imageUrl: event.target.value, photoCount: event.target.value.trim() ? 1 : 0, galleryCount: event.target.value.trim() ? 1 : 0 })} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
+                  <label className="grid gap-2 text-sm text-slate-700"><span className="font-medium">Notes</span><textarea value={editingRow.notes ?? ""} onChange={(event) => updateRow(editingRow.id, { notes: event.target.value })} rows={4} className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" /></label>
 
                   <div className="grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    <div className="flex flex-wrap items-center justify-between gap-3"><span>Extended cost</span><strong className="text-slate-950">{money(editingRow.qty * editingRow.supplierUnitPrice)}</strong></div>
                     <div className="flex flex-wrap items-center justify-between gap-3"><span>Extended sell</span><strong className="text-slate-950">{money(editingRow.qty * editingRow.finalUnitPrice)}</strong></div>
+                    <div className="flex flex-wrap items-center justify-between gap-3"><span>Gross margin</span><strong className="text-slate-950">{money(editingRow.qty * (editingRow.finalUnitPrice - editingRow.supplierUnitPrice))}</strong></div>
                     <div className="flex flex-wrap items-center justify-between gap-3"><span>Review status</span><strong className="text-slate-950">{editingRow.reviewStatus}</strong></div>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
                     <button type="button" onClick={saveStateToServer} disabled={isPending} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Save</button>
-                    <button type="button" onClick={() => publishSelection([editingRow.id])} disabled={isPending} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Publish item</button>
+                    <button type="button" onClick={() => publishSelection([editingRow.id])} disabled={isPending || !canPublishEditingRow} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">Publish item</button>
                     <button type="button" onClick={() => handleAddPhoto(editingRow.id)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">{editingRow.photoCount > 0 ? "Replace photo" : "Add photo"}</button>
                     {editingRow.photoCount > 0 ? <button type="button" onClick={() => handleRemovePhoto(editingRow.id)} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">Remove photo</button> : null}
                   </div>
