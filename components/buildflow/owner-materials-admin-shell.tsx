@@ -649,7 +649,7 @@ export function OwnerMaterialsAdminShell({
     chooseMode("manual");
     updateUrlState({ batch: batchId, item: row.id });
     setNoticeTone("success");
-    setNotice("Manual material added to the review queue.");
+    setNotice("Manual material added. Review it, then press Save Item.");
   }
 
   async function handlePdfFile(event: ChangeEvent<HTMLInputElement>) {
@@ -716,7 +716,7 @@ export function OwnerMaterialsAdminShell({
     setSelectedExtractedIds([]);
     updateUrlState({ batch: batchId, item: selected[0]?.id ?? null });
     setNoticeTone("success");
-    setNotice(`${selected.length} extracted item(s) added to the review queue.`);
+    setNotice(`${selected.length} extracted item(s) added. Review each one, then press Save Item.`);
   }
 
   function toggleQueueRow(rowId: string) {
@@ -733,36 +733,43 @@ export function OwnerMaterialsAdminShell({
     }
     if (!activeBatch) return;
     const selectedRows = activeBatch.rows.filter((row) => selectedQueueIds.includes(row.id));
-    const confirmed = window.confirm(`Move ${selectedRows.length} selected item(s) to Skipped? You can undo this before saving.`);
+    const confirmed = window.confirm(`Move ${selectedRows.length} selected item(s) to Skipped? You can undo this after it saves.`);
     if (!confirmed) return;
 
     const ids = new Set(selectedQueueIds);
-    setLastSkipped({ batchId: activeBatch.id, rows: selectedRows });
-    setState((current) => ({
-      ...current,
-      batches: current.batches.map((batch) =>
-        batch.id === current.selectedBatchId
+    const nextState: OwnerMaterialsAdminState = {
+      ...state,
+      batches: state.batches.map((batch) =>
+        batch.id === state.selectedBatchId
           ? {
               ...batch,
               rows: batch.rows.map((row) => (ids.has(row.id) ? { ...row, publishStatus: "Skipped", error: undefined } : row)),
             }
           : batch,
       ),
-    }));
+    };
+
+    setLastSkipped({ batchId: activeBatch.id, rows: selectedRows });
+    setState(nextState);
     setSelectedQueueIds([]);
     setEditingRowId(null);
-    setNoticeTone("success");
-    setNotice("Selected item(s) moved to Skipped. Use Undo if this was not intended.");
     updateUrlState({ item: null });
+    startTransition(async () => {
+      const result = await saveOwnerMaterialsAdmin(nextState);
+      setState(result.state);
+      setNoticeTone(result.ok ? "success" : "error");
+      setNotice(result.ok ? "Selected item(s) moved to Skipped and saved. Use Undo if this was not intended." : result.message);
+    });
   }
 
   function restoreLastSkippedRows() {
     if (!lastSkipped) return;
     const rowsById = new Map(lastSkipped.rows.map((row) => [row.id, row]));
-    setState((current) => ({
-      ...current,
+    const restoredItemId = lastSkipped.rows[0]?.id ?? null;
+    const nextState: OwnerMaterialsAdminState = {
+      ...state,
       selectedBatchId: lastSkipped.batchId,
-      batches: current.batches.map((batch) =>
+      batches: state.batches.map((batch) =>
         batch.id === lastSkipped.batchId
           ? {
               ...batch,
@@ -770,21 +777,35 @@ export function OwnerMaterialsAdminShell({
             }
           : batch,
       ),
-    }));
-    setEditingRowId(lastSkipped.rows[0]?.id ?? null);
+    };
+
+    setState(nextState);
+    setEditingRowId(restoredItemId);
     setQueueFilter("all");
     setLastSkipped(null);
-    setNoticeTone("success");
-    setNotice("Skipped item(s) restored to the review queue.");
-    updateUrlState({ batch: lastSkipped.batchId, filter: "all", item: lastSkipped.rows[0]?.id ?? null });
+    updateUrlState({ batch: lastSkipped.batchId, filter: "all", item: restoredItemId });
+    startTransition(async () => {
+      const result = await saveOwnerMaterialsAdmin(nextState);
+      setState(result.state);
+      setNoticeTone(result.ok ? "success" : "error");
+      setNotice(result.ok ? "Skipped item(s) restored and saved." : result.message);
+    });
   }
 
-  function saveWorkspace() {
+  function saveItem(rowId: string) {
+    const row = allRows.find((entry) => entry.id === rowId);
+    if (!row) {
+      setNoticeTone("error");
+      setNotice("Choose an item to save.");
+      return;
+    }
+
     startTransition(async () => {
       const result = await saveOwnerMaterialsAdmin(state);
       setState(result.state);
+      setEditingRowId(rowId);
       setNoticeTone(result.ok ? "success" : "error");
-      setNotice(result.message);
+      setNotice(result.ok ? `${row.description || "Item"} saved.` : result.message);
     });
   }
 
@@ -845,9 +866,6 @@ export function OwnerMaterialsAdminShell({
                 </button>
                 <button type="button" onClick={() => chooseMode("pdf")} className={`rounded-2xl px-4 py-3 text-sm font-semibold ${buttonFocusClass} ${mode === "pdf" ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-700"}`}>
                   Import PDF
-                </button>
-                <button type="button" onClick={saveWorkspace} disabled={isPending} className={`rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-60 ${buttonFocusClass}`}>
-                  Save Workspace
                 </button>
               </div>
               <div
@@ -1091,9 +1109,14 @@ export function OwnerMaterialsAdminShell({
                         <div><strong className={isEditing ? "text-white" : "text-slate-950"}>{row.category}</strong><br />Category</div>
                         <div><strong className={isEditing ? "text-white" : "text-slate-950"}>{issues.length ? issues.join(", ") : "Ready"}</strong><br />Missing</div>
                       </div>
-                      <button type="button" onClick={() => { setEditingRowId(row.id); updateUrlState({ item: row.id }); }} className={`mt-4 rounded-2xl px-4 py-2 text-sm font-semibold ${buttonFocusClass} ${isEditing ? "bg-white text-slate-950" : "bg-white text-slate-700"}`}>
-                        Edit And Preview
-                      </button>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button type="button" onClick={() => { setEditingRowId(row.id); updateUrlState({ item: row.id }); }} className={`rounded-2xl px-4 py-2 text-sm font-semibold ${buttonFocusClass} ${isEditing ? "bg-white text-slate-950" : "bg-white text-slate-700"}`}>
+                          Edit And Preview
+                        </button>
+                        <button type="button" onClick={() => saveItem(row.id)} disabled={isPending} className={`rounded-2xl px-4 py-2 text-sm font-semibold disabled:opacity-60 ${buttonFocusClass} ${isEditing ? "border border-white/30 bg-white/10 text-white" : "bg-slate-950 text-white"}`}>
+                          Save Item
+                        </button>
+                      </div>
                     </article>
                   );
                 })
@@ -1117,7 +1140,15 @@ export function OwnerMaterialsAdminShell({
 
             {editingRow ? (
               <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-                <h2 className="text-lg font-semibold text-slate-950">Edit selected item</h2>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-950">Edit selected item</h2>
+                    <p className="mt-1 text-sm leading-5 text-slate-500">Make changes here, then save this item.</p>
+                  </div>
+                  <button type="button" onClick={() => saveItem(editingRow.id)} disabled={isPending} className={`shrink-0 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${buttonFocusClass}`}>
+                    Save Item
+                  </button>
+                </div>
                 <div className="mt-4 grid gap-3">
                   <label className="grid gap-1 text-sm font-medium text-slate-700">
                     Name
@@ -1172,6 +1203,9 @@ export function OwnerMaterialsAdminShell({
                     <div className="mt-2 flex justify-between gap-3"><span>Extended sell</span><strong className="text-slate-950">{money(editingRow.qty * editingRow.finalUnitPrice)}</strong></div>
                     <div className="mt-2 flex justify-between gap-3"><span>Margin</span><strong className="text-slate-950">{money(editingRow.qty * (editingRow.finalUnitPrice - editingRow.supplierUnitPrice))}</strong></div>
                   </div>
+                  <button type="button" onClick={() => saveItem(editingRow.id)} disabled={isPending} className={`rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${buttonFocusClass}`}>
+                    Save Item
+                  </button>
                 </div>
               </section>
             ) : null}
