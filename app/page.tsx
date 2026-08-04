@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler"
 import { getSessionWithProfile } from "@/lib/auth"
+import { isOwnerIdentity } from "@/lib/owner-access"
 
 const heroImage =
   "/images/buildflow-retail/hero.jpg"
@@ -67,8 +68,15 @@ function FeatureIcon({ type }: { type: (typeof featureCards)[number]["icon"] }) 
 }
 
 export default async function Home() {
-  const { user } = await getSessionWithProfile()
+  const { user, profile } = await getSessionWithProfile()
   const isSignedIn = Boolean(user)
+  const isOwner = Boolean(
+    user &&
+      isOwnerIdentity({
+        email: user.email || profile?.email,
+        phone: user.phone || profile?.phone,
+      }),
+  )
   const startHref = isSignedIn ? "/shop" : "/login"
   const gatedHref = isSignedIn ? null : "/login"
   const projectsHref = gatedHref ?? "/projects"
@@ -118,6 +126,11 @@ export default async function Home() {
                 <Link href="/shop" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm active:scale-[0.99]">
                   Open Shop
                 </Link>
+                {isOwner ? (
+                  <Link href="/owner/materials" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-[#0e2341] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(14,35,65,0.18)] active:scale-[0.99]">
+                    Add Materials
+                  </Link>
+                ) : null}
               </div>
             </div>
 

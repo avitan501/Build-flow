@@ -1,6 +1,7 @@
 "use server";
 
 import type { OwnerMaterialsAdminState } from "@/lib/owner-materials-admin-data";
+import { requireOwnerAccess } from "@/lib/owner-access";
 import { getOwnerMaterialsAdminState, publishOwnerMaterialsRows, saveOwnerMaterialsAdminState, unpublishOwnerMaterialsRows } from "@/lib/owner-materials-admin-store";
 
 function getErrorMessage(error: unknown) {
@@ -9,6 +10,7 @@ function getErrorMessage(error: unknown) {
 
 export async function saveOwnerMaterialsAdmin(nextState: OwnerMaterialsAdminState) {
   try {
+    await requireOwnerAccess();
     const state = await saveOwnerMaterialsAdminState(nextState);
     return { ok: true as const, state, message: "Materials admin changes saved." };
   } catch (error) {
@@ -18,6 +20,7 @@ export async function saveOwnerMaterialsAdmin(nextState: OwnerMaterialsAdminStat
 
 export async function restoreOwnerMaterialsAdminBatches() {
   try {
+    await requireOwnerAccess();
     const state = await getOwnerMaterialsAdminState();
     return { ok: true as const, state, message: "Material documents and quote batches restored." };
   } catch (error) {
@@ -27,6 +30,7 @@ export async function restoreOwnerMaterialsAdminBatches() {
 
 export async function publishOwnerMaterialsSelection(nextState: OwnerMaterialsAdminState, batchId: string, rowIds: string[]) {
   try {
+    await requireOwnerAccess();
     const result = await publishOwnerMaterialsRows(nextState, { batchId, rowIds });
     return { ok: !result.error as boolean, ...result, message: result.error ?? `${result.publishedCount} material(s) published to shop.` };
   } catch (error) {
@@ -36,6 +40,7 @@ export async function publishOwnerMaterialsSelection(nextState: OwnerMaterialsAd
 
 export async function unpublishOwnerMaterialsSelection(nextState: OwnerMaterialsAdminState, batchId: string, rowIds: string[]) {
   try {
+    await requireOwnerAccess();
     const result = await unpublishOwnerMaterialsRows(nextState, { batchId, rowIds });
     return { ok: true as const, ...result, message: `${result.unpublishedCount} material(s) moved back to draft.` };
   } catch (error) {
