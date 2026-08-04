@@ -10,6 +10,24 @@ type LoadShopItemsOptions = {
   limit?: number;
 };
 
+const SHOP_ITEMS_REMOTE_TIMEOUT_MS = 1500;
+
+function shopItemsTimeoutSignal() {
+  if (typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(SHOP_ITEMS_REMOTE_TIMEOUT_MS);
+  }
+
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), SHOP_ITEMS_REMOTE_TIMEOUT_MS);
+  return controller.signal;
+}
+
+function isAbortResult(error: unknown) {
+  if (!error) return false;
+  const message = error instanceof Error ? error.message : typeof error === "object" && "message" in error ? String((error as { message?: unknown }).message ?? "") : String(error);
+  return message.toLowerCase().includes("abort");
+}
+
 function mergeUniqueShopItems(primary: ShopItemRecord[] | null | undefined, fallback: ShopItemRecord[]) {
   const merged = [...fallback, ...(primary ?? [])];
   return merged.filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index);
@@ -31,6 +49,7 @@ export async function loadShopItems({ limit = 24 }: LoadShopItemsOptions = {}) {
     .select(SHOP_ITEM_SELECT_FIELDS)
     .order("created_at", { ascending: false })
     .limit(limit)
+    .abortSignal(shopItemsTimeoutSignal())
     .returns<ShopItemRecord[]>();
 
   if (!publicResult.error && (publicResult.data?.length ?? 0) > 0) {
@@ -40,6 +59,11 @@ export async function loadShopItems({ limit = 24 }: LoadShopItemsOptions = {}) {
     };
   }
 
+  if (isAbortResult(publicResult.error)) {
+    console.warn("[shop-loader] shop_items public query timed out; using local catalog fallback.");
+    return emptyShopResult(localItems.slice(0, limit));
+  }
+
   try {
     const admin = createAdminClient();
     const adminResult = await admin
@@ -47,9 +71,15 @@ export async function loadShopItems({ limit = 24 }: LoadShopItemsOptions = {}) {
       .select(SHOP_ITEM_SELECT_FIELDS)
       .order("created_at", { ascending: false })
       .limit(limit)
+      .abortSignal(shopItemsTimeoutSignal())
       .returns<ShopItemRecord[]>();
 
     if ((adminResult.data?.length ?? 0) > 0 || publicResult.error) {
+      if (isAbortResult(adminResult.error)) {
+        console.warn("[shop-loader] shop_items admin query timed out; using local catalog fallback.");
+        return emptyShopResult(localItems.slice(0, limit));
+      }
+
       return {
         ...adminResult,
         data: mergeUniqueShopItems(adminResult.data, localItems).slice(0, limit),

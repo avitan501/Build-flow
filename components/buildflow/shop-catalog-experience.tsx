@@ -69,7 +69,7 @@ function SuggestedProductCard({ product }: { product: ShopCatalogProduct }) {
   const price = product.price > 0 ? formatCurrency(product.price) : null
 
   return (
-    <Link href={`/shop/${product.slug}`} className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition hover:border-sky-200 hover:shadow-md">
+    <Link href={`/shop/${product.slug}`} prefetch={false} className="flex items-center gap-3 rounded-[18px] border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition hover:border-sky-200 hover:shadow-md">
       <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
         <Image src={product.imageUrl} alt={product.imageAlt} fill sizes="48px" className="object-contain p-1.5" />
       </span>
@@ -105,7 +105,7 @@ function ServiceListCard({ product, onQuickAdd, localOnly = false }: { product: 
 
   return (
     <article className="flex min-w-0 flex-col gap-3 rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md">
-      {localOnly ? <div className="grid gap-3">{content}</div> : <Link href={`/shop/${product.slug}`} className="grid gap-3">{content}</Link>}
+      {localOnly ? <div className="grid gap-3">{content}</div> : <Link href={`/shop/${product.slug}`} prefetch={false} className="grid gap-3">{content}</Link>}
       <button type="button" onClick={() => onQuickAdd(product.id)} className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800">
         Add to cart
       </button>
@@ -136,7 +136,7 @@ function ShopProductCard({ product, onQuickAdd, localOnly = false }: { product: 
       {localOnly ? (
         <div className="block border-b border-slate-100 bg-slate-50/70 p-2.5 sm:p-3">{imageBlock}</div>
       ) : (
-        <Link href={`/shop/${product.slug}`} className="block border-b border-slate-100 bg-slate-50/70 p-2.5 sm:p-3">{imageBlock}</Link>
+        <Link href={`/shop/${product.slug}`} prefetch={false} className="block border-b border-slate-100 bg-slate-50/70 p-2.5 sm:p-3">{imageBlock}</Link>
       )}
 
       <div className="flex flex-1 flex-col p-3">
@@ -171,7 +171,7 @@ function ShopProductCard({ product, onQuickAdd, localOnly = false }: { product: 
         {localOnly ? (
           <div className="mt-2.5 block text-[0.92rem] font-semibold leading-5 text-slate-900">{nameBlock}</div>
         ) : (
-          <Link href={`/shop/${product.slug}`} className="mt-2.5 block text-[0.92rem] font-semibold leading-5 text-slate-900">{nameBlock}</Link>
+          <Link href={`/shop/${product.slug}`} prefetch={false} className="mt-2.5 block text-[0.92rem] font-semibold leading-5 text-slate-900">{nameBlock}</Link>
         )}
 
         {isService ? (
@@ -501,7 +501,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
         {quickAddMessage ? (
           <section className="flex flex-col gap-3 rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-[0_10px_28px_rgba(16,185,129,0.12)] sm:flex-row sm:items-center sm:justify-between">
             <span>{quickAddMessage}</span>
-            <Link href="/cart" className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-white px-4 text-sm font-bold text-emerald-800 shadow-sm">
+            <Link href="/cart" prefetch={false} className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-white px-4 text-sm font-bold text-emerald-800 shadow-sm">
               View cart
             </Link>
           </section>
@@ -562,7 +562,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
                 <div className="text-lg font-bold text-slate-950">Featured materials</div>
                 <div className="mt-1 text-sm text-slate-500">Popular picks for framing, finish, and rough-in work</div>
               </div>
-              <Link href="/shop/materials" className="shrink-0 text-sm font-semibold text-sky-700">
+              <Link href="/shop/materials" prefetch={false} className="shrink-0 text-sm font-semibold text-sky-700">
                 View all
               </Link>
             </div>

@@ -124,7 +124,7 @@ export function ShopToolProductGrid({ products }: ShopToolProductGridProps) {
       {message ? (
         <div className="flex flex-col gap-3 rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-[0_10px_28px_rgba(16,185,129,0.12)] sm:flex-row sm:items-center sm:justify-between">
           <span>{message}</span>
-          <Link href="/cart" className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-white px-4 text-sm font-bold text-emerald-800 shadow-sm">
+          <Link href="/cart" prefetch={false} className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-white px-4 text-sm font-bold text-emerald-800 shadow-sm">
             View cart
           </Link>
         </div>
@@ -153,7 +153,7 @@ export function ShopToolProductGrid({ products }: ShopToolProductGridProps) {
                   </div>
                 </div>
               ) : (
-                <Link href={`/shop/${product.slug}`} className="block border-b border-slate-100 bg-slate-50/70 p-2.5 sm:p-3">
+                <Link href={`/shop/${product.slug}`} prefetch={false} className="block border-b border-slate-100 bg-slate-50/70 p-2.5 sm:p-3">
                   <div className="relative aspect-square w-full overflow-hidden rounded-[18px] bg-white">
                     <Image
                       src={product.imageUrl}
@@ -194,7 +194,7 @@ export function ShopToolProductGrid({ products }: ShopToolProductGridProps) {
                     <span className="line-clamp-2">{product.name}</span>
                   </div>
                 ) : (
-                  <Link href={`/shop/${product.slug}`} className="mt-2.5 block text-[0.92rem] font-semibold leading-5 text-slate-900">
+                  <Link href={`/shop/${product.slug}`} prefetch={false} className="mt-2.5 block text-[0.92rem] font-semibold leading-5 text-slate-900">
                     <span className="line-clamp-2">{product.name}</span>
                   </Link>
                 )}
@@ -206,7 +206,7 @@ export function ShopToolProductGrid({ products }: ShopToolProductGridProps) {
                   {localOnly ? (
                     <span className="shrink-0 text-[11px] font-semibold text-sky-700">Manager item</span>
                   ) : (
-                    <Link href={`/shop/${product.slug}`} className="shrink-0 text-[11px] font-semibold text-sky-700">
+                    <Link href={`/shop/${product.slug}`} prefetch={false} className="shrink-0 text-[11px] font-semibold text-sky-700">
                       Details
                     </Link>
                   )}

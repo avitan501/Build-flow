@@ -222,7 +222,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
               <span className="truncate text-sm text-slate-500">{shopQuery || "Search materials"}</span>
             </button>
           ) : (
-            <Link href="/" aria-label="Avantia Build home" className="min-w-0 flex-1">
+            <Link href="/" prefetch={false} aria-label="Avantia Build home" className="min-w-0 flex-1">
               <span className="flex min-h-10 items-center justify-center rounded-2xl border border-slate-200/90 bg-white/95 px-3 py-2 shadow-sm transition active:scale-[0.99]">
                 <AvantiaBuildLockup compact />
               </span>
@@ -230,7 +230,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
           )}
 
           {isShopPage || isCartPage || shopCartCount > 0 ? (
-            <Link href="/cart" aria-label="Cart" className="inline-flex">
+            <Link href="/cart" prefetch={false} aria-label="Cart" className="inline-flex">
               <IconShell active={isCartPage || shopCartCount > 0}>
                 <CartIcon />
                 {shopCartCount > 0 ? <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-950">{shopCartCount}</span> : null}

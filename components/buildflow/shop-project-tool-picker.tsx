@@ -165,6 +165,7 @@ export function ShopProjectToolPicker({
           </button>
           <Link
             href="/projects"
+            prefetch={false}
             className="hidden min-h-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 sm:inline-flex"
           >
             My Projects
@@ -233,7 +234,7 @@ export function ShopProjectToolPicker({
             ) : null}
 
           <div className="mt-4 grid gap-1">
-            <Link href="/shop" className="flex w-full items-center gap-3 rounded-2xl px-1 py-3 text-left transition hover:bg-slate-50">
+            <Link href="/shop" prefetch={false} className="flex w-full items-center gap-3 rounded-2xl px-1 py-3 text-left transition hover:bg-slate-50">
               <span className={`h-6 w-6 shrink-0 rounded-full border-2 ${!selectedProject && !selectedCustomAddress ? "border-slate-950 shadow-[inset_0_0_0_5px_white] bg-slate-950" : "border-slate-400"}`} />
               <span className="min-w-0 flex-1">
                 <span className="block text-lg font-bold leading-6 text-slate-950">No selected address</span>
@@ -242,7 +243,7 @@ export function ShopProjectToolPicker({
             </Link>
 
             {selectedCustomAddress ? (
-              <Link href={buildShopHref("", selectedCustomAddress)} className="flex w-full items-center gap-3 rounded-2xl px-1 py-3 text-left transition hover:bg-slate-50">
+              <Link href={buildShopHref("", selectedCustomAddress)} prefetch={false} className="flex w-full items-center gap-3 rounded-2xl px-1 py-3 text-left transition hover:bg-slate-50">
                 <span className="h-6 w-6 shrink-0 rounded-full border-2 border-slate-950 bg-slate-950 shadow-[inset_0_0_0_5px_white]" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-lg font-bold leading-6 text-slate-950">{selectedCustomAddress}</span>
@@ -257,7 +258,7 @@ export function ShopProjectToolPicker({
               const selected = selectedProject?.id === project.id
 
               return (
-                <Link key={project.id} href={buildShopHref(project.id)} className="flex w-full items-center gap-3 rounded-2xl px-1 py-3 text-left transition hover:bg-slate-50">
+                <Link key={project.id} href={buildShopHref(project.id)} prefetch={false} className="flex w-full items-center gap-3 rounded-2xl px-1 py-3 text-left transition hover:bg-slate-50">
                   <span className={`h-6 w-6 shrink-0 rounded-full border-2 ${selected ? "border-slate-950 shadow-[inset_0_0_0_5px_white] bg-slate-950" : "border-slate-400"}`} />
                   <span className="min-w-0 flex-1">
                     <span className="block text-lg font-bold leading-6 text-slate-950">{address}</span>
@@ -298,6 +299,7 @@ export function ShopProjectToolPicker({
               <Link
                 key={category.slug}
                 href={href}
+                prefetch={false}
                 className="block touch-manipulation overflow-hidden rounded-[4px] border border-slate-100 bg-white text-center shadow-[0_5px_18px_rgba(15,23,42,0.10)] transition active:scale-[0.98] active:border-[#f96302]"
               >
                 <span className={`flex aspect-square items-center justify-center ${isIcon ? "bg-white p-5" : "bg-slate-100 p-0"}`}>

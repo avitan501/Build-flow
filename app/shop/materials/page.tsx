@@ -29,6 +29,7 @@ export default async function ShopMaterialsPage() {
             </div>
             <Link
               href="/shop"
+              prefetch={false}
               className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(148,163,184,0.08)] transition hover:bg-slate-50"
             >
               Back to Shop
@@ -47,7 +48,7 @@ export default async function ShopMaterialsPage() {
                 key={product.id}
                 className="overflow-hidden rounded-[24px] border border-sky-100 bg-white shadow-[0_12px_30px_rgba(148,163,184,0.10)]"
               >
-                <Link href={`/shop/${product.slug}`} className="block border-b border-slate-100 bg-slate-50/70 p-3">
+                <Link href={`/shop/${product.slug}`} prefetch={false} className="block border-b border-slate-100 bg-slate-50/70 p-3">
                   <div className="relative aspect-[1.1/1] w-full overflow-hidden rounded-[18px] bg-white">
                     <Image
                       src={product.imageUrl}
@@ -75,6 +76,7 @@ export default async function ShopMaterialsPage() {
                     <div className="min-w-0 text-sm text-slate-500">{product.supplierName || product.availability || "Available"}</div>
                     <Link
                       href={`/shop/${product.slug}`}
+                      prefetch={false}
                       className="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-100"
                     >
                       View details

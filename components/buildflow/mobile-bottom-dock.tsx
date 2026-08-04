@@ -9,7 +9,7 @@ type MobileBottomDockProps = {
   projectsHref: string;
 };
 
-const DOCK_PATHS = new Set(["/", "/dashboard", "/projects", "/projects/new", "/upload", "/materials", "/quotes", "/orders", "/search", "/shop", "/account"]);
+const DOCK_PATHS = new Set(["/", "/dashboard", "/projects", "/projects/new", "/upload", "/materials", "/quotes", "/orders", "/search", "/shop", "/cart", "/account"]);
 
 function shouldShowDock(pathname: string) {
   return pathname.startsWith("/projects/") || pathname.startsWith("/shop/") || DOCK_PATHS.has(pathname);
@@ -23,6 +23,7 @@ function DockItem({ href, label, active, children, accent = false }: { href: str
   return (
     <Link
       href={href}
+      prefetch={false}
       aria-label={label}
       className={`group relative flex min-w-0 ${accent ? "flex-[1.28]" : "flex-1"} flex-col items-center justify-center rounded-[18px] px-1 py-1.5 text-center transition-all duration-200 ease-out active:scale-[0.96] ${
         active

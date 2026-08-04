@@ -141,7 +141,7 @@ export function ShopCartExperience({ products, projects, isSignedIn, feedbackCod
         {cartLines.length === 0 && customCartItems.length === 0 ? (
           <section className="rounded-[28px] border border-dashed border-sky-200 bg-white/92 p-8 text-center shadow-[0_18px_42px_rgba(148,163,184,0.1)]">
             <h1 className="text-xl font-semibold text-slate-950">Your cart is empty</h1>
-            <Link href="/shop/materials" className="mt-5 inline-flex items-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(14,116,244,0.2)] transition hover:-translate-y-0.5 hover:bg-sky-700">
+            <Link href="/shop/materials" prefetch={false} className="mt-5 inline-flex items-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(14,116,244,0.2)] transition hover:-translate-y-0.5 hover:bg-sky-700">
               Browse materials
             </Link>
           </section>
@@ -154,7 +154,7 @@ export function ShopCartExperience({ products, projects, isSignedIn, feedbackCod
                   <h1 className="mt-2 text-[1.7rem] font-semibold tracking-[-0.04em] text-slate-950">Review your order request</h1>
                   <p className="mt-2 text-sm text-slate-600">Preview quantities, remove items, and send a clean order request when ready.</p>
                 </div>
-                <Link href="/shop" className="inline-flex items-center rounded-full border border-sky-100 bg-white px-4 py-2 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                <Link href="/shop" prefetch={false} className="inline-flex items-center rounded-full border border-sky-100 bg-white px-4 py-2 text-sm font-semibold text-sky-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                   Continue shopping
                 </Link>
               </div>
@@ -172,11 +172,11 @@ export function ShopCartExperience({ products, projects, isSignedIn, feedbackCod
                     style={{ animationDelay: `${index * 60}ms` }}
                   >
                     <div className="flex gap-4">
-                      <Link href={`/shop/${product.slug}`} className="w-24 shrink-0 overflow-hidden rounded-[18px] border border-slate-100 bg-slate-50 sm:w-28">
+                      <Link href={`/shop/${product.slug}`} prefetch={false} className="w-24 shrink-0 overflow-hidden rounded-[18px] border border-slate-100 bg-slate-50 sm:w-28">
                         <Image src={product.imageUrl} alt={product.imageAlt} width={240} height={240} className="h-24 w-full object-contain transition duration-300 hover:scale-105 sm:h-28" />
                       </Link>
                       <div className="min-w-0 flex-1">
-                        <Link href={`/shop/${product.slug}`} className="line-clamp-2 text-base font-semibold text-slate-950 hover:text-sky-700">
+                        <Link href={`/shop/${product.slug}`} prefetch={false} className="line-clamp-2 text-base font-semibold text-slate-950 hover:text-sky-700">
                           {product.name}
                         </Link>
                         <div className="mt-1 text-sm text-slate-500">{product.unit}</div>
@@ -281,12 +281,12 @@ export function ShopCartExperience({ products, projects, isSignedIn, feedbackCod
                       </select>
                     </label>
                   ) : (
-                    <Link href="/projects/new?next=%2Fcart" className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-sky-200 bg-white px-4 text-sm font-semibold text-sky-700">
+                    <Link href="/projects/new?next=%2Fcart" prefetch={false} className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-sky-200 bg-white px-4 text-sm font-semibold text-sky-700">
                       Create project first
                     </Link>
                   )
                 ) : (
-                  <Link href="/login?next=%2Fcart" className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-sky-200 bg-white px-4 text-sm font-semibold text-sky-700">
+                  <Link href="/login?next=%2Fcart" prefetch={false} className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-sky-200 bg-white px-4 text-sm font-semibold text-sky-700">
                     Sign in to request quote
                   </Link>
                 )}

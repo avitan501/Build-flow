@@ -66,6 +66,7 @@ function TileWorkActions() {
     <section className="grid grid-cols-2 gap-3 sm:max-w-2xl sm:gap-4">
       <Link
         href="/shop/tile-work/thinset-calculator"
+        prefetch={false}
         className="flex min-h-[148px] touch-manipulation flex-col justify-between rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition active:scale-[0.99] active:border-sky-300"
       >
         <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
@@ -94,6 +95,7 @@ function SheetRockActions() {
     <section className="grid grid-cols-2 gap-3 sm:max-w-2xl sm:gap-4">
       <Link
         href="/shop/sheet-rock/drywall-calculator"
+        prefetch={false}
         className="flex min-h-[148px] touch-manipulation flex-col justify-between rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition active:scale-[0.99] active:border-sky-300"
       >
         <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
@@ -120,6 +122,7 @@ function WoodFloorActions() {
     <section className="grid grid-cols-2 gap-3 sm:max-w-2xl sm:gap-4">
       <Link
         href="/shop/wood-floor/flooring-calculator"
+        prefetch={false}
         className="flex min-h-[148px] touch-manipulation flex-col justify-between rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition active:scale-[0.99] active:border-sky-300"
       >
         <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
@@ -327,12 +330,12 @@ function WindowUploadActions({
               </select>
             </label>
           ) : (
-            <Link href="/projects/new" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 text-sm font-semibold text-sky-700">
+            <Link href="/projects/new" prefetch={false} className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 text-sm font-semibold text-sky-700">
               Create project first
             </Link>
           )
         ) : (
-          <Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 text-sm font-semibold text-sky-700">
+          <Link href="/login" prefetch={false} className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 text-sm font-semibold text-sky-700">
             Sign in to upload
           </Link>
         )}

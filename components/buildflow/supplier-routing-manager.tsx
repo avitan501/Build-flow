@@ -864,7 +864,7 @@ export function SupplierRoutingManager({ catalogProducts = [] }: SupplierRouting
                     <p className="mt-2 text-sm leading-6 text-slate-500">Add sub-departments and the exact items customers can choose inside this department.</p>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <Link href={selectedDepartmentShopHref} className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800">
+                    <Link href={selectedDepartmentShopHref} prefetch={false} className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800">
                       View in shop
                     </Link>
                     <button type="button" onClick={openDepartmentEditor} className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">Edit department</button>
@@ -1024,7 +1024,7 @@ export function SupplierRoutingManager({ catalogProducts = [] }: SupplierRouting
                                   <div className="mt-1 text-xs leading-5 text-slate-500">{product.unit} · {product.price > 0 ? `$${product.price.toFixed(2)}` : "Get pricing"} · {product.supplierName || "Catalog"}</div>
                                   <div className="mt-2 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Existing catalog</div>
                                 </div>
-                                <Link href={`/shop/${product.slug}`} className="text-sm font-semibold text-sky-700">View</Link>
+                                <Link href={`/shop/${product.slug}`} prefetch={false} className="text-sm font-semibold text-sky-700">View</Link>
                               </div>
                             </div>
                           ))}

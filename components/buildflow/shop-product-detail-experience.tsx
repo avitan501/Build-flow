@@ -168,15 +168,15 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
           <div className="border-b border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] px-4 py-4 sm:px-6">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Link href="/shop" className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm">
+                <Link href="/shop" prefetch={false} className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm">
                   Back
                 </Link>
-                <Link href="/shop" className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm" aria-label="Search products">
+                <Link href="/shop" prefetch={false} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm" aria-label="Search products">
                   <SearchIcon />
                 </Link>
               </div>
               <AvantiaBuildLockup compact />
-              <Link href="/cart" className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm">
+              <Link href="/cart" prefetch={false} className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm">
                 <CartIcon />
                 <span>{cartCount}</span>
               </Link>
@@ -356,7 +356,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
           <section className="border-t border-slate-100 bg-[#fbfdff] px-4 py-5 sm:px-6">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-slate-950">{relatedTitle}</h2>
-              <Link href="/shop" className="text-sm font-semibold text-sky-700">Back to shop</Link>
+              <Link href="/shop" prefetch={false} className="text-sm font-semibold text-sky-700">Back to shop</Link>
             </div>
 
             <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-4 lg:overflow-visible">
@@ -366,6 +366,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                   <Link
                     key={related.id}
                     href={`/shop/${related.slug}`}
+                    prefetch={false}
                     className="w-[176px] shrink-0 rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:w-[188px] lg:w-auto"
                   >
                     <div className="overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 p-2">
@@ -391,7 +392,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
       </section>
 
       {cartCount > 0 ? (
-        <Link href="/cart" className="fixed bottom-[calc(env(safe-area-inset-bottom)+6.25rem)] left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-3 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_rgba(15,23,42,0.28)] lg:bottom-4">
+        <Link href="/cart" prefetch={false} className="fixed bottom-[calc(env(safe-area-inset-bottom)+6.25rem)] left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-3 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_rgba(15,23,42,0.28)] lg:bottom-4">
           <CartIcon />
           <span>{cartCount} item{cartCount === 1 ? "" : "s"} in cart</span>
         </Link>
