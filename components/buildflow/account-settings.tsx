@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { updateAccountPhone } from "@/app/account/actions";
+import { updateAccountName, updateAccountPhone } from "@/app/account/actions";
 import type { ProfileRecord } from "@/lib/auth";
 import { AccountSignOutButton } from "@/components/buildflow/account-sign-out-button";
 
@@ -12,11 +12,13 @@ type AccountSettingsProps = {
 };
 
 const errorMessages: Record<string, string> = {
+  name: "Enter a valid name.",
   phone: "Enter a valid phone number.",
-  profile: "Phone number could not be saved. Please try again.",
+  profile: "Account details could not be saved. Please try again.",
 };
 
 const successMessages: Record<string, string> = {
+  name: "Name saved.",
   phone: "Phone number saved.",
 };
 
@@ -32,11 +34,54 @@ function SectionCard({ title, description, children }: { title: string; descript
   );
 }
 
-function ItemRow({ label, value }: { label: string; value: string }) {
+function FieldRow({ label, value, note, actionLabel, children }: { label: string; value: string; note?: string; actionLabel?: string; children?: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
-      <span className="text-sm font-medium text-slate-500">{label}</span>
-      <span className="text-right text-sm font-semibold text-slate-900">{value}</span>
+    <div className="rounded-[22px] border border-slate-100 bg-slate-50/80 px-4 py-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</div>
+          <div className="mt-1 break-words text-sm font-semibold text-slate-950">{value}</div>
+          {note ? <div className="mt-1 text-xs leading-5 text-slate-500">{note}</div> : null}
+        </div>
+        {children ? (
+          <details className="group shrink-0 text-right">
+            <summary className="list-none rounded-full border border-sky-100 bg-white px-3 py-1.5 text-xs font-semibold text-sky-700 shadow-sm transition hover:bg-sky-50 [&::-webkit-details-marker]:hidden">
+              {actionLabel || "Change"}
+            </summary>
+            <div className="mt-3 w-[min(18rem,calc(100vw-4rem))] rounded-[22px] border border-sky-100 bg-white p-3 text-left shadow-[0_18px_42px_rgba(15,23,42,0.1)]">
+              {children}
+            </div>
+          </details>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function LockedRow({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-[22px] border border-slate-100 bg-slate-50/80 px-4 py-3">
+      <div className="min-w-0">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</div>
+        <div className="mt-1 break-words text-sm font-semibold text-slate-950">{value}</div>
+        <div className="mt-1 text-xs leading-5 text-slate-500">{note}</div>
+      </div>
+      <span className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-400">Locked</span>
+    </div>
+  );
+}
+
+function PendingAddRow({ label, value, note, actionLabel }: { label: string; value: string; note: string; actionLabel: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-[22px] border border-dashed border-sky-200 bg-sky-50/50 px-4 py-3">
+      <div className="min-w-0">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-600/75">{label}</div>
+        <div className="mt-1 text-sm font-semibold text-slate-950">{value}</div>
+        <div className="mt-1 text-xs leading-5 text-slate-500">{note}</div>
+      </div>
+      <button type="button" disabled className="shrink-0 rounded-full border border-sky-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-400 shadow-sm">
+        {actionLabel}
+      </button>
     </div>
   );
 }
@@ -138,40 +183,60 @@ export function AccountSettings({ email, profile, feedbackCode, feedbackTone }: 
         ) : null}
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <SectionCard title="My Account" description="Overview and quick access to your BuildFlow workspace.">
+          <SectionCard title="Account Profile" description="Your basic account details. Change only the rows that need attention.">
             <div className="space-y-3">
-              <ItemRow label="Name" value={displayName} />
-              <ItemRow label="Email" value={emailValue} />
-              <ItemRow label="Phone" value={phone} />
+              <FieldRow label="Name" value={displayName} actionLabel="Change">
+                <form action={updateAccountName} className="space-y-3">
+                  <label htmlFor="fullName" className="text-sm font-semibold text-slate-900">Name</label>
+                  <input
+                    id="fullName"
+                    name="fullName"
+                    type="text"
+                    defaultValue={profile?.full_name || ""}
+                    placeholder="Full name"
+                    autoComplete="name"
+                    className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                  />
+                  <button type="submit" className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(2,132,199,0.18)] transition hover:bg-sky-700">
+                    Save name
+                  </button>
+                </form>
+              </FieldRow>
+
+              <FieldRow label="Phone number" value={phone} note="Used for project and delivery coordination." actionLabel="Change">
+                <form action={updateAccountPhone} className="space-y-3">
+                  <label htmlFor="phone" className="text-sm font-semibold text-slate-900">Phone number</label>
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    defaultValue={profile?.phone || ""}
+                    placeholder="+1 555 123 4567"
+                    autoComplete="tel"
+                    className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                  />
+                  <p className="text-xs leading-5 text-slate-500">Numbers are normalized before saving.</p>
+                  <button type="submit" className="inline-flex min-h-11 w-full items-center justify-center rounded-2xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(2,132,199,0.18)] transition hover:bg-sky-700">
+                    Save phone
+                  </button>
+                </form>
+              </FieldRow>
+
+              <LockedRow label="Login email" value={emailValue} note="This is the email used to sign in. It cannot be changed here." />
+              <PendingAddRow label="Alternate email" value="Not added" note="Ready for a second contact email once profile contact storage is connected." actionLabel="Add" />
+              <PendingAddRow label="Second phone" value="Not added" note="Ready for a backup phone once profile contact storage is connected." actionLabel="Add" />
             </div>
           </SectionCard>
 
-          <SectionCard title="Personal Information" description="Save the phone number used for project and delivery coordination.">
-            <form action={updateAccountPhone} className="space-y-3">
-              <ItemRow label="Full name" value={displayName} />
-              <ItemRow label="Email" value={emailValue} />
-              <div>
-                <label htmlFor="phone" className="text-sm font-semibold text-slate-900">Phone number</label>
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  defaultValue={profile?.phone || ""}
-                  placeholder="+1 555 123 4567"
-                  autoComplete="tel"
-                  className="mt-2 min-h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                />
-                <p className="mt-2 text-xs leading-5 text-slate-500">We normalize phone numbers for account display and project contact records.</p>
+          <SectionCard title="Addresses" description="Add jobsite, billing, or delivery addresses for faster project setup.">
+            <div className="space-y-3">
+              <div className="rounded-[22px] border border-dashed border-sky-200 bg-sky-50/50 px-4 py-4">
+                <div className="text-sm font-semibold text-slate-950">No saved addresses yet</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">Addresses will appear here as separate rows for project, billing, and delivery use.</p>
               </div>
-              <button type="submit" className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(2,132,199,0.18)] transition hover:bg-sky-700">
-                Save phone number
+              <button type="button" disabled className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl border border-sky-100 bg-white px-4 py-3 text-sm font-semibold text-slate-400 shadow-sm">
+                Add address
               </button>
-            </form>
-          </SectionCard>
-
-          <SectionCard title="Addresses" description="Save project and job addresses here later for quick project setup.">
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-4 text-sm text-slate-600">
-              Address persistence is not connected yet. This placeholder is ready for a later approved schema step.
             </div>
           </SectionCard>
 

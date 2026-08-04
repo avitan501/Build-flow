@@ -7,6 +7,25 @@ import { requireSignedInProfile } from "@/lib/auth";
 import { normalizePhoneNumber } from "@/lib/auth-phone";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+export async function updateAccountName(formData: FormData) {
+  const { user } = await requireSignedInProfile();
+  const fullName = String(formData.get("fullName") || "").trim();
+
+  if (!fullName || fullName.length < 2) {
+    redirect("/account?error=name");
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("profiles").update({ full_name: fullName }).eq("id", user.id);
+
+  if (error) {
+    redirect("/account?error=profile");
+  }
+
+  revalidatePath("/account");
+  redirect("/account?updated=name");
+}
+
 export async function updateAccountPhone(formData: FormData) {
   const { user } = await requireSignedInProfile();
   const rawPhone = String(formData.get("phone") || "");
