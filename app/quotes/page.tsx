@@ -20,6 +20,9 @@ const quoteStatusMessages = {
   "quote-create-failed": { tone: "error", text: "Draft quote could not be created. Please try again." },
   "quote-created": { tone: "success", text: "Draft quote created successfully." },
   "cart-quote-created": { tone: "success", text: "Cart quote created successfully. Review and approve it when ready." },
+  "cart-quote-created-email-sent": { tone: "success", text: "Cart quote created successfully and emailed to avitanneto@gmail.com." },
+  "cart-quote-created-email-not-configured": { tone: "success", text: "Cart quote created successfully. Owner email is wired, but RESEND_API_KEY is not configured in Vercel yet." },
+  "cart-quote-created-email-failed": { tone: "success", text: "Cart quote created successfully. Owner email was attempted but the provider returned an error." },
   "quote-not-found": { tone: "error", text: "We could not confirm that draft quote for this project." },
   "quote-not-draft": { tone: "error", text: "Only draft quotes can receive project materials." },
   "quote-items-load-failed": { tone: "error", text: "Existing quote items could not be checked. Please try again." },
@@ -158,7 +161,7 @@ export default async function QuotesPage({ searchParams }: QuotesPageProps) {
 
   return (
     <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
-      <ShopCartSuccessCleanup shouldClear={successCode === "cart-quote-created"} />
+      <ShopCartSuccessCleanup shouldClear={Boolean(successCode?.startsWith("cart-quote-created"))} />
       <section className="mx-auto flex max-w-7xl flex-col gap-6">
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">

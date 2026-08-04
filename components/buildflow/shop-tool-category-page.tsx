@@ -3,6 +3,8 @@ import Link from "next/link"
 
 import { uploadWindowScheduleAction } from "@/app/shop/window/actions"
 import { EitanWhatsAppUploadForm } from "@/components/buildflow/eitan-whatsapp-upload-form"
+import { PlanRequestUploadCard } from "@/components/buildflow/plan-request-upload-card"
+import { ShopToolCategoryProducts } from "@/components/buildflow/shop-tool-category-products"
 import type { ProjectRecord } from "@/lib/projects"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import type { ShopToolCategory } from "@/lib/shop-tools"
@@ -16,17 +18,6 @@ type ShopToolCategoryPageProps = {
   isSignedIn: boolean
   errorCode?: string | null
   successCode?: string | null
-}
-
-function formatCurrency(value: number) {
-  const [dollars, cents] = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value).split(".")
-
-  return { dollars, cents: cents ?? "00" }
 }
 
 function FramingUploadActions() {
@@ -64,19 +55,7 @@ function FramingUploadActions() {
   return (
     <section className="grid grid-cols-2 gap-3 sm:max-w-2xl sm:gap-4">
       {actions.map((action) => (
-        <label
-          key={action.label}
-          className="flex min-h-[148px] cursor-pointer touch-manipulation flex-col justify-between rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition active:scale-[0.99] active:border-sky-300"
-        >
-          <input type="file" accept={action.accept} className="sr-only" aria-label={action.label} />
-          <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
-            {action.icon}
-          </span>
-          <span>
-            <span className="block text-base font-bold leading-5 text-slate-950">{action.label}</span>
-            <span className="mt-1 block text-xs font-medium leading-4 text-slate-500">{action.description}</span>
-          </span>
-        </label>
+        <PlanRequestUploadCard key={action.label} requestId={`framing-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} category="Framing" label={action.label} description={action.description} accept={action.accept} icon={action.icon} />
       ))}
     </section>
   )
@@ -206,7 +185,7 @@ function KitchenActions() {
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.72),rgba(15,23,42,0.28)_48%,rgba(15,23,42,0.02))]" />
           <div className="relative flex min-h-[260px] max-w-xl flex-col justify-between p-5 text-white sm:min-h-[340px] sm:p-7">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/75">INSTA BUILD Kitchen</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/75">Avantia Build Kitchen</p>
               <h2 className="mt-3 max-w-md text-3xl font-bold leading-tight tracking-normal sm:text-4xl">Premium cabinetry for builder-ready kitchens</h2>
               <p className="mt-3 max-w-sm text-sm leading-6 text-white/82">
                 Upload the plan or design spec and keep cabinet style, finish, hardware, and ordering notes connected to the project.
@@ -224,19 +203,7 @@ function KitchenActions() {
 
       <div className="grid grid-cols-2 gap-3 self-start sm:gap-4 lg:grid-cols-1">
         {actions.map((action) => (
-          <label
-            key={action.label}
-            className="flex min-h-[148px] cursor-pointer touch-manipulation flex-col justify-between rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition active:scale-[0.99] active:border-sky-300"
-          >
-            <input type="file" accept={action.accept} className="sr-only" aria-label={action.label} />
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
-              {action.icon}
-            </span>
-            <span>
-              <span className="block text-base font-bold leading-5 text-slate-950">{action.label}</span>
-              <span className="mt-1 block text-xs font-medium leading-4 text-slate-500">{action.description}</span>
-            </span>
-          </label>
+          <PlanRequestUploadCard key={action.label} requestId={`kitchen-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} category="Kitchen" label={action.label} description={action.description} accept={action.accept} icon={action.icon} />
         ))}
       </div>
     </section>
@@ -394,66 +361,7 @@ export function ShopToolCategoryPage({ category, products, projects, selectedPro
         {category.slug === "eitan" ? <EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /> : null}
         {category.slug === "window" ? <WindowUploadActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} successCode={successCode} /> : null}
 
-        {products.length === 0 ? (
-          <section className="rounded-[28px] border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-sm text-slate-500 shadow-[0_14px_34px_rgba(148,163,184,0.08)]">
-            No items are assigned to this tool page yet.
-          </section>
-        ) : (
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
-            {products.map((product) => {
-              const price = formatCurrency(product.price)
-
-              return (
-                <Link
-                  href={`/shop/${product.slug}`}
-                  key={product.id}
-                  className="flex h-full min-h-[228px] touch-manipulation flex-col overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition duration-200 active:scale-[0.99] active:border-sky-300"
-                >
-                  <span className="block border-b border-slate-100 bg-slate-50/70 p-2.5 sm:p-3">
-                    <div className="relative aspect-square w-full overflow-hidden rounded-[18px] bg-white">
-                      <Image
-                        src={product.imageUrl}
-                        alt={product.imageAlt}
-                        fill
-                        sizes="(min-width: 1280px) 18vw, (min-width: 768px) 24vw, 42vw"
-                        className="object-contain p-2"
-                      />
-                    </div>
-                  </span>
-
-                  <div className="flex flex-1 flex-col p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        {product.price > 0 ? (
-                          <div className="flex items-start gap-0.5 text-slate-950">
-                            <span className="text-[1.15rem] font-bold leading-none">{price.dollars}</span>
-                            <span className="pt-0.5 text-[11px] font-bold leading-none">.{price.cents}</span>
-                          </div>
-                        ) : (
-                          <div className="text-[1.05rem] font-bold leading-none text-slate-950">Get pricing</div>
-                        )}
-                        <div className="mt-0.5 text-[11px] font-medium text-slate-500">{product.unit}</div>
-                      </div>
-                    </div>
-
-                    <span className="mt-2.5 block text-[0.92rem] font-semibold leading-5 text-slate-900">
-                      <span className="line-clamp-2">{product.name}</span>
-                    </span>
-
-                    <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-slate-600">{product.shortDescription || product.description}</p>
-
-                    <div className="mt-auto flex items-center justify-between gap-3 pt-3">
-                      <div className="min-w-0 truncate text-[11px] font-medium text-slate-500">{product.supplierName || product.availability || "Available"}</div>
-                      <span className="shrink-0 text-[11px] font-semibold text-sky-700">
-                        Details
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              )
-            })}
-          </section>
-        )}
+        <ShopToolCategoryProducts categoryLabel={category.label} products={products} />
       </section>
     </main>
   )

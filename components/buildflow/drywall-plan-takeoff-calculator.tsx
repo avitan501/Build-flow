@@ -506,7 +506,7 @@ export function DrywallPlanTakeoffCalculator({
         wallSideMultiplier: calculation.wallSideMultiplier,
         scaleNote: activePlanState.result?.scaleNote || `Reviewed with ${wallCountingMethodLabels[wallCountingMethod]}.`,
         sectionNote: activePlanState.result?.sectionNote || null,
-        notes: [activePlanState.result?.notes, `Reviewed in BuildFlow with ${wallCountingMethodLabels[wallCountingMethod]}, 4x${sheetLength} boards, and ${wastePercent}% waste.`]
+        notes: [activePlanState.result?.notes, `Reviewed in Avantia Build with ${wallCountingMethodLabels[wallCountingMethod]}, 4x${sheetLength} boards, and ${wastePercent}% waste.`]
           .filter(Boolean)
           .join(" "),
       });

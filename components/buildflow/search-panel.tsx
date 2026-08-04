@@ -50,7 +50,7 @@ export function SearchPanel({ items }: SearchPanelProps) {
     <>
       <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
         <label htmlFor="buildflow-search" className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Search BuildFlow
+          Search Avantia Build
         </label>
         <div className="mt-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -66,7 +66,7 @@ export function SearchPanel({ items }: SearchPanelProps) {
           />
         </div>
         <p className="mt-3 text-sm leading-6 text-slate-500">
-          {normalizedQuery ? `${filteredItems.length} result${filteredItems.length === 1 ? "" : "s"} found.` : "Start typing to filter BuildFlow pages and project items."}
+          {normalizedQuery ? `${filteredItems.length} result${filteredItems.length === 1 ? "" : "s"} found.` : "Start typing to filter Avantia Build pages and project items."}
         </p>
       </div>
 

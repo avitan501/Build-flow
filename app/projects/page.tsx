@@ -1,5 +1,6 @@
 import Link from "next/link"
 
+import { GuestProjectsPanel } from "@/components/buildflow/guest-projects-panel"
 import { getSessionWithProfile } from "@/lib/auth"
 import { type ProjectRecord } from "@/lib/projects"
 
@@ -126,6 +127,12 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                   <span className="shrink-0 text-slate-400"><ChevronRightIcon /></span>
                 </Link>
               ))}
+            </div>
+          ) : null}
+
+          {!user ? (
+            <div className="mt-5">
+              <GuestProjectsPanel />
             </div>
           ) : null}
         </section>

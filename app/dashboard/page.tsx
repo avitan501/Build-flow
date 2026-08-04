@@ -15,7 +15,7 @@ export default async function DashboardPage() {
   const whatsapp = specMap.get("admin-whatsapp");
 
   if (!dashboard || !projects || !upload || !materials || !orders || !whatsapp) {
-    throw new Error("Missing BuildFlow dashboard route data.");
+    throw new Error("Missing Avantia Build dashboard route data.");
   }
 
   const statusTone = statusClasses(dashboard.status);
@@ -34,7 +34,7 @@ export default async function DashboardPage() {
               <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
                 {isPending
                   ? "Your account is pending approval. Your account is pending admin approval."
-                  : `BuildFlow command center for the client journey. Signed in as ${user.email}. Start a project, upload plans, review materials, and move toward order approval.`}
+                  : `Avantia Build command center for the client journey. Signed in as ${user.email}. Start a project, upload plans, review materials, and move toward order approval.`}
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Who this page is for: Client Flow</span>

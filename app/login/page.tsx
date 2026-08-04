@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
+import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { createClient } from "@/lib/supabase/client";
 
@@ -197,17 +198,11 @@ export default function LoginPage() {
       <section className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-md items-center">
         <div className="w-full rounded-[32px] border border-sky-100 bg-white/95 p-7 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur sm:p-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-600 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(2,132,199,0.25)]">
-              BF
-            </div>
-            <div>
-              <p className="text-sm font-semibold tracking-[0.18em] text-sky-700 uppercase">BuildFlow</p>
-              <p className="text-sm text-slate-500">Premium project workflow</p>
-            </div>
+            <AvantiaBuildLockup showSlogan />
           </div>
 
           <div className="mt-8 space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Log in to BuildFlow</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Log in to Avantia Build</h1>
             <p className="text-sm text-slate-500">Use email, Google, or phone number with a password.</p>
           </div>
 

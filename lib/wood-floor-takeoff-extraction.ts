@@ -132,7 +132,7 @@ function normalizeRooms(value: unknown): WoodFloorRoom[] {
         reason:
           normalizeText(item.reason) ||
           (inferredType === "basement"
-              ? "Basement is excluded by BuildFlow default."
+              ? "Basement is excluded by Avantia Build default."
               : "Selected for wood floor review."),
         bboxPercent: normalizeBbox(item.bboxPercent || item.bbox),
         confidence: normalizeConfidence(item.confidence),

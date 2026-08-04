@@ -42,9 +42,9 @@ export type ShopCatalogProduct = {
 
 type ProductSeed = Omit<ShopCatalogProduct, "id">
 
-const LOCAL_IMAGE_SOURCE = "BuildFlow local placeholder"
-const LOCAL_IMAGE_LICENSE = "BuildFlow placeholder asset"
-const LOCAL_IMAGE_CREDIT = "BuildFlow"
+const LOCAL_IMAGE_SOURCE = "Avantia Build local placeholder"
+const LOCAL_IMAGE_LICENSE = "Avantia Build placeholder asset"
+const LOCAL_IMAGE_CREDIT = "Avantia Build"
 const LOCAL_PRODUCT_IMAGE_SOURCE = "Home Depot Canada supplier product photo"
 const LOCAL_PRODUCT_IMAGE_LICENSE = "Third-party supplier product photo"
 
@@ -62,7 +62,7 @@ const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
     imageUrl: "/images/materials/products-real/mapei-ultraflex-thinset.jpg",
     imageAlt: "White thinset tile mortar bag on a clean product background",
     imageCategory: "Tile",
-    imageSource: "Generated with OpenAI imagegen for INSTA BUILD",
+    imageSource: "Generated with OpenAI imagegen for Avantia Build",
     imageLicense: "Project-owned generated image",
     imageCredit: "OpenAI imagegen",
   },
@@ -70,7 +70,7 @@ const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
     imageUrl: "/images/materials/products-real/yardas-fine-sand.jpg",
     imageAlt: "Fine sand bag for tile prep on a clean product background",
     imageCategory: "Tile",
-    imageSource: "Generated with OpenAI imagegen for INSTA BUILD",
+    imageSource: "Generated with OpenAI imagegen for Avantia Build",
     imageLicense: "Project-owned generated image",
     imageCredit: "OpenAI imagegen",
   },
@@ -78,7 +78,7 @@ const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
     imageUrl: "/images/materials/products-real/lehigh-portland-cement-type-i-ii.jpg",
     imageAlt: "Portland cement bag for tile prep on a clean product background",
     imageCategory: "Tile",
-    imageSource: "Generated with OpenAI imagegen for INSTA BUILD",
+    imageSource: "Generated with OpenAI imagegen for Avantia Build",
     imageLicense: "Project-owned generated image",
     imageCredit: "OpenAI imagegen",
   },
@@ -86,7 +86,7 @@ const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
     imageUrl: "/images/materials/products-real/tile-underlayment-paper.jpg",
     imageAlt: "Underlayment paper roll for plywood tile prep on a clean product background",
     imageCategory: "Tile",
-    imageSource: "Generated with OpenAI imagegen for INSTA BUILD",
+    imageSource: "Generated with OpenAI imagegen for Avantia Build",
     imageLicense: "Project-owned generated image",
     imageCredit: "OpenAI imagegen",
   },
@@ -94,7 +94,7 @@ const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
     imageUrl: "/images/materials/products-real/tile-wire-mesh-v2.jpg",
     imageAlt: "Galvanized wire mesh for tile mortar bed prep on a clean product background",
     imageCategory: "Tile",
-    imageSource: "Generated with OpenAI imagegen for INSTA BUILD",
+    imageSource: "Generated with OpenAI imagegen for Avantia Build",
     imageLicense: "Project-owned generated image",
     imageCredit: "OpenAI imagegen",
   },
@@ -102,7 +102,7 @@ const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
     imageUrl: "/images/materials/products-real/cement-board-5x3.jpg",
     imageAlt: "Cement backer board panel for tile substrate on a clean product background",
     imageCategory: "Tile",
-    imageSource: "Generated with OpenAI imagegen for INSTA BUILD",
+    imageSource: "Generated with OpenAI imagegen for Avantia Build",
     imageLicense: "Project-owned generated image",
     imageCredit: "OpenAI imagegen",
   },
@@ -110,7 +110,7 @@ const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
     imageUrl: "/images/materials/products-real/kitchen-cabinets.jpg",
     imageAlt: "White shaker and natural wood kitchen cabinet showroom display",
     imageCategory: "Cabinets",
-    imageSource: "Generated with OpenAI imagegen for INSTA BUILD",
+    imageSource: "Generated with OpenAI imagegen for Avantia Build",
     imageLicense: "Project-owned generated image",
     imageCredit: "OpenAI imagegen",
   },
@@ -118,7 +118,7 @@ const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
     imageUrl: "/images/materials/products-real/kitchen-cabinets.jpg",
     imageAlt: "European slab kitchen cabinetry showroom display",
     imageCategory: "Cabinets",
-    imageSource: "Generated with OpenAI imagegen for INSTA BUILD",
+    imageSource: "Generated with OpenAI imagegen for Avantia Build",
     imageLicense: "Project-owned generated image",
     imageCredit: "OpenAI imagegen",
   },
@@ -126,7 +126,7 @@ const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
     imageUrl: "/images/materials/products-real/kitchen-cabinets.jpg",
     imageAlt: "Kitchen cabinetry design review showroom display",
     imageCategory: "Cabinets",
-    imageSource: "Generated with OpenAI imagegen for INSTA BUILD",
+    imageSource: "Generated with OpenAI imagegen for Avantia Build",
     imageLicense: "Project-owned generated image",
     imageCredit: "OpenAI imagegen",
   },
@@ -174,9 +174,9 @@ const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
     imageUrl: "/images/materials/products/view-as-built-lidar-capture.svg",
     imageAlt: "LiDAR scanner icon projecting a floor plan and point cloud",
     imageCategory: "Services",
-    imageSource: "BuildFlow local SVG icon",
-    imageLicense: "BuildFlow original icon",
-    imageCredit: "BuildFlow",
+    imageSource: "Avantia Build local SVG icon",
+    imageLicense: "Avantia Build original icon",
+    imageCredit: "Avantia Build",
   },
 }
 
@@ -443,7 +443,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Services",
     unit: "Per service",
     price: 850,
-    supplierName: "BuildFlow survey services",
+    supplierName: "Avantia Build survey services",
     quoteNumber: "SRV-STK-001",
     specLine: "Foundation stakeout before concrete and footing work begins",
     featuredLabel: "Field layout service",
@@ -466,7 +466,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Services",
     unit: "Per service",
     price: 800,
-    supplierName: "BuildFlow survey services",
+    supplierName: "Avantia Build survey services",
     quoteNumber: "SRV-UCS-002",
     specLine: "Mid-project alignment and location check during active construction",
     featuredLabel: "Progress verification",
@@ -489,7 +489,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Services",
     unit: "Per service",
     price: 950,
-    supplierName: "BuildFlow survey services",
+    supplierName: "Avantia Build survey services",
     quoteNumber: "SRV-FNL-003",
     specLine: "As-built survey for final approvals, permits, and closing needs",
     featuredLabel: "Closing ready",
@@ -535,7 +535,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Kitchen",
     unit: "Custom quote",
     price: 0,
-    supplierName: "INSTA BUILD kitchen desk",
+    supplierName: "Avantia Build kitchen desk",
     quoteNumber: "Kitchen package",
     specLine: "White shaker cabinetry - plan and design spec review",
     featuredLabel: "Cabinet package",
@@ -557,7 +557,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Kitchen",
     unit: "Custom quote",
     price: 0,
-    supplierName: "INSTA BUILD kitchen desk",
+    supplierName: "Avantia Build kitchen desk",
     quoteNumber: "Kitchen package",
     specLine: "European slab cabinetry - plan and design spec review",
     featuredLabel: "Modern cabinet package",
@@ -579,7 +579,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Kitchen",
     unit: "Review",
     price: 0,
-    supplierName: "INSTA BUILD kitchen desk",
+    supplierName: "Avantia Build kitchen desk",
     quoteNumber: "Design review",
     specLine: "Plan, elevations, finish schedule, and appliance notes",
     featuredLabel: "Upload first",
@@ -666,7 +666,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Framing",
     unit: "Each - 8 ft",
     price: 7.95,
-    supplierName: "BuildFlow sample catalog",
+    supplierName: "Avantia Build sample catalog",
     quoteNumber: "CAT-LUM-204",
     specLine: "#2 SPF - kiln dried - framing",
     featuredLabel: "Popular for framing",
@@ -682,7 +682,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Framing",
     unit: "Each - 12 ft",
     price: 23.4,
-    supplierName: "BuildFlow sample catalog",
+    supplierName: "Avantia Build sample catalog",
     quoteNumber: "CAT-TRL-208",
     specLine: "Ground contact rated - exterior use",
     featuredLabel: "Deck & exterior",
@@ -698,7 +698,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Framing",
     unit: "Sheet - 4x8",
     price: 34.75,
-    supplierName: "BuildFlow sample catalog",
+    supplierName: "Avantia Build sample catalog",
     quoteNumber: "CAT-PLY-001",
     specLine: "5/8 in - structural sheathing",
     featuredLabel: "Popular for framing",
@@ -714,7 +714,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Framing",
     unit: "Each - 1-3/4 x 11-7/8 x 16 ft",
     price: 118.2,
-    supplierName: "BuildFlow sample catalog",
+    supplierName: "Avantia Build sample catalog",
     quoteNumber: "CAT-LVL-118",
     specLine: "Engineered span member - header ready",
     featuredLabel: "Structural",
@@ -730,7 +730,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Framing",
     unit: "Each",
     price: 4.85,
-    supplierName: "BuildFlow sample catalog",
+    supplierName: "Avantia Build sample catalog",
     quoteNumber: "CAT-HNG-210",
     specLine: "Galvanized steel - ledger/beam mount",
     featuredLabel: "Framing essential",
@@ -746,7 +746,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Framing",
     unit: "Box",
     price: 42.1,
-    supplierName: "BuildFlow sample catalog",
+    supplierName: "Avantia Build sample catalog",
     quoteNumber: "CAT-FST-501",
     specLine: "Paper tape collated - framing gun ready",
     featuredLabel: "Popular for framing",
@@ -762,7 +762,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Framing",
     unit: "Tube - 28 oz",
     price: 6.45,
-    supplierName: "BuildFlow sample catalog",
+    supplierName: "Avantia Build sample catalog",
     quoteNumber: "CAT-ADH-028",
     specLine: "High strength bond - subfloor rated",
     featuredLabel: "Jobsite staple",
@@ -1065,7 +1065,7 @@ const PRODUCT_SEED_INPUTS = [
     category: "Exterior",
     unit: "Roll - 10 in x 50 ft",
     price: 58.9,
-    supplierName: "BuildFlow sample catalog",
+    supplierName: "Avantia Build sample catalog",
     quoteNumber: "CAT-FLS-050",
     specLine: "Corrosion resistant - exterior weatherproofing",
     featuredLabel: "Envelope",
@@ -1172,12 +1172,18 @@ export function normalizeShopItems(items: ShopItemRecord[]): ShopCatalogProduct[
 }
 
 export function buildShopProducts(itemsData: ShopItemRecord[] | null | undefined, error: unknown) {
-  const alwaysIncludedProducts = SAMPLE_SHOP_PRODUCTS.filter((product) => product.category === "Tile work" || product.category === "Sheet rock")
-  const dynamicProducts = !error && itemsData && itemsData.length > 0 ? normalizeShopItems(itemsData) : SAMPLE_SHOP_PRODUCTS.filter((product) => product.productType !== "service")
+  const sampleMaterialProducts = SAMPLE_SHOP_PRODUCTS.filter((product) => product.productType !== "service")
+  const dynamicProducts = !error && itemsData && itemsData.length > 0 ? normalizeShopItems(itemsData) : []
   const serviceProducts = SAMPLE_SHOP_PRODUCTS.filter((product) => product.productType === "service").sort(
     (a, b) => Number(b.slug === "view-as-built-lidar-capture") - Number(a.slug === "view-as-built-lidar-capture"),
   )
-  const materialProducts = [...alwaysIncludedProducts, ...dynamicProducts].filter((product, index, all) => all.findIndex((candidate) => candidate.slug === product.slug) === index)
+  const materialProducts = [...dynamicProducts, ...sampleMaterialProducts].filter((product, index, all) => {
+    const key = `${product.name.trim().toLowerCase()}::${product.category.trim().toLowerCase()}`
+    return (
+      all.findIndex((candidate) => candidate.slug === product.slug) === index &&
+      all.findIndex((candidate) => `${candidate.name.trim().toLowerCase()}::${candidate.category.trim().toLowerCase()}` === key) === index
+    )
+  })
 
   return [...serviceProducts, ...materialProducts]
 }

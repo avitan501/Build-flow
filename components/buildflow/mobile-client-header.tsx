@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { MobileMenuDrawer, type MobileMenuLink } from "@/components/buildflow/mobile-menu-drawer";
 import { placeholderImageMetadata } from "@/lib/shop-catalog";
 import { SHOP_CATEGORY_NAMES, SHOP_POPULAR_SEARCHES } from "@/lib/shop";
@@ -13,9 +14,7 @@ import { SHOP_CART_UPDATED_EVENT, readShopCartCount } from "@/lib/shop-cart";
 type MobileClientHeaderProps = {
   isSignedIn: boolean;
   isAdmin: boolean;
-  accountHref: string;
-  searchHref: string;
-  aiHref: string;
+  isPreviewAdminEnabled?: boolean;
 };
 
 const HIDDEN_PATHS = new Set(["/login", "/signup", "/reset-password"]);
@@ -76,7 +75,7 @@ function CartIcon() {
   );
 }
 
-export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHref, aiHref }: MobileClientHeaderProps) {
+export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled = false }: MobileClientHeaderProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -121,30 +120,38 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
 
   const primaryLinks = useMemo<MobileMenuLink[]>(() => [
     { href: "/", label: "Home" },
-    { href: isSignedIn ? "/projects" : "/login", label: "Projects", gated: !isSignedIn },
-    { href: isSignedIn ? "/start-project" : "/login", label: "Start New Project", gated: !isSignedIn },
-    { href: isSignedIn ? "/upload" : "/login", label: "Upload Plans", gated: !isSignedIn },
-    { href: isSignedIn ? "/materials" : "/login", label: "Materials", gated: !isSignedIn },
-    { href: isSignedIn ? "/quotes" : "/login", label: "Quotes", gated: !isSignedIn },
-    { href: isSignedIn ? "/orders" : "/login", label: "Orders", gated: !isSignedIn },
-    { href: searchHref, label: "Search Materials", gated: !isSignedIn },
-    { href: accountHref, label: "Account & Settings", gated: !isSignedIn },
-    { href: aiHref, label: "Ask AI" },
-  ], [accountHref, aiHref, isSignedIn, searchHref]);
+    { href: "/shop", label: "Shop" },
+    { href: "/projects", label: "My Projects" },
+    ...(isPreviewAdminEnabled ? [{ href: "/preview-admin/vendors", label: "Manager" }] : []),
+    { href: "/projects/new?next=%2Fshop", label: "Start Building" },
+    { href: "/cart", label: "Cart" },
+    ...(isSignedIn
+      ? [
+          { href: "/quotes", label: "Quotes" },
+          { href: "/orders", label: "Orders" },
+          { href: "/account", label: "Account & Settings" },
+        ]
+      : []),
+  ], [isPreviewAdminEnabled, isSignedIn]);
 
   const adminLinks = useMemo<MobileMenuLink[]>(() => {
-    if (!isAdmin) {
+    if (!isAdmin && !isPreviewAdminEnabled) {
       return [];
     }
 
     return [
-      { href: "/admin/build-map", label: "Admin" },
-      { href: "/owner/materials", label: "Material Admin" },
-      { href: "/shop", label: "Shop" },
-      { href: "/admin/users", label: "Users" },
-      { href: "/admin/whatsapp", label: "WhatsApp" },
+      ...(isAdmin
+        ? [
+            { href: "/admin/build-map", label: "Admin" },
+            { href: "/admin/vendors", label: "Supplier Routing" },
+            { href: "/owner/materials", label: "Material Admin" },
+            { href: "/shop", label: "Shop" },
+            { href: "/admin/users", label: "Users" },
+            { href: "/admin/whatsapp", label: "WhatsApp" },
+          ]
+        : []),
     ];
-  }, [isAdmin]);
+  }, [isAdmin, isPreviewAdminEnabled]);
 
   const normalizedQuery = draftQuery.trim().toLowerCase();
   const shopSuggestions = useMemo(() => {
@@ -215,24 +222,14 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
               <span className="truncate text-sm text-slate-500">{shopQuery || "Search materials"}</span>
             </button>
           ) : (
-            <Link href={searchHref} aria-label="Search materials" className="min-w-0 flex-1">
-              <span className={`flex min-h-10 items-center gap-2 rounded-2xl border px-3 py-2 shadow-sm transition ${isActivePath(pathname, "/search") || isActivePath(pathname, "/shop") || isActivePath(pathname, "/materials") || isActivePath(pathname, "/quotes") || isActivePath(pathname, "/orders") ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))]" : "border-slate-200/90 bg-white/95"}`}>
-                <SearchIcon />
-                <span className="truncate text-sm text-slate-500">Search materials</span>
+            <Link href="/" aria-label="Avantia Build home" className="min-w-0 flex-1">
+              <span className="flex min-h-10 items-center justify-center rounded-2xl border border-slate-200/90 bg-white/95 px-3 py-2 shadow-sm transition active:scale-[0.99]">
+                <AvantiaBuildLockup compact />
               </span>
             </Link>
           )}
 
-          <Link href={accountHref} aria-label="Account" className="inline-flex">
-            <IconShell active={isActivePath(pathname, "/account")}>
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M20 21a8 8 0 0 0-16 0" />
-                <circle cx="12" cy="8" r="4" />
-              </svg>
-            </IconShell>
-          </Link>
-
-          {isShopPage || isCartPage ? (
+          {isShopPage || isCartPage || shopCartCount > 0 ? (
             <Link href="/cart" aria-label="Cart" className="inline-flex">
               <IconShell active={isCartPage || shopCartCount > 0}>
                 <CartIcon />
@@ -241,14 +238,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
             </Link>
           ) : null}
 
-          <Link href={aiHref} aria-label="Ask BuildFlow AI" className="inline-flex">
-            <IconShell active={isActivePath(pathname, "/ai")} premium>
-              <span className="relative text-sm font-semibold tracking-[-0.04em]">
-                AI
-                <span className="absolute -right-2 -top-1 text-[10px] text-fuchsia-500">✦</span>
-              </span>
-            </IconShell>
-          </Link>
         </div>
       </div>
 
@@ -268,7 +257,9 @@ export function MobileClientHeader({ isSignedIn, isAdmin, accountHref, searchHre
               >
                 <CloseIcon />
               </button>
-              <div className="text-center text-sm font-semibold tracking-[0.18em] text-slate-900">BUILDFLOW</div>
+              <div className="flex justify-center">
+                <AvantiaBuildLockup compact />
+              </div>
               <div />
             </div>
 

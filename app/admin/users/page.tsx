@@ -25,7 +25,7 @@ export default async function AdminUsersPage() {
       <main className="min-h-screen bg-[#f5f7fb] px-6 py-16 text-slate-900 sm:px-10">
         <section className="mx-auto flex max-w-3xl flex-col gap-6 rounded-3xl border border-red-200 bg-red-50 p-8">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">BuildFlow Supply</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Avantia Build</p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight">Access denied</h1>
             <p className="mt-4 text-sm leading-7 text-slate-700">Only admin accounts can view user approvals and role-management controls.</p>
           </div>

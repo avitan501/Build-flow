@@ -3,6 +3,7 @@ import "server-only";
 import { SHOP_ITEM_SELECT_FIELDS, type ShopItemRecord } from "@/lib/shop";
 import { getLocalPublishedShopItems } from "@/lib/owner-materials-admin-store";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
 type LoadShopItemsOptions = {
@@ -20,6 +21,10 @@ function emptyShopResult(data: ShopItemRecord[]) {
 
 export async function loadShopItems({ limit = 24 }: LoadShopItemsOptions = {}) {
   const localItems = await getLocalPublishedShopItems();
+  if (!hasSupabasePublicEnv()) {
+    return emptyShopResult(localItems.slice(0, limit));
+  }
+
   const supabase = await createClient();
   const publicResult = await supabase
     .from("shop_items")

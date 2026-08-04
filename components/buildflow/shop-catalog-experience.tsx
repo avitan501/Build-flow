@@ -2,14 +2,37 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import { recordShopActivity } from "@/app/shop/actions"
+import { QualifyingQuestionsModal } from "@/components/buildflow/qualifying-questions-modal"
+import {
+  MANAGER_ADD_ONS_UPDATED_EVENT,
+  departmentDisplayLabel,
+  isManagerAddOnProductId,
+  managerAddOnsToShopProducts,
+  readManagerAddOns,
+  resolveDepartmentSourceLabel,
+  visibleDepartmentSources,
+  type ManagerCatalogAddOns,
+} from "@/lib/manager-add-ons"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import type { ShopActivityEvent } from "@/lib/shop-activity"
 import { buildSuggestedProducts, getShopActivitySessionId, readLocalShopActivity, writeLocalShopActivity } from "@/lib/shop-activity"
-import { SHOP_SAVE_UPDATED_EVENT, readShopSavedIds, readShopCartMap, writeShopCartMap } from "@/lib/shop-cart"
+import {
+  SHOP_SAVE_UPDATED_EVENT,
+  readShopCartCount,
+  readShopCartMap,
+  readShopCustomCartItems,
+  readShopSavedIds,
+  upsertShopCartItemDetails,
+  upsertShopCustomCartItem,
+  type ShopCartQualificationStatus,
+  type ShopCartQuestionAnswer,
+  writeShopCartMap,
+} from "@/lib/shop-cart"
+import { getQualificationSettingForProduct, type QualifyingQuestion } from "@/lib/shop-qualification"
 import { SHOP_CATEGORY_CHIPS } from "@/lib/shop"
 
 type ShopCatalogExperienceProps = {
@@ -59,14 +82,10 @@ function SuggestedProductCard({ product }: { product: ShopCatalogProduct }) {
   )
 }
 
-function ServiceListCard({ product }: { product: ShopCatalogProduct }) {
+function ServiceListCard({ product, onQuickAdd, localOnly = false }: { product: ShopCatalogProduct; onQuickAdd: (productId: string) => number; localOnly?: boolean }) {
   const price = product.price > 0 ? formatCurrency(product.price) : null
-
-  return (
-    <Link
-      href={`/shop/${product.slug}`}
-      className="flex min-w-0 flex-col gap-3 rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md"
-    >
+  const content = (
+    <>
       <div className="flex min-w-0 items-start gap-3">
         <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border border-sky-100 bg-sky-50">
           <Image src={product.imageUrl} alt={product.imageAlt} fill sizes="44px" className="object-contain p-1.5" />
@@ -79,29 +98,46 @@ function ServiceListCard({ product }: { product: ShopCatalogProduct }) {
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2">
         <span className="min-w-0 text-base font-bold text-slate-950">{price ? <>{price.dollars}<span className="text-[10px] align-top">.{price.cents}</span></> : "Get pricing"}</span>
-        <span className="shrink-0 text-[11px] font-semibold text-sky-700">View details</span>
+        <span className="shrink-0 text-[11px] font-semibold text-sky-700">{localOnly ? "Manager preview" : "View details"}</span>
       </div>
-    </Link>
+    </>
+  )
+
+  return (
+    <article className="flex min-w-0 flex-col gap-3 rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md">
+      {localOnly ? <div className="grid gap-3">{content}</div> : <Link href={`/shop/${product.slug}`} className="grid gap-3">{content}</Link>}
+      <button type="button" onClick={() => onQuickAdd(product.id)} className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800">
+        Add to cart
+      </button>
+    </article>
   )
 }
 
-function ShopProductCard({ product, onQuickAdd }: { product: ShopCatalogProduct; onQuickAdd: (productId: string) => number }) {
+function ShopProductCard({ product, onQuickAdd, localOnly = false }: { product: ShopCatalogProduct; onQuickAdd: (productId: string) => number; localOnly?: boolean }) {
   const price = product.price > 0 ? formatCurrency(product.price) : null
   const isService = product.productType === "service"
+  const imageBlock = (
+    <div className="relative aspect-square w-full overflow-hidden rounded-[18px] bg-white">
+      <Image
+        src={product.imageUrl}
+        alt={product.imageAlt}
+        fill
+        sizes="(min-width: 1280px) 18vw, (min-width: 768px) 24vw, 42vw"
+        className="object-contain p-2 transition duration-300 group-hover:scale-[1.03]"
+      />
+    </div>
+  )
+  const nameBlock = (
+    <span className="line-clamp-2">{product.name}</span>
+  )
 
   return (
     <article className="group flex h-full min-h-[228px] flex-col overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-[0_18px_36px_rgba(15,23,42,0.10)]">
-      <Link href={`/shop/${product.slug}`} className="block border-b border-slate-100 bg-slate-50/70 p-2.5 sm:p-3">
-        <div className="relative aspect-square w-full overflow-hidden rounded-[18px] bg-white">
-          <Image
-            src={product.imageUrl}
-            alt={product.imageAlt}
-            fill
-            sizes="(min-width: 1280px) 18vw, (min-width: 768px) 24vw, 42vw"
-            className="object-contain p-2 transition duration-300 group-hover:scale-[1.03]"
-          />
-        </div>
-      </Link>
+      {localOnly ? (
+        <div className="block border-b border-slate-100 bg-slate-50/70 p-2.5 sm:p-3">{imageBlock}</div>
+      ) : (
+        <Link href={`/shop/${product.slug}`} className="block border-b border-slate-100 bg-slate-50/70 p-2.5 sm:p-3">{imageBlock}</Link>
+      )}
 
       <div className="flex flex-1 flex-col p-3">
         <div className="flex items-start justify-between gap-3">
@@ -132,9 +168,11 @@ function ShopProductCard({ product, onQuickAdd }: { product: ShopCatalogProduct;
           )}
         </div>
 
-        <Link href={`/shop/${product.slug}`} className="mt-2.5 block text-[0.92rem] font-semibold leading-5 text-slate-900">
-          <span className="line-clamp-2">{product.name}</span>
-        </Link>
+        {localOnly ? (
+          <div className="mt-2.5 block text-[0.92rem] font-semibold leading-5 text-slate-900">{nameBlock}</div>
+        ) : (
+          <Link href={`/shop/${product.slug}`} className="mt-2.5 block text-[0.92rem] font-semibold leading-5 text-slate-900">{nameBlock}</Link>
+        )}
 
         {isService ? (
           <>
@@ -154,6 +192,13 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [browseTab, setBrowseTab] = useState<BrowseTab>("materials")
   const [localActivity, setLocalActivity] = useState<ShopActivityEvent[]>([])
+  const [managerAddOns, setManagerAddOns] = useState<ManagerCatalogAddOns>(() => readManagerAddOns())
+  const [quickAddMessage, setQuickAddMessage] = useState<string | null>(null)
+  const [qualificationTarget, setQualificationTarget] = useState<{
+    product: ShopCatalogProduct
+    customItemId?: string
+    questions: QualifyingQuestion[]
+  } | null>(null)
   const supplierSectionRef = useRef<HTMLElement>(null)
   const serviceSectionRef = useRef<HTMLElement>(null)
   const lastSearchRef = useRef("")
@@ -162,6 +207,26 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   const query = (searchParams.get("q") ?? "").trim()
   const normalizedQuery = query.toLowerCase()
   const activeCategory = searchParams.get("category")?.trim() || "All"
+  const activeCategorySource = activeCategory === "All" ? "All" : resolveDepartmentSourceLabel(managerAddOns, activeCategory)
+  const activeCategoryLabel = activeCategorySource === "All" ? "All" : departmentDisplayLabel(managerAddOns, activeCategorySource)
+  const catalogProducts = useMemo(() => {
+    const managerProducts = managerAddOnsToShopProducts(managerAddOns)
+    return [...managerProducts, ...products].filter((product, index, all) => all.findIndex((candidate) => candidate.id === product.id) === index)
+  }, [managerAddOns, products])
+  const shopCategorySources = useMemo(() => {
+    const labels = [
+      ...SHOP_CATEGORIES,
+      ...managerAddOns.categories.map((category) => category.label),
+      ...managerAddOns.products.map((product) => product.category),
+      ...managerAddOns.services.map((service) => service.category),
+    ].filter(Boolean)
+
+    return visibleDepartmentSources(labels, managerAddOns)
+  }, [managerAddOns])
+  const shopCategories = useMemo(
+    () => shopCategorySources.map((category) => departmentDisplayLabel(managerAddOns, category)),
+    [managerAddOns, shopCategorySources],
+  )
 
   useEffect(() => {
     const sync = () => {
@@ -173,6 +238,21 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
     window.addEventListener(SHOP_SAVE_UPDATED_EVENT, sync)
     return () => {
       window.removeEventListener(SHOP_SAVE_UPDATED_EVENT, sync)
+    }
+  }, [])
+
+  useEffect(() => {
+    const syncManagerAddOns = () => {
+      setManagerAddOns(readManagerAddOns())
+    }
+
+    syncManagerAddOns()
+    window.addEventListener("storage", syncManagerAddOns)
+    window.addEventListener(MANAGER_ADD_ONS_UPDATED_EVENT, syncManagerAddOns as EventListener)
+
+    return () => {
+      window.removeEventListener("storage", syncManagerAddOns)
+      window.removeEventListener(MANAGER_ADD_ONS_UPDATED_EVENT, syncManagerAddOns as EventListener)
     }
   }, [])
 
@@ -197,13 +277,13 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   }, [query])
 
   useEffect(() => {
-    if (!activeCategory || activeCategory === "All" || lastCategoryRef.current === activeCategory) return
-    lastCategoryRef.current = activeCategory
-    trackActivity({ eventType: "category_select", category: activeCategory })
-  }, [activeCategory])
+    if (!activeCategorySource || activeCategorySource === "All" || lastCategoryRef.current === activeCategorySource) return
+    lastCategoryRef.current = activeCategorySource
+    trackActivity({ eventType: "category_select", category: activeCategorySource })
+  }, [activeCategorySource])
 
   const supplierSummaries = Object.values(
-    products.reduce<Record<string, { name: string; count: number; image: string }>>((acc, product) => {
+    catalogProducts.reduce<Record<string, { name: string; count: number; image: string }>>((acc, product) => {
       const key = product.supplierName || product.category
       if (!acc[key]) {
         acc[key] = {
@@ -219,24 +299,29 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
     .sort((a, b) => b.count - a.count)
     .slice(0, 8)
 
-  const featuredProducts = [...products]
+  const featuredProducts = [...catalogProducts]
     .filter((product) => product.productType !== "service")
     .sort((a, b) => b.rating - a.rating || a.price - b.price)
     .slice(0, 8)
 
-  const dealProducts = [...products]
+  const dealProducts = [...catalogProducts]
     .filter((product) => product.productType !== "service")
     .sort((a, b) => a.price - b.price || b.rating - a.rating)
     .slice(0, 8)
 
-  const savedProducts = products.filter((product) => savedIds.includes(product.id))
-  const serviceProducts = products.filter((product) => product.productType === "service")
+  const savedProducts = catalogProducts.filter((product) => savedIds.includes(product.id))
+  const serviceProducts = catalogProducts.filter((product) => product.productType === "service")
   const mergedActivity = [...localActivity, ...recentActivity]
-  const suggestedProducts = buildSuggestedProducts(products, mergedActivity, 6)
+  const suggestedProducts = buildSuggestedProducts(catalogProducts.filter((product) => !isManagerAddOnProductId(product.id)), mergedActivity, 6)
 
   const filteredProducts = (() => {
-    const base = products.filter((product) => {
-      const matchesCategory = activeCategory === "All" || product.imageCategory === activeCategory || product.category === activeCategory
+    const base = catalogProducts.filter((product) => {
+      const matchesCategory =
+        activeCategorySource === "All" ||
+        product.imageCategory === activeCategorySource ||
+        product.category === activeCategorySource ||
+        product.imageCategory === activeCategoryLabel ||
+        product.category === activeCategoryLabel
       const haystack = [product.name, product.category, product.imageCategory, product.description, product.unit, product.specLine, product.supplierName || "", product.quoteNumber || "", product.popularUse]
         .join(" ")
         .toLowerCase()
@@ -259,15 +344,17 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   })()
 
   const materialFilteredProducts = filteredProducts.filter((product) => product.productType !== "service")
+  const categoryServiceProducts = filteredProducts.filter((product) => product.productType === "service")
 
-  const isCategoryFiltered = activeCategory !== "All"
-  const resultLabel = query ? `Search results for "${query}"` : browseTab === "saved" ? "Saved tools" : isCategoryFiltered ? `${activeCategory} tools` : "All tools"
-  const activeCategoryProducts = activeCategory === "Services" ? serviceProducts : materialFilteredProducts
+  const isCategoryFiltered = activeCategorySource !== "All"
+  const resultLabel = query ? `Search results for "${query}"` : browseTab === "saved" ? "Saved tools" : isCategoryFiltered ? `${activeCategoryLabel} tools` : "All tools"
+  const activeCategoryProducts = activeCategorySource === "Services" ? serviceProducts : isCategoryFiltered ? [...categoryServiceProducts, ...materialFilteredProducts] : materialFilteredProducts
 
   function applyFilters(next: { query?: string; category?: string; close?: boolean }) {
     const params = new URLSearchParams(searchParams.toString())
     const nextQuery = next.query ?? query
-    const nextCategory = next.category ?? activeCategory
+    const nextCategory = next.category ?? activeCategorySource
+    const nextCategorySource = nextCategory === "All" ? "All" : resolveDepartmentSourceLabel(managerAddOns, nextCategory)
 
     if (nextQuery.trim()) {
       params.set("q", nextQuery.trim())
@@ -275,10 +362,10 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
       params.delete("q")
     }
 
-    if (!nextCategory || nextCategory === "All") {
+    if (!nextCategorySource || nextCategorySource === "All") {
       params.delete("category")
     } else {
-      params.set("category", nextCategory)
+      params.set("category", nextCategorySource)
     }
 
     const queryString = params.toString()
@@ -287,9 +374,10 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   }
 
   function setCategory(nextCategory: string) {
-    setBrowseTab(nextCategory === "Services" ? "services" : "materials")
+    const nextCategorySource = resolveDepartmentSourceLabel(managerAddOns, nextCategory)
+    setBrowseTab(nextCategorySource === "Services" ? "services" : "materials")
     applyFilters({ category: nextCategory })
-    trackActivity({ eventType: "category_select", category: nextCategory })
+    trackActivity({ eventType: "category_select", category: nextCategorySource })
   }
 
   function clearFilters() {
@@ -298,15 +386,79 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
     applyFilters({ query: "", category: "All" })
   }
 
+  function saveQualification(status: ShopCartQualificationStatus, answers: ShopCartQuestionAnswer[] = []) {
+    if (!qualificationTarget) return
+
+    if (qualificationTarget.customItemId) {
+      const item = readShopCustomCartItems().find((entry) => entry.id === qualificationTarget.customItemId)
+      if (item) {
+        upsertShopCustomCartItem({ ...item, qualificationStatus: status, answers, updatedAt: new Date().toISOString() })
+      }
+      setQualificationTarget(null)
+      return
+    }
+
+    upsertShopCartItemDetails({
+      productId: qualificationTarget.product.id,
+      productName: qualificationTarget.product.name,
+      category: qualificationTarget.product.category,
+      itemType: qualificationTarget.product.productType === "service" ? "service" : qualificationTarget.product.price <= 0 ? "custom-priced" : "material",
+      qualificationStatus: status,
+      answers,
+      updatedAt: new Date().toISOString(),
+    })
+    setQualificationTarget(null)
+  }
+
   function quickAdd(productId: string) {
     const current = readShopCartMap()
-    const nextQty = (current[productId] || 0) + 1
-    writeShopCartMap({ ...current, [productId]: nextQty })
-    const product = products.find((entry) => entry.id === productId)
+    const product = catalogProducts.find((entry) => entry.id === productId)
+    if (!product) return 0
+
+    const qualification = getQualificationSettingForProduct(product)
+    const shouldAskQuestions = qualification.enabled && qualification.questions.length > 0 && (product.productType === "service" || product.price <= 0)
+
+    if (isManagerAddOnProductId(product.id)) {
+      const existing = readShopCustomCartItems().find((item) => item.id === product.id)
+      const quantity = (existing?.quantity || 0) + 1
+      const customItem = {
+        id: product.id,
+        name: product.name,
+        category: product.category,
+        quantity,
+        unit: product.unit,
+        unitPrice: product.price,
+        qualificationStatus: shouldAskQuestions ? "pending" : (existing?.qualificationStatus ?? "not_required"),
+        answers: existing?.answers ?? [],
+        updatedAt: new Date().toISOString(),
+      }
+      upsertShopCustomCartItem(customItem)
+      if (shouldAskQuestions) {
+        setQualificationTarget({ product, customItemId: customItem.id, questions: qualification.questions })
+      }
+    } else {
+      const nextQty = (current[productId] || 0) + 1
+      writeShopCartMap({ ...current, [productId]: nextQty })
+      upsertShopCartItemDetails({
+        productId: product.id,
+        productName: product.name,
+        category: product.category,
+        itemType: product.productType === "service" ? "service" : product.price <= 0 ? "custom-priced" : "material",
+        qualificationStatus: shouldAskQuestions ? "pending" : "not_required",
+        answers: [],
+        updatedAt: new Date().toISOString(),
+      })
+      if (shouldAskQuestions) {
+        setQualificationTarget({ product, questions: qualification.questions })
+      }
+    }
+
     if (product) {
       trackActivity({ eventType: "add_to_cart", productSlug: product.slug, productName: product.name, category: product.category })
     }
-    return nextQty
+    const count = readShopCartCount()
+    setQuickAddMessage(`${product.name} added to cart. Cart now has ${count} item${count === 1 ? "" : "s"}.`)
+    return count
   }
 
   function activateTab(tab: BrowseTab) {
@@ -336,7 +488,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
     }
 
     if (tab === "saved") {
-      applyFilters({ category: activeCategory })
+      applyFilters({ category: activeCategorySource })
       return
     }
 
@@ -346,6 +498,15 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   return (
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
+        {quickAddMessage ? (
+          <section className="flex flex-col gap-3 rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-[0_10px_28px_rgba(16,185,129,0.12)] sm:flex-row sm:items-center sm:justify-between">
+            <span>{quickAddMessage}</span>
+            <Link href="/cart" className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-white px-4 text-sm font-bold text-emerald-800 shadow-sm">
+              View cart
+            </Link>
+          </section>
+        ) : null}
+
         <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
           <div className="flex flex-col gap-1">
             <div className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Tools</div>
@@ -356,8 +517,8 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
           </div>
           <div className="mt-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="flex w-max min-w-full gap-2 rounded-[20px] border border-slate-200/80 bg-slate-50/85 p-1.5">
-              {SHOP_CATEGORIES.map((category) => {
-                const active = activeCategory === category
+              {shopCategories.map((category) => {
+                const active = activeCategoryLabel === category
                 return (
                   <button
                     key={category}
@@ -382,9 +543,9 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-sky-800 shadow-sm">Filtered view</div>
-                <h2 className="mt-3 text-2xl font-bold tracking-normal text-slate-950">{activeCategory}</h2>
+                <h2 className="mt-3 text-2xl font-bold tracking-normal text-slate-950">{activeCategoryLabel}</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Showing only {activeCategory.toLowerCase()} items. Use the section buttons above to switch focus.
+                  Showing only {activeCategoryLabel.toLowerCase()} items. Use the section buttons above to switch focus.
                 </p>
               </div>
               <button type="button" onClick={clearFilters} className="inline-flex h-11 items-center justify-center rounded-2xl bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-slate-800">
@@ -408,7 +569,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
             <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {featuredProducts.map((product) => (
                 <div key={`featured-${product.id}`} className="w-[220px] shrink-0">
-                  <ShopProductCard product={product} onQuickAdd={quickAdd} />
+                  <ShopProductCard product={product} onQuickAdd={quickAdd} localOnly={isManagerAddOnProductId(product.id)} />
                 </div>
               ))}
             </div>
@@ -436,7 +597,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
         </section>
         ) : null}
 
-        {serviceProducts.length > 0 && (!isCategoryFiltered || activeCategory === "Services") ? (
+        {serviceProducts.length > 0 && (!isCategoryFiltered || activeCategorySource === "Services") ? (
           <section ref={serviceSectionRef} className="overflow-hidden rounded-[24px] bg-white p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
@@ -450,8 +611,8 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
               ) : null}
             </div>
             <div className="grid gap-3 md:grid-cols-3">
-              {(browseTab === "services" || activeCategory === "Services" ? serviceProducts : serviceProducts.slice(0, 3)).map((product) => (
-                <ServiceListCard key={`service-${product.id}`} product={product} />
+              {(browseTab === "services" || activeCategorySource === "Services" ? serviceProducts : serviceProducts.slice(0, 3)).map((product) => (
+                <ServiceListCard key={`service-${product.id}`} product={product} onQuickAdd={quickAdd} localOnly={isManagerAddOnProductId(product.id)} />
               ))}
             </div>
           </section>
@@ -471,7 +632,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
           <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {dealProducts.map((product) => (
               <div key={`deal-${product.id}`} className="w-[220px] shrink-0">
-                <ShopProductCard product={product} onQuickAdd={quickAdd} />
+                <ShopProductCard product={product} onQuickAdd={quickAdd} localOnly={isManagerAddOnProductId(product.id)} />
               </div>
             ))}
           </div>
@@ -527,7 +688,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
             <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {savedProducts.slice(0, 6).map((product) => (
                 <div key={`saved-${product.id}`} className="w-[220px] shrink-0">
-                  <ShopProductCard product={product} onQuickAdd={quickAdd} />
+                  <ShopProductCard product={product} onQuickAdd={quickAdd} localOnly={isManagerAddOnProductId(product.id)} />
                 </div>
               ))}
             </div>
@@ -560,9 +721,9 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
           <section aria-label="Products" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
             {activeCategoryProducts.map((product) => (
               product.productType === "service" ? (
-                <ServiceListCard key={product.id} product={product} />
+                <ServiceListCard key={product.id} product={product} onQuickAdd={quickAdd} localOnly={isManagerAddOnProductId(product.id)} />
               ) : (
-                <ShopProductCard key={product.id} product={product} onQuickAdd={quickAdd} />
+                <ShopProductCard key={product.id} product={product} onQuickAdd={quickAdd} localOnly={isManagerAddOnProductId(product.id)} />
               )
             ))}
           </section>
@@ -574,6 +735,14 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
         )}
       </div>
 
+      <QualifyingQuestionsModal
+        open={Boolean(qualificationTarget)}
+        title={qualificationTarget?.product.name || "Service questions"}
+        questions={qualificationTarget?.questions || []}
+        onClose={() => saveQualification("skipped")}
+        onSave={(answers) => saveQualification("answered", answers)}
+        onSkip={() => saveQualification("skipped")}
+      />
     </main>
   )
 }

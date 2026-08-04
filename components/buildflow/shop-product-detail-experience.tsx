@@ -5,7 +5,9 @@ import Image from "next/image"
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 
+import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { recordShopActivity } from "@/app/shop/actions"
+import { QualifyingQuestionsModal } from "@/components/buildflow/qualifying-questions-modal"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import { getShopActivitySessionId, writeLocalShopActivity } from "@/lib/shop-activity"
 import {
@@ -14,9 +16,12 @@ import {
   readShopCartCount,
   readShopCartMap,
   readShopSavedIds,
+  upsertShopCartItemDetails,
+  type ShopCartQuestionAnswer,
   writeShopCartMap,
   writeShopSavedIds,
 } from "@/lib/shop-cart"
+import { getQualificationSettingForProduct, type QualifyingQuestion } from "@/lib/shop-qualification"
 
 type ShopProductDetailExperienceProps = {
   product: ShopCatalogProduct
@@ -69,6 +74,8 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
   const [cartCount, setCartCount] = useState(0)
   const [saved, setSaved] = useState(false)
   const [addedMessage, setAddedMessage] = useState<string | null>(null)
+  const [qualifyingQuestions, setQualifyingQuestions] = useState<QualifyingQuestion[]>([])
+  const [questionsOpen, setQuestionsOpen] = useState(false)
 
   useEffect(() => {
     const sync = () => {
@@ -95,6 +102,18 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
     }
   }, [product.category, product.id, product.name, product.productType, product.slug])
 
+  function saveCartDetails(status: "not_required" | "pending" | "answered" | "skipped", answers: ShopCartQuestionAnswer[] = []) {
+    upsertShopCartItemDetails({
+      productId: product.id,
+      productName: product.name,
+      category: product.category,
+      itemType: product.productType === "service" ? "service" : product.price <= 0 ? "custom-priced" : "material",
+      qualificationStatus: status,
+      answers,
+      updatedAt: new Date().toISOString(),
+    })
+  }
+
   function addToCart() {
     const current = readShopCartMap()
     writeShopCartMap({ ...current, [product.id]: quantity })
@@ -108,7 +127,14 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
       category: product.category,
       metadata: { quantity },
     })
-    setAddedMessage(`Added ${quantity} to cart`)
+    const qualification = getQualificationSettingForProduct(product)
+    const shouldAskQuestions = qualification.enabled && qualification.questions.length > 0
+    saveCartDetails(shouldAskQuestions ? "pending" : "not_required")
+    setAddedMessage(shouldAskQuestions ? `Added ${quantity} to cart. Quick questions opened.` : `Added ${quantity} to cart`)
+    if (shouldAskQuestions) {
+      setQualifyingQuestions(qualification.questions)
+      setQuestionsOpen(true)
+    }
   }
 
   function buyNow() {
@@ -149,7 +175,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                   <SearchIcon />
                 </Link>
               </div>
-              <div className="text-sm font-semibold tracking-[0.16em] text-slate-900">BUILDFLOW</div>
+              <AvantiaBuildLockup compact />
               <Link href="/cart" className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm">
                 <CartIcon />
                 <span>{cartCount}</span>
@@ -286,12 +312,18 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                   <div className="mt-4 rounded-[20px] border border-sky-100 bg-sky-50 p-4 sm:rounded-[24px]">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Custom priced service</div>
                     <p className="mt-2 text-sm leading-6 text-slate-700">This service is quoted by project scope, property type, deliverables, and timeline.</p>
-                    <a
-                      href={quoteHref || "/shop"}
-                      className="mt-4 inline-flex min-h-12 items-center justify-center rounded-full bg-sky-600 px-5 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(2,132,199,0.22)] transition hover:bg-sky-700"
+                    {quoteHref ? (
+                      <a href={quoteHref} className="mt-4 inline-flex min-h-12 items-center justify-center rounded-full border border-sky-200 bg-white px-5 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">
+                        View service source
+                      </a>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={addToCart}
+                      className="mt-3 inline-flex min-h-12 items-center justify-center rounded-full bg-sky-600 px-5 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(2,132,199,0.22)] transition hover:bg-sky-700"
                     >
-                      Request quote
-                    </a>
+                      Add to cart
+                    </button>
                   </div>
                 )}
 
@@ -311,7 +343,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                       <div><span className="font-medium text-slate-500">{isService ? "Service scope:" : "Product specs:"}</span> {product.specLine}</div>
                       <div><span className="font-medium text-slate-500">Unit:</span> {product.unit}</div>
                       <div><span className="font-medium text-slate-500">Best use:</span> {product.popularUse}</div>
-                      <div><span className="font-medium text-slate-500">Supplier:</span> {product.supplierName || "BuildFlow sample catalog"}</div>
+                      <div><span className="font-medium text-slate-500">Supplier:</span> {product.supplierName || "Avantia Build sample catalog"}</div>
                       <div><span className="font-medium text-slate-500">Source:</span> {product.quoteNumber || "Catalog reference"}</div>
                     </div>
                   </div>
@@ -364,6 +396,27 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
           <span>{cartCount} item{cartCount === 1 ? "" : "s"} in cart</span>
         </Link>
       ) : null}
+
+      <QualifyingQuestionsModal
+        open={questionsOpen}
+        title={product.name}
+        questions={qualifyingQuestions}
+        onClose={() => {
+          saveCartDetails("skipped")
+          setAddedMessage("Item kept in cart. Questions skipped.")
+          setQuestionsOpen(false)
+        }}
+        onSave={(answers) => {
+          saveCartDetails("answered", answers)
+          setAddedMessage("Answers saved with this cart item.")
+          setQuestionsOpen(false)
+        }}
+        onSkip={() => {
+          saveCartDetails("skipped")
+          setAddedMessage("Item kept in cart. Questions skipped.")
+          setQuestionsOpen(false)
+        }}
+      />
     </main>
   )
 }

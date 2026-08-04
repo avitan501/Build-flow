@@ -34,7 +34,7 @@ export function ShopSearchPanel({ items }: ShopSearchPanelProps) {
       <div className="rounded-[28px] border border-[#25446d] bg-[#0e2341] p-5 text-white shadow-[0_20px_45px_rgba(15,23,42,0.22)] sm:p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Shop Search</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Search available materials</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-200">For now this search shows only materials BuildFlow has in the website flow.</p>
+        <p className="mt-2 text-sm leading-6 text-slate-200">For now this search shows only materials Avantia Build has in the website flow.</p>
 
         <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/12 bg-white px-4 py-3 shadow-sm">
           <svg viewBox="0 0 24 24" className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

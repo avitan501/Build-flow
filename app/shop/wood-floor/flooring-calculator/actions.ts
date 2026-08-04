@@ -311,7 +311,7 @@ export async function saveReviewedWoodFloorTakeoffAction(input: ReviewedWoodFloo
     const rooms = normalizeReviewedRooms(input.rooms);
     const takeoff: WoodFloorTakeoffResult = {
       rooms,
-      sourceNote: input.sourceNote?.trim() || "Reviewed wood floor takeoff values were confirmed in BuildFlow before PDF save.",
+      sourceNote: input.sourceNote?.trim() || "Reviewed wood floor takeoff values were confirmed in Avantia Build before PDF save.",
       notes: input.notes?.trim() || "Reviewed wood floor takeoff saved after room selection.",
     };
     const calculation = calculateWoodFloorMaterials({

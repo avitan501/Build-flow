@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
+
 export type MobileMenuLink = {
   href: string;
   label: string;
@@ -36,14 +38,8 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, adminLinks = [],
         className={`fixed inset-y-0 left-0 z-[71] w-[88vw] max-w-[22rem] overflow-y-auto border-r border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f5f9ff_100%)] px-4 pb-8 pt-5 shadow-[0_24px_60px_rgba(15,23,42,0.18)] transition duration-200 ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between gap-3">
-          <Link href="/" onClick={onClose} className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-100 bg-[linear-gradient(180deg,#ffffff_0%,#ebf4ff_100%)] text-sm font-semibold tracking-[0.18em] text-slate-950 shadow-sm">
-              BF
-            </span>
-            <div>
-              <p className="text-base font-semibold tracking-tight text-slate-950">BuildFlow</p>
-              <p className="text-xs text-slate-500">Project + materials flow</p>
-            </div>
+          <Link href="/" onClick={onClose} aria-label="Avantia Build home" className="flex min-w-0 items-center gap-3">
+            <AvantiaBuildLockup showSlogan />
           </Link>
           <button
             type="button"

@@ -7,7 +7,7 @@ export type MaterialCategoryPhoto = {
   imageCategory: string
 }
 
-const GENERATED_IMAGE_SOURCE = 'Generated with OpenAI imagegen for INSTA BUILD'
+const GENERATED_IMAGE_SOURCE = 'Generated with OpenAI imagegen for Avantia Build'
 const GENERATED_IMAGE_LICENSE = 'Project-owned generated image'
 const GENERATED_IMAGE_CREDIT = 'OpenAI imagegen'
 

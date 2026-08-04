@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
+import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 
 export type ProfileRecord = {
   id: string;
@@ -15,6 +17,11 @@ export type ProfileRecord = {
 };
 
 export async function getSessionWithProfile() {
+  if (!hasSupabasePublicEnv()) {
+    await cookies();
+    return { supabase: null, user: null, profile: null };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

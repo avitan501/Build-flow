@@ -92,7 +92,7 @@ export async function generateWoodFloorTakeoffPdf(input: WoodFloorTakeoffPdfInpu
     year: "numeric",
   });
 
-  page.drawText("BUILDFLOW", { x: 48, y: 760, size: 20, font: bold, color: rgb(0.05, 0.09, 0.16) });
+  page.drawText("AVANTIA BUILD", { x: 48, y: 760, size: 20, font: bold, color: rgb(0.05, 0.09, 0.16) });
   page.drawText("Wood floor takeoff", { x: 48, y: 738, size: 10, font, color: rgb(0.28, 0.33, 0.42) });
   page.drawText("WOOD FLOOR TAKEOFF", { x: 372, y: 760, size: 12, font: bold, color: rgb(0.05, 0.09, 0.16) });
   page.drawText(`Created ${createdLabel}`, { x: 372, y: 742, size: 9, font, color: rgb(0.28, 0.33, 0.42) });
@@ -159,7 +159,7 @@ export async function generateWoodFloorTakeoffPdf(input: WoodFloorTakeoffPdfInpu
   page.drawText(cleanText(input.takeoff.notes).slice(0, 110), { x: 48, y: 28, size: 8, font, color: rgb(0.34, 0.39, 0.48) });
 
   const detailPage = pdf.addPage([612, 792]);
-  detailPage.drawText("BUILDFLOW", { x: 48, y: 760, size: 18, font: bold, color: rgb(0.05, 0.09, 0.16) });
+  detailPage.drawText("AVANTIA BUILD", { x: 48, y: 760, size: 18, font: bold, color: rgb(0.05, 0.09, 0.16) });
   detailPage.drawText("Review detail and source proof", { x: 48, y: 738, size: 10, font, color: rgb(0.28, 0.33, 0.42) });
   detailPage.drawLine({ start: { x: 48, y: 716 }, end: { x: 548, y: 716 }, thickness: 0.5, color: rgb(0.75, 0.8, 0.88) });
 
@@ -265,7 +265,7 @@ export async function generateMarkedWoodFloorPlanAttachment(input: {
       borderWidth: 0.8,
     });
 
-    page.drawText("BuildFlow Wood Floor Markup", {
+    page.drawText("Avantia Build Wood Floor Markup", {
       x: textX,
       y: y + boxHeight - 26,
       size: 14,
@@ -338,7 +338,7 @@ export async function generateMarkedWoodFloorPlanAttachment(input: {
   }
 
   const proofPage = pdf.addPage([612, 792]);
-  proofPage.drawText("BUILDFLOW SOURCE-PROOF MARKUP", { x: 44, y: 752, size: 14, font: bold, color: rgb(0.05, 0.09, 0.16) });
+  proofPage.drawText("AVANTIA BUILD SOURCE-PROOF MARKUP", { x: 44, y: 752, size: 14, font: bold, color: rgb(0.05, 0.09, 0.16) });
   proofPage.drawText(cleanText(input.sourceFileName).slice(0, 82), { x: 44, y: 734, size: 8, font, color: rgb(0.34, 0.39, 0.48) });
   proofPage.drawRectangle({ x: 44, y: 662, width: 524, height: 54, color: rgb(1, 0.98, 0.58), opacity: 0.9, borderColor: rgb(0.72, 0.68, 0.35), borderWidth: 0.8 });
   proofPage.drawText("Professional markup note", { x: 56, y: 694, size: 10, font: bold, color: rgb(0.05, 0.09, 0.16) });

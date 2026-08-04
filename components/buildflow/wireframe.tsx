@@ -114,7 +114,7 @@ export function PageStatusHeader({
     <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">BuildFlow wireframe</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Avantia Build wireframe</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{title}</h1>
           <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">{purpose}</p>
           <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
@@ -162,7 +162,7 @@ export function PageStatusHeader({
               Next Step
             </button>
             <Link href={backHref} className="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
-              Back to Build Map
+              Back to Avantia Build Map
             </Link>
           </div>
         </div>

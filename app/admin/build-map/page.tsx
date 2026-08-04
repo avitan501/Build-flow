@@ -38,7 +38,7 @@ export default async function AdminBuildMapPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Admin only · system map</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Build Map</h1>
               <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-                Clickable wireframe map of BuildFlow with the main areas separated clearly: Client Flow, Admin / Ops, and WhatsApp Operations.
+                Clickable wireframe map of Avantia Build with the main areas separated clearly: Client Flow, Admin / Ops, and WhatsApp Operations.
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Who this page is for: Admin / Ops</span>

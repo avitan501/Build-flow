@@ -465,7 +465,7 @@ export function WoodFloorPlanTakeoffCalculator({
           invoiceTotal: SOURCE_FLOORING_RED_OAK.invoiceTotal,
         },
         sourceNote: activePlanState.result?.sourceNote || null,
-        notes: `Reviewed in BuildFlow step by step with ${wastePercent}% waste. Room exclude boxes were reviewed before saving. Material source: ${SOURCE_FLOORING_RED_OAK.supplierName}, ${SOURCE_FLOORING_RED_OAK.productName}, ${selectedWidth}, ${selectedGrade}, ${selectedLength}. Transitions and reducers are excluded for now.`,
+        notes: `Reviewed in Avantia Build step by step with ${wastePercent}% waste. Room exclude boxes were reviewed before saving. Material source: ${SOURCE_FLOORING_RED_OAK.supplierName}, ${SOURCE_FLOORING_RED_OAK.productName}, ${selectedWidth}, ${selectedGrade}, ${selectedLength}. Transitions and reducers are excluded for now.`,
       });
       setSavedPlanState(saved);
       setUploadStage(saved.status === "success" ? "done" : "error");

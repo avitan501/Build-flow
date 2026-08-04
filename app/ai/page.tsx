@@ -23,7 +23,7 @@ const aiOptions = [
   },
 ];
 
-export default async function BuildFlowAiPage() {
+export default async function AvantiaBuildAiPage() {
   const { user } = await getSessionWithProfile();
   const projectHref = user ? "/start-project" : "/login";
   const uploadHref = user ? "/upload" : "/login";
@@ -34,12 +34,12 @@ export default async function BuildFlowAiPage() {
       <section className="mx-auto max-w-4xl overflow-hidden rounded-[32px] border border-slate-200/90 bg-white shadow-[0_24px_60px_rgba(148,163,184,0.14)]">
         <div className="border-b border-slate-200/80 bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.14),transparent_24%),radial-gradient(circle_at_top_right,rgba(96,165,250,0.16),transparent_26%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(243,247,255,0.98))] px-6 py-7 sm:px-8">
           <div className="inline-flex items-center gap-2 rounded-full border border-fuchsia-100 bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-fuchsia-700 shadow-sm">
-            <span>Ask BuildFlow AI</span>
+            <span>Ask Avantia Build AI</span>
             <span className="text-fuchsia-500">✦</span>
           </div>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2.4rem]">Ask BuildFlow AI</h1>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2.4rem]">Ask Avantia Build AI</h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-            The full AI backend is still rolling out, but this screen already gives clients a useful front door into the next best actions inside BuildFlow.
+            The full AI backend is still rolling out, but this screen already gives clients a useful front door into the next best actions inside Avantia Build.
           </p>
         </div>
 

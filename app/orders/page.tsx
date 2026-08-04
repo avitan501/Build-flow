@@ -89,7 +89,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   const quotes = specMap.get("quotes");
 
   if (!orders || !quotes) {
-    throw new Error("Missing BuildFlow order route data.");
+    throw new Error("Missing Avantia Build order route data.");
   }
 
   const statusTone = statusClasses(orders.status);

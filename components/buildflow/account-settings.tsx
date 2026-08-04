@@ -145,7 +145,7 @@ function BankIcon() {
 }
 
 export function AccountSettings({ email, profile, feedbackCode, feedbackTone }: AccountSettingsProps) {
-  const displayName = profile?.full_name || "BuildFlow client";
+  const displayName = profile?.full_name || "Avantia Build client";
   const phone = profile?.phone || "Not added yet";
   const emailValue = email || profile?.email || "Not available";
   const feedbackText = feedbackCode
@@ -262,13 +262,13 @@ export function AccountSettings({ email, profile, feedbackCode, feedbackTone }: 
               <PaymentMethodOption
                 title="Credit card"
                 description="Add a card for material orders and approved project charges."
-                details="Card entry must happen in a secure provider form. BuildFlow should only save the provider token and last 4 digits."
+                details="Card entry must happen in a secure provider form. Avantia Build should only save the provider token and last 4 digits."
                 icon={<CardIcon />}
               />
               <PaymentMethodOption
                 title="ACH bank account"
                 description="Add a bank account option for larger orders or account billing."
-                details="Bank details must be verified through a provider flow. BuildFlow should not store full account or routing numbers."
+                details="Bank details must be verified through a provider flow. Avantia Build should not store full account or routing numbers."
                 icon={<BankIcon />}
               />
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">

@@ -1,5 +1,6 @@
 import Link from "next/link"
 
+import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler"
 import { getSessionWithProfile } from "@/lib/auth"
 import { isOwnerIdentity } from "@/lib/owner-access"
@@ -69,7 +70,6 @@ function FeatureIcon({ type }: { type: (typeof featureCards)[number]["icon"] }) 
 
 export default async function Home() {
   const { user, profile } = await getSessionWithProfile()
-  const isSignedIn = Boolean(user)
   const isOwner = Boolean(
     user &&
       isOwnerIdentity({
@@ -77,11 +77,10 @@ export default async function Home() {
         phone: user.phone || profile?.phone,
       }),
   )
-  const startHref = isSignedIn ? "/shop" : "/login"
-  const gatedHref = isSignedIn ? null : "/login"
-  const projectsHref = gatedHref ?? "/projects"
-  const uploadHref = gatedHref ?? "/upload"
-  const ordersHref = gatedHref ?? "/orders"
+  const startHref = "/projects/new?next=%2Fshop"
+  const projectsHref = "/projects"
+  const uploadHref = "/shop"
+  const ordersHref = "/cart"
 
   const hrefs = {
     projects: projectsHref,
@@ -99,22 +98,12 @@ export default async function Home() {
         <section className="overflow-hidden rounded-[32px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(239,247,255,0.94))] shadow-[0_24px_60px_rgba(148,163,184,0.14)] lg:rounded-[34px]">
           <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch lg:gap-8 lg:p-8 xl:p-10">
             <div className="flex flex-col justify-center">
-              <div className="inline-flex items-center gap-3 rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,246,255,0.9))] px-3 py-3 shadow-[0_12px_28px_rgba(148,163,184,0.1)]">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#0e2341_0%,#1a4b86_100%)] text-sm font-semibold tracking-[0.18em] text-white shadow-[0_10px_24px_rgba(14,35,65,0.2)]">
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M4 19h16" />
-                    <path d="M5 19V9l7-4 7 4v10" />
-                    <path d="M9 19v-5h6v5" />
-                  </svg>
-                </span>
-                <div>
-                  <p className="text-base font-semibold tracking-tight text-slate-950">instabuild.ca</p>
-                  <p className="text-xs text-slate-500">Builder command center</p>
-                </div>
+              <div className="inline-flex w-fit items-center rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,246,255,0.9))] px-3 py-3 shadow-[0_12px_28px_rgba(148,163,184,0.1)]">
+                <AvantiaBuildLockup showSlogan />
               </div>
-              <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Built for builders</p>
+              <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Everything it takes to build</p>
               <h1 className="mt-3 max-w-2xl text-4xl font-semibold leading-[1.02] tracking-tight text-slate-950 sm:text-[3.2rem] lg:text-[4.35rem]">
-                The problem solver for the builder
+                Avantia Build for the modern jobsite
               </h1>
               <p className="mt-4 max-w-xl text-base leading-7 text-slate-600 lg:text-lg lg:leading-8">
                 A cleaner way to start a job, choose materials by trade, keep the project address connected, and move decisions forward.
@@ -196,7 +185,7 @@ export default async function Home() {
                 <h3 className="mt-2 text-lg font-semibold text-slate-950">{card.title}</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{card.body}</p>
                 <Link href={hrefs[card.hrefKey]} className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-[#0e2341] underline underline-offset-4 active:scale-[0.99]">
-                  {isSignedIn ? `Open ${card.eyebrow.toLowerCase()}` : `Log in to view ${card.eyebrow.toLowerCase()}`}
+                  Open {card.eyebrow.toLowerCase()}
                 </Link>
               </div>
             </article>

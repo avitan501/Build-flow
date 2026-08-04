@@ -8,7 +8,17 @@ import { createQuoteFromCartAction } from "@/app/cart/actions"
 import type { ProjectRecord } from "@/lib/projects"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import { calculateShopCartTax } from "@/lib/shop-checkout"
-import { SHOP_CART_UPDATED_EVENT, readShopCartMap, writeShopCartMap } from "@/lib/shop-cart"
+import {
+  SHOP_CART_UPDATED_EVENT,
+  readShopCartDetailsMap,
+  readShopCartMap,
+  readShopCustomCartItems,
+  removeShopCartItemDetails,
+  removeShopCustomCartItem,
+  writeShopCartMap,
+  type ShopCartItemDetails,
+  type ShopCustomCartItem,
+} from "@/lib/shop-cart"
 
 type ShopCartExperienceProps = {
   products: ShopCatalogProduct[]
@@ -21,6 +31,7 @@ type ShopCartExperienceProps = {
 type CartLine = {
   product: ShopCatalogProduct
   quantity: number
+  details?: ShopCartItemDetails
 }
 
 function formatCurrency(value: number) {
@@ -36,19 +47,25 @@ const cartStatusMessages = {
   "cart-empty": { tone: "error", text: "Add at least one item before requesting a quote." },
   "cart-items-load-failed": { tone: "error", text: "Cart items could not be checked. Please try again." },
   "cart-items-invalid": { tone: "error", text: "The cart items are no longer available in the shop catalog." },
-  "cart-total-invalid": { tone: "error", text: "The cart total must be greater than zero before creating a quote." },
+  "cart-total-invalid": { tone: "error", text: "The cart must include at least one valid material or service request." },
   "cart-quote-create-failed": { tone: "error", text: "The quote could not be created. Please try again." },
   "cart-quote-items-create-failed": { tone: "error", text: "The quote was not completed because its items could not be saved." },
 } as const
 
 export function ShopCartExperience({ products, projects, isSignedIn, feedbackCode, feedbackTone }: ShopCartExperienceProps) {
   const [cartMap, setCartMap] = useState<Record<string, number>>({})
+  const [cartDetailsMap, setCartDetailsMap] = useState<Record<string, ShopCartItemDetails>>({})
+  const [customCartItems, setCustomCartItems] = useState<ShopCustomCartItem[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState(projects[0]?.id ?? "")
 
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const syncCart = () => setCartMap(readShopCartMap())
+    const syncCart = () => {
+      setCartMap(readShopCartMap())
+      setCartDetailsMap(readShopCartDetailsMap())
+      setCustomCartItems(readShopCustomCartItems())
+    }
     syncCart()
     window.addEventListener("storage", syncCart)
     window.addEventListener(SHOP_CART_UPDATED_EVENT, syncCart as EventListener)
@@ -62,15 +79,19 @@ export function ShopCartExperience({ products, projects, isSignedIn, feedbackCod
   const cartLines = useMemo<CartLine[]>(() => {
     return Object.entries(cartMap)
       .filter(([, quantity]) => quantity > 0)
-      .map(([productId, quantity]) => ({ product: products.find((candidate) => candidate.id === productId), quantity }))
-      .filter((line): line is CartLine => Boolean(line.product))
-  }, [cartMap, products])
+      .flatMap(([productId, quantity]) => {
+        const product = products.find((candidate) => candidate.id === productId)
+        return product ? [{ product, quantity, details: cartDetailsMap[productId] }] : []
+      })
+  }, [cartDetailsMap, cartMap, products])
 
-  const itemCount = cartLines.reduce((sum, line) => sum + line.quantity, 0)
-  const subtotal = cartLines.reduce((sum, line) => sum + line.product.price * line.quantity, 0)
+  const itemCount = cartLines.reduce((sum, line) => sum + line.quantity, 0) + customCartItems.reduce((sum, item) => sum + item.quantity, 0)
+  const subtotal = cartLines.reduce((sum, line) => sum + line.product.price * line.quantity, 0) + customCartItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
   const estimatedFees = subtotal > 0 ? calculateShopCartTax(subtotal) : 0
   const total = subtotal + estimatedFees
   const cartLinesPayload = JSON.stringify(cartLines.map((line) => ({ productId: line.product.id, quantity: line.quantity })))
+  const cartDetailsPayload = JSON.stringify(cartLines.map((line) => line.details).filter(Boolean))
+  const customLinesPayload = JSON.stringify(customCartItems)
   const feedback: { tone: "success" | "error"; text: string } | null =
     feedbackCode && feedbackTone
       ? cartStatusMessages[feedbackCode as keyof typeof cartStatusMessages] || { tone: feedbackTone, text: feedbackTone === "success" ? "Saved successfully." : "The request could not be completed." }
@@ -80,6 +101,7 @@ export function ShopCartExperience({ products, projects, isSignedIn, feedbackCod
     const next = { ...readShopCartMap() }
     if (quantity <= 0) {
       delete next[productId]
+      removeShopCartItemDetails(productId)
     } else {
       next[productId] = quantity
     }
@@ -87,10 +109,36 @@ export function ShopCartExperience({ products, projects, isSignedIn, feedbackCod
     writeShopCartMap(next)
   }
 
+  function qualificationLabel(status: ShopCartItemDetails["qualificationStatus"]) {
+    if (status === "answered") return "Questions answered"
+    if (status === "skipped") return "Questions skipped"
+    if (status === "pending") return "Questions pending"
+    return "No questions needed"
+  }
+
+  function AnswerSummary({ details }: { details?: Pick<ShopCartItemDetails, "qualificationStatus" | "answers"> | null }) {
+    if (!details) return null
+    return (
+      <div className="mt-3 rounded-[18px] border border-slate-200 bg-slate-50 px-3 py-2">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{qualificationLabel(details.qualificationStatus)}</div>
+        {details.answers.length > 0 ? (
+          <dl className="mt-2 grid gap-2 text-xs leading-5 text-slate-600">
+            {details.answers.map((answer) => (
+              <div key={answer.questionId}>
+                <dt className="font-semibold text-slate-800">{answer.label}</dt>
+                <dd>{answer.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#eaf4ff_0%,#f8fbff_42%,#ffffff_100%)] px-4 py-4 pb-28 text-slate-950 sm:px-8 sm:pb-10 lg:px-10 lg:pb-12">
       <section className="mx-auto flex max-w-6xl flex-col gap-5">
-        {cartLines.length === 0 ? (
+        {cartLines.length === 0 && customCartItems.length === 0 ? (
           <section className="rounded-[28px] border border-dashed border-sky-200 bg-white/92 p-8 text-center shadow-[0_18px_42px_rgba(148,163,184,0.1)]">
             <h1 className="text-xl font-semibold text-slate-950">Your cart is empty</h1>
             <Link href="/shop/materials" className="mt-5 inline-flex items-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(14,116,244,0.2)] transition hover:-translate-y-0.5 hover:bg-sky-700">
@@ -133,6 +181,8 @@ export function ShopCartExperience({ products, projects, isSignedIn, feedbackCod
                         </Link>
                         <div className="mt-1 text-sm text-slate-500">{product.unit}</div>
                         <div className="mt-2 text-lg font-semibold text-slate-950">{formatCurrency(product.price)}</div>
+                        <AnswerSummary details={cartDetailsMap[product.id]} />
+
                         <div className="mt-3 flex flex-wrap items-center gap-3">
                           <div className="flex items-center overflow-hidden rounded-full border border-slate-200 bg-slate-50">
                             <button type="button" onClick={() => updateQuantity(product.id, quantity - 1)} className="h-10 w-10 text-lg text-slate-700">−</button>
@@ -152,6 +202,30 @@ export function ShopCartExperience({ products, projects, isSignedIn, feedbackCod
                   </article>
                 )
               })}
+
+              {customCartItems.map((item) => (
+                <article key={item.id} className="rounded-[24px] border border-white/80 bg-white/96 p-4 shadow-[0_18px_42px_rgba(148,163,184,0.12)]">
+                  <div className="flex gap-4">
+                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-[18px] border border-slate-100 bg-slate-50 text-slate-500 sm:w-28">
+                      <svg viewBox="0 0 24 24" className="h-9 w-9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M4 3h12l4 4v14H4z" />
+                        <path d="M16 3v5h5" />
+                        <path d="M8 13h8" />
+                        <path d="M8 17h5" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="line-clamp-2 text-base font-semibold text-slate-950">{item.name}</div>
+                      <div className="mt-1 text-sm text-slate-500">{item.fileName || item.category}</div>
+                      <div className="mt-2 text-lg font-semibold text-slate-950">Get pricing</div>
+                      <AnswerSummary details={item} />
+                      <button type="button" onClick={() => removeShopCustomCartItem(item.id)} className="mt-3 text-sm font-semibold text-sky-700">
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
             </section>
 
             <aside className="rounded-[28px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,247,255,0.95))] p-5 shadow-[0_18px_44px_rgba(148,163,184,0.14)] lg:sticky lg:top-24 lg:self-start">
@@ -186,6 +260,8 @@ export function ShopCartExperience({ products, projects, isSignedIn, feedbackCod
 
               <form action={createQuoteFromCartAction} className="mt-5 grid gap-4">
                 <input type="hidden" name="cartLines" value={cartLinesPayload} />
+                <input type="hidden" name="cartDetails" value={cartDetailsPayload} />
+                <input type="hidden" name="customLines" value={customLinesPayload} />
 
                 {isSignedIn ? (
                   projects.length > 0 ? (
@@ -217,7 +293,7 @@ export function ShopCartExperience({ products, projects, isSignedIn, feedbackCod
 
                 <button
                   type="submit"
-                  disabled={!isSignedIn || projects.length === 0 || cartLines.length === 0}
+                  disabled={!isSignedIn || projects.length === 0 || itemCount === 0}
                   className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#FFD814] px-4 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:bg-[#f7ca00] disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0"
                 >
                   Request quote

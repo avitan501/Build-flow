@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { requireSignedInProfile } from "@/lib/auth";
+import { GuestProjectForm } from "@/components/buildflow/guest-project-form";
+import { getSessionWithProfile } from "@/lib/auth";
 
 import { createProjectAction } from "./actions";
 
@@ -9,9 +10,9 @@ export default async function NewProjectPage({
 }: {
   searchParams?: Promise<{ error?: string; next?: string }>;
 }) {
-  await requireSignedInProfile();
+  const { user } = await getSessionWithProfile();
   const params = (await searchParams) ?? {};
-  const nextPath = params.next?.startsWith("/") && !params.next.startsWith("//") ? params.next : "/projects";
+  const nextPath = params.next?.startsWith("/") && !params.next.startsWith("//") ? params.next : "/shop";
   const errorMessage =
     params.error === "project-name-required"
       ? "Project name is required."
@@ -22,7 +23,8 @@ export default async function NewProjectPage({
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#eef6ff_0%,#f8fbff_45%,#eef4fb_100%)] px-4 py-5 pb-28 text-slate-900 sm:px-8 sm:py-8">
       <section className="mx-auto max-w-2xl">
-        <form action={createProjectAction} className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-7">
+        {user ? (
+          <form action={createProjectAction} className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-7">
           <input type="hidden" name="next" value={nextPath} />
           <div>
             <h1 className="text-[2rem] font-semibold tracking-[-0.05em] text-slate-950 sm:text-[2.4rem]">Start New Project</h1>
@@ -76,6 +78,9 @@ export default async function NewProjectPage({
             </Link>
           </div>
         </form>
+        ) : (
+          <GuestProjectForm nextPath={nextPath} errorMessage={errorMessage} />
+        )}
       </section>
     </main>
   );

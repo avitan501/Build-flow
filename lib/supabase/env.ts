@@ -15,3 +15,7 @@ export function getSupabasePublicEnv() {
     anonKey: requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", supabaseAnonKey),
   };
 }
+
+export function hasSupabasePublicEnv() {
+  return Boolean(supabaseUrl && supabaseAnonKey);
+}

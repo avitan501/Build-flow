@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getSupabasePublicEnv } from "@/lib/supabase/env";
+import { getSupabasePublicEnv, hasSupabasePublicEnv } from "@/lib/supabase/env";
 
 const PROTECTED_PATH_PREFIXES = [
   "/dashboard",
@@ -20,6 +20,7 @@ const AUTH_PAGES = new Set(["/login", "/signup"]);
 
 function isProtectedPath(pathname: string) {
   if (pathname === "/projects") return false;
+  if (pathname === "/projects/new") return false;
   return PROTECTED_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
@@ -36,6 +37,18 @@ export async function proxy(request: NextRequest) {
       headers: request.headers,
     },
   });
+
+  const { pathname, search } = request.nextUrl;
+
+  if (!hasSupabasePublicEnv()) {
+    if (!isProtectedPath(pathname)) return response;
+
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.search = "";
+    loginUrl.searchParams.set("next", `${pathname}${search}`);
+    return NextResponse.redirect(loginUrl);
+  }
 
   const { url, anonKey } = getSupabasePublicEnv();
   const supabase = createServerClient(url, anonKey, {
@@ -55,8 +68,6 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const { pathname, search } = request.nextUrl;
 
   if (!user && isProtectedPath(pathname)) {
     const loginUrl = request.nextUrl.clone();

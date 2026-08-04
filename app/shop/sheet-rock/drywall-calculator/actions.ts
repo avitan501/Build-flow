@@ -131,7 +131,7 @@ function buildReviewedTakeoffResult(input: DrywallReviewedTakeoffInput): Drywall
     wallHeightFeet: positiveNumber(input.wallHeightFeet),
     ceilingAreaSqft: positiveNumber(input.ceilingAreaSqft),
     outsideCorners: positiveNumber(input.outsideCorners),
-    scaleNote: input.scaleNote?.trim() || "Reviewed takeoff values were confirmed in BuildFlow before the PDF was saved.",
+    scaleNote: input.scaleNote?.trim() || "Reviewed takeoff values were confirmed in Avantia Build before the PDF was saved.",
     sectionNote: input.sectionNote?.trim() || null,
     openings: normalizeReviewedOpenings(input.openings),
     notes: input.notes?.trim() || "Reviewed drywall takeoff saved after manual review.",

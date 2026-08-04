@@ -41,7 +41,7 @@ export function MobileSearchDrawer({ items, mode = "inline", onClose }: MobileSe
     <div className={shellClass}>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Search BuildFlow</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Search Avantia Build</p>
           <p className="mt-1 text-xs leading-5 text-slate-200">{scopeText}</p>
         </div>
         {mode === "floating" ? (

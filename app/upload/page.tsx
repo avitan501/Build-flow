@@ -66,7 +66,7 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
   const materials = specMap.get("materials");
 
   if (!upload || !materials) {
-    throw new Error("Missing BuildFlow upload route data.");
+    throw new Error("Missing Avantia Build upload route data.");
   }
 
   const { data: project, error } = await supabase

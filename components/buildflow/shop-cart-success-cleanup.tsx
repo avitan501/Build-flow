@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 
-import { writeShopCartMap } from "@/lib/shop-cart"
+import { writeShopCartDetailsMap, writeShopCartMap, writeShopCustomCartItems } from "@/lib/shop-cart"
 
 type ShopCartSuccessCleanupProps = {
   shouldClear: boolean
@@ -13,6 +13,8 @@ export function ShopCartSuccessCleanup({ shouldClear }: ShopCartSuccessCleanupPr
     if (!shouldClear) return
 
     writeShopCartMap({})
+    writeShopCartDetailsMap({})
+    writeShopCustomCartItems([])
   }, [shouldClear])
 
   return null

@@ -2,8 +2,10 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type FormEvent } from "react"
 
+import { createGuestProject, readSelectedGuestProject } from "@/lib/guest-projects"
+import { MANAGER_ADD_ONS_UPDATED_EVENT, applyDepartmentAddOns, readManagerAddOns, type ManagerCatalogAddOns } from "@/lib/manager-add-ons"
 import type { ProjectRecord } from "@/lib/projects"
 import type { ShopToolCategory } from "@/lib/shop-tools"
 
@@ -41,6 +43,19 @@ function buildShopHref(projectId: string, address = "") {
   return query ? `/shop?${query}` : "/shop"
 }
 
+function buildCategoryFilterHref(category: string, projectId: string, address: string) {
+  const params = new URLSearchParams()
+  params.set("category", category)
+
+  if (projectId) {
+    params.set("project", projectId)
+  } else if (address.trim()) {
+    params.set("address", address.trim())
+  }
+
+  return `/shop?${params.toString()}`
+}
+
 export function ShopProjectToolPicker({
   projects,
   categories,
@@ -51,11 +66,50 @@ export function ShopProjectToolPicker({
   projectError = false,
 }: ShopProjectToolPickerProps) {
   const [projectId, setProjectId] = useState(selectedProjectId)
-  const [selectedCustomAddress, setSelectedCustomAddress] = useState(selectedAddress)
+  const [selectedCustomAddress, setSelectedCustomAddress] = useState(() => {
+    if (selectedAddress || isSignedIn) return selectedAddress
+    const guestProject = readSelectedGuestProject()
+    return guestProject?.address || guestProject?.name || ""
+  })
   const [locationStatus, setLocationStatus] = useState("")
+  const [managerAddOns, setManagerAddOns] = useState<ManagerCatalogAddOns>(() => readManagerAddOns())
   const selectedProject = useMemo(() => projects.find((project) => project.id === projectId) ?? null, [projectId, projects])
   const selectedProjectIdForLinks = selectedProject?.id ?? ""
   const selectedAddressLabel = selectedProject?.address || selectedProject?.name || selectedCustomAddress || "No selected address"
+  const visibleCategories = useMemo(() => applyDepartmentAddOns(categories, managerAddOns), [categories, managerAddOns])
+  const managerCategorySlugs = useMemo(() => new Set(managerAddOns.categories.map((category) => category.slug)), [managerAddOns.categories])
+
+  useEffect(() => {
+    const syncManagerCategories = () => {
+      setManagerAddOns(readManagerAddOns())
+    }
+
+    syncManagerCategories()
+    window.addEventListener("storage", syncManagerCategories)
+    window.addEventListener(MANAGER_ADD_ONS_UPDATED_EVENT, syncManagerCategories as EventListener)
+
+    return () => {
+      window.removeEventListener("storage", syncManagerCategories)
+      window.removeEventListener(MANAGER_ADD_ONS_UPDATED_EVENT, syncManagerCategories as EventListener)
+    }
+  }, [])
+
+  function handleAddressSubmit(event: FormEvent<HTMLFormElement>) {
+    if (isSignedIn) return
+
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const address = String(formData.get("address") || "").trim()
+    if (!address) return
+
+    createGuestProject(address, address)
+    setProjectId("")
+    setSelectedCustomAddress(address)
+    setLocationStatus("Project saved on this device. You can keep shopping as a guest.")
+
+    const picker = document.getElementById("address-picker-details") as HTMLDetailsElement | null
+    if (picker) picker.open = false
+  }
 
   function useCurrentLocation() {
     if (!window.isSecureContext) {
@@ -74,7 +128,11 @@ export function ShopProjectToolPicker({
         const locationAddress = `Current location: ${position.coords.latitude.toFixed(5)}, ${position.coords.longitude.toFixed(5)}`
         setProjectId("")
         setSelectedCustomAddress(locationAddress)
-        setLocationStatus(isSignedIn ? "Current location selected. Creating project..." : "Current location selected. Sign in to save it to My Projects.")
+        setLocationStatus(isSignedIn ? "Current location selected. Creating project..." : "Current location saved on this device.")
+        if (!isSignedIn) {
+          createGuestProject(locationAddress, locationAddress)
+          return
+        }
         window.location.href = `/shop/add-address?address=${encodeURIComponent(locationAddress)}`
       },
       () => {
@@ -150,7 +208,7 @@ export function ShopProjectToolPicker({
           </summary>
 
           <div className="border-t border-slate-200 px-3 pb-3 pt-3">
-            <form action="/shop/add-address" method="get" className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <form action={isSignedIn ? "/shop/add-address" : undefined} method="get" onSubmit={handleAddressSubmit} className="grid gap-2 sm:grid-cols-[1fr_auto]">
               <input
                 name="address"
                 list="shop-address-suggestions"
@@ -165,12 +223,12 @@ export function ShopProjectToolPicker({
                 ))}
               </datalist>
               <button type="submit" className="h-12 rounded-full bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-slate-800">
-                Save project
+                {isSignedIn ? "Save project" : "Use address"}
               </button>
             </form>
             {!isSignedIn ? (
-              <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-                You will sign in first, then this address will be saved to My Projects.
+              <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+                This saves on your device for now. Login happens only when you submit the cart.
               </div>
             ) : null}
 
@@ -229,8 +287,11 @@ export function ShopProjectToolPicker({
       <section>
         <h2 className="mb-3 text-[2rem] font-bold tracking-normal text-slate-950">Departments</h2>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {categories.map((category) => {
-            const href = buildToolHref(category.slug, selectedProjectIdForLinks, selectedCustomAddress)
+          {visibleCategories.map((category) => {
+            const isManagerCategory = managerCategorySlugs.has(category.slug)
+            const href = isManagerCategory
+              ? buildCategoryFilterHref(category.label, selectedProjectIdForLinks, selectedCustomAddress)
+              : buildToolHref(category.slug, selectedProjectIdForLinks, selectedCustomAddress)
             const isIcon = category.imageUrl.endsWith(".svg")
 
             return (
