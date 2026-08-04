@@ -35,8 +35,9 @@ export async function GET(request: Request) {
   const oauthError = requestUrl.searchParams.get("error_description") || requestUrl.searchParams.get("error");
 
   if (oauthError) {
-    console.warn("Google OAuth callback returned an error", { error: oauthError, next });
-    return NextResponse.redirect(buildLoginRedirect(requestUrl.origin, next, oauthError));
+    const safeError = getSafeErrorMessage(oauthError);
+    console.warn("Google OAuth callback returned an error", { error: safeError, next });
+    return NextResponse.redirect(buildLoginRedirect(requestUrl.origin, next, safeError));
   }
 
   if (code) {
@@ -47,8 +48,9 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(next, requestUrl.origin));
     }
 
-    console.warn("Google OAuth session exchange failed", { error: error.message, next });
-    return NextResponse.redirect(buildLoginRedirect(requestUrl.origin, next, getSafeErrorMessage(error.message)));
+    const safeError = getSafeErrorMessage(error.message);
+    console.warn("Google OAuth session exchange failed", { error: safeError, next });
+    return NextResponse.redirect(buildLoginRedirect(requestUrl.origin, next, safeError));
   }
 
   console.warn("Google OAuth callback missing code", { next });
