@@ -74,7 +74,14 @@ test("siding and roofing are separate departments with a complete request flow",
   await page.goto("/shop/siding")
   await expect(page.getByRole("heading", { name: "Siding", exact: true })).toBeVisible()
   await expect(page.getByText("Upload blueprint or shopping list", { exact: true })).toBeVisible()
-  await expect(page.getByTestId("department-essentials").locator("article")).toHaveCount(8)
+  const essentials = page.getByTestId("department-essentials").locator("article")
+  await expect(essentials).toHaveCount(8)
+  const positions = await essentials.locator("[role='img']").evaluateAll((elements) =>
+    elements.map((element) => getComputedStyle(element).backgroundPosition),
+  )
+  expect(new Set(positions).size).toBe(8)
+  await expect(page.getByRole("heading", { name: "Available items" })).toHaveCount(0)
+  await expect(page.getByText("Recommended next", { exact: true })).toHaveCount(0)
   await expect(page.getByRole("heading", { name: "Tell us what you need" })).toBeVisible()
 })
 

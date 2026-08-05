@@ -7,15 +7,12 @@ import { DepartmentRequestComposer } from "@/components/buildflow/department-req
 import { EitanWhatsAppUploadForm } from "@/components/buildflow/eitan-whatsapp-upload-form"
 import { ManagerItemVisibility } from "@/components/buildflow/manager-item-visibility"
 import { PlanRequestUploadCard } from "@/components/buildflow/plan-request-upload-card"
-import { ShopToolCategoryProducts } from "@/components/buildflow/shop-tool-category-products"
 import type { ProjectRecord } from "@/lib/projects"
 import { getDepartmentEssentials } from "@/lib/department-essentials"
-import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import type { ShopToolCategory } from "@/lib/shop-tools"
 
 type ShopToolCategoryPageProps = {
   category: ShopToolCategory
-  products: ShopCatalogProduct[]
   projects: ProjectRecord[]
   selectedProjectId?: string
   selectedAddress?: string
@@ -348,7 +345,7 @@ function WindowUploadActions({
   )
 }
 
-export function ShopToolCategoryPage({ category, products, projects, selectedProjectId, isSignedIn, errorCode, successCode }: ShopToolCategoryPageProps) {
+export function ShopToolCategoryPage({ category, projects, selectedProjectId, isSignedIn, errorCode, successCode }: ShopToolCategoryPageProps) {
   const essentials = getDepartmentEssentials(category.slug)
   const usesStandardUpload = !["framing", "kitchen", "eitan", "window"].includes(category.slug)
 
@@ -368,14 +365,7 @@ export function ShopToolCategoryPage({ category, products, projects, selectedPro
 
         <DepartmentEssentials data={essentials} />
 
-        {products.length > 0 ? (
-          <section aria-labelledby="available-items-heading">
-            <h2 id="available-items-heading" className="mb-4 text-xl font-semibold text-slate-950 sm:text-2xl">Available items</h2>
-            <ShopToolCategoryProducts categoryLabel={category.label} products={products} />
-          </section>
-        ) : null}
-
-        <DepartmentRequestComposer category={category.label} requestId={category.slug} nextStep={essentials.nextStep} />
+        <DepartmentRequestComposer category={category.label} requestId={category.slug} />
       </section>
     </main>
   )

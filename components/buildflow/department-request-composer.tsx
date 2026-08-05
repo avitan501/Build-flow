@@ -4,12 +4,12 @@ import { useState } from "react"
 
 import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
 
-export function DepartmentRequestComposer({ category, requestId, nextStep }: { category: string; requestId: string; nextStep: string }) {
+export function DepartmentRequestComposer({ category, requestId }: { category: string; requestId: string }) {
   const [details, setDetails] = useState("")
   const trimmedDetails = details.trim()
 
   return (
-    <section className="grid gap-5 border-t border-slate-200 bg-white py-6 sm:grid-cols-[minmax(0,1fr)_minmax(16rem,0.38fr)] sm:py-8">
+    <section className="border-t border-slate-200 bg-white py-6 sm:py-8">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Custom request</p>
         <h2 className="mt-1 text-xl font-semibold text-slate-950 sm:text-2xl">Tell us what you need</h2>
@@ -36,10 +36,6 @@ export function DepartmentRequestComposer({ category, requestId, nextStep }: { c
         </div>
       </div>
 
-      <aside className="self-start border-l-4 border-[#0066cc] bg-sky-50 px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0066cc]">Recommended next</p>
-        <p className="mt-2 text-sm leading-6 text-slate-700">{nextStep}</p>
-      </aside>
     </section>
   )
 }
