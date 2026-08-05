@@ -3,14 +3,15 @@
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
-import { deleteProjectQuestionAction, managerUpdateProjectAction, returnRequestToDraftAction, saveProjectQuestionAction, updateSupplierPackageAction } from "@/app/preview-admin/workflow-actions"
-import type { ProjectQuestionRecord } from "@/lib/quote-requests"
+import { deleteProjectQuestionAction, managerUpdateProjectAction, returnRequestToDraftAction, saveProjectQuestionAction, updateRequestStatusAction, updateSupplierPackageAction } from "@/app/preview-admin/workflow-actions"
+import { quoteRequestStatusLabel, type ProjectQuestionRecord, type QuoteRequestStatus } from "@/lib/quote-requests"
 
 type PackageRow = { id: string; request_id: string; department: string; supplier_id: string | null; status: string; created_at: string; requestTitle: string; projectName: string }
 
 type ProjectRow = { id: string; name: string; address: string | null; status: "draft" | "active" | "archived"; updated_at: string }
+type RequestRow = { id: string; project_id: string; title: string; status: QuoteRequestStatus; updated_at: string; projectName: string }
 
-export function ProjectWorkflowManager({ questions, packages, projects }: { questions: ProjectQuestionRecord[]; packages: PackageRow[]; projects: ProjectRow[] }) {
+export function ProjectWorkflowManager({ questions, packages, projects, requests }: { questions: ProjectQuestionRecord[]; packages: PackageRow[]; projects: ProjectRow[]; requests: RequestRow[] }) {
   const router = useRouter()
   const [label, setLabel] = useState("")
   const [type, setType] = useState<ProjectQuestionRecord["question_type"]>("text")
@@ -78,6 +79,15 @@ export function ProjectWorkflowManager({ questions, packages, projects }: { ques
     })
   }
 
+  function updateRequestStatus(requestId: string, status: QuoteRequestStatus) {
+    startTransition(async () => {
+      const result = await updateRequestStatusAction({ requestId, status })
+      if (!result.ok) return setMessage(result.error)
+      setMessage("Request status updated.")
+      router.refresh()
+    })
+  }
+
   return (
     <section className="grid gap-4" id="project-workflow">
       <article className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -89,6 +99,23 @@ export function ProjectWorkflowManager({ questions, packages, projects }: { ques
           <label className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-semibold"><input type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} /> Required</label>
           {type === "select" ? <input value={options} onChange={(event) => setOptions(event.target.value)} placeholder="Options separated by commas" className="min-h-11 rounded-xl border border-slate-300 px-3 sm:col-span-2" /> : null}
           <button type="button" disabled={isPending || !label.trim()} onClick={addQuestion} className="min-h-11 rounded-full bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2">Add Project Question</button>
+        </div>
+      </article>
+
+      <article className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Request Workflow</p><h2 className="mt-1 text-xl font-semibold text-slate-950">Project Requests</h2><p className="mt-1 text-sm text-slate-500">Move each customer request through the four visible project stages.</p></div>
+        <div className="mt-4 grid max-h-[30rem] gap-2 overflow-y-auto">
+          {requests.length ? requests.map((request) => (
+            <div key={request.id} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_15rem] sm:items-center">
+              <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-950">{request.title}</p><p className="truncate text-xs text-slate-500">{request.projectName} · {quoteRequestStatusLabel(request.status)}</p></div>
+              <select value={request.status === "closed" ? "quoted" : request.status} disabled={isPending} onChange={(event) => updateRequestStatus(request.id, event.target.value as QuoteRequestStatus)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800">
+                <option value="draft">Request Created</option>
+                <option value="submitted">Under Review</option>
+                <option value="in_review">Waiting for Client Approval</option>
+                <option value="quoted">Request Completed</option>
+              </select>
+            </div>
+          )) : <p className="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">No project requests yet.</p>}
         </div>
       </article>
 

@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache"
 import { requireAdminProfile } from "@/lib/auth"
 import type { ManagerCatalogAddOns } from "@/lib/manager-add-ons"
 import type { ShopQualificationSettings } from "@/lib/shop-qualification"
+import type { QuoteRequestStatus } from "@/lib/quote-requests"
+import { createProjectEvent } from "@/lib/projects"
 import { publicWorkflowState } from "@/lib/workflow-public"
 
 type ManagerResult = { ok: true } | { ok: false; error: string }
@@ -60,6 +62,45 @@ export async function returnRequestToDraftAction(requestId: string): Promise<Man
   const { error } = await supabase.from("quote_requests").update({ status: "draft", submitted_at: null }).eq("id", requestId).in("status", ["submitted", "in_review"])
   if (error) return { ok: false, error: "Could not return the request to Draft." }
   revalidatePath("/preview-admin/vendors")
+  return { ok: true }
+}
+
+export async function updateRequestStatusAction(input: { requestId: string; status: QuoteRequestStatus }): Promise<ManagerResult> {
+  const { supabase } = await requireAdminProfile()
+  const allowed: QuoteRequestStatus[] = ["draft", "submitted", "in_review", "quoted", "closed"]
+  if (!allowed.includes(input.status)) return { ok: false, error: "Choose a valid request status." }
+
+  const patch = {
+    status: input.status,
+    submitted_at: input.status === "draft" ? null : new Date().toISOString(),
+  }
+  const { data: request, error } = await supabase
+    .from("quote_requests")
+    .update(patch)
+    .eq("id", input.requestId)
+    .select("project_id, owner_id, title")
+    .maybeSingle<{ project_id: string; owner_id: string; title: string }>()
+
+  if (error || !request) return { ok: false, error: "Could not update the request status." }
+
+  const statusDescriptions: Record<QuoteRequestStatus, string> = {
+    draft: "Request created",
+    submitted: "Request is under review",
+    in_review: "Request is waiting for client approval",
+    quoted: "Request completed",
+    closed: "Request completed",
+  }
+  await createProjectEvent({
+    supabase,
+    projectId: request.project_id,
+    ownerId: request.owner_id,
+    eventType: "status_changed",
+    source: "admin",
+    title: `${request.title}: ${statusDescriptions[input.status]}`,
+    metadata: { quote_request_id: input.requestId, request_status: input.status },
+  })
+  revalidatePath("/preview-admin/vendors")
+  revalidatePath(`/projects/${request.project_id}`)
   return { ok: true }
 }
 

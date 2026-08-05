@@ -21,7 +21,7 @@ export function AvantiaBuildLockup({ compact = false, showSlogan = false, classN
             priority
           />
         </span>
-        <span className={`${compact ? "text-[1rem]" : "text-[1.25rem]"} font-medium leading-none tracking-normal text-[#173A63]`}>
+        <span className={`${compact ? "text-[0.95rem]" : "text-[1.2rem]"} font-semibold uppercase leading-none tracking-normal text-[#173A63]`}>
           Build
         </span>
       </span>

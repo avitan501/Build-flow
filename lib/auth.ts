@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
+import { isOwnerIdentity } from "@/lib/owner-identity";
 
 export type ProfileRecord = {
   id: string;
@@ -56,10 +58,14 @@ export async function requireSignedInProfile() {
 
 export async function requireAdminProfile() {
   const session = await requireSignedInProfile();
+  const email = session.user.email || session.profile?.email || null;
+  const phone = session.user.phone || session.profile?.phone || null;
+  const hasAdminRole = session.profile?.role === "admin";
+  const isOwner = isOwnerIdentity({ email, phone });
 
-  if (!session.profile || session.profile.role !== "admin") {
+  if (!hasAdminRole && !isOwner) {
     redirect("/dashboard");
   }
 
-  return session;
+  return hasAdminRole ? session : { ...session, supabase: createAdminClient() };
 }

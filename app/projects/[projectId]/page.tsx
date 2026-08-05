@@ -7,6 +7,8 @@ import { PROJECT_UPLOAD_STORAGE_BUCKET, type ProjectEventRecord, type ProjectRec
 import {
   quoteRequestStatusClass,
   quoteRequestStatusLabel,
+  quoteRequestProgressIndex,
+  QUOTE_REQUEST_PROGRESS_STEPS,
   type ProjectQuestionAnswerRecord,
   type ProjectQuestionRecord,
   type QuoteRequestItemRecord,
@@ -30,6 +32,23 @@ function formatDate(value: string) {
 
 function formatActivityDate(value: string) {
   return new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+}
+
+function RequestProgress({ status }: { status: QuoteRequestRecord["status"] }) {
+  const activeIndex = quoteRequestProgressIndex(status)
+  return (
+    <ol className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={`Request progress: ${quoteRequestStatusLabel(status)}`}>
+      {QUOTE_REQUEST_PROGRESS_STEPS.map((label, index) => {
+        const complete = index <= activeIndex
+        return (
+          <li key={label} className={`rounded-xl border px-2.5 py-2 text-[11px] font-semibold leading-4 ${complete ? "border-sky-200 bg-sky-50 text-sky-800" : "border-slate-200 bg-white text-slate-400"}`}>
+            <span className={`mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${complete ? "bg-[#0071e3] text-white" : "bg-slate-100 text-slate-400"}`}>{index + 1}</span>
+            {label}
+          </li>
+        )
+      })}
+    </ol>
+  )
 }
 
 export default async function ProjectWorkspacePage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -99,7 +118,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
           <section className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_8px_28px_rgba(15,23,42,0.05)] sm:p-5">
             <div className="flex items-end justify-between gap-3">
               <div>
-                <h2 className="text-xl font-semibold text-slate-950">Quote Requests</h2>
+                <h2 className="text-xl font-semibold text-slate-950">Requests</h2>
                 <p className="mt-1 text-sm text-slate-500">Items, plans, questions, and files stay together.</p>
               </div>
               <span className="text-sm font-semibold text-slate-500">{requests.length}</span>
@@ -124,6 +143,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
                         </div>
                         {request.status === "draft" ? <SubmitQuoteRequestButton projectId={project.id} requestId={request.id} /> : null}
                       </div>
+                      <RequestProgress status={request.status} />
                       {departments.length ? <div className="mt-3 flex flex-wrap gap-1.5">{departments.map((department) => <span key={department} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">{department}</span>)}</div> : null}
                       {needsAnswers ? <p className="mt-3 text-xs font-semibold text-amber-700">{needsAnswers} item{needsAnswers === 1 ? " needs" : "s need"} qualifying answers before submission.</p> : null}
                       <div className="mt-4 grid gap-2 border-t border-slate-200 pt-3">
@@ -137,7 +157,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
               </div>
             ) : (
               <div className="mt-4 rounded-[18px] border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
-                <p className="text-sm font-medium text-slate-700">No Quote Requests yet.</p>
+                <p className="text-sm font-medium text-slate-700">No requests yet.</p>
                 <Link href="/shop" className="mt-3 inline-flex text-sm font-semibold text-[#0066cc]">Browse departments</Link>
               </div>
             )}

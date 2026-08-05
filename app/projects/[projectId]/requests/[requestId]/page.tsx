@@ -4,7 +4,7 @@ import { notFound } from "next/navigation"
 import { QuoteItemAnswersEditor, SubmitQuoteRequestButton } from "@/components/buildflow/project-workspace-controls"
 import { requireSignedInProfile } from "@/lib/auth"
 import { PROJECT_UPLOAD_STORAGE_BUCKET } from "@/lib/projects"
-import { quoteRequestStatusClass, quoteRequestStatusLabel, type QuoteRequestItemRecord, type QuoteRequestRecord } from "@/lib/quote-requests"
+import { quoteRequestProgressIndex, quoteRequestStatusClass, quoteRequestStatusLabel, QUOTE_REQUEST_PROGRESS_STEPS, type QuoteRequestItemRecord, type QuoteRequestRecord } from "@/lib/quote-requests"
 import { getQualificationSettingForPlanRequest, getQualificationSettingForProduct } from "@/lib/shop-qualification"
 
 type AttachmentRecord = { id: string; item_id: string | null; file_name: string; file_path: string; file_type: string | null; file_size: number | null }
@@ -24,6 +24,7 @@ export default async function QuoteRequestDetailPage({ params }: { params: Promi
     return { ...file, signedUrl: data?.signedUrl ?? null }
   }))
   const locked = request.status !== "draft"
+  const activeProgressIndex = quoteRequestProgressIndex(request.status)
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] pb-28 text-slate-950 sm:pb-12">
@@ -31,13 +32,16 @@ export default async function QuoteRequestDetailPage({ params }: { params: Promi
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-8">
           <Link href={`/projects/${projectId}`} className="text-sm font-semibold text-[#0066cc]">Back to Project</Link>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Quote Request</p><h1 className="mt-1 text-2xl font-semibold sm:text-3xl">{request.title}</h1></div>
+            <div><p className="text-[11px] font-semibold uppercase text-slate-500">Project Request</p><h1 className="mt-1 text-2xl font-semibold sm:text-3xl">{request.title}</h1></div>
             <span className={`w-fit rounded-full border px-3 py-1.5 text-xs font-semibold uppercase ${quoteRequestStatusClass(request.status)}`}>{quoteRequestStatusLabel(request.status)}</span>
           </div>
         </div>
       </header>
 
       <div className="mx-auto grid max-w-4xl gap-4 px-4 py-5 sm:px-8">
+        <ol className="grid grid-cols-2 gap-2 rounded-[20px] border border-slate-200 bg-white p-3 sm:grid-cols-4" aria-label={`Request progress: ${quoteRequestStatusLabel(request.status)}`}>
+          {QUOTE_REQUEST_PROGRESS_STEPS.map((label, index) => <li key={label} className={`rounded-xl px-2 py-2 text-[11px] font-semibold leading-4 ${index <= activeProgressIndex ? "bg-sky-50 text-sky-800" : "bg-slate-50 text-slate-400"}`}><span className="mr-1">{index + 1}.</span>{label}</li>)}
+        </ol>
         {locked ? <div className="rounded-[18px] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">This request is locked while it is being reviewed.</div> : null}
         {(items ?? []).map((item) => {
           const qualificationTarget = { id: item.catalog_item_id || item.id, name: item.name, category: item.department, price: item.unit_price, productType: item.item_type === "material" ? "material" as const : "service" as const }

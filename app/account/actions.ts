@@ -45,3 +45,32 @@ export async function updateAccountPhone(formData: FormData) {
   revalidatePath("/account");
   redirect("/account?updated=phone");
 }
+
+export async function updateAlternateContacts(formData: FormData) {
+  const { supabase } = await requireSignedInProfile();
+  const alternateEmail = String(formData.get("alternateEmail") || "").trim().toLowerCase();
+  const rawAlternatePhone = String(formData.get("alternatePhone") || "").trim();
+  const alternatePhone = rawAlternatePhone ? normalizePhoneNumber(rawAlternatePhone) : "";
+
+  if (alternateEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(alternateEmail)) {
+    redirect("/account?error=alternate-email");
+  }
+
+  if (rawAlternatePhone && (!alternatePhone || alternatePhone.length < 8)) {
+    redirect("/account?error=alternate-phone");
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    data: {
+      alternate_email: alternateEmail || null,
+      alternate_phone: alternatePhone || null,
+    },
+  });
+
+  if (error) {
+    redirect("/account?error=contacts");
+  }
+
+  revalidatePath("/account");
+  redirect("/account?updated=contacts");
+}

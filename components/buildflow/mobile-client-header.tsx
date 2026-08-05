@@ -104,11 +104,8 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
     { href: "/shop", label: "Shop" },
     { href: "/projects", label: "My Projects" },
     ...(isPreviewAdminEnabled ? [{ href: "/preview-admin/vendors", label: "Manager" }] : []),
-    { href: "/projects/new?next=%2Fshop", label: "Start Building" },
     ...(isSignedIn
       ? [
-          { href: "/quotes", label: "Quotes" },
-          { href: "/orders", label: "Orders" },
           { href: "/account", label: "Account & Settings" },
         ]
       : [

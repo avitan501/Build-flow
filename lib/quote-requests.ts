@@ -54,8 +54,24 @@ export type ProjectQuestionAnswerRecord = {
 }
 
 export function quoteRequestStatusLabel(status: QuoteRequestStatus) {
-  if (status === "in_review") return "In Review"
-  return status.charAt(0).toUpperCase() + status.slice(1)
+  if (status === "draft") return "Request Created"
+  if (status === "submitted") return "Under Review"
+  if (status === "in_review") return "Waiting for Client Approval"
+  return "Request Completed"
+}
+
+export const QUOTE_REQUEST_PROGRESS_STEPS = [
+  "Request Created",
+  "Under Review",
+  "Waiting for Client Approval",
+  "Request Completed",
+] as const
+
+export function quoteRequestProgressIndex(status: QuoteRequestStatus) {
+  if (status === "draft") return 0
+  if (status === "submitted") return 1
+  if (status === "in_review") return 2
+  return 3
 }
 
 export function quoteRequestStatusClass(status: QuoteRequestStatus) {
