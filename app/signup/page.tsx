@@ -309,7 +309,7 @@ export default function SignupPage() {
               disabled={isSubmitting}
               className="w-full rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {isSubmitting ? "Opening Google..." : "Continue with Google"}
+              {isSubmitting ? "Opening Gmail..." : "Continue with Gmail"}
             </button>
           </div>
           ) : null}

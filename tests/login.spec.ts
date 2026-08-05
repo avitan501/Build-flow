@@ -33,3 +33,17 @@ test("the email login field accepts a phone-password account", async ({ page }) 
   expect(submittedEmail).toBe("phone-13475675077@phone-login.buildflow.local")
   expect(pageErrors.filter((message) => message.includes("Hydration failed"))).toEqual([])
 })
+
+test("login shows Gmail when Google authentication is enabled", async ({ page }) => {
+  await page.route("**/auth/v1/settings", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ external: { google: true } }),
+    })
+  })
+
+  await page.goto("/login")
+
+  await expect(page.getByRole("button", { name: "Continue with Gmail" })).toBeVisible()
+})
