@@ -21,6 +21,12 @@ function buildLoginRedirect(origin: string, next: string, errorMessage: string) 
 }
 
 function getSafeErrorMessage(errorMessage: string) {
+  const normalized = errorMessage.toLowerCase();
+
+  if (normalized.includes("pkce") || normalized.includes("code verifier")) {
+    return "That sign-in attempt expired. Start again on the login page.";
+  }
+
   if (errorMessage.includes("Unable to exchange external code")) {
     return "Google sign-in reached Supabase, but Supabase could not exchange the Google code. Please try again.";
   }

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
+import { friendlyAuthError, isGoogleAuthEnabled } from "@/lib/auth-ui";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 
@@ -40,9 +41,10 @@ export default function LoginPage() {
   const callbackError = searchParams.get("error");
   const [form, setForm] = useState<LoginState>(initialState);
   const [mode, setMode] = useState<LoginMode>("email");
-  const [error, setError] = useState<string | null>(callbackError);
+  const [error, setError] = useState<string | null>(callbackError ? friendlyAuthError(callbackError) : null);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
   const redirectPath = sanitizeNextPath(searchParams.get("next"));
   const nextQuery = redirectPath === "/" ? "" : `?next=${encodeURIComponent(redirectPath)}`;
   const phoneSignupQuery = redirectPath === "/" ? "?mode=phone" : `?mode=phone&next=${encodeURIComponent(redirectPath)}`;
@@ -72,6 +74,15 @@ export default function LoginPage() {
     };
   }, [redirectPath, router, supabase]);
 
+  const markFormReady = useCallback((formElement: HTMLFormElement | null) => {
+    if (formElement) formElement.dataset.hydrated = "true"
+  }, [])
+
+  useEffect(() => {
+    if (!supabase) return
+    void isGoogleAuthEnabled().then(setGoogleEnabled)
+  }, [supabase])
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -85,13 +96,24 @@ export default function LoginPage() {
     }
 
     try {
+      const enteredCredential = form.email.trim()
+      const enteredPhone = normalizePhoneNumber(enteredCredential)
+      const phoneEmail = !enteredCredential.includes("@") && enteredPhone.length >= 8
+        ? phoneLoginEmailForPhone(enteredPhone)
+        : null
+
+      if (!enteredCredential.includes("@") && !phoneEmail) {
+        setError("Enter a valid email address or phone number.")
+        return
+      }
+
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: form.email,
+        email: phoneEmail || enteredCredential,
         password: form.password,
       });
 
       if (signInError) {
-        setError(signInError.message);
+        setError(friendlyAuthError(signInError.message));
         return;
       }
 
@@ -132,7 +154,7 @@ export default function LoginPage() {
       });
 
       if (otpError) {
-        setError(otpError.message);
+        setError(friendlyAuthError(otpError.message));
         return;
       }
 
@@ -178,7 +200,7 @@ export default function LoginPage() {
       });
 
       if (signInError) {
-        setError(signInError.message);
+        setError(friendlyAuthError(signInError.message));
         return;
       }
 
@@ -213,7 +235,7 @@ export default function LoginPage() {
       });
 
       if (oauthError) {
-        setError(oauthError.message);
+        setError(friendlyAuthError(oauthError.message));
       }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Google sign-in request failed.");
@@ -232,7 +254,7 @@ export default function LoginPage() {
 
           <div className="mt-8 space-y-2">
             <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Log in to Avantia Build</h1>
-            <p className="text-sm text-slate-500">Use email, Google, or phone number with a password.</p>
+            <p className="text-sm text-slate-500">Use your email or phone number with a password.</p>
           </div>
 
           {!hasAuthConfig ? (
@@ -267,16 +289,21 @@ export default function LoginPage() {
           </div>
 
           {mode === "email" ? (
-            <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+            <form ref={markFormReady} className="mt-6 space-y-4" onSubmit={handleSubmit} data-testid="login-form">
               <label className="block text-sm font-medium text-slate-700">
                 <span className="mb-2 block">Email</span>
                 <input
                   required
-                  type="email"
+                  type="text"
+                  inputMode="email"
+                  autoComplete="username"
                   value={form.email}
-                  onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+                  onChange={(event) => {
+                    setError(null)
+                    setForm((current) => ({ ...current, email: event.target.value }))
+                  }}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                  placeholder="name@company.com"
+                  placeholder="Email or phone number"
                 />
               </label>
 
@@ -319,7 +346,7 @@ export default function LoginPage() {
               </button>
             </form>
           ) : (
-            <form className="mt-6 space-y-4" onSubmit={handlePhoneSubmit}>
+            <form ref={markFormReady} className="mt-6 space-y-4" onSubmit={handlePhoneSubmit} data-testid="login-form">
               <label className="block text-sm font-medium text-slate-700">
                 <span className="mb-2 block">Phone number</span>
                 <input
@@ -369,10 +396,8 @@ export default function LoginPage() {
             </form>
           )}
 
+          {googleEnabled ? (
           <div className="mt-4">
-            {mode !== "email" && error ? (
-              <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
-            ) : null}
             <button
               type="button"
               onClick={handleGoogleSignIn}
@@ -382,6 +407,7 @@ export default function LoginPage() {
               {isSubmitting ? "Opening Google..." : "Continue with Google"}
             </button>
           </div>
+          ) : null}
 
           <div className="mt-6 flex items-center justify-between gap-4 text-sm">
             <Link href="/reset-password" className="font-medium text-sky-700 hover:text-sky-800">

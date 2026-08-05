@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
+import { friendlyAuthError, isGoogleAuthEnabled } from "@/lib/auth-ui";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 
@@ -41,8 +42,14 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
   const redirectPath = sanitizeNextPath(searchParams.get("next"));
   const nextQuery = redirectPath === "/" ? "" : `?next=${encodeURIComponent(redirectPath)}`;
+
+  useEffect(() => {
+    if (!supabase) return;
+    void isGoogleAuthEnabled().then(setGoogleEnabled);
+  }, [supabase]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -173,7 +180,7 @@ export default function SignupPage() {
       });
 
       if (oauthError) {
-        setError(oauthError.message);
+        setError(friendlyAuthError(oauthError.message));
       }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Google sign-in request failed.");
@@ -294,6 +301,7 @@ export default function SignupPage() {
             </button>
           </form>
 
+          {googleEnabled ? (
           <div className="mt-4">
             <button
               type="button"
@@ -304,6 +312,7 @@ export default function SignupPage() {
               {isSubmitting ? "Opening Google..." : "Continue with Google"}
             </button>
           </div>
+          ) : null}
 
           <div className="mt-6 flex items-center justify-between gap-4 text-sm">
             <Link href={`/login${nextQuery}`} className="font-medium text-sky-700 hover:text-sky-800">

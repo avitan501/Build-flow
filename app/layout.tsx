@@ -7,6 +7,7 @@ import { MobileClientHeader } from "@/components/buildflow/mobile-client-header"
 import { SiteFooter } from "@/components/buildflow/site-footer";
 import { WorkflowSettingsHydrator } from "@/components/buildflow/workflow-settings-hydrator";
 import { getSessionWithProfile } from "@/lib/auth";
+import { getSupabasePublicEnv, hasSupabasePublicEnv } from "@/lib/supabase/env";
 import type { PublicWorkflowState } from "@/lib/workflow-public";
 import "./globals.css";
 
@@ -40,6 +41,10 @@ export default async function RootLayout({
   const isPreviewAdminEnabled = process.env.VERCEL_ENV !== "production";
   const projectsHref = "/projects";
   const displayName = profile?.full_name?.trim() || user?.email?.split("@")[0] || null;
+  const supabaseBrowserConfig = hasSupabasePublicEnv() ? getSupabasePublicEnv() : null;
+  const serializedSupabaseConfig = supabaseBrowserConfig
+    ? JSON.stringify(supabaseBrowserConfig).replace(/</g, "\\u003c")
+    : null;
   const { data: publicStateRow } = supabase
     ? await supabase.from("workflow_public_catalog").select("state").eq("id", "singleton").maybeSingle<{ state: PublicWorkflowState }>()
     : { data: null };
@@ -49,6 +54,15 @@ export default async function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      {serializedSupabaseConfig ? (
+        <head>
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `window.__AVANTIA_SUPABASE__=${serializedSupabaseConfig}`,
+            }}
+          />
+        </head>
+      ) : null}
       <body className="min-h-full">
         <AvantiaBuildClientShell>
           <WorkflowSettingsHydrator state={publicStateRow?.state ?? null} />
