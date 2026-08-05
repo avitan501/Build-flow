@@ -51,62 +51,6 @@ function FramingUploadActions() {
   )
 }
 
-function TileWorkActions() {
-  return (
-    <section className="grid grid-cols-2 gap-3 sm:max-w-2xl sm:gap-4">
-      <Link
-        href="/shop/tile-work/thinset-calculator"
-        prefetch={false}
-        className="flex min-h-[148px] touch-manipulation flex-col justify-between rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition active:scale-[0.99] active:border-sky-300"
-      >
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
-          <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="4" y="3" width="16" height="18" rx="2" />
-            <path d="M8 7h8" />
-            <path d="M8 11h2" />
-            <path d="M12 11h2" />
-            <path d="M16 11h.01" />
-            <path d="M8 15h2" />
-            <path d="M12 15h2" />
-            <path d="M16 15h.01" />
-          </svg>
-        </span>
-        <span>
-          <span className="block text-base font-bold leading-5 text-slate-950">Thinset calculator</span>
-          <span className="mt-1 block text-xs font-medium leading-4 text-slate-500">Estimate thinset for tile work</span>
-        </span>
-      </Link>
-    </section>
-  )
-}
-
-function SheetRockActions() {
-  return (
-    <section className="grid grid-cols-2 gap-3 sm:max-w-2xl sm:gap-4">
-      <Link
-        href="/shop/sheet-rock/drywall-calculator"
-        prefetch={false}
-        className="flex min-h-[148px] touch-manipulation flex-col justify-between rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition active:scale-[0.99] active:border-sky-300"
-      >
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
-          <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="5" y="3" width="14" height="18" rx="2" />
-            <path d="M9 7h6" />
-            <path d="M9 11h2" />
-            <path d="M13 11h2" />
-            <path d="M9 15h2" />
-            <path d="M13 15h2" />
-          </svg>
-        </span>
-        <span>
-          <span className="block text-base font-bold leading-5 text-slate-950">Drywall calculator</span>
-          <span className="mt-1 block text-xs font-medium leading-4 text-slate-500">Plan ruler takeoff, openings, boards, screws, tape, and mud</span>
-        </span>
-      </Link>
-    </section>
-  )
-}
-
 function WoodFloorActions() {
   return (
     <section className="grid grid-cols-2 gap-3 sm:max-w-2xl sm:gap-4">
@@ -150,43 +94,12 @@ function KitchenActions() {
   ]
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)]">
-      <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.08)]">
-        <div className="relative min-h-[260px] bg-slate-900 sm:min-h-[340px]">
-          <Image
-            src="/images/buildflow-retail/kitchen.jpg"
-            alt="Premium kitchen cabinetry showroom with cabinet samples"
-            fill
-            sizes="(min-width: 1024px) 58vw, 100vw"
-            className="object-cover"
-            priority
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.72),rgba(15,23,42,0.28)_48%,rgba(15,23,42,0.02))]" />
-          <div className="relative flex min-h-[260px] max-w-xl flex-col justify-between p-5 text-white sm:min-h-[340px] sm:p-7">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/75">Avantia Build Kitchen</p>
-              <h2 className="mt-3 max-w-md text-3xl font-bold leading-tight tracking-normal sm:text-4xl">Premium cabinetry for builder-ready kitchens</h2>
-              <p className="mt-3 max-w-sm text-sm leading-6 text-white/82">
-                Upload the plan or design spec and keep cabinet style, finish, hardware, and ordering notes connected to the project.
-              </p>
-            </div>
-            <div className="mt-6 grid grid-cols-2 gap-2 text-xs font-semibold text-slate-950 sm:max-w-md">
-              <span className="rounded-2xl bg-white/90 px-3 py-3">Shaker</span>
-              <span className="rounded-2xl bg-white/90 px-3 py-3">Slab</span>
-              <span className="rounded-2xl bg-white/90 px-3 py-3">Custom finish</span>
-              <span className="rounded-2xl bg-white/90 px-3 py-3">Hardware notes</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-3 self-start sm:gap-4">
+    <section className="grid max-w-xl gap-3 sm:gap-4">
         {actions.map((action) => (
           <ManagerItemVisibility key={action.label} itemId={`kitchen-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
             <PlanRequestUploadCard requestId={`kitchen-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} category="Kitchen" label={action.label} description={action.description} accept={action.accept} icon={action.icon} />
           </ManagerItemVisibility>
         ))}
-      </div>
     </section>
   )
 }
@@ -356,8 +269,6 @@ export function ShopToolCategoryPage({ category, projects, selectedProjectId, is
 
         {usesStandardUpload ? <CombinedUploadAction category={category.label} requestId={category.slug} /> : null}
         {category.slug === "framing" ? <FramingUploadActions /> : null}
-        {category.slug === "tile-work" ? <ManagerItemVisibility itemId="tile-work-package"><TileWorkActions /></ManagerItemVisibility> : null}
-        {category.slug === "sheet-rock" ? <ManagerItemVisibility itemId="sheet-rock-drywall-takeoff"><SheetRockActions /></ManagerItemVisibility> : null}
         {category.slug === "wood-floor" ? <ManagerItemVisibility itemId="wood-floor-takeoff"><WoodFloorActions /></ManagerItemVisibility> : null}
         {category.slug === "kitchen" ? <KitchenActions /> : null}
         {category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}

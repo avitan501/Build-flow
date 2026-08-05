@@ -82,7 +82,18 @@ test("siding and roofing are separate departments with a complete request flow",
   expect(new Set(positions).size).toBe(8)
   await expect(page.getByRole("heading", { name: "Available items" })).toHaveCount(0)
   await expect(page.getByText("Recommended next", { exact: true })).toHaveCount(0)
-  await expect(page.getByRole("heading", { name: "Tell us what you need" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Order here with our AI agent" })).toBeVisible()
+})
+
+test("kitchen, tile, and drywall omit retired promotional and calculator cards", async ({ page }) => {
+  await page.goto("/shop/kitchen")
+  await expect(page.getByText("Premium cabinetry for builder-ready kitchens")).toHaveCount(0)
+
+  await page.goto("/shop/tile-work")
+  await expect(page.getByText("Thinset calculator", { exact: true })).toHaveCount(0)
+
+  await page.goto("/shop/sheet-rock")
+  await expect(page.getByText("Drywall calculator", { exact: true })).toHaveCount(0)
 })
 
 test("shop shows the sourcing brands and direct help actions", async ({ page }) => {
