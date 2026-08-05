@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
 type PhonePasswordSignupBody = {
   fullName?: string;
@@ -36,16 +37,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
     }
 
-    const admin = createAdminClient();
-    const { data: createdUser, error: createError } = await admin.auth.admin.createUser({
+    const { url, anonKey } = getSupabasePublicEnv();
+    const supabase = createClient(url, anonKey, {
+      auth: {
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        persistSession: false,
+      },
+    });
+    const { data: createdUser, error: createError } = await supabase.auth.signUp({
       email,
       password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: fullName,
-        company_name: fullName,
-        phone,
-        login_type: "phone",
+      options: {
+        data: {
+          full_name: fullName,
+          company_name: fullName,
+          phone,
+          login_type: "phone",
+        },
       },
     });
 
@@ -59,24 +68,6 @@ export async function POST(request: Request) {
 
     if (!createdUser.user?.id) {
       return NextResponse.json({ error: "Phone account creation failed." }, { status: 500 });
-    }
-
-    const { error: profileError } = await admin.from("profiles").upsert(
-      {
-        id: createdUser.user.id,
-        email,
-        full_name: fullName,
-        phone,
-        company_name: fullName,
-        role: "client",
-        approval_status: "pending",
-        is_active: true,
-      },
-      { onConflict: "id" },
-    );
-
-    if (profileError) {
-      return NextResponse.json({ error: profileError.message || "Profile insert failed." }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true, email, phone });

@@ -127,24 +127,6 @@ export default function SignupPage() {
         return;
       }
 
-      const profileResponse = await fetch("/api/auth/create-profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: data.user.id,
-          email,
-          fullName: form.fullName,
-          companyName: form.fullName,
-          phone,
-        }),
-      });
-      const profileResult = (await profileResponse.json().catch(() => null)) as { error?: string } | null;
-
-      if (!profileResponse.ok) {
-        setError(profileResult?.error || "Account was created, but profile setup failed.");
-        return;
-      }
-
       if (data.session) {
         router.push(redirectPath);
         router.refresh();
