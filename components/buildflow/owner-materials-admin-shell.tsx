@@ -455,7 +455,7 @@ function ProductPreviewCard({ row }: { row: OwnerMaterialRowState | null }) {
           </div>
         </div>
         <button type="button" disabled className={`mt-5 w-full rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 opacity-80 ${buttonFocusClass}`}>
-          Add To Cart Preview
+          Add To Project Preview
         </button>
       </div>
     </article>

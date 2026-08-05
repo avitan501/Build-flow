@@ -9,12 +9,12 @@ import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { MobileMenuDrawer, type MobileMenuLink } from "@/components/buildflow/mobile-menu-drawer";
 import { placeholderImageMetadata } from "@/lib/shop-catalog";
 import { SHOP_CATEGORY_NAMES, SHOP_POPULAR_SEARCHES } from "@/lib/shop";
-import { SHOP_CART_UPDATED_EVENT, readShopCartCount } from "@/lib/shop-cart";
 
 type MobileClientHeaderProps = {
   isSignedIn: boolean;
   isAdmin: boolean;
   isPreviewAdminEnabled?: boolean;
+  displayName?: string | null;
 };
 
 const HIDDEN_PATHS = new Set(["/login", "/signup", "/reset-password"]);
@@ -65,28 +65,26 @@ function CloseIcon() {
   );
 }
 
-function CartIcon() {
+function AccountIcon({ signedIn }: { signedIn: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="9" cy="19" r="1.5" />
-      <circle cx="17" cy="19" r="1.5" />
-      <path d="M3 4h2l2.2 10.2A1 1 0 0 0 8.2 15H18a1 1 0 0 0 1-.8L21 7H6" />
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill={signedIn ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="8" r="3.25" />
+      <path d="M5.5 20c.6-4 2.8-6 6.5-6s5.9 2 6.5 6" />
     </svg>
   );
 }
 
-export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled = false }: MobileClientHeaderProps) {
+export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled = false, displayName = null }: MobileClientHeaderProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [shopSearchOpen, setShopSearchOpen] = useState(false);
   const [draftQuery, setDraftQuery] = useState("");
-  const [shopCartCount, setShopCartCount] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isShopPage = Boolean(pathname) && pathname.startsWith("/shop");
-  const isCartPage = pathname === "/cart";
   const shopQuery = isShopPage ? searchParams.get("q") ?? "" : "";
+  const accountLabel = isSignedIn ? displayName?.split(/\s+/)[0] || "Account" : "Log in";
 
   useEffect(() => {
     if (shopSearchOpen) {
@@ -101,30 +99,12 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
     }
   }, [shopQuery, shopSearchOpen]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const syncCartCount = () => setShopCartCount(readShopCartCount());
-
-    syncCartCount();
-    window.addEventListener("storage", syncCartCount);
-    window.addEventListener(SHOP_CART_UPDATED_EVENT, syncCartCount as EventListener);
-
-    return () => {
-      window.removeEventListener("storage", syncCartCount);
-      window.removeEventListener(SHOP_CART_UPDATED_EVENT, syncCartCount as EventListener);
-    };
-  }, []);
-
   const primaryLinks = useMemo<MobileMenuLink[]>(() => [
     { href: "/", label: "Home" },
     { href: "/shop", label: "Shop" },
     { href: "/projects", label: "My Projects" },
     ...(isPreviewAdminEnabled ? [{ href: "/preview-admin/vendors", label: "Manager" }] : []),
     { href: "/projects/new?next=%2Fshop", label: "Start Building" },
-    { href: "/cart", label: "Cart" },
     ...(isSignedIn
       ? [
           { href: "/quotes", label: "Quotes" },
@@ -232,20 +212,17 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
             </Link>
           )}
 
-          {isShopPage || isCartPage || shopCartCount > 0 ? (
-            <Link href="/cart" prefetch={false} aria-label="Cart" className="inline-flex">
-              <IconShell active={isCartPage || shopCartCount > 0}>
-                <CartIcon />
-                {shopCartCount > 0 ? <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-950">{shopCartCount}</span> : null}
-              </IconShell>
-            </Link>
-          ) : null}
-
-          {!isSignedIn && !isShopPage ? (
-            <Link href="/login" prefetch={false} className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200/90 bg-white/95 px-3 text-xs font-bold text-[#0E2A4A] shadow-sm transition active:scale-[0.98]">
-              Log in
-            </Link>
-          ) : null}
+          <Link
+            href={isSignedIn ? "/account" : "/login"}
+            prefetch={false}
+            aria-label={isSignedIn ? `Open account for ${accountLabel}` : "Log in"}
+            className={`flex min-h-10 max-w-[7.75rem] shrink-0 items-center gap-1.5 rounded-2xl border px-2.5 text-xs font-bold shadow-sm transition active:scale-[0.98] ${pathname === "/account" ? "border-sky-200 bg-sky-50 text-[#0E2A4A]" : "border-slate-200/90 bg-white/95 text-[#0E2A4A]"}`}
+          >
+            <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isSignedIn ? "bg-[#0E2A4A] text-white" : "bg-slate-100 text-slate-700"}`}>
+              <AccountIcon signedIn={isSignedIn} />
+            </span>
+            <span className="min-w-0 truncate">{accountLabel}</span>
+          </Link>
 
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
+import { saveWorkflowManagerSettingsAction } from "@/app/preview-admin/workflow-actions"
 
 import {
   buildManagerDepartmentOverride,
@@ -37,12 +38,15 @@ type ManagerPanel = "services" | "departments" | "suppliers"
 type DepartmentItemKind = "product" | "file-upload"
 type SupplierRoutingManagerProps = {
   catalogProducts?: ShopCatalogProduct[]
+  initialSettings?: ShopQualificationSettings | null
+  initialAddOns?: ManagerCatalogAddOns | null
 }
 
 const questionTypes: QualifyingQuestionType[] = ["text", "textarea", "select"]
 const deliveryMethods: SupplierDeliveryMethod[] = ["email", "phone", "whatsapp", "sms", "portal", "manual"]
 
-function loadSettings(): ShopQualificationSettings {
+function loadSettings(initial?: ShopQualificationSettings | null): ShopQualificationSettings {
+  if (initial) return initial
   const stored = readShopQualificationSettings()
   return {
     suppliers: stored.suppliers.length > 0 ? stored.suppliers : DEFAULT_SUPPLIERS,
@@ -50,8 +54,8 @@ function loadSettings(): ShopQualificationSettings {
   }
 }
 
-function loadAddOns(): ManagerCatalogAddOns {
-  return readManagerAddOns()
+function loadAddOns(initial?: ManagerCatalogAddOns | null): ManagerCatalogAddOns {
+  return initial ?? readManagerAddOns()
 }
 
 function makeId(value: string) {
@@ -100,9 +104,9 @@ function departmentShopHref(departmentLabel: string) {
   return `/shop?category=${encodeURIComponent(departmentLabel)}`
 }
 
-export function SupplierRoutingManager({ catalogProducts = [] }: SupplierRoutingManagerProps) {
-  const [settings, setSettings] = useState<ShopQualificationSettings>(() => loadSettings())
-  const [addOns, setAddOns] = useState<ManagerCatalogAddOns>(() => loadAddOns())
+export function SupplierRoutingManager({ catalogProducts = [], initialSettings = null, initialAddOns = null }: SupplierRoutingManagerProps) {
+  const [settings, setSettings] = useState<ShopQualificationSettings>(() => loadSettings(initialSettings))
+  const [addOns, setAddOns] = useState<ManagerCatalogAddOns>(() => loadAddOns(initialAddOns))
   const [activePanel, setActivePanel] = useState<ManagerPanel>("departments")
   const [selectedTargetId, setSelectedTargetId] = useState(SERVICE_ASSIGNMENT_TARGETS[0]?.id ?? "")
   const [selectedSupplierId, setSelectedSupplierId] = useState(settings.suppliers[0]?.id ?? DEFAULT_SUPPLIERS[0]?.id ?? "")
@@ -216,11 +220,13 @@ export function SupplierRoutingManager({ catalogProducts = [] }: SupplierRouting
   function persist(next: ShopQualificationSettings) {
     setSettings(next)
     writeShopQualificationSettings(next)
+    void saveWorkflowManagerSettingsAction({ qualificationSettings: next, addOns })
   }
 
   function persistAddOns(next: ManagerCatalogAddOns) {
     setAddOns(next)
     writeManagerAddOns(next)
+    void saveWorkflowManagerSettingsAction({ qualificationSettings: settings, addOns: next })
   }
 
   function updateSelectedSetting(patch: Partial<ProductQualificationSetting>) {
@@ -672,7 +678,7 @@ export function SupplierRoutingManager({ catalogProducts = [] }: SupplierRouting
 
                 <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] sm:p-7">
                   <h3 className="text-lg font-semibold text-slate-950">Question set</h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-500">These questions appear after the customer adds this sub-department/upload to cart.</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">These questions appear after the customer adds this sub-department or upload to a project.</p>
                   <div className="mt-4 grid gap-3">
                     {selectedSetting.questions.length === 0 ? (
                       <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">No questions added for this sub-department.</div>
@@ -1079,7 +1085,7 @@ export function SupplierRoutingManager({ catalogProducts = [] }: SupplierRouting
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h4 className="text-lg font-semibold text-slate-950">Add item to {selectedDepartmentDisplay}</h4>
-                      <p className="mt-1 text-sm leading-6 text-slate-500">Choose product for a normal cart item, or file upload when the customer should upload plans and answer questions.</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-500">Choose product for a normal project item, or file upload when the customer should upload plans and answer questions.</p>
                     </div>
                     <div className="grid grid-cols-2 rounded-2xl border border-slate-200 bg-slate-50 p-1">
                       {(["product", "file-upload"] as DepartmentItemKind[]).map((kind) => (

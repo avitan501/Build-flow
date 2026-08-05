@@ -3,25 +3,17 @@
 import Link from "next/link"
 import Image from "next/image"
 import { useEffect, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
+import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
 import { recordShopActivity } from "@/app/shop/actions"
-import { QualifyingQuestionsModal } from "@/components/buildflow/qualifying-questions-modal"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import { getShopActivitySessionId, writeLocalShopActivity } from "@/lib/shop-activity"
 import {
-  SHOP_CART_UPDATED_EVENT,
   SHOP_SAVE_UPDATED_EVENT,
-  readShopCartCount,
-  readShopCartMap,
   readShopSavedIds,
-  upsertShopCartItemDetails,
-  type ShopCartQuestionAnswer,
-  writeShopCartMap,
   writeShopSavedIds,
 } from "@/lib/shop-cart"
-import { getQualificationSettingForProduct, type QualifyingQuestion } from "@/lib/shop-qualification"
 
 type ShopProductDetailExperienceProps = {
   product: ShopCatalogProduct
@@ -47,16 +39,6 @@ function SearchIcon() {
   )
 }
 
-function CartIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="8" cy="21" r="1" />
-      <circle cx="19" cy="21" r="1" />
-      <path d="M2.05 2.05h2l2.66 12.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.69L22 7H6" />
-    </svg>
-  )
-}
-
 function BookmarkIcon({ filled = false }: { filled?: boolean }) {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -66,20 +48,14 @@ function BookmarkIcon({ filled = false }: { filled?: boolean }) {
 }
 
 export function ShopProductDetailExperience({ product, relatedProducts }: ShopProductDetailExperienceProps) {
-  const router = useRouter()
   const [quantity, setQuantity] = useState(1)
   const isService = product.productType === "service"
   const [activeImage, setActiveImage] = useState(product.gallery[0]?.imageUrl || product.imageUrl)
   const galleryScrollRef = useRef<HTMLDivElement>(null)
-  const [cartCount, setCartCount] = useState(0)
   const [saved, setSaved] = useState(false)
-  const [addedMessage, setAddedMessage] = useState<string | null>(null)
-  const [qualifyingQuestions, setQualifyingQuestions] = useState<QualifyingQuestion[]>([])
-  const [questionsOpen, setQuestionsOpen] = useState(false)
 
   useEffect(() => {
     const sync = () => {
-      setCartCount(readShopCartCount())
       setSaved(readShopSavedIds().includes(product.id))
     }
 
@@ -94,53 +70,11 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
       category: product.category,
       metadata: { productType: product.productType || "material" },
     })
-    window.addEventListener(SHOP_CART_UPDATED_EVENT, sync)
     window.addEventListener(SHOP_SAVE_UPDATED_EVENT, sync)
     return () => {
-      window.removeEventListener(SHOP_CART_UPDATED_EVENT, sync)
       window.removeEventListener(SHOP_SAVE_UPDATED_EVENT, sync)
     }
   }, [product.category, product.id, product.name, product.productType, product.slug])
-
-  function saveCartDetails(status: "not_required" | "pending" | "answered" | "skipped", answers: ShopCartQuestionAnswer[] = []) {
-    upsertShopCartItemDetails({
-      productId: product.id,
-      productName: product.name,
-      category: product.category,
-      itemType: product.productType === "service" ? "service" : product.price <= 0 ? "custom-priced" : "material",
-      qualificationStatus: status,
-      answers,
-      updatedAt: new Date().toISOString(),
-    })
-  }
-
-  function addToCart() {
-    const current = readShopCartMap()
-    writeShopCartMap({ ...current, [product.id]: quantity })
-    setCartCount(readShopCartCount())
-    writeLocalShopActivity({ eventType: "add_to_cart", productSlug: product.slug, productName: product.name, category: product.category })
-    void recordShopActivity({
-      eventType: "add_to_cart",
-      sessionId: getShopActivitySessionId(),
-      productSlug: product.slug,
-      productName: product.name,
-      category: product.category,
-      metadata: { quantity },
-    })
-    const qualification = getQualificationSettingForProduct(product)
-    const shouldAskQuestions = qualification.enabled && qualification.questions.length > 0
-    saveCartDetails(shouldAskQuestions ? "pending" : "not_required")
-    setAddedMessage(shouldAskQuestions ? `Added ${quantity} to cart. Quick questions opened.` : `Added ${quantity} to cart`)
-    if (shouldAskQuestions) {
-      setQualifyingQuestions(qualification.questions)
-      setQuestionsOpen(true)
-    }
-  }
-
-  function buyNow() {
-    addToCart()
-    router.push("/cart")
-  }
 
   function toggleSaved() {
     const current = readShopSavedIds()
@@ -176,9 +110,8 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                 </Link>
               </div>
               <AvantiaBuildLockup compact />
-              <Link href="/cart" prefetch={false} className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm">
-                <CartIcon />
-                <span>{cartCount}</span>
+              <Link href="/account" prefetch={false} className="inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+                Account
               </Link>
             </div>
           </div>
@@ -281,7 +214,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Quantity</div>
-                          <div className="mt-1 text-sm text-slate-600">Adjust before adding to cart</div>
+                          <div className="mt-1 text-sm text-slate-600">Adjust before adding to the project</div>
                         </div>
                         <div className="flex items-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
                           <button type="button" onClick={() => setQuantity((current) => Math.max(1, current - 1))} className="h-11 w-11 text-lg text-slate-700" aria-label="Decrease quantity">−</button>
@@ -291,21 +224,8 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                       </div>
                     </div>
 
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <button
-                        type="button"
-                        onClick={addToCart}
-                        className="inline-flex min-h-14 items-center justify-center rounded-full bg-emerald-500 px-5 text-base font-semibold text-white shadow-[0_18px_34px_rgba(34,197,94,0.28)] transition hover:bg-emerald-600"
-                      >
-                        Add to cart
-                      </button>
-                      <button
-                        type="button"
-                        onClick={buyNow}
-                        className="inline-flex min-h-14 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-base font-semibold text-slate-800 shadow-sm"
-                      >
-                        Buy now
-                      </button>
+                    <div className="mt-4">
+                      <AddToProjectButton product={product} quantity={quantity} className="min-h-14 w-full text-base" />
                     </div>
                   </>
                 ) : (
@@ -317,21 +237,9 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                         View service source
                       </a>
                     ) : null}
-                    <button
-                      type="button"
-                      onClick={addToCart}
-                      className="mt-3 inline-flex min-h-12 items-center justify-center rounded-full bg-sky-600 px-5 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(2,132,199,0.22)] transition hover:bg-sky-700"
-                    >
-                      Add to cart
-                    </button>
+                    <AddToProjectButton product={product} className="mt-3 w-full" />
                   </div>
                 )}
-
-                {addedMessage ? (
-                  <div className="mt-4 rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                    {addedMessage}
-                  </div>
-                ) : null}
               </div>
 
               <div className="mt-4 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
@@ -391,33 +299,6 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
         </div>
       </section>
 
-      {cartCount > 0 ? (
-        <Link href="/cart" prefetch={false} className="fixed bottom-[calc(env(safe-area-inset-bottom)+6.25rem)] left-1/2 z-40 inline-flex -translate-x-1/2 items-center gap-3 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_20px_40px_rgba(15,23,42,0.28)] lg:bottom-4">
-          <CartIcon />
-          <span>{cartCount} item{cartCount === 1 ? "" : "s"} in cart</span>
-        </Link>
-      ) : null}
-
-      <QualifyingQuestionsModal
-        open={questionsOpen}
-        title={product.name}
-        questions={qualifyingQuestions}
-        onClose={() => {
-          saveCartDetails("skipped")
-          setAddedMessage("Item kept in cart. Questions skipped.")
-          setQuestionsOpen(false)
-        }}
-        onSave={(answers) => {
-          saveCartDetails("answered", answers)
-          setAddedMessage("Answers saved with this cart item.")
-          setQuestionsOpen(false)
-        }}
-        onSkip={() => {
-          saveCartDetails("skipped")
-          setAddedMessage("Item kept in cart. Questions skipped.")
-          setQuestionsOpen(false)
-        }}
-      />
     </main>
   )
 }

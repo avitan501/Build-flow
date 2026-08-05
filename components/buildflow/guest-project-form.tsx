@@ -43,7 +43,7 @@ export function GuestProjectForm({ nextPath, errorMessage }: GuestProjectFormPro
     <form onSubmit={handleSubmit} className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-7">
       <div>
         <h1 className="text-[2rem] font-semibold tracking-[-0.05em] text-slate-950 sm:text-[2.4rem]">Start New Project</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600">Add the job name and address. You can shop and build the cart as a guest, then sign in only when you submit the quote.</p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">Add the job name and address, then keep every material, service, plan, and quote request organized in this project.</p>
       </div>
 
       <div className="mt-6 space-y-4">

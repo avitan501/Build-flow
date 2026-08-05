@@ -51,7 +51,7 @@ export function QualifyingQuestionsModal({ open, title, questions, onClose, onSa
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">Quick questions</div>
               <h2 id="qualifying-question-title" className="mt-1 text-xl font-bold tracking-normal text-slate-950">{title}</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-600">This is already in your cart. These answers help prepare a better quote.</p>
+              <p className="mt-1 text-sm leading-6 text-slate-600">This is already in your project. These answers help prepare a better quote.</p>
             </div>
             <button type="button" onClick={onClose} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-xl leading-none text-slate-500 shadow-sm" aria-label="Close questions">
               ×
@@ -85,7 +85,7 @@ export function QualifyingQuestionsModal({ open, title, questions, onClose, onSa
         </div>
 
         <div className="grid gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:grid-cols-[1fr_auto_auto] sm:items-center">
-          <div className="text-xs leading-5 text-slate-500">You can skip this and keep the item in the cart.</div>
+          <div className="text-xs leading-5 text-slate-500">You can answer later from the project before submitting.</div>
           <button type="button" onClick={skipQuestions} className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700">
             Skip
           </button>
@@ -97,4 +97,3 @@ export function QualifyingQuestionsModal({ open, title, questions, onClose, onSa
     </div>
   )
 }
-

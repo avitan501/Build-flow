@@ -12,6 +12,8 @@ function projectShopHref(project: GuestProject) {
 
 export function GuestProjectsPanel() {
   const [projects, setProjects] = useState<GuestProject[]>([])
+  const [showAllProjects, setShowAllProjects] = useState(false)
+  const displayedProjects = showAllProjects ? projects : projects.slice(0, 3)
 
   useEffect(() => {
     const sync = () => setProjects(readGuestProjects())
@@ -25,36 +27,39 @@ export function GuestProjectsPanel() {
   }, [])
 
   return (
-    <section className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">Guest projects</p>
-          <h2 className="mt-1 text-xl font-semibold text-slate-950">Saved on this device</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">You can build the cart without logging in. Sign in only when you submit the quote.</p>
-        </div>
-        <Link href="/projects/new?next=%2Fshop" className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white">
-          New project
-        </Link>
+    <section>
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Saved on this device</p>
+        <h2 className="mt-1 text-xl font-semibold text-[#101828]">Recent Projects</h2>
+        <p className="mt-1 text-sm leading-6 text-[#667085]">Sign in to create a project and keep requests available on every device.</p>
       </div>
 
       {projects.length > 0 ? (
         <div className="mt-4 grid gap-2">
-          {projects.map((project) => (
-            <Link
-              key={project.id}
-              href={projectShopHref(project)}
-              onClick={() => selectGuestProject(project.id)}
-              className="rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 transition active:scale-[0.99]"
-            >
-              <div className="text-sm font-semibold text-slate-950">{project.name}</div>
-              <div className="mt-1 text-xs text-slate-500">{project.address || "No address yet"}</div>
-              <div className="mt-2 text-xs font-semibold text-sky-700">Continue building</div>
-            </Link>
-          ))}
+          <div className={`grid gap-2 ${showAllProjects ? "max-h-[22rem] overflow-y-auto [overscroll-behavior:contain]" : ""}`}>
+            {displayedProjects.map((project) => (
+              <Link
+                key={project.id}
+                href={projectShopHref(project)}
+                onClick={() => selectGuestProject(project.id)}
+                data-testid="guest-project-card"
+                className="rounded-[16px] border border-[#e5e7eb] bg-white px-4 py-3 shadow-[0_5px_18px_rgba(16,24,40,0.04)] transition-[border-color,box-shadow,transform] hover:border-[#b9d7ff] hover:shadow-[0_8px_22px_rgba(16,24,40,0.07)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc] active:scale-[0.99]"
+              >
+                <div className="text-sm font-semibold text-slate-950">{project.name}</div>
+                <div className="mt-1 text-xs text-slate-500">{project.address && project.address.trim() !== project.name.trim() ? project.address : "Saved on this device"}</div>
+                <div className="mt-2 text-xs font-semibold text-sky-700">Continue building</div>
+              </Link>
+            ))}
+          </div>
+          {projects.length > 3 ? (
+            <button type="button" onClick={() => setShowAllProjects((showAll) => !showAll)} className="min-h-10 rounded-full border border-[#d0d5dd] bg-white px-4 text-sm font-semibold text-[#0066cc] transition-colors hover:bg-[#f5f9ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc]">
+              {showAllProjects ? "Show recent projects" : `Show all ${projects.length} projects`}
+            </button>
+          ) : null}
         </div>
       ) : (
-        <div className="mt-4 rounded-[20px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
-          No guest projects saved yet. Start a project, choose materials, and submit the cart when ready.
+        <div className="mt-4 rounded-[16px] border border-dashed border-[#d0d5dd] bg-white px-4 py-6 text-sm text-[#667085]">
+          No guest projects saved yet. Start a project, choose materials, and submit the request when ready.
         </div>
       )}
     </section>

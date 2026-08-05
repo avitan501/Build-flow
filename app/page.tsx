@@ -1,206 +1,200 @@
 import Link from "next/link"
 
-import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler"
 import { getSessionWithProfile } from "@/lib/auth"
-import { isOwnerIdentity } from "@/lib/owner-access"
 
-const heroImage =
-  "/images/buildflow-retail/hero.jpg"
-
-const featureCards = [
+const serviceCards = [
   {
+    symbol: "↗",
     eyebrow: "Projects",
-    title: "Organize jobs clearly",
-    body: "Keep job details, address, timeline, and client info ready before uploads begin.",
+    title: "Start every job clean",
+    body: "Create the project, attach the address, and keep the next material steps tied to the right job.",
     hrefKey: "projects" as const,
-    image: "/images/buildflow-retail/projects.jpg",
-    iconBg: "bg-sky-600",
-    icon: "grid" as const,
   },
   {
-    eyebrow: "Uploads",
-    title: "Collect plans fast",
-    body: "Send plans, photos, and documents so the next material step has the right context.",
-    hrefKey: "upload" as const,
-    image: "/images/buildflow-retail/uploads.jpg",
-    iconBg: "bg-cyan-500",
-    icon: "upload" as const,
+    symbol: "◇",
+    eyebrow: "Shop",
+    title: "Choose by department",
+    body: "Browse materials and services in the shop without forcing a login before checkout.",
+    hrefKey: "shop" as const,
   },
   {
-    eyebrow: "Orders",
-    title: "Review with confidence",
-    body: "Review quotes, approve orders, and keep project decisions lined up in one flow.",
-    hrefKey: "orders" as const,
-    image: "/images/buildflow-retail/orders.jpg",
-    iconBg: "bg-amber-500",
-    icon: "shield" as const,
+    symbol: "{ }",
+    eyebrow: "Plans",
+    title: "Upload files with context",
+    body: "Send drawings, schedules, and service details into the project flow for review.",
+    hrefKey: "start" as const,
+  },
+  {
+    symbol: "✓",
+    eyebrow: "Review",
+    title: "Keep every request together",
+    body: "Review selected materials and uploaded plans together before the final submission.",
+    hrefKey: "projects" as const,
   },
 ]
 
-function FeatureIcon({ type }: { type: (typeof featureCards)[number]["icon"] }) {
-  if (type === "upload") {
-    return (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M12 16V5" />
-        <path d="m7 10 5-5 5 5" />
-        <path d="M5 19h14" />
-      </svg>
-    )
-  }
+const imageTiles = [
+  {
+    label: "Lumber",
+    image: "/images/buildflow-retail/lumber.jpg",
+  },
+  {
+    label: "Kitchen",
+    image: "/images/buildflow-retail/kitchen.jpg",
+  },
+  {
+    label: "Finish",
+    image: "/images/buildflow-retail/finish.jpg",
+  },
+]
 
-  if (type === "shield") {
-    return (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3Z" />
-        <path d="m9.5 12 1.7 1.7 3.8-4" />
-      </svg>
-    )
-  }
-
+function SymbolBadge({ symbol }: { symbol: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="4" y="4" width="7" height="7" rx="1.5" />
-      <rect x="13" y="4" width="7" height="7" rx="1.5" />
-      <rect x="4" y="13" width="7" height="7" rx="1.5" />
-      <rect x="13" y="13" width="7" height="7" rx="1.5" />
-    </svg>
+    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-sky-100 bg-[linear-gradient(180deg,#ffffff_0%,#edf7ff_100%)] text-lg font-semibold text-[#0E2A4A] shadow-[0_10px_26px_rgba(14,42,74,0.08)]">
+      {symbol}
+    </span>
   )
 }
 
 export default async function Home() {
-  const { user, profile } = await getSessionWithProfile()
+  const { user } = await getSessionWithProfile()
   const isSignedIn = Boolean(user)
-  const isOwner = Boolean(
-    user &&
-      isOwnerIdentity({
-        email: user.email || profile?.email,
-        phone: user.phone || profile?.phone,
-      }),
-  )
-  const startHref = "/projects/new?next=%2Fshop"
-  const projectsHref = "/projects"
-  const uploadHref = "/shop"
-  const ordersHref = "/cart"
 
+  const startHref = "/projects/new?next=%2Fshop"
   const hrefs = {
-    projects: projectsHref,
-    upload: uploadHref,
-    orders: ordersHref,
+    projects: "/projects",
+    shop: "/shop",
+    start: startHref,
   }
 
   return (
-    <main className="min-h-screen overflow-x-clip bg-[linear-gradient(180deg,#f7fbff_0%,#eef6ff_45%,#ffffff_100%)] text-slate-900">
+    <main className="min-h-screen overflow-x-clip bg-[#f7f9fc] pb-28 text-slate-950 sm:pb-16">
       <RecoveryLinkHandler />
 
-      <section className="relative mx-auto flex min-h-screen max-w-6xl flex-col gap-5 px-4 pb-32 pt-4 sm:gap-6 sm:px-8 sm:pb-14 sm:pt-8 lg:gap-7 lg:px-10 lg:pb-14 lg:pt-10">
-        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(circle_at_top,_rgba(125,211,252,0.18),_transparent_58%)]" />
+      <section className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-5 sm:px-8 sm:py-8 lg:px-10">
+        <section className="grid gap-5 rounded-[34px] border border-slate-200 bg-white p-5 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:p-7 lg:grid-cols-[1.03fr_0.97fr] lg:items-stretch lg:p-9">
+          <div className="flex flex-col justify-center py-2">
+            <h1 className="max-w-2xl text-4xl font-semibold leading-[1.03] text-[#071126] sm:text-6xl lg:text-7xl">
+              A cleaner way to build from plan to project.
+            </h1>
+            <p className="mt-5 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
+              Start a project, add the address, browse materials, upload plans, and keep every request organized before checkout.
+            </p>
 
-        <section className="overflow-hidden rounded-[32px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(239,247,255,0.94))] shadow-[0_24px_60px_rgba(148,163,184,0.14)] lg:rounded-[34px]">
-          <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch lg:gap-8 lg:p-8 xl:p-10">
-            <div className="flex flex-col justify-center">
-              <div className="inline-flex w-fit items-center rounded-[22px] border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(239,246,255,0.9))] px-3 py-3 shadow-[0_12px_28px_rgba(148,163,184,0.1)]">
-                <AvantiaBuildLockup showSlogan />
-              </div>
-              <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Everything it takes to build</p>
-              <h1 className="mt-3 max-w-2xl text-4xl font-semibold leading-[1.02] tracking-tight text-slate-950 sm:text-[3.2rem] lg:text-[4.35rem]">
-                Avantia Build for the modern jobsite
-              </h1>
-              <p className="mt-4 max-w-xl text-base leading-7 text-slate-600 lg:text-lg lg:leading-8">
-                A cleaner way to start a job, choose materials by trade, keep the project address connected, and move decisions forward.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link href={startHref} className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-5 py-3 text-sm font-semibold text-slate-950 shadow-[0_16px_30px_rgba(220,168,69,0.22)] active:scale-[0.99]">
-                  Start Building
-                </Link>
-                <Link href="/shop" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-100 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm active:scale-[0.99]">
-                  Open Shop
-                </Link>
-                {!isSignedIn ? (
-                  <>
-                    <Link href="/login" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-[#0E2A4A] shadow-sm active:scale-[0.99]">
-                      Log in
-                    </Link>
-                    <Link href="/signup" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.94))] px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm active:scale-[0.99]">
-                      Create account
-                    </Link>
-                  </>
-                ) : null}
-                {isOwner ? (
-                  <Link href="/owner/materials" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-[#0e2341] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(14,35,65,0.18)] active:scale-[0.99]">
-                    Add Materials
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link
+                href={startHref}
+                className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#071126] px-6 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(7,17,38,0.2)] transition active:scale-[0.99]"
+              >
+                Start Building
+              </Link>
+              <Link
+                href="/shop"
+                className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm transition active:scale-[0.99]"
+              >
+                Open Shop
+              </Link>
+              {!isSignedIn ? (
+                <>
+                  <Link
+                    href="/login"
+                    className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-[#0E2A4A] shadow-sm transition active:scale-[0.99]"
+                  >
+                    Log in
                   </Link>
-                ) : null}
-              </div>
-              <div className="mt-8 grid max-w-2xl gap-3 sm:grid-cols-3">
-                {[
-                  ["01", "Start the project"],
-                  ["02", "Pick materials"],
-                  ["03", "Approve and order"],
-                ].map(([step, label]) => (
-                  <div key={step} className="rounded-[22px] border border-sky-100 bg-white/75 px-4 py-3 shadow-[0_12px_28px_rgba(148,163,184,0.08)]">
-                    <p className="text-xs font-semibold text-sky-700">{step}</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">{label}</p>
-                  </div>
+                  <Link
+                    href="/signup"
+                    className="inline-flex min-h-12 items-center justify-center rounded-full border border-sky-100 bg-[#eaf6ff] px-6 py-3 text-sm font-semibold text-[#0E2A4A] transition active:scale-[0.99]"
+                  >
+                    Create account
+                  </Link>
+                </>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="relative min-h-[360px] overflow-hidden rounded-[28px] border border-slate-200 bg-[#eef6ff]">
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundImage:
+                  "linear-gradient(180deg,rgba(7,17,38,0.06),rgba(7,17,38,0.42)),url(/images/buildflow-retail/hero.jpg)",
+                backgroundPosition: "center",
+                backgroundSize: "cover",
+              }}
+            />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_12%,rgba(244,207,117,0.38),transparent_30%)]" />
+            <div className="relative flex h-full flex-col justify-between p-5 sm:p-6">
+              <div className="ml-auto grid grid-cols-3 gap-2 rounded-[22px] border border-white/40 bg-white/72 p-2 text-[#071126] shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur">
+                {["↗", "◇", "∞"].map((symbol) => (
+                  <span key={symbol} className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-lg font-semibold shadow-sm">
+                    {symbol}
+                  </span>
                 ))}
               </div>
-            </div>
-
-            <div
-              className="relative min-h-[280px] overflow-hidden rounded-[28px] border border-sky-100/80 shadow-[0_18px_42px_rgba(15,23,42,0.16)] lg:min-h-[430px]"
-              style={{
-                backgroundImage: `linear-gradient(180deg, rgba(14,35,65,0.08) 0%, rgba(14,35,65,0.34) 48%, rgba(14,35,65,0.76) 100%), url(${heroImage})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            >
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(243,203,114,0.26),transparent_36%)]" />
-              <div className="relative flex h-full flex-col justify-between p-5 text-white sm:p-6">
-                <div className="flex justify-end">
-                  <span className="inline-flex items-center rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/88 backdrop-blur-sm">Job ready</span>
-                </div>
-                <div>
-                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white/12 text-white shadow-[0_10px_24px_rgba(15,23,42,0.2)] backdrop-blur-sm">
-                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M4 19h16" />
-                      <path d="M5 19V9l7-4 7 4v10" />
-                      <path d="M9 19v-5h6v5" />
-                    </svg>
-                  </div>
-                  <h2 className="mt-4 text-xl font-semibold tracking-tight text-white">Project setup, departments, and buying decisions in one place.</h2>
-                  <p className="mt-2 max-w-sm text-sm leading-6 text-white/82">Keep the experience practical for the field while the page still feels clean and professional.</p>
+              <div className="max-w-sm rounded-[24px] border border-white/35 bg-white/84 p-5 shadow-[0_18px_40px_rgba(15,23,42,0.18)] backdrop-blur">
+                <p className="text-sm font-semibold text-[#2a6fbb]">Job flow</p>
+                <div className="mt-4 space-y-3">
+                  {[
+                    ["01", "Project name and address"],
+                    ["02", "Materials and plan uploads"],
+                    ["03", "One request for review"],
+                  ].map(([step, label]) => (
+                    <div key={step} className="flex items-center gap-3 border-t border-slate-200 pt-3 first:border-t-0 first:pt-0">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#071126] text-xs font-semibold text-white">
+                        {step}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-900">{label}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-3">
-          {featureCards.map((card) => (
-            <article key={card.title} className="overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-[0_18px_40px_rgba(148,163,184,0.1)]">
-              <div
-                className="relative min-h-[168px] lg:min-h-[190px]"
-                style={{
-                  backgroundImage: `linear-gradient(180deg, rgba(14,35,65,0.08) 0%, rgba(14,35,65,0.5) 100%), url(${card.image})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }}
-              >
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(243,203,114,0.24),transparent_36%)]" />
-                <div className={`absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-2xl ${card.iconBg} text-white shadow-[0_12px_24px_rgba(15,23,42,0.2)]`}>
-                  <FeatureIcon type={card.icon} />
-                </div>
-              </div>
-              <div className="p-5 sm:p-6">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{card.eyebrow}</p>
-                <h3 className="mt-2 text-lg font-semibold text-slate-950">{card.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{card.body}</p>
-                <Link href={hrefs[card.hrefKey]} className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-[#0e2341] underline underline-offset-4 active:scale-[0.99]">
-                  Open {card.eyebrow.toLowerCase()}
-                </Link>
-              </div>
-            </article>
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {serviceCards.map((card) => (
+            <Link
+              key={card.title}
+              href={hrefs[card.hrefKey]}
+              className="group rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_18px_46px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_22px_54px_rgba(15,23,42,0.1)]"
+            >
+              <SymbolBadge symbol={card.symbol} />
+              <p className="mt-5 text-sm font-semibold text-[#2a6fbb]">{card.eyebrow}</p>
+              <h2 className="mt-2 text-xl font-semibold text-[#071126]">{card.title}</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{card.body}</p>
+              <span className="mt-5 inline-flex text-sm font-semibold text-[#0E2A4A] underline underline-offset-4">
+                Open
+              </span>
+            </Link>
           ))}
+        </section>
+
+        <section className="grid gap-4 rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_18px_46px_rgba(15,23,42,0.06)] sm:p-6 lg:grid-cols-[0.72fr_1.28fr] lg:items-center">
+          <div>
+            <p className="text-sm font-semibold text-[#2a6fbb]">Departments</p>
+            <h2 className="mt-2 text-3xl font-semibold leading-tight text-[#071126] sm:text-4xl">
+              Materials stay visual, simple, and easy to find.
+            </h2>
+            <p className="mt-4 text-sm leading-6 text-slate-600">
+              The shop can stay practical while the homepage gives customers a sharper first impression.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {imageTiles.map((tile) => (
+              <div key={tile.label} className="overflow-hidden rounded-[24px] border border-slate-200 bg-slate-100">
+                <div
+                  className="h-40 bg-cover bg-center sm:h-52"
+                  style={{ backgroundImage: `url(${tile.image})` }}
+                  role="img"
+                  aria-label={`${tile.label} material preview`}
+                />
+                <div className="bg-white px-4 py-3 text-sm font-semibold text-slate-900">{tile.label}</div>
+              </div>
+            ))}
+          </div>
         </section>
       </section>
     </main>

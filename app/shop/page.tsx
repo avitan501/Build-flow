@@ -1,10 +1,8 @@
-import Link from "next/link"
-
+import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { ShopProjectToolPicker } from "@/components/buildflow/shop-project-tool-picker"
 import { getSessionWithProfile } from "@/lib/auth"
 import type { ProjectRecord } from "@/lib/projects"
 import { ShopCatalogExperience } from "@/components/buildflow/shop-catalog-experience"
-import { ShopToolProductGrid } from "@/components/buildflow/shop-tool-product-grid"
 import { buildShopProducts } from "@/lib/shop-catalog"
 import { loadShopActivityForCurrentUser } from "@/lib/shop-activity-server"
 import { loadShopItems } from "@/lib/shop-loader"
@@ -18,7 +16,7 @@ async function loadCurrentUserProjects() {
   const { supabase, user } = await getSessionWithProfile()
 
   if (!user) {
-    return []
+    return { projects: [] as ProjectRecord[], user: null }
   }
 
   const { data, error } = await supabase
@@ -32,32 +30,38 @@ async function loadCurrentUserProjects() {
     throw new Error("Failed to load projects.")
   }
 
-  return data ?? []
+  return { projects: data ?? [], user }
 }
 
 export default async function ShopPage({ searchParams }: ShopPageProps) {
   const params = (await searchParams) ?? {}
   const hasCatalogSearch = Boolean(params.q?.trim() || params.category?.trim())
-  const [{ data: itemsData, error }, recentActivity] = await Promise.all([
-    loadShopItems({ limit: 240 }),
-    loadShopActivityForCurrentUser(24),
-  ])
-  const products = buildShopProducts(itemsData, error)
 
   if (hasCatalogSearch) {
+    const [{ data: itemsData, error }, recentActivity] = await Promise.all([
+      loadShopItems({ limit: 240 }),
+      loadShopActivityForCurrentUser(24),
+    ])
+    const products = buildShopProducts(itemsData, error)
+
     return <ShopCatalogExperience products={products} recentActivity={recentActivity} />
   }
 
-  const { user } = await getSessionWithProfile()
-  const projects = await loadCurrentUserProjects()
+  const { projects, user } = await loadCurrentUserProjects()
   const selectedProjectId = projects.some((project) => project.id === params.project) ? params.project : ""
   const selectedAddress = selectedProjectId ? "" : params.address?.trim() || ""
-  const materialProducts = products.filter((product) => product.productType !== "service")
 
   return (
-    <main className="min-h-screen bg-[#f7f8fa] px-4 py-4 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
-      <section className="mx-auto flex max-w-7xl flex-col gap-4">
+    <main className="min-h-screen w-full min-w-0 overflow-x-clip bg-[#f5f5f7] pb-24 text-[#1d1d1f] sm:pb-12">
+      <section className="border-b border-black/[0.05] bg-white">
+        <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-8 sm:py-7 lg:px-10">
+          <AvantiaBuildLockup />
+        </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-8 sm:py-8 lg:px-10">
         <ShopProjectToolPicker
+          key={`${selectedProjectId}:${selectedAddress}`}
           projects={projects}
           categories={SHOP_TOOL_CATEGORIES}
           selectedProjectId={selectedProjectId}
@@ -66,16 +70,6 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
           projectCreated={params.created === "1" || params.created === "existing"}
           projectError={params.error === "project-create-failed"}
         />
-
-        {materialProducts.length > 0 ? (
-          <section className="grid gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-[1.65rem] font-bold tracking-normal text-slate-950">Shop materials</h2>
-              <Link href="/shop?category=All" className="text-sm font-semibold text-sky-700">Open catalog</Link>
-            </div>
-            <ShopToolProductGrid products={materialProducts} />
-          </section>
-        ) : null}
       </section>
     </main>
   )

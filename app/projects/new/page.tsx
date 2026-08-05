@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { GuestProjectForm } from "@/components/buildflow/guest-project-form";
 import { getSessionWithProfile } from "@/lib/auth";
 
 import { createProjectAction } from "./actions";
@@ -12,7 +11,7 @@ export default async function NewProjectPage({
 }) {
   const { user } = await getSessionWithProfile();
   const params = (await searchParams) ?? {};
-  const nextPath = params.next?.startsWith("/") && !params.next.startsWith("//") ? params.next : "/shop";
+  const nextPath = params.next?.startsWith("/") && !params.next.startsWith("//") ? params.next : "/projects";
   const errorMessage =
     params.error === "project-name-required"
       ? "Project name is required."
@@ -79,7 +78,11 @@ export default async function NewProjectPage({
           </div>
         </form>
         ) : (
-          <GuestProjectForm nextPath={nextPath} errorMessage={errorMessage} />
+          <section className="rounded-[28px] border border-sky-100 bg-white p-6 text-center shadow-[0_18px_42px_rgba(148,163,184,0.12)] sm:p-8">
+            <h1 className="text-2xl font-semibold text-slate-950">Sign in to create a project</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Browsing is public. Signing in keeps your project, requests, answers, and files available on every device.</p>
+            <Link href={`/login?next=${encodeURIComponent(`/projects/new?next=${encodeURIComponent(nextPath)}`)}`} className="mt-5 inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white">Continue to Sign In</Link>
+          </section>
         )}
       </section>
     </main>

@@ -3,16 +3,15 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
 
 type MobileBottomDockProps = {
   projectsHref: string;
 };
 
-const DOCK_PATHS = new Set(["/", "/dashboard", "/projects", "/projects/new", "/upload", "/materials", "/quotes", "/orders", "/search", "/shop", "/cart", "/account"]);
+const HIDDEN_DOCK_PATHS = new Set(["/login", "/signup", "/reset-password"]);
 
 function shouldShowDock(pathname: string) {
-  return pathname.startsWith("/projects/") || pathname.startsWith("/shop/") || DOCK_PATHS.has(pathname);
+  return !HIDDEN_DOCK_PATHS.has(pathname) && !pathname.startsWith("/admin");
 }
 
 function isActivePath(pathname: string, href: string) {
@@ -59,50 +58,6 @@ function DockItem({ href, label, active, children, accent = false }: { href: str
 
 export function MobileBottomDock({ projectsHref }: MobileBottomDockProps) {
   const pathname = usePathname();
-  const [isVisible, setIsVisible] = useState(true);
-  const lastScrollY = useRef(0);
-  const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const threshold = 12;
-
-    const handleScroll = () => {
-      const currentY = window.scrollY;
-      const delta = currentY - lastScrollY.current;
-
-      if (currentY <= 12) {
-        setIsVisible(true);
-      } else if (delta > threshold) {
-        setIsVisible(false);
-      } else if (delta < -threshold) {
-        setIsVisible(true);
-      }
-
-      lastScrollY.current = currentY;
-
-      if (stopTimer.current) {
-        clearTimeout(stopTimer.current);
-      }
-
-      stopTimer.current = setTimeout(() => {
-        setIsVisible(true);
-      }, 180);
-    };
-
-    lastScrollY.current = window.scrollY;
-    window.addEventListener("scroll", handleScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      if (stopTimer.current) {
-        clearTimeout(stopTimer.current);
-      }
-    };
-  }, []);
 
   if (!pathname || !shouldShowDock(pathname)) {
     return null;
@@ -113,10 +68,10 @@ export function MobileBottomDock({ projectsHref }: MobileBottomDockProps) {
   return (
     <>
       <div aria-hidden="true" className="h-[6.5rem] lg:hidden" />
-      <div className={`pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+0.35rem)] left-1/2 z-50 w-[calc(100%-1rem)] max-w-[29rem] -translate-x-1/2 px-2 transition-all duration-200 lg:hidden ${isVisible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"}`}>
+      <div className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+0.35rem)] left-1/2 z-50 w-[calc(100%-1rem)] max-w-[29rem] -translate-x-1/2 px-2 lg:hidden">
         <nav
           aria-label="Mobile homepage"
-          className={`relative flex w-full items-center justify-between gap-1 overflow-hidden rounded-[24px] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(240,247,255,0.18))] px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.68),inset_0_-12px_20px_rgba(255,255,255,0.08),0_18px_34px_rgba(15,23,42,0.12),0_6px_16px_rgba(148,163,184,0.12)] backdrop-blur-[26px] [backdrop-filter:blur(26px)_saturate(145%)] ${isVisible ? "pointer-events-auto" : "pointer-events-none"}`}
+          className="pointer-events-auto relative flex w-full items-center justify-between gap-1 overflow-hidden rounded-[24px] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(240,247,255,0.18))] px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.68),inset_0_-12px_20px_rgba(255,255,255,0.08),0_18px_34px_rgba(15,23,42,0.12),0_6px_16px_rgba(148,163,184,0.12)] backdrop-blur-[26px] [backdrop-filter:blur(26px)_saturate(145%)]"
         >
           <span aria-hidden="true" className="pointer-events-none absolute inset-[1px] rounded-[23px] border border-white/35" />
           <span aria-hidden="true" className="pointer-events-none absolute inset-x-8 top-1 h-4 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,255,255,0.14))] opacity-90 blur-[0.8px]" />

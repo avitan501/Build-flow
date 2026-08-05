@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import { recordShopActivity } from "@/app/shop/actions"
-import { QualifyingQuestionsModal } from "@/components/buildflow/qualifying-questions-modal"
+import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
 import {
   MANAGER_ADD_ONS_UPDATED_EVENT,
   departmentDisplayLabel,
@@ -22,17 +22,8 @@ import type { ShopActivityEvent } from "@/lib/shop-activity"
 import { buildSuggestedProducts, getShopActivitySessionId, readLocalShopActivity, writeLocalShopActivity } from "@/lib/shop-activity"
 import {
   SHOP_SAVE_UPDATED_EVENT,
-  readShopCartCount,
-  readShopCartMap,
-  readShopCustomCartItems,
   readShopSavedIds,
-  upsertShopCartItemDetails,
-  upsertShopCustomCartItem,
-  type ShopCartQualificationStatus,
-  type ShopCartQuestionAnswer,
-  writeShopCartMap,
 } from "@/lib/shop-cart"
-import { getQualificationSettingForProduct, type QualifyingQuestion } from "@/lib/shop-qualification"
 import { SHOP_CATEGORY_CHIPS } from "@/lib/shop"
 
 type ShopCatalogExperienceProps = {
@@ -41,7 +32,7 @@ type ShopCatalogExperienceProps = {
 }
 
 type SortMode = "featured" | "price-low" | "price-high"
-type BrowseTab = "materials" | "services" | "deals" | "suppliers" | "saved" | "cart"
+type BrowseTab = "materials" | "services" | "deals" | "suppliers" | "saved"
 
 const SHOP_CATEGORIES = SHOP_CATEGORY_CHIPS
 
@@ -54,15 +45,6 @@ const SORT_OPTIONS: { key: SortMode; label: string }[] = [
 function formatCurrency(value: number) {
   const [dollars, cents] = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value).split(".")
   return { dollars, cents: cents ?? "00" }
-}
-
-function PlusIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 5v14" />
-      <path d="M5 12h14" />
-    </svg>
-  )
 }
 
 function SuggestedProductCard({ product }: { product: ShopCatalogProduct }) {
@@ -82,7 +64,7 @@ function SuggestedProductCard({ product }: { product: ShopCatalogProduct }) {
   )
 }
 
-function ServiceListCard({ product, onQuickAdd, localOnly = false }: { product: ShopCatalogProduct; onQuickAdd: (productId: string) => number; localOnly?: boolean }) {
+function ServiceListCard({ product, localOnly = false }: { product: ShopCatalogProduct; localOnly?: boolean }) {
   const price = product.price > 0 ? formatCurrency(product.price) : null
   const content = (
     <>
@@ -106,14 +88,12 @@ function ServiceListCard({ product, onQuickAdd, localOnly = false }: { product: 
   return (
     <article className="flex min-w-0 flex-col gap-3 rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md">
       {localOnly ? <div className="grid gap-3">{content}</div> : <Link href={`/shop/${product.slug}`} prefetch={false} className="grid gap-3">{content}</Link>}
-      <button type="button" onClick={() => onQuickAdd(product.id)} className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800">
-        Add to cart
-      </button>
+      <AddToProjectButton product={product} className="w-full" />
     </article>
   )
 }
 
-function ShopProductCard({ product, onQuickAdd, localOnly = false }: { product: ShopCatalogProduct; onQuickAdd: (productId: string) => number; localOnly?: boolean }) {
+function ShopProductCard({ product, localOnly = false }: { product: ShopCatalogProduct; localOnly?: boolean }) {
   const price = product.price > 0 ? formatCurrency(product.price) : null
   const isService = product.productType === "service"
   const imageBlock = (
@@ -157,14 +137,7 @@ function ShopProductCard({ product, onQuickAdd, localOnly = false }: { product: 
               Service
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => onQuickAdd(product.id)}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_12px_24px_rgba(34,197,94,0.28)] transition hover:bg-emerald-600"
-              aria-label={`Add ${product.name} to cart`}
-            >
-              <PlusIcon />
-            </button>
+            <AddToProjectButton product={product} compact />
           )}
         </div>
 
@@ -193,12 +166,6 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   const [browseTab, setBrowseTab] = useState<BrowseTab>("materials")
   const [localActivity, setLocalActivity] = useState<ShopActivityEvent[]>([])
   const [managerAddOns, setManagerAddOns] = useState<ManagerCatalogAddOns>(() => readManagerAddOns())
-  const [quickAddMessage, setQuickAddMessage] = useState<string | null>(null)
-  const [qualificationTarget, setQualificationTarget] = useState<{
-    product: ShopCatalogProduct
-    customItemId?: string
-    questions: QualifyingQuestion[]
-  } | null>(null)
   const supplierSectionRef = useRef<HTMLElement>(null)
   const serviceSectionRef = useRef<HTMLElement>(null)
   const lastSearchRef = useRef("")
@@ -386,87 +353,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
     applyFilters({ query: "", category: "All" })
   }
 
-  function saveQualification(status: ShopCartQualificationStatus, answers: ShopCartQuestionAnswer[] = []) {
-    if (!qualificationTarget) return
-
-    if (qualificationTarget.customItemId) {
-      const item = readShopCustomCartItems().find((entry) => entry.id === qualificationTarget.customItemId)
-      if (item) {
-        upsertShopCustomCartItem({ ...item, qualificationStatus: status, answers, updatedAt: new Date().toISOString() })
-      }
-      setQualificationTarget(null)
-      return
-    }
-
-    upsertShopCartItemDetails({
-      productId: qualificationTarget.product.id,
-      productName: qualificationTarget.product.name,
-      category: qualificationTarget.product.category,
-      itemType: qualificationTarget.product.productType === "service" ? "service" : qualificationTarget.product.price <= 0 ? "custom-priced" : "material",
-      qualificationStatus: status,
-      answers,
-      updatedAt: new Date().toISOString(),
-    })
-    setQualificationTarget(null)
-  }
-
-  function quickAdd(productId: string) {
-    const current = readShopCartMap()
-    const product = catalogProducts.find((entry) => entry.id === productId)
-    if (!product) return 0
-
-    const qualification = getQualificationSettingForProduct(product)
-    const shouldAskQuestions = qualification.enabled && qualification.questions.length > 0 && (product.productType === "service" || product.price <= 0)
-
-    if (isManagerAddOnProductId(product.id)) {
-      const existing = readShopCustomCartItems().find((item) => item.id === product.id)
-      const quantity = (existing?.quantity || 0) + 1
-      const customItem = {
-        id: product.id,
-        name: product.name,
-        category: product.category,
-        quantity,
-        unit: product.unit,
-        unitPrice: product.price,
-        qualificationStatus: shouldAskQuestions ? "pending" : (existing?.qualificationStatus ?? "not_required"),
-        answers: existing?.answers ?? [],
-        updatedAt: new Date().toISOString(),
-      }
-      upsertShopCustomCartItem(customItem)
-      if (shouldAskQuestions) {
-        setQualificationTarget({ product, customItemId: customItem.id, questions: qualification.questions })
-      }
-    } else {
-      const nextQty = (current[productId] || 0) + 1
-      writeShopCartMap({ ...current, [productId]: nextQty })
-      upsertShopCartItemDetails({
-        productId: product.id,
-        productName: product.name,
-        category: product.category,
-        itemType: product.productType === "service" ? "service" : product.price <= 0 ? "custom-priced" : "material",
-        qualificationStatus: shouldAskQuestions ? "pending" : "not_required",
-        answers: [],
-        updatedAt: new Date().toISOString(),
-      })
-      if (shouldAskQuestions) {
-        setQualificationTarget({ product, questions: qualification.questions })
-      }
-    }
-
-    if (product) {
-      trackActivity({ eventType: "add_to_cart", productSlug: product.slug, productName: product.name, category: product.category })
-    }
-    const count = readShopCartCount()
-    setQuickAddMessage(`${product.name} added to cart. Cart now has ${count} item${count === 1 ? "" : "s"}.`)
-    return count
-  }
-
   function activateTab(tab: BrowseTab) {
-    if (tab === "cart") {
-      router.push("/cart")
-      return
-    }
-
     setBrowseTab(tab)
 
     if (tab === "services") {
@@ -498,15 +385,6 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   return (
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        {quickAddMessage ? (
-          <section className="flex flex-col gap-3 rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-[0_10px_28px_rgba(16,185,129,0.12)] sm:flex-row sm:items-center sm:justify-between">
-            <span>{quickAddMessage}</span>
-            <Link href="/cart" prefetch={false} className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-white px-4 text-sm font-bold text-emerald-800 shadow-sm">
-              View cart
-            </Link>
-          </section>
-        ) : null}
-
         <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
           <div className="flex flex-col gap-1">
             <div className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Tools</div>
@@ -569,7 +447,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
             <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {featuredProducts.map((product) => (
                 <div key={`featured-${product.id}`} className="w-[220px] shrink-0">
-                  <ShopProductCard product={product} onQuickAdd={quickAdd} localOnly={isManagerAddOnProductId(product.id)} />
+                  <ShopProductCard product={product} localOnly={isManagerAddOnProductId(product.id)} />
                 </div>
               ))}
             </div>
@@ -612,7 +490,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               {(browseTab === "services" || activeCategorySource === "Services" ? serviceProducts : serviceProducts.slice(0, 3)).map((product) => (
-                <ServiceListCard key={`service-${product.id}`} product={product} onQuickAdd={quickAdd} localOnly={isManagerAddOnProductId(product.id)} />
+                <ServiceListCard key={`service-${product.id}`} product={product} localOnly={isManagerAddOnProductId(product.id)} />
               ))}
             </div>
           </section>
@@ -632,7 +510,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
           <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {dealProducts.map((product) => (
               <div key={`deal-${product.id}`} className="w-[220px] shrink-0">
-                <ShopProductCard product={product} onQuickAdd={quickAdd} localOnly={isManagerAddOnProductId(product.id)} />
+                <ShopProductCard product={product} localOnly={isManagerAddOnProductId(product.id)} />
               </div>
             ))}
           </div>
@@ -688,7 +566,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
             <div className="mt-4 flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {savedProducts.slice(0, 6).map((product) => (
                 <div key={`saved-${product.id}`} className="w-[220px] shrink-0">
-                  <ShopProductCard product={product} onQuickAdd={quickAdd} localOnly={isManagerAddOnProductId(product.id)} />
+                  <ShopProductCard product={product} localOnly={isManagerAddOnProductId(product.id)} />
                 </div>
               ))}
             </div>
@@ -721,9 +599,9 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
           <section aria-label="Products" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
             {activeCategoryProducts.map((product) => (
               product.productType === "service" ? (
-                <ServiceListCard key={product.id} product={product} onQuickAdd={quickAdd} localOnly={isManagerAddOnProductId(product.id)} />
+                <ServiceListCard key={product.id} product={product} localOnly={isManagerAddOnProductId(product.id)} />
               ) : (
-                <ShopProductCard key={product.id} product={product} onQuickAdd={quickAdd} localOnly={isManagerAddOnProductId(product.id)} />
+                <ShopProductCard key={product.id} product={product} localOnly={isManagerAddOnProductId(product.id)} />
               )
             ))}
           </section>
@@ -735,14 +613,6 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
         )}
       </div>
 
-      <QualifyingQuestionsModal
-        open={Boolean(qualificationTarget)}
-        title={qualificationTarget?.product.name || "Service questions"}
-        questions={qualificationTarget?.questions || []}
-        onClose={() => saveQualification("skipped")}
-        onSave={(answers) => saveQualification("answered", answers)}
-        onSkip={() => saveQualification("skipped")}
-      />
     </main>
   )
 }

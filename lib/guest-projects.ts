@@ -40,12 +40,17 @@ export function selectGuestProject(projectId: string) {
   window.dispatchEvent(new Event(GUEST_PROJECTS_UPDATED_EVENT))
 }
 
+export function clearSelectedGuestProject() {
+  selectGuestProject("")
+}
+
 export function readSelectedGuestProject() {
   if (typeof window === "undefined") return null
 
   const selectedId = window.localStorage.getItem(GUEST_SELECTED_PROJECT_STORAGE_KEY)
   const projects = readGuestProjects()
-  return projects.find((project) => project.id === selectedId) ?? projects[0] ?? null
+  if (selectedId === "") return null
+  return projects.find((project) => project.id === selectedId) ?? (selectedId === null ? projects[0] ?? null : null)
 }
 
 export function createGuestProject(name: string, address: string | null): GuestProject {

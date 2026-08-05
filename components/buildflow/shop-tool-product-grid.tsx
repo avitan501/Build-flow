@@ -2,22 +2,10 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useState } from "react"
 
-import { QualifyingQuestionsModal } from "@/components/buildflow/qualifying-questions-modal"
+import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
 import { isManagerAddOnProductId } from "@/lib/manager-add-ons"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
-import {
-  readShopCartCount,
-  readShopCartMap,
-  readShopCustomCartItems,
-  upsertShopCartItemDetails,
-  upsertShopCustomCartItem,
-  type ShopCartQualificationStatus,
-  type ShopCartQuestionAnswer,
-  writeShopCartMap,
-} from "@/lib/shop-cart"
-import { getQualificationSettingForProduct, type QualifyingQuestion } from "@/lib/shop-qualification"
 
 type ShopToolProductGridProps = {
   products: ShopCatalogProduct[]
@@ -34,102 +22,9 @@ function formatCurrency(value: number) {
   return { dollars, cents: cents ?? "00" }
 }
 
-function PlusIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 5v14" />
-      <path d="M5 12h14" />
-    </svg>
-  )
-}
-
 export function ShopToolProductGrid({ products }: ShopToolProductGridProps) {
-  const [message, setMessage] = useState<string | null>(null)
-  const [qualificationTarget, setQualificationTarget] = useState<{
-    product: ShopCatalogProduct
-    customItemId?: string
-    questions: QualifyingQuestion[]
-  } | null>(null)
-
-  function saveQualification(status: ShopCartQualificationStatus, answers: ShopCartQuestionAnswer[] = []) {
-    if (!qualificationTarget) return
-
-    if (qualificationTarget.customItemId) {
-      const item = readShopCustomCartItems().find((entry) => entry.id === qualificationTarget.customItemId)
-      if (item) {
-        upsertShopCustomCartItem({ ...item, qualificationStatus: status, answers, updatedAt: new Date().toISOString() })
-      }
-      setQualificationTarget(null)
-      return
-    }
-
-    upsertShopCartItemDetails({
-      productId: qualificationTarget.product.id,
-      productName: qualificationTarget.product.name,
-      category: qualificationTarget.product.category,
-      itemType: qualificationTarget.product.productType === "service" ? "service" : qualificationTarget.product.price <= 0 ? "custom-priced" : "material",
-      qualificationStatus: status,
-      answers,
-      updatedAt: new Date().toISOString(),
-    })
-    setQualificationTarget(null)
-  }
-
-  function addToCart(product: ShopCatalogProduct) {
-    const qualification = getQualificationSettingForProduct(product)
-    const shouldAskQuestions = qualification.enabled && qualification.questions.length > 0 && (product.productType === "service" || product.price <= 0)
-
-    if (isManagerAddOnProductId(product.id)) {
-      const existing = readShopCustomCartItems().find((item) => item.id === product.id)
-      const quantity = (existing?.quantity || 0) + 1
-      const customItem = {
-        id: product.id,
-        name: product.name,
-        category: product.category,
-        quantity,
-        unit: product.unit,
-        unitPrice: product.price,
-        qualificationStatus: shouldAskQuestions ? "pending" : (existing?.qualificationStatus ?? "not_required"),
-        answers: existing?.answers ?? [],
-        updatedAt: new Date().toISOString(),
-      }
-      upsertShopCustomCartItem(customItem)
-      if (shouldAskQuestions) {
-        setQualificationTarget({ product, customItemId: customItem.id, questions: qualification.questions })
-      }
-    } else {
-      const current = readShopCartMap()
-      const quantity = (current[product.id] || 0) + 1
-      writeShopCartMap({ ...current, [product.id]: quantity })
-      upsertShopCartItemDetails({
-        productId: product.id,
-        productName: product.name,
-        category: product.category,
-        itemType: product.productType === "service" ? "service" : product.price <= 0 ? "custom-priced" : "material",
-        qualificationStatus: shouldAskQuestions ? "pending" : "not_required",
-        answers: [],
-        updatedAt: new Date().toISOString(),
-      })
-      if (shouldAskQuestions) {
-        setQualificationTarget({ product, questions: qualification.questions })
-      }
-    }
-
-    const count = readShopCartCount()
-    setMessage(`${product.name} added to cart. Cart now has ${count} item${count === 1 ? "" : "s"}.`)
-  }
-
   return (
     <section className="grid gap-3">
-      {message ? (
-        <div className="flex flex-col gap-3 rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-[0_10px_28px_rgba(16,185,129,0.12)] sm:flex-row sm:items-center sm:justify-between">
-          <span>{message}</span>
-          <Link href="/cart" prefetch={false} className="inline-flex min-h-10 items-center justify-center rounded-2xl bg-white px-4 text-sm font-bold text-emerald-800 shadow-sm">
-            View cart
-          </Link>
-        </div>
-      ) : null}
-
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
         {products.map((product) => {
           const price = formatCurrency(product.price)
@@ -138,11 +33,11 @@ export function ShopToolProductGrid({ products }: ShopToolProductGridProps) {
           return (
             <article
               key={product.id}
-              className="flex h-full min-h-[244px] touch-manipulation flex-col overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition duration-200 active:scale-[0.99] active:border-sky-300"
+              className="flex h-full min-h-[244px] touch-manipulation flex-col overflow-hidden rounded-[28px] border border-white bg-white shadow-[0_16px_36px_rgba(0,0,0,0.08)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_46px_rgba(0,0,0,0.12)] active:scale-[0.99] active:border-sky-300"
             >
               {localOnly ? (
-                <div className="block border-b border-slate-100 bg-slate-50/70 p-2.5 sm:p-3">
-                  <div className="relative aspect-square w-full overflow-hidden rounded-[18px] bg-white">
+                <div className="block border-b border-slate-100 bg-[#f5f5f7] p-2.5 sm:p-3">
+                  <div className="relative aspect-square w-full overflow-hidden rounded-[24px] bg-white">
                     <Image
                       src={product.imageUrl}
                       alt={product.imageAlt}
@@ -153,8 +48,8 @@ export function ShopToolProductGrid({ products }: ShopToolProductGridProps) {
                   </div>
                 </div>
               ) : (
-                <Link href={`/shop/${product.slug}`} prefetch={false} className="block border-b border-slate-100 bg-slate-50/70 p-2.5 sm:p-3">
-                  <div className="relative aspect-square w-full overflow-hidden rounded-[18px] bg-white">
+                <Link href={`/shop/${product.slug}`} prefetch={false} className="block border-b border-slate-100 bg-[#f5f5f7] p-2.5 sm:p-3">
+                  <div className="relative aspect-square w-full overflow-hidden rounded-[24px] bg-white">
                     <Image
                       src={product.imageUrl}
                       alt={product.imageAlt}
@@ -179,14 +74,7 @@ export function ShopToolProductGrid({ products }: ShopToolProductGridProps) {
                     )}
                     <div className="mt-0.5 text-[11px] font-medium text-slate-500">{product.unit}</div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => addToCart(product)}
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_12px_24px_rgba(34,197,94,0.28)] transition hover:bg-emerald-600"
-                    aria-label={`Add ${product.name} to cart`}
-                  >
-                    <PlusIcon />
-                  </button>
+                  <AddToProjectButton product={product} compact />
                 </div>
 
                 {localOnly ? (
@@ -217,14 +105,6 @@ export function ShopToolProductGrid({ products }: ShopToolProductGridProps) {
         })}
       </div>
 
-      <QualifyingQuestionsModal
-        open={Boolean(qualificationTarget)}
-        title={qualificationTarget?.product.name || "Service questions"}
-        questions={qualificationTarget?.questions || []}
-        onClose={() => saveQualification("skipped")}
-        onSave={(answers) => saveQualification("answered", answers)}
-        onSkip={() => saveQualification("skipped")}
-      />
     </section>
   )
 }

@@ -51,5 +51,5 @@ export async function createProjectAction(formData: FormData) {
     metadata: { project_id: createdProject.id },
   });
 
-  redirect(nextPath);
+  redirect(nextPath === "/projects" ? `/projects/${createdProject.id}` : nextPath);
 }

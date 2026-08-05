@@ -1,276 +1,168 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import Link from "next/link"
+import { notFound } from "next/navigation"
 
-import { requireSignedInProfile } from "@/lib/auth";
-import { PROJECT_UPLOAD_STORAGE_BUCKET, type ProjectEventRecord, type ProjectRecord, type ProjectUploadRecord } from "@/lib/projects";
+import { ProjectInfoEditor, ProjectQuestionsForm, SubmitQuoteRequestButton } from "@/components/buildflow/project-workspace-controls"
+import { requireSignedInProfile } from "@/lib/auth"
+import { PROJECT_UPLOAD_STORAGE_BUCKET, type ProjectEventRecord, type ProjectRecord, type ProjectUploadRecord } from "@/lib/projects"
+import {
+  quoteRequestStatusClass,
+  quoteRequestStatusLabel,
+  type ProjectQuestionAnswerRecord,
+  type ProjectQuestionRecord,
+  type QuoteRequestItemRecord,
+  type QuoteRequestRecord,
+} from "@/lib/quote-requests"
 
-function formatProjectDate(value: string) {
-  return new Date(value).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+type AttachmentRecord = {
+  id: string
+  request_id: string
+  item_id: string | null
+  file_name: string
+  file_path: string
+  file_type: string | null
+  file_size: number | null
+  created_at: string
 }
 
-function formatProjectTimelineDate(value: string) {
-  return new Date(value).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-function formatFileSize(value: number | null) {
-  if (!value || value <= 0) return "File";
-  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+function formatActivityDate(value: string) {
+  return new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
 }
-
-function formatProjectStatus(status: ProjectRecord["status"]) {
-  if (status === "active") return "Active";
-  if (status === "archived") return "Archived";
-  return "Draft";
-}
-
-type ProjectStepStatus = "Live" | "Partial Live" | "Coming Soon";
-
-function getStepStatusClass(status: ProjectStepStatus) {
-  if (status === "Partial Live") {
-    return "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100";
-  }
-
-  if (status === "Coming Soon") {
-    return "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100";
-  }
-
-  return "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
-}
-
-const nextSteps = (projectId: string) => [
-  { title: "Upload Plans", status: "Live", href: `/upload?projectId=${projectId}` },
-  { title: "Drywall Takeoff", status: "Live", href: `/shop/sheet-rock/drywall-calculator?projectId=${projectId}` },
-  { title: "Wood Floor Takeoff", status: "Live", href: `/shop/wood-floor/flooring-calculator?projectId=${projectId}` },
-  { title: "Materials", status: "Live", href: "/shop" },
-  { title: "Quote", status: "Live", href: `/quotes?projectId=${projectId}` },
-  { title: "Orders", status: "Partial Live", href: `/orders?projectId=${projectId}` },
-] as const;
 
 export default async function ProjectWorkspacePage({ params }: { params: Promise<{ projectId: string }> }) {
-  const { projectId } = await params;
-  const { supabase, user } = await requireSignedInProfile();
-
+  const { projectId } = await params
+  const { supabase, user } = await requireSignedInProfile()
   const { data: project, error } = await supabase
     .from("projects")
     .select("id, owner_id, name, address, status, created_at, updated_at")
     .eq("id", projectId)
     .eq("owner_id", user.id)
-    .maybeSingle<ProjectRecord>();
+    .maybeSingle<ProjectRecord>()
+  if (error || !project) notFound()
 
-  if (error || !project) {
-    notFound();
+  const [requestsResult, itemsResult, attachmentsResult, questionsResult, answersResult, eventsResult, uploadsResult] = await Promise.all([
+    supabase.from("quote_requests").select("id, project_id, owner_id, title, status, submitted_at, created_at, updated_at").eq("project_id", projectId).eq("owner_id", user.id).order("updated_at", { ascending: false }).returns<QuoteRequestRecord[]>(),
+    supabase.from("quote_request_items").select("id, request_id, project_id, owner_id, catalog_item_id, name, department, item_type, quantity, unit, unit_price, qualification_status, answers, metadata, created_at, updated_at").eq("project_id", projectId).eq("owner_id", user.id).order("created_at", { ascending: true }).returns<QuoteRequestItemRecord[]>(),
+    supabase.from("quote_request_attachments").select("id, request_id, item_id, file_name, file_path, file_type, file_size, created_at").eq("project_id", projectId).eq("owner_id", user.id).order("created_at", { ascending: true }).returns<AttachmentRecord[]>(),
+    supabase.from("project_questions").select("id, label, question_type, required, options, active, sort_order").eq("active", true).order("sort_order").returns<ProjectQuestionRecord[]>(),
+    supabase.from("project_question_answers").select("project_id, question_id, owner_id, value").eq("project_id", projectId).eq("owner_id", user.id).returns<ProjectQuestionAnswerRecord[]>(),
+    supabase.from("project_events").select("id, project_id, owner_id, event_type, source, title, description, metadata, created_at").eq("project_id", projectId).eq("owner_id", user.id).order("created_at", { ascending: false }).limit(20).returns<ProjectEventRecord[]>(),
+    supabase.from("project_uploads").select("id, project_id, owner_id, file_name, file_path, file_type, file_size, status, created_at").eq("project_id", projectId).eq("owner_id", user.id).order("created_at", { ascending: false }).returns<ProjectUploadRecord[]>(),
+  ])
+
+  if (requestsResult.error || itemsResult.error || attachmentsResult.error || questionsResult.error || answersResult.error) {
+    throw new Error("Failed to load the project workspace.")
   }
 
-  const { data: timelineEvents } = await supabase
-    .from("project_events")
-    .select("id, project_id, owner_id, event_type, source, title, description, metadata, created_at")
-    .eq("project_id", projectId)
-    .eq("owner_id", user.id)
-    .order("created_at", { ascending: false })
-    .returns<ProjectEventRecord[]>();
-
-  const { data: projectUploads, error: uploadsError } = await supabase
-    .from("project_uploads")
-    .select("id, project_id, owner_id, file_name, file_path, file_type, file_size, status, created_at")
-    .eq("project_id", projectId)
-    .eq("owner_id", user.id)
-    .order("created_at", { ascending: false })
-    .returns<ProjectUploadRecord[]>();
-
-  if (uploadsError) {
-    throw new Error("Failed to load project documents.");
-  }
-
-  const documents = await Promise.all(
-    (projectUploads ?? []).map(async (upload) => {
-      const { data } = await supabase.storage.from(PROJECT_UPLOAD_STORAGE_BUCKET).createSignedUrl(upload.file_path, 60 * 30);
-      return {
-        ...upload,
-        signedUrl: data?.signedUrl ?? null,
-      };
-    }),
-  );
+  const requests = requestsResult.data ?? []
+  const items = itemsResult.data ?? []
+  const attachments = await Promise.all((attachmentsResult.data ?? []).map(async (attachment) => {
+    const { data } = await supabase.storage.from(PROJECT_UPLOAD_STORAGE_BUCKET).createSignedUrl(attachment.file_path, 60 * 30)
+    return { ...attachment, signedUrl: data?.signedUrl ?? null }
+  }))
+  const legacyUploads = await Promise.all((uploadsResult.data ?? []).map(async (upload) => {
+    const { data } = await supabase.storage.from(PROJECT_UPLOAD_STORAGE_BUCKET).createSignedUrl(upload.file_path, 60 * 30)
+    return { ...upload, signedUrl: data?.signedUrl ?? null }
+  }))
+  const initialAnswers = Object.fromEntries((answersResult.data ?? []).map((answer) => [answer.question_id, answer.value]))
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#eef6ff_0%,#f8fbff_45%,#eef4fb_100%)] px-4 py-4 pb-28 text-slate-900 sm:px-8 sm:py-6 sm:pb-10 lg:px-10">
-      <section className="mx-auto flex max-w-6xl flex-col gap-4">
-        <section className="rounded-[30px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(243,248,255,0.94))] p-5 shadow-[0_18px_40px_rgba(148,163,184,0.12)] sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">Project</p>
-              <h1 className="mt-2 text-[2rem] font-semibold tracking-[-0.05em] text-slate-950 sm:text-[2.7rem]">{project.name}</h1>
-              <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]">
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700">{formatProjectStatus(project.status)}</span>
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">Created {formatProjectDate(project.created_at)}</span>
-                {project.updated_at !== project.created_at ? (
-                  <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">Updated {formatProjectDate(project.updated_at)}</span>
-                ) : null}
-              </div>
-            </div>
-            <Link
-              href="/projects"
-              className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(148,163,184,0.08)] transition hover:bg-slate-50"
-            >
-              Back to Projects
-            </Link>
+    <main className="min-h-screen bg-[#f5f5f7] pb-28 text-[#1d1d1f] sm:pb-12">
+      <header className="border-b border-black/[0.06] bg-white">
+        <div className="mx-auto flex max-w-6xl items-start justify-between gap-4 px-4 py-5 sm:px-8 sm:py-7">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Project Workspace</p>
+            <h1 className="mt-1 truncate text-[1.8rem] font-semibold leading-tight text-slate-950 sm:text-[2.35rem]">{project.name}</h1>
           </div>
-        </section>
+          <Link href="/projects" className="inline-flex min-h-10 shrink-0 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700">Projects</Link>
+        </div>
+      </header>
 
-        <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-          <article className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
+      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-8 sm:py-7 lg:grid-cols-[0.72fr_1.28fr]">
+        <aside className="grid content-start gap-4">
+          <section className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_8px_28px_rgba(15,23,42,0.05)]">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-slate-950">Project details</h2>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Overview</span>
+              <h2 className="text-base font-semibold text-slate-950">Project Info</h2>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase text-slate-600">{project.status}</span>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Status</div>
-                <div className="mt-2 text-sm font-semibold text-slate-900">{formatProjectStatus(project.status)}</div>
-              </div>
-              <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Started</div>
-                <div className="mt-2 text-sm font-semibold text-slate-900">{formatProjectDate(project.created_at)}</div>
-              </div>
-              <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4 sm:col-span-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Address</div>
-                <div className="mt-2 text-sm leading-6 font-semibold text-slate-900">{project.address || "No address added yet."}</div>
-              </div>
-            </div>
-          </article>
+            <div className="mt-3"><ProjectInfoEditor project={project} /></div>
+            <div className="mt-4"><ProjectQuestionsForm projectId={project.id} questions={questionsResult.data ?? []} initialAnswers={initialAnswers} /></div>
+          </section>
 
-          <aside className="flex flex-col gap-4">
-            <article className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-slate-950">Next actions</h2>
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Workflow</span>
+          <Link href="/shop" className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(0,113,227,0.2)]">Add Items from Shop</Link>
+        </aside>
+
+        <div className="grid content-start gap-4">
+          <section className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_8px_28px_rgba(15,23,42,0.05)] sm:p-5">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-950">Quote Requests</h2>
+                <p className="mt-1 text-sm text-slate-500">Items, plans, questions, and files stay together.</p>
               </div>
+              <span className="text-sm font-semibold text-slate-500">{requests.length}</span>
+            </div>
+
+            {requests.length ? (
               <div className="mt-4 grid gap-3">
-                {nextSteps(project.id).map((step, index) => (
-                  <Link
-                    key={step.title}
-                    href={step.href}
-                    className={`flex items-center justify-between gap-3 rounded-[22px] border px-4 py-3.5 text-sm font-semibold transition ${getStepStatusClass(step.status)}`}
-                  >
-                    <span className="flex items-center gap-3">
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/80 text-xs font-semibold text-slate-700 shadow-sm">{index + 1}</span>
-                      <span>{step.title}</span>
-                    </span>
-                    <span className="text-[11px] uppercase tracking-[0.16em] opacity-85">{step.status}</span>
-                  </Link>
-                ))}
+                {requests.map((request) => {
+                  const requestItems = items.filter((item) => item.request_id === request.id)
+                  const requestAttachments = attachments.filter((attachment) => attachment.request_id === request.id)
+                  const departments = [...new Set(requestItems.map((item) => item.department))]
+                  const needsAnswers = requestItems.filter((item) => item.qualification_status === "pending" || item.qualification_status === "skipped").length
+                  return (
+                    <article key={request.id} className="rounded-[18px] border border-slate-200 bg-[#fbfbfd] p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-semibold text-slate-950">{request.title}</h3>
+                            <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase ${quoteRequestStatusClass(request.status)}`}>{quoteRequestStatusLabel(request.status)}</span>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">Updated {formatDate(request.updated_at)} · {requestItems.length} item{requestItems.length === 1 ? "" : "s"} · {requestAttachments.length} file{requestAttachments.length === 1 ? "" : "s"}</p>
+                        </div>
+                        {request.status === "draft" ? <SubmitQuoteRequestButton projectId={project.id} requestId={request.id} /> : null}
+                      </div>
+                      {departments.length ? <div className="mt-3 flex flex-wrap gap-1.5">{departments.map((department) => <span key={department} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">{department}</span>)}</div> : null}
+                      {needsAnswers ? <p className="mt-3 text-xs font-semibold text-amber-700">{needsAnswers} item{needsAnswers === 1 ? " needs" : "s need"} qualifying answers before submission.</p> : null}
+                      <div className="mt-4 grid gap-2 border-t border-slate-200 pt-3">
+                        {requestItems.slice(0, 3).map((item) => <div key={item.id} className="flex items-center justify-between gap-3 text-sm"><span className="min-w-0 truncate font-medium text-slate-800">{item.name}</span><span className="shrink-0 text-xs text-slate-500">{item.quantity} {item.unit || "item"}</span></div>)}
+                        {requestItems.length > 3 ? <p className="text-xs text-slate-500">+{requestItems.length - 3} more</p> : null}
+                      </div>
+                      <Link href={`/projects/${project.id}/requests/${request.id}`} className="mt-4 inline-flex text-sm font-semibold text-[#0066cc]">Open Request</Link>
+                    </article>
+                  )
+                })}
               </div>
-            </article>
-
-            <article className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
-              <h2 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-slate-950">Project activity</h2>
-              <p className="mt-1 text-sm text-slate-500">Latest updates for this project.</p>
-              <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                {timelineEvents && timelineEvents.length > 0 ? `${timelineEvents.length} update${timelineEvents.length === 1 ? "" : "s"} available below.` : "No updates yet."}
+            ) : (
+              <div className="mt-4 rounded-[18px] border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
+                <p className="text-sm font-medium text-slate-700">No Quote Requests yet.</p>
+                <Link href="/shop" className="mt-3 inline-flex text-sm font-semibold text-[#0066cc]">Browse departments</Link>
               </div>
-            </article>
-          </aside>
-        </section>
+            )}
+          </section>
 
-        <section id="documents" className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-slate-950">Documents</h2>
-              <p className="text-sm text-slate-500">Project files and generated order PDFs.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link href={`/shop/sheet-rock/drywall-calculator?projectId=${project.id}`} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
-                Drywall takeoff
-              </Link>
-              <Link href={`/shop/wood-floor/flooring-calculator?projectId=${project.id}`} className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600">
-                Wood floor takeoff
-              </Link>
-              <Link href={`/upload?projectId=${project.id}`} className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
-                Upload file
-              </Link>
-            </div>
-          </div>
+          {legacyUploads.length ? (
+            <section className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_8px_28px_rgba(15,23,42,0.05)] sm:p-5">
+              <h2 className="text-base font-semibold text-slate-950">Previous Project Files</h2>
+              <div className="mt-3 grid gap-2">{legacyUploads.map((upload) => upload.signedUrl ? <a key={upload.id} href={upload.signedUrl} target="_blank" rel="noreferrer" className="truncate rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-[#0066cc]">{upload.file_name}</a> : <span key={upload.id} className="truncate text-sm text-slate-600">{upload.file_name}</span>)}</div>
+            </section>
+          ) : null}
 
-          {documents.length > 0 ? (
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
-              {documents.map((document) => (
-                <article key={document.id} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="truncate text-sm font-semibold text-slate-900">{document.file_name}</h3>
-                      <p className="mt-1.5 text-xs font-medium text-slate-500">
-                        {document.file_type || "Document"} · {formatFileSize(document.file_size)}
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600">
-                      {document.status}
-                    </span>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {document.signedUrl ? (
-                      <a
-                        href={document.signedUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center justify-center rounded-2xl border border-sky-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50"
-                      >
-                        Open PDF
-                      </a>
-                    ) : (
-                      <span className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-500">
-                        Link unavailable
-                      </span>
-                    )}
-                  </div>
+          <section className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_8px_28px_rgba(15,23,42,0.05)] sm:p-5">
+            <h2 className="text-base font-semibold text-slate-950">Project Activity</h2>
+            <div className="mt-3 grid gap-3">
+              {(eventsResult.data ?? []).length ? (eventsResult.data ?? []).map((event) => (
+                <article key={event.id} className="border-l-2 border-sky-200 pl-3">
+                  <div className="flex items-start justify-between gap-3"><h3 className="text-sm font-semibold text-slate-900">{event.title}</h3><time className="shrink-0 text-[11px] text-slate-500">{formatActivityDate(event.created_at)}</time></div>
+                  {event.description ? <p className="mt-1 text-xs leading-5 text-slate-600">{event.description}</p> : null}
                 </article>
-              ))}
+              )) : <p className="text-sm text-slate-500">No activity yet.</p>}
             </div>
-          ) : (
-            <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-              No project documents yet. Generated order PDFs will appear here.
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-[28px] border border-sky-100 bg-white p-5 shadow-[0_14px_34px_rgba(148,163,184,0.10)] sm:p-6">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-[1.1rem] font-semibold tracking-[-0.03em] text-slate-950">Timeline</h2>
-              <p className="text-sm text-slate-500">Recent project updates.</p>
-            </div>
-          </div>
-
-          {timelineEvents && timelineEvents.length > 0 ? (
-            <div className="mt-5 grid gap-3">
-              {timelineEvents.map((event) => (
-                <article key={event.id} className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <h3 className="text-sm font-semibold text-slate-900">{event.title}</h3>
-                      {event.description ? <p className="mt-1.5 text-sm leading-6 text-slate-600">{event.description}</p> : null}
-                    </div>
-                    <div className="shrink-0 text-xs font-medium text-slate-500">{formatProjectTimelineDate(event.created_at)}</div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-5 rounded-[22px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-              No timeline events yet.
-            </div>
-          )}
-        </section>
-      </section>
+          </section>
+        </div>
+      </div>
     </main>
-  );
+  )
 }
