@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const requestedEmail = body.email?.trim();
     const fullName = body.fullName?.trim();
     const companyName = body.companyName?.trim();
-    const phone = body.phone?.trim();
+    const phone = body.phone?.trim() || null;
 
     if (!userId) {
       return NextResponse.json(
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!fullName || !companyName || !phone) {
+    if (!fullName || !companyName) {
       return NextResponse.json(
         { error: "Missing required profile fields." },
         { status: 400 },

@@ -41,8 +41,6 @@ export async function POST(request: Request) {
       email,
       password,
       email_confirm: true,
-      phone,
-      phone_confirm: true,
       user_metadata: {
         full_name: fullName,
         company_name: fullName,
