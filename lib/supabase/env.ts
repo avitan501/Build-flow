@@ -4,7 +4,7 @@ const useIsolatedPreview = process.env.VERCEL_ENV === "preview";
 const supabaseUrl = useIsolatedPreview ? previewSupabaseUrl : process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = useIsolatedPreview ? previewSupabasePublishableKey : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-type SupabaseBrowserConfig = {
+export type SupabaseBrowserConfig = {
   url: string;
   anonKey: string;
 };

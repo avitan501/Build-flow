@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 
 import { AvantiaBuildClientShell } from "@/components/buildflow/buildflow-client-shell";
 import { MobileBottomDock } from "@/components/buildflow/mobile-bottom-dock";
@@ -54,16 +55,12 @@ export default async function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      {serializedSupabaseConfig ? (
-        <head>
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `window.__AVANTIA_SUPABASE__=${serializedSupabaseConfig}`,
-            }}
-          />
-        </head>
-      ) : null}
       <body className="min-h-full">
+        {serializedSupabaseConfig ? (
+          <Script id="avantia-supabase-config" strategy="beforeInteractive">
+            {`window.__AVANTIA_SUPABASE__=${serializedSupabaseConfig}`}
+          </Script>
+        ) : null}
         <AvantiaBuildClientShell>
           <WorkflowSettingsHydrator state={publicStateRow?.state ?? null} />
           <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />

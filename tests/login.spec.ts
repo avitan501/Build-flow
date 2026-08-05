@@ -11,6 +11,8 @@ test("login replaces technical PKCE errors with a useful restart message", async
 
 test("the email login field accepts a phone-password account", async ({ page }) => {
   let submittedEmail = ""
+  const pageErrors: string[] = []
+  page.on("pageerror", (error) => pageErrors.push(error.message))
   await page.route("**/auth/v1/token?grant_type=password", async (route) => {
     const payload = route.request().postDataJSON() as { email?: string }
     submittedEmail = payload.email ?? ""
@@ -29,4 +31,5 @@ test("the email login field accepts a phone-password account", async ({ page }) 
 
   await expect(page.getByText("Invalid login credentials")).toBeVisible()
   expect(submittedEmail).toBe("phone-13475675077@phone-login.buildflow.local")
+  expect(pageErrors.filter((message) => message.includes("Hydration failed"))).toEqual([])
 })
