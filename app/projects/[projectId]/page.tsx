@@ -147,7 +147,18 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
                       {departments.length ? <div className="mt-3 flex flex-wrap gap-1.5">{departments.map((department) => <span key={department} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">{department}</span>)}</div> : null}
                       {needsAnswers ? <p className="mt-3 text-xs font-semibold text-amber-700">{needsAnswers} item{needsAnswers === 1 ? " needs" : "s need"} qualifying answers before submission.</p> : null}
                       <div className="mt-4 grid gap-2 border-t border-slate-200 pt-3">
-                        {requestItems.slice(0, 3).map((item) => <div key={item.id} className="flex items-center justify-between gap-3 text-sm"><span className="min-w-0 truncate font-medium text-slate-800">{item.name}</span><span className="shrink-0 text-xs text-slate-500">{item.quantity} {item.unit || "item"}</span></div>)}
+                        {requestItems.slice(0, 3).map((item) => {
+                          const requestDetails = typeof item.metadata?.request_details === "string" ? item.metadata.request_details.trim() : ""
+                          return (
+                            <div key={item.id} className="grid gap-1 text-sm">
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="min-w-0 truncate font-medium text-slate-800">{item.name}</span>
+                                <span className="shrink-0 text-xs text-slate-500">{item.quantity} {item.unit || "item"}</span>
+                              </div>
+                              {requestDetails ? <p className="line-clamp-2 text-xs leading-5 text-slate-600">{requestDetails}</p> : null}
+                            </div>
+                          )
+                        })}
                         {requestItems.length > 3 ? <p className="text-xs text-slate-500">+{requestItems.length - 3} more</p> : null}
                       </div>
                       <Link href={`/projects/${project.id}/requests/${request.id}`} className="mt-4 inline-flex text-sm font-semibold text-[#0066cc]">Open Request</Link>

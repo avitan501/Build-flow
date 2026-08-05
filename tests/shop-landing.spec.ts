@@ -47,7 +47,7 @@ test("all departments wrap into downward rows without page overflow", async ({ p
   await expect(page.getByRole("heading", { name: "Shop by department" })).toBeVisible()
 
   const cards = page.getByTestId("department-card")
-  await expect(cards).toHaveCount(10)
+  await expect(cards).toHaveCount(11)
 
   const rowPositions = await cards.evaluateAll((elements) => elements.map((element) => Math.round(element.getBoundingClientRect().top)))
   expect(new Set(rowPositions).size).toBeGreaterThan(1)
@@ -57,6 +57,25 @@ test("all departments wrap into downward rows without page overflow", async ({ p
     scrollWidth: document.documentElement.scrollWidth,
   }))
   expect(widths.scrollWidth).toBe(widths.clientWidth)
+})
+
+test("home shows the compact manufacturer brand showcase", async ({ page }) => {
+  await page.goto("/")
+
+  await expect(page.getByRole("heading", { name: "Brands we source" })).toBeVisible()
+  await expect(page.getByTestId("shop-brand-grid").getByRole("img")).toHaveCount(8)
+})
+
+test("siding and roofing are separate departments with a complete request flow", async ({ page }) => {
+  await page.goto("/shop")
+  await expect(page.getByRole("link", { name: /Siding/ })).toBeVisible()
+  await expect(page.getByRole("link", { name: /Roofing/ })).toBeVisible()
+
+  await page.goto("/shop/siding")
+  await expect(page.getByRole("heading", { name: "Siding", exact: true })).toBeVisible()
+  await expect(page.getByText("Upload blueprint or shopping list", { exact: true })).toBeVisible()
+  await expect(page.getByTestId("department-essentials").locator("article")).toHaveCount(8)
+  await expect(page.getByRole("heading", { name: "Tell us what you need" })).toBeVisible()
 })
 
 test("shop shows the sourcing brands and direct help actions", async ({ page }) => {

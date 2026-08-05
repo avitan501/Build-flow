@@ -24,6 +24,7 @@ type AddToProjectButtonProps = {
   label?: string
   file?: File | null
   questions?: QualifyingQuestion[]
+  details?: string
 }
 
 type Options = {
@@ -40,7 +41,7 @@ function PlusIcon() {
   )
 }
 
-export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Add to Project", file = null, questions: questionOverride }: AddToProjectButtonProps) {
+export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Add to Project", file = null, questions: questionOverride, details }: AddToProjectButtonProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -108,6 +109,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
           unit: product.unit,
           unitPrice: product.price,
           requiredQuestionIds: questions.filter((question) => question.required).map((question) => question.id),
+          details,
         },
       })
       if (!result.ok) {

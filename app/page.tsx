@@ -1,4 +1,5 @@
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
+import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase";
 
 const conciergePoints = [
   {
@@ -68,6 +69,8 @@ export default function Home() {
           Working with designers, homeowners, and builders.
         </p>
       </section>
+
+      <ShopBrandShowcase compact />
     </main>
   );
 }

@@ -99,6 +99,7 @@ export async function addCatalogItemToProjectAction(input: {
     unit: string
     unitPrice: number
     requiredQuestionIds: string[]
+    details?: string
   }
 }): Promise<ActionResult<{ requestId: string; itemId: string }>> {
   const session = await currentUser()
@@ -151,7 +152,10 @@ export async function addCatalogItemToProjectAction(input: {
       unit: input.product.unit.trim() || null,
       unit_price: Math.max(0, Number(input.product.unitPrice) || 0),
       qualification_status: needsQuestions ? "pending" : "not_required",
-      metadata: { required_question_ids: input.product.requiredQuestionIds },
+      metadata: {
+        required_question_ids: input.product.requiredQuestionIds,
+        ...(input.product.details?.trim() ? { request_details: input.product.details.trim().slice(0, 4000) } : {}),
+      },
     })
     .select("id")
     .single<{ id: string }>()

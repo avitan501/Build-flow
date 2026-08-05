@@ -66,6 +66,8 @@ const CATEGORY_ICON_URLS: Record<string, string> = {
   eitan: "/images/materials/windows.svg",
   "door-and-molding": "/images/materials/doors.svg",
   "wood-floor": "/images/materials/flooring.svg",
+  siding: "/images/materials/trim.svg",
+  roofing: "/images/materials/roofing.svg",
   exterior: "/images/materials/roofing.svg",
   window: "/images/materials/windows.svg",
 }

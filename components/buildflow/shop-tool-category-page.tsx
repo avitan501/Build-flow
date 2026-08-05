@@ -2,11 +2,14 @@ import Image from "next/image"
 import Link from "next/link"
 
 import { uploadWindowScheduleAction } from "@/app/shop/window/actions"
+import { DepartmentEssentials } from "@/components/buildflow/department-essentials"
+import { DepartmentRequestComposer } from "@/components/buildflow/department-request-composer"
 import { EitanWhatsAppUploadForm } from "@/components/buildflow/eitan-whatsapp-upload-form"
 import { ManagerItemVisibility } from "@/components/buildflow/manager-item-visibility"
 import { PlanRequestUploadCard } from "@/components/buildflow/plan-request-upload-card"
 import { ShopToolCategoryProducts } from "@/components/buildflow/shop-tool-category-products"
 import type { ProjectRecord } from "@/lib/projects"
+import { getDepartmentEssentials } from "@/lib/department-essentials"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import type { ShopToolCategory } from "@/lib/shop-tools"
 
@@ -24,8 +27,8 @@ type ShopToolCategoryPageProps = {
 function FramingUploadActions() {
   const actions = [
     {
-      label: "Upload framer list",
-      description: "List, photo, PDF, or spreadsheet",
+      label: "Upload blueprint or shopping list",
+      description: "Plan, list, photo, PDF, CSV, or spreadsheet",
       accept: ".csv,.xls,.xlsx,.pdf,image/*",
       icon: (
         <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -38,23 +41,10 @@ function FramingUploadActions() {
         </svg>
       ),
     },
-    {
-      label: "Upload blue print",
-      description: "Plan file, PDF, or image",
-      accept: ".pdf,image/*",
-      icon: (
-        <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M4 3h12l4 4v14H4z" />
-          <path d="M16 3v5h5" />
-          <path d="M8 14h8" />
-          <path d="M8 18h5" />
-        </svg>
-      ),
-    },
   ]
 
   return (
-    <section className="grid grid-cols-2 gap-3 sm:max-w-2xl sm:gap-4">
+    <section className="grid max-w-xl gap-3 sm:gap-4">
       {actions.map((action) => (
         <ManagerItemVisibility key={action.label} itemId={`framing-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
           <PlanRequestUploadCard requestId={`framing-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} category="Framing" label={action.label} description={action.description} accept={action.accept} icon={action.icon} />
@@ -148,29 +138,15 @@ function WoodFloorActions() {
 function KitchenActions() {
   const actions = [
     {
-      label: "Upload kitchen plan",
-      description: "Cabinet layout, floor plan, PDF, or image",
-      accept: ".pdf,image/*",
+      label: "Upload blueprint or shopping list",
+      description: "Kitchen plan, design spec, list, PDF, image, CSV, or spreadsheet",
+      accept: ".csv,.xls,.xlsx,.pdf,image/*",
       icon: (
         <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M4 3h12l4 4v14H4z" />
           <path d="M16 3v5h5" />
           <path d="M8 13h8" />
           <path d="M8 17h5" />
-        </svg>
-      ),
-    },
-    {
-      label: "Upload design spec",
-      description: "Door style, finish, hardware, appliance notes",
-      accept: ".csv,.xls,.xlsx,.pdf,image/*",
-      icon: (
-        <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <rect x="4" y="3" width="16" height="18" rx="2" />
-          <path d="M8 7h8" />
-          <path d="M8 11h8" />
-          <path d="M8 15h4" />
-          <path d="M15 15h1" />
         </svg>
       ),
     },
@@ -207,7 +183,7 @@ function KitchenActions() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 self-start sm:gap-4 lg:grid-cols-1">
+      <div className="grid gap-3 self-start sm:gap-4">
         {actions.map((action) => (
           <ManagerItemVisibility key={action.label} itemId={`kitchen-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
             <PlanRequestUploadCard requestId={`kitchen-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} category="Kitchen" label={action.label} description={action.description} accept={action.accept} icon={action.icon} />
@@ -228,6 +204,23 @@ function BlueprintIcon() {
       <path d="M13 16h3" />
       <path d="M8 19h8" />
     </svg>
+  )
+}
+
+function CombinedUploadAction({ category, requestId }: { category: string; requestId: string }) {
+  return (
+    <section className="max-w-xl">
+      <ManagerItemVisibility itemId={`${requestId}-upload`}>
+        <PlanRequestUploadCard
+          requestId={`${requestId}-blueprint-shopping-list`}
+          category={category}
+          label="Upload blueprint or shopping list"
+          description="Plan, material list, photo, PDF, CSV, or spreadsheet"
+          accept=".csv,.xls,.xlsx,.pdf,image/*"
+          icon={<BlueprintIcon />}
+        />
+      </ManagerItemVisibility>
+    </section>
   )
 }
 
@@ -356,11 +349,15 @@ function WindowUploadActions({
 }
 
 export function ShopToolCategoryPage({ category, products, projects, selectedProjectId, isSignedIn, errorCode, successCode }: ShopToolCategoryPageProps) {
+  const essentials = getDepartmentEssentials(category.slug)
+  const usesStandardUpload = !["framing", "kitchen", "eitan", "window"].includes(category.slug)
+
   return (
     <main className="min-h-screen bg-[#f7f8fa] px-4 py-4 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <section className="mx-auto flex max-w-7xl flex-col gap-4">
         <h1 className="text-[2rem] font-bold tracking-normal text-slate-950 sm:text-[2.4rem]">{category.label}</h1>
 
+        {usesStandardUpload ? <CombinedUploadAction category={category.label} requestId={category.slug} /> : null}
         {category.slug === "framing" ? <FramingUploadActions /> : null}
         {category.slug === "tile-work" ? <ManagerItemVisibility itemId="tile-work-package"><TileWorkActions /></ManagerItemVisibility> : null}
         {category.slug === "sheet-rock" ? <ManagerItemVisibility itemId="sheet-rock-drywall-takeoff"><SheetRockActions /></ManagerItemVisibility> : null}
@@ -369,7 +366,16 @@ export function ShopToolCategoryPage({ category, products, projects, selectedPro
         {category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
         {category.slug === "window" ? <ManagerItemVisibility itemId="window-package"><WindowUploadActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} successCode={successCode} /></ManagerItemVisibility> : null}
 
-        <ShopToolCategoryProducts categoryLabel={category.label} products={products} />
+        <DepartmentEssentials data={essentials} />
+
+        {products.length > 0 ? (
+          <section aria-labelledby="available-items-heading">
+            <h2 id="available-items-heading" className="mb-4 text-xl font-semibold text-slate-950 sm:text-2xl">Available items</h2>
+            <ShopToolCategoryProducts categoryLabel={category.label} products={products} />
+          </section>
+        ) : null}
+
+        <DepartmentRequestComposer category={category.label} requestId={category.slug} nextStep={essentials.nextStep} />
       </section>
     </main>
   )

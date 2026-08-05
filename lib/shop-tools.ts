@@ -10,6 +10,8 @@ export type ShopToolSlug =
   | "eitan"
   | "door-and-molding"
   | "wood-floor"
+  | "siding"
+  | "roofing"
   | "exterior"
   | "window"
 
@@ -79,11 +81,18 @@ export const SHOP_TOOL_CATEGORIES: ShopToolCategory[] = [
     imageAlt: "Wood floor material",
   },
   {
-    slug: "exterior",
-    label: "Exterior",
-    description: "Exterior envelope, flashing, siding, and weather protection items.",
+    slug: "siding",
+    label: "Siding",
+    description: "Siding, weather barriers, trim, fasteners, and exterior finish materials.",
+    imageUrl: "/images/materials/photos/trim.jpg",
+    imageAlt: "Exterior siding and trim material",
+  },
+  {
+    slug: "roofing",
+    label: "Roofing",
+    description: "Shingles, underlayment, flashing, ventilation, and roofing fasteners.",
     imageUrl: "/images/materials/photos/roofing.jpg",
-    imageAlt: "Exterior building material",
+    imageAlt: "Roofing material",
   },
   {
     slug: "window",
@@ -97,6 +106,10 @@ export const SHOP_TOOL_CATEGORIES: ShopToolCategory[] = [
 export function findShopToolCategory(slug: string) {
   if (slug === "paper-work") {
     return SHOP_TOOL_CATEGORIES.find((category) => category.slug === "services") ?? null
+  }
+
+  if (slug === "exterior") {
+    return SHOP_TOOL_CATEGORIES.find((category) => category.slug === "roofing") ?? null
   }
 
   return SHOP_TOOL_CATEGORIES.find((category) => category.slug === slug) ?? null
@@ -130,6 +143,14 @@ function isWindowProduct(product: ShopCatalogProduct) {
 function isKitchenProduct(product: ShopCatalogProduct) {
   const haystack = productHaystack(product)
   return product.category === "Kitchen" || /\b(kitchen|cabinet|cabinets|cabinetry|countertop|countertops|shaker)\b/.test(haystack)
+}
+
+function isRoofingProduct(product: ShopCatalogProduct) {
+  return /\b(roof|roofing|shingle|underlayment|ice and water|drip edge|ridge cap|roof vent)\b/.test(productHaystack(product))
+}
+
+function isSidingProduct(product: ShopCatalogProduct) {
+  return /\b(siding|house wrap|weather barrier|j-channel|starter strip|fiber cement)\b/.test(productHaystack(product))
 }
 
 export function filterProductsForShopTool(products: ShopCatalogProduct[], slug: ShopToolSlug) {
@@ -166,8 +187,12 @@ export function filterProductsForShopTool(products: ShopCatalogProduct[], slug: 
       return product.productType !== "service" && isWoodFloorProduct(product)
     }
 
-    if (slug === "exterior") {
-      return product.productType !== "service" && product.category === "Exterior" && !isWindowProduct(product)
+    if (slug === "siding") {
+      return product.productType !== "service" && product.category === "Exterior" && isSidingProduct(product)
+    }
+
+    if (slug === "roofing" || slug === "exterior") {
+      return product.productType !== "service" && product.category === "Exterior" && !isWindowProduct(product) && (isRoofingProduct(product) || !isSidingProduct(product))
     }
 
     return product.productType !== "service" && isWindowProduct(product)
