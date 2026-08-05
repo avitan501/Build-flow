@@ -1,5 +1,6 @@
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { ShopProjectToolPicker } from "@/components/buildflow/shop-project-tool-picker"
+import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase"
 import { getSessionWithProfile } from "@/lib/auth"
 import type { ProjectRecord } from "@/lib/projects"
 import { ShopCatalogExperience } from "@/components/buildflow/shop-catalog-experience"
@@ -71,6 +72,8 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
           projectError={params.error === "project-create-failed"}
         />
       </section>
+
+      <ShopBrandShowcase />
     </main>
   )
 }

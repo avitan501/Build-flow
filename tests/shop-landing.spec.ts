@@ -59,6 +59,15 @@ test("all departments wrap into downward rows without page overflow", async ({ p
   expect(widths.scrollWidth).toBe(widths.clientWidth)
 })
 
+test("shop shows the sourcing brands and direct help actions", async ({ page }) => {
+  await page.goto("/shop")
+
+  await expect(page.getByRole("heading", { name: "Brands we source" })).toBeVisible()
+  await expect(page.getByTestId("shop-brand-grid").getByRole("img")).toHaveCount(8)
+  await expect(page.getByRole("link", { name: "Call us" })).toHaveAttribute("href", "tel:+19292077156")
+  await expect(page.getByRole("link", { name: "Text HELP" })).toHaveAttribute("href", "sms:+19292077156?body=HELP")
+})
+
 test("guest projects stay compact until the full list is requested", async ({ page }) => {
   await page.addInitScript(() => {
     const projects = Array.from({ length: 8 }, (_, index) => ({
