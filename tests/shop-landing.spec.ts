@@ -44,6 +44,7 @@ test("saved guest project hydrates cleanly and can be cleared", async ({ page })
 
 test("all departments wrap into downward rows without page overflow", async ({ page }) => {
   await page.goto("/shop")
+  await expect(page.getByRole("heading", { name: "Shop by department" })).toBeVisible()
 
   const cards = page.getByTestId("department-card")
   await expect(cards).toHaveCount(10)
