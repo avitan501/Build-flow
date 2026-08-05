@@ -3,6 +3,7 @@ import Link from "next/link"
 
 import { uploadWindowScheduleAction } from "@/app/shop/window/actions"
 import { EitanWhatsAppUploadForm } from "@/components/buildflow/eitan-whatsapp-upload-form"
+import { ManagerItemVisibility } from "@/components/buildflow/manager-item-visibility"
 import { PlanRequestUploadCard } from "@/components/buildflow/plan-request-upload-card"
 import { ShopToolCategoryProducts } from "@/components/buildflow/shop-tool-category-products"
 import type { ProjectRecord } from "@/lib/projects"
@@ -55,7 +56,9 @@ function FramingUploadActions() {
   return (
     <section className="grid grid-cols-2 gap-3 sm:max-w-2xl sm:gap-4">
       {actions.map((action) => (
-        <PlanRequestUploadCard key={action.label} requestId={`framing-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} category="Framing" label={action.label} description={action.description} accept={action.accept} icon={action.icon} />
+        <ManagerItemVisibility key={action.label} itemId={`framing-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
+          <PlanRequestUploadCard requestId={`framing-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} category="Framing" label={action.label} description={action.description} accept={action.accept} icon={action.icon} />
+        </ManagerItemVisibility>
       ))}
     </section>
   )
@@ -206,7 +209,9 @@ function KitchenActions() {
 
       <div className="grid grid-cols-2 gap-3 self-start sm:gap-4 lg:grid-cols-1">
         {actions.map((action) => (
-          <PlanRequestUploadCard key={action.label} requestId={`kitchen-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} category="Kitchen" label={action.label} description={action.description} accept={action.accept} icon={action.icon} />
+          <ManagerItemVisibility key={action.label} itemId={`kitchen-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
+            <PlanRequestUploadCard requestId={`kitchen-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} category="Kitchen" label={action.label} description={action.description} accept={action.accept} icon={action.icon} />
+          </ManagerItemVisibility>
         ))}
       </div>
     </section>
@@ -357,12 +362,12 @@ export function ShopToolCategoryPage({ category, products, projects, selectedPro
         <h1 className="text-[2rem] font-bold tracking-normal text-slate-950 sm:text-[2.4rem]">{category.label}</h1>
 
         {category.slug === "framing" ? <FramingUploadActions /> : null}
-        {category.slug === "tile-work" ? <TileWorkActions /> : null}
-        {category.slug === "sheet-rock" ? <SheetRockActions /> : null}
-        {category.slug === "wood-floor" ? <WoodFloorActions /> : null}
+        {category.slug === "tile-work" ? <ManagerItemVisibility itemId="tile-work-package"><TileWorkActions /></ManagerItemVisibility> : null}
+        {category.slug === "sheet-rock" ? <ManagerItemVisibility itemId="sheet-rock-drywall-takeoff"><SheetRockActions /></ManagerItemVisibility> : null}
+        {category.slug === "wood-floor" ? <ManagerItemVisibility itemId="wood-floor-takeoff"><WoodFloorActions /></ManagerItemVisibility> : null}
         {category.slug === "kitchen" ? <KitchenActions /> : null}
-        {category.slug === "eitan" ? <EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /> : null}
-        {category.slug === "window" ? <WindowUploadActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} successCode={successCode} /> : null}
+        {category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
+        {category.slug === "window" ? <ManagerItemVisibility itemId="window-package"><WindowUploadActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} successCode={successCode} /></ManagerItemVisibility> : null}
 
         <ShopToolCategoryProducts categoryLabel={category.label} products={products} />
       </section>

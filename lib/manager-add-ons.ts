@@ -42,6 +42,7 @@ export type ManagerCatalogAddOns = {
   products: ManagerProductAddOn[]
   services: ManagerProductAddOn[]
   departmentOverrides: ManagerDepartmentOverride[]
+  hiddenItemIds: string[]
 }
 
 export const MANAGER_ADD_ONS_STORAGE_KEY = "buildflow-manager-catalog-add-ons"
@@ -55,7 +56,7 @@ export function makeManagerSlug(value: string) {
 }
 
 export function createEmptyManagerAddOns(): ManagerCatalogAddOns {
-  return { categories: [], products: [], services: [], departmentOverrides: [] }
+  return { categories: [], products: [], services: [], departmentOverrides: [], hiddenItemIds: [] }
 }
 
 export function readManagerAddOns(): ManagerCatalogAddOns {
@@ -72,6 +73,7 @@ export function readManagerAddOns(): ManagerCatalogAddOns {
       products: Array.isArray(addOns.products) ? addOns.products : [],
       services: Array.isArray(addOns.services) ? addOns.services : [],
       departmentOverrides: Array.isArray(addOns.departmentOverrides) ? addOns.departmentOverrides : [],
+      hiddenItemIds: Array.isArray(addOns.hiddenItemIds) ? addOns.hiddenItemIds : [],
     }
   } catch {
     return createEmptyManagerAddOns()
@@ -86,6 +88,14 @@ export function writeManagerAddOns(addOns: ManagerCatalogAddOns) {
 
 export function isManagerAddOnProductId(productId: string) {
   return productId.startsWith(MANAGER_PRODUCT_ID_PREFIX) || productId.startsWith(MANAGER_SERVICE_ID_PREFIX)
+}
+
+export function isManagerItemHidden(addOns: ManagerCatalogAddOns, itemId: string) {
+  return addOns.hiddenItemIds.includes(itemId)
+}
+
+export function visibleManagerItems<T extends { id: string }>(items: T[], addOns: ManagerCatalogAddOns) {
+  return items.filter((item) => !isManagerItemHidden(addOns, item.id))
 }
 
 export function buildManagerCategoryAddOn(input: { label: string; description?: string; imageUrl?: string }): ManagerCategoryAddOn {
@@ -221,7 +231,7 @@ export function managerAddOnsToShopCategories(addOns: ManagerCatalogAddOns): Sho
 }
 
 export function managerAddOnsToShopProducts(addOns: ManagerCatalogAddOns): ShopCatalogProduct[] {
-  return [...addOns.services, ...addOns.products].map((item, index) => {
+  return visibleManagerItems([...addOns.services, ...addOns.products], addOns).map((item, index) => {
     const image = placeholderImageMetadata(item.kind === "service" ? "Sub-departments" : item.category, item.name)
 
     return {

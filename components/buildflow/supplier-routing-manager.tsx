@@ -10,6 +10,7 @@ import {
   buildManagerProductAddOn,
   departmentDisplayLabel,
   departmentOverrideFor,
+  isManagerItemHidden,
   readManagerAddOns,
   visibleDepartmentSources,
   writeManagerAddOns,
@@ -55,7 +56,12 @@ function loadSettings(initial?: ShopQualificationSettings | null): ShopQualifica
 }
 
 function loadAddOns(initial?: ManagerCatalogAddOns | null): ManagerCatalogAddOns {
-  return initial ?? readManagerAddOns()
+  const addOns = initial ?? readManagerAddOns()
+  return { ...addOns, hiddenItemIds: Array.isArray(addOns.hiddenItemIds) ? addOns.hiddenItemIds : [] }
+}
+
+function parseDepartmentItemList(value: string) {
+  return [...new Set(value.split(/\r?\n/).map((line) => line.trim().replace(/^[-*]\s+/, "").replace(/^\d+[.)]\s+/, "")).filter(Boolean))].slice(0, 200)
 }
 
 function makeId(value: string) {
@@ -123,6 +129,8 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
     price: "",
     supplierId: settings.suppliers[0]?.id ?? DEFAULT_SUPPLIERS[0]?.id ?? "",
   })
+  const [bulkItemText, setBulkItemText] = useState("")
+  const [bulkItemStatus, setBulkItemStatus] = useState("")
   const [supplierDraft, setSupplierDraft] = useState({
     name: "",
     contactName: "",
@@ -154,8 +162,8 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
       defaultQuestions: DEFAULT_SERVICE_QUESTIONS,
     }))
 
-    return [...SERVICE_ASSIGNMENT_TARGETS, ...managerServices]
-  }, [addOns.services, settings.suppliers])
+    return [...SERVICE_ASSIGNMENT_TARGETS, ...managerServices].filter((target) => !isManagerItemHidden(addOns, target.id))
+  }, [addOns, settings.suppliers])
   const categoryOptions = useMemo(() => {
     const values = [
       "Framing",
@@ -187,20 +195,26 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
   const selectedSetting = useMemo(() => selectedSettingFor(settings, selectedTarget.id, assignmentTargets), [assignmentTargets, selectedTarget.id, settings])
   const selectedSupplier = settings.suppliers.find((supplier) => supplier.id === selectedSupplierId) ?? settings.suppliers[0] ?? null
   const assignedSupplier = settings.suppliers.find((supplier) => supplier.id === selectedSetting.supplierId) ?? null
-  const existingDepartmentProducts = useMemo(() => productsForDepartment(catalogProducts, selectedDepartment), [catalogProducts, selectedDepartment])
+  const existingDepartmentProducts = useMemo(() => productsForDepartment(catalogProducts, selectedDepartment).filter((product) => !isManagerItemHidden(addOns, product.id)), [addOns, catalogProducts, selectedDepartment])
   const departmentProducts = useMemo(() => addOns.products.filter((product) => product.category === selectedDepartment), [addOns.products, selectedDepartment])
   const departmentFileUploads = useMemo(() => addOns.services.filter((service) => service.category === selectedDepartment), [addOns.services, selectedDepartment])
   const builtInDepartmentServices = useMemo(
-    () => SERVICE_ASSIGNMENT_TARGETS.filter((target) => target.departmentLabel === selectedDepartment),
-    [selectedDepartment],
+    () => SERVICE_ASSIGNMENT_TARGETS.filter((target) => target.departmentLabel === selectedDepartment && !isManagerItemHidden(addOns, target.id)),
+    [addOns, selectedDepartment],
   )
+  const hiddenDepartmentItems = useMemo(() => {
+    const catalogItems = productsForDepartment(catalogProducts, selectedDepartment).filter((product) => isManagerItemHidden(addOns, product.id)).map((product) => ({ id: product.id, label: product.name, type: "Product" }))
+    const serviceItems = SERVICE_ASSIGNMENT_TARGETS.filter((target) => target.departmentLabel === selectedDepartment && isManagerItemHidden(addOns, target.id)).map((target) => ({ id: target.id, label: target.serviceLabel, type: "Sub-item" }))
+    return [...catalogItems, ...serviceItems]
+  }, [addOns, catalogProducts, selectedDepartment])
+  const parsedBulkItems = useMemo(() => parseDepartmentItemList(bulkItemText), [bulkItemText])
   const selectedDepartmentShopHref = departmentShopHref(selectedDepartment)
   const departmentSummaries = useMemo(() => {
     return categoryOptions.map((label) => {
-      const existingProducts = productsForDepartment(catalogProducts, label).length
+      const existingProducts = productsForDepartment(catalogProducts, label).filter((product) => !isManagerItemHidden(addOns, product.id)).length
       const managerProducts = addOns.products.filter((product) => product.category === label).length
       const managerFileUploads = addOns.services.filter((service) => service.category === label).length
-      const builtInServices = SERVICE_ASSIGNMENT_TARGETS.filter((target) => target.departmentLabel === label).length
+      const builtInServices = SERVICE_ASSIGNMENT_TARGETS.filter((target) => target.departmentLabel === label && !isManagerItemHidden(addOns, target.id)).length
       return {
         label,
         displayLabel: departmentDisplayLabel(addOns, label),
@@ -227,6 +241,14 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
     setAddOns(next)
     writeManagerAddOns(next)
     void saveWorkflowManagerSettingsAction({ qualificationSettings: settings, addOns: next })
+  }
+
+  function persistAll(nextSettings: ShopQualificationSettings, nextAddOns: ManagerCatalogAddOns) {
+    setSettings(nextSettings)
+    setAddOns(nextAddOns)
+    writeShopQualificationSettings(nextSettings)
+    writeManagerAddOns(nextAddOns)
+    void saveWorkflowManagerSettingsAction({ qualificationSettings: nextSettings, addOns: nextAddOns })
   }
 
   function updateSelectedSetting(patch: Partial<ProductQualificationSetting>) {
@@ -420,11 +442,11 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
         supplierName: supplier?.name,
       })
 
-      persistAddOns({
+      const nextAddOns = {
         ...addOns,
         services: [...addOns.services.filter((entry) => entry.id !== service.id), service],
-      })
-      persist({
+      }
+      const nextSettings = {
         ...settings,
         products: {
           ...settings.products,
@@ -435,7 +457,8 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
             questions: draftQuestions.length > 0 ? draftQuestions : DEFAULT_PLAN_UPLOAD_QUESTIONS,
           },
         },
-      })
+      }
+      persistAll(nextSettings, nextAddOns)
       setSelectedTargetId(service.id)
       setDraftQuestions(DEFAULT_PLAN_UPLOAD_QUESTIONS)
     }
@@ -448,6 +471,46 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
       ...addOns,
       products: addOns.products.filter((product) => product.id !== productId),
     })
+  }
+
+  function hideBuiltInItem(itemId: string, itemLabel: string) {
+    if (!window.confirm(`Remove ${itemLabel} from the customer shop? You can restore it later.`)) return
+    persistAddOns({ ...addOns, hiddenItemIds: [...new Set([...addOns.hiddenItemIds, itemId])] })
+  }
+
+  function restoreBuiltInItem(itemId: string) {
+    persistAddOns({ ...addOns, hiddenItemIds: addOns.hiddenItemIds.filter((id) => id !== itemId) })
+  }
+
+  function addBulkDepartmentItems() {
+    if (parsedBulkItems.length === 0) return
+    const supplier = settings.suppliers.find((entry) => entry.id === departmentItemDraft.supplierId) ?? settings.suppliers[0]
+    const additions = parsedBulkItems.map((name) => buildManagerProductAddOn({
+      kind: "product",
+      name,
+      category: selectedDepartment,
+      description: `${name} commonly requested in ${selectedDepartmentDisplay}.`,
+      unit: departmentItemDraft.unit || "Each",
+      price: 0,
+      supplierId: supplier?.id,
+      supplierName: supplier?.name,
+    }))
+    const merged = new Map(addOns.products.map((product) => [product.id, product]))
+    additions.forEach((product) => merged.set(product.id, product))
+    persistAddOns({ ...addOns, products: [...merged.values()] })
+    setBulkItemText("")
+    setBulkItemStatus(`${additions.length} item${additions.length === 1 ? "" : "s"} added to ${selectedDepartmentDisplay}.`)
+  }
+
+  async function importBulkItemFile(file: File | null) {
+    if (!file) return
+    if (file.size > 1024 * 1024) {
+      setBulkItemStatus("Choose a text file smaller than 1 MB.")
+      return
+    }
+    const text = await file.text()
+    setBulkItemText(text)
+    setBulkItemStatus(`${parseDepartmentItemList(text).length} items loaded. Review the list before adding.`)
   }
 
   function addService() {
@@ -466,11 +529,11 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
 
     if (!service.name) return
 
-    persistAddOns({
+    const nextAddOns = {
       ...addOns,
       services: [...addOns.services.filter((entry) => entry.id !== service.id), service],
-    })
-    persist({
+    }
+    const nextSettings = {
       ...settings,
       products: {
         ...settings.products,
@@ -481,7 +544,8 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
           questions: DEFAULT_SERVICE_QUESTIONS,
         },
       },
-    })
+    }
+    persistAll(nextSettings, nextAddOns)
     setSelectedTargetId(service.id)
     setActivePanel("departments")
     setServiceDraft({ name: "", category: service.category, description: "", supplierId: supplier?.id ?? "" })
@@ -490,11 +554,11 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
   function removeService(serviceId: string) {
     const remainingProducts = { ...settings.products }
     delete remainingProducts[serviceId]
-    persistAddOns({
+    const nextAddOns = {
       ...addOns,
       services: addOns.services.filter((service) => service.id !== serviceId),
-    })
-    persist({ ...settings, products: remainingProducts })
+    }
+    persistAll({ ...settings, products: remainingProducts }, nextAddOns)
     if (selectedTargetId === serviceId) {
       setSelectedTargetId(SERVICE_ASSIGNMENT_TARGETS[0]?.id ?? "")
     }
@@ -1030,7 +1094,10 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
                                   <div className="mt-1 text-xs leading-5 text-slate-500">{product.unit} · {product.price > 0 ? `$${product.price.toFixed(2)}` : "Get pricing"} · {product.supplierName || "Catalog"}</div>
                                   <div className="mt-2 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Existing catalog</div>
                                 </div>
-                                <Link href={`/shop/${product.slug}`} prefetch={false} className="text-sm font-semibold text-sky-700">View</Link>
+                                <div className="flex shrink-0 flex-col items-end gap-2">
+                                  <Link href={`/shop/${product.slug}`} prefetch={false} className="text-sm font-semibold text-sky-700">View</Link>
+                                  <button type="button" onClick={() => hideBuiltInItem(product.id, product.name)} className="text-sm font-semibold text-rose-700">Remove</button>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -1060,8 +1127,10 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
                         <>
                           {builtInDepartmentServices.map((service) => (
                             <div key={service.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-                              <div className="text-sm font-semibold text-slate-950">{service.serviceLabel}</div>
-                              <div className="mt-1 text-xs leading-5 text-slate-500">Built-in upload workflow · managed as a sub-department</div>
+                              <div className="flex items-start justify-between gap-3">
+                                <div><div className="text-sm font-semibold text-slate-950">{service.serviceLabel}</div><div className="mt-1 text-xs leading-5 text-slate-500">Built-in upload workflow · managed as a sub-department</div></div>
+                                <button type="button" onClick={() => hideBuiltInItem(service.id, service.serviceLabel)} className="shrink-0 text-sm font-semibold text-rose-700">Remove</button>
+                              </div>
                             </div>
                           ))}
                           {departmentFileUploads.map((service) => (
@@ -1080,6 +1149,44 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
                     </div>
                   </div>
                 </div>
+
+                {hiddenDepartmentItems.length > 0 ? (
+                  <details className="mt-4 rounded-[22px] border border-slate-200 bg-white px-4 py-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-slate-700">Removed items ({hiddenDepartmentItems.length})</summary>
+                    <div className="mt-3 grid gap-2 border-t border-slate-100 pt-3">
+                      {hiddenDepartmentItems.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+                          <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900">{item.label}</p><p className="text-xs text-slate-500">{item.type}</p></div>
+                          <button type="button" onClick={() => restoreBuiltInItem(item.id)} className="shrink-0 text-sm font-semibold text-sky-700">Restore</button>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
+
+                <section className="mt-6 rounded-[26px] border border-sky-100 bg-sky-50/55 p-4 sm:p-5">
+                  <p className="text-xs font-semibold uppercase text-sky-700">Common department items</p>
+                  <h4 className="mt-1 text-lg font-semibold text-slate-950">Add an item list to {selectedDepartmentDisplay}</h4>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">Write or paste one product name per line. You can also import a plain-text list, review it, and add every item together.</p>
+                  <textarea
+                    value={bulkItemText}
+                    onChange={(event) => { setBulkItemText(event.target.value); setBulkItemStatus("") }}
+                    rows={7}
+                    placeholder={"2x4 studs\n3/4 plywood\nFraming nails"}
+                    className="mt-4 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base leading-7 outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+                  />
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-sm font-semibold text-slate-600">{parsedBulkItems.length} item{parsedBulkItems.length === 1 ? "" : "s"} ready</span>
+                    <label className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-full border border-sky-200 bg-white px-4 text-sm font-semibold text-sky-800">
+                      <input type="file" accept=".txt,text/plain" className="sr-only" onChange={(event) => { void importBulkItemFile(event.target.files?.[0] ?? null); event.currentTarget.value = "" }} />
+                      Import .txt list
+                    </label>
+                  </div>
+                  {bulkItemStatus ? <p className="mt-3 rounded-xl border border-sky-100 bg-white px-3 py-2 text-sm text-slate-700" role="status">{bulkItemStatus}</p> : null}
+                  <button type="button" disabled={parsedBulkItems.length === 0} onClick={addBulkDepartmentItems} className="mt-4 min-h-12 w-full rounded-2xl bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45">
+                    Add {parsedBulkItems.length || "list"} item{parsedBulkItems.length === 1 ? "" : "s"} to department
+                  </button>
+                </section>
 
                 <div className="mt-6 rounded-[26px] border border-slate-200 bg-white p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -11,6 +11,7 @@ import {
   MANAGER_ADD_ONS_UPDATED_EVENT,
   departmentDisplayLabel,
   isManagerAddOnProductId,
+  isManagerItemHidden,
   managerAddOnsToShopProducts,
   readManagerAddOns,
   resolveDepartmentSourceLabel,
@@ -178,7 +179,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   const activeCategoryLabel = activeCategorySource === "All" ? "All" : departmentDisplayLabel(managerAddOns, activeCategorySource)
   const catalogProducts = useMemo(() => {
     const managerProducts = managerAddOnsToShopProducts(managerAddOns)
-    return [...managerProducts, ...products].filter((product, index, all) => all.findIndex((candidate) => candidate.id === product.id) === index)
+    return [...managerProducts, ...products].filter((product, index, all) => !isManagerItemHidden(managerAddOns, product.id) && all.findIndex((candidate) => candidate.id === product.id) === index)
   }, [managerAddOns, products])
   const shopCategorySources = useMemo(() => {
     const labels = [

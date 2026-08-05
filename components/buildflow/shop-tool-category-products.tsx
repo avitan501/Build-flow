@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react"
 import {
   MANAGER_ADD_ONS_UPDATED_EVENT,
   departmentDisplayLabel,
+  isManagerItemHidden,
   managerAddOnsToShopProducts,
   readManagerAddOns,
   resolveDepartmentSourceLabel,
@@ -51,6 +52,7 @@ export function ShopToolCategoryProducts({ categoryLabel, products }: ShopToolCa
     return [...managerProducts, ...products].filter((product, index, all) => {
       const key = productKey(product)
       return (
+        !isManagerItemHidden(managerAddOns, product.id) &&
         all.findIndex((candidate) => candidate.id === product.id || candidate.slug === product.slug) === index &&
         all.findIndex((candidate) => productKey(candidate) === key) === index
       )
