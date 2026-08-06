@@ -8,6 +8,9 @@ test("home presents the concise construction concierge information", async ({ pa
   await expect(page.getByRole("heading", { name: "Liquidation opportunities" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Hard-to-find items" })).toBeVisible();
   await expect(page.getByText("Working with designers, homeowners, and builders.")).toBeVisible();
+  const lockups = page.getByTestId("avantia-build-lockup");
+  await expect(lockups.first()).toHaveAttribute("data-testid", "avantia-build-lockup");
+  await expect(lockups.locator("img")).toHaveCount(0);
 
   const overflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflows).toBe(false);

@@ -1,32 +1,30 @@
-import Image from "next/image";
-
 type AvantiaBuildLockupProps = {
   compact?: boolean;
   showSlogan?: boolean;
   className?: string;
+  tone?: "navy" | "light";
 };
 
-export function AvantiaBuildLockup({ compact = false, showSlogan = false, className = "" }: AvantiaBuildLockupProps) {
+export function AvantiaBuildLockup({ compact = false, showSlogan = false, className = "", tone = "navy" }: AvantiaBuildLockupProps) {
+  const foreground = tone === "light" ? "text-white" : "text-[#0E2A4A]";
+
   return (
-    <span className={`flex min-w-0 flex-col ${className}`}>
-      <span className="flex min-w-0 items-center gap-2.5" translate="no">
-        <span className={`relative block shrink-0 overflow-hidden ${compact ? "h-7 w-[94px]" : "h-9 w-[122px]"}`}>
-          <Image
-            src="/images/avantia/avantia-logo-horizontal.png"
-            alt="Avantia"
-            width={3541}
-            height={506}
-            sizes={compact ? "196px" : "252px"}
-            className="absolute left-0 top-0 h-full w-auto max-w-none"
-            priority
-          />
+    <span className={`flex min-w-0 flex-col ${className}`} data-testid="avantia-build-lockup">
+      <span
+        className={`flex min-w-0 items-baseline whitespace-nowrap font-extrabold leading-none tracking-normal ${foreground}`}
+        style={{ fontFamily: "var(--font-poppins), sans-serif" }}
+        aria-label="Avantia Build"
+        translate="no"
+      >
+        <span className={compact ? "text-[1.08rem] sm:text-[1.15rem]" : "text-[1.55rem] sm:text-[1.75rem]"} aria-hidden="true">
+          av<span className="bg-[linear-gradient(135deg,#1E9BFF_0%,#1FC9C6_24%,#2BD98A_42%,#7E5BEA_68%,#F0419E_86%,#FF5BC2_100%)] bg-clip-text text-transparent">a</span>ntia
         </span>
-        <span className={`${compact ? "text-[0.95rem]" : "text-[1.2rem]"} font-semibold uppercase leading-none tracking-normal text-[#173A63]`}>
+        <span className={`${compact ? "ml-2 text-[0.78rem] sm:text-[0.82rem]" : "ml-3 text-[1.02rem] sm:text-[1.15rem]"} font-bold`} aria-hidden="true">
           Build
         </span>
       </span>
       {showSlogan ? (
-        <span className="mt-1 block truncate text-[0.65rem] font-medium normal-case tracking-normal text-slate-500">
+        <span className={`mt-1 block truncate text-[0.65rem] font-medium normal-case tracking-normal ${tone === "light" ? "text-white/70" : "text-slate-500"}`}>
           Everything it takes to build
         </span>
       ) : null}

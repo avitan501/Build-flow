@@ -1,4 +1,5 @@
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
+import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase";
 
 const conciergePoints = [
@@ -41,7 +42,7 @@ export default function Home() {
         />
         <div className="absolute inset-0 -z-10 bg-[#071126]/80" aria-hidden="true" />
         <div className="mx-auto flex min-h-[23rem] max-w-6xl flex-col justify-end px-5 py-10 sm:min-h-[28rem] sm:px-8 sm:py-14 lg:px-10">
-          <p className="text-sm font-semibold text-sky-200">Avantia Build</p>
+          <AvantiaBuildLockup tone="light" />
           <h1 className="mt-3 max-w-3xl text-4xl font-semibold leading-tight sm:text-6xl">
             Concierge service for every construction need.
           </h1>
