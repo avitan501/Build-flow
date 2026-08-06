@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionWithProfile } from "@/lib/auth";
+import { isManagerIdentity } from "@/lib/owner-identity";
 import { getWhatsAppSettingsState, saveWhatsAppSettings } from "@/lib/whatsapp-settings";
 
 function unauthorized(message: string, status = 403) {
@@ -14,8 +15,8 @@ async function requireAdminApi() {
     return { error: unauthorized("Authentication required.", 401) };
   }
 
-  if (!profile || profile.role !== "admin") {
-    return { error: unauthorized("Admin access required.") };
+  if (!isManagerIdentity({ email: user.email || profile?.email })) {
+    return { error: unauthorized("Manager access required.") };
   }
 
   return { user, profile };

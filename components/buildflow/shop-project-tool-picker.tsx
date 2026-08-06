@@ -56,28 +56,24 @@ function buildCategoryFilterHref(category: string, projectId: string, address: s
   return `/shop?${params.toString()}`
 }
 
-const CATEGORY_ICON_URLS: Record<string, string> = {
-  services: "/images/materials/services.svg",
-  "paper-work": "/images/materials/tools.svg",
-  framing: "/images/materials/lumber.svg",
-  "tile-work": "/images/materials/tile.svg",
-  "sheet-rock": "/images/materials/drywall.svg",
-  kitchen: "/images/materials/cabinets.svg",
-  eitan: "/images/materials/windows.svg",
-  "door-and-molding": "/images/materials/doors.svg",
-  "wood-floor": "/images/materials/flooring.svg",
-  siding: "/images/materials/trim.svg",
-  roofing: "/images/materials/roofing.svg",
-  exterior: "/images/materials/roofing.svg",
-  window: "/images/materials/windows.svg",
+const CATEGORY_PRODUCT_GRID_URLS: Record<string, string> = {
+  services: "/images/department-essentials/services-grid.webp",
+  "paper-work": "/images/department-essentials/services-grid.webp",
+  framing: "/images/department-essentials/lumber-grid.webp",
+  "tile-work": "/images/department-essentials/tile-grid.webp",
+  "sheet-rock": "/images/department-essentials/drywall-grid.webp",
+  kitchen: "/images/department-essentials/kitchen-grid.webp",
+  eitan: "/images/department-essentials/windows-grid.webp",
+  "door-and-molding": "/images/department-essentials/moldings-grid.webp",
+  "wood-floor": "/images/department-essentials/flooring-grid.webp",
+  siding: "/images/department-essentials/siding-grid.webp",
+  roofing: "/images/department-essentials/roofing-grid.webp",
+  exterior: "/images/department-essentials/roofing-grid.webp",
+  window: "/images/department-essentials/windows-grid.webp",
 }
 
-function categoryIconUrl(category: ShopToolCategory) {
-  return CATEGORY_ICON_URLS[category.slug] ?? category.imageUrl
-}
-
-function isIconImage(imageUrl: string) {
-  return imageUrl.toLowerCase().endsWith(".svg")
+function categoryProductGridUrl(category: ShopToolCategory) {
+  return CATEGORY_PRODUCT_GRID_URLS[category.slug] ?? category.imageUrl
 }
 
 function subscribeToGuestProject(onStoreChange: () => void) {
@@ -415,8 +411,7 @@ export function ShopProjectToolPicker({
             const href = isManagerCategory
               ? buildCategoryFilterHref(category.label, selectedProjectIdForLinks, activeCustomAddress)
               : buildToolHref(category.slug, selectedProjectIdForLinks, activeCustomAddress)
-            const iconUrl = categoryIconUrl(category)
-            const isIcon = isIconImage(iconUrl)
+            const productGridUrl = categoryProductGridUrl(category)
 
             return (
               <Link
@@ -424,21 +419,18 @@ export function ShopProjectToolPicker({
                 href={href}
                 prefetch={false}
                 data-testid="department-card"
-                className="group flex min-h-[164px] min-w-0 touch-manipulation flex-col items-center justify-between gap-3 rounded-[24px] border border-black/[0.06] bg-white px-2 py-4 text-center shadow-[0_14px_34px_rgba(0,0,0,0.07)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_22px_48px_rgba(0,0,0,0.11)] active:scale-[0.98] sm:min-h-[180px] sm:rounded-[28px] sm:px-3 sm:py-5"
+                className="group flex min-h-[150px] min-w-0 touch-manipulation flex-col overflow-hidden rounded-lg border border-black/[0.08] bg-white text-left shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-black/[0.14] hover:shadow-[0_16px_34px_rgba(0,0,0,0.10)] active:scale-[0.98] sm:min-h-[176px]"
               >
-                <span className="relative flex h-[68px] w-[68px] items-center justify-center overflow-hidden rounded-full border border-black/[0.04] bg-[#f5f5f7] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_10px_24px_rgba(0,0,0,0.07)] sm:h-[84px] sm:w-[84px]">
-                  <span className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_34%_24%,#ffffff_0%,#eef5fb_72%)]" />
-                  <span className="relative block h-full w-full">
-                    <Image
-                      src={iconUrl}
-                      alt={category.imageAlt}
-                      fill
-                      sizes="(max-width: 639px) 68px, 84px"
-                      className={isIcon ? "object-contain p-4 sm:p-[19px]" : "object-cover"}
-                    />
-                  </span>
+                <span className="relative block aspect-[4/3] w-full overflow-hidden border-b border-black/[0.06] bg-white">
+                  <Image
+                    src={productGridUrl}
+                    alt={`${category.label} products`}
+                    fill
+                    sizes="(max-width: 639px) 32vw, (max-width: 1023px) 24vw, 18vw"
+                    className="object-cover transition duration-300 group-hover:scale-[1.025]"
+                  />
                 </span>
-                <span className="flex min-h-10 w-full min-w-0 items-center justify-center text-[12px] font-semibold leading-4 text-[#1d1d1f] [overflow-wrap:anywhere] sm:text-[13px] sm:leading-5">
+                <span className="flex min-h-12 w-full min-w-0 items-center px-3 py-2 text-[12px] font-bold leading-4 text-[#1d1d1f] [overflow-wrap:anywhere] sm:min-h-14 sm:text-[14px] sm:leading-5">
                   {category.label}
                 </span>
               </Link>
