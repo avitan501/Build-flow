@@ -32,7 +32,7 @@ function withOther(value: MaterialAnswerValue, other: string): MaterialAnswerVal
   return { selected: Array.isArray(selected) ? selected : typeof selected === "string" ? selected : undefined, other }
 }
 
-function CardOptions({ question, value, onChange, disabled }: { question: MaterialQuestion; value: MaterialAnswerValue; onChange: (value: MaterialAnswerValue) => void; disabled: boolean }) {
+function CardOptions({ question, value, onChange, disabled }: { question: MaterialQuestion; value: MaterialAnswerValue; onChange: (value: MaterialAnswerValue, autoAdvance?: boolean) => void; disabled: boolean }) {
   const selected = selectableValue(value)
   const selectedValues = Array.isArray(selected) ? selected : typeof selected === "string" ? [selected] : []
   const isMulti = question.question_type === "multi_select"
@@ -40,7 +40,7 @@ function CardOptions({ question, value, onChange, disabled }: { question: Materi
   function toggle(optionValue: string) {
     if (!isMulti) {
       const other = typeof value === "object" && value && !Array.isArray(value) ? value.other : undefined
-      onChange(question.allow_other && optionValue === "other" ? { selected: optionValue, other } : optionValue)
+      onChange(question.allow_other && optionValue === "other" ? { selected: optionValue, other } : optionValue, optionValue !== "other")
       return
     }
     const next = selectedValues.includes(optionValue) ? selectedValues.filter((entry) => entry !== optionValue) : [...selectedValues, optionValue]
@@ -82,7 +82,7 @@ function CardOptions({ question, value, onChange, disabled }: { question: Materi
 function QuestionControl({ question, value, onChange, disabled, onUpload }: {
   question: MaterialQuestion
   value: MaterialAnswerValue
-  onChange: (value: MaterialAnswerValue) => void
+  onChange: (value: MaterialAnswerValue, autoAdvance?: boolean) => void
   disabled: boolean
   onUpload?: MaterialQuestionnaireWizardProps["onUpload"]
 }) {
@@ -121,9 +121,18 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, emb
   const current = visibleQuestions[Math.min(step, Math.max(visibleQuestions.length - 1, 0))]
   const progress = visibleQuestions.length ? ((Math.min(step, visibleQuestions.length - 1) + 1) / visibleQuestions.length) * 100 : 100
 
-  function update(questionId: string, value: MaterialAnswerValue) {
-    setAnswers((existing) => ({ ...existing, [questionId]: value }))
+  function update(questionId: string, value: MaterialAnswerValue, autoAdvance = false) {
+    const nextAnswers = { ...answers, [questionId]: value }
+    setAnswers(nextAnswers)
     setError(null)
+    if (!autoAdvance) return
+
+    window.setTimeout(() => {
+      const nextVisibleQuestions = snapshot.questions.filter((question) => isQuestionVisible(question, nextAnswers))
+      const currentIndex = nextVisibleQuestions.findIndex((question) => question.id === questionId)
+      if (currentIndex >= nextVisibleQuestions.length - 1) setReviewing(true)
+      else setStep(currentIndex + 1)
+    }, 220)
   }
 
   function next() {
@@ -154,7 +163,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, emb
       </header>
 
       <div className={`${embedded ? "" : "max-h-[62vh] overflow-y-auto"} px-5 py-6 sm:px-7`}>
-        {reviewing ? <div><div className="mb-5"><h3 className="text-xl font-bold text-slate-950">Review your answers</h3><p className="mt-1 text-sm text-slate-600">Check the details before finishing. You can edit any answer.</p></div><div className="grid gap-2">{visibleQuestions.map((question, index) => <button key={question.id} type="button" onClick={() => { setStep(index); setReviewing(false) }} className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-sky-300"><span><span className="block text-sm font-semibold text-slate-950">{question.label}</span><span className="mt-1 block text-sm text-slate-600">{formatMaterialAnswer(question, answers[question.id]) || "Not answered"}</span></span><Pencil className="mt-0.5 h-4 w-4 shrink-0 text-[#0071e3]" /></button>)}</div></div> : current ? <div><h3 className="text-[1.35rem] font-bold leading-tight text-slate-950 sm:text-2xl">{current.label}{current.is_required ? <span className="text-rose-500"> *</span> : null}</h3>{current.help_text ? <p className="mt-2 text-sm leading-6 text-slate-600">{current.help_text}</p> : null}<div className="mt-5"><QuestionControl question={current} value={answers[current.id] ?? null} onChange={(value) => update(current.id, value)} disabled={locked} onUpload={onUpload} /></div></div> : <p className="text-sm text-slate-600">No active questions are configured.</p>}
+        {reviewing ? <div><div className="mb-5"><h3 className="text-xl font-bold text-slate-950">Review your answers</h3><p className="mt-1 text-sm text-slate-600">Check the details before finishing. You can edit any answer.</p></div><div className="grid gap-2">{visibleQuestions.map((question, index) => <button key={question.id} type="button" onClick={() => { setStep(index); setReviewing(false) }} className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-sky-300"><span><span className="block text-sm font-semibold text-slate-950">{question.label}</span><span className="mt-1 block text-sm text-slate-600">{formatMaterialAnswer(question, answers[question.id]) || "Not answered"}</span></span><Pencil className="mt-0.5 h-4 w-4 shrink-0 text-[#0071e3]" /></button>)}</div></div> : current ? <div><h3 className="text-[1.35rem] font-bold leading-tight text-slate-950 sm:text-2xl">{current.label}{current.is_required ? <span className="text-rose-500"> *</span> : null}</h3>{current.help_text ? <p className="mt-2 text-sm leading-6 text-slate-600">{current.help_text}</p> : null}<div className="mt-5"><QuestionControl question={current} value={answers[current.id] ?? null} onChange={(value, autoAdvance) => update(current.id, value, autoAdvance)} disabled={locked} onUpload={onUpload} /></div></div> : <p className="text-sm text-slate-600">No active questions are configured.</p>}
         {error ? <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</div> : null}
       </div>
 
