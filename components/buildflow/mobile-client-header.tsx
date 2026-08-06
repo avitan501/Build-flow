@@ -24,7 +24,7 @@ function shouldShowHeader(pathname: string) {
     return false;
   }
 
-  return !pathname.startsWith("/admin");
+  return !pathname.startsWith("/admin") && !pathname.startsWith("/owner");
 }
 
 function isActivePath(pathname: string, href: string) {

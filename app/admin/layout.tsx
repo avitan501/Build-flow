@@ -1,8 +1,9 @@
 import type { ReactNode } from "react"
 
+import { AdminShell } from "@/components/buildflow/admin-shell"
 import { requireAdminProfile } from "@/lib/auth"
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   await requireAdminProfile()
-  return children
+  return <AdminShell>{children}</AdminShell>
 }
