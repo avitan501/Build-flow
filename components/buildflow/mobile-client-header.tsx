@@ -103,7 +103,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
     { href: "/", label: "Home" },
     { href: "/shop", label: "Shop" },
     { href: "/projects", label: "My Projects" },
-    ...(isPreviewAdminEnabled && isAdmin ? [{ href: "/preview-admin/vendors", label: "Manager" }] : []),
+    ...(isAdmin ? [{ href: "/admin/vendors", label: "Manager" }] : []),
     ...(isSignedIn
       ? [
           { href: "/account", label: "Account & Settings" },
@@ -112,7 +112,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
           { href: "/login", label: "Log in" },
           { href: "/signup", label: "Create account" },
         ]),
-  ], [isAdmin, isPreviewAdminEnabled, isSignedIn]);
+  ], [isAdmin, isSignedIn]);
 
   const adminLinks = useMemo<MobileMenuLink[]>(() => {
     if (!isAdmin && !isPreviewAdminEnabled) {

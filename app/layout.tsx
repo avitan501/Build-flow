@@ -8,7 +8,7 @@ import { MobileClientHeader } from "@/components/buildflow/mobile-client-header"
 import { SiteFooter } from "@/components/buildflow/site-footer";
 import { WorkflowSettingsHydrator } from "@/components/buildflow/workflow-settings-hydrator";
 import { getSessionWithProfile } from "@/lib/auth";
-import { isManagerIdentity } from "@/lib/owner-identity";
+import { isApprovedManagerIdentity } from "@/lib/owner-identity";
 import { getSupabasePublicEnv, hasSupabasePublicEnv } from "@/lib/supabase/env";
 import type { PublicWorkflowState } from "@/lib/workflow-public";
 import "./globals.css";
@@ -45,7 +45,15 @@ export default async function RootLayout({
 }>) {
   const { supabase, user, profile } = await getSessionWithProfile();
   const isSignedIn = Boolean(user);
-  const isAdmin = Boolean(user && isManagerIdentity({ email: user.email || profile?.email }));
+  const isAdmin = Boolean(
+    user &&
+      isApprovedManagerIdentity({
+        email: user.email || profile?.email,
+        role: profile?.role,
+        approvalStatus: profile?.approval_status,
+        isActive: profile?.is_active,
+      }),
+  );
   const isPreviewAdminEnabled = process.env.VERCEL_ENV !== "production";
   const projectsHref = "/projects";
   const displayName = profile?.full_name?.trim() || user?.email?.split("@")[0] || null;

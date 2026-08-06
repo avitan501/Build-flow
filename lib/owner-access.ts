@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { getSessionWithProfile } from "@/lib/auth";
-import { isManagerIdentity } from "@/lib/owner-identity";
+import { isApprovedManagerIdentity } from "@/lib/owner-identity";
 
 export { isOwnerIdentity } from "@/lib/owner-identity";
 
@@ -11,14 +11,22 @@ export async function getOwnerAccessSession() {
 
   return {
     ...session,
-    isOwner: Boolean(session.user && isManagerIdentity({ email })),
+    isOwner: Boolean(
+      session.user &&
+        isApprovedManagerIdentity({
+          email,
+          role: session.profile?.role,
+          approvalStatus: session.profile?.approval_status,
+          isActive: session.profile?.is_active,
+        }),
+    ),
   };
 }
 
 export async function requireOwnerAccess() {
   const session = await getOwnerAccessSession();
 
-  if (!session.user) {
+  if (!session.user || !session.supabase) {
     redirect("/login?next=/owner/materials");
   }
 

@@ -2,9 +2,8 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
-import { isManagerIdentity } from "@/lib/owner-identity";
+import { isApprovedManagerIdentity } from "@/lib/owner-identity";
 
 export type ProfileRecord = {
   id: string;
@@ -49,7 +48,7 @@ export async function getSessionWithProfile() {
 export async function requireSignedInProfile() {
   const session = await getSessionWithProfile();
 
-  if (!session.user) {
+  if (!session.user || !session.supabase) {
     redirect("/login");
   }
 
@@ -60,9 +59,14 @@ export async function requireAdminProfile() {
   const session = await requireSignedInProfile();
   const email = session.user.email || session.profile?.email || null;
 
-  if (!isManagerIdentity({ email })) {
+  if (!isApprovedManagerIdentity({
+    email,
+    role: session.profile?.role,
+    approvalStatus: session.profile?.approval_status,
+    isActive: session.profile?.is_active,
+  })) {
     redirect("/");
   }
 
-  return { ...session, supabase: createAdminClient() };
+  return session;
 }
