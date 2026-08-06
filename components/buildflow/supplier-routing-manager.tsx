@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { saveWorkflowManagerSettingsAction } from "@/app/preview-admin/workflow-actions"
+import { DepartmentSymbolBadges, DEPARTMENT_SYMBOL_OPTIONS } from "@/components/buildflow/department-symbol-badges"
 
 import {
   buildManagerDepartmentOverride,
@@ -10,9 +11,9 @@ import {
   buildManagerProductAddOn,
   departmentDisplayLabel,
   departmentOverrideFor,
+  isDepartmentHidden,
   isManagerItemHidden,
   readManagerAddOns,
-  visibleDepartmentSources,
   writeManagerAddOns,
   type ManagerCatalogAddOns,
 } from "@/lib/manager-add-ons"
@@ -33,7 +34,7 @@ import {
   type SupplierRoutingOption,
 } from "@/lib/shop-qualification"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
-import { filterProductsForShopTool, SHOP_TOOL_CATEGORIES, type ShopToolSlug } from "@/lib/shop-tools"
+import { filterProductsForShopTool, SHOP_TOOL_CATEGORIES, type DepartmentSymbolKey, type ShopToolSlug } from "@/lib/shop-tools"
 
 type ManagerPanel = "services" | "departments" | "suppliers"
 type DepartmentItemKind = "product" | "file-upload"
@@ -117,9 +118,9 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
   const [selectedTargetId, setSelectedTargetId] = useState(SERVICE_ASSIGNMENT_TARGETS[0]?.id ?? "")
   const [selectedSupplierId, setSelectedSupplierId] = useState(settings.suppliers[0]?.id ?? DEFAULT_SUPPLIERS[0]?.id ?? "")
   const [selectedDepartmentLabel, setSelectedDepartmentLabel] = useState("Framing")
-  const [categoryDraft, setCategoryDraft] = useState({ label: "", description: "", imageUrl: "" })
+  const [categoryDraft, setCategoryDraft] = useState<{ label: string; description: string; imageUrl: string; symbols: DepartmentSymbolKey[] }>({ label: "", description: "", imageUrl: "", symbols: [] })
   const [departmentEditOpen, setDepartmentEditOpen] = useState(false)
-  const [departmentEditDraft, setDepartmentEditDraft] = useState({ label: "", description: "", imageUrl: "" })
+  const [departmentEditDraft, setDepartmentEditDraft] = useState<{ label: string; description: string; imageUrl: string; symbols: DepartmentSymbolKey[]; hidden: boolean }>({ label: "", description: "", imageUrl: "", symbols: [], hidden: false })
   const [serviceDraft, setServiceDraft] = useState({ name: "", category: "Framing", description: "", supplierId: settings.suppliers[0]?.id ?? "" })
   const [departmentItemDraft, setDepartmentItemDraft] = useState({
     kind: "product" as DepartmentItemKind,
@@ -166,19 +167,11 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
   }, [addOns, settings.suppliers])
   const categoryOptions = useMemo(() => {
     const values = [
-      "Framing",
-      "Tile work",
-      "Sheet rock",
-      "Kitchen",
-      "Eitan",
-      "Door and molding",
-      "Wood Floor",
-      "Exterior",
-      "Window",
+      ...SHOP_TOOL_CATEGORIES.map((category) => category.label),
       ...addOns.categories.map((category) => category.label),
     ]
 
-    return visibleDepartmentSources(values, addOns)
+    return values.filter((value, index) => value && values.indexOf(value) === index)
   }, [addOns])
   const selectedDepartment = categoryOptions.includes(selectedDepartmentLabel) ? selectedDepartmentLabel : categoryOptions[0] ?? "Framing"
   const selectedDepartmentDisplay = departmentDisplayLabel(addOns, selectedDepartment)
@@ -218,6 +211,7 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
       return {
         label,
         displayLabel: departmentDisplayLabel(addOns, label),
+        hidden: isDepartmentHidden(addOns, label),
         products: existingProducts + managerProducts,
         fileUploads: builtInServices + managerFileUploads,
         total: existingProducts + managerProducts + builtInServices + managerFileUploads,
@@ -330,16 +324,19 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
       ...addOns,
       categories: [...addOns.categories.filter((entry) => entry.id !== category.id), category],
     })
-    setCategoryDraft({ label: "", description: "", imageUrl: "" })
+    setCategoryDraft({ label: "", description: "", imageUrl: "", symbols: [] })
     setSelectedDepartmentLabel(category.label)
     setServiceDraft((draft) => ({ ...draft, category: category.label }))
   }
 
   function openDepartmentEditor() {
+    const builtInCategory = SHOP_TOOL_CATEGORIES.find((category) => category.label === selectedDepartment)
     setDepartmentEditDraft({
       label: selectedDepartmentDisplay,
       description: selectedDepartmentOverride?.description || selectedCategoryAddOn?.description || "",
       imageUrl: selectedDepartmentOverride?.imageUrl || selectedCategoryAddOn?.imageUrl || "",
+      symbols: selectedDepartmentOverride?.symbols || selectedCategoryAddOn?.symbols || builtInCategory?.symbols || [],
+      hidden: isDepartmentHidden(addOns, selectedDepartment),
     })
     setDepartmentEditOpen(true)
   }
@@ -353,6 +350,7 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
         label: nextLabel,
         description: departmentEditDraft.description,
         imageUrl: departmentEditDraft.imageUrl,
+        symbols: departmentEditDraft.symbols,
       })
       persistAddOns({
         ...addOns,
@@ -368,7 +366,8 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
         label: nextLabel,
         description: departmentEditDraft.description,
         imageUrl: departmentEditDraft.imageUrl,
-        hidden: false,
+        symbols: departmentEditDraft.symbols,
+        hidden: departmentEditDraft.hidden,
       })
       persistAddOns({
         ...addOns,
@@ -396,6 +395,7 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
         label: selectedDepartmentDisplay,
         description: selectedDepartmentOverride?.description || "",
         imageUrl: selectedDepartmentOverride?.imageUrl || "",
+        symbols: selectedDepartmentOverride?.symbols || SHOP_TOOL_CATEGORIES.find((category) => category.label === selectedDepartment)?.symbols || [],
         hidden: true,
       })
       persistAddOns({
@@ -404,9 +404,24 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
       })
     }
 
-    const nextDepartment = categoryOptions.find((category) => category !== selectedDepartment) ?? "Framing"
+    const nextDepartment = categoryOptions.find((category) => category !== selectedDepartment && !isDepartmentHidden(addOns, category)) ?? "Framing"
     setSelectedDepartmentLabel(nextDepartment)
     setDepartmentEditOpen(false)
+  }
+
+  function toggleDraftSymbol(target: "category" | "department", symbol: DepartmentSymbolKey) {
+    if (target === "category") {
+      setCategoryDraft((draft) => ({
+        ...draft,
+        symbols: draft.symbols.includes(symbol) ? draft.symbols.filter((item) => item !== symbol) : [...draft.symbols, symbol],
+      }))
+      return
+    }
+
+    setDepartmentEditDraft((draft) => ({
+      ...draft,
+      symbols: draft.symbols.includes(symbol) ? draft.symbols.filter((item) => item !== symbol) : [...draft.symbols, symbol],
+    }))
   }
 
   function addDepartmentItem() {
@@ -908,7 +923,7 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
                       >
                         <span className="block text-sm font-semibold">{department.displayLabel}</span>
                         <span className={`mt-1 block text-xs leading-5 ${active ? "text-slate-300" : "text-slate-500"}`}>
-                          {department.products} product(s) · {department.fileUploads} upload item(s)
+                          {department.hidden ? "Hidden from customers · " : ""}{department.products} product(s) · {department.fileUploads} upload item(s)
                         </span>
                       </button>
                     )
@@ -921,6 +936,18 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
                     <input value={categoryDraft.label} onChange={(event) => setCategoryDraft((draft) => ({ ...draft, label: event.target.value }))} placeholder="Department name, e.g. Electrical" className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                     <textarea value={categoryDraft.description} onChange={(event) => setCategoryDraft((draft) => ({ ...draft, description: event.target.value }))} placeholder="Short description for this department" rows={4} className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                     <input value={categoryDraft.imageUrl} onChange={(event) => setCategoryDraft((draft) => ({ ...draft, imageUrl: event.target.value }))} placeholder="Optional image URL" className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
+                    <fieldset className="rounded-2xl border border-slate-200 bg-white p-3">
+                      <legend className="px-1 text-xs font-semibold text-slate-700">Department symbols</legend>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        {DEPARTMENT_SYMBOL_OPTIONS.map(({ key, label, Icon }) => (
+                          <label key={key} className="flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700">
+                            <input type="checkbox" checked={categoryDraft.symbols.includes(key)} onChange={() => toggleDraftSymbol("category", key)} />
+                            <Icon aria-hidden="true" className="h-4 w-4" />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
                     <button type="button" onClick={addCategory} className="min-h-12 rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white">Add department</button>
                   </div>
                 </div>
@@ -931,6 +958,7 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Selected department</p>
                     <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{selectedDepartmentDisplay}</h3>
+                    <div className="mt-3"><DepartmentSymbolBadges symbols={selectedDepartmentOverride?.symbols || selectedCategoryAddOn?.symbols || SHOP_TOOL_CATEGORIES.find((category) => category.label === selectedDepartment)?.symbols} /></div>
                     <p className="mt-2 text-sm leading-6 text-slate-500">Add sub-departments and the exact items customers can choose inside this department.</p>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
@@ -946,7 +974,7 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <h4 className="text-lg font-semibold text-slate-950">Edit department</h4>
-                        <p className="mt-1 text-sm leading-6 text-slate-600">Change the customer-facing name, description, image, or remove this department from the preview shop.</p>
+                        <p className="mt-1 text-sm leading-6 text-slate-600">Control the customer-facing name, description, image, symbols, and visibility.</p>
                       </div>
                       <button type="button" onClick={() => setDepartmentEditOpen(false)} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Close</button>
                     </div>
@@ -954,6 +982,24 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
                       <input value={departmentEditDraft.label} onChange={(event) => setDepartmentEditDraft((draft) => ({ ...draft, label: event.target.value }))} placeholder="Department name" className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       <input value={departmentEditDraft.imageUrl} onChange={(event) => setDepartmentEditDraft((draft) => ({ ...draft, imageUrl: event.target.value }))} placeholder="Optional image URL" className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       <textarea value={departmentEditDraft.description} onChange={(event) => setDepartmentEditDraft((draft) => ({ ...draft, description: event.target.value }))} placeholder="Department description" rows={4} className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100 sm:col-span-2" />
+                      <fieldset className="rounded-2xl border border-slate-200 bg-white p-3 sm:col-span-2">
+                        <legend className="px-1 text-sm font-semibold text-slate-800">Customer menu symbols</legend>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                          {DEPARTMENT_SYMBOL_OPTIONS.map(({ key, label, Icon }) => (
+                            <label key={key} className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700">
+                              <input type="checkbox" checked={departmentEditDraft.symbols.includes(key)} onChange={() => toggleDraftSymbol("department", key)} />
+                              <Icon aria-hidden="true" className="h-4 w-4" />
+                              {label}
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                      {!selectedCategoryAddOn ? (
+                        <label className="flex min-h-12 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 sm:col-span-2">
+                          <input type="checkbox" checked={!departmentEditDraft.hidden} onChange={(event) => setDepartmentEditDraft((draft) => ({ ...draft, hidden: !event.target.checked }))} />
+                          Show this department to customers
+                        </label>
+                      ) : null}
                     </div>
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                       <button type="button" onClick={saveDepartmentEdit} className="min-h-12 flex-1 rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white">Save department changes</button>

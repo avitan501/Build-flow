@@ -3,6 +3,7 @@ import Link from "next/link";
 import { JourneyStrip, ProgressMiniCards, statusButtonClass, statusClasses } from "@/components/buildflow/wireframe";
 import { requireSignedInProfile } from "@/lib/auth";
 import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
+import { isManagerIdentity } from "@/lib/owner-identity";
 
 export default async function DashboardPage() {
   const { user, profile } = await requireSignedInProfile();
@@ -20,6 +21,7 @@ export default async function DashboardPage() {
 
   const statusTone = statusClasses(dashboard.status);
   const isPending = profile?.approval_status === "pending";
+  const isManager = isManagerIdentity({ email: user.email || profile?.email });
 
   return (
     <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
@@ -99,7 +101,7 @@ export default async function DashboardPage() {
                   : "Folder / step workflow only. Preview and blocked areas stay visibly limited."}
               </p>
             </div>
-            <Link href="/admin/build-map" className="text-sm font-semibold text-slate-700 underline underline-offset-4">Back to Build Map</Link>
+            {isManager ? <Link href="/admin/build-map" className="text-sm font-semibold text-slate-700 underline underline-offset-4">Back to Build Map</Link> : null}
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {isPending ? (
@@ -118,8 +120,8 @@ export default async function DashboardPage() {
                 <Link href="/materials" className={statusButtonClass(materials.status)}>Review Materials</Link>
                 <Link href="/orders" className={statusButtonClass(orders.status)}>Approve Order</Link>
                 <Link href="/projects" className={statusButtonClass(projects.status)}>My Projects</Link>
-                <Link href={profile?.role === "admin" ? "/admin/whatsapp" : "/orders/demo"} className={statusButtonClass(profile?.role === "admin" ? whatsapp.status : orders.status)}>
-                  {profile?.role === "admin" ? "WhatsApp Operations" : "Track Delivery"}
+                <Link href={isManager ? "/admin/whatsapp" : "/orders/demo"} className={statusButtonClass(isManager ? whatsapp.status : orders.status)}>
+                  {isManager ? "WhatsApp Operations" : "Track Delivery"}
                 </Link>
               </>
             )}
@@ -165,7 +167,7 @@ export default async function DashboardPage() {
                 <li key={item}>• {item}</li>
               ))}
             </ul>
-            {profile?.role === "admin" ? (
+            {isManager ? (
               <Link href="/admin/users" className="mt-5 inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600">
                 Admin Users
               </Link>

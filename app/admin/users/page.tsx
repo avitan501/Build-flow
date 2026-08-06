@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { PageStatusHeader } from "@/components/buildflow/wireframe";
 import { changeUserRole, approvePendingUser, rejectUser, suspendUser } from "@/app/admin/users/actions";
-import { requireSignedInProfile } from "@/lib/auth";
+import { requireAdminProfile } from "@/lib/auth";
 import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
 
 const roleOptions = ["admin", "staff", "client"] as const;
@@ -16,23 +16,9 @@ function badgeTone(value: string) {
 }
 
 export default async function AdminUsersPage() {
-  const { supabase, profile } = await requireSignedInProfile();
+  const { supabase, profile } = await requireAdminProfile();
   const { specMap } = getBuildflowWireframeData();
   const spec = specMap.get("admin-users");
-
-  if (!profile || profile.role !== "admin") {
-    return (
-      <main className="min-h-screen bg-[#f5f7fb] px-6 py-16 text-slate-900 sm:px-10">
-        <section className="mx-auto flex max-w-3xl flex-col gap-6 rounded-3xl border border-red-200 bg-red-50 p-8">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Avantia Build</p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight">Access denied</h1>
-            <p className="mt-4 text-sm leading-7 text-slate-700">Only admin accounts can view user approvals and role-management controls.</p>
-          </div>
-        </section>
-      </main>
-    );
-  }
 
   if (!spec) {
     throw new Error("Missing admin users wireframe spec.");

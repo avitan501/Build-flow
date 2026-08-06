@@ -47,7 +47,7 @@ test("all departments wrap into downward rows without page overflow", async ({ p
   await expect(page.getByRole("heading", { name: "Shop by department" })).toBeVisible()
 
   const cards = page.getByTestId("department-card")
-  await expect(cards).toHaveCount(11)
+  await expect(cards).toHaveCount(8)
 
   const rowPositions = await cards.evaluateAll((elements) => elements.map((element) => Math.round(element.getBoundingClientRect().top)))
   expect(new Set(rowPositions).size).toBeGreaterThan(1)
@@ -57,6 +57,37 @@ test("all departments wrap into downward rows without page overflow", async ({ p
     scrollWidth: document.documentElement.scrollWidth,
   }))
   expect(widths.scrollWidth).toBe(widths.clientWidth)
+})
+
+test("department cards use product-grid photography instead of generic icons", async ({ page }) => {
+  await page.goto("/shop")
+
+  const cardImages = page.getByTestId("department-card").getByRole("img")
+  await expect(cardImages).toHaveCount(8)
+
+  const sources = await cardImages.evaluateAll((images) =>
+    images.map((image) => (image as HTMLImageElement).currentSrc || (image as HTMLImageElement).src),
+  )
+
+  expect(sources.every((source) => source.includes("department-essentials") && !source.includes(".svg"))).toBe(true)
+})
+
+test("retired departments are hidden and department symbols are visible", async ({ page }) => {
+  await page.goto("/shop")
+
+  await expect(page.getByTestId("department-card").filter({ hasText: "Kitchen" })).toHaveCount(0)
+  await expect(page.getByTestId("department-card").filter({ hasText: "Services" })).toHaveCount(0)
+  await expect(page.getByTestId("department-card").filter({ hasText: "Eitan" })).toHaveCount(0)
+  await expect(page.getByTestId("department-card").first().getByTestId("department-symbols")).toBeVisible()
+})
+
+test("manager pages require authentication and stay out of the guest menu", async ({ page }) => {
+  await page.goto("/")
+  await page.getByRole("button", { name: "Open navigation menu" }).click()
+  await expect(page.getByRole("link", { name: "Manager", exact: true })).toHaveCount(0)
+
+  await page.goto("/admin/build-map")
+  await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Fbuild-map/)
 })
 
 test("home shows the compact manufacturer brand showcase", async ({ page }) => {

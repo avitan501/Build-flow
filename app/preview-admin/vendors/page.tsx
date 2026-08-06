@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ProjectWorkflowManager } from "@/components/buildflow/project-workflow-manager";
 import { SupplierRoutingManager } from "@/components/buildflow/supplier-routing-manager";
 import { getSessionWithProfile, requireAdminProfile } from "@/lib/auth";
-import { isOwnerIdentity } from "@/lib/owner-identity";
+import { isManagerIdentity } from "@/lib/owner-identity";
 import { buildShopProducts } from "@/lib/shop-catalog";
 import { loadShopItems } from "@/lib/shop-loader";
 import type { ProjectQuestionRecord } from "@/lib/quote-requests";
@@ -19,7 +19,7 @@ export default async function PreviewAdminVendorsPage() {
   const [{ data, error }, session] = await Promise.all([loadShopItems({ limit: 240 }), getSessionWithProfile()]);
   const products = buildShopProducts(data, error);
 
-  const isManager = Boolean(session.user && (session.profile?.role === "admin" || isOwnerIdentity({ email: session.user.email || session.profile?.email, phone: session.user.phone || session.profile?.phone })));
+  const isManager = Boolean(session.user && isManagerIdentity({ email: session.user.email || session.profile?.email }));
 
   if (!isManager) {
     return (

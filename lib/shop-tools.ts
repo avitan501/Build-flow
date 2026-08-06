@@ -15,12 +15,24 @@ export type ShopToolSlug =
   | "exterior"
   | "window"
 
+export const DEPARTMENT_SYMBOL_KEYS = [
+  "shopping-list",
+  "blueprint",
+  "site-visit",
+  "delivery",
+  "quote",
+  "installation",
+] as const
+
+export type DepartmentSymbolKey = (typeof DEPARTMENT_SYMBOL_KEYS)[number]
+
 export type ShopToolCategory = {
   slug: ShopToolSlug
   label: string
   description: string
   imageUrl: string
   imageAlt: string
+  symbols?: DepartmentSymbolKey[]
 }
 
 export const SHOP_TOOL_CATEGORIES: ShopToolCategory[] = [
@@ -28,78 +40,89 @@ export const SHOP_TOOL_CATEGORIES: ShopToolCategory[] = [
     slug: "services",
     label: "Services",
     description: "Survey, as-built capture, and paperwork services for the job.",
-    imageUrl: "/images/materials/services.svg",
+    imageUrl: "/images/department-essentials/services-grid.webp",
     imageAlt: "Services icon",
+    symbols: ["site-visit", "quote"],
   },
   {
     slug: "framing",
     label: "Framing",
     description: "Framing lumber, plywood, hangers, nails, and structural items.",
-    imageUrl: "/images/materials/photos/lumber.jpg",
+    imageUrl: "/images/department-essentials/lumber-grid.webp",
     imageAlt: "Framing lumber",
+    symbols: ["shopping-list", "blueprint", "site-visit"],
   },
   {
     slug: "tile-work",
     label: "Tile work",
     description: "Tile materials and tile installation supplies.",
-    imageUrl: "/images/materials/photos/tile.jpg",
+    imageUrl: "/images/department-essentials/tile-grid.webp",
     imageAlt: "Tile work material",
+    symbols: ["shopping-list", "blueprint", "installation"],
   },
   {
     slug: "sheet-rock",
     label: "Sheet rock",
     description: "Drywall, sheetrock, compound, and wall board materials.",
-    imageUrl: "/images/materials/photos/drywall.jpg",
+    imageUrl: "/images/department-essentials/drywall-grid.webp",
     imageAlt: "Sheet rock material",
+    symbols: ["shopping-list", "blueprint", "delivery"],
   },
   {
     slug: "kitchen",
     label: "Kitchen",
     description: "Kitchen cabinets, design specs, plans, and cabinet package review.",
-    imageUrl: "/images/materials/photos/kitchen.jpg",
+    imageUrl: "/images/department-essentials/kitchen-grid.webp",
     imageAlt: "Kitchen cabinet showroom with cabinet door samples and island display",
+    symbols: ["shopping-list", "blueprint", "site-visit"],
   },
   {
     slug: "eitan",
     label: "Eitan",
     description: "Window schedule upload and renovation material quote requests.",
-    imageUrl: "/images/buildflow-retail/eitan-renovation.png",
+    imageUrl: "/images/department-essentials/windows-grid.webp",
     imageAlt: "Residential renovation jobsite with window plans and materials",
+    symbols: ["blueprint", "quote"],
   },
   {
     slug: "door-and-molding",
     label: "Door and molding",
     description: "Doors, trim, molding, casing, and finish carpentry materials.",
-    imageUrl: "/images/materials/photos/trim.jpg",
+    imageUrl: "/images/department-essentials/moldings-grid.webp",
     imageAlt: "Door and molding material",
+    symbols: ["shopping-list", "blueprint", "delivery"],
   },
   {
     slug: "wood-floor",
     label: "Wood Floor",
     description: "Wood flooring and related floor finish materials.",
-    imageUrl: "/images/materials/photos/flooring.jpg",
+    imageUrl: "/images/department-essentials/flooring-grid.webp",
     imageAlt: "Wood floor material",
+    symbols: ["shopping-list", "site-visit", "installation"],
   },
   {
     slug: "siding",
     label: "Siding",
     description: "Siding, weather barriers, trim, fasteners, and exterior finish materials.",
-    imageUrl: "/images/materials/photos/trim.jpg",
+    imageUrl: "/images/department-essentials/siding-grid.webp",
     imageAlt: "Exterior siding and trim material",
+    symbols: ["shopping-list", "blueprint", "site-visit"],
   },
   {
     slug: "roofing",
     label: "Roofing",
     description: "Shingles, underlayment, flashing, ventilation, and roofing fasteners.",
-    imageUrl: "/images/materials/photos/roofing.jpg",
+    imageUrl: "/images/department-essentials/roofing-grid.webp",
     imageAlt: "Roofing material",
+    symbols: ["shopping-list", "blueprint", "site-visit"],
   },
   {
     slug: "window",
     label: "Window",
     description: "Window materials and window-related exterior items.",
-    imageUrl: "/images/materials/photos/windows.jpg",
+    imageUrl: "/images/department-essentials/windows-grid.webp",
     imageAlt: "Window material",
+    symbols: ["shopping-list", "blueprint", "site-visit"],
   },
 ]
 
