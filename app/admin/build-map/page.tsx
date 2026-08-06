@@ -1,150 +1,140 @@
 import Link from "next/link";
+import { Building2, ClipboardList, FolderKanban, Store, Users } from "lucide-react";
 
-import { ProgressMiniCards, statusButtonClass, statusClasses } from "@/components/buildflow/wireframe";
 import { requireAdminProfile } from "@/lib/auth";
-import { getBuildflowWireframeData, type RouteSpec } from "@/lib/buildflow-wireframe";
 
-const flowLabels: Record<RouteSpec["flow"], string> = {
-  client: "Client flow",
-  admin: "Admin / Ops",
-  whatsapp: "WhatsApp Operations",
-  ai: "AI Takeoff flow",
-  orders: "Order flow",
+type RecentRequest = {
+  id: string;
+  title: string;
+  status: string;
+  updated_at: string;
 };
 
-const flowOrder: RouteSpec["flow"][] = ["client", "admin", "whatsapp", "ai", "orders"];
+type ManagerState = {
+  qualificationSettings?: {
+    suppliers?: Array<{ id: string; name: string }>;
+  };
+};
+
+const statusLabels: Record<string, string> = {
+  draft: "Draft",
+  submitted: "Submitted",
+  under_review: "Under review",
+  waiting_for_client: "Waiting for client",
+  approved: "Approved",
+  completed: "Completed",
+};
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
+}
 
 export default async function AdminBuildMapPage() {
-  await requireAdminProfile();
-  const { specMap, specs, liveData } = getBuildflowWireframeData();
-  const buildMap = specMap.get("admin-build-map");
+  const { supabase } = await requireAdminProfile();
 
-  if (!buildMap) {
-    throw new Error("Missing Build Map route spec.");
-  }
+  const [requestsResult, projectsResult, customersResult, managerStateResult] = await Promise.all([
+    supabase
+      .from("quote_requests")
+      .select("id, title, status, updated_at", { count: "exact" })
+      .order("updated_at", { ascending: false })
+      .limit(6)
+      .returns<RecentRequest[]>(),
+    supabase.from("projects").select("id", { count: "exact", head: true }),
+    supabase.from("profiles").select("id", { count: "exact", head: true }),
+    supabase
+      .from("workflow_manager_settings")
+      .select("state")
+      .eq("id", "singleton")
+      .maybeSingle<{ state: ManagerState }>(),
+  ]);
 
-  const tone = statusClasses(buildMap.status);
-  const flows = flowOrder.map((flow) => ({
-    flow,
-    items: specs.filter((spec) => spec.flow === flow),
-  }));
+  const recentRequests = requestsResult.data ?? [];
+  const supplierCount = managerStateResult.data?.state?.qualificationSettings?.suppliers?.length ?? 0;
+  const submittedCount = recentRequests.filter((request) => request.status !== "draft" && request.status !== "completed").length;
+
+  const metrics = [
+    { label: "Requests", value: requestsResult.count ?? 0, detail: `${submittedCount} recent requests need attention`, icon: ClipboardList, href: "/owner/materials/requests" },
+    { label: "Projects", value: projectsResult.count ?? 0, detail: "Customer projects and request activity", icon: FolderKanban, href: "/admin/projects" },
+    { label: "Customers", value: customersResult.count ?? 0, detail: "Registered customer accounts", icon: Users, href: "/admin/users" },
+    { label: "Suppliers", value: supplierCount, detail: "Supplier contacts and department routing", icon: Store, href: "/admin/vendors" },
+  ];
 
   return (
-    <main className="min-h-screen bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-8 lg:px-10">
-      <section className="mx-auto flex max-w-7xl flex-col gap-6">
-        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Admin only · system map</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Build Map</h1>
-              <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-                Clickable wireframe map of Avantia Build with the main areas separated clearly: Client Flow, Admin / Ops, and WhatsApp Operations.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">Who this page is for: Admin / Ops</span>
-              </div>
-            </div>
-            <div className="grid gap-3 sm:min-w-72">
-              <span className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${tone.badge}`}>
-                {buildMap.status}
-              </span>
-              <div className={`rounded-2xl border px-4 py-3 text-sm ${tone.card}`}>
-                {buildMap.progress}% complete · {100 - buildMap.progress}% remaining
-              </div>
-            </div>
-          </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Live health source</div>
-              <p className="mt-3 text-sm text-slate-700">Control Center JSON drives progress and status colors where possible.</p>
-            </article>
-            <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Current blocker</div>
-              <p className="mt-3 text-sm text-slate-700">{liveData.current_blocker || "No blocker recorded."}</p>
-            </article>
-            <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">What is missing</div>
-              <p className="mt-3 text-sm text-slate-700">{buildMap.missing.join(" · ")}</p>
-            </article>
-            <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Next step</div>
-              <p className="mt-3 text-sm text-slate-700">{buildMap.nextStep}</p>
-            </article>
-          </div>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/dashboard" className={statusButtonClass(specMap.get("dashboard")?.status || "Preview")}>Open Dashboard</Link>
-            <Link href="/admin/users" className={statusButtonClass(specMap.get("admin-users")?.status || "Preview")}>Open Admin Users</Link>
-            <Link href="http://5.78.189.133:3000/admin/flow-check?password=BuildFlowOwner2800" className={statusButtonClass(buildMap.status)}>
-              Open Control Center
-            </Link>
-          </div>
+    <main className="min-h-screen bg-[#f5f5f7] px-4 pb-28 pt-6 text-slate-950 sm:px-8 sm:pb-12">
+      <div className="mx-auto max-w-7xl">
+        <header className="border-b border-slate-200 pb-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager</p>
+          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Dashboard</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">A live overview of customer requests, projects, accounts, and supplier routing.</p>
+        </header>
+
+        <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Manager overview">
+          {metrics.map((metric) => {
+            const Icon = metric.icon;
+            return (
+              <Link key={metric.label} href={metric.href} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-sky-300 hover:shadow-md">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-600">{metric.label}</p>
+                    <p className="mt-2 text-3xl font-bold text-slate-950">{metric.value}</p>
+                  </div>
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 text-white"><Icon className="h-5 w-5" /></span>
+                </div>
+                <p className="mt-4 text-xs leading-5 text-slate-500">{metric.detail}</p>
+              </Link>
+            );
+          })}
         </section>
 
-        <ProgressMiniCards specs={specs.filter((spec) => ["home", "dashboard", "admin-users", "admin-whatsapp", "orders", "takeoff-review"].includes(spec.key))} />
-
-        {flows.map(({ flow, items }) => (
-          <section key={flow} className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,.65fr)]">
+          <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
               <div>
-                <h2 className="text-lg font-semibold">{flowLabels[flow]}</h2>
-                <p className="mt-1 text-sm text-slate-500">Route map with simple labels, visible status colors, and a clear audience boundary for each area.</p>
+                <h2 className="text-lg font-bold">Recent requests</h2>
+                <p className="mt-1 text-xs text-slate-500">Latest customer material and service requests.</p>
+              </div>
+              <Link href="/owner/materials/requests" className="text-sm font-semibold text-[#0066cc]">View all</Link>
+            </div>
+            {recentRequests.length ? (
+              <div className="divide-y divide-slate-100">
+                {recentRequests.map((request) => (
+                  <Link key={request.id} href={`/owner/materials/requests/${request.id}`} className="flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-slate-50">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-950">{request.title}</p>
+                      <p className="mt-1 text-xs text-slate-500">Updated {formatDate(request.updated_at)}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+                      {statusLabels[request.status] ?? request.status.replaceAll("_", " ")}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="px-5 py-10 text-center text-sm text-slate-500">No customer requests yet.</p>
+            )}
+          </section>
+
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#eaf3ff] text-[#0066cc]"><Building2 className="h-5 w-5" /></span>
+              <div>
+                <h2 className="text-lg font-bold">Manager tools</h2>
+                <p className="text-xs text-slate-500">Open the area you want to manage.</p>
               </div>
             </div>
-            <div className="mt-5 grid gap-4 lg:grid-cols-2">
-              {items.map((item) => {
-                const itemTone = statusClasses(item.status);
-                return (
-                  <article key={item.key} className={`rounded-[26px] border p-5 ${itemTone.card}`}>
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="max-w-2xl">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
-                          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${itemTone.badge}`}>
-                            {item.status}
-                          </span>
-                          <span className="rounded-full border border-white/70 bg-white/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-700">
-                            {item.audience === "admin" ? "Admin / Ops" : item.audience === "signed_in" ? "Client Flow" : "Public / Client"}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm leading-6 text-slate-700">{item.purpose}</p>
-                        <p className="mt-3 text-sm text-slate-600">Route: {item.href}</p>
-                      </div>
-                      <div className="min-w-44 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm text-slate-700">
-                        {item.progress}% complete
-                      </div>
-                    </div>
-                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/80">
-                      <div className="h-full rounded-full bg-slate-900" style={{ width: `${item.progress}%` }} />
-                    </div>
-                    <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr]">
-                      <div className="rounded-2xl border border-white/70 bg-white/70 p-4">
-                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Missing</div>
-                        <ul className="mt-2 space-y-1 text-sm text-slate-700">
-                          {item.missing.map((missing) => (
-                            <li key={missing}>• {missing}</li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div className="rounded-2xl border border-white/70 bg-white/70 p-4">
-                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Next step</div>
-                        <p className="mt-2 text-sm leading-6 text-slate-700">{item.nextStep}</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <Link href={item.href} className={statusButtonClass(item.status, item.status === "Coming Soon")}>
-                        Open {item.title}
-                      </Link>
-                      <Link href="/admin/build-map" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-white/60">
-                        Back to Build Map
-                      </Link>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+            <nav className="mt-5 grid gap-2" aria-label="Manager tools">
+              <Link href="/admin/settings/material-order-questions" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Departments & questions</Link>
+              <Link href="/admin/users" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Customers & requests</Link>
+              <Link href="/admin/vendors" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Suppliers</Link>
+              <Link href="/owner/materials" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Catalog & subcategories</Link>
+            </nav>
           </section>
-        ))}
-      </section>
+        </div>
+      </div>
     </main>
   );
 }
