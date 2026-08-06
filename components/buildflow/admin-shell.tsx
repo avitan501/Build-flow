@@ -34,6 +34,9 @@ function isActive(pathname: string, href: string) {
   if (href === "/admin/users") {
     return pathname.startsWith("/admin/users") || pathname.startsWith("/owner/materials/requests");
   }
+  if (href === "/admin/settings") {
+    return pathname === href || pathname.startsWith("/admin/whatsapp");
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
