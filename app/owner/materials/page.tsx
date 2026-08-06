@@ -11,12 +11,12 @@ function firstSearchValue(value: string | string[] | undefined) {
 }
 
 export default async function OwnerMaterialsPage({ searchParams }: OwnerMaterialsPageProps) {
-  await requireOwnerAccess();
+  const { supabase } = await requireOwnerAccess();
 
   const query = await searchParams;
   const [initialState, storageStatus] = await Promise.all([
-    getOwnerMaterialsAdminState(),
-    getOwnerMaterialsStorageStatus(),
+    getOwnerMaterialsAdminState(supabase),
+    getOwnerMaterialsStorageStatus(supabase),
   ]);
 
   return (

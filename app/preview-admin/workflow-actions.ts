@@ -36,7 +36,7 @@ export async function saveProjectQuestionAction(input: {
     sort_order: input.sortOrder,
   })
   if (error) return { ok: false, error: "Could not save the project question." }
-  revalidatePath("/preview-admin/vendors")
+  revalidatePath("/admin/vendors")
   return { ok: true }
 }
 
@@ -44,7 +44,7 @@ export async function deleteProjectQuestionAction(questionIdValue: string): Prom
   const { supabase } = await requireAdminProfile()
   const { error } = await supabase.from("project_questions").delete().eq("id", questionIdValue)
   if (error) return { ok: false, error: "Could not remove the project question." }
-  revalidatePath("/preview-admin/vendors")
+  revalidatePath("/admin/vendors")
   return { ok: true }
 }
 
@@ -53,7 +53,7 @@ export async function updateSupplierPackageAction(input: { packageId: string; st
   const patch = input.status === "approved" ? { status: "approved", approved_by: user.id, approved_at: new Date().toISOString() } : { status: "cancelled" }
   const { error } = await supabase.from("supplier_packages").update(patch).eq("id", input.packageId).eq("status", "pending_approval")
   if (error) return { ok: false, error: "Could not update the supplier package." }
-  revalidatePath("/preview-admin/vendors")
+  revalidatePath("/admin/vendors")
   return { ok: true }
 }
 
@@ -61,7 +61,7 @@ export async function returnRequestToDraftAction(requestId: string): Promise<Man
   const { supabase } = await requireAdminProfile()
   const { error } = await supabase.from("quote_requests").update({ status: "draft", submitted_at: null }).eq("id", requestId).in("status", ["submitted", "in_review"])
   if (error) return { ok: false, error: "Could not return the request to Draft." }
-  revalidatePath("/preview-admin/vendors")
+  revalidatePath("/admin/vendors")
   return { ok: true }
 }
 
@@ -99,7 +99,7 @@ export async function updateRequestStatusAction(input: { requestId: string; stat
     title: `${request.title}: ${statusDescriptions[input.status]}`,
     metadata: { quote_request_id: input.requestId, request_status: input.status },
   })
-  revalidatePath("/preview-admin/vendors")
+  revalidatePath("/admin/vendors")
   revalidatePath(`/projects/${request.project_id}`)
   return { ok: true }
 }
@@ -119,7 +119,7 @@ export async function saveWorkflowManagerSettingsAction(input: { qualificationSe
     }),
   ])
   if (managerError || publicError) return { ok: false, error: "Could not save the shared manager settings." }
-  revalidatePath("/preview-admin/vendors")
+  revalidatePath("/admin/vendors")
   revalidatePath("/shop")
   return { ok: true }
 }
@@ -134,7 +134,7 @@ export async function managerUpdateProjectAction(input: { projectId: string; nam
   if (input.status) patch.status = input.status
   const { error } = await supabase.from("projects").update(patch).eq("id", input.projectId)
   if (error) return { ok: false, error: "Could not update the client project." }
-  revalidatePath("/preview-admin/vendors")
+  revalidatePath("/admin/vendors")
   revalidatePath("/projects")
   return { ok: true }
 }

@@ -2,15 +2,15 @@ import "server-only";
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { mapExistingCategoryToShopCategory, type ShopItemRecord } from "@/lib/shop";
 import { cloneOwnerMaterialsState, ownerMaterialsSeedState, type OwnerMaterialBatchState, type OwnerMaterialRowState, type OwnerMaterialsAdminState } from "@/lib/owner-materials-admin-data";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 const dataDir = path.join(process.cwd(), "data");
 const statePath = path.join(dataDir, "owner-materials-admin-state.json");
 const publishedItemsPath = path.join(dataDir, "owner-materials-published-shop-items.json");
-const remoteAdminStateId = "singleton";
+const remoteAdminStateId = "owner-materials";
 
 export type OwnerMaterialsStorageStatus = {
   workspace: "supabase" | "local-fallback";
@@ -72,11 +72,10 @@ function throwSupabaseError(error: { message?: string; code?: string } | null, f
   throw nextError;
 }
 
-async function readRemoteAdminState() {
+async function readRemoteAdminState(admin: SupabaseClient) {
   try {
-    const admin = createAdminClient();
     const { data, error } = await admin
-      .from("owner_materials_admin_state")
+      .from("workflow_manager_settings")
       .select("state")
       .eq("id", remoteAdminStateId)
       .maybeSingle<{ state: OwnerMaterialsAdminState }>();
@@ -89,10 +88,9 @@ async function readRemoteAdminState() {
   }
 }
 
-async function writeRemoteAdminState(state: OwnerMaterialsAdminState) {
+async function writeRemoteAdminState(admin: SupabaseClient, state: OwnerMaterialsAdminState) {
   try {
-    const admin = createAdminClient();
-    const { error } = await admin.from("owner_materials_admin_state").upsert(
+    const { error } = await admin.from("workflow_manager_settings").upsert(
       {
         id: remoteAdminStateId,
         state,
@@ -108,9 +106,8 @@ async function writeRemoteAdminState(state: OwnerMaterialsAdminState) {
   }
 }
 
-async function readRemotePublishedShopItems() {
+async function readRemotePublishedShopItems(admin: SupabaseClient) {
   try {
-    const admin = createAdminClient();
     const { data, error } = await admin
       .from("shop_items")
       .select("*")
@@ -125,11 +122,10 @@ async function readRemotePublishedShopItems() {
   }
 }
 
-async function upsertRemotePublishedShopItems(items: ShopItemRecord[]) {
+async function upsertRemotePublishedShopItems(admin: SupabaseClient, items: ShopItemRecord[]) {
   if (items.length === 0) return true;
 
   try {
-    const admin = createAdminClient();
     const { error } = await admin.from("shop_items").upsert(items, { onConflict: "id" });
     if (error) throwSupabaseError(error, "Could not publish materials to Supabase shop_items.");
     return true;
@@ -139,11 +135,10 @@ async function upsertRemotePublishedShopItems(items: ShopItemRecord[]) {
   }
 }
 
-async function deleteRemotePublishedShopItems(itemIds: string[]) {
+async function deleteRemotePublishedShopItems(admin: SupabaseClient, itemIds: string[]) {
   if (itemIds.length === 0) return true;
 
   try {
-    const admin = createAdminClient();
     const { error } = await admin.from("shop_items").delete().in("id", itemIds);
     if (error) throwSupabaseError(error, "Could not unpublish materials from Supabase shop_items.");
     return true;
@@ -153,9 +148,8 @@ async function deleteRemotePublishedShopItems(itemIds: string[]) {
   }
 }
 
-async function canReadRemoteTable(tableName: "owner_materials_admin_state" | "shop_items") {
+async function canReadRemoteTable(admin: SupabaseClient, tableName: "workflow_manager_settings" | "shop_items") {
   try {
-    const admin = createAdminClient();
     const { error } = await admin.from(tableName).select("id").limit(1);
     if (error) throwSupabaseError(error, `Could not read ${tableName}.`);
     return true;
@@ -165,8 +159,8 @@ async function canReadRemoteTable(tableName: "owner_materials_admin_state" | "sh
   }
 }
 
-async function persistAdminState(state: OwnerMaterialsAdminState) {
-  const wroteRemote = await writeRemoteAdminState(state);
+async function persistAdminState(admin: SupabaseClient, state: OwnerMaterialsAdminState) {
+  const wroteRemote = await writeRemoteAdminState(admin, state);
   if (!wroteRemote) await writeJsonFile(statePath, state);
   return state;
 }
@@ -236,22 +230,22 @@ function mergeStates(saved: OwnerMaterialsAdminState | null): OwnerMaterialsAdmi
   };
 }
 
-export async function getOwnerMaterialsAdminState() {
-  const saved = (await readRemoteAdminState()) ?? (await readJsonFile<OwnerMaterialsAdminState>(statePath));
+export async function getOwnerMaterialsAdminState(admin: SupabaseClient) {
+  const saved = (await readRemoteAdminState(admin)) ?? (await readJsonFile<OwnerMaterialsAdminState>(statePath));
   const merged = mergeStates(saved);
-  if (!saved) await persistAdminState(merged);
+  if (!saved) await persistAdminState(admin, merged);
   return merged;
 }
 
-export async function saveOwnerMaterialsAdminState(nextState: OwnerMaterialsAdminState) {
+export async function saveOwnerMaterialsAdminState(admin: SupabaseClient, nextState: OwnerMaterialsAdminState) {
   const merged = mergeStates(nextState);
-  return persistAdminState(merged);
+  return persistAdminState(admin, merged);
 }
 
-export async function getOwnerMaterialsStorageStatus(): Promise<OwnerMaterialsStorageStatus> {
+export async function getOwnerMaterialsStorageStatus(admin: SupabaseClient): Promise<OwnerMaterialsStorageStatus> {
   const [workspaceReady, shopItemsReady] = await Promise.all([
-    canReadRemoteTable("owner_materials_admin_state"),
-    canReadRemoteTable("shop_items"),
+    canReadRemoteTable(admin, "workflow_manager_settings"),
+    canReadRemoteTable(admin, "shop_items"),
   ]);
 
   const workspace = workspaceReady ? "supabase" : "local-fallback";
@@ -322,18 +316,18 @@ async function saveLocalPublishedShopItems(items: ShopItemRecord[]) {
   await writeJsonFile(publishedItemsPath, items);
 }
 
-async function getPublishedShopItemsForWrite() {
-  return (await readRemotePublishedShopItems()) ?? (await getLocalPublishedShopItems());
+async function getPublishedShopItemsForWrite(admin: SupabaseClient) {
+  return (await readRemotePublishedShopItems(admin)) ?? (await getLocalPublishedShopItems());
 }
 
-async function savePublishedShopItemsForWrite(items: ShopItemRecord[]) {
-  const wroteRemote = await upsertRemotePublishedShopItems(items);
+async function savePublishedShopItemsForWrite(admin: SupabaseClient, items: ShopItemRecord[]) {
+  const wroteRemote = await upsertRemotePublishedShopItems(admin, items);
   if (!wroteRemote) await saveLocalPublishedShopItems(items);
   return wroteRemote;
 }
 
-export async function publishOwnerMaterialsRows(nextState: OwnerMaterialsAdminState, options: { batchId: string; rowIds: string[] }) {
-  const savedState = await saveOwnerMaterialsAdminState(nextState);
+export async function publishOwnerMaterialsRows(admin: SupabaseClient, nextState: OwnerMaterialsAdminState, options: { batchId: string; rowIds: string[] }) {
+  const savedState = await saveOwnerMaterialsAdminState(admin, nextState);
   const batch = savedState.batches.find((entry) => entry.id === options.batchId);
   if (!batch) {
     return { state: savedState, publishedCount: 0, error: "Batch not found." };
@@ -362,11 +356,11 @@ export async function publishOwnerMaterialsRows(nextState: OwnerMaterialsAdminSt
             },
       ),
     };
-    await persistAdminState(erroredState);
+    await persistAdminState(admin, erroredState);
     return { state: erroredState, publishedCount: 0, error: `${invalidRows.length} item(s) need category, unit, description, and price before publish.` };
   }
 
-  const publishedItems = await getPublishedShopItemsForWrite();
+  const publishedItems = await getPublishedShopItemsForWrite(admin);
   const publishedMap = new Map(publishedItems.map((item) => [item.id, item]));
   const nextItems: ShopItemRecord[] = [];
   rowsToPublish.forEach((row) => {
@@ -375,7 +369,7 @@ export async function publishOwnerMaterialsRows(nextState: OwnerMaterialsAdminSt
     publishedMap.set(nextItem.id, nextItem);
     nextItems.push(nextItem);
   });
-  const wroteRemote = await savePublishedShopItemsForWrite(nextItems);
+  const wroteRemote = await savePublishedShopItemsForWrite(admin, nextItems);
   if (!wroteRemote) await saveLocalPublishedShopItems(Array.from(publishedMap.values()));
 
   const updatedState: OwnerMaterialsAdminState = {
@@ -394,18 +388,18 @@ export async function publishOwnerMaterialsRows(nextState: OwnerMaterialsAdminSt
     ),
   };
 
-  await persistAdminState(updatedState);
+  await persistAdminState(admin, updatedState);
   return { state: updatedState, publishedCount: rowsToPublish.length, error: null };
 }
 
-export async function unpublishOwnerMaterialsRows(nextState: OwnerMaterialsAdminState, options: { batchId: string; rowIds: string[] }) {
-  const savedState = await saveOwnerMaterialsAdminState(nextState);
+export async function unpublishOwnerMaterialsRows(admin: SupabaseClient, nextState: OwnerMaterialsAdminState, options: { batchId: string; rowIds: string[] }) {
+  const savedState = await saveOwnerMaterialsAdminState(admin, nextState);
   const batch = savedState.batches.find((entry) => entry.id === options.batchId);
   if (!batch) return { state: savedState, unpublishedCount: 0 };
 
   const selectedIds = new Set(options.rowIds);
   const itemIds = new Set(batch.rows.filter((row) => selectedIds.has(row.id)).map((row) => buildPublishedItem(row, batch).id));
-  const deletedRemote = await deleteRemotePublishedShopItems(Array.from(itemIds));
+  const deletedRemote = await deleteRemotePublishedShopItems(admin, Array.from(itemIds));
   if (!deletedRemote) {
     const publishedItems = await getLocalPublishedShopItems();
     await saveLocalPublishedShopItems(publishedItems.filter((item) => !itemIds.has(item.id)));
@@ -423,6 +417,6 @@ export async function unpublishOwnerMaterialsRows(nextState: OwnerMaterialsAdmin
     ),
   };
 
-  await persistAdminState(updatedState);
+  await persistAdminState(admin, updatedState);
   return { state: updatedState, unpublishedCount: itemIds.size };
 }

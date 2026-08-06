@@ -3,15 +3,13 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdminProfile } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 type AdminAction = "approve" | "reject" | "suspend" | "change_role";
 type RoleValue = "admin" | "staff" | "client";
 
 async function applyUserAction(formData: FormData, action: AdminAction) {
-  const { profile } = await requireAdminProfile();
+  const { profile, supabase } = await requireAdminProfile();
   const adminProfile = profile;
-  const admin = createAdminClient();
 
   if (!adminProfile) {
     throw new Error("Admin profile is required.");
@@ -28,7 +26,7 @@ async function applyUserAction(formData: FormData, action: AdminAction) {
     throw new Error("Admin cannot change their own approval or role from this screen.");
   }
 
-  const { data: targetUser, error: targetError } = await admin
+  const { data: targetUser, error: targetError } = await supabase
     .from("profiles")
     .select("id, role, approval_status, is_active")
     .eq("id", userId)
@@ -84,7 +82,7 @@ async function applyUserAction(formData: FormData, action: AdminAction) {
     audit.new_approval_status = null;
   }
 
-  const { error: updateError } = await admin.from("profiles").update(patch).eq("id", userId);
+  const { error: updateError } = await supabase.from("profiles").update(patch).eq("id", userId);
 
   if (updateError) {
     throw new Error(updateError.message || "Failed to update user.");
@@ -99,7 +97,7 @@ async function applyUserAction(formData: FormData, action: AdminAction) {
           ? "suspended"
           : "role_changed";
 
-  const { error: auditError } = await admin.from("approval_actions").insert({
+  const { error: auditError } = await supabase.from("approval_actions").insert({
     user_id: userId,
     action: actionName,
     old_role: audit.old_role,
