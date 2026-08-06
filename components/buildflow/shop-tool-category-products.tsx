@@ -67,5 +67,5 @@ export function ShopToolCategoryProducts({ categoryLabel, products }: ShopToolCa
     )
   }
 
-  return <ShopToolProductGrid products={mergedProducts} />
+  return <ShopToolProductGrid products={mergedProducts} questionnaireDepartment={categoryLabel} />
 }

@@ -3,6 +3,16 @@
 import { revalidatePath } from "next/cache"
 
 import { getSessionWithProfile } from "@/lib/auth"
+import {
+  buildMaterialQuestionnaireSnapshot,
+  formatMaterialAnswer,
+  hasMaterialAnswer,
+  isQuestionVisible,
+  type MaterialAnswerValue,
+  type MaterialQuestionnaireResponse,
+  type MaterialRequestAnswer,
+} from "@/lib/material-questionnaires"
+import { loadMaterialQuestionnaireForDepartment } from "@/lib/material-questionnaires-server"
 import { createProjectEvent } from "@/lib/projects"
 import type { QuoteRequestAnswer } from "@/lib/quote-requests"
 
@@ -53,11 +63,12 @@ export async function saveQuoteAttachmentRecordAction(input: {
   projectId: string
   requestId: string
   itemId: string
+  materialResponseId?: string
   fileName: string
   filePath: string
   fileType: string
   fileSize: number
-}): Promise<ActionResult> {
+}): Promise<ActionResult<{ id: string }>> {
   const session = await currentUser()
   if (!session) return { ok: false, error: "Your session expired.", authRequired: true }
 
@@ -71,19 +82,20 @@ export async function saveQuoteAttachmentRecordAction(input: {
     .maybeSingle()
   if (!item) return { ok: false, error: "The request item was not found." }
 
-  const { error } = await session.supabase.from("quote_request_attachments").insert({
+  const { data, error } = await session.supabase.from("quote_request_attachments").insert({
     request_id: input.requestId,
     project_id: input.projectId,
     owner_id: session.user.id,
     item_id: input.itemId,
+    material_response_id: input.materialResponseId || null,
     file_name: input.fileName,
     file_path: input.filePath,
     file_type: input.fileType || null,
     file_size: input.fileSize,
-  })
-  if (error) return { ok: false, error: "The file uploaded, but its project record could not be saved." }
+  }).select("id").single<{ id: string }>()
+  if (error || !data) return { ok: false, error: "The file uploaded, but its project record could not be saved." }
   revalidatePath(`/projects/${input.projectId}`)
-  return { ok: true, data: undefined }
+  return { ok: true, data }
 }
 
 export async function addCatalogItemToProjectAction(input: {
@@ -100,8 +112,9 @@ export async function addCatalogItemToProjectAction(input: {
     unitPrice: number
     requiredQuestionIds: string[]
     details?: string
+    questionnaireDepartment?: string
   }
-}): Promise<ActionResult<{ requestId: string; itemId: string }>> {
+}): Promise<ActionResult<{ requestId: string; itemId: string; materialResponse: MaterialQuestionnaireResponse | null; materialAnswers: MaterialRequestAnswer[] }>> {
   const session = await currentUser()
   if (!session) return { ok: false, error: "Sign in to add this item to a project.", authRequired: true }
 
@@ -116,6 +129,7 @@ export async function addCatalogItemToProjectAction(input: {
   if (!project) return { ok: false, error: "Choose an active project." }
 
   let requestId = input.requestId?.trim() || ""
+  let createdRequest = false
   if (requestId) {
     const { data: request } = await session.supabase
       .from("quote_requests")
@@ -135,9 +149,19 @@ export async function addCatalogItemToProjectAction(input: {
       .single<{ id: string }>()
     if (error || !request) return { ok: false, error: "Could not start the quote request." }
     requestId = request.id
+    createdRequest = true
   }
 
-  const needsQuestions = input.product.requiredQuestionIds.length > 0
+  let materialCategory = null
+  try {
+    materialCategory = await loadMaterialQuestionnaireForDepartment(
+      session.supabase,
+      input.product.questionnaireDepartment?.trim() || input.product.department.trim(),
+    )
+  } catch {
+    return { ok: false, error: "Could not load the material questions. Please try again." }
+  }
+  const needsQuestions = Boolean(materialCategory) || input.product.requiredQuestionIds.length > 0
   const { data: item, error: itemError } = await session.supabase
     .from("quote_request_items")
     .insert({
@@ -162,6 +186,49 @@ export async function addCatalogItemToProjectAction(input: {
 
   if (itemError || !item) return { ok: false, error: "Could not add the item to this request." }
 
+  let materialResponse: MaterialQuestionnaireResponse | null = null
+  let materialAnswers: MaterialRequestAnswer[] = []
+  if (materialCategory) {
+    const { data: existing } = await session.supabase
+      .from("material_questionnaire_responses")
+      .select("id, request_id, project_id, owner_id, category_id, category_name_snapshot, category_slug_snapshot, definition_version, definition_snapshot, status, completed_at, created_at, updated_at")
+      .eq("request_id", requestId)
+      .eq("category_id", materialCategory.id)
+      .maybeSingle<MaterialQuestionnaireResponse>()
+
+    if (existing) {
+      materialResponse = existing
+    } else {
+      const { data: inserted, error: responseError } = await session.supabase
+        .from("material_questionnaire_responses")
+        .insert({
+          request_id: requestId,
+          project_id: project.id,
+          owner_id: session.user.id,
+          category_id: materialCategory.id,
+          category_name_snapshot: materialCategory.name,
+          category_slug_snapshot: materialCategory.slug,
+          definition_version: materialCategory.current_version,
+          definition_snapshot: buildMaterialQuestionnaireSnapshot(materialCategory),
+        })
+        .select("id, request_id, project_id, owner_id, category_id, category_name_snapshot, category_slug_snapshot, definition_version, definition_snapshot, status, completed_at, created_at, updated_at")
+        .single<MaterialQuestionnaireResponse>()
+      if (responseError || !inserted) {
+        await session.supabase.from("quote_request_items").delete().eq("id", item.id).eq("owner_id", session.user.id)
+        if (createdRequest) await session.supabase.from("quote_requests").delete().eq("id", requestId).eq("owner_id", session.user.id)
+        return { ok: false, error: "Could not start the category questionnaire. Nothing was added." }
+      }
+      materialResponse = inserted
+    }
+
+    const { data: savedAnswers } = await session.supabase
+      .from("material_request_answers")
+      .select("id, response_id, question_id, question_key, question_label_snapshot, question_type_snapshot, answer_value, answer_display_snapshot, unit_snapshot")
+      .eq("response_id", materialResponse.id)
+      .returns<MaterialRequestAnswer[]>()
+    materialAnswers = savedAnswers ?? []
+  }
+
   await createProjectEvent({
     supabase: session.supabase,
     projectId: project.id,
@@ -174,7 +241,64 @@ export async function addCatalogItemToProjectAction(input: {
   })
 
   revalidatePath(`/projects/${project.id}`)
-  return { ok: true, data: { requestId, itemId: item.id } }
+  return { ok: true, data: { requestId, itemId: item.id, materialResponse, materialAnswers } }
+}
+
+export async function saveMaterialQuestionnaireResponseAction(input: {
+  projectId: string
+  requestId: string
+  responseId: string
+  answers: Record<string, MaterialAnswerValue>
+  complete: boolean
+}): Promise<ActionResult> {
+  const session = await currentUser()
+  if (!session) return { ok: false, error: "Your session expired. Please sign in again.", authRequired: true }
+
+  const { data: response } = await session.supabase
+    .from("material_questionnaire_responses")
+    .select("id, definition_snapshot")
+    .eq("id", input.responseId)
+    .eq("request_id", input.requestId)
+    .eq("project_id", input.projectId)
+    .eq("owner_id", session.user.id)
+    .maybeSingle<{ id: string; definition_snapshot: MaterialQuestionnaireResponse["definition_snapshot"] }>()
+  if (!response) return { ok: false, error: "The material questionnaire was not found." }
+
+  const visible = response.definition_snapshot.questions.filter((question) => isQuestionVisible(question, input.answers))
+  if (input.complete) {
+    const missing = visible.find((question) => question.is_required && !hasMaterialAnswer(input.answers[question.id]))
+    if (missing) return { ok: false, error: `Please answer: ${missing.label}` }
+  }
+
+  const rows = visible.filter((question) => hasMaterialAnswer(input.answers[question.id])).map((question) => ({
+    response_id: response.id,
+    question_id: question.id,
+    question_key: question.question_key,
+    question_label_snapshot: question.label,
+    question_type_snapshot: question.question_type,
+    answer_value: input.answers[question.id],
+    answer_display_snapshot: formatMaterialAnswer(question, input.answers[question.id]),
+    unit_snapshot: question.unit,
+  }))
+  const { data: existing } = await session.supabase.from("material_request_answers").select("id, question_key").eq("response_id", response.id).returns<Array<{ id: string; question_key: string }>>()
+  const savedKeys = new Set(rows.map((row) => row.question_key))
+  const staleIds = (existing ?? []).filter((answer) => !savedKeys.has(answer.question_key)).map((answer) => answer.id)
+  if (staleIds.length) {
+    const { error } = await session.supabase.from("material_request_answers").delete().in("id", staleIds)
+    if (error) return { ok: false, error: "Could not update conditional answers." }
+  }
+  if (rows.length) {
+    const { error } = await session.supabase.from("material_request_answers").upsert(rows, { onConflict: "response_id,question_key" })
+    if (error) return { ok: false, error: "Could not save the questionnaire answers." }
+  }
+  const { error: responseError } = await session.supabase.from("material_questionnaire_responses").update({
+    status: input.complete ? "complete" : "in_progress",
+    completed_at: input.complete ? new Date().toISOString() : null,
+  }).eq("id", response.id)
+  if (responseError) return { ok: false, error: "Answers saved, but completion status could not be updated." }
+  revalidatePath(`/projects/${input.projectId}`)
+  revalidatePath(`/projects/${input.projectId}/requests/${input.requestId}`)
+  return { ok: true, data: undefined }
 }
 
 export async function saveQuoteItemAnswersAction(input: {
@@ -265,10 +389,11 @@ export async function submitQuoteRequestAction(input: { projectId: string; reque
     .maybeSingle<{ id: string; title: string }>()
   if (!request) return { ok: false, error: "Only draft requests can be submitted." }
 
-  const [{ data: questions }, { data: projectAnswers }, { data: items }] = await Promise.all([
+  const [{ data: questions }, { data: projectAnswers }, { data: items }, { data: materialResponses }] = await Promise.all([
     session.supabase.from("project_questions").select("id, label, required").eq("active", true).eq("required", true),
     session.supabase.from("project_question_answers").select("question_id, value").eq("project_id", input.projectId).eq("owner_id", session.user.id),
     session.supabase.from("quote_request_items").select("id, catalog_item_id, department, qualification_status, answers, metadata").eq("request_id", input.requestId).eq("owner_id", session.user.id),
+    session.supabase.from("material_questionnaire_responses").select("id, definition_snapshot").eq("request_id", input.requestId).eq("owner_id", session.user.id),
   ])
 
   if (!items || items.length === 0) return { ok: false, error: "Add at least one item before submitting." }
@@ -283,6 +408,16 @@ export async function submitQuoteRequestAction(input: { projectId: string; reque
     return required.some((questionId) => !answered.has(questionId))
   })
   if (incompleteItem) return { ok: false, error: "Complete all required item questions before submitting." }
+
+  for (const response of materialResponses ?? []) {
+    const { data: savedAnswers } = await session.supabase.from("material_request_answers").select("question_id, answer_value").eq("response_id", response.id)
+    const materialAnswerMap = Object.fromEntries((savedAnswers ?? []).map((answer) => [answer.question_id, answer.answer_value])) as Record<string, MaterialAnswerValue>
+    const snapshot = response.definition_snapshot as MaterialQuestionnaireResponse["definition_snapshot"]
+    const missing = snapshot.questions
+      .filter((question) => isQuestionVisible(question, materialAnswerMap))
+      .find((question) => question.is_required && !hasMaterialAnswer(materialAnswerMap[question.id]))
+    if (missing) return { ok: false, error: `Complete the ${snapshot.category.name} question: ${missing.label}` }
+  }
 
   const { error } = await session.supabase.rpc("submit_quote_request_packages", {
     p_request_id: input.requestId,

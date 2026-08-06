@@ -1,0 +1,115 @@
+"use client"
+
+import { ChevronDown, ChevronUp, Eye, Plus, Save, Settings2, Trash2 } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useMemo, useState, useTransition } from "react"
+
+import {
+  createMaterialCategoryAction,
+  createMaterialOptionAction,
+  createMaterialQuestionAction,
+  deleteMaterialOptionAction,
+  deleteMaterialQuestionAction,
+  moveMaterialOptionAction,
+  moveMaterialQuestionAction,
+  updateMaterialCategoryAction,
+  updateMaterialOptionAction,
+  updateMaterialQuestionAction,
+} from "@/app/admin/settings/material-order-questions/actions"
+import { MaterialQuestionnaireWizard } from "@/components/buildflow/material-questionnaire-wizard"
+import {
+  MATERIAL_DEPARTMENTS,
+  MATERIAL_QUESTION_TYPES,
+  MATERIAL_QUESTION_TYPE_LABELS,
+  buildMaterialQuestionnaireSnapshot,
+  type MaterialQuestion,
+  type MaterialQuestionOption,
+  type MaterialQuestionnaireCategory,
+} from "@/lib/material-questionnaires"
+
+const inputClass = "min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+
+function ActionMessage({ message }: { message: string | null }) {
+  return message ? <p className={`text-sm font-medium ${message.startsWith("Saved") || message.startsWith("Added") ? "text-emerald-700" : "text-rose-700"}`}>{message}</p> : null
+}
+
+function OptionEditor({ option, questionId, first, last }: { option: MaterialQuestionOption; questionId: string; first: boolean; last: boolean }) {
+  const router = useRouter()
+  const [label, setLabel] = useState(option.label)
+  const [value, setValue] = useState(option.value)
+  const [active, setActive] = useState(option.is_active)
+  const [pending, startTransition] = useTransition()
+
+  function run(task: () => Promise<{ ok: boolean; error?: string }>) {
+    startTransition(async () => { await task(); router.refresh() })
+  }
+
+  return <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-center"><input aria-label="Option label" value={label} onChange={(event) => setLabel(event.target.value)} className={inputClass} /><input aria-label="Option value" value={value} onChange={(event) => setValue(event.target.value)} className={inputClass} /><div className="flex items-center gap-1"><button type="button" disabled={pending || first} onClick={() => run(() => moveMaterialOptionAction({ id: option.id, questionId, direction: "up" }))} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white disabled:opacity-30" title="Move option up"><ChevronUp className="h-4 w-4" /></button><button type="button" disabled={pending || last} onClick={() => run(() => moveMaterialOptionAction({ id: option.id, questionId, direction: "down" }))} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white disabled:opacity-30" title="Move option down"><ChevronDown className="h-4 w-4" /></button><button type="button" disabled={pending} onClick={() => run(() => updateMaterialOptionAction({ id: option.id, label, value, isActive: active }))} className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 text-white" title="Save option"><Save className="h-4 w-4" /></button><button type="button" onClick={() => setActive((entry) => !entry)} className={`h-10 rounded-lg border px-3 text-xs font-semibold ${active ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-500"}`}>{active ? "On" : "Off"}</button><button type="button" disabled={pending} onClick={() => { if (window.confirm("Delete this answer option?")) run(() => deleteMaterialOptionAction(option.id)) }} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-700" title="Delete option"><Trash2 className="h-4 w-4" /></button></div></div>
+}
+
+function QuestionEditor({ question, questions, index, total }: { question: MaterialQuestion; questions: MaterialQuestion[]; index: number; total: number }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState({
+    label: question.label,
+    helpText: question.help_text,
+    placeholder: question.placeholder,
+    questionType: question.question_type,
+    unit: question.unit ?? "",
+    isRequired: question.is_required,
+    isActive: question.is_active,
+    allowOther: question.allow_other,
+    parentQuestionId: question.conditional_parent_question_id ?? "",
+    conditionalOperator: question.conditional_operator ?? "equals",
+    conditionalValue: typeof question.conditional_value === "string" ? question.conditional_value : "",
+    quantityUnits: (question.configuration.units ?? []).join(", "),
+    allowNotes: Boolean(question.configuration.allowNotes),
+  })
+  const [message, setMessage] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+  const optionType = ["single_select", "multi_select", "dropdown"].includes(draft.questionType)
+  const eligibleParents = questions.filter((candidate) => candidate.sort_order < question.sort_order)
+
+  function refreshTask(task: () => Promise<{ ok: boolean; error?: string }>, success: string) {
+    startTransition(async () => { const result = await task(); setMessage(result.ok ? success : result.error || "Could not save."); if (result.ok) router.refresh() })
+  }
+
+  return <article className={`rounded-2xl border bg-white ${question.is_active ? "border-slate-200" : "border-slate-200 opacity-65"}`}>
+    <button type="button" onClick={() => setOpen((value) => !value)} className="flex w-full items-start justify-between gap-3 p-4 text-left"><span><span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">{MATERIAL_QUESTION_TYPE_LABELS[question.question_type]}</span><span className="mt-1 block text-sm font-semibold text-slate-950">{question.label}</span><span className="mt-1 block text-xs text-slate-500">{question.is_required ? "Required" : "Optional"}{question.conditional_parent_question_id ? " · Conditional" : ""}</span></span><Settings2 className="h-5 w-5 shrink-0 text-slate-400" /></button>
+    {open ? <div className="grid gap-4 border-t border-slate-100 p-4">
+      <label className="grid gap-1.5 text-sm font-semibold">Question label<input value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} className={inputClass} /></label>
+      <div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1.5 text-sm font-semibold">Question type<select value={draft.questionType} onChange={(event) => setDraft({ ...draft, questionType: event.target.value as typeof draft.questionType })} className={inputClass}>{MATERIAL_QUESTION_TYPES.map((type) => <option key={type} value={type}>{MATERIAL_QUESTION_TYPE_LABELS[type]}</option>)}</select></label><label className="grid gap-1.5 text-sm font-semibold">Unit<input value={draft.unit} onChange={(event) => setDraft({ ...draft, unit: event.target.value })} placeholder="sq. ft., gallons, pieces" className={inputClass} /></label></div>
+      <label className="grid gap-1.5 text-sm font-semibold">Help text<textarea rows={2} value={draft.helpText} onChange={(event) => setDraft({ ...draft, helpText: event.target.value })} className={`${inputClass} py-2`} /></label>
+      <label className="grid gap-1.5 text-sm font-semibold">Placeholder<input value={draft.placeholder} onChange={(event) => setDraft({ ...draft, placeholder: event.target.value })} className={inputClass} /></label>
+      <div className="flex flex-wrap gap-2">{[["isRequired","Required"],["isActive","Enabled"],["allowOther","Allow Other"],["allowNotes","Allow notes"]].map(([key,label]) => <button key={key} type="button" onClick={() => setDraft({ ...draft, [key]: !draft[key as keyof typeof draft] })} className={`min-h-10 rounded-full border px-4 text-sm font-semibold ${draft[key as keyof typeof draft] ? "border-sky-300 bg-sky-50 text-sky-800" : "border-slate-200 bg-white text-slate-600"}`}>{label}</button>)}</div>
+      {draft.questionType === "quantity" ? <label className="grid gap-1.5 text-sm font-semibold">Quantity units<input value={draft.quantityUnits} onChange={(event) => setDraft({ ...draft, quantityUnits: event.target.value })} placeholder="pieces, boxes, buckets" className={inputClass} /></label> : null}
+      <fieldset className="grid gap-3 rounded-xl border border-slate-200 p-3"><legend className="px-1 text-sm font-semibold">Conditional display</legend><label className="grid gap-1.5 text-sm font-semibold">Show after<select value={draft.parentQuestionId} onChange={(event) => setDraft({ ...draft, parentQuestionId: event.target.value })} className={inputClass}><option value="">Always show</option>{eligibleParents.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}</select></label>{draft.parentQuestionId ? <div className="grid gap-3 sm:grid-cols-2"><select aria-label="Condition operator" value={draft.conditionalOperator} onChange={(event) => setDraft({ ...draft, conditionalOperator: event.target.value as typeof draft.conditionalOperator })} className={inputClass}><option value="equals">Equals</option><option value="not_equals">Does not equal</option><option value="includes_any">Includes any</option><option value="includes_all">Includes all</option><option value="is_answered">Is answered</option></select>{draft.conditionalOperator !== "is_answered" ? <input aria-label="Condition value" value={draft.conditionalValue} onChange={(event) => setDraft({ ...draft, conditionalValue: event.target.value })} placeholder="Stored option value, e.g. yes" className={inputClass} /> : null}</div> : null}</fieldset>
+      {optionType ? <section className="grid gap-2"><div className="flex items-center justify-between"><h4 className="text-sm font-semibold">Answer options</h4><button type="button" disabled={pending} onClick={() => refreshTask(() => createMaterialOptionAction(question.id), "Added option.")} className="inline-flex min-h-10 items-center gap-1 rounded-full border border-slate-200 px-3 text-xs font-semibold"><Plus className="h-4 w-4" />Option</button></div>{question.options.map((option, optionIndex) => <OptionEditor key={option.id} option={option} questionId={question.id} first={optionIndex === 0} last={optionIndex === question.options.length - 1} />)}</section> : null}
+      <div className="flex flex-wrap items-center gap-2"><button type="button" disabled={pending} onClick={() => refreshTask(() => updateMaterialQuestionAction({ id: question.id, ...draft }), "Saved question.")} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white"><Save className="h-4 w-4" />Save question</button><button type="button" disabled={pending || index === 0} onClick={() => refreshTask(() => moveMaterialQuestionAction({ id: question.id, categoryId: question.category_id, direction: "up" }), "Saved order.")} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200" title="Move question up"><ChevronUp className="h-4 w-4" /></button><button type="button" disabled={pending || index === total - 1} onClick={() => refreshTask(() => moveMaterialQuestionAction({ id: question.id, categoryId: question.category_id, direction: "down" }), "Saved order.")} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200" title="Move question down"><ChevronDown className="h-4 w-4" /></button><button type="button" disabled={pending} onClick={() => { if (window.confirm("Delete this question? Historical order answers will remain saved.")) refreshTask(() => deleteMaterialQuestionAction(question.id), "Deleted question.") }} className="inline-flex h-11 items-center gap-2 rounded-full border border-rose-200 px-4 text-sm font-semibold text-rose-700"><Trash2 className="h-4 w-4" />Delete</button></div><ActionMessage message={message} />
+    </div> : null}
+  </article>
+}
+
+export function MaterialQuestionnaireAdmin({ categories }: { categories: MaterialQuestionnaireCategory[] }) {
+  const router = useRouter()
+  const [selectedId, setSelectedId] = useState(categories[0]?.id ?? "")
+  const [preview, setPreview] = useState(false)
+  const [newCategory, setNewCategory] = useState({ name: "", departmentKey: MATERIAL_DEPARTMENTS.find((department) => !categories.some((category) => category.department_key === department)) ?? MATERIAL_DEPARTMENTS[0] })
+  const selected = categories.find((category) => category.id === selectedId) ?? categories[0] ?? null
+  const [categoryDraft, setCategoryDraft] = useState(selected ? { name: selected.name, departmentKey: selected.department_key, description: selected.description, isActive: selected.is_active } : null)
+  const [message, setMessage] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+  const availableDepartments = useMemo(() => MATERIAL_DEPARTMENTS.filter((department) => department === selected?.department_key || !categories.some((category) => category.department_key === department)), [categories, selected])
+
+  function choose(category: MaterialQuestionnaireCategory) { setSelectedId(category.id); setCategoryDraft({ name: category.name, departmentKey: category.department_key, description: category.description, isActive: category.is_active }); setMessage(null) }
+  function run(task: () => Promise<{ ok: boolean; error?: string; data?: { id: string } }>, success: string) { startTransition(async () => { const result = await task(); setMessage(result.ok ? success : result.error || "Could not save."); if (result.ok) { if (result.data?.id) setSelectedId(result.data.id); router.refresh() } }) }
+
+  return <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+    <aside className="h-fit rounded-[20px] border border-slate-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,.06)] xl:sticky xl:top-24"><div className="px-2 py-2"><h2 className="text-sm font-bold text-slate-950">Material categories</h2><p className="mt-1 text-xs leading-5 text-slate-500">Each category controls one Shop department.</p></div><div className="grid gap-1">{categories.map((category) => <button key={category.id} type="button" onClick={() => choose(category)} className={`rounded-xl px-3 py-3 text-left ${selected?.id === category.id ? "bg-slate-950 text-white" : "hover:bg-slate-50"}`}><span className="block text-sm font-semibold">{category.name}</span><span className={`mt-0.5 block text-xs ${selected?.id === category.id ? "text-white/65" : "text-slate-500"}`}>{category.department_key} · {category.questions.length} questions</span></button>)}</div><div className="mt-3 grid gap-2 border-t border-slate-100 pt-3"><input value={newCategory.name} onChange={(event) => setNewCategory({ ...newCategory, name: event.target.value })} placeholder="New category name" className={inputClass} /><select value={newCategory.departmentKey} onChange={(event) => setNewCategory({ ...newCategory, departmentKey: event.target.value as typeof newCategory.departmentKey })} className={inputClass}>{MATERIAL_DEPARTMENTS.filter((department) => !categories.some((category) => category.department_key === department)).map((department) => <option key={department}>{department}</option>)}</select><button type="button" disabled={pending || !newCategory.name.trim()} onClick={() => run(() => createMaterialCategoryAction(newCategory), "Added category.")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50"><Plus className="h-4 w-4" />Add category</button></div></aside>
+
+    <main className="min-w-0">{selected && categoryDraft ? <div className="grid gap-4"><section className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_12px_32px_rgba(15,23,42,.05)] sm:p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[11px] font-semibold uppercase tracking-[.14em] text-sky-700">Category settings</p><h2 className="mt-1 text-xl font-bold text-slate-950">{selected.name}</h2><p className="mt-1 text-xs text-slate-500">Version {selected.current_version}. New requests receive the latest saved version.</p></div><button type="button" onClick={() => setPreview(true)} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-slate-200 px-4 text-sm font-semibold"><Eye className="h-4 w-4" />Preview client view</button></div><div className="mt-5 grid gap-3 sm:grid-cols-2"><label className="grid gap-1.5 text-sm font-semibold">Category name<input value={categoryDraft.name} onChange={(event) => setCategoryDraft({ ...categoryDraft, name: event.target.value })} className={inputClass} /></label><label className="grid gap-1.5 text-sm font-semibold">Shop department<select value={categoryDraft.departmentKey} onChange={(event) => setCategoryDraft({ ...categoryDraft, departmentKey: event.target.value })} className={inputClass}>{availableDepartments.map((department) => <option key={department}>{department}</option>)}</select></label><label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">Description<textarea rows={2} value={categoryDraft.description} onChange={(event) => setCategoryDraft({ ...categoryDraft, description: event.target.value })} className={`${inputClass} py-2`} /></label></div><div className="mt-4 flex flex-wrap items-center gap-3"><button type="button" onClick={() => setCategoryDraft({ ...categoryDraft, isActive: !categoryDraft.isActive })} className={`min-h-10 rounded-full border px-4 text-sm font-semibold ${categoryDraft.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600"}`}>{categoryDraft.isActive ? "Category enabled" : "Category disabled"}</button><button type="button" disabled={pending} onClick={() => run(() => updateMaterialCategoryAction({ id: selected.id, ...categoryDraft }), "Saved category.")} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-slate-950 px-4 text-sm font-semibold text-white"><Save className="h-4 w-4" />Save category</button><ActionMessage message={message} /></div></section>
+      <section><div className="mb-3 flex items-center justify-between"><div><h2 className="text-lg font-bold text-slate-950">Questions</h2><p className="text-sm text-slate-500">Open a question to edit its logic and answer choices.</p></div><button type="button" disabled={pending} onClick={() => run(() => createMaterialQuestionAction(selected.id), "Added question.")} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#0071e3] px-4 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Question</button></div><div className="grid gap-2">{selected.questions.map((question, index) => <QuestionEditor key={question.id} question={question} questions={selected.questions} index={index} total={selected.questions.length} />)}</div></section>
+    </div> : <div className="rounded-[20px] border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">Add a category to begin.</div>}</main>
+    {preview && selected ? <MaterialQuestionnaireWizard snapshot={buildMaterialQuestionnaireSnapshot(selected)} onClose={() => setPreview(false)} /> : null}
+  </div>
+}

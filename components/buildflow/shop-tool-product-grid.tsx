@@ -9,6 +9,7 @@ import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 
 type ShopToolProductGridProps = {
   products: ShopCatalogProduct[]
+  questionnaireDepartment?: string
 }
 
 function formatCurrency(value: number) {
@@ -22,7 +23,7 @@ function formatCurrency(value: number) {
   return { dollars, cents: cents ?? "00" }
 }
 
-export function ShopToolProductGrid({ products }: ShopToolProductGridProps) {
+export function ShopToolProductGrid({ products, questionnaireDepartment }: ShopToolProductGridProps) {
   return (
     <section className="grid gap-3">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
@@ -74,7 +75,7 @@ export function ShopToolProductGrid({ products }: ShopToolProductGridProps) {
                     )}
                     <div className="mt-0.5 text-[11px] font-medium text-slate-500">{product.unit}</div>
                   </div>
-                  <AddToProjectButton product={product} compact />
+                  <AddToProjectButton product={product} compact questionnaireDepartment={questionnaireDepartment} />
                 </div>
 
                 {localOnly ? (

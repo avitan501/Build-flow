@@ -4,10 +4,15 @@ import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
 import {
+  saveMaterialQuestionnaireResponseAction,
+  saveQuoteAttachmentRecordAction,
   saveProjectAnswersAction,
   submitQuoteRequestAction,
   updateProjectAction,
 } from "@/app/projects/quote-request-actions"
+import { MaterialQuestionnaireWizard } from "@/components/buildflow/material-questionnaire-wizard"
+import type { MaterialAnswerValue, MaterialQuestion, MaterialQuestionnaireResponse, MaterialRequestAnswer } from "@/lib/material-questionnaires"
+import { createClient } from "@/lib/supabase/client"
 import type { ProjectQuestionRecord } from "@/lib/quote-requests"
 import type { QualifyingQuestion } from "@/lib/shop-qualification"
 import { saveQuoteItemAnswersAction } from "@/app/projects/quote-request-actions"
@@ -131,6 +136,46 @@ export function SubmitQuoteRequestButton({ projectId, requestId }: { projectId: 
       {message ? <p className="text-xs leading-5 text-slate-600">{message}</p> : null}
     </div>
   )
+}
+
+export function MaterialQuestionnaireRequestEditor({ response, savedAnswers, userId, itemId, locked }: {
+  response: MaterialQuestionnaireResponse
+  savedAnswers: MaterialRequestAnswer[]
+  userId: string
+  itemId: string
+  locked: boolean
+}) {
+  const router = useRouter()
+  const initialAnswers = Object.fromEntries(savedAnswers.map((answer) => [answer.question_id || answer.question_key, answer.answer_value])) as Record<string, MaterialAnswerValue>
+
+  async function save(answers: Record<string, MaterialAnswerValue>, complete: boolean) {
+    const result = await saveMaterialQuestionnaireResponseAction({
+      projectId: response.project_id,
+      requestId: response.request_id,
+      responseId: response.id,
+      answers,
+      complete,
+    })
+    if (result.ok) router.refresh()
+    return result.ok ? { ok: true } : { ok: false, error: result.error }
+  }
+
+  async function upload(_question: MaterialQuestion, files: File[]) {
+    const attachmentIds: string[] = []
+    for (const file of files) {
+      if (file.size > 25 * 1024 * 1024) return { ok: false, error: `${file.name} is larger than 25 MB.` }
+      const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-|-$/g, "") || "upload"
+      const filePath = `${userId}/${response.project_id}/${crypto.randomUUID()}-${safeName}`
+      const { error } = await createClient().storage.from("project-uploads").upload(filePath, file, { upsert: false })
+      if (error) return { ok: false, error: error.message }
+      const record = await saveQuoteAttachmentRecordAction({ projectId: response.project_id, requestId: response.request_id, itemId, materialResponseId: response.id, fileName: file.name, filePath, fileType: file.type, fileSize: file.size })
+      if (!record.ok) return { ok: false, error: record.error }
+      attachmentIds.push(record.data.id)
+    }
+    return { ok: true, attachmentIds }
+  }
+
+  return <MaterialQuestionnaireWizard snapshot={response.definition_snapshot} initialAnswers={initialAnswers} embedded locked={locked} onSave={save} onUpload={upload} />
 }
 
 export function QuoteItemAnswersEditor({ projectId, requestId, itemId, questions, initialAnswers, locked }: {

@@ -1,21 +1,23 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { QuoteItemAnswersEditor, SubmitQuoteRequestButton } from "@/components/buildflow/project-workspace-controls"
+import { MaterialQuestionnaireRequestEditor, QuoteItemAnswersEditor, SubmitQuoteRequestButton } from "@/components/buildflow/project-workspace-controls"
 import { requireSignedInProfile } from "@/lib/auth"
 import { PROJECT_UPLOAD_STORAGE_BUCKET } from "@/lib/projects"
 import { quoteRequestProgressIndex, quoteRequestStatusClass, quoteRequestStatusLabel, QUOTE_REQUEST_PROGRESS_STEPS, type QuoteRequestItemRecord, type QuoteRequestRecord } from "@/lib/quote-requests"
 import { getQualificationSettingForPlanRequest, getQualificationSettingForProduct } from "@/lib/shop-qualification"
+import type { MaterialQuestionnaireResponse, MaterialRequestAnswer } from "@/lib/material-questionnaires"
 
 type AttachmentRecord = { id: string; item_id: string | null; file_name: string; file_path: string; file_type: string | null; file_size: number | null }
 
 export default async function QuoteRequestDetailPage({ params }: { params: Promise<{ projectId: string; requestId: string }> }) {
   const { projectId, requestId } = await params
   const { supabase, user } = await requireSignedInProfile()
-  const [{ data: request }, { data: items }, { data: attachments }] = await Promise.all([
+  const [{ data: request }, { data: items }, { data: attachments }, { data: materialResponses }] = await Promise.all([
     supabase.from("quote_requests").select("id, project_id, owner_id, title, status, submitted_at, created_at, updated_at").eq("id", requestId).eq("project_id", projectId).eq("owner_id", user.id).maybeSingle<QuoteRequestRecord>(),
     supabase.from("quote_request_items").select("id, request_id, project_id, owner_id, catalog_item_id, name, department, item_type, quantity, unit, unit_price, qualification_status, answers, metadata, created_at, updated_at").eq("request_id", requestId).eq("owner_id", user.id).order("created_at").returns<QuoteRequestItemRecord[]>(),
     supabase.from("quote_request_attachments").select("id, item_id, file_name, file_path, file_type, file_size").eq("request_id", requestId).eq("owner_id", user.id).returns<AttachmentRecord[]>(),
+    supabase.from("material_questionnaire_responses").select("id, request_id, project_id, owner_id, category_id, category_name_snapshot, category_slug_snapshot, definition_version, definition_snapshot, status, completed_at, created_at, updated_at").eq("request_id", requestId).eq("owner_id", user.id).order("created_at").returns<MaterialQuestionnaireResponse[]>(),
   ])
   if (!request) notFound()
 
@@ -25,6 +27,9 @@ export default async function QuoteRequestDetailPage({ params }: { params: Promi
   }))
   const locked = request.status !== "draft"
   const activeProgressIndex = quoteRequestProgressIndex(request.status)
+  const { data: materialAnswers } = materialResponses?.length
+    ? await supabase.from("material_request_answers").select("id, response_id, question_id, question_key, question_label_snapshot, question_type_snapshot, answer_value, answer_display_snapshot, unit_snapshot").in("response_id", materialResponses.map((response) => response.id)).returns<MaterialRequestAnswer[]>()
+    : { data: [] as MaterialRequestAnswer[] }
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] pb-28 text-slate-950 sm:pb-12">
@@ -43,6 +48,7 @@ export default async function QuoteRequestDetailPage({ params }: { params: Promi
           {QUOTE_REQUEST_PROGRESS_STEPS.map((label, index) => <li key={label} className={`rounded-xl px-2 py-2 text-[11px] font-semibold leading-4 ${index <= activeProgressIndex ? "bg-sky-50 text-sky-800" : "bg-slate-50 text-slate-400"}`}><span className="mr-1">{index + 1}.</span>{label}</li>)}
         </ol>
         {locked ? <div className="rounded-[18px] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">This request is locked while it is being reviewed.</div> : null}
+        {(materialResponses ?? []).map((response) => <article key={response.id} className="overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]"><div className="flex items-center justify-between border-b border-slate-100 px-5 py-3"><div><p className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#0066cc]">Category questionnaire</p><h2 className="mt-0.5 font-semibold">{response.category_name_snapshot}</h2></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{response.status === "complete" ? "Complete" : "Needs review"}</span></div><MaterialQuestionnaireRequestEditor response={response} savedAnswers={(materialAnswers ?? []).filter((answer) => answer.response_id === response.id)} userId={user.id} itemId={(items ?? [])[0]?.id ?? ""} locked={locked} /></article>)}
         {(items ?? []).map((item) => {
           const qualificationTarget = { id: item.catalog_item_id || item.id, name: item.name, category: item.department, price: item.unit_price, productType: item.item_type === "material" ? "material" as const : "service" as const }
           const questions = item.item_type === "file_upload" || item.item_type === "service"
