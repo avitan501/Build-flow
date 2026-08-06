@@ -1,5 +1,14 @@
 import { placeholderImageMetadata, type ShopCatalogProduct } from "@/lib/shop-catalog"
-import type { ShopToolCategory } from "@/lib/shop-tools"
+import { DEPARTMENT_SYMBOL_KEYS, type DepartmentSymbolKey, type ShopToolCategory } from "@/lib/shop-tools"
+
+const DEFAULT_HIDDEN_DEPARTMENTS = new Set(["Services", "Kitchen", "Eitan"])
+
+function normalizeDepartmentSymbols(value: unknown): DepartmentSymbolKey[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((symbol): symbol is DepartmentSymbolKey =>
+    typeof symbol === "string" && DEPARTMENT_SYMBOL_KEYS.includes(symbol as DepartmentSymbolKey),
+  )
+}
 
 export type ManagerAddOnProductKind = "product" | "service"
 
@@ -10,6 +19,7 @@ export type ManagerCategoryAddOn = {
   description: string
   imageUrl: string
   imageAlt: string
+  symbols: DepartmentSymbolKey[]
   createdAt: string
 }
 
@@ -19,7 +29,9 @@ export type ManagerDepartmentOverride = {
   description: string
   imageUrl: string
   imageAlt: string
+  symbols: DepartmentSymbolKey[]
   hidden: boolean
+  visibilityConfigured?: boolean
   updatedAt: string
 }
 
@@ -69,10 +81,14 @@ export function readManagerAddOns(): ManagerCatalogAddOns {
 
     const addOns = parsed as Partial<ManagerCatalogAddOns>
     return {
-      categories: Array.isArray(addOns.categories) ? addOns.categories : [],
+      categories: Array.isArray(addOns.categories)
+        ? addOns.categories.map((category) => ({ ...category, symbols: normalizeDepartmentSymbols(category.symbols) }))
+        : [],
       products: Array.isArray(addOns.products) ? addOns.products : [],
       services: Array.isArray(addOns.services) ? addOns.services : [],
-      departmentOverrides: Array.isArray(addOns.departmentOverrides) ? addOns.departmentOverrides : [],
+      departmentOverrides: Array.isArray(addOns.departmentOverrides)
+        ? addOns.departmentOverrides.map((override) => ({ ...override, symbols: normalizeDepartmentSymbols(override.symbols) }))
+        : [],
       hiddenItemIds: Array.isArray(addOns.hiddenItemIds) ? addOns.hiddenItemIds : [],
     }
   } catch {
@@ -98,7 +114,7 @@ export function visibleManagerItems<T extends { id: string }>(items: T[], addOns
   return items.filter((item) => !isManagerItemHidden(addOns, item.id))
 }
 
-export function buildManagerCategoryAddOn(input: { label: string; description?: string; imageUrl?: string }): ManagerCategoryAddOn {
+export function buildManagerCategoryAddOn(input: { label: string; description?: string; imageUrl?: string; symbols?: DepartmentSymbolKey[] }): ManagerCategoryAddOn {
   const label = input.label.trim()
   const slug = makeManagerSlug(label)
   const image = input.imageUrl?.trim()
@@ -115,6 +131,7 @@ export function buildManagerCategoryAddOn(input: { label: string; description?: 
     description: input.description?.trim() || `${label} requests and materials.`,
     imageUrl: image.imageUrl,
     imageAlt: image.imageAlt,
+    symbols: normalizeDepartmentSymbols(input.symbols),
     createdAt: new Date().toISOString(),
   }
 }
@@ -124,6 +141,7 @@ export function buildManagerDepartmentOverride(input: {
   label: string
   description?: string
   imageUrl?: string
+  symbols?: DepartmentSymbolKey[]
   hidden?: boolean
 }): ManagerDepartmentOverride {
   const sourceLabel = input.sourceLabel.trim()
@@ -141,7 +159,9 @@ export function buildManagerDepartmentOverride(input: {
     description: input.description?.trim() || `${label} requests and materials.`,
     imageUrl: image.imageUrl,
     imageAlt: image.imageAlt,
+    symbols: normalizeDepartmentSymbols(input.symbols),
     hidden: Boolean(input.hidden),
+    visibilityConfigured: true,
     updatedAt: new Date().toISOString(),
   }
 }
@@ -151,7 +171,9 @@ export function departmentOverrideFor(addOns: ManagerCatalogAddOns, sourceLabel:
 }
 
 export function isDepartmentHidden(addOns: ManagerCatalogAddOns, sourceLabel: string) {
-  return Boolean(departmentOverrideFor(addOns, sourceLabel)?.hidden)
+  const override = departmentOverrideFor(addOns, sourceLabel)
+  if (override?.visibilityConfigured) return override.hidden
+  return Boolean(override?.hidden) || DEFAULT_HIDDEN_DEPARTMENTS.has(sourceLabel)
 }
 
 export function departmentDisplayLabel(addOns: ManagerCatalogAddOns, sourceLabel: string) {
@@ -181,6 +203,7 @@ export function applyDepartmentAddOns(categories: ShopToolCategory[], addOns: Ma
             description: override.description,
             imageUrl: override.imageUrl || category.imageUrl,
             imageAlt: override.imageAlt || category.imageAlt,
+            symbols: override.symbols,
           }
         : category
     })
@@ -227,6 +250,7 @@ export function managerAddOnsToShopCategories(addOns: ManagerCatalogAddOns): Sho
     description: category.description,
     imageUrl: category.imageUrl,
     imageAlt: category.imageAlt,
+    symbols: category.symbols,
   }))
 }
 

@@ -7,6 +7,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
+import { authRedirectOrigin } from "@/lib/site-url";
 
 type ResetState = "loading" | "request" | "ready" | "success" | "error";
 
@@ -105,7 +106,7 @@ export default function ResetPasswordPage() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${authRedirectOrigin()}/reset-password`,
       });
 
       if (error) {

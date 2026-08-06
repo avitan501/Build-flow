@@ -4,6 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useMemo, useState, useSyncExternalStore, type FormEvent } from "react"
 
+import { DepartmentSymbolBadges } from "@/components/buildflow/department-symbol-badges"
 import { clearSelectedGuestProject, createGuestProject, GUEST_PROJECTS_UPDATED_EVENT, readSelectedGuestProject } from "@/lib/guest-projects"
 import { MANAGER_ADD_ONS_UPDATED_EVENT, applyDepartmentAddOns, readManagerAddOns, type ManagerCatalogAddOns } from "@/lib/manager-add-ons"
 import type { ProjectRecord } from "@/lib/projects"
@@ -56,24 +57,8 @@ function buildCategoryFilterHref(category: string, projectId: string, address: s
   return `/shop?${params.toString()}`
 }
 
-const CATEGORY_PRODUCT_GRID_URLS: Record<string, string> = {
-  services: "/images/department-essentials/services-grid.webp",
-  "paper-work": "/images/department-essentials/services-grid.webp",
-  framing: "/images/department-essentials/lumber-grid.webp",
-  "tile-work": "/images/department-essentials/tile-grid.webp",
-  "sheet-rock": "/images/department-essentials/drywall-grid.webp",
-  kitchen: "/images/department-essentials/kitchen-grid.webp",
-  eitan: "/images/department-essentials/windows-grid.webp",
-  "door-and-molding": "/images/department-essentials/moldings-grid.webp",
-  "wood-floor": "/images/department-essentials/flooring-grid.webp",
-  siding: "/images/department-essentials/siding-grid.webp",
-  roofing: "/images/department-essentials/roofing-grid.webp",
-  exterior: "/images/department-essentials/roofing-grid.webp",
-  window: "/images/department-essentials/windows-grid.webp",
-}
-
 function categoryProductGridUrl(category: ShopToolCategory) {
-  return CATEGORY_PRODUCT_GRID_URLS[category.slug] ?? category.imageUrl
+  return category.imageUrl
 }
 
 function subscribeToGuestProject(onStoreChange: () => void) {
@@ -429,6 +414,9 @@ export function ShopProjectToolPicker({
                     sizes="(max-width: 639px) 32vw, (max-width: 1023px) 24vw, 18vw"
                     className="object-cover transition duration-300 group-hover:scale-[1.025]"
                   />
+                  <span className="absolute left-2 top-2">
+                    <DepartmentSymbolBadges symbols={category.symbols} compact />
+                  </span>
                 </span>
                 <span className="flex min-h-12 w-full min-w-0 items-center px-3 py-2 text-[12px] font-bold leading-4 text-[#1d1d1f] [overflow-wrap:anywhere] sm:min-h-14 sm:text-[14px] sm:leading-5">
                   {category.label}

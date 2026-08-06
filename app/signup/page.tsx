@@ -9,6 +9,7 @@ import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone"
 import { friendlyAuthError, isGoogleAuthEnabled } from "@/lib/auth-ui";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
+import { authRedirectOrigin } from "@/lib/site-url";
 
 type FormState = {
   fullName: string;
@@ -157,7 +158,7 @@ export default function SignupPage() {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback${next}`,
+          redirectTo: `${authRedirectOrigin()}/auth/callback${next}`,
         },
       });
 
