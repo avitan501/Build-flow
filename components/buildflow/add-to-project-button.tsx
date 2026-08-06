@@ -7,10 +7,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   addCatalogItemToProjectAction,
   getAddToProjectOptionsAction,
+  saveMaterialQuestionnaireResponseAction,
   saveQuoteAttachmentRecordAction,
   saveQuoteItemAnswersAction,
 } from "@/app/projects/quote-request-actions"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
+import { MaterialQuestionnaireWizard } from "@/components/buildflow/material-questionnaire-wizard"
+import type { MaterialAnswerValue, MaterialQuestion, MaterialQuestionnaireResponse, MaterialRequestAnswer } from "@/lib/material-questionnaires"
 import { createClient } from "@/lib/supabase/client"
 import { getQualificationSettingForProduct, type QualifyingQuestion } from "@/lib/shop-qualification"
 
@@ -25,6 +28,7 @@ type AddToProjectButtonProps = {
   file?: File | null
   questions?: QualifyingQuestion[]
   details?: string
+  questionnaireDepartment?: string
 }
 
 type Options = {
@@ -41,7 +45,7 @@ function PlusIcon() {
   )
 }
 
-export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Add to Project", file = null, questions: questionOverride, details }: AddToProjectButtonProps) {
+export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Add to Project", file = null, questions: questionOverride, details, questionnaireDepartment }: AddToProjectButtonProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -50,7 +54,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
   const [projectId, setProjectId] = useState("")
   const [requestChoice, setRequestChoice] = useState("new")
   const [requestTitle, setRequestTitle] = useState(`${product.category} request`)
-  const [created, setCreated] = useState<{ projectId: string; requestId: string; itemId: string } | null>(null)
+  const [created, setCreated] = useState<{ projectId: string; requestId: string; itemId: string; materialResponse: MaterialQuestionnaireResponse | null; materialAnswers: MaterialRequestAnswer[] } | null>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -110,6 +114,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
           unitPrice: product.price,
           requiredQuestionIds: questions.filter((question) => question.required).map((question) => question.id),
           details,
+          questionnaireDepartment,
         },
       })
       if (!result.ok) {
@@ -131,6 +136,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
             filePath,
             fileType: file.type,
             fileSize: file.size,
+            materialResponseId: result.data.materialResponse?.id,
           })
           if (!attachmentResult.ok) setError(attachmentResult.error)
         }
@@ -138,6 +144,48 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
       setCreated({ projectId, ...result.data })
       router.refresh()
     })
+  }
+
+  async function saveMaterialAnswers(nextAnswers: Record<string, MaterialAnswerValue>, complete: boolean) {
+    if (!created?.materialResponse) return { ok: false, error: "Questionnaire not found." }
+    const result = await saveMaterialQuestionnaireResponseAction({
+      projectId: created.projectId,
+      requestId: created.requestId,
+      responseId: created.materialResponse.id,
+      answers: nextAnswers,
+      complete,
+    })
+    if (result.ok) {
+      router.refresh()
+      if (!complete) setOpen(false)
+    }
+    return result.ok ? { ok: true } : { ok: false, error: result.error }
+  }
+
+  async function uploadQuestionFiles(_question: MaterialQuestion, files: File[]) {
+    if (!created?.materialResponse || !options) return { ok: false, error: "Questionnaire upload is not ready." }
+    const attachmentIds: string[] = []
+    for (const upload of files) {
+      if (upload.size > 25 * 1024 * 1024) return { ok: false, error: `${upload.name} is larger than 25 MB.` }
+      const safeName = upload.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-|-$/g, "") || "upload"
+      const filePath = `${options.userId}/${created.projectId}/${crypto.randomUUID()}-${safeName}`
+      const supabase = createClient()
+      const { error: uploadError } = await supabase.storage.from("project-uploads").upload(filePath, upload, { upsert: false })
+      if (uploadError) return { ok: false, error: `Could not upload ${upload.name}: ${uploadError.message}` }
+      const record = await saveQuoteAttachmentRecordAction({
+        projectId: created.projectId,
+        requestId: created.requestId,
+        itemId: created.itemId,
+        materialResponseId: created.materialResponse.id,
+        fileName: upload.name,
+        filePath,
+        fileType: upload.type,
+        fileSize: upload.size,
+      })
+      if (!record.ok) return { ok: false, error: record.error }
+      attachmentIds.push(record.data.id)
+    }
+    return { ok: true, attachmentIds }
   }
 
   function finishAnswers(skipped = false) {
@@ -220,7 +268,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
                 </div>
               ) : null}
 
-              {created ? (
+              {created && !created.materialResponse ? (
                 <div className="grid gap-4">
                   <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
                     Added to the project. Complete these details now or return before submitting.
@@ -245,6 +293,15 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
             </div>
           </section>
         </div>
+      ) : null}
+      {open && created?.materialResponse ? (
+        <MaterialQuestionnaireWizard
+          snapshot={created.materialResponse.definition_snapshot}
+          initialAnswers={Object.fromEntries(created.materialAnswers.map((answer) => [answer.question_id || answer.question_key, answer.answer_value]))}
+          onClose={() => setOpen(false)}
+          onSave={saveMaterialAnswers}
+          onUpload={uploadQuestionFiles}
+        />
       ) : null}
     </>
   )

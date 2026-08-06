@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type ChangeEvent, type FormEvent } from "react";
@@ -861,6 +862,12 @@ export function OwnerMaterialsAdminShell({
                 Add materials manually or import a supplier PDF. Every item lands in a review queue first, so you can fix pricing, category, photo, and description before it appears in the shop.
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
+                <Link href="/owner/materials/requests" className={`rounded-2xl bg-[#0071e3] px-4 py-3 text-sm font-semibold text-white ${buttonFocusClass}`}>
+                  Client Requests
+                </Link>
+                <Link href="/admin/settings/material-order-questions" className={`rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 ${buttonFocusClass}`}>
+                  Material Questions
+                </Link>
                 <button type="button" onClick={() => chooseMode("manual")} className={`rounded-2xl px-4 py-3 text-sm font-semibold ${buttonFocusClass} ${mode === "manual" ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-700"}`}>
                   Add Manually
                 </button>
