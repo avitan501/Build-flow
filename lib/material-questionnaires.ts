@@ -92,16 +92,7 @@ export type MaterialRequestAnswer = {
   unit_snapshot: string | null
 }
 
-export const MATERIAL_DEPARTMENTS = [
-  "Framing",
-  "Tile work",
-  "Sheet rock",
-  "Door and molding",
-  "Wood Floor",
-  "Siding",
-  "Roofing",
-  "Window",
-] as const
+export const MATERIAL_DEPARTMENTS = SHOP_TOOL_CATEGORIES.map((department) => department.label)
 
 export const MATERIAL_QUESTION_TYPE_LABELS: Record<MaterialQuestionType, string> = {
   single_select: "Single-select cards",
@@ -187,3 +178,4 @@ export function formatMaterialAnswer(question: MaterialQuestion, value: Material
 export function slugifyMaterialCategory(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80)
 }
+import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools"
