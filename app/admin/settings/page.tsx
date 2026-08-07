@@ -20,7 +20,7 @@ function deliveryClass(status?: string) {
     : "border-rose-200 bg-rose-50 text-rose-800";
 }
 
-export default async function AdminSettingsPage({ searchParams }: { searchParams: Promise<{ owner?: DeliveryStatus; client?: DeliveryStatus }> }) {
+export default async function AdminSettingsPage({ searchParams }: { searchParams: Promise<{ owner?: DeliveryStatus; client?: DeliveryStatus; clientReason?: "domain" | "provider" }> }) {
   await requireAdminProfile();
   const params = await searchParams;
   const ownerResult = deliveryLabel(params.owner);
@@ -37,7 +37,11 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
         {ownerResult || clientResult ? (
           <div className="mt-6 grid gap-2 sm:grid-cols-2" role="status" aria-live="polite">
             <div className={`rounded-lg border px-4 py-3 text-sm font-semibold ${deliveryClass(params.owner)}`}>Owner notification: {ownerResult}</div>
-            <div className={`rounded-lg border px-4 py-3 text-sm font-semibold ${deliveryClass(params.client)}`}>Client confirmation: {clientResult}</div>
+            <div className={`rounded-lg border px-4 py-3 text-sm font-semibold ${deliveryClass(params.client)}`}>
+              <p>Client confirmation: {clientResult}</p>
+              {params.clientReason === "domain" ? <p className="mt-1 text-xs font-medium leading-5">Verify an Avantia sending domain in Resend before sending to client addresses.</p> : null}
+              {params.clientReason === "provider" ? <p className="mt-1 text-xs font-medium leading-5">The email provider rejected this delivery. Check the Resend delivery log.</p> : null}
+            </div>
           </div>
         ) : null}
         <div className="mt-6 grid gap-4 sm:grid-cols-2">

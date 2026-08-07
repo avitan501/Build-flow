@@ -33,6 +33,12 @@ export async function sendOrderNotificationTestAction() {
     total: 125,
   });
 
+  const clientReason = result.client.status === "failed" && /domain|testing email|verify/i.test(result.client.error)
+    ? "domain"
+    : result.client.status === "failed"
+      ? "provider"
+      : "";
   const params = new URLSearchParams({ owner: result.owner.status, client: result.client.status });
+  if (clientReason) params.set("clientReason", clientReason);
   redirect(`/admin/settings?${params.toString()}`);
 }
