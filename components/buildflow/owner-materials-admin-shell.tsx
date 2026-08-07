@@ -58,8 +58,8 @@ type SkippedSnapshot = {
 
 const fallbackSupplier = "Owner manual";
 const fallbackUnit = "EA";
-const inputClass = "min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-950 outline-none transition focus-visible:border-sky-500 focus-visible:ring-4 focus-visible:ring-sky-100";
-const smallInputClass = "min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none transition focus-visible:border-sky-500 focus-visible:ring-4 focus-visible:ring-sky-100";
+const inputClass = "min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-950 outline-none transition focus-visible:border-sky-500 focus-visible:ring-4 focus-visible:ring-sky-100";
+const smallInputClass = "min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none transition focus-visible:border-sky-500 focus-visible:ring-4 focus-visible:ring-sky-100";
 const buttonFocusClass = "transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100";
 
 const initialManualDraft: ManualDraft = {
