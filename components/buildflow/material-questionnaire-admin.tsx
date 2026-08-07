@@ -104,7 +104,7 @@ export function MaterialQuestionnaireAdmin({ categories }: { categories: Materia
   const departmentRows = useMemo(() => {
     const configured = new Map(categories.map((category) => [category.department_key, category]))
     const shopRows = MATERIAL_DEPARTMENTS.map((department) => ({ department, category: configured.get(department) ?? null }))
-    const customRows = categories.filter((category) => !MATERIAL_DEPARTMENTS.includes(category.department_key)).map((category) => ({ department: category.department_key, category }))
+    const customRows = categories.filter((category) => !MATERIAL_DEPARTMENTS.some((department) => department === category.department_key)).map((category) => ({ department: category.department_key, category }))
     return [...shopRows, ...customRows]
   }, [categories])
 
