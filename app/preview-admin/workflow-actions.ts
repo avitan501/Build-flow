@@ -54,6 +54,60 @@ export async function updateSupplierPackageAction(input: { packageId: string; st
   const { error } = await supabase.from("supplier_packages").update(patch).eq("id", input.packageId).eq("status", "pending_approval")
   if (error) return { ok: false, error: "Could not update the supplier package." }
   revalidatePath("/admin/vendors")
+  revalidatePath("/admin/supplier-approvals")
+  revalidatePath(`/admin/supplier-approvals/${input.packageId}`)
+  return { ok: true }
+}
+
+export async function assignSupplierPackageAction(input: { packageId: string; supplierId: string }): Promise<ManagerResult> {
+  const { supabase } = await requireAdminProfile()
+  const supplierId = input.supplierId.trim()
+  if (!supplierId) return { ok: false, error: "Choose a supplier." }
+
+  const { data: settings } = await supabase
+    .from("workflow_manager_settings")
+    .select("state")
+    .eq("id", "singleton")
+    .maybeSingle<{ state: { qualificationSettings?: { suppliers?: Array<{ id: string }> } } }>()
+  const supplierExists = settings?.state?.qualificationSettings?.suppliers?.some((supplier) => supplier.id === supplierId)
+  if (!supplierExists) return { ok: false, error: "That supplier is no longer available." }
+
+  const { error } = await supabase
+    .from("supplier_packages")
+    .update({ supplier_id: supplierId, status: "pending_approval", approved_by: null, approved_at: null })
+    .eq("id", input.packageId)
+    .in("status", ["pending_approval", "approved"])
+  if (error) return { ok: false, error: "Could not change the assigned supplier." }
+
+  revalidatePath("/admin/supplier-approvals")
+  revalidatePath(`/admin/supplier-approvals/${input.packageId}`)
+  return { ok: true }
+}
+
+export async function returnSupplierPackageForInfoAction(input: { packageId: string; requestId: string }): Promise<ManagerResult> {
+  const { supabase, user } = await requireAdminProfile()
+  const { data: pkg, error: packageError } = await supabase
+    .from("supplier_packages")
+    .select("request_id,payload")
+    .eq("id", input.packageId)
+    .eq("request_id", input.requestId)
+    .maybeSingle<{ request_id: string; payload: Record<string, unknown> }>()
+  if (packageError || !pkg) return { ok: false, error: "Supplier package was not found." }
+
+  const [{ error: requestError }, { error: updateError }] = await Promise.all([
+    supabase.from("quote_requests").update({ status: "draft", submitted_at: null }).eq("id", input.requestId),
+    supabase.from("supplier_packages").update({
+      status: "pending_approval",
+      approved_by: null,
+      approved_at: null,
+      payload: { ...pkg.payload, review_status: "returned_for_information", returned_at: new Date().toISOString(), returned_by: user.id },
+    }).eq("id", input.packageId),
+  ])
+  if (requestError || updateError) return { ok: false, error: "Could not return the request for more information." }
+
+  revalidatePath("/admin/supplier-approvals")
+  revalidatePath(`/admin/supplier-approvals/${input.packageId}`)
+  revalidatePath(`/projects`)
   return { ok: true }
 }
 

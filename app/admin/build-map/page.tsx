@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, ClipboardList, FolderKanban, Store, Users } from "lucide-react";
+import { Building2, ClipboardCheck, ClipboardList, FolderKanban, Store, Users } from "lucide-react";
 
 import { requireAdminProfile } from "@/lib/auth";
 
@@ -36,7 +36,7 @@ function formatDate(value: string) {
 export default async function AdminBuildMapPage() {
   const { supabase } = await requireAdminProfile();
 
-  const [requestsResult, projectsResult, customersResult, managerStateResult] = await Promise.all([
+  const [requestsResult, projectsResult, customersResult, managerStateResult, approvalsResult] = await Promise.all([
     supabase
       .from("quote_requests")
       .select("id, title, status, updated_at", { count: "exact" })
@@ -50,6 +50,7 @@ export default async function AdminBuildMapPage() {
       .select("state")
       .eq("id", "singleton")
       .maybeSingle<{ state: ManagerState }>(),
+    supabase.from("supplier_packages").select("id", { count: "exact", head: true }).eq("status", "pending_approval"),
   ]);
 
   const recentRequests = requestsResult.data ?? [];
@@ -57,7 +58,8 @@ export default async function AdminBuildMapPage() {
   const submittedCount = recentRequests.filter((request) => request.status !== "draft" && request.status !== "completed").length;
 
   const metrics = [
-    { label: "Requests", value: requestsResult.count ?? 0, detail: `${submittedCount} recent requests need attention`, icon: ClipboardList, href: "/owner/materials/requests" },
+    { label: "Requests", value: requestsResult.count ?? 0, detail: `${submittedCount} recent requests need attention`, icon: ClipboardList, href: "/admin/users?view=requests" },
+    { label: "Approvals", value: approvalsResult.count ?? 0, detail: "Supplier packages waiting for review", icon: ClipboardCheck, href: "/admin/supplier-approvals" },
     { label: "Projects", value: projectsResult.count ?? 0, detail: "Customer projects and request activity", icon: FolderKanban, href: "/admin/projects" },
     { label: "Customers", value: customersResult.count ?? 0, detail: "Registered customer accounts", icon: Users, href: "/admin/users" },
     { label: "Suppliers", value: supplierCount, detail: "Supplier contacts and department routing", icon: Store, href: "/admin/vendors" },
@@ -72,7 +74,7 @@ export default async function AdminBuildMapPage() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">A live overview of customer requests, projects, accounts, and supplier routing.</p>
         </header>
 
-        <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Manager overview">
+        <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Manager overview">
           {metrics.map((metric) => {
             const Icon = metric.icon;
             return (
@@ -129,6 +131,7 @@ export default async function AdminBuildMapPage() {
             <nav className="mt-5 grid gap-2" aria-label="Manager tools">
               <Link href="/admin/settings/material-order-questions" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Departments & questions</Link>
               <Link href="/admin/users" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Customers & requests</Link>
+              <Link href="/admin/supplier-approvals" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Supplier approvals</Link>
               <Link href="/admin/vendors" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Suppliers</Link>
               <Link href="/owner/materials" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Catalog & subcategories</Link>
             </nav>
