@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { friendlyAuthError, isGoogleAuthEnabled } from "@/lib/auth-ui";
 import { createClient } from "@/lib/supabase/client";
-import { hasSupabasePublicEnv } from "@/lib/supabase/env";
+import { hasSupabaseBuildEnv, hasSupabasePublicEnv } from "@/lib/supabase/env";
 import { authRedirectOrigin } from "@/lib/site-url";
 
 type LoginState = {
@@ -34,10 +34,14 @@ function sanitizeNextPath(value: string | null) {
   return value;
 }
 
+function subscribeToAuthConfig() {
+  return () => undefined;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const hasAuthConfig = hasSupabasePublicEnv();
+  const hasAuthConfig = useSyncExternalStore(subscribeToAuthConfig, hasSupabasePublicEnv, hasSupabaseBuildEnv);
   const supabase = useMemo(() => (hasAuthConfig ? createClient() : null), [hasAuthConfig]);
   const callbackError = searchParams.get("error");
   const [form, setForm] = useState<LoginState>(initialState);

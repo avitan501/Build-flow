@@ -1,5 +1,14 @@
 import { expect, test } from "@playwright/test"
 
+async function configureTestAuth(page: import("@playwright/test").Page) {
+  await page.addInitScript(() => {
+    window.__AVANTIA_SUPABASE__ = {
+      url: "https://supabase.test",
+      anonKey: "test-anon-key",
+    }
+  })
+}
+
 test("login replaces technical PKCE errors with a useful restart message", async ({ page }) => {
   const technicalError = "PKCE code verifier not found in storage. This can happen if the auth flow was initiated in a different browser."
 
@@ -10,6 +19,7 @@ test("login replaces technical PKCE errors with a useful restart message", async
 })
 
 test("the email login field accepts a phone-password account", async ({ page }) => {
+  await configureTestAuth(page)
   let submittedEmail = ""
   const pageErrors: string[] = []
   page.on("pageerror", (error) => pageErrors.push(error.message))
@@ -35,6 +45,7 @@ test("the email login field accepts a phone-password account", async ({ page }) 
 })
 
 test("login shows Gmail when Google authentication is enabled", async ({ page }) => {
+  await configureTestAuth(page)
   await page.route("**/auth/v1/settings", async (route) => {
     await route.fulfill({
       status: 200,

@@ -41,3 +41,7 @@ export function hasSupabasePublicEnv() {
   const browser = browserConfig();
   return Boolean((browser?.url && browser.anonKey) || (supabaseUrl && supabaseAnonKey));
 }
+
+export function hasSupabaseBuildEnv() {
+  return Boolean(supabaseUrl && supabaseAnonKey);
+}
