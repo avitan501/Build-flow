@@ -406,13 +406,13 @@ export function ShopProjectToolPicker({
                 data-testid="department-card"
                 className="group flex min-h-[150px] min-w-0 touch-manipulation flex-col overflow-hidden rounded-lg border border-black/[0.08] bg-white text-left shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-black/[0.14] hover:shadow-[0_16px_34px_rgba(0,0,0,0.10)] active:scale-[0.98] sm:min-h-[176px]"
               >
-                <span className="relative block aspect-[4/3] w-full overflow-hidden border-b border-black/[0.06] bg-white">
+                <span className="relative block aspect-[4/3] w-full overflow-hidden border-b border-black/[0.06] bg-[#fafafa]">
                   <Image
                     src={productGridUrl}
                     alt={`${category.label} products`}
                     fill
                     sizes="(max-width: 639px) 32vw, (max-width: 1023px) 24vw, 18vw"
-                    className="object-cover transition duration-300 group-hover:scale-[1.025]"
+                    className="object-contain p-2 transition duration-300 group-hover:scale-[1.025] sm:p-3"
                   />
                   <span className="absolute left-2 top-2">
                     <DepartmentSymbolBadges symbols={category.symbols} compact />

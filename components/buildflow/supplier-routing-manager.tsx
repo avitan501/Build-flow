@@ -701,35 +701,36 @@ export function SupplierRoutingManager({
         </aside> : null}
 
         <section className="grid gap-5">
-          <header className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] sm:p-7">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Owner controls</p>
-                <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">{supplierDirectoryOnly ? "Supplier Directory" : "Departments and shop structure"}</h2>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                  {supplierDirectoryOnly
-                    ? "Keep supplier contacts private and choose which department requests should be routed to each supplier."
-                    : "Manage customer departments, sub-departments, material products, questions, and private supplier routing from one owner-only screen."}
-                </p>
-              </div>
-              <div className={`grid gap-2 text-center ${supplierDirectoryOnly ? "grid-cols-2" : "grid-cols-3"}`}>
-                {!supplierDirectoryOnly ? (
+          {supplierDirectoryOnly ? (
+            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-5">
+              <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Supplier Directory</h1>
+              <span className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">{settings.suppliers.length} total suppliers</span>
+            </header>
+          ) : (
+            <header className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] sm:p-7">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Owner controls</p>
+                  <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Departments and shop structure</h2>
+                  <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Manage customer departments, sub-departments, material products, questions, and private supplier routing from one owner-only screen.</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                     <div className="text-2xl font-semibold">{assignmentTargets.length}</div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Sub-depts</div>
                   </div>
-                ) : null}
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-2xl font-semibold">{settings.suppliers.length}</div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Suppliers</div>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-2xl font-semibold">{supplierDirectoryOnly ? assignmentTargets.length : catalogProducts.filter((product) => product.productType !== "service").length + addOns.products.length + addOns.services.length}</div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{supplierDirectoryOnly ? "Routes" : "Shop items"}</div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="text-2xl font-semibold">{settings.suppliers.length}</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Suppliers</div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="text-2xl font-semibold">{catalogProducts.filter((product) => product.productType !== "service").length + addOns.products.length + addOns.services.length}</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Shop items</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </header>
+            </header>
+          )}
 
           {activePanel === "services" ? (
             <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
@@ -865,9 +866,7 @@ export function SupplierRoutingManager({
           {activePanel === "suppliers" ? (
             <section className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
               <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_42px_rgba(15,23,42,0.07)]">
-                <h3 className="text-lg font-semibold text-slate-950">Supplier directory</h3>
-                <p className="mt-1 text-sm leading-6 text-slate-500">Each supplier can have a full contact profile and preferred report delivery method.</p>
-                <div className="mt-4 grid gap-2">
+                <div className="grid gap-2">
                   {settings.suppliers.map((supplier) => (
                     <button
                       key={supplier.id}
