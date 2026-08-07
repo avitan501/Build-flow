@@ -91,7 +91,7 @@ export default async function SupplierApprovalsPage({ searchParams }: { searchPa
       <div className="mx-auto max-w-7xl">
         <header className="border-b border-slate-200 pb-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager review</p>
-          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Supplier Approval Inbox</h1>
+          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Supplier Requests</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Review customer details, answers, items, and files before approving a supplier package. Nothing is sent automatically.</p>
         </header>
 

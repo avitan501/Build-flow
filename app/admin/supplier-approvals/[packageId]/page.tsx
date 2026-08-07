@@ -69,7 +69,7 @@ export default async function SupplierApprovalDetailPage({ params }: { params: P
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 pb-28 pt-6 text-slate-950 sm:px-8 sm:pb-12">
       <div className="mx-auto max-w-6xl">
-        <Link href="/admin/supplier-approvals" className="text-sm font-semibold text-[#0066cc]">Back to Supplier Approvals</Link>
+        <Link href="/admin/supplier-approvals" className="text-sm font-semibold text-[#0066cc]">Back to Supplier Requests</Link>
 
         <header className="mt-5 border-b border-slate-200 pb-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

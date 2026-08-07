@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
@@ -22,27 +22,29 @@ import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 const managerLinks = [
   { href: "/admin/build-map", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/settings/material-order-questions", label: "Departments & Questions", icon: Building2 },
-  { href: "/admin/users", label: "Customers & Requests", icon: Users },
-  { href: "/admin/supplier-approvals", label: "Supplier Approvals", icon: ClipboardCheck },
-  { href: "/admin/vendors", label: "Suppliers", icon: Store },
+  { href: "/admin/users?view=customers", label: "Customer Directory", icon: Users, view: "customers" },
+  { href: "/admin/users?view=requests", label: "Customer Requests", icon: ClipboardList, view: "requests" },
+  { href: "/admin/vendors", label: "Supplier Directory", icon: Store },
+  { href: "/admin/supplier-approvals", label: "Supplier Requests", icon: ClipboardCheck },
   { href: "/owner/materials", label: "Catalog & Subcategories", icon: Boxes },
   { href: "/admin/settings", label: "Integrations", icon: Settings },
 ] as const;
 
-function isActive(pathname: string, href: string) {
+function isActive(pathname: string, href: string, currentView: string, targetView?: string) {
+  const hrefPath = href.split("?")[0];
   if (href === "/owner/materials") {
     return pathname === href;
   }
-  if (href === "/admin/users") {
-    return pathname.startsWith("/admin/users") || pathname.startsWith("/owner/materials/requests");
+  if (hrefPath === "/admin/users") {
+    return pathname.startsWith("/admin/users") && currentView === targetView;
   }
   if (href === "/admin/settings") {
     return pathname === href || pathname.startsWith("/admin/whatsapp");
   }
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
 }
 
-function ManagerNavigation({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+function ManagerNavigation({ pathname, currentView, onNavigate }: { pathname: string; currentView: string; onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="border-b border-slate-200 px-5 py-5">
@@ -55,7 +57,7 @@ function ManagerNavigation({ pathname, onNavigate }: { pathname: string; onNavig
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Manager navigation">
         {managerLinks.map((link) => {
           const Icon = link.icon;
-          const active = isActive(pathname, link.href);
+          const active = isActive(pathname, link.href, currentView, "view" in link ? link.view : undefined);
           return (
             <Link
               key={link.href}
@@ -88,12 +90,14 @@ function ManagerNavigation({ pathname, onNavigate }: { pathname: string; onNavig
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentView = searchParams.get("view") === "requests" ? "requests" : "customers";
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
       <aside className="sticky top-0 hidden h-screen border-r border-slate-200 lg:block">
-        <ManagerNavigation pathname={pathname} />
+        <ManagerNavigation pathname={pathname} currentView={currentView} />
       </aside>
 
       <div className="min-w-0">
@@ -126,7 +130,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         >
           <X className="h-5 w-5" />
         </button>
-        <ManagerNavigation pathname={pathname} onNavigate={() => setMenuOpen(false)} />
+        <ManagerNavigation pathname={pathname} currentView={currentView} onNavigate={() => setMenuOpen(false)} />
       </aside>
     </div>
   );
