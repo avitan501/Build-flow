@@ -3,13 +3,23 @@
 import { revalidatePath } from "next/cache"
 
 import { requireAdminProfile } from "@/lib/auth"
+import {
+  buildManagerDepartmentOverride,
+  createEmptyManagerAddOns,
+  type ManagerCatalogAddOns,
+} from "@/lib/manager-add-ons"
 import { MATERIAL_QUESTION_TYPES, slugifyMaterialCategory, type MaterialConditionalOperator, type MaterialQuestionType } from "@/lib/material-questionnaires"
+import { createEmptyQualificationSettings, type ShopQualificationSettings } from "@/lib/shop-qualification"
+import type { DepartmentSymbolKey } from "@/lib/shop-tools"
+import { publicWorkflowState } from "@/lib/workflow-public"
 
 type AdminResult<T = undefined> = { ok: true; data: T } | { ok: false; error: string }
 
 function refreshSettings() {
   revalidatePath("/admin/settings")
   revalidatePath("/admin/settings/material-order-questions")
+  revalidatePath("/shop")
+  revalidatePath("/shop/[slug]", "page")
 }
 
 function cleanText(value: string | null | undefined, max = 500) {
@@ -38,20 +48,67 @@ export async function updateMaterialCategoryAction(input: {
   departmentKey: string
   description: string
   isActive: boolean
+  showInShop: boolean
+  showPlanUpload: boolean
+  showChatToOrder: boolean
+  showTakeoff: boolean
+  imageUrl: string
+  symbols: DepartmentSymbolKey[]
 }): Promise<AdminResult> {
-  const { supabase } = await requireAdminProfile()
-  const { data: category } = await supabase.from("material_questionnaire_categories").select("current_version").eq("id", input.id).maybeSingle<{ current_version: number }>()
+  const { supabase, user } = await requireAdminProfile()
+  const { data: category } = await supabase
+    .from("material_questionnaire_categories")
+    .select("current_version, department_key")
+    .eq("id", input.id)
+    .maybeSingle<{ current_version: number; department_key: string }>()
   if (!category) return { ok: false, error: "Category not found." }
   const name = cleanText(input.name, 120)
   if (!name) return { ok: false, error: "Category name is required." }
+  const { data: managerRow, error: managerReadError } = await supabase
+    .from("workflow_manager_settings")
+    .select("state")
+    .eq("id", "singleton")
+    .maybeSingle<{ state: { qualificationSettings?: ShopQualificationSettings; addOns?: ManagerCatalogAddOns } }>()
+  if (managerReadError) return { ok: false, error: "Could not load the existing Shop settings. Nothing was changed." }
   const { error } = await supabase.from("material_questionnaire_categories").update({
     name,
-    department_key: cleanText(input.departmentKey, 120),
     description: cleanText(input.description, 1000),
     is_active: input.isActive,
     current_version: category.current_version + 1,
   }).eq("id", input.id)
   if (error) return { ok: false, error: error.message.includes("department_key") ? "That department already has a questionnaire." : "Could not save the category." }
+
+  const currentState = managerRow?.state
+  const addOns = currentState?.addOns ?? createEmptyManagerAddOns()
+  const sourceLabel = category.department_key
+  const nextOverride = buildManagerDepartmentOverride({
+    sourceLabel,
+    label: name,
+    description: cleanText(input.description, 1000),
+    imageUrl: cleanText(input.imageUrl, 1000),
+    symbols: input.symbols,
+    hidden: !input.showInShop,
+    showQuickOrder: input.isActive,
+    showPlanUpload: input.showPlanUpload,
+    showChatToOrder: input.showChatToOrder,
+    showTakeoff: input.showTakeoff,
+  })
+  const nextAddOns: ManagerCatalogAddOns = {
+    ...addOns,
+    departmentOverrides: [
+      ...addOns.departmentOverrides.filter((override) => override.sourceLabel !== sourceLabel),
+      nextOverride,
+    ],
+  }
+  const nextState = {
+    qualificationSettings: currentState?.qualificationSettings ?? createEmptyQualificationSettings(),
+    addOns: nextAddOns,
+  }
+  const [{ error: managerError }, { error: publicError }] = await Promise.all([
+    supabase.from("workflow_manager_settings").upsert({ id: "singleton", state: nextState, updated_by: user.id }),
+    supabase.from("workflow_public_catalog").upsert({ id: "singleton", state: publicWorkflowState(nextState), updated_by: user.id }),
+  ])
+  if (managerError || publicError) return { ok: false, error: "Question settings were saved, but the Shop display settings could not be published." }
   refreshSettings()
   return { ok: true, data: undefined }
 }

@@ -10,11 +10,12 @@ type PlanRequestUploadCardProps = {
   label: string
   description: string
   category: string
+  questionnaireDepartment?: string
   accept: string
   icon: ReactNode
 }
 
-export function PlanRequestUploadCard({ requestId, label, description, category, accept, icon }: PlanRequestUploadCardProps) {
+export function PlanRequestUploadCard({ requestId, label, description, category, questionnaireDepartment, accept, icon }: PlanRequestUploadCardProps) {
   const [file, setFile] = useState<File | null>(null)
   const product = {
     id: requestId,
@@ -40,7 +41,7 @@ export function PlanRequestUploadCard({ requestId, label, description, category,
             <input type="file" accept={accept} className="sr-only" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
             {file ? "Change File" : "Choose File"}
           </label>
-          {file ? <AddToProjectButton product={product} file={file} questions={questions} questionnaireDepartment={category} className="w-full" label="Add Plan to Project" /> : null}
+          {file ? <AddToProjectButton product={product} file={file} questions={questions} questionnaireDepartment={questionnaireDepartment ?? category} className="w-full" label="Add Plan to Project" /> : null}
         </div>
       </div>
     </article>

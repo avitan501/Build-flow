@@ -368,6 +368,10 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
         imageUrl: departmentEditDraft.imageUrl,
         symbols: departmentEditDraft.symbols,
         hidden: departmentEditDraft.hidden,
+        showQuickOrder: selectedDepartmentOverride?.showQuickOrder,
+        showPlanUpload: selectedDepartmentOverride?.showPlanUpload,
+        showChatToOrder: selectedDepartmentOverride?.showChatToOrder,
+        showTakeoff: selectedDepartmentOverride?.showTakeoff,
       })
       persistAddOns({
         ...addOns,
@@ -397,6 +401,10 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
         imageUrl: selectedDepartmentOverride?.imageUrl || "",
         symbols: selectedDepartmentOverride?.symbols || SHOP_TOOL_CATEGORIES.find((category) => category.label === selectedDepartment)?.symbols || [],
         hidden: true,
+        showQuickOrder: selectedDepartmentOverride?.showQuickOrder,
+        showPlanUpload: selectedDepartmentOverride?.showPlanUpload,
+        showChatToOrder: selectedDepartmentOverride?.showChatToOrder,
+        showTakeoff: selectedDepartmentOverride?.showTakeoff,
       })
       persistAddOns({
         ...addOns,

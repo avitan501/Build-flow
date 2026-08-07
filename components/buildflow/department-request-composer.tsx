@@ -4,7 +4,7 @@ import { useState } from "react"
 
 import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
 
-export function DepartmentRequestComposer({ category, requestId }: { category: string; requestId: string }) {
+export function DepartmentRequestComposer({ category, requestId, questionnaireDepartment }: { category: string; requestId: string; questionnaireDepartment?: string }) {
   const [details, setDetails] = useState("")
   const trimmedDetails = details.trim()
 
@@ -27,6 +27,7 @@ export function DepartmentRequestComposer({ category, requestId }: { category: s
             <AddToProjectButton
               product={{ id: `${requestId}-custom-request`, name: `${category} custom request`, category, productType: "service", price: 0, unit: "Request" }}
               details={trimmedDetails}
+              questionnaireDepartment={questionnaireDepartment ?? category}
               label="Add Request to Project"
             />
           ) : (

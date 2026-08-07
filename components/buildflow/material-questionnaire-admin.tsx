@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowLeft, Building2, ChevronDown, ChevronUp, Eye, ListChecks, Plus, Save, Settings2, Trash2 } from "lucide-react"
+import { ArrowLeft, Building2, Calculator, ChevronDown, ChevronUp, Eye, FileUp, ListChecks, MessageSquareText, Plus, Save, Settings2, ShoppingBag, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition } from "react"
 
@@ -17,6 +17,13 @@ import {
   updateMaterialQuestionAction,
 } from "@/app/admin/settings/material-order-questions/actions"
 import { MaterialQuestionnaireWizard } from "@/components/buildflow/material-questionnaire-wizard"
+import { DEPARTMENT_SYMBOL_OPTIONS } from "@/components/buildflow/department-symbol-badges"
+import {
+  departmentExperienceFor,
+  departmentOverrideFor,
+  isDepartmentHidden,
+  type ManagerCatalogAddOns,
+} from "@/lib/manager-add-ons"
 import {
   MATERIAL_DEPARTMENTS,
   MATERIAL_QUESTION_TYPES,
@@ -26,8 +33,44 @@ import {
   type MaterialQuestionOption,
   type MaterialQuestionnaireCategory,
 } from "@/lib/material-questionnaires"
+import { SHOP_TOOL_CATEGORIES, type DepartmentSymbolKey } from "@/lib/shop-tools"
 
 const inputClass = "min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+
+type CategoryDraft = {
+  name: string
+  departmentKey: string
+  description: string
+  isActive: boolean
+  showInShop: boolean
+  showPlanUpload: boolean
+  showChatToOrder: boolean
+  showTakeoff: boolean
+  imageUrl: string
+  symbols: DepartmentSymbolKey[]
+}
+
+function categorySettingsDraft(category: MaterialQuestionnaireCategory, addOns: ManagerCatalogAddOns): CategoryDraft {
+  const base = SHOP_TOOL_CATEGORIES.find((entry) => entry.label === category.department_key)
+  const override = departmentOverrideFor(addOns, category.department_key)
+  const experience = departmentExperienceFor(addOns, category.department_key)
+  return {
+    name: override?.label || base?.label || category.name,
+    departmentKey: category.department_key,
+    description: override?.description || base?.description || category.description,
+    isActive: category.is_active,
+    showInShop: !isDepartmentHidden(addOns, category.department_key),
+    showPlanUpload: experience.showPlanUpload,
+    showChatToOrder: experience.showChatToOrder,
+    showTakeoff: experience.showTakeoff,
+    imageUrl: override?.imageUrl || base?.imageUrl || "",
+    symbols: override?.symbols?.length ? override.symbols : base?.symbols ?? [],
+  }
+}
+
+function FeatureToggle({ enabled, label, description, Icon, onClick }: { enabled: boolean; label: string; description: string; Icon: typeof ShoppingBag; onClick: () => void }) {
+  return <button type="button" onClick={onClick} aria-pressed={enabled} className={`flex min-h-[92px] items-start gap-3 rounded-lg border p-3 text-left transition ${enabled ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}><span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${enabled ? "bg-[#0071e3] text-white" : "bg-slate-100 text-slate-500"}`}><Icon className="h-5 w-5" /></span><span className="min-w-0"><span className="flex items-center gap-2 text-sm font-bold text-slate-950">{label}<span className={`text-[10px] font-semibold uppercase ${enabled ? "text-emerald-700" : "text-slate-400"}`}>{enabled ? "On" : "Off"}</span></span><span className="mt-1 block text-xs leading-5 text-slate-500">{description}</span></span></button>
+}
 
 function ActionMessage({ message }: { message: string | null }) {
   return message ? <p className={`text-sm font-medium ${message.startsWith("Saved") || message.startsWith("Added") ? "text-emerald-700" : "text-rose-700"}`}>{message}</p> : null
@@ -90,17 +133,16 @@ function QuestionEditor({ question, questions, index, total }: { question: Mater
   </article>
 }
 
-export function MaterialQuestionnaireAdmin({ categories }: { categories: MaterialQuestionnaireCategory[] }) {
+export function MaterialQuestionnaireAdmin({ categories, initialAddOns }: { categories: MaterialQuestionnaireCategory[]; initialAddOns: ManagerCatalogAddOns }) {
   const router = useRouter()
   const [selectedId, setSelectedId] = useState("")
   const [activeTab, setActiveTab] = useState<"settings" | "questions" | "preview">("settings")
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategory, setNewCategory] = useState({ name: "", departmentKey: MATERIAL_DEPARTMENTS.find((department) => !categories.some((category) => category.department_key === department)) ?? MATERIAL_DEPARTMENTS[0] })
   const selected = categories.find((category) => category.id === selectedId) ?? null
-  const [categoryDraft, setCategoryDraft] = useState(selected ? { name: selected.name, departmentKey: selected.department_key, description: selected.description, isActive: selected.is_active } : null)
+  const [categoryDraft, setCategoryDraft] = useState<CategoryDraft | null>(selected ? categorySettingsDraft(selected, initialAddOns) : null)
   const [message, setMessage] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-  const availableDepartments = useMemo(() => MATERIAL_DEPARTMENTS.filter((department) => department === selected?.department_key || !categories.some((category) => category.department_key === department)), [categories, selected])
   const departmentRows = useMemo(() => {
     const configured = new Map(categories.map((category) => [category.department_key, category]))
     const shopRows = MATERIAL_DEPARTMENTS.map((department) => ({ department, category: configured.get(department) ?? null }))
@@ -108,7 +150,7 @@ export function MaterialQuestionnaireAdmin({ categories }: { categories: Materia
     return [...shopRows, ...customRows]
   }, [categories])
 
-  function choose(category: MaterialQuestionnaireCategory) { setSelectedId(category.id); setCategoryDraft({ name: category.name, departmentKey: category.department_key, description: category.description, isActive: category.is_active }); setActiveTab("settings"); setMessage(null) }
+  function choose(category: MaterialQuestionnaireCategory) { setSelectedId(category.id); setCategoryDraft(categorySettingsDraft(category, initialAddOns)); setActiveTab("settings"); setMessage(null) }
   function run(task: () => Promise<{ ok: boolean; error?: string; data?: { id: string } }>, success: string) { startTransition(async () => { const result = await task(); setMessage(result.ok ? success : result.error || "Could not save."); if (result.ok) { if (result.data?.id) setSelectedId(result.data.id); router.refresh() } }) }
   function setUpDepartment(department: string) { startTransition(async () => { const result = await createMaterialCategoryAction({ name: department, departmentKey: department }); setMessage(result.ok ? `Added ${department}. Open it to configure Quick Order.` : result.error || "Could not set up department."); router.refresh() }) }
 
@@ -130,7 +172,36 @@ export function MaterialQuestionnaireAdmin({ categories }: { categories: Materia
     <div><p className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#0066cc]">Department</p><h2 className="mt-1 text-2xl font-bold">{selected.name}</h2><p className="mt-1 text-sm text-slate-500">Manage this department without changing any other department.</p></div>
     <nav className="grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-white p-1" aria-label="Department management sections">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold ${activeTab === tab.id ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Icon className="h-4 w-4" /><span className="hidden sm:inline">{tab.label}</span></button> })}</nav>
 
-    {activeTab === "settings" ? <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5"><h3 className="text-lg font-bold">Department settings</h3><p className="mt-1 text-sm text-slate-500">These settings control how this department appears to customers.</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><label className="grid gap-1.5 text-sm font-semibold">Department name<input value={categoryDraft.name} onChange={(event) => setCategoryDraft({ ...categoryDraft, name: event.target.value })} className={inputClass} /></label><label className="grid gap-1.5 text-sm font-semibold">Shop department<select value={categoryDraft.departmentKey} onChange={(event) => setCategoryDraft({ ...categoryDraft, departmentKey: event.target.value })} className={inputClass}>{availableDepartments.map((department) => <option key={department}>{department}</option>)}</select></label><label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">Customer description<textarea rows={3} value={categoryDraft.description} onChange={(event) => setCategoryDraft({ ...categoryDraft, description: event.target.value })} className={`${inputClass} py-2`} /></label></div><div className="mt-5 flex flex-wrap items-center gap-3"><button type="button" onClick={() => setCategoryDraft({ ...categoryDraft, isActive: !categoryDraft.isActive })} className={`min-h-11 rounded-lg border px-4 text-sm font-semibold ${categoryDraft.isActive ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-slate-300 bg-white text-slate-600"}`}>{categoryDraft.isActive ? "Quick Order enabled" : "Quick Order disabled"}</button><button type="button" disabled={pending} onClick={() => run(() => updateMaterialCategoryAction({ id: selected.id, ...categoryDraft }), "Saved department.")} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white"><Save className="h-4 w-4" />Save changes</button><ActionMessage message={message} /></div></section> : null}
+    {activeTab === "settings" ? <section className="grid gap-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div><h3 className="text-lg font-bold">Department settings</h3><p className="mt-1 text-sm text-slate-500">Saved changes control this department on the customer Shop.</p></div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="grid gap-1.5 text-sm font-semibold">Customer display name<input value={categoryDraft.name} onChange={(event) => setCategoryDraft({ ...categoryDraft, name: event.target.value })} className={inputClass} /></label>
+        <label className="grid gap-1.5 text-sm font-semibold">Connected Shop department<input value={categoryDraft.departmentKey} readOnly className={`${inputClass} bg-slate-100 text-slate-500`} /><span className="text-xs font-normal text-slate-500">The route stays fixed so renaming does not break links.</span></label>
+        <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">Customer description<textarea rows={3} value={categoryDraft.description} onChange={(event) => setCategoryDraft({ ...categoryDraft, description: event.target.value })} className={`${inputClass} py-2`} /></label>
+        <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">Department image<input value={categoryDraft.imageUrl} onChange={(event) => setCategoryDraft({ ...categoryDraft, imageUrl: event.target.value })} placeholder="/images/... or https://..." className={inputClass} /><span className="text-xs font-normal text-slate-500">Used on the Shop department card.</span></label>
+      </div>
+
+      <div>
+        <h4 className="text-sm font-bold text-slate-950">Customer experience</h4>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Turn each customer-facing tool on or off for this department.</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <FeatureToggle enabled={categoryDraft.showInShop} label="Show in Shop" description="Display this department in the Shop list." Icon={ShoppingBag} onClick={() => setCategoryDraft({ ...categoryDraft, showInShop: !categoryDraft.showInShop })} />
+          <FeatureToggle enabled={categoryDraft.isActive} label="Quick Order" description="Ask the configured department questions." Icon={ListChecks} onClick={() => setCategoryDraft({ ...categoryDraft, isActive: !categoryDraft.isActive })} />
+          <FeatureToggle enabled={categoryDraft.showPlanUpload} label="Plan upload" description="Accept a blueprint or shopping list." Icon={FileUp} onClick={() => setCategoryDraft({ ...categoryDraft, showPlanUpload: !categoryDraft.showPlanUpload })} />
+          <FeatureToggle enabled={categoryDraft.showChatToOrder} label="Chat to Order" description="Show the written custom-order request." Icon={MessageSquareText} onClick={() => setCategoryDraft({ ...categoryDraft, showChatToOrder: !categoryDraft.showChatToOrder })} />
+          <FeatureToggle enabled={categoryDraft.showTakeoff} label="Takeoff tools" description="Show calculators or takeoff tools when available." Icon={Calculator} onClick={() => setCategoryDraft({ ...categoryDraft, showTakeoff: !categoryDraft.showTakeoff })} />
+        </div>
+      </div>
+
+      <fieldset>
+        <legend className="text-sm font-bold text-slate-950">Department symbols</legend>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Small badges shown on the department card.</p>
+        <div className="mt-3 flex flex-wrap gap-2">{DEPARTMENT_SYMBOL_OPTIONS.map(({ key, label, Icon }) => { const enabled = categoryDraft.symbols.includes(key); return <button key={key} type="button" aria-pressed={enabled} onClick={() => setCategoryDraft({ ...categoryDraft, symbols: enabled ? categoryDraft.symbols.filter((symbol) => symbol !== key) : [...categoryDraft.symbols, key] })} className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3 text-sm font-semibold ${enabled ? "border-sky-300 bg-sky-50 text-sky-800" : "border-slate-200 bg-white text-slate-600"}`}><Icon className="h-4 w-4" />{label}</button> })}</div>
+      </fieldset>
+
+      <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4"><button type="button" disabled={pending} onClick={() => run(() => updateMaterialCategoryAction({ id: selected.id, ...categoryDraft }), "Saved department.")} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-50"><Save className="h-4 w-4" />Save and publish</button><ActionMessage message={message} /></div>
+    </section> : null}
 
     {activeTab === "questions" ? <section><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-bold">Customer questions</h3><p className="text-sm text-slate-500">Open one question to edit its answers and follow-up rules.</p></div><button type="button" disabled={pending} onClick={() => run(() => createMaterialQuestionAction(selected.id), "Added question.")} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Add question</button></div><div className="grid gap-2">{selected.questions.map((question, index) => <QuestionEditor key={question.id} question={question} questions={selected.questions} index={index} total={selected.questions.length} />)}</div></section> : null}
 

@@ -32,7 +32,18 @@ export type ManagerDepartmentOverride = {
   symbols: DepartmentSymbolKey[]
   hidden: boolean
   visibilityConfigured?: boolean
+  showQuickOrder?: boolean
+  showPlanUpload?: boolean
+  showChatToOrder?: boolean
+  showTakeoff?: boolean
   updatedAt: string
+}
+
+export type ManagerDepartmentExperience = {
+  showQuickOrder: boolean
+  showPlanUpload: boolean
+  showChatToOrder: boolean
+  showTakeoff: boolean
 }
 
 export type ManagerProductAddOn = {
@@ -143,6 +154,10 @@ export function buildManagerDepartmentOverride(input: {
   imageUrl?: string
   symbols?: DepartmentSymbolKey[]
   hidden?: boolean
+  showQuickOrder?: boolean
+  showPlanUpload?: boolean
+  showChatToOrder?: boolean
+  showTakeoff?: boolean
 }): ManagerDepartmentOverride {
   const sourceLabel = input.sourceLabel.trim()
   const label = input.label.trim() || sourceLabel
@@ -162,6 +177,10 @@ export function buildManagerDepartmentOverride(input: {
     symbols: normalizeDepartmentSymbols(input.symbols),
     hidden: Boolean(input.hidden),
     visibilityConfigured: true,
+    showQuickOrder: input.showQuickOrder ?? false,
+    showPlanUpload: input.showPlanUpload ?? true,
+    showChatToOrder: input.showChatToOrder ?? true,
+    showTakeoff: input.showTakeoff ?? true,
     updatedAt: new Date().toISOString(),
   }
 }
@@ -178,6 +197,16 @@ export function isDepartmentHidden(addOns: ManagerCatalogAddOns, sourceLabel: st
 
 export function departmentDisplayLabel(addOns: ManagerCatalogAddOns, sourceLabel: string) {
   return departmentOverrideFor(addOns, sourceLabel)?.label || sourceLabel
+}
+
+export function departmentExperienceFor(addOns: ManagerCatalogAddOns, sourceLabel: string): ManagerDepartmentExperience {
+  const override = departmentOverrideFor(addOns, sourceLabel)
+  return {
+    showQuickOrder: override?.showQuickOrder ?? false,
+    showPlanUpload: override?.showPlanUpload ?? true,
+    showChatToOrder: override?.showChatToOrder ?? true,
+    showTakeoff: override?.showTakeoff ?? true,
+  }
 }
 
 export function resolveDepartmentSourceLabel(addOns: ManagerCatalogAddOns, labelOrSource: string) {

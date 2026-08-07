@@ -2,8 +2,10 @@ import { notFound } from "next/navigation"
 
 import { ShopToolCategoryPage } from "@/components/buildflow/shop-tool-category-page"
 import { getSessionWithProfile } from "@/lib/auth"
+import { applyDepartmentAddOns, createEmptyManagerAddOns, departmentExperienceFor, isDepartmentHidden } from "@/lib/manager-add-ons"
 import type { ProjectRecord } from "@/lib/projects"
 import { findShopToolCategory, type ShopToolSlug } from "@/lib/shop-tools"
+import type { PublicWorkflowState } from "@/lib/workflow-public"
 
 type ToolPageSearchParams = {
   project?: string
@@ -14,9 +16,17 @@ type ToolPageSearchParams = {
 
 async function loadCurrentUserProjects() {
   const { supabase, user } = await getSessionWithProfile()
+  if (!supabase) {
+    return { projects: [], isSignedIn: false, addOns: createEmptyManagerAddOns() }
+  }
+  const { data: publicStateRow } = await supabase
+    .from("workflow_public_catalog")
+    .select("state")
+    .eq("id", "singleton")
+    .maybeSingle<{ state: PublicWorkflowState }>()
 
   if (!user) {
-    return { projects: [], isSignedIn: false }
+    return { projects: [], isSignedIn: false, addOns: publicStateRow?.state?.addOns ?? createEmptyManagerAddOns() }
   }
 
   const { data, error } = await supabase
@@ -30,18 +40,21 @@ async function loadCurrentUserProjects() {
     throw new Error("Failed to load projects.")
   }
 
-  return { projects: data ?? [], isSignedIn: true }
+  return { projects: data ?? [], isSignedIn: true, addOns: publicStateRow?.state?.addOns ?? createEmptyManagerAddOns() }
 }
 
 export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Promise<ToolPageSearchParams>) {
-  const category = findShopToolCategory(slug)
+  const baseCategory = findShopToolCategory(slug)
 
-  if (!category) {
+  if (!baseCategory) {
     notFound()
   }
 
   const params = (await searchParams) ?? {}
   const projectSession = await loadCurrentUserProjects()
+  if (isDepartmentHidden(projectSession.addOns, baseCategory.label)) notFound()
+  const category = applyDepartmentAddOns([baseCategory], projectSession.addOns)[0] ?? baseCategory
+  const experience = departmentExperienceFor(projectSession.addOns, baseCategory.label)
   const projects = projectSession.projects
   const selectedProjectId = projects.some((project) => project.id === params.project) ? params.project : ""
   const selectedAddress = selectedProjectId ? "" : params.address?.trim() || ""
@@ -49,6 +62,8 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
   return (
     <ShopToolCategoryPage
       category={category}
+      questionnaireDepartment={baseCategory.label}
+      experience={experience}
       projects={projects}
       selectedProjectId={selectedProjectId}
       selectedAddress={selectedAddress}
