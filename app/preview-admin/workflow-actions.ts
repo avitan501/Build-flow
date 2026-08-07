@@ -154,6 +154,8 @@ export async function updateRequestStatusAction(input: { requestId: string; stat
     metadata: { quote_request_id: input.requestId, request_status: input.status },
   })
   revalidatePath("/admin/vendors")
+  revalidatePath("/admin/users")
+  revalidatePath(`/owner/materials/requests/${input.requestId}`)
   revalidatePath(`/projects/${request.project_id}`)
   return { ok: true }
 }
