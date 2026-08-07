@@ -42,6 +42,8 @@ type SupplierRoutingManagerProps = {
   catalogProducts?: ShopCatalogProduct[]
   initialSettings?: ShopQualificationSettings | null
   initialAddOns?: ManagerCatalogAddOns | null
+  initialPanel?: ManagerPanel
+  supplierDirectoryOnly?: boolean
 }
 
 const questionTypes: QualifyingQuestionType[] = ["text", "textarea", "select"]
@@ -111,10 +113,16 @@ function departmentShopHref(departmentLabel: string) {
   return `/shop?category=${encodeURIComponent(departmentLabel)}`
 }
 
-export function SupplierRoutingManager({ catalogProducts = [], initialSettings = null, initialAddOns = null }: SupplierRoutingManagerProps) {
+export function SupplierRoutingManager({
+  catalogProducts = [],
+  initialSettings = null,
+  initialAddOns = null,
+  initialPanel = "departments",
+  supplierDirectoryOnly = false,
+}: SupplierRoutingManagerProps) {
   const [settings, setSettings] = useState<ShopQualificationSettings>(() => loadSettings(initialSettings))
   const [addOns, setAddOns] = useState<ManagerCatalogAddOns>(() => loadAddOns(initialAddOns))
-  const [activePanel, setActivePanel] = useState<ManagerPanel>("departments")
+  const [activePanel, setActivePanel] = useState<ManagerPanel>(initialPanel)
   const [selectedTargetId, setSelectedTargetId] = useState(SERVICE_ASSIGNMENT_TARGETS[0]?.id ?? "")
   const [selectedSupplierId, setSelectedSupplierId] = useState(settings.suppliers[0]?.id ?? DEFAULT_SUPPLIERS[0]?.id ?? "")
   const [selectedDepartmentLabel, setSelectedDepartmentLabel] = useState("Framing")
@@ -187,6 +195,10 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
       : assignmentTargets.find((target) => target.id === selectedTargetId) ?? assignmentTargets[0] ?? SERVICE_ASSIGNMENT_TARGETS[0]
   const selectedSetting = useMemo(() => selectedSettingFor(settings, selectedTarget.id, assignmentTargets), [assignmentTargets, selectedTarget.id, settings])
   const selectedSupplier = settings.suppliers.find((supplier) => supplier.id === selectedSupplierId) ?? settings.suppliers[0] ?? null
+  const selectedSupplierAssignments = useMemo(
+    () => assignmentTargets.filter((target) => selectedSettingFor(settings, target.id, assignmentTargets).supplierId === selectedSupplier?.id),
+    [assignmentTargets, selectedSupplier?.id, settings],
+  )
   const assignedSupplier = settings.suppliers.find((supplier) => supplier.id === selectedSetting.supplierId) ?? null
   const existingDepartmentProducts = useMemo(() => productsForDepartment(catalogProducts, selectedDepartment).filter((product) => !isManagerItemHidden(addOns, product.id)), [addOns, catalogProducts, selectedDepartment])
   const departmentProducts = useMemo(() => addOns.products.filter((product) => product.category === selectedDepartment), [addOns.products, selectedDepartment])
@@ -301,6 +313,8 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
   function removeSupplier(supplierId: string) {
     const nextSuppliers = settings.suppliers.filter((supplier) => supplier.id !== supplierId)
     if (nextSuppliers.length === 0) return
+    const supplier = settings.suppliers.find((entry) => entry.id === supplierId)
+    if (!window.confirm(`Remove ${supplier?.name || "this supplier"}? Its assignments will move to ${nextSuppliers[0].name}.`)) return
 
     persist({
       ...settings,
@@ -313,6 +327,25 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
       ),
     })
     setSelectedSupplierId(nextSuppliers[0].id)
+  }
+
+  function toggleSupplierAssignment(targetId: string, checked: boolean) {
+    if (!selectedSupplier) return
+    const current = selectedSettingFor(settings, targetId, assignmentTargets)
+    const fallbackSupplier = settings.suppliers.find((supplier) => supplier.id !== selectedSupplier.id)
+    if (!checked && !fallbackSupplier) return
+
+    persist({
+      ...settings,
+      products: {
+        ...settings.products,
+        [targetId]: {
+          ...current,
+          productId: targetId,
+          supplierId: checked ? selectedSupplier.id : fallbackSupplier!.id,
+        },
+      },
+    })
   }
 
   function addCategory() {
@@ -649,8 +682,8 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
 
   return (
     <main className="min-h-screen bg-[#eef3f7] text-slate-950">
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 pb-28 sm:px-6 sm:py-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
-        <aside className="lg:sticky lg:top-5 lg:self-start">
+      <div className={`mx-auto grid max-w-7xl gap-5 px-4 py-5 pb-28 sm:px-6 sm:py-8 ${supplierDirectoryOnly ? "" : "lg:grid-cols-[18rem_minmax(0,1fr)]"}`}>
+        {!supplierDirectoryOnly ? <aside className="lg:sticky lg:top-5 lg:self-start">
           <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
             <div className="rounded-[22px] bg-slate-950 p-4 text-white">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-200">Manager preview</p>
@@ -665,30 +698,34 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
               Preview-only manager access. The customer never sees supplier routing.
             </div>
           </section>
-        </aside>
+        </aside> : null}
 
         <section className="grid gap-5">
           <header className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] sm:p-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Owner controls</p>
-                <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Departments and shop structure</h2>
+                <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">{supplierDirectoryOnly ? "Suppliers and routing" : "Departments and shop structure"}</h2>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                  Manage customer departments, sub-departments, material products, questions, and private supplier routing from one owner-only screen.
+                  {supplierDirectoryOnly
+                    ? "Keep supplier contacts private and choose which department requests should be routed to each supplier."
+                    : "Manage customer departments, sub-departments, material products, questions, and private supplier routing from one owner-only screen."}
                 </p>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-2xl font-semibold">{assignmentTargets.length}</div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Sub-depts</div>
-                </div>
+              <div className={`grid gap-2 text-center ${supplierDirectoryOnly ? "grid-cols-2" : "grid-cols-3"}`}>
+                {!supplierDirectoryOnly ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="text-2xl font-semibold">{assignmentTargets.length}</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Sub-depts</div>
+                  </div>
+                ) : null}
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <div className="text-2xl font-semibold">{settings.suppliers.length}</div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Suppliers</div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-2xl font-semibold">{catalogProducts.filter((product) => product.productType !== "service").length + addOns.products.length + addOns.services.length}</div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Shop items</div>
+                  <div className="text-2xl font-semibold">{supplierDirectoryOnly ? assignmentTargets.length : catalogProducts.filter((product) => product.productType !== "service").length + addOns.products.length + addOns.services.length}</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{supplierDirectoryOnly ? "Routes" : "Shop items"}</div>
                 </div>
               </div>
             </div>
@@ -893,6 +930,35 @@ export function SupplierRoutingManager({ catalogProducts = [], initialSettings =
                         <textarea value={selectedSupplier.deliveryNotes || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { deliveryNotes: event.target.value })} rows={4} className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
                     </div>
+
+                    <section className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div>
+                          <h4 className="text-base font-semibold text-slate-950">Department routing</h4>
+                          <p className="mt-1 text-sm leading-6 text-slate-500">Checked request types are routed to this supplier after manager approval.</p>
+                        </div>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">{selectedSupplierAssignments.length} assigned</span>
+                      </div>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        {assignmentTargets.map((target) => {
+                          const checked = selectedSettingFor(settings, target.id, assignmentTargets).supplierId === selectedSupplier.id
+                          return (
+                            <label key={target.id} className={`flex min-h-14 items-start gap-3 rounded-2xl border px-4 py-3 text-sm ${checked ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white"}`}>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(event) => toggleSupplierAssignment(target.id, event.target.checked)}
+                                className="mt-1"
+                              />
+                              <span>
+                                <span className="block font-semibold text-slate-950">{target.serviceLabel}</span>
+                                <span className="mt-1 block text-xs text-slate-500">{target.departmentLabel}</span>
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </section>
                   </>
                 ) : null}
 
