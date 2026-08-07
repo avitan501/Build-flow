@@ -2,6 +2,7 @@ import Image from "next/image"
 import Link from "next/link"
 
 import { uploadWindowScheduleAction } from "@/app/shop/window/actions"
+import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
 import { DepartmentEssentials } from "@/components/buildflow/department-essentials"
 import { DepartmentRequestComposer } from "@/components/buildflow/department-request-composer"
 import { EitanWhatsAppUploadForm } from "@/components/buildflow/eitan-whatsapp-upload-form"
@@ -9,16 +10,23 @@ import { ManagerItemVisibility } from "@/components/buildflow/manager-item-visib
 import { PlanRequestUploadCard } from "@/components/buildflow/plan-request-upload-card"
 import type { ProjectRecord } from "@/lib/projects"
 import { getDepartmentEssentials } from "@/lib/department-essentials"
+import type { ManagerDepartmentExperience } from "@/lib/manager-add-ons"
 import type { ShopToolCategory } from "@/lib/shop-tools"
 
 type ShopToolCategoryPageProps = {
   category: ShopToolCategory
+  questionnaireDepartment: string
+  experience: ManagerDepartmentExperience
   projects: ProjectRecord[]
   selectedProjectId?: string
   selectedAddress?: string
   isSignedIn: boolean
   errorCode?: string | null
   successCode?: string | null
+}
+
+function QuickOrderAction({ category, questionnaireDepartment }: { category: ShopToolCategory; questionnaireDepartment: string }) {
+  return <section className="flex max-w-xl flex-col items-start justify-between gap-4 rounded-[20px] border border-sky-200 bg-sky-50 p-4 sm:flex-row sm:items-center"><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Quick Order</p><h2 className="mt-1 text-base font-bold text-slate-950">Answer a few questions to start your request</h2></div><AddToProjectButton product={{ id: `${category.slug}-quick-order`, name: `${category.label} Quick Order`, category: category.label, productType: "service", price: 0, unit: "Request" }} questionnaireDepartment={questionnaireDepartment} label="Start quick order" /></section>
 }
 
 function FramingUploadActions() {
@@ -117,13 +125,14 @@ function BlueprintIcon() {
   )
 }
 
-function CombinedUploadAction({ category, requestId }: { category: string; requestId: string }) {
+function CombinedUploadAction({ category, requestId, questionnaireDepartment }: { category: string; requestId: string; questionnaireDepartment: string }) {
   return (
     <section className="max-w-xl">
       <ManagerItemVisibility itemId={`${requestId}-upload`}>
         <PlanRequestUploadCard
           requestId={`${requestId}-blueprint-shopping-list`}
           category={category}
+          questionnaireDepartment={questionnaireDepartment}
           label="Upload blueprint or shopping list"
           description="Plan, material list, photo, PDF, CSV, or spreadsheet"
           accept=".csv,.xls,.xlsx,.pdf,image/*"
@@ -258,7 +267,7 @@ function WindowUploadActions({
   )
 }
 
-export function ShopToolCategoryPage({ category, projects, selectedProjectId, isSignedIn, errorCode, successCode }: ShopToolCategoryPageProps) {
+export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, successCode }: ShopToolCategoryPageProps) {
   const essentials = getDepartmentEssentials(category.slug)
   const usesStandardUpload = !["framing", "kitchen", "eitan", "window"].includes(category.slug)
 
@@ -267,16 +276,17 @@ export function ShopToolCategoryPage({ category, projects, selectedProjectId, is
       <section className="mx-auto flex max-w-7xl flex-col gap-4">
         <h1 className="text-[2rem] font-bold tracking-normal text-slate-950 sm:text-[2.4rem]">{category.label}</h1>
 
-        {usesStandardUpload ? <CombinedUploadAction category={category.label} requestId={category.slug} /> : null}
-        {category.slug === "framing" ? <FramingUploadActions /> : null}
-        {category.slug === "wood-floor" ? <ManagerItemVisibility itemId="wood-floor-takeoff"><WoodFloorActions /></ManagerItemVisibility> : null}
-        {category.slug === "kitchen" ? <KitchenActions /> : null}
-        {category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
-        {category.slug === "window" ? <ManagerItemVisibility itemId="window-package"><WindowUploadActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} successCode={successCode} /></ManagerItemVisibility> : null}
+        {experience.showQuickOrder ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
+        {experience.showPlanUpload && usesStandardUpload ? <CombinedUploadAction category={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
+        {experience.showPlanUpload && category.slug === "framing" ? <FramingUploadActions /> : null}
+        {experience.showTakeoff && category.slug === "wood-floor" ? <ManagerItemVisibility itemId="wood-floor-takeoff"><WoodFloorActions /></ManagerItemVisibility> : null}
+        {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}
+        {experience.showPlanUpload && category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
+        {experience.showPlanUpload && category.slug === "window" ? <ManagerItemVisibility itemId="window-package"><WindowUploadActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} successCode={successCode} /></ManagerItemVisibility> : null}
 
         <DepartmentEssentials data={essentials} />
 
-        <DepartmentRequestComposer category={category.label} requestId={category.slug} />
+        {experience.showChatToOrder ? <DepartmentRequestComposer category={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
       </section>
     </main>
   )
