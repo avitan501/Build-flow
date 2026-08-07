@@ -109,8 +109,8 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
       <div className="mx-auto max-w-7xl">
         <header className="border-b border-slate-200 pb-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager</p>
-          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Customers & Requests</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Customer accounts, projects, and every material or service request in one place.</p>
+          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">{view === "customers" ? "Customer Directory" : "Customer Requests"}</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{view === "customers" ? "Customer accounts, contact details, projects, and access status." : "Every material and service request submitted by your customers."}</p>
         </header>
 
         <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Customer and request overview">

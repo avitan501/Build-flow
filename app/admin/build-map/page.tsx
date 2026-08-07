@@ -130,9 +130,10 @@ export default async function AdminBuildMapPage() {
             </div>
             <nav className="mt-5 grid gap-2" aria-label="Manager tools">
               <Link href="/admin/settings/material-order-questions" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Departments & questions</Link>
-              <Link href="/admin/users" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Customers & requests</Link>
-              <Link href="/admin/supplier-approvals" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Supplier approvals</Link>
-              <Link href="/admin/vendors" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Suppliers</Link>
+              <Link href="/admin/users?view=customers" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Customer directory</Link>
+              <Link href="/admin/users?view=requests" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Customer requests</Link>
+              <Link href="/admin/vendors" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Supplier directory</Link>
+              <Link href="/admin/supplier-approvals" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Supplier requests</Link>
               <Link href="/owner/materials" className="rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold hover:border-sky-300 hover:bg-sky-50">Catalog & subcategories</Link>
             </nav>
           </section>

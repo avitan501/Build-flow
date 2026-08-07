@@ -705,7 +705,7 @@ export function SupplierRoutingManager({
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Owner controls</p>
-                <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">{supplierDirectoryOnly ? "Suppliers and routing" : "Departments and shop structure"}</h2>
+                <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">{supplierDirectoryOnly ? "Supplier Directory" : "Departments and shop structure"}</h2>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
                   {supplierDirectoryOnly
                     ? "Keep supplier contacts private and choose which department requests should be routed to each supplier."
