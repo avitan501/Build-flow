@@ -66,8 +66,6 @@ export function MobileBottomDock({ projectsHref }: MobileBottomDockProps) {
   const shopHref = "/shop";
 
   return (
-    <>
-      <div aria-hidden="true" className="h-[6.5rem] lg:hidden" />
       <div className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+0.35rem)] left-1/2 z-50 w-[calc(100%-1rem)] max-w-[29rem] -translate-x-1/2 px-2 lg:hidden">
         <nav
           aria-label="Mobile homepage"
@@ -103,6 +101,5 @@ export function MobileBottomDock({ projectsHref }: MobileBottomDockProps) {
           </DockItem>
         </nav>
       </div>
-    </>
   );
 }

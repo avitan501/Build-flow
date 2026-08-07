@@ -59,7 +59,7 @@ test("all departments wrap into downward rows without page overflow", async ({ p
   expect(widths.scrollWidth).toBe(widths.clientWidth)
 })
 
-test("department cards use product-grid photography instead of generic icons", async ({ page }) => {
+test("department cards use distinct full-bleed photography instead of generic icons", async ({ page }) => {
   await page.goto("/shop")
 
   const cardImages = page.getByTestId("department-card").getByRole("img")
@@ -69,7 +69,8 @@ test("department cards use product-grid photography instead of generic icons", a
     images.map((image) => (image as HTMLImageElement).currentSrc || (image as HTMLImageElement).src),
   )
 
-  expect(sources.every((source) => source.includes("department-essentials") && !source.includes(".svg"))).toBe(true)
+  expect(sources.every((source) => !source.includes("department-essentials") && !source.includes(".svg"))).toBe(true)
+  expect(new Set(sources).size).toBe(8)
 })
 
 test("retired departments are hidden and department symbols are visible", async ({ page }) => {
