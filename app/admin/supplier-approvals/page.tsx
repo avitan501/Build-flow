@@ -80,7 +80,7 @@ export default async function SupplierApprovalsPage({ searchParams }: { searchPa
 
   const visiblePackages = packages.filter((pkg) => {
     if (view === "pending") return pkg.status === "pending_approval"
-    if (view === "approved") return pkg.status === "approved" || pkg.status === "sent"
+    if (view === "approved") return pkg.status === "approved"
     return true
   })
   const pendingCount = packages.filter((pkg) => pkg.status === "pending_approval").length
@@ -95,17 +95,13 @@ export default async function SupplierApprovalsPage({ searchParams }: { searchPa
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Review customer details, answers, items, and files before approving a supplier package. Nothing is sent automatically.</p>
         </header>
 
-        <section className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Approval summary">
-          <div className="rounded-lg border border-amber-200 bg-white p-4"><Clock3 className="h-5 w-5 text-amber-700" /><p className="mt-3 text-3xl font-bold">{pendingCount}</p><p className="text-sm font-semibold text-slate-600">Needs review</p></div>
-          <div className="rounded-lg border border-emerald-200 bg-white p-4"><PackageCheck className="h-5 w-5 text-emerald-700" /><p className="mt-3 text-3xl font-bold">{approvedCount}</p><p className="text-sm font-semibold text-slate-600">Approved, not sent</p></div>
-          <div className="rounded-lg border border-slate-200 bg-white p-4"><CheckCircle2 className="h-5 w-5 text-[#0066cc]" /><p className="mt-3 text-3xl font-bold">{packages.length}</p><p className="text-sm font-semibold text-slate-600">Total packages</p></div>
+        <section className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Supplier request filters">
+          <Link href="/admin/supplier-approvals?view=pending" aria-current={view === "pending" ? "page" : undefined} className={`rounded-lg border bg-white p-4 transition hover:border-amber-400 ${view === "pending" ? "border-amber-400 ring-2 ring-amber-100" : "border-amber-200"}`}><Clock3 className="h-5 w-5 text-amber-700" /><p className="mt-3 text-3xl font-bold">{pendingCount}</p><p className="text-sm font-semibold text-slate-600">Needs review</p></Link>
+          <Link href="/admin/supplier-approvals?view=approved" aria-current={view === "approved" ? "page" : undefined} className={`rounded-lg border bg-white p-4 transition hover:border-emerald-400 ${view === "approved" ? "border-emerald-400 ring-2 ring-emerald-100" : "border-emerald-200"}`}><PackageCheck className="h-5 w-5 text-emerald-700" /><p className="mt-3 text-3xl font-bold">{approvedCount}</p><p className="text-sm font-semibold text-slate-600">Approved, not sent</p></Link>
+          <Link href="/admin/supplier-approvals?view=all" aria-current={view === "all" ? "page" : undefined} className={`rounded-lg border bg-white p-4 transition hover:border-sky-400 ${view === "all" ? "border-sky-400 ring-2 ring-sky-100" : "border-slate-200"}`}><CheckCircle2 className="h-5 w-5 text-[#0066cc]" /><p className="mt-3 text-3xl font-bold">{packages.length}</p><p className="text-sm font-semibold text-slate-600">Total packages</p></Link>
         </section>
 
-        <nav className="mt-6 grid grid-cols-3 rounded-lg border border-slate-200 bg-white p-1" aria-label="Approval filters">
-          {filters.map((filter) => <Link key={filter.value} href={`/admin/supplier-approvals?view=${filter.value}`} className={`flex min-h-11 items-center justify-center rounded-md px-3 text-center text-sm font-semibold ${view === filter.value ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}>{filter.label}</Link>)}
-        </nav>
-
-        <section className="mt-5 grid gap-3">
+        <section className="mt-6 grid gap-3">
           {visiblePackages.length ? visiblePackages.map((pkg) => {
             const request = pkg.quote_requests
             const profile = request ? profileMap.get(request.owner_id) : null

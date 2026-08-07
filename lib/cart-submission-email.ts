@@ -25,10 +25,18 @@ export type CartSubmissionEmailInput = {
   total: number
 }
 
-export type CartSubmissionEmailResult =
+export type EmailDeliveryResult =
   | { status: "sent"; providerId: string | null }
   | { status: "not_configured" }
+  | { status: "skipped" }
   | { status: "failed"; error: string }
+
+export type CartSubmissionEmailResult = {
+  status: "sent" | "not_configured" | "failed"
+  providerId: string | null
+  owner: EmailDeliveryResult
+  client: EmailDeliveryResult
+}
 
 const DEFAULT_TO = "avitanneto@gmail.com"
 const DEFAULT_FROM = "Avantia Build <onboarding@resend.dev>"
@@ -54,7 +62,7 @@ function answerLines(details: Pick<ShopCartItemDetails | ShopCustomCartItem, "an
 function buildText(input: CartSubmissionEmailInput) {
   const profile = input.customer.profile
   const lines = [
-    "New Avantia Build cart submission",
+    "New Avantia Build order request needs review",
     "",
     `Quote ID: ${input.quoteId}`,
     `Project: ${input.project.name}`,
@@ -112,7 +120,7 @@ function buildHtml(input: CartSubmissionEmailInput) {
 
   return `
     <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5">
-      <h1 style="margin:0 0 12px;font-size:22px">New Avantia Build cart submission</h1>
+      <h1 style="margin:0 0 12px;font-size:22px">New Avantia Build order request needs review</h1>
       <p><strong>Quote ID:</strong> ${escapeHtml(input.quoteId)}</p>
       <p><strong>Project:</strong> ${escapeHtml(input.project.name)}<br />
       <strong>Address:</strong> ${escapeHtml(input.project.address || "Not provided")}</p>
@@ -162,43 +170,123 @@ function buildHtml(input: CartSubmissionEmailInput) {
   `
 }
 
-export async function sendCartSubmissionEmail(input: CartSubmissionEmailInput): Promise<CartSubmissionEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) {
-    return { status: "not_configured" }
-  }
+function buildClientText(input: CartSubmissionEmailInput) {
+  const profile = input.customer.profile
+  return [
+    `Hi ${profile?.full_name || "there"},`,
+    "",
+    "We received your Avantia Build request and our team will review it.",
+    "",
+    `Request ID: ${input.quoteId}`,
+    `Project: ${input.project.name}`,
+    `Address: ${input.project.address || "Not provided"}`,
+    `Items: ${input.quoteItems.length}`,
+    `Estimated request total: ${money(input.total)}`,
+    "",
+    "We will contact you if we need more information. This message confirms receipt and is not a final quote or invoice.",
+    "",
+    "Avantia Build",
+    "Everything it takes to build",
+  ].join("\n")
+}
 
-  const to = process.env.QUOTE_SUBMISSION_TO || DEFAULT_TO
-  const from = process.env.QUOTE_SUBMISSION_FROM || DEFAULT_FROM
-  const subject = `Avantia Build quote request: ${input.project.name}`
-  const replyTo = input.customer.email || input.customer.profile?.email || undefined
+function buildClientHtml(input: CartSubmissionEmailInput) {
+  const profile = input.customer.profile
+  return `
+    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:620px;margin:0 auto">
+      <p>Hi ${escapeHtml(profile?.full_name || "there")},</p>
+      <h1 style="margin:12px 0;font-size:22px">We received your request</h1>
+      <p>Our Avantia Build team will review the materials and details you submitted.</p>
+      <div style="margin:20px 0;padding:16px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc">
+        <strong>Request ID:</strong> ${escapeHtml(input.quoteId)}<br />
+        <strong>Project:</strong> ${escapeHtml(input.project.name)}<br />
+        <strong>Address:</strong> ${escapeHtml(input.project.address || "Not provided")}<br />
+        <strong>Items:</strong> ${input.quoteItems.length}<br />
+        <strong>Estimated request total:</strong> ${money(input.total)}
+      </div>
+      <p>We will contact you if we need more information. This confirmation is not a final quote or invoice.</p>
+      <p style="margin-top:24px"><strong>Avantia Build</strong><br /><span style="color:#64748b">Everything it takes to build</span></p>
+    </div>
+  `
+}
 
+async function sendEmail(input: {
+  apiKey: string
+  from: string
+  to: string
+  subject: string
+  html: string
+  text: string
+  replyTo?: string
+  idempotencyKey: string
+}): Promise<EmailDeliveryResult> {
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${input.apiKey}`,
         "Content-Type": "application/json",
-        "Idempotency-Key": `avantia-cart-${input.quoteId}`,
+        "Idempotency-Key": input.idempotencyKey,
       },
       body: JSON.stringify({
-        from,
-        to: [to],
-        subject,
-        html: buildHtml(input),
-        text: buildText(input),
-        reply_to: replyTo,
+        from: input.from,
+        to: [input.to],
+        subject: input.subject,
+        html: input.html,
+        text: input.text,
+        reply_to: input.replyTo,
       }),
     })
 
     const payload = (await response.json().catch(() => null)) as { id?: string; message?: string; error?: string } | null
-
-    if (!response.ok) {
-      return { status: "failed", error: payload?.message || payload?.error || `Resend returned ${response.status}` }
-    }
-
+    if (!response.ok) return { status: "failed", error: payload?.message || payload?.error || `Resend returned ${response.status}` }
     return { status: "sent", providerId: payload?.id ?? null }
   } catch (error) {
     return { status: "failed", error: error instanceof Error ? error.message : "Unknown email error" }
+  }
+}
+
+export async function sendCartSubmissionEmail(input: CartSubmissionEmailInput): Promise<CartSubmissionEmailResult> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    return {
+      status: "not_configured",
+      providerId: null,
+      owner: { status: "not_configured" },
+      client: { status: "not_configured" },
+    }
+  }
+
+  const to = process.env.QUOTE_SUBMISSION_TO || DEFAULT_TO
+  const from = process.env.QUOTE_SUBMISSION_FROM || DEFAULT_FROM
+  const clientEmail = input.customer.email || input.customer.profile?.email || ""
+  const owner = await sendEmail({
+    apiKey,
+    from,
+    to,
+    subject: `New Avantia Build request: ${input.project.name}`,
+    html: buildHtml(input),
+    text: buildText(input),
+    replyTo: clientEmail || undefined,
+    idempotencyKey: `avantia-order-owner-${input.quoteId}`,
+  })
+  const client = clientEmail
+    ? await sendEmail({
+        apiKey,
+        from,
+        to: clientEmail,
+        subject: `We received your Avantia Build request: ${input.project.name}`,
+        html: buildClientHtml(input),
+        text: buildClientText(input),
+        replyTo: to,
+        idempotencyKey: `avantia-order-client-${input.quoteId}`,
+      })
+    : { status: "skipped" as const }
+
+  return {
+    status: owner.status === "sent" ? "sent" : owner.status === "not_configured" ? "not_configured" : "failed",
+    providerId: owner.status === "sent" ? owner.providerId : null,
+    owner,
+    client,
   }
 }

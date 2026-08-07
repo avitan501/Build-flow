@@ -245,7 +245,11 @@ export async function createQuoteFromCartAction(formData: FormData) {
     eventType: "quote_created",
     source: "quotes",
     title: "Shop cart quote requested",
-    description: emailResult.status === "sent" ? "A draft quote was created from the shop cart and emailed to the owner." : "A draft quote was created from the shop cart.",
+    description: emailResult.owner.status === "sent"
+      ? emailResult.client.status === "sent"
+        ? "A request was created and confirmation emails were sent to the owner and client."
+        : "A request was created and emailed to the owner; client confirmation was not delivered."
+      : "A request was created, but the owner notification was not delivered.",
     metadata: {
       quote_id: quoteId,
       item_count: quoteItems.length,
@@ -254,6 +258,7 @@ export async function createQuoteFromCartAction(formData: FormData) {
       total,
       has_qualifying_details: cartDetails.length > 0 || customLines.length > 0,
       owner_email_status: emailResult.status,
+      client_email_status: emailResult.client.status,
     },
   });
 
