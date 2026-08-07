@@ -412,7 +412,7 @@ export function ShopProjectToolPicker({
                     alt={`${category.label} products`}
                     fill
                     sizes="(max-width: 639px) 32vw, (max-width: 1023px) 24vw, 18vw"
-                    className="object-contain p-2 transition duration-300 group-hover:scale-[1.025] sm:p-3"
+                    className="object-cover transition duration-300 group-hover:scale-[1.035]"
                   />
                   <span className="absolute left-2 top-2">
                     <DepartmentSymbolBadges symbols={category.symbols} compact />

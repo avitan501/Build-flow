@@ -4,34 +4,34 @@ import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase";
 
 const conciergePoints = [
   {
-    title: "Current market pricing",
-    body: "Material and trade costs change with supply, demand, and world events. We compare the market when you are ready to buy.",
+    title: "Market pricing",
+    body: "We compare prices when you are ready to buy.",
   },
   {
-    title: "The right questions",
-    body: "We clarify what you actually need, then compare knowledgeable service with lower-cost sources that may sell the same item.",
+    title: "Right questions",
+    body: "We confirm exactly what your project needs.",
   },
   {
-    title: "Liquidation opportunities",
-    body: "We look for quality surplus, closeout, and liquidation inventory that can reduce the cost of your project.",
+    title: "Closeout savings",
+    body: "We find quality surplus and liquidation deals.",
   },
   {
-    title: "Bulk and reserved pricing",
-    body: "When volume creates leverage, we can buy in bulk or reserve favorable pricing before costs move.",
+    title: "Volume pricing",
+    body: "We use buying power to secure better pricing.",
   },
   {
-    title: "Smarter alternatives",
-    body: "Before you commit, we can adjust the order and recommend a more economical equivalent that still fits the job.",
+    title: "Better alternatives",
+    body: "We suggest lower-cost options that still fit.",
   },
   {
     title: "Hard-to-find items",
-    body: "For specific products that are not widely stocked, we search beyond the usual suppliers to find the right source.",
+    body: "We source products others cannot find.",
   },
 ];
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-x-clip bg-white pb-28 text-slate-950 sm:pb-16">
+    <main className="min-h-screen overflow-x-clip bg-white text-slate-950">
       <RecoveryLinkHandler />
 
       <section className="relative isolate overflow-hidden border-b border-slate-200 bg-[#071126] text-white">
@@ -47,7 +47,7 @@ export default function Home() {
             Concierge service for every construction need.
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
-            We compare, source, and simplify materials and trades so every project gets the right option at the right time.
+            We source materials, compare options, and simplify every order.
           </p>
         </div>
       </section>
@@ -67,7 +67,7 @@ export default function Home() {
         </div>
 
         <p className="py-10 text-center text-lg font-semibold text-[#071126] sm:text-xl">
-          Working with designers, homeowners, and builders.
+          Working with designers, developers, and builders.
         </p>
       </section>
 
