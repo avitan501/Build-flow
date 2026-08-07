@@ -58,8 +58,8 @@ type SkippedSnapshot = {
 
 const fallbackSupplier = "Owner manual";
 const fallbackUnit = "EA";
-const inputClass = "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition focus-visible:border-sky-500 focus-visible:ring-4 focus-visible:ring-sky-100";
-const smallInputClass = "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus-visible:border-sky-500 focus-visible:ring-4 focus-visible:ring-sky-100";
+const inputClass = "min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-950 outline-none transition focus-visible:border-sky-500 focus-visible:ring-4 focus-visible:ring-sky-100";
+const smallInputClass = "min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none transition focus-visible:border-sky-500 focus-visible:ring-4 focus-visible:ring-sky-100";
 const buttonFocusClass = "transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100";
 
 const initialManualDraft: ManualDraft = {
@@ -425,8 +425,8 @@ function ProductPreviewCard({ row }: { row: OwnerMaterialRowState | null }) {
   const imageAlt = row?.imageAlt?.trim() || fallback.imageAlt;
 
   return (
-    <article className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
-      <div className="relative min-h-[190px] overflow-hidden bg-slate-100">
+    <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="relative min-h-[170px] overflow-hidden bg-slate-100">
         <Image src={imageUrl} alt={imageAlt} fill sizes="(max-width: 1280px) 100vw, 420px" unoptimized className="object-cover" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.03),rgba(15,23,42,0.18))]" />
       </div>
@@ -436,26 +436,26 @@ function ProductPreviewCard({ row }: { row: OwnerMaterialRowState | null }) {
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{row?.category || "Category"}</p>
             <h3 className="mt-2 text-xl font-semibold leading-tight text-slate-950">{row?.description || "Select a material to preview"}</h3>
           </div>
-          <div className="rounded-2xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white">{row ? money(row.finalUnitPrice) : "$0.00"}</div>
+          <div className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white">{row ? money(row.finalUnitPrice) : "$0.00"}</div>
         </div>
         <p className="mt-3 min-h-12 text-sm leading-6 text-slate-600">
           {row?.notes?.trim() || row?.description || "This is the customer-facing shop card preview before the item goes live."}
         </p>
         <div className="mt-4 grid grid-cols-3 gap-2 text-xs text-slate-600">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
             <div className="font-semibold text-slate-950">{row?.unit || "-"}</div>
             <div>Unit</div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
             <div className="font-semibold text-slate-950">{row?.supplier || "-"}</div>
             <div>Supplier</div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
             <div className="font-semibold text-slate-950">{row?.itemNo || "-"}</div>
             <div>Item no</div>
           </div>
         </div>
-        <button type="button" disabled className={`mt-5 w-full rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-4 py-3 text-sm font-semibold text-slate-950 opacity-80 ${buttonFocusClass}`}>
+        <button type="button" disabled className={`mt-5 w-full rounded-lg bg-[#e9bd59] px-4 py-3 text-sm font-semibold text-slate-950 opacity-80 ${buttonFocusClass}`}>
           Add To Project Preview
         </button>
       </div>
@@ -851,65 +851,50 @@ export function OwnerMaterialsAdminShell({
   const previewRows = allRows.filter((row) => row.publishStatus === "Published" || (row.publishStatus === "Draft" && isPublishReady(row))).slice(0, 6);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#eef4f8] px-3 py-4 text-slate-950 sm:px-6 sm:py-8">
-      <section className="mx-auto grid w-full max-w-[1680px] gap-4">
-        <header className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.1)]">
-          <div className="grid gap-5 p-5 lg:grid-cols-[1.1fr_0.9fr] lg:p-7">
+    <main className="min-h-screen overflow-x-hidden bg-[#f5f5f7] px-4 pb-12 pt-6 text-slate-950 sm:px-8">
+      <section className="mx-auto grid w-full max-w-7xl gap-5">
+        <header className="border-b border-slate-200 pb-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">Materials Command Center</p>
-              <h1 className="mt-3 max-w-3xl text-3xl font-semibold leading-tight tracking-tight text-slate-950 sm:text-5xl">Bring items in, review them, preview the shop, publish.</h1>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-                Add materials manually or import a supplier PDF. Every item lands in a review queue first, so you can fix pricing, category, photo, and description before it appears in the shop.
-              </p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Link href="/owner/materials/requests" className={`rounded-2xl bg-[#0071e3] px-4 py-3 text-sm font-semibold text-white ${buttonFocusClass}`}>
-                  Client Requests
-                </Link>
-                <Link href="/admin/settings/material-order-questions" className={`rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 ${buttonFocusClass}`}>
-                  Material Questions
-                </Link>
-                <button type="button" onClick={() => chooseMode("manual")} className={`rounded-2xl px-4 py-3 text-sm font-semibold ${buttonFocusClass} ${mode === "manual" ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-700"}`}>
-                  Add Manually
-                </button>
-                <button type="button" onClick={() => chooseMode("pdf")} className={`rounded-2xl px-4 py-3 text-sm font-semibold ${buttonFocusClass} ${mode === "pdf" ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-700"}`}>
-                  Import PDF
-                </button>
-              </div>
-              <div
-                role="status"
-                aria-live="polite"
-                className={`mt-5 rounded-[22px] border px-4 py-3 text-sm leading-6 ${
-                  storageStatus.workspace === "supabase" && storageStatus.shopItems === "supabase"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                    : "border-amber-200 bg-amber-50 text-amber-950"
-                }`}
-              >
-                <div className="font-semibold">
-                  Storage: {storageStatus.workspace === "supabase" && storageStatus.shopItems === "supabase" ? "Supabase connected" : "Local fallback active"}
-                </div>
-                <div>{storageStatus.message}</div>
-              </div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager catalog</p>
+              <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Catalog &amp; Subcategories</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Add materials, review pricing and photos, then publish finished items to the customer shop.</p>
             </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/owner/materials/requests" className={`rounded-lg bg-[#0071e3] px-4 py-3 text-sm font-semibold text-white ${buttonFocusClass}`}>
+                Customer Requests
+              </Link>
+              <Link href="/admin/settings/material-order-questions" className={`rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 ${buttonFocusClass}`}>
+                Department Questions
+              </Link>
+            </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-              {[
-                ["Extracted", counts.extracted, "PDF rows waiting"],
-                ["Drafts", counts.drafts, "Not live yet"],
-                ["Ready", counts.ready, "Can publish"],
-                ["Published", counts.published, "In shop source"],
-              ].map(([label, value, detail]) => (
-                <div key={label} className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</div>
-                  <div className="mt-3 text-3xl font-semibold text-slate-950">{value}</div>
-                  <div className="mt-1 text-xs text-slate-500">{detail}</div>
+          <div className="mt-5 grid grid-cols-2 gap-2 lg:grid-cols-4">
+            {[
+              ["Extracted", counts.extracted, "PDF rows waiting"],
+              ["Drafts", counts.drafts, "Not live"],
+              ["Ready", counts.ready, "Ready to publish"],
+              ["Published", counts.published, "Visible in shop"],
+            ].map(([label, value, detail]) => (
+              <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className="text-sm font-semibold text-slate-600">{label}</div>
+                  <div className="text-2xl font-bold text-slate-950">{value}</div>
                 </div>
-              ))}
-            </div>
+                <div className="mt-1 text-xs text-slate-500">{detail}</div>
+              </div>
+            ))}
+          </div>
+
+          <div role="status" aria-live="polite" className={`mt-3 flex items-center gap-2 text-xs font-semibold ${storageStatus.workspace === "supabase" && storageStatus.shopItems === "supabase" ? "text-emerald-700" : "text-amber-800"}`}>
+            <span className={`h-2 w-2 rounded-full ${storageStatus.workspace === "supabase" && storageStatus.shopItems === "supabase" ? "bg-emerald-500" : "bg-amber-500"}`} />
+            {storageStatus.workspace === "supabase" && storageStatus.shopItems === "supabase" ? "Supabase connected" : "Local fallback active"}
           </div>
         </header>
 
         {notice ? (
-          <div role={noticeTone === "error" ? "alert" : "status"} aria-live={noticeTone === "error" ? "assertive" : "polite"} className={`rounded-[24px] border px-4 py-3 text-sm font-medium ${noticeTone === "error" ? "border-rose-200 bg-rose-50 text-rose-900" : noticeTone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-sky-200 bg-sky-50 text-sky-900"}`}>
+          <div role={noticeTone === "error" ? "alert" : "status"} aria-live={noticeTone === "error" ? "assertive" : "polite"} className={`rounded-lg border px-4 py-3 text-sm font-medium ${noticeTone === "error" ? "border-rose-200 bg-rose-50 text-rose-900" : noticeTone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-sky-200 bg-sky-50 text-sky-900"}`}>
             <span>{notice}</span>
             {lastSkipped ? (
               <button type="button" onClick={restoreLastSkippedRows} className={`ml-3 rounded-xl bg-white/70 px-3 py-1 text-sm font-semibold text-slate-950 ${buttonFocusClass}`}>
@@ -919,15 +904,20 @@ export function OwnerMaterialsAdminShell({
           </div>
         ) : null}
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(310px,0.85fr)_minmax(0,1.35fr)_minmax(320px,0.85fr)]">
+        <section className="grid gap-5 xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]">
           <aside className="grid gap-4 self-start">
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Intake</p>
                   <h2 className="mt-2 text-xl font-semibold text-slate-950">{mode === "manual" ? "Add one item" : "Extract from PDF"}</h2>
                 </div>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">Step 1</span>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">Intake</span>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 rounded-lg border border-slate-200 bg-slate-50 p-1" aria-label="Material intake method">
+                <button type="button" onClick={() => chooseMode("manual")} aria-pressed={mode === "manual"} className={`min-h-10 rounded-md px-3 text-sm font-semibold ${buttonFocusClass} ${mode === "manual" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-white"}`}>Add manually</button>
+                <button type="button" onClick={() => chooseMode("pdf")} aria-pressed={mode === "pdf"} className={`min-h-10 rounded-md px-3 text-sm font-semibold ${buttonFocusClass} ${mode === "pdf" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-white"}`}>Import PDF</button>
               </div>
 
               {mode === "manual" ? (
@@ -990,23 +980,23 @@ export function OwnerMaterialsAdminShell({
                     Shop description
                     <textarea name="material-description" autoComplete="off" value={manualDraft.description} onChange={(event) => updateManualDraft({ description: event.target.value })} rows={3} className={inputClass} />
                   </label>
-                  <button type="submit" className={`rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white ${buttonFocusClass}`}>Add To Review Queue</button>
+                  <button type="submit" className={`rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text-white ${buttonFocusClass}`}>Add to review queue</button>
                 </form>
               ) : (
                 <div className="mt-5 grid gap-4">
-                  <label className={`flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-[26px] border border-dashed border-sky-300 bg-sky-50 px-4 py-6 text-center ${buttonFocusClass}`}>
+                  <label className={`flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-sky-300 bg-sky-50 px-4 py-6 text-center ${buttonFocusClass}`}>
                     <span className="text-sm font-semibold text-slate-950">{isExtracting ? "Reading PDF..." : "Choose supplier PDF"}</span>
                     <span className="mt-2 max-w-sm text-xs leading-5 text-slate-600">The file is read in the browser. Extracted rows stay in review until you choose what to add.</span>
                     <input name="supplier-pdf" type="file" accept="application/pdf" onChange={handlePdfFile} disabled={isExtracting} className="sr-only" />
                   </label>
                   {extracted ? (
-                    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                       <div className="text-sm font-semibold text-slate-950">{extracted.fileName}</div>
                       <p className="mt-2 text-sm leading-6 text-slate-600">{extracted.note}</p>
                       {extracted.unmatchedLines.length > 0 ? (
                         <p className="mt-2 text-xs leading-5 text-amber-800">{extracted.unmatchedLines.length} PDF line(s) need manual review below.</p>
                       ) : null}
-                      <button type="button" onClick={addSelectedExtracted} className={`mt-4 w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white ${buttonFocusClass}`}>
+                      <button type="button" onClick={addSelectedExtracted} className={`mt-4 w-full rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text-white ${buttonFocusClass}`}>
                         Add Selected To Review
                       </button>
                     </div>
@@ -1016,7 +1006,7 @@ export function OwnerMaterialsAdminShell({
             </section>
 
             {extracted && mode === "pdf" ? (
-              <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+              <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-lg font-semibold text-slate-950">Extracted items</h2>
                   <button type="button" onClick={() => setSelectedExtractedIds(extracted.rows.filter((row) => !duplicateCounts.has(row.duplicateKey)).map((row) => row.id))} className={`rounded-xl px-2 py-1 text-sm font-semibold text-sky-700 ${buttonFocusClass}`}>Select Non-Duplicates</button>
@@ -1028,7 +1018,7 @@ export function OwnerMaterialsAdminShell({
                     extracted.rows.map((row) => {
                       const alreadyExists = duplicateCounts.has(row.duplicateKey);
                       return (
-                        <label key={row.id} className="flex cursor-pointer gap-3 rounded-[22px] border border-slate-200 bg-slate-50 p-3">
+                        <label key={row.id} className="flex cursor-pointer gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                           <input type="checkbox" checked={selectedExtractedIds.includes(row.id)} onChange={() => toggleExtracted(row.id)} className="mt-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100" />
                           <span className="min-w-0 flex-1">
                             <span className="block break-words text-sm font-semibold text-slate-950">{row.description}</span>
@@ -1057,7 +1047,7 @@ export function OwnerMaterialsAdminShell({
             ) : null}
           </aside>
 
-          <section className="min-w-0 rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Review queue</p>
@@ -1081,28 +1071,28 @@ export function OwnerMaterialsAdminShell({
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <button type="button" onClick={publishSelected} disabled={isPending || selectedQueueIds.length === 0} className={`rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 ${buttonFocusClass}`}>Publish Selected Ready</button>
-              <button type="button" onClick={unpublishSelected} disabled={isPending || selectedQueueIds.length === 0} className={`rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50 ${buttonFocusClass}`}>Unpublish Selected</button>
-              <button type="button" onClick={skipSelectedQueueRows} disabled={selectedQueueIds.length === 0} className={`rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800 disabled:opacity-50 ${buttonFocusClass}`}>Move To Skipped</button>
-              <span className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">{selectedQueueIds.length} selected</span>
+              <button type="button" onClick={publishSelected} disabled={isPending || selectedQueueIds.length === 0} className={`rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50 ${buttonFocusClass}`}>Publish selected</button>
+              <button type="button" onClick={unpublishSelected} disabled={isPending || selectedQueueIds.length === 0} className={`rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50 ${buttonFocusClass}`}>Unpublish</button>
+              <button type="button" onClick={skipSelectedQueueRows} disabled={selectedQueueIds.length === 0} className={`rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800 disabled:opacity-50 ${buttonFocusClass}`}>Skip selected</button>
+              <span className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">{selectedQueueIds.length} selected</span>
             </div>
 
             <div className="mt-5 grid gap-3">
               {queueRows.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">No materials match this queue filter.</div>
+                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">No materials match this queue filter.</div>
               ) : (
                 queueRows.map((row) => {
                   const issues = readinessIssues(row);
                   const isEditing = editingRowId === row.id;
                   const duplicate = duplicateCounts.get(row.duplicateKey) && duplicateCounts.get(row.duplicateKey)! > 1;
                   return (
-                    <article key={row.id} className={`rounded-[24px] border p-4 transition ${isEditing ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-slate-50 text-slate-950"}`}>
+                    <article key={row.id} className={`rounded-lg border p-4 transition ${isEditing ? "border-sky-400 bg-sky-50 text-slate-950 ring-2 ring-sky-100" : "border-slate-200 bg-slate-50 text-slate-950"}`}>
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <label className="flex min-w-0 cursor-pointer gap-3">
                           <input type="checkbox" checked={selectedQueueIds.includes(row.id)} onChange={() => toggleQueueRow(row.id)} className="mt-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100" />
                           <span className="min-w-0">
                             <span className="block break-words text-sm font-semibold">{row.description}</span>
-                            <span className={`mt-1 block text-xs ${isEditing ? "text-slate-300" : "text-slate-500"}`}>{row.itemNo || "No item no"} · {row.supplier} · {row.qty} {row.unit}</span>
+                            <span className="mt-1 block text-xs text-slate-500">{row.itemNo || "No item no"} · {row.supplier} · {row.qty} {row.unit}</span>
                           </span>
                         </label>
                         <div className="flex shrink-0 flex-wrap gap-2">
@@ -1110,17 +1100,17 @@ export function OwnerMaterialsAdminShell({
                           {duplicate ? <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">Duplicate</span> : null}
                         </div>
                       </div>
-                      <div className={`mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4 ${isEditing ? "text-slate-200" : "text-slate-600"}`}>
-                        <div><strong className={isEditing ? "text-white" : "text-slate-950"}>{money(row.supplierUnitPrice)}</strong><br />Cost</div>
-                        <div><strong className={isEditing ? "text-white" : "text-slate-950"}>{money(row.finalUnitPrice)}</strong><br />Sell</div>
-                        <div><strong className={isEditing ? "text-white" : "text-slate-950"}>{row.category}</strong><br />Category</div>
-                        <div><strong className={isEditing ? "text-white" : "text-slate-950"}>{issues.length ? issues.join(", ") : "Ready"}</strong><br />Missing</div>
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-sm text-slate-600 sm:grid-cols-4">
+                        <div><strong className="text-slate-950">{money(row.supplierUnitPrice)}</strong><br />Cost</div>
+                        <div><strong className="text-slate-950">{money(row.finalUnitPrice)}</strong><br />Sell</div>
+                        <div><strong className="text-slate-950">{row.category}</strong><br />Category</div>
+                        <div><strong className="text-slate-950">{issues.length ? issues.join(", ") : "Ready"}</strong><br />Missing</div>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        <button type="button" onClick={() => { setEditingRowId(row.id); updateUrlState({ item: row.id }); }} className={`rounded-2xl px-4 py-2 text-sm font-semibold ${buttonFocusClass} ${isEditing ? "bg-white text-slate-950" : "bg-white text-slate-700"}`}>
-                          Edit And Preview
+                        <button type="button" onClick={() => { setEditingRowId(row.id); updateUrlState({ item: row.id }); }} className={`rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 ${buttonFocusClass}`}>
+                          Edit and preview
                         </button>
-                        <button type="button" onClick={() => saveItem(row.id)} disabled={isPending} className={`rounded-2xl px-4 py-2 text-sm font-semibold disabled:opacity-60 ${buttonFocusClass} ${isEditing ? "border border-white/30 bg-white/10 text-white" : "bg-slate-950 text-white"}`}>
+                        <button type="button" onClick={() => saveItem(row.id)} disabled={isPending} className={`rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${buttonFocusClass}`}>
                           Save Item
                         </button>
                       </div>
@@ -1131,8 +1121,8 @@ export function OwnerMaterialsAdminShell({
             </div>
           </section>
 
-          <aside className="grid gap-4 self-start">
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+          <aside className="grid gap-5 self-start xl:col-span-2 xl:grid-cols-[minmax(300px,0.75fr)_minmax(0,1.25fr)]">
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Shop preview</p>
@@ -1146,13 +1136,13 @@ export function OwnerMaterialsAdminShell({
             </section>
 
             {editingRow ? (
-              <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+              <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm xl:row-span-2">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-950">Edit selected item</h2>
                     <p className="mt-1 text-sm leading-5 text-slate-500">Make changes here, then save this item.</p>
                   </div>
-                  <button type="button" onClick={() => saveItem(editingRow.id)} disabled={isPending} className={`shrink-0 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${buttonFocusClass}`}>
+                  <button type="button" onClick={() => saveItem(editingRow.id)} disabled={isPending} className={`shrink-0 rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${buttonFocusClass}`}>
                     Save Item
                   </button>
                 </div>
@@ -1161,7 +1151,7 @@ export function OwnerMaterialsAdminShell({
                     Name
                     <input name="edit-material-name" autoComplete="off" value={editingRow.description} onChange={(event) => updateRow(editingRow.id, { description: event.target.value })} className={inputClass} />
                   </label>
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <label className="grid gap-1 text-sm font-medium text-slate-700">
                       Item no
                       <input name="edit-material-item-number" autoComplete="off" value={editingRow.itemNo} onChange={(event) => updateRow(editingRow.id, { itemNo: event.target.value })} className={inputClass} />
@@ -1171,7 +1161,7 @@ export function OwnerMaterialsAdminShell({
                       <input name="edit-material-unit" autoComplete="off" value={editingRow.unit} onChange={(event) => updateRow(editingRow.id, { unit: event.target.value })} className={inputClass} />
                     </label>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <label className="grid gap-1 text-sm font-medium text-slate-700">
                       Qty
                       <input name="edit-material-quantity" type="number" inputMode="decimal" min="0" step="0.01" value={numberInput(editingRow.qty)} onChange={(event) => updateRow(editingRow.id, { qty: parseCurrency(event.target.value) })} className={inputClass} />
@@ -1183,7 +1173,7 @@ export function OwnerMaterialsAdminShell({
                       </select>
                     </label>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+                  <div className="grid gap-3 sm:grid-cols-3">
                     <label className="grid gap-1 text-sm font-medium text-slate-700">
                       Cost
                       <input name="edit-material-cost" type="number" inputMode="decimal" min="0" step="0.01" value={numberInput(editingRow.supplierUnitPrice)} onChange={(event) => updateRow(editingRow.id, { supplierUnitPrice: parseCurrency(event.target.value) })} className={inputClass} />
@@ -1205,27 +1195,27 @@ export function OwnerMaterialsAdminShell({
                     Description
                     <textarea name="edit-material-description" autoComplete="off" value={editingRow.notes ?? ""} onChange={(event) => updateRow(editingRow.id, { notes: event.target.value })} rows={3} className={inputClass} />
                   </label>
-                  <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                     <div className="flex justify-between gap-3"><span>Extended cost</span><strong className="text-slate-950">{money(editingRow.qty * editingRow.supplierUnitPrice)}</strong></div>
                     <div className="mt-2 flex justify-between gap-3"><span>Extended sell</span><strong className="text-slate-950">{money(editingRow.qty * editingRow.finalUnitPrice)}</strong></div>
                     <div className="mt-2 flex justify-between gap-3"><span>Margin</span><strong className="text-slate-950">{money(editingRow.qty * (editingRow.finalUnitPrice - editingRow.supplierUnitPrice))}</strong></div>
                   </div>
-                  <button type="button" onClick={() => saveItem(editingRow.id)} disabled={isPending} className={`rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${buttonFocusClass}`}>
+                  <button type="button" onClick={() => saveItem(editingRow.id)} disabled={isPending} className={`rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60 ${buttonFocusClass}`}>
                     Save Item
                   </button>
                 </div>
               </section>
             ) : null}
 
-            <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-semibold text-slate-950">Ready and live preview</h2>
               <div className="mt-4 grid gap-3">
                 {previewRows.length === 0 ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">Ready items will appear here.</div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">Ready items will appear here.</div>
                 ) : (
                   previewRows.map((row) => (
-                    <button key={row.id} type="button" onClick={() => { setEditingRowId(row.id); updateUrlState({ item: row.id }); }} className={`flex items-center gap-3 rounded-[22px] border border-slate-200 bg-slate-50 p-3 text-left ${buttonFocusClass}`}>
-                      <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-slate-200">
+                    <button key={row.id} type="button" onClick={() => { setEditingRowId(row.id); updateUrlState({ item: row.id }); }} className={`flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-left ${buttonFocusClass}`}>
+                      <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-slate-200">
                         <Image src={row.imageUrl || fallbackPhoto(row.category).imageUrl} alt={row.imageAlt || fallbackPhoto(row.category).imageAlt} fill sizes="56px" unoptimized className="object-cover" />
                       </span>
                       <span className="min-w-0">
