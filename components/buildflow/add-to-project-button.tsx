@@ -310,6 +310,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
       {open && created?.materialResponse ? (
         <MaterialQuestionnaireWizard
           snapshot={created.materialResponse.definition_snapshot}
+          displayMode={created.materialResponse.definition_snapshot.category.department_key === "Wood Floor" ? "all" : "steps"}
           initialAnswers={Object.fromEntries(created.materialAnswers.map((answer) => [answer.question_id || answer.question_key, answer.answer_value]))}
           onClose={() => setOpen(false)}
           requireCompletion
