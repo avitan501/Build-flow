@@ -123,6 +123,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
             { href: "/admin/build-map", label: "Dashboard" },
             { href: "/admin/users", label: "Customers" },
             { href: "/admin/vendors", label: "Suppliers" },
+            { href: "/admin/ai-tools", label: "AI Tools" },
           ]
         : []),
     ];
@@ -170,7 +171,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
   return (
     <>
       <div className="sticky top-0 z-[60] border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,255,0.94))] shadow-[0_8px_24px_rgba(148,163,184,0.1)] backdrop-blur">
-        <div className="mx-auto flex w-full items-center gap-2 px-3 py-2.5">
+        <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-3 py-2.5 sm:px-5">
           <button type="button" aria-label="Open navigation menu" onClick={() => setMenuOpen(true)} className="inline-flex">
             <IconShell active={menuOpen}>
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -197,12 +198,21 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
               <span className="truncate text-sm text-slate-500">{shopQuery || "Search materials"}</span>
             </button>
           ) : (
-            <Link href="/" prefetch={false} aria-label="Avantia Build home" className="min-w-0 flex-1">
-              <span className="flex min-h-10 items-center justify-center rounded-2xl border border-slate-200/90 bg-white/95 px-3 py-2 shadow-sm transition active:scale-[0.99]">
+            <Link href="/" prefetch={false} aria-label="Avantia Build home" className="flex min-h-10 min-w-0 flex-1 items-center px-1 md:flex-none">
+              <span className="flex items-center transition active:scale-[0.99]">
                 <AvantiaBuildLockup compact />
               </span>
             </Link>
           )}
+
+          {!isShopPage ? (
+            <nav className="hidden flex-1 items-center justify-center gap-1 md:flex" aria-label="Primary navigation">
+              <Link href="/" className={`rounded-lg px-3 py-2 text-sm font-semibold ${pathname === "/" ? "bg-slate-100 text-slate-950" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}>Home</Link>
+              <Link href="/shop" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Shop</Link>
+              <Link href="/projects" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">My Projects</Link>
+              <Link href="/request-quote" className="rounded-lg bg-[#0E2A4A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163a63]">Request a Quote</Link>
+            </nav>
+          ) : null}
 
           <Link
             href={isSignedIn ? "/account" : "/login"}
@@ -217,6 +227,14 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
           </Link>
 
         </div>
+        {!isShopPage ? (
+          <div className="border-t border-slate-200/70 px-3 py-2 md:hidden">
+            <Link href="/request-quote" className="mx-auto flex min-h-9 max-w-md items-center justify-between rounded-full bg-[#0E2A4A] px-4 text-xs font-semibold text-white">
+              <span>Need materials or pricing?</span>
+              <span>Request a Quote →</span>
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} primaryLinks={primaryLinks} adminLinks={adminLinks} isSignedIn={isSignedIn} />
