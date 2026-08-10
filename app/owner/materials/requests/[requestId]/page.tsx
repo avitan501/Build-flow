@@ -34,6 +34,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
   ])
   const answers = answersResult.data ?? []
   const signedFiles = await Promise.all((attachments ?? []).map(async (file) => ({ ...file, url: (await supabase.storage.from("project-uploads").createSignedUrl(file.file_path, 1800)).data?.signedUrl ?? null })))
+  const generalFiles = signedFiles.filter((file) => !file.material_response_id)
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 pb-28 pt-5 text-slate-950 sm:px-8">
@@ -53,6 +54,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
               }) : <p className="text-sm text-slate-500">No request items found.</p>}
             </div>
           </section>
+          {generalFiles.length ? <section className="rounded-lg border border-slate-200 bg-white p-5"><h2 className="text-xl font-bold">Attachments</h2><p className="mt-1 text-sm text-slate-500">Plans and material lists submitted with this request.</p><div className="mt-4 flex flex-wrap gap-2">{generalFiles.map((file) => file.url ? <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-[#0066cc]">{file.file_name}</a> : <span key={file.id} className="text-sm">{file.file_name}</span>)}</div></section> : null}
           {(responses ?? []).map((response) => {
             const responseFiles = signedFiles.filter((file) => file.material_response_id === response.id)
             return <article key={response.id} className="rounded-[20px] border border-slate-200 bg-white p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#0066cc]">Version {response.definition_version}</p><h2 className="mt-1 text-xl font-bold">{response.category_name_snapshot}</h2></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{response.status === "complete" ? "Complete" : "In progress"}</span></div><dl className="mt-5 grid gap-2">{answers.filter((answer) => answer.response_id === response.id).map((answer) => <div key={answer.question_key} className="grid gap-1 rounded-xl bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(12rem,.8fr)_1.2fr]"><dt className="text-sm font-semibold text-slate-700">{answer.question_label_snapshot}</dt><dd className="text-sm text-slate-950">{answer.answer_display_snapshot || "Not answered"}{answer.unit_snapshot && !answer.answer_display_snapshot.includes(answer.unit_snapshot) ? ` ${answer.unit_snapshot}` : ""}</dd></div>)}</dl>{responseFiles.length ? <div className="mt-4 border-t border-slate-100 pt-4"><h3 className="text-sm font-bold">Files</h3><div className="mt-2 flex flex-wrap gap-2">{responseFiles.map((file) => file.url ? <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-[#0066cc]">{file.file_name}</a> : <span key={file.id}>{file.file_name}</span>)}</div></div> : null}</article>
