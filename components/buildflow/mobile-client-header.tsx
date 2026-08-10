@@ -103,6 +103,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
     { href: "/", label: "Home" },
     { href: "/shop", label: "Shop" },
     { href: "/projects", label: "My Projects" },
+    { href: "https://www.bldr.com/contact/request-quote", label: "BLDR Partner Quote", external: true, badge: "Partner" },
     ...(isAdmin ? [{ href: "/admin/vendors", label: "Manager" }] : []),
     ...(isSignedIn
       ? [
