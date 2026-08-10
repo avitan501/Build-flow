@@ -16,6 +16,7 @@ type MaterialQuestionnaireWizardProps = {
   snapshot: MaterialQuestionnaireSnapshot
   initialAnswers?: Record<string, MaterialAnswerValue>
   displayMode?: "steps" | "all"
+  density?: "comfortable" | "compact"
   embedded?: boolean
   locked?: boolean
   requireCompletion?: boolean
@@ -34,7 +35,7 @@ function withOther(value: MaterialAnswerValue, other: string): MaterialAnswerVal
   return { selected: Array.isArray(selected) ? selected : typeof selected === "string" ? selected : undefined, other }
 }
 
-function CardOptions({ question, value, onChange, disabled }: { question: MaterialQuestion; value: MaterialAnswerValue; onChange: (value: MaterialAnswerValue, autoAdvance?: boolean) => void; disabled: boolean }) {
+function CardOptions({ question, value, onChange, disabled, compact = false }: { question: MaterialQuestion; value: MaterialAnswerValue; onChange: (value: MaterialAnswerValue, autoAdvance?: boolean) => void; disabled: boolean; compact?: boolean }) {
   const selected = selectableValue(value)
   const selectedValues = Array.isArray(selected) ? selected : typeof selected === "string" ? [selected] : []
   const isMulti = question.question_type === "multi_select"
@@ -55,7 +56,7 @@ function CardOptions({ question, value, onChange, disabled }: { question: Materi
     : question.options
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className={compact ? "flex flex-wrap gap-2" : "grid gap-3 sm:grid-cols-2"}>
       {options.map((option) => {
         const active = selectedValues.includes(option.value)
         return (
@@ -64,10 +65,10 @@ function CardOptions({ question, value, onChange, disabled }: { question: Materi
             type="button"
             disabled={disabled}
             onClick={() => toggle(option.value)}
-            className={`relative flex min-h-16 items-center justify-between gap-3 rounded-[18px] border-2 px-4 py-3 text-left text-[15px] font-semibold transition focus:outline-none focus:ring-4 focus:ring-sky-100 disabled:cursor-default ${active ? "border-[#0071e3] bg-sky-50 text-slate-950 shadow-[0_8px_20px_rgba(0,113,227,0.12)]" : "border-slate-200 bg-white text-slate-800 hover:border-slate-400"}`}
+            className={`${compact ? "min-h-10 rounded-lg px-3 py-2 text-sm" : "min-h-16 rounded-[18px] px-4 py-3 text-[15px]"} relative flex items-center justify-between gap-3 border-2 text-left font-semibold transition focus:outline-none focus:ring-4 focus:ring-sky-100 disabled:cursor-default ${active ? compact ? "border-[#0071e3] bg-white text-slate-950 shadow-[0_0_0_1px_#0071e3]" : "border-[#0071e3] bg-sky-50 text-slate-950 shadow-[0_8px_20px_rgba(0,113,227,0.12)]" : "border-slate-300 bg-white text-slate-800 hover:border-slate-500"}`}
           >
             <span>{option.label}</span>
-            <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${active ? "border-[#0071e3] bg-[#0071e3] text-white" : "border-slate-300 text-transparent"}`}><Check className="h-4 w-4" strokeWidth={3} /></span>
+            {!compact ? <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${active ? "border-[#0071e3] bg-[#0071e3] text-white" : "border-slate-300 text-transparent"}`}><Check className="h-4 w-4" strokeWidth={3} /></span> : null}
           </button>
         )
       })}
@@ -81,18 +82,19 @@ function CardOptions({ question, value, onChange, disabled }: { question: Materi
   )
 }
 
-function QuestionControl({ question, value, onChange, disabled, onUpload }: {
+function QuestionControl({ question, value, onChange, disabled, onUpload, compact = false }: {
   question: MaterialQuestion
   value: MaterialAnswerValue
   onChange: (value: MaterialAnswerValue, autoAdvance?: boolean) => void
   disabled: boolean
   onUpload?: MaterialQuestionnaireWizardProps["onUpload"]
+  compact?: boolean
 }) {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
   if (["single_select", "multi_select", "yes_no"].includes(question.question_type)) {
-    return <CardOptions question={question} value={value} onChange={onChange} disabled={disabled} />
+    return <CardOptions question={question} value={value} onChange={onChange} disabled={disabled} compact={compact} />
   }
   if (question.question_type === "dropdown") {
     return <select disabled={disabled} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} className="min-h-13 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"><option value="">Choose one</option>{question.options.map((option) => <option key={option.id} value={option.value}>{option.label}</option>)}</select>
@@ -110,10 +112,10 @@ function QuestionControl({ question, value, onChange, disabled, onUpload }: {
   }
 
   const numeric = ["number", "square_feet", "linear_feet", "gallons"].includes(question.question_type)
-  return <div className="relative"><input disabled={disabled} type={numeric ? "number" : "text"} min={numeric ? 0 : undefined} inputMode={numeric ? "decimal" : undefined} value={typeof value === "number" || typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(numeric ? event.target.value === "" ? "" : Math.max(0, Number(event.target.value)) : event.target.value)} className={`min-h-13 w-full rounded-2xl border border-slate-300 px-4 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50 ${question.unit ? "pr-24" : ""}`} />{question.unit ? <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm font-semibold text-slate-500">{question.unit}</span> : null}</div>
+  return <div className={`relative ${compact ? "max-w-sm" : ""}`}><input disabled={disabled} type={numeric ? "number" : "text"} min={numeric ? 0 : undefined} inputMode={numeric ? "decimal" : undefined} value={typeof value === "number" || typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(numeric ? event.target.value === "" ? "" : Math.max(0, Number(event.target.value)) : event.target.value)} className={`${compact ? "min-h-11 rounded-lg text-sm" : "min-h-13 rounded-2xl text-base"} w-full border border-slate-300 px-4 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50 ${question.unit ? "pr-24" : ""}`} />{question.unit ? <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-xs font-semibold text-slate-500">{question.unit}</span> : null}</div>
 }
 
-export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, displayMode = "steps", embedded = false, locked = false, requireCompletion = false, onClose, onSave, onUpload }: MaterialQuestionnaireWizardProps) {
+export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, displayMode = "steps", density = "comfortable", embedded = false, locked = false, requireCompletion = false, onClose, onSave, onUpload }: MaterialQuestionnaireWizardProps) {
   const [answers, setAnswers] = useState<Record<string, MaterialAnswerValue>>(initialAnswers)
   const [step, setStep] = useState(0)
   const [reviewing, setReviewing] = useState(false)
@@ -123,6 +125,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
   const current = visibleQuestions[Math.min(step, Math.max(visibleQuestions.length - 1, 0))]
   const progress = visibleQuestions.length ? ((Math.min(step, visibleQuestions.length - 1) + 1) / visibleQuestions.length) * 100 : 100
   const showAllQuestions = displayMode === "all"
+  const compact = density === "compact"
 
   function update(questionId: string, value: MaterialAnswerValue, autoAdvance = false) {
     const nextAnswers = { ...answers, [questionId]: value }
@@ -167,13 +170,13 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
 
   const content = (
     <section className={`${embedded ? "w-full" : "max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-[24px] border border-white/70 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.32)]"}`} aria-label={`${snapshot.category.name} material questions`}>
-      <header className="border-b border-slate-100 bg-white px-5 py-4 sm:px-7">
+      <header className={`border-b border-slate-100 bg-white ${compact ? "px-4 py-3 sm:px-5" : "px-5 py-4 sm:px-7"}`}>
         <div className="flex items-start justify-between gap-4"><div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Material order details</p><h2 className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">{snapshot.category.name}</h2>{requireCompletion ? <p className="mt-1 text-xs font-semibold text-slate-500">Required to complete this department request</p> : null}</div>{onClose && !requireCompletion ? <button type="button" onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500" aria-label="Close questionnaire"><X className="h-5 w-5" /></button> : null}</div>
         {!reviewing ? showAllQuestions ? <p className="mt-3 text-xs font-semibold text-slate-500">{visibleQuestions.length} questions</p> : <div className="mt-4"><div className="flex justify-between text-xs font-semibold text-slate-500"><span>Question {Math.min(step + 1, visibleQuestions.length)} of {visibleQuestions.length}</span><span>{Math.round(progress)}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#0071e3] transition-all" style={{ width: `${progress}%` }} /></div></div> : null}
       </header>
 
-      <div className={`${embedded ? "" : "max-h-[62vh] overflow-y-auto"} px-5 py-6 sm:px-7`}>
-        {reviewing ? <div><div className="mb-5"><h3 className="text-xl font-bold text-slate-950">Review your answers</h3><p className="mt-1 text-sm text-slate-600">Check the details before finishing. You can edit any answer.</p></div><div className="grid gap-2">{visibleQuestions.map((question, index) => <button key={question.id} type="button" onClick={() => { setStep(index); setReviewing(false) }} className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-sky-300"><span><span className="block text-sm font-semibold text-slate-950">{question.label}</span><span className="mt-1 block text-sm text-slate-600">{formatMaterialAnswer(question, answers[question.id]) || "Not answered"}</span></span><Pencil className="mt-0.5 h-4 w-4 shrink-0 text-[#0071e3]" /></button>)}</div></div> : showAllQuestions ? <div className="grid gap-7">{visibleQuestions.map((question, index) => <section key={question.id} className="border-b border-slate-100 pb-7 last:border-b-0 last:pb-0"><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Question {index + 1}</p><h3 className="mt-1 text-lg font-bold leading-tight text-slate-950 sm:text-xl">{question.label}{question.is_required ? <span className="text-rose-500"> *</span> : null}</h3>{question.help_text ? <p className="mt-2 text-sm leading-6 text-slate-600">{question.help_text}</p> : null}<div className="mt-4"><QuestionControl question={question} value={answers[question.id] ?? null} onChange={(value, autoAdvance) => update(question.id, value, autoAdvance)} disabled={locked} onUpload={onUpload} /></div></section>)}</div> : current ? <div><h3 className="text-[1.35rem] font-bold leading-tight text-slate-950 sm:text-2xl">{current.label}{current.is_required ? <span className="text-rose-500"> *</span> : null}</h3>{current.help_text ? <p className="mt-2 text-sm leading-6 text-slate-600">{current.help_text}</p> : null}<div className="mt-5"><QuestionControl question={current} value={answers[current.id] ?? null} onChange={(value, autoAdvance) => update(current.id, value, autoAdvance)} disabled={locked} onUpload={onUpload} /></div></div> : <p className="text-sm text-slate-600">No active questions are configured.</p>}
+      <div className={`${embedded ? "" : "max-h-[62vh] overflow-y-auto"} ${compact ? "px-4 py-4 sm:px-5" : "px-5 py-6 sm:px-7"}`}>
+        {reviewing ? <div><div className="mb-5"><h3 className="text-xl font-bold text-slate-950">Review your answers</h3><p className="mt-1 text-sm text-slate-600">Check the details before finishing. You can edit any answer.</p></div><div className="grid gap-2">{visibleQuestions.map((question, index) => <button key={question.id} type="button" onClick={() => { setStep(index); setReviewing(false) }} className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left hover:border-sky-300"><span><span className="block text-sm font-semibold text-slate-950">{question.label}</span><span className="mt-1 block text-sm text-slate-600">{formatMaterialAnswer(question, answers[question.id]) || "Not answered"}</span></span><Pencil className="mt-0.5 h-4 w-4 shrink-0 text-[#0071e3]" /></button>)}</div></div> : showAllQuestions ? <div className={compact ? "grid gap-4" : "grid gap-7"}>{visibleQuestions.map((question, index) => <section key={question.id} className={`${compact ? "pb-4" : "pb-7"} border-b border-slate-100 last:border-b-0 last:pb-0`}>{!compact ? <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Question {index + 1}</p> : null}<h3 className={`${compact ? "text-sm" : "mt-1 text-lg sm:text-xl"} font-bold leading-tight text-slate-950`}>{question.label}{question.is_required ? <span className="text-rose-500"> *</span> : null}</h3>{question.help_text ? <p className={`${compact ? "mt-1 text-xs leading-5" : "mt-2 text-sm leading-6"} text-slate-600`}>{question.help_text}</p> : null}<div className={compact ? "mt-2" : "mt-4"}><QuestionControl question={question} value={answers[question.id] ?? null} onChange={(value, autoAdvance) => update(question.id, value, autoAdvance)} disabled={locked} onUpload={onUpload} compact={compact} /></div></section>)}</div> : current ? <div><h3 className="text-[1.35rem] font-bold leading-tight text-slate-950 sm:text-2xl">{current.label}{current.is_required ? <span className="text-rose-500"> *</span> : null}</h3>{current.help_text ? <p className="mt-2 text-sm leading-6 text-slate-600">{current.help_text}</p> : null}<div className="mt-5"><QuestionControl question={current} value={answers[current.id] ?? null} onChange={(value, autoAdvance) => update(current.id, value, autoAdvance)} disabled={locked} onUpload={onUpload} /></div></div> : <p className="text-sm text-slate-600">No active questions are configured.</p>}
         {error ? <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</div> : null}
       </div>
 

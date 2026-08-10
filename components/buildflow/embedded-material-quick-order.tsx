@@ -38,6 +38,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
       <MaterialQuestionnaireWizard
         snapshot={snapshot}
         displayMode="all"
+        density="compact"
         embedded
         requireCompletion
         onSave={async (answers, complete) => {
