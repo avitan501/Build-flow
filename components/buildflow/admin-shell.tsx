@@ -1,51 +1,41 @@
 "use client";
 
 import {
-  Boxes,
-  Building2,
   ChevronLeft,
   ClipboardList,
   LayoutDashboard,
   Menu,
-  Settings,
   Store,
   Users,
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 
 const managerLinks = [
   { href: "/admin/build-map", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/settings/material-order-questions", label: "Departments & Questions", icon: Building2 },
-  { href: "/admin/users?view=customers", label: "Customer Directory", icon: Users, view: "customers" },
-  { href: "/admin/users?view=requests", label: "Customer Requests", icon: ClipboardList, view: "requests" },
+  { href: "/admin/users", label: "Customers", icon: Users },
   { href: "/admin/vendors", label: "Suppliers", icon: Store },
-  { href: "/owner/materials", label: "Catalog & Subcategories", icon: Boxes },
-  { href: "/admin/settings", label: "Integrations", icon: Settings },
 ] as const;
 
-function isActive(pathname: string, href: string, currentView: string, targetView?: string) {
+function isActive(pathname: string, href: string) {
   const hrefPath = href.split("?")[0];
   if (href === "/owner/materials") {
     return pathname === href;
   }
   if (hrefPath === "/admin/users") {
-    return pathname.startsWith("/admin/users") && currentView === targetView;
+    return pathname.startsWith("/admin/users");
   }
   if (href === "/admin/vendors") {
     return pathname.startsWith("/admin/vendors") || pathname.startsWith("/admin/supplier-approvals");
   }
-  if (href === "/admin/settings") {
-    return pathname === href || pathname.startsWith("/admin/whatsapp");
-  }
   return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
 }
 
-function ManagerNavigation({ pathname, currentView, onNavigate }: { pathname: string; currentView: string; onNavigate?: () => void }) {
+function ManagerNavigation({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="border-b border-slate-200 px-5 py-5">
@@ -58,7 +48,7 @@ function ManagerNavigation({ pathname, currentView, onNavigate }: { pathname: st
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Manager navigation">
         {managerLinks.map((link) => {
           const Icon = link.icon;
-          const active = isActive(pathname, link.href, currentView, "view" in link ? link.view : undefined);
+          const active = isActive(pathname, link.href);
           return (
             <Link
               key={link.href}
@@ -91,14 +81,12 @@ function ManagerNavigation({ pathname, currentView, onNavigate }: { pathname: st
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const currentView = searchParams.get("view") === "requests" ? "requests" : "customers";
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
       <aside className="sticky top-0 hidden h-screen border-r border-slate-200 lg:block">
-        <ManagerNavigation pathname={pathname} currentView={currentView} />
+        <ManagerNavigation pathname={pathname} />
       </aside>
 
       <div className="min-w-0">
@@ -131,7 +119,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         >
           <X className="h-5 w-5" />
         </button>
-        <ManagerNavigation pathname={pathname} currentView={currentView} onNavigate={() => setMenuOpen(false)} />
+        <ManagerNavigation pathname={pathname} onNavigate={() => setMenuOpen(false)} />
       </aside>
     </div>
   );

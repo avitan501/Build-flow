@@ -11,6 +11,7 @@ import {
   buildManagerProductAddOn,
   departmentDisplayLabel,
   departmentOverrideFor,
+  applyDepartmentAddOns,
   isDepartmentHidden,
   isManagerItemHidden,
   readManagerAddOns,
@@ -101,6 +102,10 @@ const departmentSlugByLabel = new Map<string, ShopToolSlug>(
   SHOP_TOOL_CATEGORIES.map((category) => [category.label, category.slug]),
 )
 
+function departmentRouteId(slug: string) {
+  return `department-route-${slug}`
+}
+
 function productsForDepartment(products: ShopCatalogProduct[], departmentLabel: string) {
   const slug = departmentSlugByLabel.get(departmentLabel)
   if (slug) return filterProductsForShopTool(products, slug)
@@ -163,7 +168,7 @@ export function SupplierRoutingManager({
   const assignmentTargets = useMemo<ServiceAssignmentTarget[]>(() => {
     const managerServices = addOns.services.map((service): ServiceAssignmentTarget => ({
       id: service.id,
-      departmentSlug: "services",
+      departmentSlug: departmentSlugByLabel.get(service.category) ?? "services",
       departmentLabel: service.category || "Sub-departments",
       serviceLabel: service.name,
       description: service.description,
@@ -195,10 +200,13 @@ export function SupplierRoutingManager({
       : assignmentTargets.find((target) => target.id === selectedTargetId) ?? assignmentTargets[0] ?? SERVICE_ASSIGNMENT_TARGETS[0]
   const selectedSetting = useMemo(() => selectedSettingFor(settings, selectedTarget.id, assignmentTargets), [assignmentTargets, selectedTarget.id, settings])
   const selectedSupplier = settings.suppliers.find((supplier) => supplier.id === selectedSupplierId) ?? settings.suppliers[0] ?? null
-  const selectedSupplierAssignments = useMemo(
-    () => assignmentTargets.filter((target) => selectedSettingFor(settings, target.id, assignmentTargets).supplierId === selectedSupplier?.id),
-    [assignmentTargets, selectedSupplier?.id, settings],
-  )
+  const shopDepartments = useMemo(() => applyDepartmentAddOns(SHOP_TOOL_CATEGORIES, addOns), [addOns])
+  const selectedSupplierDepartments = useMemo(() => shopDepartments.filter((department) => {
+    const explicit = settings.products[departmentRouteId(department.slug)]
+    if (explicit) return explicit.supplierId === selectedSupplier?.id
+    const targets = assignmentTargets.filter((target) => target.departmentSlug === department.slug)
+    return targets.length > 0 && targets.every((target) => selectedSettingFor(settings, target.id, assignmentTargets).supplierId === selectedSupplier?.id)
+  }), [assignmentTargets, selectedSupplier?.id, settings, shopDepartments])
   const assignedSupplier = settings.suppliers.find((supplier) => supplier.id === selectedSetting.supplierId) ?? null
   const existingDepartmentProducts = useMemo(() => productsForDepartment(catalogProducts, selectedDepartment).filter((product) => !isManagerItemHidden(addOns, product.id)), [addOns, catalogProducts, selectedDepartment])
   const departmentProducts = useMemo(() => addOns.products.filter((product) => product.category === selectedDepartment), [addOns.products, selectedDepartment])
@@ -329,23 +337,27 @@ export function SupplierRoutingManager({
     setSelectedSupplierId(nextSuppliers[0].id)
   }
 
-  function toggleSupplierAssignment(targetId: string, checked: boolean) {
+  function toggleSupplierDepartment(departmentSlug: string, checked: boolean) {
     if (!selectedSupplier) return
-    const current = selectedSettingFor(settings, targetId, assignmentTargets)
     const fallbackSupplier = settings.suppliers.find((supplier) => supplier.id !== selectedSupplier.id)
     if (!checked && !fallbackSupplier) return
-
-    persist({
-      ...settings,
-      products: {
-        ...settings.products,
-        [targetId]: {
-          ...current,
-          productId: targetId,
-          supplierId: checked ? selectedSupplier.id : fallbackSupplier!.id,
-        },
+    const supplierId = checked ? selectedSupplier.id : fallbackSupplier!.id
+    const routeId = departmentRouteId(departmentSlug)
+    const nextProducts = {
+      ...settings.products,
+      [routeId]: {
+        productId: routeId,
+        enabled: true,
+        supplierId,
+        questions: settings.products[routeId]?.questions ?? [],
       },
-    })
+    }
+
+    for (const target of assignmentTargets.filter((entry) => entry.departmentSlug === departmentSlug)) {
+      const current = selectedSettingFor(settings, target.id, assignmentTargets)
+      nextProducts[target.id] = { ...current, productId: target.id, supplierId }
+    }
+    persist({ ...settings, products: nextProducts })
   }
 
   function addCategory() {
@@ -940,24 +952,25 @@ export function SupplierRoutingManager({
                       <div className="flex flex-wrap items-end justify-between gap-3">
                         <div>
                           <h4 className="text-base font-semibold text-slate-950">Department routing</h4>
-                          <p className="mt-1 text-sm leading-6 text-slate-500">Checked request types are routed to this supplier after manager approval.</p>
+                          <p className="mt-1 text-sm leading-6 text-slate-500">These are the same active departments customers see in Shop.</p>
                         </div>
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">{selectedSupplierAssignments.length} assigned</span>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">{selectedSupplierDepartments.length} assigned</span>
                       </div>
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        {assignmentTargets.map((target) => {
-                          const checked = selectedSettingFor(settings, target.id, assignmentTargets).supplierId === selectedSupplier.id
+                        {shopDepartments.map((department) => {
+                          const explicit = settings.products[departmentRouteId(department.slug)]
+                          const targets = assignmentTargets.filter((target) => target.departmentSlug === department.slug)
+                          const checked = explicit ? explicit.supplierId === selectedSupplier.id : targets.length > 0 && targets.every((target) => selectedSettingFor(settings, target.id, assignmentTargets).supplierId === selectedSupplier.id)
                           return (
-                            <label key={target.id} className={`flex min-h-14 items-start gap-3 rounded-2xl border px-4 py-3 text-sm ${checked ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white"}`}>
+                            <label key={department.slug} className={`flex min-h-14 items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${checked ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white"}`}>
                               <input
                                 type="checkbox"
                                 checked={checked}
-                                onChange={(event) => toggleSupplierAssignment(target.id, event.target.checked)}
-                                className="mt-1"
+                                onChange={(event) => toggleSupplierDepartment(department.slug, event.target.checked)}
                               />
                               <span>
-                                <span className="block font-semibold text-slate-950">{target.serviceLabel}</span>
-                                <span className="mt-1 block text-xs text-slate-500">{target.departmentLabel}</span>
+                                <span className="block font-semibold text-slate-950">{department.label}</span>
+                                <span className="mt-1 block text-xs text-slate-500">Shop department</span>
                               </span>
                             </label>
                           )

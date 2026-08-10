@@ -121,10 +121,8 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
       ...(isAdmin
         ? [
             { href: "/admin/build-map", label: "Dashboard" },
-            { href: "/admin/users?view=requests", label: "Customer Requests" },
+            { href: "/admin/users", label: "Customers" },
             { href: "/admin/vendors", label: "Suppliers" },
-            { href: "/admin/settings/material-order-questions", label: "Departments & Questions" },
-            { href: "/owner/materials", label: "Catalog & Subcategories" },
           ]
         : []),
     ];
