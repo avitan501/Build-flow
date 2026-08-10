@@ -22,7 +22,7 @@ export default async function MaterialRequestsInboxPage() {
     .returns<InboxRequest[]>()
   if (error) throw new Error(`Could not load material requests: ${error.message}`)
 
-  const requests = (data ?? []).filter((request) => request.material_questionnaire_responses.length > 0)
+  const requests = data ?? []
   const { data: profiles } = requests.length
     ? await supabase.from("profiles").select("id,full_name,email").in("id", requests.map((request) => request.owner_id))
     : { data: [] as Array<{ id: string; full_name: string | null; email: string | null }> }
@@ -50,11 +50,11 @@ export default async function MaterialRequestsInboxPage() {
                   <p className="mt-1 text-sm text-slate-600">{request.projects?.name || "Project"}{request.projects?.address ? ` · ${request.projects.address}` : ""}</p>
                   <p className="mt-2 text-xs text-slate-500">{profile?.full_name || profile?.email || "Client"} · {new Date(request.created_at).toLocaleString()}</p>
                 </div>
-                <div className="flex flex-wrap gap-2">{request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{response.category_name_snapshot}</span>)}</div>
+                <div className="flex flex-wrap gap-2">{request.material_questionnaire_responses.length ? request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{response.category_name_snapshot}</span>) : <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700">Direct quote request</span>}</div>
               </Link>
             )
           })}
-          {requests.length === 0 ? <div className="rounded-[20px] border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No material questionnaires have been started yet.</div> : null}
+          {requests.length === 0 ? <div className="rounded-[20px] border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No customer requests have been submitted yet.</div> : null}
         </div>
       </div>
     </main>

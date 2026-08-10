@@ -74,8 +74,8 @@ export function QuoteRequestForm() {
         <label className={labelClass}>Project details or material list<textarea name="details" required rows={6} minLength={10} maxLength={5000} placeholder="Tell us the materials, sizes, quantities, brands, delivery requirements, or questions you have." className={`${inputClass} min-h-36 resize-y py-3`} /></label>
         <label className="grid cursor-pointer gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-700 transition hover:border-sky-400 hover:bg-sky-50">
           <span className="inline-flex items-center gap-2 font-semibold text-slate-900"><FileUp className="h-5 w-5 text-[#0071e3]" />Attach a plan or material list <span className="font-normal text-slate-500">Optional</span></span>
-          <input type="file" name="attachment" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.dwg,.dxf,.jpg,.jpeg,.png,.webp,.zip" className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-slate-950 file:px-3 file:py-2 file:font-semibold file:text-white" />
-          <span className="text-xs text-slate-500">PDF, Word, Excel, CSV, CAD, image, or ZIP. Maximum 10 MB.</span>
+          <input type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png,.webp" className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-slate-950 file:px-3 file:py-2 file:font-semibold file:text-white" />
+          <span className="text-xs text-slate-500">PDF, JPG, PNG, or WebP. Maximum 4 MB.</span>
         </label>
 
         {state.status === "error" ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800" role="alert">{state.message}</p> : null}

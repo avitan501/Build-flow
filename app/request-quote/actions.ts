@@ -1,17 +1,26 @@
 "use server"
 
 import { randomUUID } from "node:crypto"
+import { revalidatePath } from "next/cache"
 
 import { sendQuoteIntakeEmail } from "@/lib/cart-submission-email"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export type QuoteRequestFormState = {
   status: "idle" | "success" | "error"
   message: string
   referenceId?: string
+  requestId?: string
 }
 
-const ALLOWED_EXTENSIONS = new Set(["pdf", "doc", "docx", "xls", "xlsx", "csv", "dwg", "dxf", "jpg", "jpeg", "png", "webp", "zip"])
-const MAX_FILE_SIZE = 10 * 1024 * 1024
+const ALLOWED_FILES = new Map([
+  ["pdf", "application/pdf"],
+  ["jpg", "image/jpeg"],
+  ["jpeg", "image/jpeg"],
+  ["png", "image/png"],
+  ["webp", "image/webp"],
+])
+const MAX_FILE_SIZE = 4 * 1024 * 1024
 
 function field(formData: FormData, name: string, maxLength = 500) {
   return String(formData.get(name) || "").trim().slice(0, maxLength)
@@ -19,6 +28,15 @@ function field(formData: FormData, name: string, maxLength = 500) {
 
 function error(message: string): QuoteRequestFormState {
   return { status: "error", message }
+}
+
+function safeFileName(value: string) {
+  return value.replace(/[^a-zA-Z0-9._ -]+/g, "-").slice(0, 100) || "project-file"
+}
+
+async function findClientByEmail(supabase: ReturnType<typeof createAdminClient>, email: string) {
+  const { data } = await supabase.from("profiles").select("id,email").ilike("email", email).limit(1).maybeSingle<{ id: string; email: string }>()
+  return data
 }
 
 export async function submitQuoteRequestFormAction(_previousState: QuoteRequestFormState, formData: FormData): Promise<QuoteRequestFormState> {
@@ -51,42 +69,159 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
   if (details.length < 10) return error("Tell us what you need, including any known sizes or quantities.")
 
   const uploaded = formData.get("attachment")
-  let attachment: { filename: string; content: string } | undefined
+  let attachment: { filename: string; content: string; bytes: Uint8Array<ArrayBuffer>; type: string } | undefined
   if (uploaded instanceof File && uploaded.size > 0) {
-    if (uploaded.size > MAX_FILE_SIZE) return error("The attachment must be 10 MB or smaller.")
-    const filename = uploaded.name.replace(/[^a-zA-Z0-9._ -]+/g, "-").slice(0, 100) || "project-file"
+    if (uploaded.size > MAX_FILE_SIZE) return error("The attachment must be 4 MB or smaller.")
+    const filename = safeFileName(uploaded.name)
     const extension = filename.split(".").pop()?.toLowerCase() || ""
-    if (!ALLOWED_EXTENSIONS.has(extension)) return error("Use a PDF, Word, Excel, CSV, CAD, image, or ZIP file.")
-    attachment = { filename, content: Buffer.from(await uploaded.arrayBuffer()).toString("base64") }
+    const expectedType = ALLOWED_FILES.get(extension)
+    if (!expectedType) return error("Attach a PDF, JPG, PNG, or WebP file.")
+    const bytes = new Uint8Array(await uploaded.arrayBuffer())
+    attachment = { filename, content: Buffer.from(bytes).toString("base64"), bytes, type: expectedType }
   }
 
   const referenceId = `AB-${randomUUID().slice(0, 8).toUpperCase()}`
-  const delivery = await sendQuoteIntakeEmail({
-    referenceId,
-    firstName,
-    lastName,
-    email,
-    phone,
-    company,
-    customerType,
-    projectName,
-    projectType,
-    street,
-    city,
-    state,
-    zip,
-    timeframe,
-    departments,
-    details,
-    attachment,
-  })
+  const fullName = `${firstName} ${lastName}`
+  const address = `${street}, ${city}, ${state} ${zip}`
+  let projectId = ""
+  let requestId = ""
+  let clientId = ""
+  let createdClient = false
+  let storedFilePath = ""
 
-  if (delivery.owner.status === "not_configured") return error("Online quote delivery is temporarily unavailable. Please call (929) 207-7156.")
-  if (delivery.owner.status !== "sent") return error("We could not send the request. Please try again or call (929) 207-7156.")
+  try {
+    const supabase = createAdminClient()
+    const existingClient = await findClientByEmail(supabase, email)
 
-  return {
-    status: "success",
-    message: "Your quote request was sent to Avantia Build. We will review it and contact you if we need more information.",
-    referenceId,
+    if (existingClient) {
+      clientId = existingClient.id
+      const { error: profileError } = await supabase.from("profiles").update({
+        full_name: fullName,
+        phone,
+        company_name: company || null,
+      }).eq("id", clientId)
+      if (profileError) throw new Error("profile_update_failed")
+    } else {
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password: `${randomUUID()}Aa1!`,
+        email_confirm: true,
+        user_metadata: { full_name: fullName, phone, company_name: company || null },
+      })
+      if (authError || !authData.user) throw new Error("client_create_failed")
+      clientId = authData.user.id
+      createdClient = true
+      const { error: profileError } = await supabase.from("profiles").upsert({
+        id: clientId,
+        email,
+        full_name: fullName,
+        phone,
+        company_name: company || null,
+        role: "client",
+        approval_status: "pending",
+        is_active: true,
+      }, { onConflict: "id" })
+      if (profileError) throw new Error("profile_create_failed")
+    }
+
+    const { data: project, error: projectError } = await supabase.from("projects").insert({
+      owner_id: clientId,
+      name: projectName || `${street} quote request`,
+      address,
+      status: "active",
+    }).select("id").single<{ id: string }>()
+    if (projectError || !project) throw new Error("project_create_failed")
+    projectId = project.id
+
+    const { data: request, error: requestError } = await supabase.from("quote_requests").insert({
+      project_id: projectId,
+      owner_id: clientId,
+      title: projectName ? `${projectName} quote request` : `Construction quote ${referenceId}`,
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    }).select("id").single<{ id: string }>()
+    if (requestError || !request) throw new Error("request_create_failed")
+    requestId = request.id
+
+    const answers = [
+      { questionId: "customer_type", label: "Customer type", value: customerType },
+      { questionId: "project_type", label: "Project type", value: projectType },
+      { questionId: "timeframe", label: "Materials needed", value: timeframe },
+      { questionId: "departments", label: "Departments", value: departments.join(", ") },
+      { questionId: "request_details", label: "Request details", value: details },
+    ]
+    const { error: itemError } = await supabase.from("quote_request_items").insert({
+      request_id: requestId,
+      project_id: projectId,
+      owner_id: clientId,
+      name: "Construction quote request",
+      department: departments.join(", "),
+      item_type: "custom_priced",
+      quantity: 1,
+      unit: "request",
+      unit_price: 0,
+      qualification_status: "answered",
+      answers,
+      metadata: { reference_id: referenceId, source: "public_quote_form", request_details: details },
+    })
+    if (itemError) throw new Error("request_item_create_failed")
+
+    if (attachment) {
+      storedFilePath = `${clientId}/${projectId}/${randomUUID()}-${attachment.filename}`
+      const { error: uploadError } = await supabase.storage.from("project-uploads").upload(storedFilePath, attachment.bytes, {
+        contentType: attachment.type,
+        upsert: false,
+      })
+      if (uploadError) throw new Error("attachment_upload_failed")
+      const { error: attachmentError } = await supabase.from("quote_request_attachments").insert({
+        request_id: requestId,
+        project_id: projectId,
+        owner_id: clientId,
+        file_name: attachment.filename,
+        file_path: storedFilePath,
+        file_type: attachment.type,
+        file_size: attachment.bytes.byteLength,
+      })
+      if (attachmentError) throw new Error("attachment_record_failed")
+    }
+
+    await sendQuoteIntakeEmail({
+      referenceId,
+      firstName,
+      lastName,
+      email,
+      phone,
+      company,
+      customerType,
+      projectName,
+      projectType,
+      street,
+      city,
+      state,
+      zip,
+      timeframe,
+      departments,
+      details,
+      attachment: attachment ? { filename: attachment.filename, content: attachment.content } : undefined,
+    })
+
+    revalidatePath("/admin/users")
+    revalidatePath("/owner/materials/requests")
+    return {
+      status: "success",
+      message: "Your request was received. Someone from Avantia Build will be with you shortly and will call you back within the next 24 hours.",
+      referenceId,
+      requestId,
+    }
+  } catch {
+    try {
+      const supabase = createAdminClient()
+      if (storedFilePath) await supabase.storage.from("project-uploads").remove([storedFilePath])
+      if (projectId) await supabase.from("projects").delete().eq("id", projectId)
+      if (createdClient && clientId) await supabase.auth.admin.deleteUser(clientId)
+    } catch {
+      // Preserve the original submission error; cleanup is best effort.
+    }
+    return error("We could not save your request. Please try again or call (929) 207-7156.")
   }
 }
