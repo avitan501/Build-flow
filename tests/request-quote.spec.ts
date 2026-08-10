@@ -28,3 +28,24 @@ test("quote request is an Avantia-branded internal workflow", async ({ page }) =
     expect((await page.getByTestId("quote-request-form").boundingBox())?.width ?? 0).toBeGreaterThan(700)
   }
 })
+
+test("oversized plan stays on the form and shows a useful error", async ({ page }) => {
+  await page.goto("/request-quote")
+  await page.getByLabel("Full name").fill("Large Plan Test Client")
+  await page.getByLabel("Email").fill("client@example.com")
+  await page.getByLabel(/Project details or material list/).fill("Please quote the attached construction plan.")
+  await page.getByLabel(/Attach a plan or material list/).setInputFiles({
+    name: "large-plan.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.alloc(4 * 1024 * 1024 + 1),
+  })
+
+  const form = page.getByTestId("quote-request-form")
+  await expect(form.getByRole("alert")).toContainText("maximum upload size is 4 MB")
+  await page.getByRole("button", { name: "Send quote request" }).click()
+  await expect(page.getByRole("heading", { name: "Request a construction quote" })).toBeVisible()
+  await expect(page.getByText("This page couldn’t load")).toHaveCount(0)
+
+  await page.getByRole("button", { name: "Remove file" }).click()
+  await expect(form.getByRole("alert")).toHaveCount(0)
+})
