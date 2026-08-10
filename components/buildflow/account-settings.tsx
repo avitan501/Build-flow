@@ -56,7 +56,7 @@ export function AccountSettings({ email, profile, alternateEmail, alternatePhone
           <p className="mt-2 text-sm text-slate-500">Manage the contact details used for your projects and requests.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <Link href="/projects" className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-white">My Projects</Link>
-            <Link href="/shop" className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-white">Shop</Link>
+            <Link href="/shop" className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-white">Let&apos;s Work</Link>
           </div>
         </header>
 

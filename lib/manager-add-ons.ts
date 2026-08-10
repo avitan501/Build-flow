@@ -180,7 +180,7 @@ export function buildManagerDepartmentOverride(input: {
     symbols: normalizeDepartmentSymbols(input.symbols),
     hidden: Boolean(input.hidden),
     visibilityConfigured: true,
-    showQuickOrder: input.showQuickOrder ?? false,
+    showQuickOrder: input.showQuickOrder ?? true,
     showPlanUpload: input.showPlanUpload ?? true,
     showChatToOrder: input.showChatToOrder ?? true,
     showTakeoff: input.showTakeoff ?? true,
@@ -207,7 +207,7 @@ export function departmentDisplayLabel(addOns: ManagerCatalogAddOns, sourceLabel
 export function departmentExperienceFor(addOns: ManagerCatalogAddOns, sourceLabel: string): ManagerDepartmentExperience {
   const override = departmentOverrideFor(addOns, sourceLabel)
   return {
-    showQuickOrder: override?.showQuickOrder ?? false,
+    showQuickOrder: override?.showQuickOrder ?? true,
     showPlanUpload: override?.showPlanUpload ?? true,
     showChatToOrder: override?.showChatToOrder ?? true,
     showTakeoff: override?.showTakeoff ?? true,

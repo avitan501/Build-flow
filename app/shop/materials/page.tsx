@@ -23,7 +23,7 @@ export default async function ShopMaterialsPage() {
         <section className="rounded-[30px] border border-sky-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(243,248,255,0.94))] p-5 shadow-[0_18px_40px_rgba(148,163,184,0.12)] sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">Shop</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">Let&apos;s Work</p>
               <h1 className="mt-2 text-[2rem] font-semibold tracking-[-0.05em] text-slate-950 sm:text-[2.6rem]">Materials</h1>
               <p className="mt-3 text-sm leading-6 text-slate-600">All material items in one place.</p>
             </div>
@@ -32,7 +32,7 @@ export default async function ShopMaterialsPage() {
               prefetch={false}
               className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(148,163,184,0.08)] transition hover:bg-slate-50"
             >
-              Back to Shop
+              Back to Let&apos;s Work
             </Link>
           </div>
         </section>

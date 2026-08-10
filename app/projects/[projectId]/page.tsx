@@ -111,7 +111,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
             <div className="mt-4"><ProjectQuestionsForm projectId={project.id} questions={questionsResult.data ?? []} initialAnswers={initialAnswers} /></div>
           </section>
 
-          <Link href="/shop" className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(0,113,227,0.2)]">Add Items from Shop</Link>
+          <Link href="/shop" className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(0,113,227,0.2)]">Open Let&apos;s Work</Link>
         </aside>
 
         <div className="grid content-start gap-4">
