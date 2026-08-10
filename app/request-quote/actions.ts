@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 
 import { sendQuoteIntakeEmail } from "@/lib/cart-submission-email"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { getSupabasePublicEnv } from "@/lib/supabase/env"
 
 export type QuoteRequestFormState = {
   status: "idle" | "success" | "error"
@@ -55,9 +56,15 @@ type QuoteIntakePayload = {
 }
 
 async function saveWithSupabaseFunction(payload: QuoteIntakePayload) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !key) return null
+  let url = ""
+  let key = ""
+  try {
+    const config = getSupabasePublicEnv()
+    url = config.url
+    key = config.anonKey
+  } catch {
+    return null
+  }
   const response = await fetch(`${url}/functions/v1/public-quote-intake`, {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
@@ -76,15 +83,18 @@ async function findClientByEmail(supabase: ReturnType<typeof createAdminClient>,
 export async function submitQuoteRequestFormAction(_previousState: QuoteRequestFormState, formData: FormData): Promise<QuoteRequestFormState> {
   if (field(formData, "website")) return { status: "success", message: "Your request was received." }
 
-  const firstName = field(formData, "firstName", 80)
-  const lastName = field(formData, "lastName", 80)
+  const fullNameInput = field(formData, "fullName", 160) || `${field(formData, "firstName", 80)} ${field(formData, "lastName", 80)}`.trim()
+  const nameParts = fullNameInput.split(/\s+/).filter(Boolean)
+  const firstName = nameParts[0] || ""
+  const lastName = nameParts.slice(1).join(" ")
   const email = field(formData, "email", 160).toLowerCase()
   const phone = field(formData, "phone", 40)
   const company = field(formData, "company", 120)
   const customerType = field(formData, "customerType", 80)
   const projectName = field(formData, "projectName", 140)
   const projectType = field(formData, "projectType", 80)
-  const street = field(formData, "street", 180)
+  const addressInput = field(formData, "address", 300)
+  const street = addressInput || field(formData, "street", 180)
   const city = field(formData, "city", 100)
   const state = field(formData, "state", 40)
   const zip = field(formData, "zip", 10)
@@ -92,15 +102,9 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
   const details = field(formData, "details", 5000)
   const departments = formData.getAll("departments").map((value) => String(value).trim()).filter(Boolean).slice(0, 12)
 
-  if (!firstName || !lastName) return error("Enter your first and last name.")
+  if (!firstName || !lastName) return error("Enter your full name, including first and last name.")
   if (!/^\S+@\S+\.\S+$/.test(email)) return error("Enter a valid email address.")
-  if (phone.replace(/\D/g, "").length < 7) return error("Enter a valid phone number.")
-  if (!customerType) return error("Choose the option that best describes you.")
-  if (!projectType) return error("Choose a project type.")
-  if (!street || !city || !state || !/^\d{5}(?:-\d{4})?$/.test(zip)) return error("Complete the job-site address, including a valid ZIP code.")
-  if (!timeframe) return error("Choose when the materials are needed.")
-  if (departments.length === 0) return error("Choose at least one material department.")
-  if (details.length < 10) return error("Tell us what you need, including any known sizes or quantities.")
+  if (phone && phone.replace(/\D/g, "").length < 7) return error("Enter a valid phone number or leave it blank.")
 
   const uploaded = formData.get("attachment")
   let attachment: { filename: string; content: string; bytes: Uint8Array<ArrayBuffer>; type: string } | undefined
@@ -113,10 +117,11 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     const bytes = new Uint8Array(await uploaded.arrayBuffer())
     attachment = { filename, content: Buffer.from(bytes).toString("base64"), bytes, type: expectedType }
   }
+  if (details.length < 3 && !attachment) return error("Tell us what you need or attach a plan or material list.")
 
   const referenceId = `AB-${randomUUID().slice(0, 8).toUpperCase()}`
   const fullName = `${firstName} ${lastName}`
-  const address = `${street}, ${city}, ${state} ${zip}`
+  const address = addressInput || [street, city, state, zip].filter(Boolean).join(", ")
   const intakePayload: QuoteIntakePayload = {
     referenceId,
     firstName,
@@ -179,8 +184,8 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
 
     const { data: project, error: projectError } = await supabase.from("projects").insert({
       owner_id: clientId,
-      name: projectName || `${street} quote request`,
-      address,
+      name: projectName || `Quote request ${referenceId}`,
+      address: address || null,
       status: "active",
     }).select("id").single<{ id: string }>()
     if (projectError || !project) throw new Error("project_create_failed")
@@ -197,10 +202,10 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     requestId = request.id
 
     const answers = [
-      { questionId: "customer_type", label: "Customer type", value: customerType },
-      { questionId: "project_type", label: "Project type", value: projectType },
-      { questionId: "timeframe", label: "Materials needed", value: timeframe },
-      { questionId: "departments", label: "Departments", value: departments.join(", ") },
+      ...(customerType ? [{ questionId: "customer_type", label: "Customer type", value: customerType }] : []),
+      ...(projectType ? [{ questionId: "project_type", label: "Project type", value: projectType }] : []),
+      ...(timeframe ? [{ questionId: "timeframe", label: "Materials needed", value: timeframe }] : []),
+      ...(departments.length ? [{ questionId: "departments", label: "Departments", value: departments.join(", ") }] : []),
       { questionId: "request_details", label: "Request details", value: details },
     ]
     const { error: itemError } = await supabase.from("quote_request_items").insert({
@@ -208,7 +213,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
       project_id: projectId,
       owner_id: clientId,
       name: "Construction quote request",
-      department: departments.join(", "),
+      department: departments.join(", ") || "General request",
       item_type: "custom_priced",
       quantity: 1,
       unit: "request",

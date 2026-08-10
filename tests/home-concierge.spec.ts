@@ -34,4 +34,6 @@ test("customer menu omits the retired quote, order, and start-building links", a
   await expect(navigation.getByRole("link", { name: "Start Building", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "Quotes", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "Orders", exact: true })).toHaveCount(0);
+  await expect(navigation.getByRole("link", { name: "Log in", exact: true })).toHaveCount(0);
+  await expect(navigation.getByRole("link", { name: "Create account", exact: true })).toHaveCount(0);
 });

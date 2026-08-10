@@ -288,18 +288,18 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
     `Reference: ${input.referenceId}`,
     `Customer: ${fullName}`,
     `Email: ${input.email}`,
-    `Phone: ${input.phone}`,
+    `Phone: ${input.phone || "Not provided"}`,
     `Company: ${input.company || "Not provided"}`,
-    `Customer type: ${input.customerType}`,
+    `Customer type: ${input.customerType || "Not provided"}`,
     "",
     `Project: ${input.projectName || "Not named"}`,
-    `Project type: ${input.projectType}`,
-    `Job site: ${address}`,
-    `Needed: ${input.timeframe}`,
+    `Project type: ${input.projectType || "Not provided"}`,
+    `Job site: ${address || "Not provided"}`,
+    `Needed: ${input.timeframe || "Not provided"}`,
     `Departments: ${departmentText}`,
     "",
     "Request details:",
-    input.details,
+    input.details || "See attached file",
     "",
     `Attachment: ${input.attachment?.filename || "None"}`,
   ].join("\n")
@@ -310,18 +310,18 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
       <div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc">
         <strong>Reference:</strong> ${escapeHtml(input.referenceId)}<br />
         <strong>Email:</strong> ${escapeHtml(input.email)}<br />
-        <strong>Phone:</strong> ${escapeHtml(input.phone)}<br />
+        <strong>Phone:</strong> ${escapeHtml(input.phone || "Not provided")}<br />
         <strong>Company:</strong> ${escapeHtml(input.company || "Not provided")}<br />
-        <strong>Customer type:</strong> ${escapeHtml(input.customerType)}
+        <strong>Customer type:</strong> ${escapeHtml(input.customerType || "Not provided")}
       </div>
       <h2 style="margin:24px 0 8px;font-size:17px">Project</h2>
       <p><strong>Name:</strong> ${escapeHtml(input.projectName || "Not named")}<br />
-      <strong>Type:</strong> ${escapeHtml(input.projectType)}<br />
-      <strong>Job site:</strong> ${escapeHtml(address)}<br />
-      <strong>Needed:</strong> ${escapeHtml(input.timeframe)}<br />
+      <strong>Type:</strong> ${escapeHtml(input.projectType || "Not provided")}<br />
+      <strong>Job site:</strong> ${escapeHtml(address || "Not provided")}<br />
+      <strong>Needed:</strong> ${escapeHtml(input.timeframe || "Not provided")}<br />
       <strong>Departments:</strong> ${escapeHtml(departmentText)}</p>
       <h2 style="margin:24px 0 8px;font-size:17px">Request details</h2>
-      <p style="white-space:pre-wrap">${escapeHtml(input.details)}</p>
+      <p style="white-space:pre-wrap">${escapeHtml(input.details || "See attached file")}</p>
       <p style="margin-top:20px;color:#64748b;font-size:13px">Attachment: ${escapeHtml(input.attachment?.filename || "None")}</p>
     </div>
   `
