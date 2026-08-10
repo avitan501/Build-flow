@@ -1,13 +1,16 @@
 "use client"
 
 import { CheckCircle2, FileUp, LocateFixed, LoaderCircle, Send } from "lucide-react"
-import { useActionState, useRef, useState } from "react"
+import { useActionState, useRef, useState, useTransition } from "react"
 
 import { submitQuoteRequestFormAction, type QuoteRequestFormState } from "@/app/request-quote/actions"
+import { createClient } from "@/lib/supabase/client"
+import { getSupabasePublicEnv } from "@/lib/supabase/env"
 
 const initialState: QuoteRequestFormState = { status: "idle", message: "" }
 const departments = ["Framing", "Flooring", "Sheet rock", "Tile work", "Door and molding", "Siding", "Roofing", "Windows"]
-const maxAttachmentSize = 4 * 1024 * 1024
+const directAttachmentSize = 4 * 1024 * 1024
+const maxAttachmentSize = 25 * 1024 * 1024
 const inputClass = "min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3.5 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
 const labelClass = "grid gap-1.5 text-sm font-semibold text-slate-800"
 
@@ -22,10 +25,12 @@ function SubmitButton({ pending }: { pending: boolean }) {
 
 export function QuoteRequestForm() {
   const [state, formAction, pending] = useActionState(submitQuoteRequestFormAction, initialState)
+  const [uploadPending, startUploadTransition] = useTransition()
   const [address, setAddress] = useState("")
   const [locationStatus, setLocationStatus] = useState("")
   const [locating, setLocating] = useState(false)
   const [fileError, setFileError] = useState("")
+  const [uploading, setUploading] = useState(false)
   const attachmentRef = useRef<HTMLInputElement>(null)
 
   function validateAttachment(file: File | undefined) {
@@ -35,8 +40,29 @@ export function QuoteRequestForm() {
     }
 
     const size = (file.size / (1024 * 1024)).toFixed(1)
-    setFileError(`This file is ${size} MB. The maximum upload size is 4 MB. Choose a smaller file or remove it to send the request without an attachment.`)
+    setFileError(`This file is ${size} MB. The maximum upload size is 25 MB. Choose a smaller file or remove it to send the request without an attachment.`)
     return false
+  }
+
+  async function uploadLargeAttachment(file: File) {
+    const { url, anonKey } = getSupabasePublicEnv()
+    const response = await fetch(`${url}/functions/v1/public-quote-intake`, {
+      method: "POST",
+      headers: {
+        apikey: anonKey,
+        authorization: `Bearer ${anonKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ action: "prepare_upload", filename: file.name, type: file.type, size: file.size }),
+    })
+    const prepared = (await response.json().catch(() => null)) as { path?: string; token?: string; error?: string } | null
+    if (!response.ok || !prepared?.path || !prepared.token) throw new Error(prepared?.error || "Could not prepare the file upload.")
+
+    const { error: uploadError } = await createClient().storage
+      .from("project-uploads")
+      .uploadToSignedUrl(prepared.path, prepared.token, file, { contentType: file.type, upsert: false })
+    if (uploadError) throw new Error("Could not upload the attachment. Please try again.")
+    return prepared.path
   }
 
   function removeAttachment() {
@@ -87,7 +113,30 @@ export function QuoteRequestForm() {
       action={formAction}
       onSubmit={(event) => {
         const file = attachmentRef.current?.files?.[0]
-        if (!validateAttachment(file)) event.preventDefault()
+        if (!validateAttachment(file)) {
+          event.preventDefault()
+          return
+        }
+        if (!file || file.size <= directAttachmentSize) return
+
+        event.preventDefault()
+        const submission = new FormData(event.currentTarget)
+        submission.delete("attachment")
+        setFileError("")
+        setUploading(true)
+        void uploadLargeAttachment(file)
+          .then((storagePath) => {
+            submission.set("attachmentPath", storagePath)
+            submission.set("attachmentName", file.name)
+            submission.set("attachmentType", file.type)
+            submission.set("attachmentSize", String(file.size))
+            setUploading(false)
+            startUploadTransition(() => formAction(submission))
+          })
+          .catch((cause) => {
+            setUploading(false)
+            setFileError(cause instanceof Error ? cause.message : "Could not upload the attachment. Please try again.")
+          })
       }}
       className="overflow-hidden border-y border-slate-200 bg-white"
       data-testid="quote-request-form"
@@ -131,7 +180,7 @@ export function QuoteRequestForm() {
         <label className="grid cursor-pointer gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-700 transition hover:border-sky-400 hover:bg-sky-50">
           <span className="inline-flex items-center gap-2 font-semibold text-slate-900"><FileUp className="h-5 w-5 text-[#0071e3]" />Attach a plan or material list <span className="font-normal text-slate-500">Optional</span></span>
           <input ref={attachmentRef} type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => validateAttachment(event.currentTarget.files?.[0])} className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-slate-950 file:px-3 file:py-2 file:font-semibold file:text-white" />
-          <span className="text-xs text-slate-500">PDF, JPG, PNG, or WebP. Maximum 4 MB.</span>
+          <span className="text-xs text-slate-500">PDF, JPG, PNG, or WebP. Maximum 25 MB.</span>
         </label>
 
         {fileError ? (
@@ -140,11 +189,12 @@ export function QuoteRequestForm() {
             <button type="button" onClick={removeAttachment} className="mt-2 min-h-9 rounded-md border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-800">Remove file</button>
           </div>
         ) : null}
+        {uploading ? <p className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-900" role="status">Uploading your plan securely...</p> : null}
         {state.status === "error" ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800" role="alert">{state.message}</p> : null}
 
         <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs leading-5 text-slate-500">By sending this request, you agree that Avantia Build may contact you about this project.</p>
-          <SubmitButton pending={pending} />
+          <SubmitButton pending={pending || uploadPending || uploading} />
         </div>
       </fieldset>
     </form>

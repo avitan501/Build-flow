@@ -18,13 +18,21 @@ type QuotePayload = {
   timeframe: string
   departments: string[]
   details: string
-  attachment?: { filename: string; content: string; type: string }
+  attachment?: { filename: string; content?: string; storagePath?: string; type: string; size?: number }
 }
 
 const allowedTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"])
+const maxInlineFileSize = 4 * 1024 * 1024
+const maxStoredFileSize = 25 * 1024 * 1024
+const temporaryUploadPrefix = "public-intake/"
+const corsHeaders = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-headers": "authorization, apikey, content-type",
+  "access-control-allow-methods": "POST, OPTIONS",
+}
 
 function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "content-type": "application/json" } })
 }
 
 function decodeBase64(value: string) {
@@ -49,7 +57,7 @@ async function sendEmail(input: { to: string; subject: string; html: string; tex
       html: input.html,
       text: input.text,
       reply_to: input.replyTo,
-      attachments: input.attachment ? [{ filename: input.attachment.filename, content: input.attachment.content }] : undefined,
+      attachments: input.attachment?.content ? [{ filename: input.attachment.filename, content: input.attachment.content }] : undefined,
     }),
   })
   return response.ok ? "sent" : "failed"
@@ -79,22 +87,39 @@ function hasValidPublicKey(request: Request) {
 }
 
 Deno.serve(async (request) => {
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders })
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405)
   if (!hasValidPublicKey(request)) return json({ error: "unauthorized" }, 401)
 
-  let payload: QuotePayload
+  let rawPayload: QuotePayload | { action: "prepare_upload"; filename?: string; type?: string; size?: number }
   try {
-    payload = await request.json()
+    rawPayload = await request.json()
   } catch {
     return json({ error: "invalid_json" }, 400)
   }
-  if (!valid(payload)) return json({ error: "invalid_request" }, 400)
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
   if (!supabaseUrl || !serviceRoleKey) return json({ error: "service_unavailable" }, 503)
 
   const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+  if ("action" in rawPayload && rawPayload.action === "prepare_upload") {
+    const size = Number(rawPayload.size)
+    const type = String(rawPayload.type || "")
+    const filename = String(rawPayload.filename || "").replace(/[^a-zA-Z0-9._ -]+/g, "-").slice(0, 100) || "project-file"
+    if (!allowedTypes.has(type)) return json({ error: "invalid_file_type" }, 400)
+    if (!Number.isFinite(size) || size <= 0 || size > maxStoredFileSize) return json({ error: "file_too_large" }, 400)
+    const extension = filename.split(".").pop()?.toLowerCase()
+    const expectedType = extension === "pdf" ? "application/pdf" : extension === "jpg" || extension === "jpeg" ? "image/jpeg" : extension === "png" ? "image/png" : extension === "webp" ? "image/webp" : ""
+    if (expectedType !== type) return json({ error: "invalid_file_type" }, 400)
+    const path = `${temporaryUploadPrefix}${crypto.randomUUID()}-${filename}`
+    const { data, error } = await supabase.storage.from("project-uploads").createSignedUploadUrl(path)
+    if (error || !data) return json({ error: "upload_preparation_failed" }, 500)
+    return json({ ok: true, path: data.path, token: data.token })
+  }
+
+  const payload = rawPayload as QuotePayload
+  if (!valid(payload)) return json({ error: "invalid_request" }, 400)
   const fullName = `${payload.firstName.trim()} ${payload.lastName.trim()}`
   const email = payload.email.trim().toLowerCase()
   const address = [payload.street, payload.city, payload.state, payload.zip].map((value) => value?.trim()).filter(Boolean).join(", ")
@@ -175,10 +200,30 @@ Deno.serve(async (request) => {
     })
     if (itemError) throw new Error("request_item_create_failed")
 
-    if (payload.attachment) {
+    if (payload.attachment?.storagePath) {
+      const temporaryPath = payload.attachment.storagePath
+      const statedSize = Number(payload.attachment.size)
+      if (!temporaryPath.startsWith(temporaryUploadPrefix) || temporaryPath.includes("..") || !allowedTypes.has(payload.attachment.type)) throw new Error("invalid_attachment")
+      const { data: fileInfo, error: infoError } = await supabase.storage.from("project-uploads").info(temporaryPath)
+      if (infoError || !fileInfo || !Number.isFinite(statedSize) || statedSize <= 0 || fileInfo.size !== statedSize || fileInfo.size > maxStoredFileSize || fileInfo.contentType !== payload.attachment.type) throw new Error("invalid_attachment")
+      const filename = payload.attachment.filename.replace(/[^a-zA-Z0-9._ -]+/g, "-").slice(0, 100) || "project-file"
+      storedFilePath = `${clientId}/${projectId}/${crypto.randomUUID()}-${filename}`
+      const { error: moveError } = await supabase.storage.from("project-uploads").move(temporaryPath, storedFilePath)
+      if (moveError) throw new Error("attachment_move_failed")
+      const { error: attachmentError } = await supabase.from("quote_request_attachments").insert({
+        request_id: requestId,
+        project_id: projectId,
+        owner_id: clientId,
+        file_name: filename,
+        file_path: storedFilePath,
+        file_type: payload.attachment.type,
+        file_size: statedSize,
+      })
+      if (attachmentError) throw new Error("attachment_record_failed")
+    } else if (payload.attachment?.content) {
       if (!allowedTypes.has(payload.attachment.type)) throw new Error("invalid_attachment")
       const bytes = decodeBase64(payload.attachment.content)
-      if (bytes.byteLength > 4 * 1024 * 1024) throw new Error("attachment_too_large")
+      if (bytes.byteLength > maxInlineFileSize) throw new Error("attachment_too_large")
       const filename = payload.attachment.filename.replace(/[^a-zA-Z0-9._ -]+/g, "-").slice(0, 100) || "project-file"
       storedFilePath = `${clientId}/${projectId}/${crypto.randomUUID()}-${filename}`
       const { error: uploadError } = await supabase.storage.from("project-uploads").upload(storedFilePath, bytes, { contentType: payload.attachment.type, upsert: false })

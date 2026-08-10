@@ -19,7 +19,7 @@ test("quote request is an Avantia-branded internal workflow", async ({ page }) =
   const attachment = page.getByLabel(/Attach a plan or material list/)
   await expect(attachment).toBeVisible()
   await expect(attachment).toHaveAttribute("accept", ".pdf,.jpg,.jpeg,.png,.webp")
-  await expect(page.getByText("PDF, JPG, PNG, or WebP. Maximum 4 MB.")).toBeVisible()
+  await expect(page.getByText("PDF, JPG, PNG, or WebP. Maximum 25 MB.")).toBeVisible()
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
   expect(overflow).toBe(false)
@@ -29,7 +29,7 @@ test("quote request is an Avantia-branded internal workflow", async ({ page }) =
   }
 })
 
-test("oversized plan stays on the form and shows a useful error", async ({ page }) => {
+test("plan over the storage limit stays on the form and shows a useful error", async ({ page }) => {
   await page.goto("/request-quote")
   await page.getByLabel("Full name").fill("Large Plan Test Client")
   await page.getByLabel("Email").fill("client@example.com")
@@ -37,11 +37,11 @@ test("oversized plan stays on the form and shows a useful error", async ({ page 
   await page.getByLabel(/Attach a plan or material list/).setInputFiles({
     name: "large-plan.pdf",
     mimeType: "application/pdf",
-    buffer: Buffer.alloc(4 * 1024 * 1024 + 1),
+    buffer: Buffer.alloc(25 * 1024 * 1024 + 1),
   })
 
   const form = page.getByTestId("quote-request-form")
-  await expect(form.getByRole("alert")).toContainText("maximum upload size is 4 MB")
+  await expect(form.getByRole("alert")).toContainText("maximum upload size is 25 MB")
   await page.getByRole("button", { name: "Send quote request" }).click()
   await expect(page.getByRole("heading", { name: "Request a construction quote" })).toBeVisible()
   await expect(page.getByText("This page couldn’t load")).toHaveCount(0)
