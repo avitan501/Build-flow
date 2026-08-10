@@ -34,6 +34,40 @@ function safeFileName(value: string) {
   return value.replace(/[^a-zA-Z0-9._ -]+/g, "-").slice(0, 100) || "project-file"
 }
 
+type QuoteIntakePayload = {
+  referenceId: string
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  company: string
+  customerType: string
+  projectName: string
+  projectType: string
+  street: string
+  city: string
+  state: string
+  zip: string
+  timeframe: string
+  departments: string[]
+  details: string
+  attachment?: { filename: string; content: string; type: string }
+}
+
+async function saveWithSupabaseFunction(payload: QuoteIntakePayload) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !key) return null
+  const response = await fetch(`${url}/functions/v1/public-quote-intake`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  })
+  if (!response.ok) return null
+  return response.json() as Promise<{ ok: true; requestId: string }>
+}
+
 async function findClientByEmail(supabase: ReturnType<typeof createAdminClient>, email: string) {
   const { data } = await supabase.from("profiles").select("id,email").ilike("email", email).limit(1).maybeSingle<{ id: string; email: string }>()
   return data
@@ -83,6 +117,25 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
   const referenceId = `AB-${randomUUID().slice(0, 8).toUpperCase()}`
   const fullName = `${firstName} ${lastName}`
   const address = `${street}, ${city}, ${state} ${zip}`
+  const intakePayload: QuoteIntakePayload = {
+    referenceId,
+    firstName,
+    lastName,
+    email,
+    phone,
+    company,
+    customerType,
+    projectName,
+    projectType,
+    street,
+    city,
+    state,
+    zip,
+    timeframe,
+    departments,
+    details,
+    attachment: attachment ? { filename: attachment.filename, content: attachment.content, type: attachment.type } : undefined,
+  }
   let projectId = ""
   let requestId = ""
   let clientId = ""
@@ -186,22 +239,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     }
 
     await sendQuoteIntakeEmail({
-      referenceId,
-      firstName,
-      lastName,
-      email,
-      phone,
-      company,
-      customerType,
-      projectName,
-      projectType,
-      street,
-      city,
-      state,
-      zip,
-      timeframe,
-      departments,
-      details,
+      ...intakePayload,
       attachment: attachment ? { filename: attachment.filename, content: attachment.content } : undefined,
     })
 
@@ -221,6 +259,25 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
       if (createdClient && clientId) await supabase.auth.admin.deleteUser(clientId)
     } catch {
       // Preserve the original submission error; cleanup is best effort.
+    }
+    try {
+      const saved = await saveWithSupabaseFunction(intakePayload)
+      if (saved?.ok) {
+        await sendQuoteIntakeEmail({
+          ...intakePayload,
+          attachment: attachment ? { filename: attachment.filename, content: attachment.content } : undefined,
+        })
+        revalidatePath("/admin/users")
+        revalidatePath("/owner/materials/requests")
+        return {
+          status: "success",
+          message: "Your request was received. Someone from Avantia Build will be with you shortly and will call you back within the next 24 hours.",
+          referenceId,
+          requestId: saved.requestId,
+        }
+      }
+    } catch {
+      // Return the customer-facing save error below.
     }
     return error("We could not save your request. Please try again or call (929) 207-7156.")
   }
