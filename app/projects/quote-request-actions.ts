@@ -393,7 +393,7 @@ export async function submitQuoteRequestAction(input: { projectId: string; reque
     session.supabase.from("project_questions").select("id, label, required").eq("active", true).eq("required", true),
     session.supabase.from("project_question_answers").select("question_id, value").eq("project_id", input.projectId).eq("owner_id", session.user.id),
     session.supabase.from("quote_request_items").select("id, catalog_item_id, department, qualification_status, answers, metadata").eq("request_id", input.requestId).eq("owner_id", session.user.id),
-    session.supabase.from("material_questionnaire_responses").select("id, definition_snapshot").eq("request_id", input.requestId).eq("owner_id", session.user.id),
+    session.supabase.from("material_questionnaire_responses").select("id, status, definition_snapshot").eq("request_id", input.requestId).eq("owner_id", session.user.id),
   ])
 
   if (!items || items.length === 0) return { ok: false, error: "Add at least one item before submitting." }
@@ -410,9 +410,12 @@ export async function submitQuoteRequestAction(input: { projectId: string; reque
   if (incompleteItem) return { ok: false, error: "Complete all required item questions before submitting." }
 
   for (const response of materialResponses ?? []) {
+    const snapshot = response.definition_snapshot as MaterialQuestionnaireResponse["definition_snapshot"]
+    if (response.status !== "complete") {
+      return { ok: false, error: `Finish the ${snapshot.category.name} questions before submitting.` }
+    }
     const { data: savedAnswers } = await session.supabase.from("material_request_answers").select("question_id, answer_value").eq("response_id", response.id)
     const materialAnswerMap = Object.fromEntries((savedAnswers ?? []).map((answer) => [answer.question_id, answer.answer_value])) as Record<string, MaterialAnswerValue>
-    const snapshot = response.definition_snapshot as MaterialQuestionnaireResponse["definition_snapshot"]
     const missing = snapshot.questions
       .filter((question) => isQuestionVisible(question, materialAnswerMap))
       .find((question) => question.is_required && !hasMaterialAnswer(materialAnswerMap[question.id]))
