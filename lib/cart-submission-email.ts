@@ -265,7 +265,7 @@ export type QuoteIntakeEmailInput = {
   timeframe: string
   departments: string[]
   details: string
-  attachment?: { filename: string; content: string }
+  attachment?: { filename: string; content?: string }
 }
 
 export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
@@ -335,7 +335,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
     text,
     replyTo: input.email,
     idempotencyKey: `avantia-intake-owner-${input.referenceId}`,
-    attachments: input.attachment ? [input.attachment] : undefined,
+    attachments: input.attachment?.content ? [{ filename: input.attachment.filename, content: input.attachment.content }] : undefined,
   })
 
   const clientText = [

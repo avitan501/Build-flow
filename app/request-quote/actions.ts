@@ -22,6 +22,8 @@ const ALLOWED_FILES = new Map([
   ["webp", "image/webp"],
 ])
 const MAX_FILE_SIZE = 4 * 1024 * 1024
+const MAX_STORED_FILE_SIZE = 25 * 1024 * 1024
+const TEMP_UPLOAD_PREFIX = "public-intake/"
 
 function field(formData: FormData, name: string, maxLength = 500) {
   return String(formData.get(name) || "").trim().slice(0, maxLength)
@@ -52,7 +54,7 @@ type QuoteIntakePayload = {
   timeframe: string
   departments: string[]
   details: string
-  attachment?: { filename: string; content: string; type: string }
+  attachment?: { filename: string; content?: string; storagePath?: string; type: string; size?: number }
 }
 
 async function saveWithSupabaseFunction(payload: QuoteIntakePayload) {
@@ -107,7 +109,11 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
   if (phone && phone.replace(/\D/g, "").length < 7) return error("Enter a valid phone number or leave it blank.")
 
   const uploaded = formData.get("attachment")
-  let attachment: { filename: string; content: string; bytes: Uint8Array<ArrayBuffer>; type: string } | undefined
+  const attachmentPath = field(formData, "attachmentPath", 300)
+  const attachmentName = field(formData, "attachmentName", 160)
+  const attachmentType = field(formData, "attachmentType", 120)
+  const attachmentSize = Number(field(formData, "attachmentSize", 20))
+  let attachment: { filename: string; content?: string; bytes?: Uint8Array<ArrayBuffer>; storagePath?: string; type: string; size: number } | undefined
   if (uploaded instanceof File && uploaded.size > 0) {
     if (uploaded.size > MAX_FILE_SIZE) return error("The attachment must be 4 MB or smaller.")
     const filename = safeFileName(uploaded.name)
@@ -115,7 +121,15 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     const expectedType = ALLOWED_FILES.get(extension)
     if (!expectedType) return error("Attach a PDF, JPG, PNG, or WebP file.")
     const bytes = new Uint8Array(await uploaded.arrayBuffer())
-    attachment = { filename, content: Buffer.from(bytes).toString("base64"), bytes, type: expectedType }
+    attachment = { filename, content: Buffer.from(bytes).toString("base64"), bytes, type: expectedType, size: bytes.byteLength }
+  } else if (attachmentPath || attachmentName || attachmentType || attachmentSize) {
+    if (!attachmentPath.startsWith(TEMP_UPLOAD_PREFIX) || attachmentPath.includes("..")) return error("The uploaded attachment could not be verified. Please select it again.")
+    const filename = safeFileName(attachmentName)
+    const extension = filename.split(".").pop()?.toLowerCase() || ""
+    const expectedType = ALLOWED_FILES.get(extension)
+    if (!expectedType || expectedType !== attachmentType) return error("Attach a PDF, JPG, PNG, or WebP file.")
+    if (!Number.isFinite(attachmentSize) || attachmentSize <= 0 || attachmentSize > MAX_STORED_FILE_SIZE) return error("The attachment must be 25 MB or smaller.")
+    attachment = { filename, storagePath: attachmentPath, type: expectedType, size: attachmentSize }
   }
   if (details.length < 3 && !attachment) return error("Tell us what you need or attach a plan or material list.")
 
@@ -139,7 +153,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     timeframe,
     departments,
     details,
-    attachment: attachment ? { filename: attachment.filename, content: attachment.content, type: attachment.type } : undefined,
+    attachment: attachment ? { filename: attachment.filename, content: attachment.content, storagePath: attachment.storagePath, type: attachment.type, size: attachment.size } : undefined,
   }
   let projectId = ""
   let requestId = ""
@@ -224,7 +238,23 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     })
     if (itemError) throw new Error("request_item_create_failed")
 
-    if (attachment) {
+    if (attachment?.storagePath) {
+      const { data: fileInfo, error: infoError } = await supabase.storage.from("project-uploads").info(attachment.storagePath)
+      if (infoError || !fileInfo || fileInfo.size !== attachment.size || fileInfo.size > MAX_STORED_FILE_SIZE || fileInfo.contentType !== attachment.type) throw new Error("attachment_verification_failed")
+      storedFilePath = `${clientId}/${projectId}/${randomUUID()}-${attachment.filename}`
+      const { error: moveError } = await supabase.storage.from("project-uploads").move(attachment.storagePath, storedFilePath)
+      if (moveError) throw new Error("attachment_move_failed")
+      const { error: attachmentError } = await supabase.from("quote_request_attachments").insert({
+        request_id: requestId,
+        project_id: projectId,
+        owner_id: clientId,
+        file_name: attachment.filename,
+        file_path: storedFilePath,
+        file_type: attachment.type,
+        file_size: attachment.size,
+      })
+      if (attachmentError) throw new Error("attachment_record_failed")
+    } else if (attachment?.bytes) {
       storedFilePath = `${clientId}/${projectId}/${randomUUID()}-${attachment.filename}`
       const { error: uploadError } = await supabase.storage.from("project-uploads").upload(storedFilePath, attachment.bytes, {
         contentType: attachment.type,
