@@ -29,6 +29,7 @@ type AddToProjectButtonProps = {
   questions?: QualifyingQuestion[]
   details?: string
   questionnaireDepartment?: string
+  materialAnswers?: Record<string, MaterialAnswerValue>
 }
 
 type Options = {
@@ -45,7 +46,7 @@ function PlusIcon() {
   )
 }
 
-export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Add to Project", file = null, questions: questionOverride, details, questionnaireDepartment }: AddToProjectButtonProps) {
+export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Add to Project", file = null, questions: questionOverride, details, questionnaireDepartment, materialAnswers }: AddToProjectButtonProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -57,6 +58,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
   const [created, setCreated] = useState<{ projectId: string; requestId: string; itemId: string; materialResponse: MaterialQuestionnaireResponse | null; materialAnswers: MaterialRequestAnswer[] } | null>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
+  const [questionnaireCompleted, setQuestionnaireCompleted] = useState(false)
   const [isPending, startTransition] = useTransition()
   const qualification = useMemo(() => getQualificationSettingForProduct(product), [product])
   const questions = questionOverride ?? (qualification.enabled ? qualification.questions : [])
@@ -76,6 +78,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
     setOpen(true)
     setError(null)
     setCreated(null)
+    setQuestionnaireCompleted(false)
     const result = await getAddToProjectOptionsAction()
     if (!result.ok) {
       if (result.authRequired) {
@@ -144,6 +147,21 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
           })
           if (!attachmentResult.ok) setError(attachmentResult.error)
         }
+      }
+      if (materialAnswers && result.data.materialResponse) {
+        const answersResult = await saveMaterialQuestionnaireResponseAction({
+          projectId,
+          requestId: result.data.requestId,
+          responseId: result.data.materialResponse.id,
+          answers: materialAnswers,
+          complete: true,
+        })
+        if (!answersResult.ok) {
+          setError(answersResult.error)
+          setCreated({ projectId, ...result.data })
+          return
+        }
+        setQuestionnaireCompleted(true)
       }
       setCreated({ projectId, ...result.data })
       router.refresh()
@@ -302,12 +320,21 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
                 </div>
               ) : null}
 
+              {created && questionnaireCompleted ? (
+                <div className="grid gap-4">
+                  <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
+                    Added to the project with all flooring answers.
+                  </div>
+                  <Link href={`/projects/${created.projectId}`} className="text-center text-sm font-semibold text-[#0066cc]">Open project</Link>
+                </div>
+              ) : null}
+
               {error ? <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div> : null}
             </div>
           </section>
         </div>
       ) : null}
-      {open && created?.materialResponse ? (
+      {open && created?.materialResponse && !questionnaireCompleted ? (
         <MaterialQuestionnaireWizard
           snapshot={created.materialResponse.definition_snapshot}
           displayMode={created.materialResponse.definition_snapshot.category.department_key === "Wood Floor" ? "all" : "steps"}
