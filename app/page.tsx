@@ -56,9 +56,9 @@ export default function Home() {
           aria-hidden="true"
         />
         <div className="absolute inset-0 -z-10 bg-[#071126]/80" aria-hidden="true" />
-        <div className="mx-auto flex min-h-[23rem] max-w-6xl flex-col justify-end px-5 py-10 sm:min-h-[28rem] sm:px-8 sm:py-14 lg:px-10">
+        <div className="mx-auto flex min-h-[18rem] max-w-6xl flex-col justify-end px-5 py-7 sm:min-h-[22rem] sm:px-8 sm:py-10 lg:px-10">
           <AvantiaBuildLockup tone="light" />
-          <h1 className="mt-3 max-w-3xl text-4xl font-semibold leading-tight sm:text-6xl">
+          <h1 className="mt-3 max-w-3xl text-3xl font-semibold leading-tight sm:text-5xl">
             Concierge service for every construction need.
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
@@ -67,41 +67,41 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14 lg:px-10">
+      <section className="mx-auto max-w-6xl px-5 py-7 sm:px-8 sm:py-9 lg:px-10">
         <div className="grid border-t border-slate-200 md:grid-cols-2">
           {conciergePoints.map((point, index) => (
             <details
               key={point.title}
               className={`group border-b border-slate-200 md:px-7 ${index % 2 === 0 ? "md:border-r md:pl-0" : "md:pr-0"}`}
             >
-              <summary className="flex min-h-28 cursor-pointer list-none items-center justify-between gap-4 py-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0066cc] [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-20 cursor-pointer list-none items-center justify-between gap-3 py-3.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0066cc] [&::-webkit-details-marker]:hidden">
                 <span className="flex min-w-0 items-start gap-4">
                   <span className="pt-0.5 text-xs font-semibold text-[#0066cc]">{String(index + 1).padStart(2, "0")}</span>
                   <span>
-                    <span className="block text-lg font-semibold text-[#071126] sm:text-xl">{point.title}</span>
+                    <span className="block text-base font-semibold text-[#071126] sm:text-lg">{point.title}</span>
                     <span className="mt-1 block text-sm leading-5 text-slate-600">{point.summary}</span>
                   </span>
                 </span>
                 <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-300 text-xl font-light text-slate-600 transition group-open:rotate-45" aria-hidden="true">+</span>
               </summary>
-              <p className="pb-5 pl-10 pr-12 text-sm leading-6 text-slate-600 sm:text-base">{point.body}</p>
+              <p className="pb-4 pl-10 pr-11 text-sm leading-5 text-slate-600">{point.body}</p>
             </details>
           ))}
         </div>
 
-        <p className="py-10 text-center text-base font-semibold text-[#071126] sm:text-lg">
+        <p className="py-6 text-center text-sm font-semibold text-[#071126] sm:text-base">
           Sourcing support for contractors, developers, design professionals, and property owners.
         </p>
       </section>
 
       <section className="border-y border-slate-200 bg-[#f5f7fa]" aria-labelledby="coverage-heading">
-        <div className="mx-auto grid max-w-6xl items-center gap-6 px-5 py-10 sm:px-8 sm:py-14 lg:grid-cols-[minmax(16rem,0.65fr)_minmax(0,1.35fr)] lg:px-10">
+        <div className="mx-auto grid max-w-5xl items-center gap-4 px-5 py-7 sm:px-8 sm:py-9 lg:grid-cols-[minmax(15rem,0.7fr)_minmax(0,1.1fr)] lg:px-10">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Nationwide sourcing</p>
-            <h2 id="coverage-heading" className="mt-2 text-3xl font-semibold leading-tight text-[#071126] sm:text-4xl">Covering 41 states.</h2>
+            <h2 id="coverage-heading" className="mt-2 text-2xl font-semibold leading-tight text-[#071126] sm:text-3xl">Covering 41 states.</h2>
             <p className="mt-3 max-w-md text-sm leading-6 text-slate-600 sm:text-base">Local projects or out-of-state jobs, we help source construction materials where your work takes you.</p>
           </div>
-          <div className="relative aspect-[16/9] overflow-hidden" data-testid="coverage-map">
+          <div className="relative mx-auto aspect-[16/9] w-full max-w-md overflow-hidden lg:max-w-xl" data-testid="coverage-map">
             <Image src="/images/buildflow-retail/us-coverage-map.webp" alt="Map showing Avantia Build coverage across the United States" fill sizes="(min-width: 1024px) 58vw, 100vw" className="object-contain" />
             {coverageDots.map(([left, top]) => (
               <span

@@ -14,7 +14,7 @@ const SHOP_BRANDS = [
 export function ShopBrandShowcase({ compact = false }: { compact?: boolean }) {
   return (
     <section aria-labelledby="shop-brands-heading" className={`${compact ? "mt-0" : "mt-8"} border-y border-black/[0.06] bg-white`}>
-      <div className={`mx-auto w-full max-w-7xl px-4 sm:px-8 lg:px-10 ${compact ? "py-8 sm:py-10" : "py-10 sm:py-14"}`}>
+      <div className={`mx-auto w-full max-w-7xl px-4 sm:px-8 lg:px-10 ${compact ? "py-6 sm:py-8" : "py-10 sm:py-14"}`}>
         <div className="text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Trusted manufacturers</p>
           <h2 id="shop-brands-heading" className="mt-2 text-2xl font-semibold tracking-normal text-[#1d1d1f] sm:text-3xl">Brands we source</h2>
@@ -23,7 +23,7 @@ export function ShopBrandShowcase({ compact = false }: { compact?: boolean }) {
           </p>
         </div>
 
-        <div className="mt-7 grid grid-cols-2 border-l border-t border-slate-200 sm:grid-cols-4" data-testid="shop-brand-grid">
+        <div className={`${compact ? "mt-5" : "mt-7"} grid grid-cols-2 border-l border-t border-slate-200 sm:grid-cols-4`} data-testid="shop-brand-grid">
           {SHOP_BRANDS.map((brand) => (
             <div key={brand.name} className="flex min-h-20 items-center justify-center border-b border-r border-slate-200 bg-white px-4 py-4 sm:min-h-24">
               <div className="relative h-9 w-full max-w-32 sm:h-10">
