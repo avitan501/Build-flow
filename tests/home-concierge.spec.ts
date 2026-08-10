@@ -28,6 +28,9 @@ test("customer menu omits the retired quote, order, and start-building links", a
   await expect(navigation.getByRole("link", { name: "Home", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Shop", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "My Projects", exact: true })).toBeVisible();
+  const partnerQuote = navigation.getByRole("link", { name: /BLDR Partner Quote/ });
+  await expect(partnerQuote).toHaveAttribute("href", "https://www.bldr.com/contact/request-quote");
+  await expect(partnerQuote).toHaveAttribute("target", "_blank");
   await expect(navigation.getByRole("link", { name: "Start Building", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "Quotes", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "Orders", exact: true })).toHaveCount(0);

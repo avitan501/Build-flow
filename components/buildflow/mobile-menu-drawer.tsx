@@ -9,6 +9,8 @@ export type MobileMenuLink = {
   href: string;
   label: string;
   gated?: boolean;
+  external?: boolean;
+  badge?: string;
 };
 
 type MobileMenuDrawerProps = {
@@ -58,13 +60,15 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, adminLinks = [],
           <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Navigation</p>
           <nav className="mt-2 grid gap-1.5" aria-label="Mobile full navigation">
             {primaryLinks.map((link) => {
-              const active = Boolean(pathname) && isActivePath(pathname, link.href);
+              const active = !link.external && Boolean(pathname) && isActivePath(pathname, link.href);
               return (
                 <Link
                   key={`${link.label}-${link.href}`}
                   href={link.href}
                   prefetch={false}
                   onClick={onClose}
+                  target={link.external ? "_blank" : undefined}
+                  rel={link.external ? "noopener noreferrer" : undefined}
                   className={`flex items-center justify-between rounded-2xl px-3 py-3 text-sm font-medium transition active:scale-[0.99] ${
                     active
                       ? "bg-[linear-gradient(180deg,rgba(14,35,65,0.08),rgba(14,35,65,0.03))] text-slate-950"
@@ -72,7 +76,8 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, adminLinks = [],
                   }`}
                 >
                   <span>{link.label}</span>
-                  {link.gated && !isSignedIn ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-slate-500">Login</span> : null}
+                  {link.badge ? <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-sky-700">{link.badge}</span> : null}
+                  {!link.badge && link.gated && !isSignedIn ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-slate-500">Login</span> : null}
                 </Link>
               );
             })}
