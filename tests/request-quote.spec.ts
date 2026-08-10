@@ -4,7 +4,7 @@ test("quote request is an Avantia-branded internal workflow", async ({ page }) =
   await page.goto("/request-quote")
 
   await expect(page).toHaveURL(/\/request-quote$/)
-  await expect(page.getByRole("heading", { name: "Request a construction quote" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Tell us what you need" })).toBeVisible()
   await expect(page.getByTestId("quote-request-form")).toBeVisible()
   await expect(page.getByText("BLDR", { exact: false })).toHaveCount(0)
   await expect(page.getByLabel("Full name")).toBeVisible()
@@ -46,7 +46,7 @@ test("plan over the storage limit stays on the form and shows a useful error", a
   const form = page.getByTestId("quote-request-form")
   await expect(form.getByRole("alert")).toContainText("maximum upload size is 25 MB")
   await page.getByRole("button", { name: "Send quote request" }).click()
-  await expect(page.getByRole("heading", { name: "Request a construction quote" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Tell us what you need" })).toBeVisible()
   await expect(page.getByText("This page couldn’t load")).toHaveCount(0)
 
   await page.getByRole("button", { name: "Remove file" }).click()
