@@ -48,7 +48,7 @@ export const SHOP_TOOL_CATEGORIES: ShopToolCategory[] = [
     slug: "framing",
     label: "Framing",
     description: "Framing lumber, plywood, hangers, nails, and structural items.",
-    imageUrl: "/images/buildflow-retail/framing-department-v2.webp",
+    imageUrl: "/images/buildflow-retail/framing-materials-yard.webp",
     imageAlt: "Framing studs, structural lumber, plywood, and connectors in a building supply store",
     symbols: ["shopping-list", "blueprint", "site-visit"],
   },

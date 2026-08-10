@@ -17,6 +17,7 @@ type MaterialQuestionnaireWizardProps = {
   initialAnswers?: Record<string, MaterialAnswerValue>
   embedded?: boolean
   locked?: boolean
+  requireCompletion?: boolean
   onClose?: () => void
   onSave?: (answers: Record<string, MaterialAnswerValue>, complete: boolean) => Promise<{ ok: boolean; error?: string }>
   onUpload?: (question: MaterialQuestion, files: File[]) => Promise<{ ok: boolean; attachmentIds?: string[]; error?: string }>
@@ -111,7 +112,7 @@ function QuestionControl({ question, value, onChange, disabled, onUpload }: {
   return <div className="relative"><input disabled={disabled} type={numeric ? "number" : "text"} min={numeric ? 0 : undefined} inputMode={numeric ? "decimal" : undefined} value={typeof value === "number" || typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(numeric ? event.target.value === "" ? "" : Math.max(0, Number(event.target.value)) : event.target.value)} className={`min-h-13 w-full rounded-2xl border border-slate-300 px-4 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50 ${question.unit ? "pr-24" : ""}`} />{question.unit ? <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm font-semibold text-slate-500">{question.unit}</span> : null}</div>
 }
 
-export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, embedded = false, locked = false, onClose, onSave, onUpload }: MaterialQuestionnaireWizardProps) {
+export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, embedded = false, locked = false, requireCompletion = false, onClose, onSave, onUpload }: MaterialQuestionnaireWizardProps) {
   const [answers, setAnswers] = useState<Record<string, MaterialAnswerValue>>(initialAnswers)
   const [step, setStep] = useState(0)
   const [reviewing, setReviewing] = useState(false)
@@ -158,7 +159,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, emb
   const content = (
     <section className={`${embedded ? "w-full" : "max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-[24px] border border-white/70 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.32)]"}`} aria-label={`${snapshot.category.name} material questions`}>
       <header className="border-b border-slate-100 bg-white px-5 py-4 sm:px-7">
-        <div className="flex items-start justify-between gap-4"><div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Material order details</p><h2 className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">{snapshot.category.name}</h2></div>{onClose ? <button type="button" onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500" aria-label="Close questionnaire"><X className="h-5 w-5" /></button> : null}</div>
+        <div className="flex items-start justify-between gap-4"><div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Material order details</p><h2 className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">{snapshot.category.name}</h2>{requireCompletion ? <p className="mt-1 text-xs font-semibold text-slate-500">Required to complete this department request</p> : null}</div>{onClose && !requireCompletion ? <button type="button" onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500" aria-label="Close questionnaire"><X className="h-5 w-5" /></button> : null}</div>
         {!reviewing ? <div className="mt-4"><div className="flex justify-between text-xs font-semibold text-slate-500"><span>Question {Math.min(step + 1, visibleQuestions.length)} of {visibleQuestions.length}</span><span>{Math.round(progress)}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#0071e3] transition-all" style={{ width: `${progress}%` }} /></div></div> : null}
       </header>
 
@@ -167,7 +168,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, emb
         {error ? <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</div> : null}
       </div>
 
-      {!locked ? <footer className="grid gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:grid-cols-[auto_1fr_auto] sm:px-7"><button type="button" onClick={() => reviewing ? setReviewing(false) : setStep((value) => Math.max(0, value - 1))} disabled={!reviewing && step === 0} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 disabled:opacity-40"><ChevronLeft className="h-4 w-4" />Back</button>{onSave ? <button type="button" disabled={isPending} onClick={() => save(false)} className="min-h-11 rounded-2xl px-4 text-sm font-semibold text-slate-600 hover:bg-white">Answer later</button> : <span />}{reviewing ? <button type="button" disabled={isPending} onClick={() => save(true)} className="min-h-11 rounded-2xl bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-50">{isPending ? "Saving..." : "Save and finish"}</button> : <button type="button" onClick={next} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white">{step >= visibleQuestions.length - 1 ? "Review" : "Next"}<ChevronRight className="h-4 w-4" /></button>}</footer> : null}
+      {!locked ? <footer className="grid gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:grid-cols-[auto_1fr_auto] sm:px-7"><button type="button" onClick={() => reviewing ? setReviewing(false) : setStep((value) => Math.max(0, value - 1))} disabled={!reviewing && step === 0} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 disabled:opacity-40"><ChevronLeft className="h-4 w-4" />Back</button>{onSave && !requireCompletion ? <button type="button" disabled={isPending} onClick={() => save(false)} className="min-h-11 rounded-2xl px-4 text-sm font-semibold text-slate-600 hover:bg-white">Answer later</button> : <span />}{reviewing ? <button type="button" disabled={isPending} onClick={() => save(true)} className="min-h-11 rounded-2xl bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-50">{isPending ? "Saving..." : "Save and finish"}</button> : <button type="button" onClick={next} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-2xl bg-slate-950 px-5 text-sm font-semibold text-white">{step >= visibleQuestions.length - 1 ? "Review" : "Next"}<ChevronRight className="h-4 w-4" /></button>}</footer> : null}
     </section>
   )
 

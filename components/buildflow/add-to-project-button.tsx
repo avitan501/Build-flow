@@ -206,6 +206,15 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
     })
   }
 
+  function saveRequiredAnswers() {
+    const missing = questions.find((question) => question.required && !answers[question.id]?.trim())
+    if (missing) {
+      setError(`Please answer: ${missing.label}`)
+      return
+    }
+    finishAnswers(false)
+  }
+
   const buttonClass = compact
     ? `inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0071e3] text-white shadow-[0_10px_20px_rgba(0,113,227,0.24)] transition hover:bg-[#0066cc] ${className}`
     : `inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(0,113,227,0.22)] transition hover:bg-[#0066cc] ${className}`
@@ -280,8 +289,8 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
                     </label>
                   )) : <p className="text-sm text-slate-600">No additional questions are required.</p>}
                   <div className="grid gap-2 sm:grid-cols-2">
-                    {questions.length > 0 ? <button type="button" disabled={isPending} onClick={() => finishAnswers(true)} className="min-h-11 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700">Answer later</button> : null}
-                    <button type="button" disabled={isPending} onClick={() => finishAnswers(false)} className="min-h-11 rounded-full bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50">
+                    {questions.length > 0 ? <p className="self-center text-center text-xs font-semibold text-slate-500 sm:text-left">Required before this request can be submitted.</p> : null}
+                    <button type="button" disabled={isPending} onClick={saveRequiredAnswers} className="min-h-11 rounded-full bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50">
                       {questions.length > 0 ? "Save Answers" : "Done"}
                     </button>
                   </div>
@@ -299,6 +308,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
           snapshot={created.materialResponse.definition_snapshot}
           initialAnswers={Object.fromEntries(created.materialAnswers.map((answer) => [answer.question_id || answer.question_key, answer.answer_value]))}
           onClose={() => setOpen(false)}
+          requireCompletion
           onSave={saveMaterialAnswers}
           onUpload={uploadQuestionFiles}
         />
