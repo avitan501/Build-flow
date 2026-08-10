@@ -55,6 +55,9 @@ preview-*.log
 # vercel
 .vercel
 
+# local Supabase CLI state
+/supabase/.temp/
+
 # local agent worktrees
 /.worktrees
 /.codex
