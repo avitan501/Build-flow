@@ -2,6 +2,9 @@ import { placeholderImageMetadata, type ShopCatalogProduct } from "@/lib/shop-ca
 import { DEPARTMENT_SYMBOL_KEYS, type DepartmentSymbolKey, type ShopToolCategory } from "@/lib/shop-tools"
 
 const DEFAULT_HIDDEN_DEPARTMENTS = new Set(["Services", "Kitchen", "Eitan"])
+const DEFAULT_DEPARTMENT_DISPLAY_LABELS: Record<string, string> = {
+  "Wood Floor": "Flooring",
+}
 
 function normalizeDepartmentSymbols(value: unknown): DepartmentSymbolKey[] {
   if (!Array.isArray(value)) return []
@@ -196,7 +199,9 @@ export function isDepartmentHidden(addOns: ManagerCatalogAddOns, sourceLabel: st
 }
 
 export function departmentDisplayLabel(addOns: ManagerCatalogAddOns, sourceLabel: string) {
-  return departmentOverrideFor(addOns, sourceLabel)?.label || sourceLabel
+  const overrideLabel = departmentOverrideFor(addOns, sourceLabel)?.label?.trim()
+  if (overrideLabel && overrideLabel !== sourceLabel) return overrideLabel
+  return DEFAULT_DEPARTMENT_DISPLAY_LABELS[sourceLabel] || sourceLabel
 }
 
 export function departmentExperienceFor(addOns: ManagerCatalogAddOns, sourceLabel: string): ManagerDepartmentExperience {
@@ -225,16 +230,20 @@ export function applyDepartmentAddOns(categories: ShopToolCategory[], addOns: Ma
     .filter((category) => !isDepartmentHidden(addOns, category.label))
     .map((category) => {
       const override = departmentOverrideFor(addOns, category.label)
+      const displayLabel = departmentDisplayLabel(addOns, category.label)
+      const overrideImage = override?.imageUrl === "/images/materials/photos/lumber.jpg"
+        ? category.imageUrl
+        : override?.imageUrl || category.imageUrl
       return override
         ? {
             ...category,
-            label: override.label,
+            label: displayLabel,
             description: override.description,
-            imageUrl: override.imageUrl || category.imageUrl,
+            imageUrl: overrideImage,
             imageAlt: override.imageAlt || category.imageAlt,
             symbols: override.symbols,
           }
-        : category
+        : { ...category, label: displayLabel }
     })
 
   const existingSlugs = new Set(baseCategories.map((category) => category.slug))

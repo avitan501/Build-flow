@@ -73,6 +73,16 @@ test("department cards use distinct full-bleed photography instead of generic ic
   expect(new Set(sources).size).toBe(8)
 })
 
+test("flooring uses the customer-facing name and framing uses its dedicated photo", async ({ page }) => {
+  await page.goto("/shop")
+
+  await expect(page.getByTestId("department-card").filter({ hasText: "Flooring" })).toBeVisible()
+  await expect(page.getByTestId("department-card").filter({ hasText: "Wood Floor" })).toHaveCount(0)
+
+  const framingCard = page.getByTestId("department-card").filter({ hasText: "Framing" })
+  await expect(framingCard.locator('img[src*="framing-department-v2.webp"]')).toBeVisible()
+})
+
 test("retired departments are hidden and department symbols are visible", async ({ page }) => {
   await page.goto("/shop")
 
