@@ -2,14 +2,17 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status"
+import { RequestManagementPanel } from "@/components/buildflow/request-management-panel"
 import type { MaterialQuestionnaireResponse, MaterialRequestAnswer } from "@/lib/material-questionnaires"
 import { requireOwnerAccess } from "@/lib/owner-access"
 import { quoteRequestStatusLabel, type QuoteRequestStatus } from "@/lib/quote-requests"
+import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 
 type RequestDetails = { id: string; owner_id: string; title: string; status: QuoteRequestStatus; created_at: string; submitted_at: string | null; projects: { name: string; address: string | null } | null }
 type Attachment = { id: string; material_response_id: string | null; file_name: string; file_path: string; file_type: string | null }
 type RequestItem = { id: string; name: string; department: string; item_type: string; quantity: number; unit: string | null; answers: unknown }
 type LegacyAnswer = { questionId?: string; label?: string; value?: string; question?: string; answer?: string }
+type SupplierPackage = { id: string; department: string; supplier_id: string | null; status: string }
 
 function legacyAnswers(value: unknown): LegacyAnswer[] {
   return Array.isArray(value) ? value.filter((answer): answer is LegacyAnswer => Boolean(answer) && typeof answer === "object") : []
@@ -18,11 +21,13 @@ function legacyAnswers(value: unknown): LegacyAnswer[] {
 export default async function OwnerMaterialRequestPage({ params }: { params: Promise<{ requestId: string }> }) {
   const { requestId } = await params
   const { supabase } = await requireOwnerAccess()
-  const [{ data: request }, { data: responses }, { data: attachments }, { data: items }] = await Promise.all([
+  const [{ data: request }, { data: responses }, { data: attachments }, { data: items }, { data: managerSettings }, { data: packages }] = await Promise.all([
     supabase.from("quote_requests").select("id,owner_id,title,status,created_at,submitted_at,projects(name,address)").eq("id", requestId).maybeSingle<RequestDetails>(),
     supabase.from("material_questionnaire_responses").select("id, request_id, project_id, owner_id, category_id, category_name_snapshot, category_slug_snapshot, definition_version, definition_snapshot, status, completed_at, created_at, updated_at").eq("request_id", requestId).order("created_at").returns<MaterialQuestionnaireResponse[]>(),
     supabase.from("quote_request_attachments").select("id,material_response_id,file_name,file_path,file_type").eq("request_id", requestId).returns<Attachment[]>(),
     supabase.from("quote_request_items").select("id,name,department,item_type,quantity,unit,answers").eq("request_id", requestId).order("created_at").returns<RequestItem[]>(),
+    supabase.from("workflow_manager_settings").select("state").eq("id", "singleton").maybeSingle<{ state: { qualificationSettings?: { suppliers?: SupplierRoutingOption[] } } }>(),
+    supabase.from("supplier_packages").select("id,department,supplier_id,status").eq("request_id", requestId).order("created_at").returns<SupplierPackage[]>(),
   ])
   if (!request) notFound()
 
@@ -35,6 +40,9 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
   const answers = answersResult.data ?? []
   const signedFiles = await Promise.all((attachments ?? []).map(async (file) => ({ ...file, url: (await supabase.storage.from("project-uploads").createSignedUrl(file.file_path, 1800)).data?.signedUrl ?? null })))
   const generalFiles = signedFiles.filter((file) => !file.material_response_id)
+  const suppliers = managerSettings?.state?.qualificationSettings?.suppliers ?? []
+  const departments = Array.from(new Set((items ?? []).map((item) => item.department).filter(Boolean)))
+  if (!departments.length) departments.push("General request")
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 pb-28 pt-5 text-slate-950 sm:px-8">
@@ -44,6 +52,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
           <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#0066cc]">{quoteRequestStatusLabel(request.status)}</p><h1 className="mt-1 text-2xl font-bold">{request.title}</h1><p className="mt-2 text-sm text-slate-600">{request.projects?.name}{request.projects?.address ? ` · ${request.projects.address}` : ""}</p></div><div className="text-right text-sm text-slate-600"><p className="font-semibold text-slate-950">{profile?.full_name || "Client"}</p><p>{profile?.email}</p><p>{profile?.phone}</p></div></div>
         </header>
         <CustomerRequestStatus requestId={request.id} status={request.status} />
+        <RequestManagementPanel requestId={request.id} requestTitle={request.title} client={{ name: profile?.full_name || "Client", email: profile?.email || "", phone: profile?.phone || "" }} departments={departments} suppliers={suppliers} packages={packages ?? []} />
         <div className="mt-4 grid gap-4">
           <section className="rounded-lg border border-slate-200 bg-white p-5">
             <h2 className="text-xl font-bold">Requested items</h2>
