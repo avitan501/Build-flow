@@ -40,6 +40,15 @@ function decodeBase64(value: string) {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0))
 }
 
+function encodeBase64(bytes: Uint8Array) {
+  let binary = ""
+  const chunkSize = 32_768
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize))
+  }
+  return btoa(binary)
+}
+
 function escapeHtml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
 }
@@ -206,6 +215,9 @@ Deno.serve(async (request) => {
       if (!temporaryPath.startsWith(temporaryUploadPrefix) || temporaryPath.includes("..") || !allowedTypes.has(payload.attachment.type)) throw new Error("invalid_attachment")
       const { data: fileInfo, error: infoError } = await supabase.storage.from("project-uploads").info(temporaryPath)
       if (infoError || !fileInfo || !Number.isFinite(statedSize) || statedSize <= 0 || fileInfo.size !== statedSize || fileInfo.size > maxStoredFileSize || fileInfo.contentType !== payload.attachment.type) throw new Error("invalid_attachment")
+      const { data: emailFile, error: downloadError } = await supabase.storage.from("project-uploads").download(temporaryPath)
+      if (downloadError || !emailFile) throw new Error("attachment_download_failed")
+      payload.attachment.content = encodeBase64(new Uint8Array(await emailFile.arrayBuffer()))
       const filename = payload.attachment.filename.replace(/[^a-zA-Z0-9._ -]+/g, "-").slice(0, 100) || "project-file"
       storedFilePath = `${clientId}/${projectId}/${crypto.randomUUID()}-${filename}`
       const { error: moveError } = await supabase.storage.from("project-uploads").move(temporaryPath, storedFilePath)

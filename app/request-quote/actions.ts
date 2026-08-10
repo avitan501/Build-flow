@@ -241,6 +241,9 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     if (attachment?.storagePath) {
       const { data: fileInfo, error: infoError } = await supabase.storage.from("project-uploads").info(attachment.storagePath)
       if (infoError || !fileInfo || fileInfo.size !== attachment.size || fileInfo.size > MAX_STORED_FILE_SIZE || fileInfo.contentType !== attachment.type) throw new Error("attachment_verification_failed")
+      const { data: emailFile, error: downloadError } = await supabase.storage.from("project-uploads").download(attachment.storagePath)
+      if (downloadError || !emailFile) throw new Error("attachment_download_failed")
+      attachment.content = Buffer.from(await emailFile.arrayBuffer()).toString("base64")
       storedFilePath = `${clientId}/${projectId}/${randomUUID()}-${attachment.filename}`
       const { error: moveError } = await supabase.storage.from("project-uploads").move(attachment.storagePath, storedFilePath)
       if (moveError) throw new Error("attachment_move_failed")
