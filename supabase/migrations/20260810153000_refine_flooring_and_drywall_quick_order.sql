@@ -232,3 +232,29 @@ where option.question_id = target.id
 update public.material_questionnaire_categories
 set current_version = current_version + 1, updated_at = now()
 where slug in ('hardwood-flooring', 'sheetrock-drywall');
+
+-- Guests may read active definitions so the questionnaire can appear before login.
+grant select on public.material_questionnaire_categories, public.material_questions, public.material_question_options to anon;
+
+drop policy if exists "material_categories_public_read" on public.material_questionnaire_categories;
+create policy "material_categories_public_read" on public.material_questionnaire_categories
+for select to anon using (is_active);
+
+drop policy if exists "material_questions_public_read" on public.material_questions;
+create policy "material_questions_public_read" on public.material_questions
+for select to anon using (
+  is_active and exists (
+    select 1 from public.material_questionnaire_categories category
+    where category.id = category_id and category.is_active
+  )
+);
+
+drop policy if exists "material_options_public_read" on public.material_question_options;
+create policy "material_options_public_read" on public.material_question_options
+for select to anon using (
+  is_active and exists (
+    select 1 from public.material_questions question
+    join public.material_questionnaire_categories category on category.id = question.category_id
+    where question.id = question_id and question.is_active and category.is_active
+  )
+);

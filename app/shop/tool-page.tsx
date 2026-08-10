@@ -6,6 +6,8 @@ import { applyDepartmentAddOns, createEmptyManagerAddOns, departmentExperienceFo
 import type { ProjectRecord } from "@/lib/projects"
 import { findShopToolCategory, type ShopToolSlug } from "@/lib/shop-tools"
 import { FLOORING_QUESTIONNAIRE_PREVIEW } from "@/lib/material-questionnaire-preview"
+import { buildMaterialQuestionnaireSnapshot } from "@/lib/material-questionnaires"
+import { loadMaterialQuestionnaireForDepartment } from "@/lib/material-questionnaires-server"
 import type { PublicWorkflowState } from "@/lib/workflow-public"
 
 type ToolPageSearchParams = {
@@ -15,11 +17,13 @@ type ToolPageSearchParams = {
   success?: string
 }
 
-async function loadCurrentUserProjects() {
+async function loadCurrentUserProjects(questionnaireDepartment: string) {
   const { supabase, user } = await getSessionWithProfile()
   if (!supabase) {
-    return { projects: [], isSignedIn: false, addOns: createEmptyManagerAddOns() }
+    return { projects: [], isSignedIn: false, addOns: createEmptyManagerAddOns(), questionnaireSnapshot: null }
   }
+  const questionnaire = await loadMaterialQuestionnaireForDepartment(supabase, questionnaireDepartment).catch(() => null)
+  const questionnaireSnapshot = questionnaire ? buildMaterialQuestionnaireSnapshot(questionnaire) : null
   const { data: publicStateRow } = await supabase
     .from("workflow_public_catalog")
     .select("state")
@@ -27,7 +31,7 @@ async function loadCurrentUserProjects() {
     .maybeSingle<{ state: PublicWorkflowState }>()
 
   if (!user) {
-    return { projects: [], isSignedIn: false, addOns: publicStateRow?.state?.addOns ?? createEmptyManagerAddOns() }
+    return { projects: [], isSignedIn: false, addOns: publicStateRow?.state?.addOns ?? createEmptyManagerAddOns(), questionnaireSnapshot }
   }
 
   const { data, error } = await supabase
@@ -41,7 +45,7 @@ async function loadCurrentUserProjects() {
     throw new Error("Failed to load projects.")
   }
 
-  return { projects: data ?? [], isSignedIn: true, addOns: publicStateRow?.state?.addOns ?? createEmptyManagerAddOns() }
+  return { projects: data ?? [], isSignedIn: true, addOns: publicStateRow?.state?.addOns ?? createEmptyManagerAddOns(), questionnaireSnapshot }
 }
 
 export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Promise<ToolPageSearchParams>) {
@@ -52,16 +56,16 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
   }
 
   const params = (await searchParams) ?? {}
-  const projectSession = await loadCurrentUserProjects()
+  const projectSession = await loadCurrentUserProjects(baseCategory.label)
   if (isDepartmentHidden(projectSession.addOns, baseCategory.label)) notFound()
   const category = applyDepartmentAddOns([baseCategory], projectSession.addOns)[0] ?? baseCategory
   const experience = departmentExperienceFor(projectSession.addOns, baseCategory.label)
   const projects = projectSession.projects
   const selectedProjectId = projects.some((project) => project.id === params.project) ? params.project : ""
   const selectedAddress = selectedProjectId ? "" : params.address?.trim() || ""
-  const questionnairePreview = process.env.VERCEL_ENV === "preview" && baseCategory.slug === "wood-floor"
+  const questionnaireSnapshot = process.env.VERCEL_ENV === "preview" && baseCategory.slug === "wood-floor"
     ? FLOORING_QUESTIONNAIRE_PREVIEW
-    : null
+    : projectSession.questionnaireSnapshot
 
   return (
     <ShopToolCategoryPage
@@ -74,7 +78,7 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
       isSignedIn={projectSession.isSignedIn}
       errorCode={params.error?.trim() || null}
       successCode={params.success?.trim() || null}
-      questionnairePreview={questionnairePreview}
+      questionnaireSnapshot={questionnaireSnapshot}
     />
   )
 }
