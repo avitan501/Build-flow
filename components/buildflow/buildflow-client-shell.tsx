@@ -15,6 +15,7 @@ export function AvantiaBuildClientShell({ children }: AvantiaBuildClientShellPro
   const isShopLanding = pathname === "/shop";
   const isShopFlow = Boolean(pathname?.startsWith("/shop/"));
   const isProjectFlow = Boolean(pathname?.startsWith("/projects"));
+  const isQuoteRequest = pathname === "/request-quote";
   const isOwnerWorkspace = Boolean(pathname?.startsWith("/owner"));
   const isManagerPreview = Boolean(pathname?.startsWith("/preview-admin"));
 
@@ -30,7 +31,7 @@ export function AvantiaBuildClientShell({ children }: AvantiaBuildClientShellPro
             ? "max-w-[96rem] lg:overflow-visible"
             : isManagerPreview
               ? "max-w-[96rem] lg:overflow-visible"
-              : isHome || isAccount || isShopLanding || isShopFlow || isProjectFlow
+              : isHome || isAccount || isShopLanding || isShopFlow || isProjectFlow || isQuoteRequest
               ? "max-w-[76rem] lg:overflow-visible"
               : "max-w-[31rem] lg:overflow-hidden"
         }`}
