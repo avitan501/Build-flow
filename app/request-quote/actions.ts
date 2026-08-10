@@ -278,6 +278,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
 
     await sendQuoteIntakeEmail({
       ...intakePayload,
+      requestId,
       attachment: attachment ? { filename: attachment.filename, content: attachment.content } : undefined,
     })
 
@@ -301,10 +302,6 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     try {
       const saved = await saveWithSupabaseFunction(intakePayload)
       if (saved?.ok) {
-        await sendQuoteIntakeEmail({
-          ...intakePayload,
-          attachment: attachment ? { filename: attachment.filename, content: attachment.content } : undefined,
-        })
         revalidatePath("/admin/users")
         revalidatePath("/owner/materials/requests")
         return {

@@ -62,6 +62,7 @@ export const DEFAULT_SUPPLIERS: SupplierRoutingOption[] = [
   { id: "materials-desk", name: "Materials supplier desk", contactLabel: "Materials quotes", contactName: "Materials coordinator", preferredDeliveryMethod: "manual" },
   { id: "survey-layout", name: "Survey and layout team", contactLabel: "Survey services", contactName: "Survey coordinator", preferredDeliveryMethod: "manual" },
   { id: "view-as-built", name: "View As-Built", contactLabel: "LiDAR / as-built", contactName: "Capture coordinator", preferredDeliveryMethod: "manual" },
+  { id: "source-flooring", name: "Source Flooring", contactLabel: "Flooring supplier", contactName: "Sales team", email: "info@sourceflooring.com", phone: "+15197429188", portalUrl: "https://www.sourceflooring.com/", preferredDeliveryMethod: "email", deliveryNotes: "Kitchener, Ontario flooring supplier. Route flooring requests here after owner review.", notes: "1362 Victoria Street North, Kitchener, Ontario N2B 3E2, Canada" },
 ]
 
 const DEFAULT_SUPPLIER_IDS = new Set(DEFAULT_SUPPLIERS.map((supplier) => supplier.id))

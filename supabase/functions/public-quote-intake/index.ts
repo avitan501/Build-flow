@@ -21,6 +21,27 @@ type QuotePayload = {
   attachment?: { filename: string; content?: string; storagePath?: string; type: string; size?: number }
 }
 
+type EmailDeliveryResult =
+  | { status: "sent"; providerId: string | null }
+  | { status: "not_configured" }
+  | { status: "failed"; error: string }
+
+type EmailActionPayload =
+  | { action: "send_manager_reply"; requestId?: string; message?: string }
+  | { action: "send_quote_notifications"; requestId?: string; quote?: QuotePayload; sendOwner?: boolean; sendClient?: boolean }
+  | { action: "send_order_notifications"; order?: OrderNotificationPayload; sendOwner?: boolean; sendClient?: boolean }
+  | { action: "prepare_upload"; filename?: string; type?: string; size?: number }
+
+type OrderNotificationPayload = {
+  quoteId: string
+  project: { name: string; address?: string | null }
+  customer: { email?: string | null; profile?: { email?: string | null; full_name?: string | null; phone?: string | null; company_name?: string | null } | null }
+  quoteItems: Array<{ name: string; quantity: number; unit: string; line_total: number }>
+  subtotal: number
+  tax: number
+  total: number
+}
+
 const allowedTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"])
 const maxInlineFileSize = 4 * 1024 * 1024
 const maxStoredFileSize = 25 * 1024 * 1024
@@ -53,23 +74,33 @@ function escapeHtml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
 }
 
+function money(value: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number.isFinite(value) ? value : 0)
+}
+
 async function sendEmail(input: { to: string; subject: string; html: string; text: string; replyTo?: string; attachment?: QuotePayload["attachment"] }) {
   const apiKey = Deno.env.get("RESEND_API_KEY")
-  if (!apiKey) return "not_configured"
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      from: "Avantia Build <onboarding@resend.dev>",
-      to: [input.to],
-      subject: input.subject,
-      html: input.html,
-      text: input.text,
-      reply_to: input.replyTo,
-      attachments: input.attachment?.content ? [{ filename: input.attachment.filename, content: input.attachment.content }] : undefined,
-    }),
-  })
-  return response.ok ? "sent" : "failed"
+  if (!apiKey) return { status: "not_configured" } satisfies EmailDeliveryResult
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        from: Deno.env.get("QUOTE_SUBMISSION_FROM") || "Avantia Build <onboarding@resend.dev>",
+        to: [input.to],
+        subject: input.subject,
+        html: input.html,
+        text: input.text,
+        reply_to: input.replyTo,
+        attachments: input.attachment?.content ? [{ filename: input.attachment.filename, content: input.attachment.content }] : undefined,
+      }),
+    })
+    const body = await response.json().catch(() => null) as { id?: string; message?: string; error?: string } | null
+    if (!response.ok) return { status: "failed", error: body?.message || body?.error || `Resend returned ${response.status}` } satisfies EmailDeliveryResult
+    return { status: "sent", providerId: body?.id ?? null } satisfies EmailDeliveryResult
+  } catch (cause) {
+    return { status: "failed", error: cause instanceof Error ? cause.message : "Email provider could not be reached" } satisfies EmailDeliveryResult
+  }
 }
 
 function valid(payload: QuotePayload) {
@@ -95,12 +126,18 @@ function hasValidPublicKey(request: Request) {
   return Boolean(token) && (token === legacyKey || publishableKeys.includes(token))
 }
 
+function hasServiceRoleKey(request: Request) {
+  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || ""
+  return Boolean(token) && token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders })
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405)
-  if (!hasValidPublicKey(request)) return json({ error: "unauthorized" }, 401)
+  const serviceRoleRequest = hasServiceRoleKey(request)
+  if (!serviceRoleRequest && !hasValidPublicKey(request)) return json({ error: "unauthorized" }, 401)
 
-  let rawPayload: QuotePayload | { action: "prepare_upload"; filename?: string; type?: string; size?: number }
+  let rawPayload: QuotePayload | EmailActionPayload
   try {
     rawPayload = await request.json()
   } catch {
@@ -112,6 +149,106 @@ Deno.serve(async (request) => {
   if (!supabaseUrl || !serviceRoleKey) return json({ error: "service_unavailable" }, 503)
 
   const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+  if ("action" in rawPayload && rawPayload.action === "send_manager_reply") {
+    if (!serviceRoleRequest) return json({ error: "forbidden" }, 403)
+    const requestId = String(rawPayload.requestId || "")
+    const message = String(rawPayload.message || "").trim().slice(0, 5000)
+    if (!requestId || message.length < 2) return json({ error: "invalid_request" }, 400)
+
+    const { data: quoteRequest } = await supabase.from("quote_requests").select("title,owner_id").eq("id", requestId).maybeSingle<{ title: string; owner_id: string }>()
+    if (!quoteRequest) return json({ error: "request_not_found" }, 404)
+    const { data: recipient } = await supabase.from("profiles").select("email,full_name").eq("id", quoteRequest.owner_id).maybeSingle<{ email: string | null; full_name: string | null }>()
+    if (!recipient?.email) return json({ error: "client_email_not_found" }, 404)
+
+    const ownerEmail = "avitanneto@gmail.com"
+    const result = await sendEmail({
+      to: recipient.email,
+      subject: `Avantia Build request: ${quoteRequest.title}`,
+      replyTo: ownerEmail,
+      text: `${message}\n\nAvantia Build\nEverything it takes to build`,
+      html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.6;max-width:620px;margin:0 auto"><p style="white-space:pre-wrap">${escapeHtml(message)}</p><div style="margin-top:28px;padding-top:18px;border-top:1px solid #e2e8f0"><strong>Avantia Build</strong><br><span style="color:#64748b">Everything it takes to build</span><br><span style="color:#64748b;font-size:13px">Request: ${escapeHtml(quoteRequest.title)}</span></div></div>`,
+    })
+    console.log("manager_reply_email", { requestId, status: result.status })
+    return json({ result })
+  }
+
+  if ("action" in rawPayload && rawPayload.action === "send_order_notifications") {
+    if (!serviceRoleRequest) return json({ error: "forbidden" }, 403)
+    const order = rawPayload.order
+    if (!order?.quoteId || !order.project?.name || !Array.isArray(order.quoteItems)) return json({ error: "invalid_request" }, 400)
+    const clientEmail = order.customer?.email || order.customer?.profile?.email || ""
+    const clientName = order.customer?.profile?.full_name || "Client"
+    const itemLines = order.quoteItems.map((item) => `- ${item.name}: ${item.quantity} ${item.unit} = ${money(item.line_total)}`)
+    const ownerText = ["New Avantia Build order request", `Quote ID: ${order.quoteId}`, `Project: ${order.project.name}`, `Address: ${order.project.address || "Not provided"}`, `Customer: ${clientName}`, `Email: ${clientEmail || "Not provided"}`, `Phone: ${order.customer?.profile?.phone || "Not provided"}`, "", "Items:", ...itemLines, "", `Total: ${money(order.total)}`].join("\n")
+    const owner = rawPayload.sendOwner === false
+      ? { status: "skipped" as const }
+      : await sendEmail({
+          to: "avitanneto@gmail.com",
+          subject: `New Avantia Build request: ${order.project.name}`,
+          replyTo: clientEmail || undefined,
+          text: ownerText,
+          html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:680px;margin:auto"><p style="color:#0066cc;font-size:12px;font-weight:700">AVANTIA BUILD ORDER REQUEST</p><h1 style="font-size:24px">${escapeHtml(order.project.name)}</h1><p><strong>Quote ID:</strong> ${escapeHtml(order.quoteId)}<br><strong>Address:</strong> ${escapeHtml(order.project.address || "Not provided")}<br><strong>Customer:</strong> ${escapeHtml(clientName)}<br><strong>Email:</strong> ${escapeHtml(clientEmail || "Not provided")}<br><strong>Phone:</strong> ${escapeHtml(order.customer?.profile?.phone || "Not provided")}</p><h2 style="font-size:17px">Items</h2><ul>${order.quoteItems.map((item) => `<li>${escapeHtml(item.name)}: ${item.quantity} ${escapeHtml(item.unit)} = ${money(item.line_total)}</li>`).join("")}</ul><p><strong>Total:</strong> ${money(order.total)}</p></div>`,
+        })
+    const client = rawPayload.sendClient === false || !clientEmail
+      ? { status: "skipped" as const }
+      : await sendEmail({
+          to: clientEmail,
+          subject: `We received your Avantia Build request: ${order.project.name}`,
+          replyTo: "avitanneto@gmail.com",
+          text: `Hi ${clientName},\n\nWe received your request for ${order.project.name}. Our team will review it and contact you if anything else is needed.\n\nQuote ID: ${order.quoteId}\n\nAvantia Build`,
+          html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:620px;margin:auto"><p>Hi ${escapeHtml(clientName)},</p><h1 style="font-size:22px">We received your request</h1><p>Our team will review the details and contact you if anything else is needed.</p><p><strong>Project:</strong> ${escapeHtml(order.project.name)}<br><strong>Quote ID:</strong> ${escapeHtml(order.quoteId)}</p><p style="margin-top:24px"><strong>Avantia Build</strong></p></div>`,
+        })
+    console.log("order_notification_email", { quoteId: order.quoteId, owner: owner.status, client: client.status })
+    return json({ owner, client })
+  }
+
+  if ("action" in rawPayload && rawPayload.action === "send_quote_notifications") {
+    if (!serviceRoleRequest) return json({ error: "forbidden" }, 403)
+    const payload = rawPayload.quote
+    if (!payload || !valid(payload)) return json({ error: "invalid_request" }, 400)
+
+    let attachment: QuotePayload["attachment"] | undefined
+    if (rawPayload.sendOwner !== false && rawPayload.requestId) {
+      const { data: storedAttachment } = await supabase
+        .from("quote_request_attachments")
+        .select("file_name,file_path,file_type,file_size")
+        .eq("request_id", rawPayload.requestId)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle<{ file_name: string; file_path: string; file_type: string; file_size: number }>()
+      if (storedAttachment && storedAttachment.file_size <= maxStoredFileSize) {
+        const { data: file } = await supabase.storage.from("project-uploads").download(storedAttachment.file_path)
+        if (file) attachment = { filename: storedAttachment.file_name, type: storedAttachment.file_type, size: storedAttachment.file_size, content: encodeBase64(new Uint8Array(await file.arrayBuffer())) }
+      }
+    }
+
+    const fullName = `${payload.firstName} ${payload.lastName}`.trim()
+    const address = [payload.street, payload.city, payload.state, payload.zip].filter(Boolean).join(", ")
+    const departmentText = payload.departments.join(", ") || "Not selected"
+    const ownerText = ["New Avantia Build quote request", `Reference: ${payload.referenceId}`, `Customer: ${fullName}`, `Email: ${payload.email}`, `Phone: ${payload.phone || "Not provided"}`, `Company: ${payload.company || "Not provided"}`, `Project: ${payload.projectName || "Not named"}`, `Address: ${address || "Not provided"}`, `Departments: ${departmentText}`, `Needed: ${payload.timeframe || "Not provided"}`, "", payload.details || "See request in the manager portal"].join("\n")
+    const owner = rawPayload.sendOwner === false
+      ? { status: "skipped" as const }
+      : await sendEmail({
+          to: "avitanneto@gmail.com",
+          subject: `New quote request: ${payload.projectName || fullName}`,
+          replyTo: payload.email,
+          text: ownerText,
+          html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:680px;margin:auto"><p style="color:#0066cc;font-size:12px;font-weight:700">AVANTIA BUILD QUOTE REQUEST</p><h1 style="font-size:24px">${escapeHtml(payload.projectName || "New construction request")}</h1><p><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}<br><strong>Customer:</strong> ${escapeHtml(fullName)}<br><strong>Email:</strong> ${escapeHtml(payload.email)}<br><strong>Phone:</strong> ${escapeHtml(payload.phone || "Not provided")}<br><strong>Company:</strong> ${escapeHtml(payload.company || "Not provided")}</p><p><strong>Address:</strong> ${escapeHtml(address || "Not provided")}<br><strong>Departments:</strong> ${escapeHtml(departmentText)}<br><strong>Needed:</strong> ${escapeHtml(payload.timeframe || "Not provided")}</p><h2 style="font-size:17px">Request details</h2><p style="white-space:pre-wrap">${escapeHtml(payload.details || "See request in the manager portal")}</p></div>`,
+          attachment,
+        })
+    const client = rawPayload.sendClient === false
+      ? { status: "skipped" as const }
+      : await sendEmail({
+          to: payload.email,
+          subject: `We received your quote request: ${payload.referenceId}`,
+          replyTo: "avitanneto@gmail.com",
+          text: `Hi ${payload.firstName},\n\nWe received your Avantia Build quote request. Someone from our team will contact you within the next 24 hours.\n\nReference: ${payload.referenceId}\n\nAvantia Build`,
+          html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:620px;margin:auto"><p>Hi ${escapeHtml(payload.firstName)},</p><h1 style="font-size:22px">We received your quote request</h1><p>Someone from Avantia Build will contact you within the next 24 hours.</p><p><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}</p><p style="margin-top:24px"><strong>Avantia Build</strong></p></div>`,
+        })
+    console.log("quote_notification_email", { referenceId: payload.referenceId, owner: owner.status, client: client.status })
+    return json({ owner, client })
+  }
+
   if ("action" in rawPayload && rawPayload.action === "prepare_upload") {
     const size = Number(rawPayload.size)
     const type = String(rawPayload.type || "")

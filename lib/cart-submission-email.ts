@@ -258,10 +258,8 @@ async function sendEmail(input: {
 
 export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmailInput): Promise<EmailDeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) return { status: "not_configured" }
-
   const from = process.env.QUOTE_SUBMISSION_FROM || DEFAULT_FROM
-  const ownerEmail = process.env.QUOTE_SUBMISSION_TO || DEFAULT_TO
+  const ownerEmail = DEFAULT_TO
   const subject = `Avantia Build request: ${input.requestTitle}`
   const text = `${input.message.trim()}\n\nAvantia Build\nEverything it takes to build`
   const html = `
@@ -275,19 +273,29 @@ export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmail
     </div>
   `
 
-  return sendEmail({
-    apiKey,
-    from,
-    to: input.recipientEmail,
-    subject,
-    html,
-    text,
-    replyTo: ownerEmail,
-    idempotencyKey: `avantia-manager-reply-${input.requestId}-${crypto.randomUUID()}`,
+  if (apiKey) {
+    const directResult = await sendEmail({
+      apiKey,
+      from,
+      to: input.recipientEmail,
+      subject,
+      html,
+      text,
+      replyTo: ownerEmail,
+      idempotencyKey: `avantia-manager-reply-${input.requestId}-${crypto.randomUUID()}`,
+    })
+    if (directResult.status === "sent") return directResult
+  }
+
+  const fallback = await sendWithSupabaseEmailFallback("send_manager_reply", {
+    requestId: input.requestId,
+    message: input.message,
   })
+  return fallback.result ?? { status: "failed", error: "Website email could not be sent." }
 }
 
 export type QuoteIntakeEmailInput = {
+  requestId?: string
   referenceId: string
   firstName: string
   lastName: string
@@ -307,16 +315,53 @@ export type QuoteIntakeEmailInput = {
   attachment?: { filename: string; content?: string }
 }
 
+async function sendWithSupabaseEmailFallback(
+  action: "send_manager_reply" | "send_quote_notifications" | "send_order_notifications",
+  payload: Record<string, unknown>,
+): Promise<{ owner?: EmailDeliveryResult; client?: EmailDeliveryResult; result?: EmailDeliveryResult }> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceRoleKey) return { result: { status: "not_configured" } }
+
+  try {
+    const response = await fetch(`${url}/functions/v1/public-quote-intake`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${serviceRoleKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ action, ...payload }),
+      cache: "no-store",
+    })
+    const body = (await response.json().catch(() => null)) as {
+      owner?: EmailDeliveryResult
+      client?: EmailDeliveryResult
+      result?: EmailDeliveryResult
+      error?: string
+    } | null
+    if (!response.ok) return { result: { status: "failed", error: body?.error || `Email service returned ${response.status}` } }
+    return body ?? { result: { status: "failed", error: "Email service returned an empty response" } }
+  } catch (error) {
+    return { result: { status: "failed", error: error instanceof Error ? error.message : "Email service could not be reached" } }
+  }
+}
+
 export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
+    const fallback = await sendWithSupabaseEmailFallback("send_quote_notifications", {
+      requestId: input.requestId,
+      quote: { ...input, attachment: input.attachment ? { filename: input.attachment.filename } : undefined },
+      sendOwner: true,
+      sendClient: true,
+    })
     return {
-      owner: { status: "not_configured" } as EmailDeliveryResult,
-      client: { status: "not_configured" } as EmailDeliveryResult,
+      owner: fallback.owner ?? fallback.result ?? { status: "failed", error: "Owner email could not be sent." },
+      client: fallback.client ?? fallback.result ?? { status: "failed", error: "Client email could not be sent." },
     }
   }
 
-  const to = process.env.QUOTE_SUBMISSION_TO || DEFAULT_TO
+  const to = DEFAULT_TO
   const from = process.env.QUOTE_SUBMISSION_FROM || DEFAULT_FROM
   const fullName = `${input.firstName} ${input.lastName}`.trim()
   const address = [input.street, input.city, input.state, input.zip].filter(Boolean).join(", ")
@@ -389,8 +434,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
     "Avantia Build",
     "Everything it takes to build",
   ].join("\n")
-  const client = owner.status === "sent"
-    ? await sendEmail({
+  const client = await sendEmail({
         apiKey,
         from,
         to: input.email,
@@ -400,23 +444,40 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
         replyTo: to,
         idempotencyKey: `avantia-intake-client-${input.referenceId}`,
       })
-    : { status: "skipped" as const }
 
-  return { owner, client }
+  if (owner.status === "sent" && client.status === "sent") return { owner, client }
+
+  const fallback = await sendWithSupabaseEmailFallback("send_quote_notifications", {
+    requestId: input.requestId,
+    quote: { ...input, attachment: input.attachment ? { filename: input.attachment.filename } : undefined },
+    sendOwner: owner.status !== "sent",
+    sendClient: client.status !== "sent",
+  })
+  return {
+    owner: owner.status === "sent" ? owner : fallback.owner ?? fallback.result ?? owner,
+    client: client.status === "sent" ? client : fallback.client ?? fallback.result ?? client,
+  }
 }
 
 export async function sendCartSubmissionEmail(input: CartSubmissionEmailInput): Promise<CartSubmissionEmailResult> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
+    const fallback = await sendWithSupabaseEmailFallback("send_order_notifications", {
+      order: input,
+      sendOwner: true,
+      sendClient: true,
+    })
+    const owner = fallback.owner ?? fallback.result ?? { status: "not_configured" as const }
+    const client = fallback.client ?? fallback.result ?? { status: "not_configured" as const }
     return {
-      status: "not_configured",
-      providerId: null,
-      owner: { status: "not_configured" },
-      client: { status: "not_configured" },
+      status: owner.status === "sent" ? "sent" : owner.status === "failed" ? "failed" : "not_configured",
+      providerId: owner.status === "sent" ? owner.providerId : null,
+      owner,
+      client,
     }
   }
 
-  const to = process.env.QUOTE_SUBMISSION_TO || DEFAULT_TO
+  const to = DEFAULT_TO
   const from = process.env.QUOTE_SUBMISSION_FROM || DEFAULT_FROM
   const clientEmail = input.customer.email || input.customer.profile?.email || ""
   const owner = await sendEmail({
@@ -442,10 +503,21 @@ export async function sendCartSubmissionEmail(input: CartSubmissionEmailInput): 
       })
     : { status: "skipped" as const }
 
+  if (owner.status === "sent" && (client.status === "sent" || client.status === "skipped")) {
+    return { status: "sent", providerId: owner.providerId, owner, client }
+  }
+
+  const fallback = await sendWithSupabaseEmailFallback("send_order_notifications", {
+    order: input,
+    sendOwner: owner.status !== "sent",
+    sendClient: client.status !== "sent" && client.status !== "skipped",
+  })
+  const finalOwner = owner.status === "sent" ? owner : fallback.owner ?? fallback.result ?? owner
+  const finalClient = client.status === "sent" || client.status === "skipped" ? client : fallback.client ?? fallback.result ?? client
   return {
-    status: owner.status === "sent" ? "sent" : owner.status === "not_configured" ? "not_configured" : "failed",
-    providerId: owner.status === "sent" ? owner.providerId : null,
-    owner,
-    client,
+    status: finalOwner.status === "sent" ? "sent" : finalOwner.status === "not_configured" ? "not_configured" : "failed",
+    providerId: finalOwner.status === "sent" ? finalOwner.providerId : null,
+    owner: finalOwner,
+    client: finalClient,
   }
 }
