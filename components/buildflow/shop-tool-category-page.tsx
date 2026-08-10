@@ -26,7 +26,7 @@ type ShopToolCategoryPageProps = {
 }
 
 function QuickOrderAction({ category, questionnaireDepartment }: { category: ShopToolCategory; questionnaireDepartment: string }) {
-  return <section className="flex max-w-xl flex-col items-start justify-between gap-4 rounded-[20px] border border-sky-200 bg-sky-50 p-4 sm:flex-row sm:items-center"><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Quick Order</p><h2 className="mt-1 text-base font-bold text-slate-950">Answer a few questions to start your request</h2></div><AddToProjectButton product={{ id: `${category.slug}-quick-order`, name: `${category.label} Quick Order`, category: category.label, productType: "service", price: 0, unit: "Request" }} questionnaireDepartment={questionnaireDepartment} label="Start quick order" /></section>
+  return <section className="flex max-w-xl flex-col items-start justify-between gap-4 rounded-[20px] border border-sky-200 bg-sky-50 p-4 sm:flex-row sm:items-center"><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Quick Order</p><h2 className="mt-1 text-base font-bold text-slate-950">Answer a few questions to start your request</h2></div><AddToProjectButton product={{ id: `${category.slug}-quick-order`, name: `${category.label} Quick Order`, category: questionnaireDepartment, productType: "service", price: 0, unit: "Request" }} questionnaireDepartment={questionnaireDepartment} label="Start quick order" /></section>
 }
 
 function FramingUploadActions() {
@@ -277,7 +277,7 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
         <h1 className="text-[2rem] font-bold tracking-normal text-slate-950 sm:text-[2.4rem]">{category.label}</h1>
 
         {experience.showQuickOrder ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
-        {experience.showPlanUpload && usesStandardUpload ? <CombinedUploadAction category={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
+        {experience.showPlanUpload && usesStandardUpload ? <CombinedUploadAction category={questionnaireDepartment} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && category.slug === "framing" ? <FramingUploadActions /> : null}
         {experience.showTakeoff && category.slug === "wood-floor" ? <ManagerItemVisibility itemId="wood-floor-takeoff"><WoodFloorActions /></ManagerItemVisibility> : null}
         {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}
@@ -286,7 +286,7 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
 
         <DepartmentEssentials data={essentials} />
 
-        {experience.showChatToOrder ? <DepartmentRequestComposer category={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
+        {experience.showChatToOrder ? <DepartmentRequestComposer category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
       </section>
     </main>
   )

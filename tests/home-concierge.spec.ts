@@ -4,10 +4,14 @@ test("home presents the concise construction concierge information", async ({ pa
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "Concierge service for every construction need." })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Market pricing" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Closeout savings" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Hard-to-find items" })).toBeVisible();
-  await expect(page.getByText("Working with designers, developers, and builders.")).toBeVisible();
+  await expect(page.getByText("Better pricing", { exact: true })).toBeVisible();
+  await expect(page.getByText("Surplus savings", { exact: true })).toBeVisible();
+  await expect(page.getByText("Specialty sourcing", { exact: true })).toBeVisible();
+  await page.getByText("Better pricing", { exact: true }).click();
+  await expect(page.getByText("Material prices change often.", { exact: false })).toBeVisible();
+  await expect(page.getByText("Sourcing support for contractors, developers, design professionals, and property owners.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Covering 41 states." })).toBeVisible();
+  await expect(page.getByTestId("coverage-map").getByTestId("coverage-dot")).toHaveCount(41);
   const lockups = page.getByTestId("avantia-build-lockup");
   await expect(lockups.first()).toHaveAttribute("data-testid", "avantia-build-lockup");
   await expect(lockups.locator("img")).toHaveCount(0);
