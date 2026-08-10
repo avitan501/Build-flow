@@ -421,6 +421,19 @@ Deno.serve(async (request) => {
       html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:620px;margin:auto"><p>Hi ${escapeHtml(payload.firstName)},</p><h1 style="font-size:22px">We received your quote request</h1><p>Someone from Avantia Build will contact you within the next 24 hours.</p><p><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}<br><strong>Project:</strong> ${escapeHtml(payload.projectName || "Not named")}</p><p style="margin-top:24px"><strong>Avantia Build</strong><br><span style="color:#64748b">Everything it takes to build</span></p></div>`,
     })
 
+    await supabase.from("quote_request_items").update({
+      metadata: {
+        reference_id: payload.referenceId,
+        source: "public_quote_form",
+        request_details: payload.details,
+        email_delivery: {
+          owner: ownerEmail.status,
+          client: clientEmail.status,
+          checked_at: new Date().toISOString(),
+        },
+      },
+    }).eq("request_id", requestId)
+
     return json({ ok: true, clientId, projectId, requestId, referenceId: payload.referenceId, email: { owner: ownerEmail, client: clientEmail } })
   } catch (cause) {
     if (storedFilePath) await supabase.storage.from("project-uploads").remove([storedFilePath])

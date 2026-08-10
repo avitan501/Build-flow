@@ -276,11 +276,23 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
       if (attachmentError) throw new Error("attachment_record_failed")
     }
 
-    await sendQuoteIntakeEmail({
+    const emailDelivery = await sendQuoteIntakeEmail({
       ...intakePayload,
       requestId,
       attachment: attachment ? { filename: attachment.filename, content: attachment.content } : undefined,
     })
+    await supabase.from("quote_request_items").update({
+      metadata: {
+        reference_id: referenceId,
+        source: "public_quote_form",
+        request_details: details,
+        email_delivery: {
+          owner: emailDelivery.owner.status,
+          client: emailDelivery.client.status,
+          checked_at: new Date().toISOString(),
+        },
+      },
+    }).eq("request_id", requestId)
 
     revalidatePath("/admin/users")
     revalidatePath("/owner/materials/requests")
