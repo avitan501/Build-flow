@@ -1,14 +1,12 @@
 "use client"
 
-import { CheckCircle2, FileUp, LoaderCircle, Send } from "lucide-react"
-import { useActionState } from "react"
+import { CheckCircle2, FileUp, LocateFixed, LoaderCircle, Send } from "lucide-react"
+import { useActionState, useState } from "react"
 
 import { submitQuoteRequestFormAction, type QuoteRequestFormState } from "@/app/request-quote/actions"
 
 const initialState: QuoteRequestFormState = { status: "idle", message: "" }
 const departments = ["Framing", "Flooring", "Sheet rock", "Tile work", "Door and molding", "Siding", "Roofing", "Windows"]
-const states = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"]
-
 const inputClass = "min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3.5 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
 const labelClass = "grid gap-1.5 text-sm font-semibold text-slate-800"
 
@@ -23,6 +21,35 @@ function SubmitButton({ pending }: { pending: boolean }) {
 
 export function QuoteRequestForm() {
   const [state, formAction, pending] = useActionState(submitQuoteRequestFormAction, initialState)
+  const [address, setAddress] = useState("")
+  const [locationStatus, setLocationStatus] = useState("")
+  const [locating, setLocating] = useState(false)
+
+  function useCurrentLocation() {
+    if (!navigator.geolocation) {
+      setLocationStatus("Location is not available on this device.")
+      return
+    }
+
+    setLocating(true)
+    setLocationStatus("Finding your address...")
+    navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+      try {
+        const response = await fetch(`/api/location/reverse?latitude=${encodeURIComponent(coords.latitude)}&longitude=${encodeURIComponent(coords.longitude)}`)
+        const result = (await response.json().catch(() => null)) as { address?: string; error?: string } | null
+        if (!response.ok || !result?.address) throw new Error(result?.error || "Address not found.")
+        setAddress(result.address)
+        setLocationStatus("Address filled in.")
+      } catch (cause) {
+        setLocationStatus(cause instanceof Error ? cause.message : "We could not find the address. Please type it instead.")
+      } finally {
+        setLocating(false)
+      }
+    }, () => {
+      setLocating(false)
+      setLocationStatus("Location permission was not available. Please type the address instead.")
+    }, { enableHighAccuracy: true, timeout: 12_000 })
+  }
 
   if (state.status === "success") {
     return (
@@ -42,36 +69,38 @@ export function QuoteRequestForm() {
 
       <fieldset className="grid gap-4 border-b border-slate-200 px-5 py-6 sm:grid-cols-2 sm:px-8 sm:py-8">
         <legend className="w-full px-5 pt-6 text-xl font-semibold text-slate-950 sm:px-8 sm:pt-8">1. Contact information</legend>
-        <label className={labelClass}>First name<input name="firstName" required autoComplete="given-name" className={inputClass} /></label>
-        <label className={labelClass}>Last name<input name="lastName" required autoComplete="family-name" className={inputClass} /></label>
+        <label className={`${labelClass} sm:col-span-2`}>Full name<input name="fullName" required autoComplete="name" placeholder="First and last name" className={inputClass} /></label>
         <label className={labelClass}>Email<input name="email" required type="email" autoComplete="email" className={inputClass} /></label>
-        <label className={labelClass}>Phone<input name="phone" required type="tel" inputMode="tel" autoComplete="tel" className={inputClass} /></label>
+        <label className={labelClass}>Phone <span className="font-normal text-slate-500">Optional</span><input name="phone" type="tel" inputMode="tel" autoComplete="tel" className={inputClass} /></label>
         <label className={labelClass}>Company <span className="font-normal text-slate-500">Optional</span><input name="company" autoComplete="organization" className={inputClass} /></label>
-        <label className={labelClass}>I am a<select name="customerType" required defaultValue="" className={inputClass}><option value="" disabled>Choose one</option><option>Contractor or builder</option><option>Developer</option><option>Designer or architect</option><option>Property owner</option><option>Property manager</option><option>Other</option></select></label>
       </fieldset>
 
       <fieldset className="grid gap-4 border-b border-slate-200 px-5 py-6 sm:grid-cols-2 sm:px-8 sm:py-8">
         <legend className="w-full px-5 pt-6 text-xl font-semibold text-slate-950 sm:px-8 sm:pt-8">2. Project information</legend>
         <label className={labelClass}>Project name <span className="font-normal text-slate-500">Optional</span><input name="projectName" placeholder="Example: 123 Main Street renovation" className={inputClass} /></label>
-        <label className={labelClass}>Project type<select name="projectType" required defaultValue="" className={inputClass}><option value="" disabled>Choose one</option><option>New construction</option><option>Renovation</option><option>Addition</option><option>Commercial</option><option>Multi-family</option><option>Repair or replacement</option><option>Other</option></select></label>
-        <label className={`${labelClass} sm:col-span-2`}>Job-site street address<input name="street" required autoComplete="street-address" className={inputClass} /></label>
-        <label className={labelClass}>City<input name="city" required autoComplete="address-level2" className={inputClass} /></label>
-        <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-3">
-          <label className={labelClass}>State<select name="state" required defaultValue="" autoComplete="address-level1" className={inputClass}><option value="" disabled>State</option>{states.map((item) => <option key={item}>{item}</option>)}</select></label>
-          <label className={labelClass}>ZIP<input name="zip" required inputMode="numeric" autoComplete="postal-code" pattern="[0-9]{5}(-[0-9]{4})?" className={inputClass} /></label>
+        <div className={`${labelClass} sm:col-span-2`}>
+          <label htmlFor="quote-address">Job-site address <span className="font-normal text-slate-500">Optional</span></label>
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <input id="quote-address" name="address" value={address} onChange={(event) => setAddress(event.target.value)} autoComplete="street-address" placeholder="Start typing or use your current location" className={inputClass} />
+            <button type="button" onClick={useCurrentLocation} disabled={locating} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:border-sky-400 hover:bg-sky-50 disabled:opacity-60">
+              {locating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}
+              {locating ? "Finding..." : "Use current location"}
+            </button>
+          </div>
+          {locationStatus ? <p className="text-xs font-normal text-slate-500" role="status">{locationStatus}</p> : null}
         </div>
-        <label className={`${labelClass} sm:col-span-2`}>When are materials needed?<select name="timeframe" required defaultValue="" className={inputClass}><option value="" disabled>Choose a timeframe</option><option>As soon as possible</option><option>Within 1-2 weeks</option><option>Within 1 month</option><option>Within 1-3 months</option><option>Planning for later</option></select></label>
+        <label className={`${labelClass} sm:col-span-2`}>When are materials needed? <span className="font-normal text-slate-500">Optional</span><select name="timeframe" defaultValue="" className={inputClass}><option value="">Not sure yet</option><option>As soon as possible</option><option>Within 1-2 weeks</option><option>Within 1 month</option><option>Within 1-3 months</option><option>Planning for later</option></select></label>
       </fieldset>
 
       <fieldset className="grid gap-5 px-5 py-6 sm:px-8 sm:py-8">
         <legend className="w-full px-5 pt-6 text-xl font-semibold text-slate-950 sm:px-8 sm:pt-8">3. What do you need?</legend>
         <div>
-          <p className="text-sm font-semibold text-slate-800">Choose all relevant departments</p>
+          <p className="text-sm font-semibold text-slate-800">Choose relevant departments <span className="font-normal text-slate-500">Optional</span></p>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {departments.map((department) => <label key={department} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-900"><input type="checkbox" name="departments" value={department} className="h-4 w-4 accent-[#0071e3]" />{department}</label>)}
           </div>
         </div>
-        <label className={labelClass}>Project details or material list<textarea name="details" required rows={6} minLength={10} maxLength={5000} placeholder="Tell us the materials, sizes, quantities, brands, delivery requirements, or questions you have." className={`${inputClass} min-h-36 resize-y py-3`} /></label>
+        <label className={labelClass}>Project details or material list <span className="font-normal text-slate-500">Optional when attaching a file</span><textarea name="details" rows={5} maxLength={5000} placeholder="Tell us what you need, or attach your plan or list below." className={`${inputClass} min-h-32 resize-y py-3`} /></label>
         <label className="grid cursor-pointer gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-700 transition hover:border-sky-400 hover:bg-sky-50">
           <span className="inline-flex items-center gap-2 font-semibold text-slate-900"><FileUp className="h-5 w-5 text-[#0071e3]" />Attach a plan or material list <span className="font-normal text-slate-500">Optional</span></span>
           <input type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png,.webp" className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-slate-950 file:px-3 file:py-2 file:font-semibold file:text-white" />

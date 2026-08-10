@@ -60,14 +60,9 @@ function valid(payload: QuotePayload) {
     && payload.firstName?.length > 0
     && payload.lastName?.length > 0
     && /^\S+@\S+\.\S+$/.test(payload.email || "")
-    && (payload.phone || "").replace(/\D/g, "").length >= 7
-    && payload.street?.length > 0
-    && payload.city?.length > 0
-    && payload.state?.length > 0
-    && /^\d{5}(?:-\d{4})?$/.test(payload.zip || "")
+    && (!(payload.phone || "").trim() || payload.phone.replace(/\D/g, "").length >= 7)
     && Array.isArray(payload.departments)
-    && payload.departments.length > 0
-    && payload.details?.length >= 10
+    && ((payload.details || "").trim().length >= 3 || Boolean(payload.attachment))
 }
 
 function hasValidPublicKey(request: Request) {
@@ -102,7 +97,7 @@ Deno.serve(async (request) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
   const fullName = `${payload.firstName.trim()} ${payload.lastName.trim()}`
   const email = payload.email.trim().toLowerCase()
-  const address = `${payload.street.trim()}, ${payload.city.trim()}, ${payload.state.trim()} ${payload.zip.trim()}`
+  const address = [payload.street, payload.city, payload.state, payload.zip].map((value) => value?.trim()).filter(Boolean).join(", ")
   let clientId = ""
   let projectId = ""
   let requestId = ""
@@ -113,14 +108,14 @@ Deno.serve(async (request) => {
     const { data: profile } = await supabase.from("profiles").select("id").ilike("email", email).limit(1).maybeSingle<{ id: string }>()
     if (profile) {
       clientId = profile.id
-      const { error } = await supabase.from("profiles").update({ full_name: fullName, phone: payload.phone, company_name: payload.company || null }).eq("id", clientId)
+      const { error } = await supabase.from("profiles").update({ full_name: fullName, phone: payload.phone || null, company_name: payload.company || null }).eq("id", clientId)
       if (error) throw new Error("profile_update_failed")
     } else {
       const { data, error } = await supabase.auth.admin.createUser({
         email,
         password: `${crypto.randomUUID()}Aa1!`,
         email_confirm: true,
-        user_metadata: { full_name: fullName, phone: payload.phone, company_name: payload.company || null },
+        user_metadata: { full_name: fullName, phone: payload.phone || null, company_name: payload.company || null },
       })
       if (error || !data.user) throw new Error("client_create_failed")
       clientId = data.user.id
@@ -129,7 +124,7 @@ Deno.serve(async (request) => {
         id: clientId,
         email,
         full_name: fullName,
-        phone: payload.phone,
+        phone: payload.phone || null,
         company_name: payload.company || null,
         role: "client",
         approval_status: "pending",
@@ -140,8 +135,8 @@ Deno.serve(async (request) => {
 
     const { data: project, error: projectError } = await supabase.from("projects").insert({
       owner_id: clientId,
-      name: payload.projectName?.trim() || `${payload.street.trim()} quote request`,
-      address,
+      name: payload.projectName?.trim() || `Quote request ${payload.referenceId}`,
+      address: address || null,
       status: "active",
     }).select("id").single<{ id: string }>()
     if (projectError || !project) throw new Error("project_create_failed")
@@ -158,10 +153,10 @@ Deno.serve(async (request) => {
     requestId = quote.id
 
     const answers = [
-      { questionId: "customer_type", label: "Customer type", value: payload.customerType },
-      { questionId: "project_type", label: "Project type", value: payload.projectType },
-      { questionId: "timeframe", label: "Materials needed", value: payload.timeframe },
-      { questionId: "departments", label: "Departments", value: payload.departments.join(", ") },
+      ...(payload.customerType ? [{ questionId: "customer_type", label: "Customer type", value: payload.customerType }] : []),
+      ...(payload.projectType ? [{ questionId: "project_type", label: "Project type", value: payload.projectType }] : []),
+      ...(payload.timeframe ? [{ questionId: "timeframe", label: "Materials needed", value: payload.timeframe }] : []),
+      ...(payload.departments.length ? [{ questionId: "departments", label: "Departments", value: payload.departments.join(", ") }] : []),
       { questionId: "request_details", label: "Request details", value: payload.details },
     ]
     const { error: itemError } = await supabase.from("quote_request_items").insert({
@@ -169,7 +164,7 @@ Deno.serve(async (request) => {
       project_id: projectId,
       owner_id: clientId,
       name: "Construction quote request",
-      department: payload.departments.join(", "),
+      department: payload.departments.join(", ") || "General request",
       item_type: "custom_priced",
       quantity: 1,
       unit: "request",
@@ -200,18 +195,18 @@ Deno.serve(async (request) => {
       if (attachmentError) throw new Error("attachment_record_failed")
     }
 
-    const departmentText = payload.departments.join(", ")
+    const departmentText = payload.departments.join(", ") || "Not selected"
     const ownerText = [
       "New Avantia Build quote request",
       `Reference: ${payload.referenceId}`,
       `Customer: ${fullName}`,
       `Email: ${email}`,
-      `Phone: ${payload.phone}`,
+      `Phone: ${payload.phone || "Not provided"}`,
       `Company: ${payload.company || "Not provided"}`,
       `Project: ${payload.projectName || "Not named"}`,
-      `Address: ${address}`,
+      `Address: ${address || "Not provided"}`,
       `Departments: ${departmentText}`,
-      `Needed: ${payload.timeframe}`,
+      `Needed: ${payload.timeframe || "Not provided"}`,
       "",
       payload.details,
     ].join("\n")
@@ -220,7 +215,7 @@ Deno.serve(async (request) => {
       subject: `New quote request: ${payload.projectName || fullName}`,
       replyTo: email,
       text: ownerText,
-      html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:680px;margin:auto"><p style="color:#0066cc;font-size:12px;font-weight:700">AVANTIA BUILD QUOTE REQUEST</p><h1 style="font-size:24px">${escapeHtml(payload.projectName || "New construction request")}</h1><p><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}<br><strong>Customer:</strong> ${escapeHtml(fullName)}<br><strong>Email:</strong> ${escapeHtml(email)}<br><strong>Phone:</strong> ${escapeHtml(payload.phone)}<br><strong>Company:</strong> ${escapeHtml(payload.company || "Not provided")}</p><p><strong>Address:</strong> ${escapeHtml(address)}<br><strong>Departments:</strong> ${escapeHtml(departmentText)}<br><strong>Needed:</strong> ${escapeHtml(payload.timeframe)}</p><h2 style="font-size:17px">Request details</h2><p style="white-space:pre-wrap">${escapeHtml(payload.details)}</p></div>`,
+      html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:680px;margin:auto"><p style="color:#0066cc;font-size:12px;font-weight:700">AVANTIA BUILD QUOTE REQUEST</p><h1 style="font-size:24px">${escapeHtml(payload.projectName || "New construction request")}</h1><p><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}<br><strong>Customer:</strong> ${escapeHtml(fullName)}<br><strong>Email:</strong> ${escapeHtml(email)}<br><strong>Phone:</strong> ${escapeHtml(payload.phone || "Not provided")}<br><strong>Company:</strong> ${escapeHtml(payload.company || "Not provided")}</p><p><strong>Address:</strong> ${escapeHtml(address || "Not provided")}<br><strong>Departments:</strong> ${escapeHtml(departmentText)}<br><strong>Needed:</strong> ${escapeHtml(payload.timeframe || "Not provided")}</p><h2 style="font-size:17px">Request details</h2><p style="white-space:pre-wrap">${escapeHtml(payload.details || "See attached file")}</p></div>`,
       attachment: payload.attachment,
     })
     const clientText = `Hi ${payload.firstName},\n\nWe received your Avantia Build quote request. Someone from our team will contact you within the next 24 hours.\n\nReference: ${payload.referenceId}\nProject: ${payload.projectName || "Not named"}\n\nAvantia Build\nEverything it takes to build`

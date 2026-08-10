@@ -109,10 +109,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
       ? [
           { href: "/account", label: "Account & Settings" },
         ]
-      : [
-          { href: "/login", label: "Log in" },
-          { href: "/signup", label: "Create account" },
-        ]),
+      : []),
   ], [isAdmin, isSignedIn]);
 
   const adminLinks = useMemo<MobileMenuLink[]>(() => {
