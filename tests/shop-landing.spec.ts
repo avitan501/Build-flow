@@ -44,7 +44,7 @@ test("saved guest project hydrates cleanly and can be cleared", async ({ page })
 
 test("all departments wrap into downward rows without page overflow", async ({ page }) => {
   await page.goto("/shop")
-  await expect(page.getByRole("heading", { name: "Shop by department" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "What are you working on now?" })).toBeVisible()
 
   const cards = page.getByTestId("department-card")
   await expect(cards).toHaveCount(8)
@@ -127,7 +127,7 @@ test("siding and roofing are separate departments with a complete request flow",
   expect(new Set(positions).size).toBe(8)
   await expect(page.getByRole("heading", { name: "Available items" })).toHaveCount(0)
   await expect(page.getByText("Recommended next", { exact: true })).toHaveCount(0)
-  await expect(page.getByRole("heading", { name: "Order here with our AI agent" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Place an order here" })).toBeVisible()
 })
 
 test("kitchen, tile, and drywall omit retired promotional and calculator cards", async ({ page }) => {
@@ -139,6 +139,23 @@ test("kitchen, tile, and drywall omit retired promotional and calculator cards",
 
   await page.goto("/shop/sheet-rock")
   await expect(page.getByText("Drywall calculator", { exact: true })).toHaveCount(0)
+})
+
+test("flooring keeps quick order first and merges plan upload into the order request", async ({ page }) => {
+  await page.goto("/shop/wood-floor")
+
+  const quickOrder = page.getByText("Choose materials", { exact: true }).locator("..")
+  const orderRequest = page.getByRole("heading", { name: "Place an order here" })
+
+  await expect(page.getByRole("button", { name: /Start quick order/ })).toBeVisible()
+  await expect(page.getByText("Attach blueprint or shopping list", { exact: true })).toBeVisible()
+  await expect(page.getByText("Wood floor calculator", { exact: true })).toHaveCount(0)
+
+  const positions = await Promise.all([
+    quickOrder.evaluate((element) => element.getBoundingClientRect().top),
+    orderRequest.evaluate((element) => element.getBoundingClientRect().top),
+  ])
+  expect(positions[0]).toBeLessThan(positions[1])
 })
 
 test("shop shows the sourcing brands and direct help actions", async ({ page }) => {

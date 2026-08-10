@@ -385,8 +385,7 @@ export function ShopProjectToolPicker({
       <section className="min-w-0 py-5 sm:py-7">
         <div className="px-1">
           <div>
-            <h2 className="text-[1.85rem] font-semibold leading-tight text-[#1d1d1f] sm:text-[2.35rem]">Shop by department</h2>
-            <p className="mt-1 text-sm leading-6 text-[#6e6e73]">Materials, services, calculators, and plan uploads.</p>
+            <h2 className="text-[1.85rem] font-semibold leading-tight text-[#1d1d1f] sm:text-[2.35rem]">What are you working on now?</h2>
           </div>
         </div>
 

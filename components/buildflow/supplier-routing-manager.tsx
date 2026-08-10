@@ -743,7 +743,7 @@ export function SupplierRoutingManager({
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                     <div className="text-2xl font-semibold">{catalogProducts.filter((product) => product.productType !== "service").length + addOns.products.length + addOns.services.length}</div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Shop items</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Department items</div>
                   </div>
                 </div>
               </div>
@@ -952,7 +952,7 @@ export function SupplierRoutingManager({
                       <div className="flex flex-wrap items-end justify-between gap-3">
                         <div>
                           <h4 className="text-base font-semibold text-slate-950">Department routing</h4>
-                          <p className="mt-1 text-sm leading-6 text-slate-500">These are the same active departments customers see in Shop.</p>
+                          <p className="mt-1 text-sm leading-6 text-slate-500">These are the same active departments customers see in Let&apos;s Work.</p>
                         </div>
                         <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">{selectedSupplierDepartments.length} assigned</span>
                       </div>
@@ -970,7 +970,7 @@ export function SupplierRoutingManager({
                               />
                               <span>
                                 <span className="block font-semibold text-slate-950">{department.label}</span>
-                                <span className="mt-1 block text-xs text-slate-500">Shop department</span>
+                                <span className="mt-1 block text-xs text-slate-500">Let&apos;s Work department</span>
                               </span>
                             </label>
                           )

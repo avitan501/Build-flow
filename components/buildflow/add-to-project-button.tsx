@@ -98,6 +98,10 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
       setError("Choose a project first.")
       return
     }
+    if (file && file.size > 25 * 1024 * 1024) {
+      setError("The attachment is larger than 25 MB. Choose a smaller file.")
+      return
+    }
     setError(null)
     startTransition(async () => {
       const result = await addCatalogItemToProjectAction({

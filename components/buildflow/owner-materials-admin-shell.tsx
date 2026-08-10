@@ -1125,7 +1125,7 @@ export function OwnerMaterialsAdminShell({
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Shop preview</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Let&apos;s Work preview</p>
                   <h2 className="mt-2 text-xl font-semibold text-slate-950">What customers see</h2>
                 </div>
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">Step 3</span>

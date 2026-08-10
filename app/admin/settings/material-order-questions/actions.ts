@@ -69,7 +69,7 @@ export async function updateMaterialCategoryAction(input: {
     .select("state")
     .eq("id", "singleton")
     .maybeSingle<{ state: { qualificationSettings?: ShopQualificationSettings; addOns?: ManagerCatalogAddOns } }>()
-  if (managerReadError) return { ok: false, error: "Could not load the existing Shop settings. Nothing was changed." }
+  if (managerReadError) return { ok: false, error: "Could not load the existing department settings. Nothing was changed." }
   const { error } = await supabase.from("material_questionnaire_categories").update({
     name,
     description: cleanText(input.description, 1000),
@@ -108,7 +108,7 @@ export async function updateMaterialCategoryAction(input: {
     supabase.from("workflow_manager_settings").upsert({ id: "singleton", state: nextState, updated_by: user.id }),
     supabase.from("workflow_public_catalog").upsert({ id: "singleton", state: publicWorkflowState(nextState), updated_by: user.id }),
   ])
-  if (managerError || publicError) return { ok: false, error: "Question settings were saved, but the Shop display settings could not be published." }
+  if (managerError || publicError) return { ok: false, error: "Question settings were saved, but the customer display settings could not be published." }
   refreshSettings()
   return { ok: true, data: undefined }
 }

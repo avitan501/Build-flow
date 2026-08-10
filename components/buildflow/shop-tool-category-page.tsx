@@ -26,7 +26,7 @@ type ShopToolCategoryPageProps = {
 }
 
 function QuickOrderAction({ category, questionnaireDepartment }: { category: ShopToolCategory; questionnaireDepartment: string }) {
-  return <section className="flex max-w-xl flex-col items-start justify-between gap-4 rounded-[20px] border border-sky-200 bg-sky-50 p-4 sm:flex-row sm:items-center"><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Quick Order</p><h2 className="mt-1 text-base font-bold text-slate-950">Answer a few questions to start your request</h2></div><AddToProjectButton product={{ id: `${category.slug}-quick-order`, name: `${category.label} Quick Order`, category: questionnaireDepartment, productType: "service", price: 0, unit: "Request" }} questionnaireDepartment={questionnaireDepartment} label="Start quick order" /></section>
+  return <section className="flex max-w-2xl flex-col items-start justify-between gap-4 rounded-[20px] border border-sky-200 bg-sky-50 p-5 sm:flex-row sm:items-center"><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Choose materials</p><h2 className="mt-1 text-lg font-bold text-slate-950">Answer a few quick questions</h2><p className="mt-1 text-sm leading-6 text-slate-600">Select sizes, quantities, and accessories for this department.</p></div><AddToProjectButton product={{ id: `${category.slug}-quick-order`, name: `${category.label} Quick Order`, category: questionnaireDepartment, productType: "service", price: 0, unit: "Request" }} questionnaireDepartment={questionnaireDepartment} label="Start quick order" /></section>
 }
 
 function FramingUploadActions() {
@@ -55,31 +55,6 @@ function FramingUploadActions() {
           <PlanRequestUploadCard requestId={`framing-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} category="Framing" label={action.label} description={action.description} accept={action.accept} icon={action.icon} />
         </ManagerItemVisibility>
       ))}
-    </section>
-  )
-}
-
-function WoodFloorActions() {
-  return (
-    <section className="grid grid-cols-2 gap-3 sm:max-w-2xl sm:gap-4">
-      <Link
-        href="/shop/wood-floor/flooring-calculator"
-        prefetch={false}
-        className="flex min-h-[148px] touch-manipulation flex-col justify-between rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition active:scale-[0.99] active:border-sky-300"
-      >
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
-          <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M4 4h16v16H4z" />
-            <path d="M4 9h16" />
-            <path d="M9 4v16" />
-            <path d="M14 4v16" />
-          </svg>
-        </span>
-        <span>
-          <span className="block text-base font-bold leading-5 text-slate-950">Wood floor calculator</span>
-          <span className="mt-1 block text-xs font-medium leading-4 text-slate-500">Plan room takeoff, room selection, 10% waste, and marked plan</span>
-        </span>
-      </Link>
     </section>
   )
 }
@@ -270,6 +245,7 @@ function WindowUploadActions({
 export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, successCode }: ShopToolCategoryPageProps) {
   const essentials = getDepartmentEssentials(category.slug)
   const usesStandardUpload = !["framing", "kitchen", "eitan", "window"].includes(category.slug)
+  const composerHandlesUpload = category.slug === "wood-floor"
 
   return (
     <main className="min-h-screen bg-[#f7f8fa] px-4 py-4 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
@@ -277,16 +253,15 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
         <h1 className="text-[2rem] font-bold tracking-normal text-slate-950 sm:text-[2.4rem]">{category.label}</h1>
 
         {experience.showQuickOrder ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
-        {experience.showPlanUpload && usesStandardUpload ? <CombinedUploadAction category={questionnaireDepartment} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
+        {experience.showPlanUpload && usesStandardUpload && !composerHandlesUpload ? <CombinedUploadAction category={questionnaireDepartment} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && category.slug === "framing" ? <FramingUploadActions /> : null}
-        {experience.showTakeoff && category.slug === "wood-floor" ? <ManagerItemVisibility itemId="wood-floor-takeoff"><WoodFloorActions /></ManagerItemVisibility> : null}
         {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}
         {experience.showPlanUpload && category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
         {experience.showPlanUpload && category.slug === "window" ? <ManagerItemVisibility itemId="window-package"><WindowUploadActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} successCode={successCode} /></ManagerItemVisibility> : null}
 
         <DepartmentEssentials data={essentials} />
 
-        {experience.showChatToOrder ? <DepartmentRequestComposer category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
+        {experience.showChatToOrder ? <DepartmentRequestComposer category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} allowUpload={composerHandlesUpload && experience.showPlanUpload} /> : null}
       </section>
     </main>
   )
