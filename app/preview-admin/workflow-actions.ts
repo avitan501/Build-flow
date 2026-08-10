@@ -84,6 +84,44 @@ export async function assignSupplierPackageAction(input: { packageId: string; su
   return { ok: true }
 }
 
+export async function routeRequestToSupplierAction(input: { requestId: string; department: string; supplierId: string }): Promise<ManagerResult> {
+  const { supabase, user } = await requireAdminProfile()
+  const department = input.department.trim()
+  const supplierId = input.supplierId.trim()
+  if (!department || !supplierId) return { ok: false, error: "Choose a department and supplier." }
+
+  const [{ data: settings }, { data: request }, { data: items }] = await Promise.all([
+    supabase.from("workflow_manager_settings").select("state").eq("id", "singleton").maybeSingle<{ state: { qualificationSettings?: { suppliers?: Array<{ id: string }> } } }>(),
+    supabase.from("quote_requests").select("id,title").eq("id", input.requestId).maybeSingle<{ id: string; title: string }>(),
+    supabase.from("quote_request_items").select("id").eq("request_id", input.requestId).eq("department", department).returns<Array<{ id: string }>>(),
+  ])
+  if (!request) return { ok: false, error: "Request was not found." }
+  if (!settings?.state?.qualificationSettings?.suppliers?.some((supplier) => supplier.id === supplierId)) return { ok: false, error: "That supplier is no longer available." }
+
+  const { error } = await supabase.from("supplier_packages").upsert({
+    request_id: input.requestId,
+    department,
+    supplier_id: supplierId,
+    status: "pending_approval",
+    approved_by: null,
+    approved_at: null,
+    sent_at: null,
+    payload: {
+      request_title: request.title,
+      item_ids: (items ?? []).map((item) => item.id),
+      routed_manually: true,
+      routed_at: new Date().toISOString(),
+      routed_by: user.id,
+    },
+  }, { onConflict: "request_id,department" })
+  if (error) return { ok: false, error: "Could not save the supplier routing." }
+
+  revalidatePath(`/owner/materials/requests/${input.requestId}`)
+  revalidatePath("/admin/supplier-approvals")
+  revalidatePath("/admin/build-map")
+  return { ok: true }
+}
+
 export async function returnSupplierPackageForInfoAction(input: { packageId: string; requestId: string }): Promise<ManagerResult> {
   const { supabase, user } = await requireAdminProfile()
   const { data: pkg, error: packageError } = await supabase

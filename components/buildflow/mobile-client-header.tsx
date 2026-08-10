@@ -104,7 +104,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
     { href: "/shop", label: "Shop" },
     { href: "/projects", label: "My Projects" },
     { href: "/request-quote", label: "Request a Quote" },
-    ...(isAdmin ? [{ href: "/admin/vendors", label: "Manager" }] : []),
+    ...(isAdmin ? [{ href: "/admin/build-map", label: "Manager" }] : []),
     ...(isSignedIn
       ? [
           { href: "/account", label: "Account & Settings" },
@@ -121,12 +121,11 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
       ...(isAdmin
         ? [
             { href: "/admin/build-map", label: "Dashboard" },
-          { href: "/admin/vendors", label: "Supplier Routing" },
-          { href: "/admin/settings/material-order-questions", label: "Material Order Questions" },
-          { href: "/owner/materials", label: "Material Admin" },
-            { href: "/shop", label: "Shop" },
-            { href: "/admin/users", label: "Users" },
-            { href: "/admin/whatsapp", label: "WhatsApp" },
+            { href: "/admin/users?view=requests", label: "Customer Requests" },
+            { href: "/admin/vendors", label: "Supplier Directory" },
+            { href: "/admin/supplier-approvals", label: "Supplier Requests" },
+            { href: "/admin/settings/material-order-questions", label: "Departments & Questions" },
+            { href: "/owner/materials", label: "Catalog & Subcategories" },
           ]
         : []),
     ];
