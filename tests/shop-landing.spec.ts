@@ -80,7 +80,7 @@ test("flooring uses the customer-facing name and framing uses its dedicated phot
   await expect(page.getByTestId("department-card").filter({ hasText: "Wood Floor" })).toHaveCount(0)
 
   const framingCard = page.getByTestId("department-card").filter({ hasText: "Framing" })
-  await expect(framingCard.locator('img[src*="framing-department-v2.webp"]')).toBeVisible()
+  await expect(framingCard.locator('img[src*="framing-materials-yard.webp"]')).toBeVisible()
 })
 
 test("retired departments are hidden and department symbols are visible", async ({ page }) => {

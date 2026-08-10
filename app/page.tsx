@@ -46,37 +46,43 @@ const coverageDots = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-x-clip bg-white text-slate-950">
+    <main className="min-h-screen overflow-x-clip bg-[#f5f7fa] pb-4 text-slate-950">
       <RecoveryLinkHandler />
 
-      <section className="relative isolate overflow-hidden border-b border-slate-200 bg-[#071126] text-white">
-        <div
-          className="absolute inset-0 -z-20 bg-cover bg-center"
-          style={{ backgroundImage: "url(/images/buildflow-retail/hero.jpg)" }}
-          aria-hidden="true"
-        />
-        <div className="absolute inset-0 -z-10 bg-[#071126]/80" aria-hidden="true" />
-        <div className="mx-auto flex min-h-[18rem] max-w-6xl flex-col justify-end px-5 py-7 sm:min-h-[22rem] sm:px-8 sm:py-10 lg:px-10">
-          <AvantiaBuildLockup tone="light" />
-          <h1 className="mt-3 max-w-3xl text-3xl font-semibold leading-tight sm:text-5xl">
-            Concierge service for every construction need.
-          </h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
-            We source materials, compare options, and simplify every order.
-          </p>
-        </div>
-      </section>
+      <div className="px-3 pt-3 sm:px-5 sm:pt-5">
+        <section className="relative isolate mx-auto max-w-[88rem] overflow-hidden rounded-[30px] bg-[#071126] text-white shadow-[0_24px_70px_rgba(7,17,38,0.24)] sm:rounded-[36px]">
+          <div
+            className="absolute inset-0 -z-20 bg-cover bg-center"
+            style={{ backgroundImage: "url(/images/buildflow-retail/hero.jpg)" }}
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 -z-10 bg-[#071126]/76" aria-hidden="true" />
+          <div className="mx-auto flex min-h-[19rem] max-w-6xl flex-col justify-end px-6 py-8 sm:min-h-[23rem] sm:px-9 sm:py-11 lg:px-10">
+            <AvantiaBuildLockup tone="light" />
+            <h1 className="mt-4 max-w-3xl text-3xl font-semibold leading-tight sm:text-5xl">
+              Concierge service for every construction need.
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
+              Better sourcing, clearer choices, and one place for every request.
+            </p>
+          </div>
+        </section>
+      </div>
 
-      <section className="mx-auto max-w-6xl px-5 py-7 sm:px-8 sm:py-9 lg:px-10">
-        <div className="grid border-t border-slate-200 md:grid-cols-2">
+      <section className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-11 lg:px-10">
+        <div className="mb-5 max-w-2xl sm:mb-7">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">How we help</p>
+          <h2 className="mt-2 text-2xl font-semibold leading-tight text-[#071126] sm:text-3xl">A simpler way to source for a project.</h2>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
           {conciergePoints.map((point, index) => (
             <details
               key={point.title}
-              className={`group border-b border-slate-200 md:px-7 ${index % 2 === 0 ? "md:border-r md:pl-0" : "md:pr-0"}`}
+              className="group overflow-hidden rounded-[22px] border border-white/80 bg-white shadow-[0_12px_34px_rgba(15,23,42,0.07)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(15,23,42,0.1)]"
             >
-              <summary className="flex min-h-20 cursor-pointer list-none items-center justify-between gap-3 py-3.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0066cc] [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-24 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0066cc] [&::-webkit-details-marker]:hidden">
                 <span className="flex min-w-0 items-start gap-4">
-                  <span className="pt-0.5 text-xs font-semibold text-[#0066cc]">{String(index + 1).padStart(2, "0")}</span>
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-xs font-bold text-[#0066cc]">{String(index + 1).padStart(2, "0")}</span>
                   <span>
                     <span className="block text-base font-semibold text-[#071126] sm:text-lg">{point.title}</span>
                     <span className="mt-1 block text-sm leading-5 text-slate-600">{point.summary}</span>
@@ -84,18 +90,18 @@ export default function Home() {
                 </span>
                 <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-300 text-xl font-light text-slate-600 transition group-open:rotate-45" aria-hidden="true">+</span>
               </summary>
-              <p className="pb-4 pl-10 pr-11 text-sm leading-5 text-slate-600">{point.body}</p>
+              <p className="border-t border-slate-100 px-5 py-4 text-sm leading-6 text-slate-600">{point.body}</p>
             </details>
           ))}
         </div>
 
-        <p className="py-6 text-center text-sm font-semibold text-[#071126] sm:text-base">
+        <p className="pt-7 text-center text-sm font-semibold text-[#071126] sm:text-base">
           Sourcing support for contractors, developers, design professionals, and property owners.
         </p>
       </section>
 
-      <section className="border-y border-slate-200 bg-[#f5f7fa]" aria-labelledby="coverage-heading">
-        <div className="mx-auto grid max-w-5xl items-center gap-4 px-5 py-7 sm:px-8 sm:py-9 lg:grid-cols-[minmax(15rem,0.7fr)_minmax(0,1.1fr)] lg:px-10">
+      <section className="px-3 sm:px-5" aria-labelledby="coverage-heading">
+        <div className="mx-auto grid max-w-6xl items-center gap-5 overflow-hidden rounded-[28px] border border-white bg-white px-5 py-7 shadow-[0_18px_48px_rgba(15,23,42,0.08)] sm:px-8 sm:py-9 lg:grid-cols-[minmax(15rem,0.7fr)_minmax(0,1.1fr)] lg:px-10">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Nationwide sourcing</p>
             <h2 id="coverage-heading" className="mt-2 text-2xl font-semibold leading-tight text-[#071126] sm:text-3xl">Covering 41 states.</h2>
@@ -117,7 +123,9 @@ export default function Home() {
         </div>
       </section>
 
-      <ShopBrandShowcase compact />
+      <div className="mt-8 px-3 sm:mt-10 sm:px-5">
+        <ShopBrandShowcase compact />
+      </div>
     </main>
   );
 }
