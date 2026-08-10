@@ -90,10 +90,15 @@ export default async function SupplierApprovalsPage({ searchParams }: { searchPa
     <main className="min-h-screen bg-[#f5f5f7] px-4 pb-28 pt-6 text-slate-950 sm:px-8 sm:pb-12">
       <div className="mx-auto max-w-7xl">
         <header className="border-b border-slate-200 pb-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager review</p>
-          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Supplier Requests</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Review customer details, answers, items, and files before approving a supplier package. Nothing is sent automatically.</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager</p>
+          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Suppliers</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage supplier contacts and routed customer requests.</p>
         </header>
+
+        <nav className="mt-6 grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-white p-1" aria-label="Supplier directory and requests views">
+          <Link href="/admin/vendors" className="flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50">Directory</Link>
+          <Link href="/admin/supplier-approvals" className="flex min-h-11 items-center justify-center rounded-md bg-slate-950 px-4 text-sm font-semibold text-white">Requests</Link>
+        </nav>
 
         <section className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Supplier request filters">
           <Link href="/admin/supplier-approvals?view=pending" aria-current={view === "pending" ? "page" : undefined} className={`rounded-lg border bg-white p-4 transition hover:border-amber-400 ${view === "pending" ? "border-amber-400 ring-2 ring-amber-100" : "border-amber-200"}`}><Clock3 className="h-5 w-5 text-amber-700" /><p className="mt-3 text-3xl font-bold">{pendingCount}</p><p className="text-sm font-semibold text-slate-600">Needs review</p></Link>

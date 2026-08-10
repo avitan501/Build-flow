@@ -702,10 +702,16 @@ export function SupplierRoutingManager({
 
         <section className="grid gap-5">
           {supplierDirectoryOnly ? (
-            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-5">
-              <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Supplier Directory</h1>
-              <span className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">{settings.suppliers.length} total suppliers</span>
-            </header>
+            <>
+              <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-5">
+                <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Suppliers</h1><p className="mt-2 text-sm text-slate-600">Manage supplier contacts and routed customer requests.</p></div>
+                <span className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">{settings.suppliers.length} total suppliers</span>
+              </header>
+              <nav className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-white p-1" aria-label="Supplier directory and requests views">
+                <Link href="/admin/vendors" className="flex min-h-11 items-center justify-center rounded-md bg-slate-950 px-4 text-sm font-semibold text-white">Directory</Link>
+                <Link href="/admin/supplier-approvals" className="flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50">Requests</Link>
+              </nav>
+            </>
           ) : (
             <header className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] sm:p-7">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">

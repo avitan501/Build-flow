@@ -4,7 +4,6 @@ import {
   Boxes,
   Building2,
   ChevronLeft,
-  ClipboardCheck,
   ClipboardList,
   LayoutDashboard,
   Menu,
@@ -24,8 +23,7 @@ const managerLinks = [
   { href: "/admin/settings/material-order-questions", label: "Departments & Questions", icon: Building2 },
   { href: "/admin/users?view=customers", label: "Customer Directory", icon: Users, view: "customers" },
   { href: "/admin/users?view=requests", label: "Customer Requests", icon: ClipboardList, view: "requests" },
-  { href: "/admin/vendors", label: "Supplier Directory", icon: Store },
-  { href: "/admin/supplier-approvals", label: "Supplier Requests", icon: ClipboardCheck },
+  { href: "/admin/vendors", label: "Suppliers", icon: Store },
   { href: "/owner/materials", label: "Catalog & Subcategories", icon: Boxes },
   { href: "/admin/settings", label: "Integrations", icon: Settings },
 ] as const;
@@ -37,6 +35,9 @@ function isActive(pathname: string, href: string, currentView: string, targetVie
   }
   if (hrefPath === "/admin/users") {
     return pathname.startsWith("/admin/users") && currentView === targetView;
+  }
+  if (href === "/admin/vendors") {
+    return pathname.startsWith("/admin/vendors") || pathname.startsWith("/admin/supplier-approvals");
   }
   if (href === "/admin/settings") {
     return pathname === href || pathname.startsWith("/admin/whatsapp");
