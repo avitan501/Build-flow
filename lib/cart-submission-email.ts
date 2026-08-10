@@ -38,6 +38,14 @@ export type CartSubmissionEmailResult = {
   client: EmailDeliveryResult
 }
 
+export type ManagerClientReplyEmailInput = {
+  requestId: string
+  requestTitle: string
+  recipientName: string
+  recipientEmail: string
+  message: string
+}
+
 const DEFAULT_TO = "avitanneto@gmail.com"
 const DEFAULT_FROM = "Avantia Build <onboarding@resend.dev>"
 
@@ -246,6 +254,37 @@ async function sendEmail(input: {
   } catch (error) {
     return { status: "failed", error: error instanceof Error ? error.message : "Unknown email error" }
   }
+}
+
+export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmailInput): Promise<EmailDeliveryResult> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) return { status: "not_configured" }
+
+  const from = process.env.QUOTE_SUBMISSION_FROM || DEFAULT_FROM
+  const ownerEmail = process.env.QUOTE_SUBMISSION_TO || DEFAULT_TO
+  const subject = `Avantia Build request: ${input.requestTitle}`
+  const text = `${input.message.trim()}\n\nAvantia Build\nEverything it takes to build`
+  const html = `
+    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.6;max-width:620px;margin:0 auto">
+      <p style="white-space:pre-wrap">${escapeHtml(input.message.trim())}</p>
+      <div style="margin-top:28px;padding-top:18px;border-top:1px solid #e2e8f0">
+        <strong>Avantia Build</strong><br />
+        <span style="color:#64748b">Everything it takes to build</span><br />
+        <span style="color:#64748b;font-size:13px">Request: ${escapeHtml(input.requestTitle)}</span>
+      </div>
+    </div>
+  `
+
+  return sendEmail({
+    apiKey,
+    from,
+    to: input.recipientEmail,
+    subject,
+    html,
+    text,
+    replyTo: ownerEmail,
+    idempotencyKey: `avantia-manager-reply-${input.requestId}-${crypto.randomUUID()}`,
+  })
 }
 
 export type QuoteIntakeEmailInput = {

@@ -99,6 +99,9 @@ test("manager pages require authentication and stay out of the guest menu", asyn
 
   await page.goto("/admin/build-map")
   await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Fbuild-map/)
+
+  await page.goto("/admin/ai-tools")
+  await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Fai-tools/)
 })
 
 test("home shows the compact manufacturer brand showcase", async ({ page }) => {
@@ -144,7 +147,7 @@ test("shop shows the sourcing brands and direct help actions", async ({ page }) 
   await expect(page.getByRole("heading", { name: "Brands we source" })).toBeVisible()
   await expect(page.getByTestId("shop-brand-grid").getByRole("img")).toHaveCount(8)
   await expect(page.getByRole("link", { name: "Call us" })).toHaveAttribute("href", "tel:+19292077156")
-  await expect(page.getByRole("link", { name: "Text HELP" })).toHaveAttribute("href", "sms:+19292077156?body=HELP")
+  await expect(page.getByRole("link", { name: "Text us" })).toHaveAttribute("href", "sms:+19292077156?body=Hi%20Avantia%20Build%2C%20I%20need%20help%20finding%20construction%20materials.")
 })
 
 test("guest projects stay compact until the full list is requested", async ({ page }) => {
