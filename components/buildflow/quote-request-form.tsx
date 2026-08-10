@@ -1,12 +1,13 @@
 "use client"
 
 import { CheckCircle2, FileUp, LocateFixed, LoaderCircle, Send } from "lucide-react"
-import { useActionState, useState } from "react"
+import { useActionState, useRef, useState } from "react"
 
 import { submitQuoteRequestFormAction, type QuoteRequestFormState } from "@/app/request-quote/actions"
 
 const initialState: QuoteRequestFormState = { status: "idle", message: "" }
 const departments = ["Framing", "Flooring", "Sheet rock", "Tile work", "Door and molding", "Siding", "Roofing", "Windows"]
+const maxAttachmentSize = 4 * 1024 * 1024
 const inputClass = "min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3.5 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
 const labelClass = "grid gap-1.5 text-sm font-semibold text-slate-800"
 
@@ -24,6 +25,24 @@ export function QuoteRequestForm() {
   const [address, setAddress] = useState("")
   const [locationStatus, setLocationStatus] = useState("")
   const [locating, setLocating] = useState(false)
+  const [fileError, setFileError] = useState("")
+  const attachmentRef = useRef<HTMLInputElement>(null)
+
+  function validateAttachment(file: File | undefined) {
+    if (!file || file.size <= maxAttachmentSize) {
+      setFileError("")
+      return true
+    }
+
+    const size = (file.size / (1024 * 1024)).toFixed(1)
+    setFileError(`This file is ${size} MB. The maximum upload size is 4 MB. Choose a smaller file or remove it to send the request without an attachment.`)
+    return false
+  }
+
+  function removeAttachment() {
+    if (attachmentRef.current) attachmentRef.current.value = ""
+    setFileError("")
+  }
 
   function useCurrentLocation() {
     if (!navigator.geolocation) {
@@ -64,7 +83,15 @@ export function QuoteRequestForm() {
   }
 
   return (
-    <form action={formAction} className="overflow-hidden border-y border-slate-200 bg-white" data-testid="quote-request-form">
+    <form
+      action={formAction}
+      onSubmit={(event) => {
+        const file = attachmentRef.current?.files?.[0]
+        if (!validateAttachment(file)) event.preventDefault()
+      }}
+      className="overflow-hidden border-y border-slate-200 bg-white"
+      data-testid="quote-request-form"
+    >
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="sr-only" aria-hidden="true" />
 
       <fieldset className="grid gap-4 border-b border-slate-200 px-5 py-6 sm:grid-cols-2 sm:px-8 sm:py-8">
@@ -103,10 +130,16 @@ export function QuoteRequestForm() {
         <label className={labelClass}>Project details or material list <span className="font-normal text-slate-500">Optional when attaching a file</span><textarea name="details" rows={5} maxLength={5000} placeholder="Tell us what you need, or attach your plan or list below." className={`${inputClass} min-h-32 resize-y py-3`} /></label>
         <label className="grid cursor-pointer gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-700 transition hover:border-sky-400 hover:bg-sky-50">
           <span className="inline-flex items-center gap-2 font-semibold text-slate-900"><FileUp className="h-5 w-5 text-[#0071e3]" />Attach a plan or material list <span className="font-normal text-slate-500">Optional</span></span>
-          <input type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png,.webp" className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-slate-950 file:px-3 file:py-2 file:font-semibold file:text-white" />
+          <input ref={attachmentRef} type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => validateAttachment(event.currentTarget.files?.[0])} className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-slate-950 file:px-3 file:py-2 file:font-semibold file:text-white" />
           <span className="text-xs text-slate-500">PDF, JPG, PNG, or WebP. Maximum 4 MB.</span>
         </label>
 
+        {fileError ? (
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800" role="alert">
+            <p>{fileError}</p>
+            <button type="button" onClick={removeAttachment} className="mt-2 min-h-9 rounded-md border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-800">Remove file</button>
+          </div>
+        ) : null}
         {state.status === "error" ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800" role="alert">{state.message}</p> : null}
 
         <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
