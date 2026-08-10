@@ -7,10 +7,12 @@ import { DepartmentEssentials } from "@/components/buildflow/department-essentia
 import { DepartmentRequestComposer } from "@/components/buildflow/department-request-composer"
 import { EitanWhatsAppUploadForm } from "@/components/buildflow/eitan-whatsapp-upload-form"
 import { ManagerItemVisibility } from "@/components/buildflow/manager-item-visibility"
+import { MaterialQuestionnairePreviewButton } from "@/components/buildflow/material-questionnaire-preview-button"
 import { PlanRequestUploadCard } from "@/components/buildflow/plan-request-upload-card"
 import type { ProjectRecord } from "@/lib/projects"
 import { getDepartmentEssentials } from "@/lib/department-essentials"
 import type { ManagerDepartmentExperience } from "@/lib/manager-add-ons"
+import type { MaterialQuestionnaireSnapshot } from "@/lib/material-questionnaires"
 import type { ShopToolCategory } from "@/lib/shop-tools"
 
 type ShopToolCategoryPageProps = {
@@ -23,10 +25,11 @@ type ShopToolCategoryPageProps = {
   isSignedIn: boolean
   errorCode?: string | null
   successCode?: string | null
+  questionnairePreview?: MaterialQuestionnaireSnapshot | null
 }
 
-function QuickOrderAction({ category, questionnaireDepartment }: { category: ShopToolCategory; questionnaireDepartment: string }) {
-  return <section className="flex max-w-2xl flex-col items-start justify-between gap-4 rounded-[20px] border border-sky-200 bg-sky-50 p-5 sm:flex-row sm:items-center"><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Choose materials</p><h2 className="mt-1 text-lg font-bold text-slate-950">Answer a few quick questions</h2><p className="mt-1 text-sm leading-6 text-slate-600">Select sizes, quantities, and accessories for this department.</p></div><AddToProjectButton product={{ id: `${category.slug}-quick-order`, name: `${category.label} Quick Order`, category: questionnaireDepartment, productType: "service", price: 0, unit: "Request" }} questionnaireDepartment={questionnaireDepartment} label="Start quick order" /></section>
+function QuickOrderAction({ category, questionnaireDepartment, questionnairePreview }: { category: ShopToolCategory; questionnaireDepartment: string; questionnairePreview?: MaterialQuestionnaireSnapshot | null }) {
+  return <section className="flex max-w-2xl flex-col items-start justify-between gap-4 rounded-[20px] border border-sky-200 bg-sky-50 p-5 sm:flex-row sm:items-center"><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Choose materials</p><h2 className="mt-1 text-lg font-bold text-slate-950">Answer a few quick questions</h2><p className="mt-1 text-sm leading-6 text-slate-600">Select sizes, quantities, and accessories for this department.</p></div>{questionnairePreview ? <MaterialQuestionnairePreviewButton snapshot={questionnairePreview} /> : <AddToProjectButton product={{ id: `${category.slug}-quick-order`, name: `${category.label} Quick Order`, category: questionnaireDepartment, productType: "service", price: 0, unit: "Request" }} questionnaireDepartment={questionnaireDepartment} label="Start quick order" />}</section>
 }
 
 function FramingUploadActions() {
@@ -242,7 +245,7 @@ function WindowUploadActions({
   )
 }
 
-export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, successCode }: ShopToolCategoryPageProps) {
+export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, successCode, questionnairePreview }: ShopToolCategoryPageProps) {
   const essentials = getDepartmentEssentials(category.slug)
   const usesStandardUpload = !["framing", "kitchen", "eitan", "window"].includes(category.slug)
   const composerHandlesUpload = category.slug === "wood-floor"
@@ -252,7 +255,7 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
       <section className="mx-auto flex max-w-7xl flex-col gap-4">
         <h1 className="text-[2rem] font-bold tracking-normal text-slate-950 sm:text-[2.4rem]">{category.label}</h1>
 
-        {experience.showQuickOrder ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
+        {experience.showQuickOrder ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} questionnairePreview={questionnairePreview} /> : null}
         {experience.showPlanUpload && usesStandardUpload && !composerHandlesUpload ? <CombinedUploadAction category={questionnaireDepartment} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && category.slug === "framing" ? <FramingUploadActions /> : null}
         {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}
