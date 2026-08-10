@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { Building2, CreditCard, Trash2 } from "lucide-react";
 
 import { updateAccountName, updateAccountPhone, updateAlternateContacts } from "@/app/account/actions";
+import { createPaymentMethodSetupSession, removePaymentMethod } from "@/app/account/payment-actions";
 import type { ProfileRecord } from "@/lib/auth";
+import type { SavedPaymentMethod } from "@/lib/stripe";
 import { AccountSignOutButton } from "@/components/buildflow/account-sign-out-button";
 
 type AccountSettingsProps = {
@@ -11,6 +14,10 @@ type AccountSettingsProps = {
   alternatePhone: string | null;
   feedbackCode?: string | null;
   feedbackTone?: "success" | "error" | null;
+  paymentConfigured: boolean;
+  paymentMethods: SavedPaymentMethod[];
+  paymentFeedback: "saved" | "removed" | "cancelled" | null;
+  paymentLoadFailed: boolean;
 };
 
 const errorMessages: Record<string, string> = {
@@ -20,6 +27,9 @@ const errorMessages: Record<string, string> = {
   "alternate-phone": "Enter a valid alternate phone number.",
   contacts: "Alternate contacts could not be saved. Please try again.",
   profile: "Account details could not be saved. Please try again.",
+  "payment-unavailable": "Secure payment setup is not connected yet.",
+  "payment-setup": "The secure payment screen could not be opened. Please try again.",
+  "payment-remove": "That payment method could not be removed. Please try again.",
 };
 
 const successMessages: Record<string, string> = {
@@ -40,7 +50,18 @@ function SectionCard({ title, description, children }: { title: string; descript
   );
 }
 
-export function AccountSettings({ email, profile, alternateEmail, alternatePhone, feedbackCode, feedbackTone }: AccountSettingsProps) {
+export function AccountSettings({
+  email,
+  profile,
+  alternateEmail,
+  alternatePhone,
+  feedbackCode,
+  feedbackTone,
+  paymentConfigured,
+  paymentMethods,
+  paymentFeedback,
+  paymentLoadFailed,
+}: AccountSettingsProps) {
   const feedbackText = feedbackCode
     ? feedbackTone === "error"
       ? errorMessages[feedbackCode] || "Account could not be updated."
@@ -63,6 +84,12 @@ export function AccountSettings({ email, profile, alternateEmail, alternatePhone
         {feedbackText ? (
           <div className={`rounded-[20px] border px-4 py-3 text-sm font-semibold ${feedbackTone === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
             {feedbackText}
+          </div>
+        ) : null}
+
+        {paymentFeedback ? (
+          <div className={`rounded-[20px] border px-4 py-3 text-sm font-semibold ${paymentFeedback === "cancelled" ? "border-slate-200 bg-white text-slate-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+            {paymentFeedback === "saved" ? "Payment method saved securely." : paymentFeedback === "removed" ? "Payment method removed." : "Payment setup was cancelled. Nothing was saved."}
           </div>
         ) : null}
 
@@ -106,8 +133,42 @@ export function AccountSettings({ email, profile, alternateEmail, alternatePhone
             <Link href="/reset-password" className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white">Change password</Link>
           </SectionCard>
 
-          <SectionCard title="Payment privacy" description="Avantia Build does not ask for or save bank account or credit card information on this page.">
-            <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm leading-6 text-emerald-900">No payment information is stored in account settings.</p>
+          <SectionCard title="Payment methods" description="Save a card or U.S. bank account for future approved payments.">
+            <div className="grid gap-3">
+              {paymentLoadFailed ? (
+                <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm leading-6 text-red-700">Saved payment methods could not be loaded. Please try again.</p>
+              ) : paymentMethods.length ? paymentMethods.map((method) => (
+                <div key={method.id} className="flex min-h-16 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-slate-800 shadow-sm">
+                    {method.type === "card" ? <CreditCard size={19} aria-hidden="true" /> : <Building2 size={19} aria-hidden="true" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-950">{method.title}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{method.detail}</p>
+                  </div>
+                  <form action={removePaymentMethod}>
+                    <input type="hidden" name="paymentMethodId" value={method.id} />
+                    <button type="submit" title="Remove payment method" aria-label={`Remove ${method.title}`} className="flex size-10 items-center justify-center rounded-full text-slate-500 transition hover:bg-red-50 hover:text-red-700">
+                      <Trash2 size={18} aria-hidden="true" />
+                    </button>
+                  </form>
+                </div>
+              )) : (
+                <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">No payment method saved.</p>
+              )}
+
+              <form action={createPaymentMethodSetupSession}>
+                <button type="submit" disabled={!paymentConfigured} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white transition hover:bg-[#0068d1] disabled:cursor-not-allowed disabled:bg-slate-300">
+                  <CreditCard size={18} aria-hidden="true" />
+                  Add payment method
+                </button>
+              </form>
+              <p className="text-xs leading-5 text-slate-500">
+                {paymentConfigured
+                  ? "Stripe securely stores the payment details. Avantia Build only sees masked account information, and saving a method does not charge it."
+                  : "Secure payment setup is being connected. No payment information can be entered until it is active."}
+              </p>
+            </div>
           </SectionCard>
 
           <SectionCard title="Sign out" description="End this session on the current device.">
