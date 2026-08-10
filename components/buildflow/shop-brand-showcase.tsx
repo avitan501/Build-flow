@@ -1,14 +1,14 @@
 import Image from "next/image"
 
 const SHOP_BRANDS = [
-  { name: "Andersen", logo: "/images/brands/andersen.svg" },
-  { name: "GAF", logo: "/images/brands/gaf.svg" },
-  { name: "Pella", logo: "/images/brands/pella.png" },
-  { name: "QUIKRETE", logo: "/images/brands/quikrete.gif" },
-  { name: "USG", logo: "/images/brands/usg.svg" },
-  { name: "Georgia-Pacific", logo: "/images/brands/georgia-pacific.svg" },
-  { name: "TimberTech", logo: "/images/brands/timbertech.svg" },
-  { name: "Trex", logo: "/images/brands/trex.svg" },
+  { name: "Andersen", logo: "/images/brands/andersen.svg", scale: "scale-95" },
+  { name: "GAF", logo: "/images/brands/gaf.svg", scale: "scale-110" },
+  { name: "Pella", logo: "/images/brands/pella.png", scale: "scale-125" },
+  { name: "QUIKRETE", logo: "/images/brands/quikrete.gif", scale: "scale-95" },
+  { name: "USG", logo: "/images/brands/usg.svg", scale: "scale-95" },
+  { name: "Georgia-Pacific", logo: "/images/brands/georgia-pacific.svg", scale: "scale-105" },
+  { name: "TimberTech", logo: "/images/brands/timbertech.svg", scale: "scale-95" },
+  { name: "Trex", logo: "/images/brands/trex.svg", scale: "scale-75" },
 ]
 
 export function ShopBrandShowcase({ compact = false }: { compact?: boolean }) {
@@ -26,8 +26,8 @@ export function ShopBrandShowcase({ compact = false }: { compact?: boolean }) {
         <div className={`${compact ? "mt-5 gap-2 sm:gap-3" : "mt-7 border-l border-t border-slate-200"} grid grid-cols-2 sm:grid-cols-4`} data-testid="shop-brand-grid">
           {SHOP_BRANDS.map((brand) => (
             <div key={brand.name} className={`flex min-h-20 items-center justify-center bg-white px-4 py-4 sm:min-h-24 ${compact ? "rounded-2xl border border-slate-200 shadow-sm" : "border-b border-r border-slate-200"}`}>
-              <div className="relative h-9 w-full max-w-32 sm:h-10">
-                <Image src={brand.logo} alt={`${brand.name} logo`} fill sizes="(max-width: 640px) 38vw, 160px" loading="eager" className="object-contain" />
+              <div className="relative h-9 w-full max-w-28 sm:h-10 sm:max-w-32">
+                <Image src={brand.logo} alt={`${brand.name} logo`} fill sizes="(max-width: 640px) 38vw, 160px" loading="eager" className={`object-contain ${brand.scale}`} />
               </div>
             </div>
           ))}
@@ -42,14 +42,14 @@ export function ShopBrandShowcase({ compact = false }: { compact?: boolean }) {
         <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-3 text-center sm:flex-row sm:text-left">
           <div>
             <h3 className="text-base font-semibold tracking-normal">Need help finding something?</h3>
-            <p className="mt-0.5 text-xs leading-5 text-white/70">Call or text HELP with what you need.</p>
+            <p className="mt-0.5 text-xs leading-5 text-white/70">Call or text us with what you need.</p>
           </div>
           <div className="grid w-full grid-cols-2 gap-2 sm:w-auto">
             <a href="tel:+19292077156" className="inline-flex min-h-10 items-center justify-center rounded-full bg-white px-4 text-xs font-semibold text-[#0e2a4a] transition hover:bg-slate-100">
               Call us
             </a>
-            <a href="sms:+19292077156?body=HELP" className="inline-flex min-h-10 items-center justify-center rounded-full border border-white/35 px-4 text-xs font-semibold text-white transition hover:bg-white/10">
-              Text HELP
+            <a href="sms:+19292077156?body=Hi%20Avantia%20Build%2C%20I%20need%20help%20finding%20construction%20materials." className="inline-flex min-h-10 items-center justify-center rounded-full border border-white/35 px-4 text-xs font-semibold text-white transition hover:bg-white/10">
+              Text us
             </a>
           </div>
         </div>

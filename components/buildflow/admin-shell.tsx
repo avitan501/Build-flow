@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ClipboardList,
   LayoutDashboard,
+  Sparkles,
   Menu,
   Store,
   Users,
@@ -19,6 +20,7 @@ const managerLinks = [
   { href: "/admin/build-map", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "Customers", icon: Users },
   { href: "/admin/vendors", label: "Suppliers", icon: Store },
+  { href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles },
 ] as const;
 
 function isActive(pathname: string, href: string) {

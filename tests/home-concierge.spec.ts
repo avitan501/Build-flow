@@ -6,6 +6,7 @@ test("home presents the concise construction concierge information", async ({ pa
   await expect(page.getByRole("heading", { name: "Concierge service for every construction need." })).toBeVisible();
   await expect(page.getByText("Better pricing", { exact: true })).toBeVisible();
   await expect(page.getByText("Surplus savings", { exact: true })).toBeVisible();
+  await page.getByText("More ways we help", { exact: true }).click();
   await expect(page.getByText("Specialty sourcing", { exact: true })).toBeVisible();
   await page.getByText("Better pricing", { exact: true }).click();
   await expect(page.getByText("Material prices change often.", { exact: false })).toBeVisible();

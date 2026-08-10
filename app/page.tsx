@@ -1,7 +1,6 @@
 import Image from "next/image";
 
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
-import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase";
 
 const conciergePoints = [
@@ -44,6 +43,24 @@ const coverageDots = [
   [85, 40], [87, 35], [89, 30], [91, 23], [80, 29], [79, 38], [68, 34], [73, 36], [66, 44], [62, 31], [93, 17],
 ] as const;
 
+function ConciergePoint({ point, index }: { point: (typeof conciergePoints)[number]; index: number }) {
+  return (
+    <details className="group overflow-hidden rounded-[22px] border border-white/80 bg-white shadow-[0_12px_34px_rgba(15,23,42,0.07)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(15,23,42,0.1)]">
+      <summary className="flex min-h-24 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0066cc] [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 items-start gap-4">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-xs font-bold text-[#0066cc]">{String(index + 1).padStart(2, "0")}</span>
+          <span>
+            <span className="block text-base font-semibold text-[#071126] sm:text-lg">{point.title}</span>
+            <span className="mt-1 block text-sm leading-5 text-slate-600">{point.summary}</span>
+          </span>
+        </span>
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-300 text-xl font-light text-slate-600 transition group-open:rotate-45" aria-hidden="true">+</span>
+      </summary>
+      <p className="border-t border-slate-100 px-5 py-4 text-sm leading-6 text-slate-600">{point.body}</p>
+    </details>
+  );
+}
+
 export default function Home() {
   return (
     <main className="min-h-screen overflow-x-clip bg-[#f5f7fa] pb-4 text-slate-950">
@@ -58,8 +75,7 @@ export default function Home() {
           />
           <div className="absolute inset-0 -z-10 bg-[#071126]/76" aria-hidden="true" />
           <div className="mx-auto flex min-h-[19rem] max-w-6xl flex-col justify-end px-6 py-8 sm:min-h-[23rem] sm:px-9 sm:py-11 lg:px-10">
-            <AvantiaBuildLockup tone="light" />
-            <h1 className="mt-4 max-w-3xl text-3xl font-semibold leading-tight sm:text-5xl">
+            <h1 className="max-w-3xl text-3xl font-semibold leading-tight sm:text-5xl">
               Concierge service for every construction need.
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
@@ -75,25 +91,19 @@ export default function Home() {
           <h2 className="mt-2 text-2xl font-semibold leading-tight text-[#071126] sm:text-3xl">A simpler way to source for a project.</h2>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
-          {conciergePoints.map((point, index) => (
-            <details
-              key={point.title}
-              className="group overflow-hidden rounded-[22px] border border-white/80 bg-white shadow-[0_12px_34px_rgba(15,23,42,0.07)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(15,23,42,0.1)]"
-            >
-              <summary className="flex min-h-24 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0066cc] [&::-webkit-details-marker]:hidden">
-                <span className="flex min-w-0 items-start gap-4">
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-xs font-bold text-[#0066cc]">{String(index + 1).padStart(2, "0")}</span>
-                  <span>
-                    <span className="block text-base font-semibold text-[#071126] sm:text-lg">{point.title}</span>
-                    <span className="mt-1 block text-sm leading-5 text-slate-600">{point.summary}</span>
-                  </span>
-                </span>
-                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-300 text-xl font-light text-slate-600 transition group-open:rotate-45" aria-hidden="true">+</span>
-              </summary>
-              <p className="border-t border-slate-100 px-5 py-4 text-sm leading-6 text-slate-600">{point.body}</p>
-            </details>
-          ))}
+          {conciergePoints.slice(0, 4).map((point, index) => <ConciergePoint key={point.title} point={point} index={index} />)}
         </div>
+
+        <details className="group mt-3">
+          <summary className="mx-auto flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-[#0066cc] shadow-sm [&::-webkit-details-marker]:hidden">
+            <span className="group-open:hidden">More ways we help</span>
+            <span className="hidden group-open:inline">Show less</span>
+            <span className="text-lg font-light transition group-open:rotate-45" aria-hidden="true">+</span>
+          </summary>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {conciergePoints.slice(4).map((point, index) => <ConciergePoint key={point.title} point={point} index={index + 4} />)}
+          </div>
+        </details>
 
         <p className="pt-7 text-center text-sm font-semibold text-[#071126] sm:text-base">
           Sourcing support for contractors, developers, design professionals, and property owners.
