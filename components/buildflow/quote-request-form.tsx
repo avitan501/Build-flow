@@ -153,7 +153,6 @@ export function QuoteRequestForm() {
 
       <fieldset className="grid gap-4 border-b border-slate-200 px-5 py-6 sm:grid-cols-2 sm:px-8 sm:py-8">
         <legend className="w-full px-5 pt-6 text-xl font-semibold text-slate-950 sm:px-8 sm:pt-8">2. Project information</legend>
-        <label className={labelClass}>Project name <span className="font-normal text-slate-500">Optional</span><input name="projectName" placeholder="Example: 123 Main Street renovation" className={inputClass} /></label>
         <div className={`${labelClass} sm:col-span-2`}>
           <label htmlFor="quote-address">Job-site address <span className="font-normal text-slate-500">Optional</span></label>
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -165,7 +164,20 @@ export function QuoteRequestForm() {
           </div>
           {locationStatus ? <p className="text-xs font-normal text-slate-500" role="status">{locationStatus}</p> : null}
         </div>
-        <label className={`${labelClass} sm:col-span-2`}>When are materials needed? <span className="font-normal text-slate-500">Optional</span><select name="timeframe" defaultValue="" className={inputClass}><option value="">Not sure yet</option><option>As soon as possible</option><option>Within 1-2 weeks</option><option>Within 1 month</option><option>Within 1-3 months</option><option>Planning for later</option></select></label>
+        <fieldset className="sm:col-span-2">
+          <legend className="text-sm font-semibold text-slate-800">When do you need the materials? <span className="font-normal text-slate-500">Optional</span></legend>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:max-w-md">
+            {[
+              { label: "ASAP", value: "As soon as possible" },
+              { label: "Later", value: "Planning for later" },
+            ].map((option) => (
+              <label key={option.value} className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-900 has-[:checked]:ring-2 has-[:checked]:ring-sky-100">
+                <input type="radio" name="timeframe" value={option.value} className="h-4 w-4 accent-[#0071e3]" />
+                {option.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
       </fieldset>
 
       <fieldset className="grid gap-5 px-5 py-6 sm:px-8 sm:py-8">
