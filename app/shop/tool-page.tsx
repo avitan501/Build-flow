@@ -5,6 +5,7 @@ import { getSessionWithProfile } from "@/lib/auth"
 import { applyDepartmentAddOns, createEmptyManagerAddOns, departmentExperienceFor, isDepartmentHidden } from "@/lib/manager-add-ons"
 import type { ProjectRecord } from "@/lib/projects"
 import { findShopToolCategory, type ShopToolSlug } from "@/lib/shop-tools"
+import { FLOORING_QUESTIONNAIRE_PREVIEW } from "@/lib/material-questionnaire-preview"
 import type { PublicWorkflowState } from "@/lib/workflow-public"
 
 type ToolPageSearchParams = {
@@ -58,6 +59,9 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
   const projects = projectSession.projects
   const selectedProjectId = projects.some((project) => project.id === params.project) ? params.project : ""
   const selectedAddress = selectedProjectId ? "" : params.address?.trim() || ""
+  const questionnairePreview = process.env.VERCEL_ENV === "preview" && baseCategory.slug === "wood-floor"
+    ? FLOORING_QUESTIONNAIRE_PREVIEW
+    : null
 
   return (
     <ShopToolCategoryPage
@@ -70,6 +74,7 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
       isSignedIn={projectSession.isSignedIn}
       errorCode={params.error?.trim() || null}
       successCode={params.success?.trim() || null}
+      questionnairePreview={questionnairePreview}
     />
   )
 }
