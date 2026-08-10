@@ -17,6 +17,7 @@ export function MaterialQuestionnairePreviewButton({ snapshot }: { snapshot: Mat
       {open ? (
         <MaterialQuestionnaireWizard
           snapshot={snapshot}
+          displayMode="all"
           onClose={() => setOpen(false)}
           onSave={async () => {
             setOpen(false)
