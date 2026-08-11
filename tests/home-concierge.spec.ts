@@ -1,16 +1,16 @@
 import { expect, test } from "@playwright/test";
 
-test("home presents the concise construction concierge information", async ({ page }) => {
+test("home presents the contractor material coordination service", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Concierge service for every construction need." })).toBeVisible();
-  await expect(page.getByText("Better pricing", { exact: true })).toBeVisible();
-  await expect(page.getByText("Surplus savings", { exact: true })).toBeVisible();
-  await page.getByText("More ways we help", { exact: true }).click();
-  await expect(page.getByText("Specialty sourcing", { exact: true })).toBeVisible();
-  await page.getByText("Better pricing", { exact: true }).click();
-  await expect(page.getByText("Material prices change often.", { exact: false })).toBeVisible();
-  await expect(page.getByText("Sourcing support for contractors, developers, design professionals, and property owners.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Keep Your Crew Building. We’ll Handle the Materials." })).toBeVisible();
+  await expect(page.getByText("Avantia Build for contractors", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Start my material request" })).toHaveAttribute("href", "/shop");
+  await expect(page.getByRole("link", { name: "Call a materials coordinator" })).toHaveAttribute("href", "tel:+19292077156");
+  await expect(page.getByText("Stop calling store after store", { exact: true })).toBeVisible();
+  await expect(page.getByText("Compare before you buy", { exact: true })).toBeVisible();
+  await expect(page.getByText("Keep every order organized", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "One request. One coordinator. No supplier runaround." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Covering 41 states." })).toBeVisible();
   await expect(page.getByTestId("coverage-map").getByTestId("coverage-dot")).toHaveCount(41);
   const lockups = page.getByTestId("avantia-build-lockup");
