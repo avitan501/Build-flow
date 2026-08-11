@@ -26,7 +26,7 @@ test("home presents the contractor material coordination service", async ({ page
   const lockups = page.getByTestId("avantia-build-lockup");
   await expect(lockups.first()).toHaveAttribute("data-testid", "avantia-build-lockup");
   await expect(lockups.first().locator("img")).toHaveAttribute("src", /avantia-build-rain-painter-animation\.gif/);
-  await expect(page.getByRole("img", { name: "Avantia Build animated logo" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Avantia Build animated logo" })).toHaveCount(0);
 
   const overflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflows).toBe(false);

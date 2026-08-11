@@ -64,17 +64,7 @@ export default function Home() {
       </div>
 
       <div className="px-3 pt-3 sm:px-5 sm:pt-5">
-        <div data-testid="homepage-island" className="mx-auto max-w-[88rem] overflow-hidden rounded-[24px] border border-slate-200/70 bg-[#fffaf4] shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
-          <div className="relative h-[clamp(7rem,31vw,15rem)] w-full overflow-hidden">
-            <Image
-              src="/images/avantia/avantia-build-rain-painter-animation.gif"
-              alt="Avantia Build animated logo"
-              fill
-              unoptimized
-              sizes="(min-width: 1440px) 88rem, 100vw"
-              className="object-cover object-center"
-            />
-          </div>
+        <div data-testid="homepage-island" className="mx-auto max-w-[88rem] overflow-hidden">
           <ShopBrandShowcase compact transparent />
         </div>
       </div>
