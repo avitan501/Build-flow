@@ -59,37 +59,46 @@ test("all departments wrap into downward rows without page overflow", async ({ p
   expect(widths.scrollWidth).toBe(widths.clientWidth)
 })
 
-test("department cards use distinct full-bleed photography instead of generic icons", async ({ page }) => {
+test("department categories use distinct unframed product cutouts", async ({ page }) => {
   await page.goto("/shop")
 
   const cardImages = page.getByTestId("department-card").getByRole("img")
   await expect(cardImages).toHaveCount(9)
 
   const sources = await cardImages.evaluateAll((images) =>
-    images.map((image) => (image as HTMLImageElement).currentSrc || (image as HTMLImageElement).src),
+    images.map((image) => image instanceof HTMLImageElement ? image.currentSrc || image.src : getComputedStyle(image).backgroundImage),
   )
 
-  expect(sources.every((source) => !source.includes("department-essentials") && !source.includes(".svg"))).toBe(true)
+  expect(sources.every((source) => source && !source.includes(".svg"))).toBe(true)
   expect(new Set(sources).size).toBe(9)
 })
 
-test("flooring uses the customer-facing name and framing uses its dedicated photo", async ({ page }) => {
+test("flooring uses the customer-facing name and framing uses a lumber cutout", async ({ page }) => {
   await page.goto("/shop")
 
   await expect(page.getByTestId("department-card").filter({ hasText: "Flooring" })).toBeVisible()
   await expect(page.getByTestId("department-card").filter({ hasText: "Wood Floor" })).toHaveCount(0)
 
   const framingCard = page.getByTestId("department-card").filter({ hasText: "Framing" })
-  await expect(framingCard.locator('img[src*="framing-jobsite-v3.webp"]')).toBeVisible()
+  await expect(framingCard.getByRole("img", { name: /framing/i })).toHaveCSS("background-image", /lumber-grid\.webp/)
 })
 
-test("retired departments are hidden and department symbols are visible", async ({ page }) => {
+test("retired departments are hidden and category photos stay clean", async ({ page }) => {
   await page.goto("/shop")
 
   await expect(page.getByTestId("department-card").filter({ hasText: "Kitchen" })).toHaveCount(0)
   await expect(page.getByTestId("department-card").filter({ hasText: "Services" })).toHaveCount(0)
   await expect(page.getByTestId("department-card").filter({ hasText: "Eitan" })).toHaveCount(0)
-  await expect(page.getByTestId("department-card").first().getByTestId("department-symbols")).toBeVisible()
+  await expect(page.getByTestId("department-grid").getByTestId("department-symbols")).toHaveCount(0)
+  const firstCard = page.getByTestId("department-card").first()
+  const cardStyle = await firstCard.evaluate((element) => ({
+    background: getComputedStyle(element).backgroundColor,
+    border: getComputedStyle(element).borderWidth,
+    shadow: getComputedStyle(element).boxShadow,
+  }))
+  expect(cardStyle.background).toBe("rgba(0, 0, 0, 0)")
+  expect(cardStyle.border).toBe("0px")
+  expect(cardStyle.shadow).toBe("none")
 })
 
 test("manager pages require authentication and stay out of the guest menu", async ({ page }) => {

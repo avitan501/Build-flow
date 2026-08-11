@@ -4,7 +4,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useMemo, useState, useSyncExternalStore, type FormEvent } from "react"
 
-import { DepartmentSymbolBadges } from "@/components/buildflow/department-symbol-badges"
 import { clearSelectedGuestProject, createGuestProject, GUEST_PROJECTS_UPDATED_EVENT, readSelectedGuestProject } from "@/lib/guest-projects"
 import { MANAGER_ADD_ONS_UPDATED_EVENT, applyDepartmentAddOns, readManagerAddOns, type ManagerCatalogAddOns } from "@/lib/manager-add-ons"
 import type { ProjectRecord } from "@/lib/projects"
@@ -57,8 +56,15 @@ function buildCategoryFilterHref(category: string, projectId: string, address: s
   return `/shop?${params.toString()}`
 }
 
-function categoryProductGridUrl(category: ShopToolCategory) {
-  return category.imageUrl
+const CATEGORY_CUTOUTS: Partial<Record<string, { imageUrl: string; imagePosition: string }>> = {
+  framing: { imageUrl: "/images/department-essentials/lumber-grid.webp", imagePosition: "0% 0%" },
+  "tile-work": { imageUrl: "/images/department-essentials/tile-grid.webp", imagePosition: "0% 0%" },
+  "sheet-rock": { imageUrl: "/images/department-essentials/drywall-grid.webp", imagePosition: "0% 0%" },
+  "door-and-molding": { imageUrl: "/images/department-essentials/moldings-grid.webp", imagePosition: "0% 0%" },
+  "wood-floor": { imageUrl: "/images/department-essentials/flooring-grid.webp", imagePosition: "0% 0%" },
+  siding: { imageUrl: "/images/department-essentials/siding-grid.webp", imagePosition: "0% 0%" },
+  roofing: { imageUrl: "/images/department-essentials/roofing-grid.webp", imagePosition: "0% 0%" },
+  window: { imageUrl: "/images/department-essentials/windows-grid.webp", imagePosition: "0% 0%" },
 }
 
 function subscribeToGuestProject(onStoreChange: () => void) {
@@ -395,7 +401,7 @@ export function ShopProjectToolPicker({
             const href = isManagerCategory
               ? buildCategoryFilterHref(category.label, selectedProjectIdForLinks, activeCustomAddress)
               : buildToolHref(category.slug, selectedProjectIdForLinks, activeCustomAddress)
-            const productGridUrl = categoryProductGridUrl(category)
+            const cutout = CATEGORY_CUTOUTS[category.slug]
 
             return (
               <Link
@@ -403,21 +409,27 @@ export function ShopProjectToolPicker({
                 href={href}
                 prefetch={false}
                 data-testid="department-card"
-                className="group flex min-h-[150px] min-w-0 touch-manipulation flex-col overflow-hidden rounded-lg border border-black/[0.08] bg-white text-left shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-black/[0.14] hover:shadow-[0_16px_34px_rgba(0,0,0,0.10)] active:scale-[0.98] sm:min-h-[176px]"
+                className="group flex min-h-[128px] min-w-0 touch-manipulation flex-col items-center text-center transition duration-200 hover:-translate-y-0.5 active:scale-[0.97] sm:min-h-[154px]"
               >
-                <span className="relative block aspect-[4/3] w-full overflow-hidden border-b border-black/[0.06] bg-[#fafafa]">
-                  <Image
-                    src={productGridUrl}
-                    alt={`${category.label} products`}
-                    fill
-                    sizes="(max-width: 639px) 32vw, (max-width: 1023px) 24vw, 18vw"
-                    className="object-cover transition duration-300 group-hover:scale-[1.035]"
-                  />
-                  <span className="absolute left-2 top-2">
-                    <DepartmentSymbolBadges symbols={category.symbols} compact />
-                  </span>
+                <span className="relative block aspect-square w-full overflow-hidden bg-white mix-blend-multiply">
+                  {cutout ? (
+                    <span
+                      role="img"
+                      aria-label={category.imageAlt}
+                      className="absolute inset-0 bg-white bg-no-repeat transition duration-300 group-hover:scale-[1.04]"
+                      style={{ backgroundImage: `url(${cutout.imageUrl})`, backgroundPosition: cutout.imagePosition, backgroundSize: "400% 200%" }}
+                    />
+                  ) : (
+                    <Image
+                      src={category.imageUrl}
+                      alt={category.imageAlt}
+                      fill
+                      sizes="(max-width: 639px) 32vw, (max-width: 1023px) 24vw, 18vw"
+                      className="scale-[0.94] object-cover [mask-image:radial-gradient(ellipse_72%_62%_at_center,#000_58%,transparent_100%)] transition duration-300 group-hover:scale-[0.98]"
+                    />
+                  )}
                 </span>
-                <span className="flex min-h-12 w-full min-w-0 items-center px-3 py-2 text-[12px] font-bold leading-4 text-[#1d1d1f] [overflow-wrap:anywhere] sm:min-h-14 sm:text-[14px] sm:leading-5">
+                <span className="mt-2 block w-full min-w-0 px-1 text-[13px] font-semibold leading-4 text-[#1d1d1f] [overflow-wrap:anywhere] sm:text-[15px] sm:leading-5">
                   {category.label}
                 </span>
               </Link>
