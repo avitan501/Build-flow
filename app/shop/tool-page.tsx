@@ -6,7 +6,7 @@ import { applyDepartmentAddOns, createEmptyManagerAddOns, departmentExperienceFo
 import type { ProjectRecord } from "@/lib/projects"
 import { findShopToolCategory, type ShopToolSlug } from "@/lib/shop-tools"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { FLOORING_QUESTIONNAIRE_PREVIEW } from "@/lib/material-questionnaire-preview"
+import { DRYWALL_QUESTIONNAIRE_PREVIEW, FLOORING_QUESTIONNAIRE_PREVIEW } from "@/lib/material-questionnaire-preview"
 import { buildMaterialQuestionnaireSnapshot } from "@/lib/material-questionnaires"
 import { loadMaterialQuestionnaireForDepartment } from "@/lib/material-questionnaires-server"
 import type { PublicWorkflowState } from "@/lib/workflow-public"
@@ -77,8 +77,12 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
   const projects = projectSession.projects
   const selectedProjectId = projects.some((project) => project.id === params.project) ? params.project : ""
   const selectedAddress = selectedProjectId ? "" : params.address?.trim() || ""
-  const questionnaireSnapshot = process.env.VERCEL_ENV !== "production" && baseCategory.slug === "wood-floor"
-    ? FLOORING_QUESTIONNAIRE_PREVIEW
+  const questionnaireSnapshot = process.env.VERCEL_ENV !== "production"
+    ? baseCategory.slug === "wood-floor"
+      ? FLOORING_QUESTIONNAIRE_PREVIEW
+      : baseCategory.slug === "sheet-rock"
+        ? DRYWALL_QUESTIONNAIRE_PREVIEW
+        : projectSession.questionnaireSnapshot
     : projectSession.questionnaireSnapshot
 
   return (

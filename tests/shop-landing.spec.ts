@@ -150,6 +150,7 @@ test("flooring uses a compact contractor configurator with a live summary", asyn
   await expect(page.getByTestId("flooring-group-size")).toBeVisible()
   await expect(page.getByTestId("flooring-group-extras")).toBeVisible()
   await expect(page.getByRole("button", { name: "Plain Sawn / Standard" })).toBeVisible()
+  await expect(page.getByText("What installation method will be used?", { exact: true })).toHaveCount(0)
   await expect(page.getByText("Wood floor calculator", { exact: true })).toHaveCount(0)
 
   const redOak = page.getByRole("button", { name: "Red Oak" })
@@ -176,6 +177,36 @@ test("flooring uses a compact contractor configurator with a live summary", asyn
   await expect(page.getByRole("heading", { name: "Review Your Request" })).toBeVisible()
   await page.getByRole("button", { name: "Choose Project", exact: true }).click()
   await expect(page.getByRole("heading", { name: "Choose the Project for This Flooring Request" })).toBeVisible()
+
+  const widths = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }))
+  expect(widths.scrollWidth).toBe(widths.clientWidth)
+})
+
+test("sheetrock uses the compact on-page contractor configurator", async ({ page }) => {
+  await page.goto("/shop/sheet-rock")
+
+  await expect(page.getByText("Choose materials", { exact: true })).toHaveCount(0)
+  await expect(page.getByTestId("flooring-group-material")).toBeVisible()
+  await expect(page.getByTestId("flooring-group-size")).toBeVisible()
+  await expect(page.getByTestId("flooring-group-extras")).toBeVisible()
+  await expect(page.getByRole("button", { name: "4′ × 8′" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Green / Moisture Resistant" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "5/8″" })).toBeVisible()
+  await expect(page.getByText("Do you need drywall screws?", { exact: true })).toBeVisible()
+  await expect(page.getByText("Need Help With a Custom Sheet rock Order?", { exact: true })).toBeVisible()
+
+  await page.getByLabel("How many sheets do you need?").fill("80")
+  await page.getByRole("button", { name: "4′ × 12′" }).click()
+  await page.getByRole("button", { name: "Regular", exact: true }).click()
+  await page.getByRole("button", { name: "1/2″" }).click()
+
+  const summary = (page.viewportSize()?.width ?? 0) >= 1024
+    ? page.getByTestId("flooring-order-summary")
+    : page.getByTestId("flooring-mobile-summary")
+  await expect(summary).toContainText("80")
 
   const widths = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,
