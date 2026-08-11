@@ -47,7 +47,7 @@ test("all departments wrap into downward rows without page overflow", async ({ p
   await expect(page.getByRole("heading", { name: "What are you working on now?" })).toBeVisible()
 
   const cards = page.getByTestId("department-card")
-  await expect(cards).toHaveCount(8)
+  await expect(cards).toHaveCount(9)
 
   const rowPositions = await cards.evaluateAll((elements) => elements.map((element) => Math.round(element.getBoundingClientRect().top)))
   expect(new Set(rowPositions).size).toBeGreaterThan(1)
@@ -63,14 +63,14 @@ test("department cards use distinct full-bleed photography instead of generic ic
   await page.goto("/shop")
 
   const cardImages = page.getByTestId("department-card").getByRole("img")
-  await expect(cardImages).toHaveCount(8)
+  await expect(cardImages).toHaveCount(9)
 
   const sources = await cardImages.evaluateAll((images) =>
     images.map((image) => (image as HTMLImageElement).currentSrc || (image as HTMLImageElement).src),
   )
 
   expect(sources.every((source) => !source.includes("department-essentials") && !source.includes(".svg"))).toBe(true)
-  expect(new Set(sources).size).toBe(8)
+  expect(new Set(sources).size).toBe(9)
 })
 
 test("flooring uses the customer-facing name and framing uses its dedicated photo", async ({ page }) => {
@@ -202,6 +202,9 @@ test("sheetrock uses the compact on-page contractor configurator", async ({ page
   await expect(page.getByText("Drywall / Sheetrock", { exact: true })).toHaveCount(0)
   await expect(page.getByText("Do you need drywall tape?", { exact: true })).toBeVisible()
   await expect(page.getByText("Do you need metal studs?", { exact: true })).toBeVisible()
+  const accessories = page.getByTestId("flooring-group-extras")
+  await expect(accessories.getByText("Do you need drywall tape?", { exact: true })).toBeVisible()
+  await expect(accessories.getByText("Do you need metal studs?", { exact: true })).toBeVisible()
 
   await page.getByLabel("How many sheets do you need?").fill("80")
   await page.getByRole("button", { name: "4′ × 12′" }).click()
@@ -244,8 +247,9 @@ test("door and molding reveals the matching order fields", async ({ page }) => {
   await page.goto("/shop/door-and-molding")
 
   await expect(page.getByRole("heading", { name: "Door & Molding Quick Order" })).toBeVisible()
-  await expect(page.getByRole("link", { name: "Molding Catalog" })).toHaveAttribute("href", "https://www.gardenstatelumber.com/products-programs/moulding/")
+  await expect(page.getByRole("heading", { name: "Choose Department" })).toBeVisible()
   await page.getByRole("button", { name: "Molding" }).click()
+  await expect(page.getByRole("link", { name: "Molding Catalog" })).toHaveAttribute("href", "https://www.gardenstatelumber.com/products-programs/moulding/")
   await expect(page.getByLabel("Molding profile code")).toHaveCount(1)
   await expect(page.getByLabel("Length")).toHaveCount(1)
   await expect(page.getByRole("button", { name: "Add Another Molding" })).toBeVisible()
@@ -257,6 +261,23 @@ test("door and molding reveals the matching order fields", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Call me to arrange a jobsite measurement" })).toBeVisible()
   await page.getByRole("button", { name: "I have the measurements" }).click()
   await expect(page.getByLabel("Enter the door measurements")).toBeVisible()
+})
+
+test("electrical supports repeatable Romex and BX cable rows", async ({ page }) => {
+  await page.goto("/shop/electrical")
+
+  await expect(page.getByRole("heading", { name: "Electrical Cable Quick Order" })).toBeVisible()
+  await expect(page.getByLabel("Cable type")).toHaveCount(1)
+  await page.getByLabel("Cable type").selectOption("Romex")
+  await page.getByLabel("Cable number").selectOption("12/2")
+  await page.getByLabel("Length").selectOption("250 ft.")
+  await page.getByLabel("Quantity").fill("3")
+  await page.getByRole("button", { name: "Add Another Cable" }).click()
+  await expect(page.getByLabel("Cable type")).toHaveCount(2)
+  await expect(page.locator('[role="img"]')).not.toHaveCount(0)
+
+  const widths = await page.evaluate(() => ({ clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }))
+  expect(widths.scrollWidth).toBe(widths.clientWidth)
 })
 
 test("framing supports repeatable lumber order rows", async ({ page }) => {

@@ -5,6 +5,7 @@ const DRYWALL_CATEGORY_ID = "drywall-preview-category"
 const TILE_CATEGORY_ID = "tile-preview-category"
 const DOOR_CATEGORY_ID = "door-molding-preview-category"
 const FRAMING_CATEGORY_ID = "framing-preview-category"
+const ELECTRICAL_CATEGORY_ID = "electrical-preview-category"
 
 function options(questionId: string, entries: Array<[string, string]>) {
   return entries.map(([label, value], index) => ({
@@ -52,6 +53,7 @@ export const FLOORING_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
       question_type: "single_select",
       is_required: true,
       sort_order: 10,
+      configuration: { imageUrl: "/images/department-essentials/flooring-grid.webp", imagePosition: "0% 0%", imageSprite: true },
       options: options("flooring-product", [["Unfinished solid hardwood", "unfinished-solid"]]),
     }),
     question({
@@ -61,6 +63,7 @@ export const FLOORING_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
       question_type: "single_select",
       is_required: true,
       sort_order: 20,
+      configuration: { imageUrl: "/images/department-essentials/flooring-grid.webp", imagePosition: "33.333% 0%", imageSprite: true },
       options: options("wood-type", [["Red Oak", "red-oak"], ["White Oak", "white-oak"]]),
     }),
     question({
@@ -115,6 +118,7 @@ export const FLOORING_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
       placeholder: "Enter square footage",
       is_required: true,
       sort_order: 70,
+      configuration: { imageUrl: "/images/department-essentials/flooring-grid.webp", imagePosition: "0% 0%", imageSprite: true },
     }),
     question({
       id: "flooring-accessories",
@@ -123,6 +127,7 @@ export const FLOORING_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
       help_text: "Select every item that applies, then press Review.",
       question_type: "multi_select",
       sort_order: 80,
+      configuration: { imageUrl: "/images/department-essentials/flooring-grid.webp", imagePosition: "100% 0%", imageSprite: true },
       options: options("flooring-accessories", [
         ["Flooring underlayment", "underlayment"],
         ["Wood floor glue", "wood-floor-glue"],
@@ -176,11 +181,11 @@ function tileQuestion(input: Partial<MaterialQuestion> & Pick<MaterialQuestion, 
 export const TILE_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
   category: { id: TILE_CATEGORY_ID, name: "Tile Quick Order", slug: "tile-quick-order-preview", department_key: "Tile work", description: "Configure tile-setting materials and jobsite accessories.", current_version: 1 },
   questions: [
-    tileQuestion({ id: "thinset-quantity", question_key: "thinset_quantity", label: "How many bags of MAPEI Ultraflex thinset do you need?", question_type: "number", unit: "50 lb. bags", placeholder: "Enter bags", is_required: true, sort_order: 20 }),
-    tileQuestion({ id: "fine-sand", question_key: "fine_sand_yards", label: "How much fine sand do you need?", question_type: "number", unit: "cu. yd.", placeholder: "Enter yards", sort_order: 30 }),
-    tileQuestion({ id: "portland-cement", question_key: "portland_cement_quantity", label: "How many bags of Portland cement do you need?", question_type: "number", unit: "50 lb. bags", placeholder: "Enter bags", sort_order: 40 }),
-    tileQuestion({ id: "wire-mesh", question_key: "wire_mesh_area", label: "How much tile wire mesh do you need?", question_type: "square_feet", unit: "sq. ft.", placeholder: "Enter square footage", sort_order: 50 }),
-    tileQuestion({ id: "needs-waterproofing", question_key: "needs_waterproofing", label: "Do you need liquid waterproofing membrane?", question_type: "yes_no", sort_order: 60 }),
+    tileQuestion({ id: "thinset-quantity", question_key: "thinset_quantity", label: "How many bags of MAPEI Ultraflex thinset do you need?", question_type: "number", unit: "50 lb. bags", placeholder: "Enter bags", is_required: true, sort_order: 20, configuration: { imageUrl: "/images/materials/products-real/mapei-ultraflex-thinset.jpg" } }),
+    tileQuestion({ id: "fine-sand", question_key: "fine_sand_yards", label: "How much fine sand do you need?", question_type: "number", unit: "cu. yd.", placeholder: "Enter yards", sort_order: 30, configuration: { imageUrl: "/images/materials/products-real/yardas-fine-sand.jpg" } }),
+    tileQuestion({ id: "portland-cement", question_key: "portland_cement_quantity", label: "How many bags of Portland cement do you need?", question_type: "number", unit: "50 lb. bags", placeholder: "Enter bags", sort_order: 40, configuration: { imageUrl: "/images/materials/products-real/lehigh-portland-cement-type-i-ii.jpg" } }),
+    tileQuestion({ id: "wire-mesh", question_key: "wire_mesh_area", label: "How much tile wire mesh do you need?", question_type: "square_feet", unit: "sq. ft.", placeholder: "Enter square footage", sort_order: 50, configuration: { imageUrl: "/images/materials/products-real/tile-wire-mesh-v2.jpg" } }),
+    tileQuestion({ id: "needs-waterproofing", question_key: "needs_waterproofing", label: "Do you need liquid waterproofing membrane?", question_type: "yes_no", sort_order: 60, configuration: { imageUrl: "/images/department-essentials/tile-grid.webp", imagePosition: "0% 100%", imageSprite: true } }),
     tileQuestion({ id: "waterproofing-gallons", question_key: "waterproofing_gallons", label: "How many gallons of waterproofing do you need?", question_type: "gallons", unit: "gallons", sort_order: 70, conditional_parent_question_id: "needs-waterproofing", conditional_operator: "equals", conditional_value: "yes" }),
     tileQuestion({ id: "tile-notes", question_key: "tile_notes", label: "Any tile or delivery notes?", question_type: "long_text", placeholder: "Add tile size, floor condition, or delivery details.", sort_order: 80 }),
   ],
@@ -193,14 +198,14 @@ function doorQuestion(input: Partial<MaterialQuestion> & Pick<MaterialQuestion, 
 export const DOOR_MOLDING_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
   category: { id: DOOR_CATEGORY_ID, name: "Door & Molding Quick Order", slug: "door-molding-quick-order-preview", department_key: "Door and molding", description: "Configure molding profiles and door requirements.", current_version: 1 },
   questions: [
-    doorQuestion({ id: "door-request-type", question_key: "request_type", label: "What are you ordering?", question_type: "multi_select", is_required: true, sort_order: 10, options: options("door-request-type", [["Molding", "molding"], ["Door", "door"]]) }),
-    doorQuestion({ id: "molding-items", question_key: "molding_items", label: "Add the molding you need", help_text: "Use one box for each molding profile.", question_type: "item_list", sort_order: 20, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["molding"], configuration: { itemMode: "molding", itemLengths: ["8 ft.", "16 ft."] } }),
-    doorQuestion({ id: "door-type", question_key: "door_type", label: "What door style do you need?", question_type: "single_select", sort_order: 60, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["door"], options: options("door-type", [["Flat / flush", "flat"], ["1-panel Shaker", "one-shaker"], ["2-panel Shaker", "two-shaker"], ["3-panel Shaker", "three-shaker"]]) }),
+    doorQuestion({ id: "door-request-type", question_key: "request_type", label: "What are you ordering?", question_type: "multi_select", is_required: true, sort_order: 10, configuration: { imageUrl: "/images/buildflow-retail/door-molding-department.webp" }, options: options("door-request-type", [["Molding", "molding"], ["Door", "door"]]) }),
+    doorQuestion({ id: "molding-items", question_key: "molding_items", label: "Add the molding you need", help_text: "Use one box for each molding profile.", question_type: "item_list", sort_order: 20, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["molding"], configuration: { itemMode: "molding", itemLengths: ["8 ft.", "16 ft."], imageUrl: "/images/department-essentials/moldings-grid.webp", imagePosition: "0% 0%", imageSprite: true } }),
+    doorQuestion({ id: "door-type", question_key: "door_type", label: "What door style do you need?", question_type: "single_select", sort_order: 60, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["door"], configuration: { imageUrl: "/images/materials/photos/doors.jpg" }, options: options("door-type", [["Flat / flush", "flat"], ["1-panel Shaker", "one-shaker"], ["2-panel Shaker", "two-shaker"], ["3-panel Shaker", "three-shaker"]]) }),
     doorQuestion({ id: "door-thickness", question_key: "door_thickness", label: "What door thickness do you need?", question_type: "single_select", sort_order: 65, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["door"], options: options("door-thickness", [["1 3/8 in.", "1-3-8"], ["1 3/4 in.", "1-3-4"]]) }),
     doorQuestion({ id: "door-quantity", question_key: "door_quantity", label: "How many doors do you need?", question_type: "number", unit: "doors", placeholder: "Enter quantity", sort_order: 70, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["door"] }),
     doorQuestion({ id: "door-measurement-method", question_key: "door_measurement_method", label: "How should we confirm the door measurements?", question_type: "single_select", sort_order: 80, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["door"], options: options("door-measurement-method", [["I have the measurements", "have-measurements"], ["Call me to arrange a jobsite measurement", "jobsite-measurement"]]) }),
     doorQuestion({ id: "door-measurements", question_key: "door_measurements", label: "Enter the door measurements", help_text: "Include width, height, jamb depth, swing, and handing if known.", question_type: "long_text", placeholder: "Example: 36 in. x 80 in., 4 9/16 in. jamb, left-hand inswing", sort_order: 90, conditional_parent_question_id: "door-measurement-method", conditional_operator: "equals", conditional_value: "have-measurements" }),
-    doorQuestion({ id: "door-molding-notes", question_key: "order_notes", label: "Any matching, finish, or delivery notes?", question_type: "long_text", placeholder: "Add species, paint grade, finish, matching, or delivery details.", sort_order: 100 }),
+    doorQuestion({ id: "door-molding-notes", question_key: "order_notes", label: "Any matching, finish, or delivery notes?", question_type: "long_text", placeholder: "Add species, paint grade, finish, matching, or delivery details.", sort_order: 100, conditional_parent_question_id: "door-request-type", conditional_operator: "is_answered" }),
   ],
 }
 
@@ -211,7 +216,19 @@ function framingQuestion(input: Partial<MaterialQuestion> & Pick<MaterialQuestio
 export const FRAMING_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
   category: { id: FRAMING_CATEGORY_ID, name: "Framing Lumber Quick Order", slug: "framing-lumber-quick-order-preview", department_key: "Framing", description: "Build a repeatable lumber list with common sizes and lengths.", current_version: 1 },
   questions: [
-    framingQuestion({ id: "lumber-items", question_key: "lumber_items", label: "Add the lumber you need", help_text: "Use one row for each size and length. Add as many rows as needed.", question_type: "item_list", is_required: true, sort_order: 10, configuration: { itemMode: "lumber", itemSizes: ["2x3", "2x4", "2x6", "2x8", "2x10", "2x12"], itemLengths: ["8 ft.", "10 ft.", "12 ft.", "16 ft."] } }),
+    framingQuestion({ id: "lumber-items", question_key: "lumber_items", label: "Add the lumber you need", help_text: "Use one row for each size and length. Add as many rows as needed.", question_type: "item_list", is_required: true, sort_order: 10, configuration: { itemMode: "lumber", itemSizes: ["2x3", "2x4", "2x6", "2x8", "2x10", "2x12"], itemLengths: ["8 ft.", "10 ft.", "12 ft.", "16 ft."], imageUrl: "/images/materials/products-real/2x4-premium-lumber.jpg" } }),
     framingQuestion({ id: "framing-notes", question_key: "framing_notes", label: "Any plywood, hardware, grade, or delivery notes?", question_type: "long_text", placeholder: "Add plywood, LVL, hangers, fasteners, treatment, or delivery details.", sort_order: 30 }),
+  ],
+}
+
+function electricalQuestion(input: Partial<MaterialQuestion> & Pick<MaterialQuestion, "id" | "question_key" | "label" | "question_type" | "sort_order">) {
+  return question({ category_id: ELECTRICAL_CATEGORY_ID, ...input })
+}
+
+export const ELECTRICAL_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
+  category: { id: ELECTRICAL_CATEGORY_ID, name: "Electrical Cable Quick Order", slug: "electrical-cable-preview", department_key: "Electrical", description: "Build a repeatable Romex or BX cable list.", current_version: 1 },
+  questions: [
+    electricalQuestion({ id: "cable-items", question_key: "cable_items", label: "Add the cable you need", help_text: "Use one row for each cable type and size.", question_type: "item_list", is_required: true, sort_order: 10, configuration: { itemMode: "cable", itemSizes: ["Romex", "BX"], cableNumbers: ["14/2", "14/3", "12/2", "12/3", "10/2", "10/3", "8/3", "6/3"], itemLengths: ["25 ft.", "50 ft.", "100 ft.", "250 ft.", "500 ft.", "1000 ft."], imageUrl: "/images/buildflow-retail/electrical-cable-department-v1.webp" } }),
+    electricalQuestion({ id: "electrical-notes", question_key: "electrical_notes", label: "Any wire color, conductor, or delivery notes?", question_type: "long_text", placeholder: "Add copper or aluminum, color, voltage, packaging, or delivery details.", sort_order: 20 }),
   ],
 }

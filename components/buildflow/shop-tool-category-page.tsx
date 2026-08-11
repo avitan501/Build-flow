@@ -248,7 +248,7 @@ function WindowUploadActions({
 export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, successCode, questionnaireSnapshot }: ShopToolCategoryPageProps) {
   const essentials = getDepartmentEssentials(category.slug)
   const usesStandardUpload = !["framing", "kitchen", "eitan", "window"].includes(category.slug)
-  const usesEmbeddedQuickOrder = ["wood-floor", "sheet-rock", "tile-work", "door-and-molding", "framing"].includes(category.slug)
+  const usesEmbeddedQuickOrder = ["wood-floor", "sheet-rock", "tile-work", "door-and-molding", "framing", "electrical"].includes(category.slug)
   const composerHandlesUpload = usesEmbeddedQuickOrder
 
   return (
@@ -264,7 +264,7 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
         {experience.showPlanUpload && category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
         {experience.showPlanUpload && category.slug === "window" ? <ManagerItemVisibility itemId="window-package"><WindowUploadActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} successCode={successCode} /></ManagerItemVisibility> : null}
 
-        {category.slug !== "sheet-rock" ? <DepartmentEssentials data={essentials} /> : null}
+        {!usesEmbeddedQuickOrder ? <DepartmentEssentials data={essentials} /> : null}
 
         {experience.showChatToOrder && usesEmbeddedQuickOrder && questionnaireSnapshot ? (
           <details className="group rounded-lg border border-slate-200 bg-white shadow-sm">

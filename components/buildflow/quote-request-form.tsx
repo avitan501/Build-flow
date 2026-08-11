@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client"
 import { getSupabasePublicEnv } from "@/lib/supabase/env"
 
 const initialState: QuoteRequestFormState = { status: "idle", message: "" }
-const departments = ["Framing", "Flooring", "Sheet rock", "Tile work", "Door and molding", "Siding", "Roofing", "Windows"]
+const departments = ["Framing", "Electrical", "Flooring", "Sheet rock", "Tile work", "Door and molding", "Siding", "Roofing", "Windows"]
 const directAttachmentSize = 4 * 1024 * 1024
 const maxAttachmentSize = 25 * 1024 * 1024
 const inputClass = "min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3.5 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"

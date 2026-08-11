@@ -14,6 +14,7 @@ export type ShopToolSlug =
   | "roofing"
   | "exterior"
   | "window"
+  | "electrical"
 
 export const DEPARTMENT_SYMBOL_KEYS = [
   "shopping-list",
@@ -51,6 +52,14 @@ export const SHOP_TOOL_CATEGORIES: ShopToolCategory[] = [
     imageUrl: "/images/buildflow-retail/framing-jobsite-v3.png",
     imageAlt: "Residential wood framing jobsite with dimensional lumber and plywood sheathing",
     symbols: ["shopping-list", "blueprint", "site-visit"],
+  },
+  {
+    slug: "electrical",
+    label: "Electrical",
+    description: "Romex, BX, cable, boxes, fittings, and electrical rough-in materials.",
+    imageUrl: "/images/buildflow-retail/electrical-cable-department-v1.webp",
+    imageAlt: "Electrical cable, boxes, fittings, and rough-in materials in a supply aisle",
+    symbols: ["shopping-list", "blueprint", "delivery"],
   },
   {
     slug: "tile-work",
@@ -184,6 +193,10 @@ export function filterProductsForShopTool(products: ShopCatalogProduct[], slug: 
 
     if (slug === "framing") {
       return product.productType !== "service" && product.category === "Framing"
+    }
+
+    if (slug === "electrical") {
+      return product.productType !== "service" && product.category === "Electrical"
     }
 
     if (slug === "tile-work") {

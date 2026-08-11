@@ -57,7 +57,8 @@ export type MaterialQuestion = {
     maxFiles?: number
     itemSizes?: string[]
     itemLengths?: string[]
-    itemMode?: "lumber" | "molding"
+    itemMode?: "lumber" | "molding" | "cable"
+    cableNumbers?: string[]
     imageUrl?: string
     imagePosition?: string
     imageSprite?: boolean
@@ -120,6 +121,7 @@ export const MATERIAL_DEPARTMENTS = [
   "Siding",
   "Roofing",
   "Window",
+  "Electrical",
 ] as const
 
 export const MATERIAL_QUESTION_TYPE_LABELS: Record<MaterialQuestionType, string> = {
@@ -199,7 +201,8 @@ export function hasCompleteMaterialAnswer(question: MaterialQuestion, value: Mat
     return Boolean(typeof value === "object" && value && !Array.isArray(value) && Number(value.value) > 0)
   }
   if (question.question_type === "item_list") {
-    return Boolean(typeof value === "object" && value && !Array.isArray(value) && value.items?.length && value.items.every((item) => item.size && item.length && Number(item.quantity) > 0))
+    const requiresCode = question.configuration.itemMode === "cable"
+    return Boolean(typeof value === "object" && value && !Array.isArray(value) && value.items?.length && value.items.every((item) => item.size && item.length && Number(item.quantity) > 0 && (!requiresCode || item.code)))
   }
   return true
 }
@@ -218,7 +221,7 @@ export function formatMaterialAnswer(question: MaterialQuestion, value: Material
     if (value.attachmentIds?.length) parts.push(`${value.attachmentIds.length} file${value.attachmentIds.length === 1 ? "" : "s"}`)
     if (value.items?.length) parts.push(value.items.map((item) => [
       `${item.size || item.code || "Item"} x ${item.length} - ${item.quantity}`,
-      item.code ? `code ${item.code}` : "",
+      item.code ? `${question.configuration.itemMode === "cable" ? "cable" : "code"} ${item.code}` : "",
       item.douglasFir ? "Douglas Fir" : "",
       item.pressureTreated ? "Pressure Treated" : "",
     ].filter(Boolean).join(", ")).join("; "))

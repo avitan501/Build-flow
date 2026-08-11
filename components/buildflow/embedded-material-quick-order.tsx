@@ -26,6 +26,8 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
   const [hydrated, setHydrated] = useState(false)
   const [referenceFile, setReferenceFile] = useState<File | null>(null)
   const allowsReferencePhoto = category === "Door and molding"
+  const requestTypeQuestion = snapshot.questions.find((question) => question.question_key === "request_type")
+  const hasReferenceSelection = !requestTypeQuestion || hasMaterialAnswer(draftAnswers[requestTypeQuestion.id] ?? draftAnswers[requestTypeQuestion.question_key])
 
   useEffect(() => {
     let parsed: StoredDraft | null = null
@@ -116,7 +118,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
           return { ok: true }
         }}
       />
-      {allowsReferencePhoto ? <div className="grid gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
+      {allowsReferencePhoto && hasReferenceSelection ? <div className="grid gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
         <div><p className="text-sm font-bold text-slate-950">Molding or door reference</p><p className="mt-1 text-xs leading-5 text-slate-500">Attach one photo, or enter a profile code in the questions above.</p></div>
         <div className="flex flex-wrap items-center gap-2">
           <a href="https://www.gardenstatelumber.com/products-programs/moulding/" target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700">Molding Catalog<ExternalLink className="h-4 w-4" /></a>

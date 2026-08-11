@@ -146,6 +146,7 @@ export async function updateMaterialQuestionAction(input: {
   quantityUnits: string
   itemSizes: string
   itemLengths: string
+  cableNumbers: string
   questionImageUrl: string
   allowNotes: boolean
 }): Promise<AdminResult> {
@@ -162,6 +163,7 @@ export async function updateMaterialQuestionAction(input: {
     ...(input.questionType === "item_list" ? {
       itemSizes: input.itemSizes.split(",").map((entry) => entry.trim()).filter(Boolean).slice(0, 30),
       itemLengths: input.itemLengths.split(",").map((entry) => entry.trim()).filter(Boolean).slice(0, 30),
+      cableNumbers: input.cableNumbers.split(",").map((entry) => entry.trim()).filter(Boolean).slice(0, 30),
     } : {}),
     imageUrl: cleanText(input.questionImageUrl, 1000) || undefined,
     ...(input.allowNotes ? { allowNotes: true } : {}),

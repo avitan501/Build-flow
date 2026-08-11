@@ -47,6 +47,7 @@ function LumberItemList({ question, value, onChange, disabled }: {
 }) {
   const storedItems = typeof value === "object" && value && !Array.isArray(value) ? value.items ?? [] : []
   const moldingMode = question.configuration.itemMode === "molding"
+  const cableMode = question.configuration.itemMode === "cable"
   const emptyItem: MaterialLineItem = { size: moldingMode ? "Molding" : "", length: "", quantity: 0 }
   const items: MaterialLineItem[] = storedItems.length ? storedItems : [emptyItem]
   const sizes = question.configuration.itemSizes ?? []
@@ -68,19 +69,20 @@ function LumberItemList({ question, value, onChange, disabled }: {
     <div className="grid gap-3">
       {items.map((item, index) => (
         <div key={index} className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <div className={`grid gap-2 ${moldingMode ? "sm:grid-cols-[1.2fr_1fr_minmax(7rem,.7fr)_2.75rem]" : "sm:grid-cols-[1fr_1fr_minmax(7rem,.7fr)_2.75rem]"} sm:items-end`}>
-          {moldingMode ? <label className="grid gap-1 text-xs font-semibold text-slate-600">Molding profile code<input disabled={disabled} value={item.code ?? ""} onChange={(event) => updateItem(index, "code", event.target.value)} placeholder="Garden State code" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label> : <label className="grid gap-1 text-xs font-semibold text-slate-600">Lumber size<select disabled={disabled} value={item.size} onChange={(event) => updateItem(index, "size", event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950"><option value="">Choose size</option>{sizes.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>}
+          <div className={`grid gap-2 ${moldingMode || cableMode ? "sm:grid-cols-[1.1fr_1.1fr_1fr_minmax(6rem,.7fr)_2.75rem]" : "sm:grid-cols-[1fr_1fr_minmax(7rem,.7fr)_2.75rem]"} sm:items-end`}>
+          {moldingMode ? <label className="grid gap-1 text-xs font-semibold text-slate-600">Molding profile code<input disabled={disabled} value={item.code ?? ""} onChange={(event) => updateItem(index, "code", event.target.value)} placeholder="Garden State code" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label> : <label className="grid gap-1 text-xs font-semibold text-slate-600">{cableMode ? "Cable type" : "Lumber size"}<select disabled={disabled} value={item.size} onChange={(event) => updateItem(index, "size", event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950"><option value="">{cableMode ? "Choose type" : "Choose size"}</option>{sizes.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>}
+          {cableMode ? <label className="grid gap-1 text-xs font-semibold text-slate-600">Cable number<select disabled={disabled} value={item.code ?? ""} onChange={(event) => updateItem(index, "code", event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950"><option value="">Choose cable</option>{(question.configuration.cableNumbers ?? []).map((number) => <option key={number} value={number}>{number}</option>)}</select></label> : null}
           <label className="grid gap-1 text-xs font-semibold text-slate-600">Length<select disabled={disabled} value={item.length} onChange={(event) => updateItem(index, "length", event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950"><option value="">Choose length</option>{lengths.map((length) => <option key={length} value={length}>{length}</option>)}</select></label>
           <label className="grid gap-1 text-xs font-semibold text-slate-600">Quantity<input disabled={disabled} type="number" min="1" inputMode="numeric" value={item.quantity || ""} placeholder="0" onChange={(event) => updateItem(index, "quantity", event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
-          <button type="button" disabled={disabled || items.length === 1} onClick={() => onChange({ items: items.filter((_, itemIndex) => itemIndex !== index) })} className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-500 disabled:opacity-30" aria-label={`Remove ${moldingMode ? "molding" : "lumber"} item ${index + 1}`}><Trash2 className="h-4 w-4" /></button>
+          <button type="button" disabled={disabled || items.length === 1} onClick={() => onChange({ items: items.filter((_, itemIndex) => itemIndex !== index) })} className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-500 disabled:opacity-30" aria-label={`Remove ${moldingMode ? "molding" : cableMode ? "cable" : "lumber"} item ${index + 1}`}><Trash2 className="h-4 w-4" /></button>
           </div>
-          {!moldingMode ? <div className="flex flex-wrap gap-2">
+          {!moldingMode && !cableMode ? <div className="flex flex-wrap gap-2">
             <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700"><input type="checkbox" checked={Boolean(item.douglasFir)} onChange={() => toggleItem(index, "douglasFir")} className="h-4 w-4 accent-[#0071e3]" />Douglas Fir</label>
             <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700"><input type="checkbox" checked={Boolean(item.pressureTreated)} onChange={() => toggleItem(index, "pressureTreated")} className="h-4 w-4 accent-[#0071e3]" />Pressure Treated</label>
-          </div> : <p className="text-xs text-slate-500">Enter a catalog code above or attach a molding photo below.</p>}
+          </div> : moldingMode ? <p className="text-xs text-slate-500">Enter a catalog code above or attach a molding photo below.</p> : null}
         </div>
       ))}
-      <button type="button" disabled={disabled} onClick={() => onChange({ items: [...items, emptyItem] })} className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:border-slate-500"><Plus className="h-4 w-4" />Add Another {moldingMode ? "Molding" : "Item"}</button>
+      <button type="button" disabled={disabled} onClick={() => onChange({ items: [...items, emptyItem] })} className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:border-slate-500"><Plus className="h-4 w-4" />Add Another {moldingMode ? "Molding" : cableMode ? "Cable" : "Item"}</button>
     </div>
   )
 }
@@ -116,7 +118,7 @@ function CardOptions({ question, value, onChange, disabled, compact = false }: {
             disabled={disabled}
             aria-pressed={active}
             onClick={() => toggle(option.value)}
-            className={`${compact ? "min-h-11 rounded-lg px-3 py-2 text-sm" : "min-h-16 rounded-[18px] px-4 py-3 text-[15px]"} relative flex touch-manipulation items-center justify-between gap-2 border-2 text-left font-semibold transition-[border-color,background-color,box-shadow,color] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:cursor-default ${active ? compact ? "border-[#0071e3] bg-sky-50 text-slate-950 shadow-[0_0_0_1px_#0071e3]" : "border-[#0071e3] bg-sky-50 text-slate-950 shadow-[0_8px_20px_rgba(0,113,227,0.12)]" : "border-slate-300 bg-white text-slate-800 hover:border-slate-500 active:bg-slate-50"}`}
+            className={`${compact ? "min-h-10 rounded-lg px-3 py-1.5 text-[13px]" : "min-h-16 rounded-[18px] px-4 py-3 text-[15px]"} relative flex touch-manipulation items-center justify-between gap-2 border text-left font-semibold transition-[border-color,background-color,box-shadow,color] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:cursor-default ${active ? compact ? "border-[#0071e3] bg-[#f5faff] text-[#1d1d1f] shadow-[inset_0_0_0_1px_#0071e3]" : "border-[#0071e3] bg-sky-50 text-slate-950 shadow-[0_8px_20px_rgba(0,113,227,0.12)]" : "border-[#d2d2d7] bg-white text-[#1d1d1f] hover:border-[#86868b] active:bg-[#f5f5f7]"}`}
           >
             <span>{option.label}</span>
             <span className={`${compact ? "h-4 w-4" : "h-6 w-6"} inline-flex shrink-0 items-center justify-center rounded-full border ${active ? "border-[#0071e3] bg-[#0071e3] text-white" : compact ? "border-transparent text-transparent" : "border-slate-300 text-transparent"}`}><Check className={compact ? "h-3 w-3" : "h-4 w-4"} strokeWidth={3} /></span>
@@ -175,19 +177,20 @@ function configuratorGroupsFor(snapshot: MaterialQuestionnaireSnapshot) {
   const isTile = snapshot.category.department_key === "Tile work"
   const isDoor = snapshot.category.department_key === "Door and molding"
   const isFraming = snapshot.category.department_key === "Framing"
+  const isElectrical = snapshot.category.department_key === "Electrical"
   return [
-    { id: "material", title: isDoor ? "Order Type" : "Material", description: isDrywall ? "Choose the board and performance type." : isTile ? "Choose the tile-setting materials." : isDoor ? "Choose molding, doors, or both." : isFraming ? "Build a lumber list for this project." : "Choose the flooring construction and appearance." },
-    { id: "size", title: "Size & Quantity", description: isDrywall ? "Set sheet dimensions, thickness, and quantity." : isTile ? "Enter the amount needed for each selected material." : isDoor ? "Add profile, length, door, and measurement details." : isFraming ? "Choose a common size and length for every lumber line." : "Set the dimensions and the amount required." },
-    { id: "extras", title: isDoor ? "Reference & Notes" : isTile ? "Waterproofing" : "Accessories", description: isDrywall ? "Include screws, compound, tape, corner bead, and metal studs." : isTile ? "Add liquid waterproofing only when the job needs it." : isDoor ? "Add catalog references and jobsite notes." : isFraming ? "Add any hardware or delivery requirements." : "Include the supporting materials needed on site." },
+    { id: "material", title: isDoor ? "Choose Department" : "Material", description: isDrywall ? "Choose the board and performance type." : isTile ? "Choose the tile-setting materials." : isDoor ? "Select molding, doors, or both." : isFraming ? "Build a lumber list for this project." : isElectrical ? "Build a cable list for this project." : "Choose the flooring construction and appearance." },
+    { id: "size", title: "Size & Quantity", description: isDrywall ? "Set sheet dimensions, thickness, and quantity." : isTile ? "Enter the amount needed for each selected material." : isDoor ? "Add profile, length, door, and measurement details." : isFraming ? "Choose a common size and length for every lumber line." : isElectrical ? "Choose the cable, length, and quantity for every line." : "Set the dimensions and the amount required." },
+    { id: "extras", title: isDoor ? "Reference & Notes" : isTile ? "Waterproofing" : isElectrical ? "Notes" : "Accessories", description: isDrywall ? "Include screws, compound, tape, corner bead, and metal studs." : isTile ? "Add liquid waterproofing only when the job needs it." : isDoor ? "Add catalog references and jobsite notes." : isFraming ? "Add any hardware or delivery requirements." : isElectrical ? "Add conductor, packaging, or delivery details." : "Include the supporting materials needed on site." },
   ] as const
 }
 
 function configuratorGroupFor(question: MaterialQuestion) {
   const key = question.question_key.toLowerCase()
-  if (key === "lumber_items") return "material"
+  if (key === "lumber_items" || key === "cable_items") return "material"
   if (key === "lumber_grade") return "extras"
   if (key === "drywall_type") return "size"
-  if (/(accessor|underlay|adhesive|glue|paper|nosing|transition|waste|bullnose|screw|compound|corner|bead|reference|catalog|note|spacer|waterproof|primer|sealant)/.test(key)) return "extras"
+  if (/(accessor|underlay|adhesive|glue|paper|nosing|transition|waste|bullnose|screw|compound|corner|bead|tape|stud|reference|catalog|note|spacer|waterproof|primer|sealant)/.test(key)) return "extras"
   if (/(width|length|area|square|quantity|amount|count|size|thickness|sand|cement|mesh|measurement|door_type)/.test(key)) return "size"
   return "material"
 }
@@ -306,12 +309,12 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
       <fieldset
         key={question.id}
         id={`question-${question.id}`}
-        className={`${compact ? "scroll-mt-28 py-4 first:pt-0 last:pb-0" : "scroll-mt-24 pb-7"} min-w-0 border-b border-slate-100 last:border-b-0`}
+        className={`${compact ? "scroll-mt-28 py-3 first:pt-0 last:pb-0" : "scroll-mt-24 pb-7"} min-w-0 border-b border-slate-100 last:border-b-0`}
         aria-describedby={question.help_text ? `question-help-${question.id}` : undefined}
       >
         {!compact ? <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Question {index + 1}</p> : null}
         <div className="flex items-start gap-3">
-          {question.configuration.imageUrl ? <span role="img" aria-label="" className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-white bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${question.configuration.imageUrl})`, backgroundPosition: question.configuration.imagePosition, backgroundSize: question.configuration.imageSprite ? "400% 200%" : undefined }} /> : null}
+          {question.configuration.imageUrl ? <span role="img" aria-label="" className="h-11 w-11 shrink-0 rounded-lg border border-[#e5e5e7] bg-white bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${question.configuration.imageUrl})`, backgroundPosition: question.configuration.imagePosition, backgroundSize: question.configuration.imageSprite ? "400% 200%" : undefined }} /> : null}
           <legend className={`${compact ? "text-sm" : "mt-1 text-lg sm:text-xl"} font-bold leading-tight text-slate-950`}>
             {question.label}{question.is_required ? <span aria-hidden="true" className="text-rose-500"> *</span> : null}
           </legend>
@@ -375,12 +378,12 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
           <div className="grid items-start lg:grid-cols-[minmax(0,1fr)_19rem]">
             <div className="min-w-0 px-4 pb-24 sm:px-6 sm:pb-24 lg:pb-6 lg:pr-8">
               {questionGroups.map((group, groupIndex) => (
-                <section key={group.id} data-testid={`flooring-group-${group.id}`} className="border-b border-slate-200 py-5 last:border-b-0 sm:py-6">
+                <section key={group.id} data-testid={`flooring-group-${group.id}`} className="border-b border-[#d2d2d7] py-4 last:border-b-0 sm:py-5">
                   <div className="mb-1 flex items-center gap-3">
                     <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-950 text-xs font-bold text-white">{groupIndex + 1}</span>
                     <div><h3 className="text-base font-bold text-slate-950">{group.title}</h3><p className="mt-0.5 text-xs leading-5 text-slate-500">{group.description}</p></div>
                   </div>
-                  <div className="ml-0 mt-3 sm:ml-10">{group.questions.map((question) => renderQuestion(question, visibleQuestions.findIndex((entry) => entry.id === question.id)))}</div>
+                  <div className="ml-0 mt-2.5 sm:ml-10">{group.questions.map((question) => renderQuestion(question, visibleQuestions.findIndex((entry) => entry.id === question.id)))}</div>
                 </section>
               ))}
               {error ? <div aria-live="polite" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</div> : null}
