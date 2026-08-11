@@ -7,7 +7,7 @@ import { AddToProjectButton } from "@/components/buildflow/add-to-project-button
 import { MaterialQuestionnaireWizard } from "@/components/buildflow/material-questionnaire-wizard"
 import { formatMaterialAnswer, hasMaterialAnswer, type MaterialAnswerValue, type MaterialQuestionnaireSnapshot } from "@/lib/material-questionnaires"
 
-const FLOORING_DRAFT_KEY = "avantia-flooring-order-draft"
+const MATERIAL_DRAFT_KEY = "avantia-material-order-draft"
 
 type StoredDraft = {
   version: 1
@@ -28,14 +28,14 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
   useEffect(() => {
     let parsed: StoredDraft | null = null
     try {
-      const stored = window.sessionStorage.getItem(`${FLOORING_DRAFT_KEY}:${requestId}`)
+      const stored = window.sessionStorage.getItem(`${MATERIAL_DRAFT_KEY}:${requestId}`)
       if (stored) {
         const candidate = JSON.parse(stored) as StoredDraft
         if (candidate.version === 1) parsed = candidate
-        else window.sessionStorage.removeItem(`${FLOORING_DRAFT_KEY}:${requestId}`)
+        else window.sessionStorage.removeItem(`${MATERIAL_DRAFT_KEY}:${requestId}`)
       }
     } catch {
-      window.sessionStorage.removeItem(`${FLOORING_DRAFT_KEY}:${requestId}`)
+      window.sessionStorage.removeItem(`${MATERIAL_DRAFT_KEY}:${requestId}`)
     }
     const frame = window.requestAnimationFrame(() => {
       if (parsed) {
@@ -53,7 +53,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
 
   function storeDraft(answers: Record<string, MaterialAnswerValue>, complete: boolean) {
     setDraftAnswers(answers)
-    window.sessionStorage.setItem(`${FLOORING_DRAFT_KEY}:${requestId}`, JSON.stringify({ version: 1, answers, complete } satisfies StoredDraft))
+    window.sessionStorage.setItem(`${MATERIAL_DRAFT_KEY}:${requestId}`, JSON.stringify({ version: 1, answers, complete } satisfies StoredDraft))
   }
 
   function answersForProject(answers: Record<string, MaterialAnswerValue>) {
@@ -67,7 +67,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
           <div className="p-5 sm:p-6">
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><CheckCircle2 className="h-6 w-6" aria-hidden="true" /></span>
             <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Request Ready</p>
-            <h2 className="mt-1 text-xl font-bold text-slate-950">Choose the Project for This Flooring Request</h2>
+            <h2 className="mt-1 text-xl font-bold text-slate-950">Choose the Project for This {displayCategory} Request</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">Your selections are saved on this device until the request is added successfully.</p>
             <div className="mt-5 flex flex-wrap gap-3">
               <AddToProjectButton
@@ -75,7 +75,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
                 questionnaireDepartment={category}
                 materialAnswers={answersForProject(completedAnswers)}
                 label="Choose Project"
-                onAdded={() => window.sessionStorage.removeItem(`${FLOORING_DRAFT_KEY}:${requestId}`)}
+                onAdded={() => window.sessionStorage.removeItem(`${MATERIAL_DRAFT_KEY}:${requestId}`)}
               />
               <button type="button" onClick={() => { setCompletedAnswers(null); storeDraft(completedAnswers, false) }} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:border-slate-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"><Pencil className="h-4 w-4" aria-hidden="true" />Edit Selections</button>
             </div>
@@ -92,7 +92,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
   }
 
   if (!hydrated) {
-    return <section className="min-h-72 animate-pulse rounded-lg border border-slate-200 bg-white" aria-label="Loading flooring order" />
+    return <section className="min-h-72 animate-pulse rounded-lg border border-slate-200 bg-white" aria-label={`Loading ${displayCategory} order`} />
   }
 
   return (

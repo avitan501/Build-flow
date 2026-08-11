@@ -120,16 +120,19 @@ function QuestionControl({ question, value, onChange, disabled, onUpload, compac
   return <div className={`relative ${compact ? "max-w-sm" : ""}`}><input id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} type={numeric ? "number" : "text"} min={numeric ? 0 : undefined} inputMode={numeric ? "decimal" : undefined} value={typeof value === "number" || typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(numeric ? event.target.value === "" ? "" : Math.max(0, Number(event.target.value)) : event.target.value)} className={`${compact ? "min-h-11 rounded-lg text-sm" : "min-h-13 rounded-2xl text-base"} w-full border border-slate-300 px-4 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50 ${question.unit ? "pr-24" : ""}`} />{question.unit ? <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-xs font-semibold text-slate-500">{question.unit}</span> : null}</div>
 }
 
-const CONFIGURATOR_GROUPS = [
-  { id: "material", title: "Material", description: "Choose the flooring construction and appearance." },
-  { id: "size", title: "Size & Quantity", description: "Set the dimensions and the amount required." },
-  { id: "extras", title: "Accessories", description: "Include the supporting materials needed on site." },
-] as const
+function configuratorGroupsFor(snapshot: MaterialQuestionnaireSnapshot) {
+  const isDrywall = snapshot.category.slug.includes("sheetrock") || snapshot.category.slug.includes("drywall")
+  return [
+    { id: "material", title: "Material", description: isDrywall ? "Choose the board and performance type." : "Choose the flooring construction and appearance." },
+    { id: "size", title: "Size & Quantity", description: isDrywall ? "Set sheet dimensions, thickness, and quantity." : "Set the dimensions and the amount required." },
+    { id: "extras", title: "Accessories", description: isDrywall ? "Include screws, compound, and corner bead." : "Include the supporting materials needed on site." },
+  ] as const
+}
 
 function configuratorGroupFor(question: MaterialQuestion) {
   const key = question.question_key.toLowerCase()
-  if (/(accessor|underlay|adhesive|glue|paper|nosing|transition|waste|bullnose)/.test(key)) return "extras"
-  if (/(width|length|area|square|quantity|amount)/.test(key)) return "size"
+  if (/(accessor|underlay|adhesive|glue|paper|nosing|transition|waste|bullnose|screw|compound|corner|bead)/.test(key)) return "extras"
+  if (/(width|length|area|square|quantity|amount|count|size|thickness)/.test(key)) return "size"
   return "material"
 }
 
@@ -163,10 +166,10 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
   const completionPercent = visibleQuestions.length ? Math.round((answeredQuestions.length / visibleQuestions.length) * 100) : 100
   const requiredQuestions = visibleQuestions.filter((question) => question.is_required)
   const requiredAnswered = requiredQuestions.filter((question) => hasCompleteMaterialAnswer(question, answerForQuestion(question, answers))).length
-  const quantityQuestion = visibleQuestions.find((question) => question.question_type === "square_feet" || /area|square/.test(question.question_key.toLowerCase()))
+  const quantityQuestion = visibleQuestions.find((question) => question.question_type === "square_feet" || /area|square|count|quantity|amount/.test(question.question_key.toLowerCase()))
   const quantityAnswer = quantityQuestion ? answerForQuestion(quantityQuestion, answers) : null
   const quantityLabel = quantityQuestion && hasMaterialAnswer(quantityAnswer) ? formatMaterialAnswer(quantityQuestion, quantityAnswer) : ""
-  const questionGroups = CONFIGURATOR_GROUPS.map((group) => ({
+  const questionGroups = configuratorGroupsFor(snapshot).map((group) => ({
     ...group,
     questions: visibleQuestions.filter((question) => configuratorGroupFor(question) === group.id),
   })).filter((group) => group.questions.length > 0)
@@ -279,7 +282,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">{configurator ? "Contractor order builder" : "Material order details"}</p>
             <h2 className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">{snapshot.category.name}</h2>
-            {configurator ? <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">Set the flooring specifications, quantity, and jobsite accessories.</p> : requireCompletion ? <p className="mt-1 text-xs font-semibold text-slate-500">Required to complete this department request</p> : null}
+            {configurator ? <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">Set the material specifications, quantity, and jobsite accessories.</p> : requireCompletion ? <p className="mt-1 text-xs font-semibold text-slate-500">Required to complete this department request</p> : null}
           </div>
           {onClose && !requireCompletion ? <button type="button" onClick={onClose} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100" aria-label="Close questionnaire"><X className="h-5 w-5" /></button> : null}
         </div>

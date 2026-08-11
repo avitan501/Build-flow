@@ -248,15 +248,16 @@ function WindowUploadActions({
 export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, successCode, questionnaireSnapshot }: ShopToolCategoryPageProps) {
   const essentials = getDepartmentEssentials(category.slug)
   const usesStandardUpload = !["framing", "kitchen", "eitan", "window"].includes(category.slug)
-  const composerHandlesUpload = category.slug === "wood-floor"
+  const usesEmbeddedQuickOrder = ["wood-floor", "sheet-rock"].includes(category.slug)
+  const composerHandlesUpload = usesEmbeddedQuickOrder
 
   return (
     <main className="min-h-screen bg-[#f7f8fa] px-4 py-4 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <section className="mx-auto flex max-w-7xl flex-col gap-4">
         <h1 className="text-[2rem] font-bold tracking-normal text-slate-950 sm:text-[2.4rem]">{category.label}</h1>
 
-        {experience.showQuickOrder && category.slug === "wood-floor" && questionnaireSnapshot ? <EmbeddedMaterialQuickOrder snapshot={questionnaireSnapshot} category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} /> : null}
-        {experience.showQuickOrder && (category.slug !== "wood-floor" || !questionnaireSnapshot) ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
+        {experience.showQuickOrder && usesEmbeddedQuickOrder && questionnaireSnapshot ? <EmbeddedMaterialQuickOrder snapshot={questionnaireSnapshot} category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} /> : null}
+        {experience.showQuickOrder && (!usesEmbeddedQuickOrder || !questionnaireSnapshot) ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && usesStandardUpload && !composerHandlesUpload ? <CombinedUploadAction category={questionnaireDepartment} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && category.slug === "framing" ? <FramingUploadActions /> : null}
         {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}
@@ -265,10 +266,10 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
 
         <DepartmentEssentials data={essentials} />
 
-        {experience.showChatToOrder && category.slug === "wood-floor" && questionnaireSnapshot ? (
+        {experience.showChatToOrder && usesEmbeddedQuickOrder && questionnaireSnapshot ? (
           <details className="group rounded-lg border border-slate-200 bg-white shadow-sm">
             <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left marker:content-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-sky-100">
-              <span><span className="block text-base font-bold text-slate-950">Need Help With a Custom Flooring Order?</span><span className="mt-0.5 block text-sm text-slate-500">Describe the request or attach a blueprint or shopping list.</span></span>
+              <span><span className="block text-base font-bold text-slate-950">Need Help With a Custom {category.label} Order?</span><span className="mt-0.5 block text-sm text-slate-500">Describe the request or attach a blueprint or shopping list.</span></span>
               <span aria-hidden="true" className="text-xl font-light text-slate-500 transition-transform group-open:rotate-45 motion-reduce:transition-none">+</span>
             </summary>
             <div className="border-t border-slate-100 px-5 [&>section]:border-0"> <DepartmentRequestComposer category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} allowUpload={composerHandlesUpload && experience.showPlanUpload} /></div>
