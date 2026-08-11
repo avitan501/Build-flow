@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import {
@@ -31,6 +31,7 @@ type AddToProjectButtonProps = {
   questionnaireDepartment?: string
   materialAnswers?: Record<string, MaterialAnswerValue>
   onAdded?: () => void
+  autoOpen?: boolean
 }
 
 type Options = {
@@ -46,7 +47,7 @@ function PlusIcon() {
   )
 }
 
-export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Add to Project", file = null, questions: questionOverride, details, questionnaireDepartment, materialAnswers, onAdded }: AddToProjectButtonProps) {
+export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Add to Project", file = null, questions: questionOverride, details, questionnaireDepartment, materialAnswers, onAdded, autoOpen = false }: AddToProjectButtonProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -58,19 +59,26 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
   const [error, setError] = useState<string | null>(null)
   const [questionnaireCompleted, setQuestionnaireCompleted] = useState(false)
   const [authRequired, setAuthRequired] = useState(false)
+  const autoOpened = useRef(false)
   const [isPending, startTransition] = useTransition()
   const qualification = useMemo(() => getQualificationSettingForProduct(product), [product])
   const questions = questionOverride ?? (qualification.enabled ? qualification.questions : [])
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    let shouldBegin = false
     if (window.sessionStorage.getItem(PENDING_PRODUCT_KEY) === product.id) {
       window.sessionStorage.removeItem(PENDING_PRODUCT_KEY)
-      void begin()
+      shouldBegin = true
     }
+    if (autoOpen && !autoOpened.current) {
+      autoOpened.current = true
+      shouldBegin = true
+    }
+    if (shouldBegin) void begin()
     // Run only when this product is mounted after returning from authentication.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product.id])
+  }, [autoOpen, product.id])
 
   async function begin() {
     setOpen(true)

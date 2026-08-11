@@ -80,6 +80,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
                 materialAnswers={answersForProject(completedAnswers)}
                 file={referenceFile}
                 label="Confirm Request"
+                autoOpen
                 onAdded={() => window.sessionStorage.removeItem(`${MATERIAL_DRAFT_KEY}:${requestId}`)}
               />
               <button type="button" onClick={() => { setCompletedAnswers(null); storeDraft(completedAnswers, false) }} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:border-slate-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"><Pencil className="h-4 w-4" aria-hidden="true" />Edit Selections</button>

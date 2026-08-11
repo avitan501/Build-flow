@@ -247,7 +247,6 @@ test("flooring uses a compact contractor configurator with a live summary", asyn
   await expect(page.getByText("Not answered", { exact: true })).toHaveCount(0)
   await page.getByRole("button", { name: "Confirm Request", exact: true }).click()
   await expect(page.getByRole("heading", { name: "Confirm This Flooring Request" })).toBeVisible()
-  await page.getByRole("button", { name: /^Confirm Request:/ }).click()
   await expect(page.getByRole("heading", { name: "Save and continue your request" })).toBeVisible()
   const continueDialog = page.getByRole("dialog")
   await expect(continueDialog.getByRole("link", { name: "Log in", exact: true })).toBeVisible()
