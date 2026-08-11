@@ -38,6 +38,12 @@ export function ExportRequestPdfButton() {
 }
 
 const requestActionContent: Record<ClientRequestActionType, { title: string; description: string; placeholder: string; submit: string }> = {
+  addon: {
+    title: "Add an item",
+    description: "Tell us what you want to add to this request, including the quantity and any size, brand, or specification.",
+    placeholder: "Example: Add 20 pieces of 2x4x8 Douglas Fir",
+    submit: "Send Add-On Request",
+  },
   change: {
     title: "Request a change",
     description: "Tell us exactly what should be changed. Your current request will stay unchanged until our team reviews it.",
@@ -72,7 +78,6 @@ export function ProjectRequestActions({ projectId, requestId, status, compact = 
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const detailsHref = `/projects/${projectId}/requests/${requestId}`
-  const addOnLabel = status === "draft" ? "Add Items" : "Add On"
 
   function close() {
     if (isPending) return
@@ -102,9 +107,9 @@ export function ProjectRequestActions({ projectId, requestId, status, compact = 
         {showView ? <Link href={detailsHref} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-slate-950 px-4 text-sm font-semibold text-white">
           <Eye className="h-4 w-4" aria-hidden="true" /> View Request
         </Link> : null}
-        <Link href={`/shop?project=${projectId}`} className={secondaryClass}>
-          <Plus className="h-4 w-4" aria-hidden="true" /> {addOnLabel}
-        </Link>
+        <button type="button" onClick={() => { setAction("addon"); setFeedback(null) }} className={secondaryClass}>
+          <Plus className="h-4 w-4" aria-hidden="true" /> Add Item
+        </button>
         {status !== "closed" ? <button type="button" onClick={() => { setAction("change"); setFeedback(null) }} className={secondaryClass}><PencilLine className="h-4 w-4" aria-hidden="true" /> Make Change</button> : null}
         <button type="button" onClick={() => { setAction("question"); setFeedback(null) }} className={secondaryClass}><CircleHelp className="h-4 w-4" aria-hidden="true" /> Ask Question</button>
         {status !== "closed" ? <button type="button" onClick={() => { setAction("cancel"); setFeedback(null) }} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"><XCircle className="h-4 w-4" aria-hidden="true" /> Cancel Request</button> : null}

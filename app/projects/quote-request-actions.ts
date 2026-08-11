@@ -21,7 +21,7 @@ import type { QuoteRequestAnswer } from "@/lib/quote-requests"
 
 type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: string; authRequired?: boolean }
 
-export type ClientRequestActionType = "change" | "question" | "cancel"
+export type ClientRequestActionType = "addon" | "change" | "question" | "cancel"
 
 async function currentUser() {
   const session = await getSessionWithProfile()
@@ -466,9 +466,12 @@ export async function createClientRequestAction(input: {
     .eq("owner_id", session.user.id)
     .maybeSingle<{ id: string; title: string; status: string; projects: { name: string } | null }>()
   if (!request) return { ok: false, error: "Request not found." }
-  if (request.status === "closed") return { ok: false, error: "This request is already completed. Start an add-on request instead." }
+  if (request.status === "closed" && (input.action === "change" || input.action === "cancel")) {
+    return { ok: false, error: "This request is already completed. Add an item or ask a question instead." }
+  }
 
   const labels: Record<ClientRequestActionType, string> = {
+    addon: "Item add-on requested",
     change: "Change requested",
     question: "Client question",
     cancel: "Cancellation requested",
