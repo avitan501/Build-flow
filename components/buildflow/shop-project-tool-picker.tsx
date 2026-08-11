@@ -417,7 +417,7 @@ export function ShopProjectToolPicker({
                       alt={category.imageAlt}
                       fill
                       sizes="(max-width: 639px) 32vw, (max-width: 1023px) 24vw, 18vw"
-                      className={category.slug === "electrical" || category.slug === "tile-work" ? "object-cover" : "scale-[0.9] object-contain mix-blend-multiply"}
+                      className="scale-[0.9] object-contain mix-blend-multiply"
                     />
                   )}
                 </span>

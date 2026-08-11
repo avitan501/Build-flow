@@ -111,10 +111,12 @@ test("customer-facing department names and category cutouts are clean", async ({
   await expect(framingCard.getByRole("img", { name: /framing/i })).toHaveCSS("background-image", /lumber-grid\.webp/)
 
   const electricalCard = page.getByTestId("department-card").filter({ hasText: "Electrical" })
-  await expect(electricalCard.getByRole("img")).toHaveAttribute("src", /electrical\.jpg/)
+  await expect(electricalCard.getByRole("img")).toHaveAttribute("src", /electrical-department-cutout-v2\.webp/)
+  await expect(electricalCard.getByRole("img")).toHaveClass(/object-contain/)
 
   const tileCard = page.getByTestId("department-card").filter({ hasText: "Tile" })
-  await expect(tileCard.getByRole("img")).toHaveAttribute("src", /tile-department\.webp/)
+  await expect(tileCard.getByRole("img")).toHaveAttribute("src", /tile-department-cutout-v2\.webp/)
+  await expect(tileCard.getByRole("img")).toHaveClass(/object-contain/)
 })
 
 test("retired departments are hidden and category photos stay clean", async ({ page }) => {
