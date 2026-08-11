@@ -18,9 +18,6 @@ export function ShopBrandShowcase({ compact = false }: { compact?: boolean }) {
         <div className="text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Trusted manufacturers</p>
           <h2 id="shop-brands-heading" className="mt-2 text-2xl font-semibold tracking-normal text-[#1d1d1f] sm:text-3xl">Brands we trust</h2>
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#6e6e73] sm:text-base">
-            Tell us the brand, product, or specification you need. We will help find the right material for your project.
-          </p>
         </div>
 
         <div className={`${compact ? "mt-5 gap-2 sm:gap-3" : "mt-7 gap-x-4 gap-y-5"} grid grid-cols-2 sm:grid-cols-4`} data-testid="shop-brand-grid">

@@ -130,7 +130,6 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
                   const requestItems = items.filter((item) => item.request_id === request.id)
                   const requestAttachments = attachments.filter((attachment) => attachment.request_id === request.id)
                   const departments = [...new Set(requestItems.map((item) => item.department))]
-                  const needsAnswers = requestItems.filter((item) => item.qualification_status === "pending" || item.qualification_status === "skipped").length
                   return (
                     <article key={request.id} className="rounded-[18px] border border-slate-200 bg-[#fbfbfd] p-4">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -145,7 +144,6 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
                       </div>
                       <RequestProgress status={request.status} />
                       {departments.length ? <div className="mt-3 flex flex-wrap gap-1.5">{departments.map((department) => <span key={department} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">{department}</span>)}</div> : null}
-                      {needsAnswers ? <p className="mt-3 text-xs font-semibold text-amber-700">{needsAnswers} item{needsAnswers === 1 ? " needs" : "s need"} qualifying answers before submission.</p> : null}
                       <div className="mt-4 grid gap-2 border-t border-slate-200 pt-3">
                         {requestItems.slice(0, 3).map((item) => {
                           const requestDetails = typeof item.metadata?.request_details === "string" ? item.metadata.request_details.trim() : ""
