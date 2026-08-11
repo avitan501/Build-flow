@@ -13,23 +13,23 @@ const SPRITE_POSITIONS = [
 
 export function DepartmentEssentials({ data }: { data: DepartmentEssentialsData }) {
   return (
-    <section aria-labelledby="department-essentials-heading" className="border-y border-slate-200 bg-white py-4 sm:py-5">
-      <h2 id="department-essentials-heading" className="mb-3 text-lg font-semibold text-slate-950">Department Essentials</h2>
+    <section aria-labelledby="department-essentials-heading" className="py-3 sm:py-5">
+      <h2 id="department-essentials-heading" className="mb-4 text-lg font-semibold text-slate-950 sm:text-xl">Department Essentials</h2>
 
-      <div className="grid grid-cols-4 gap-x-2 gap-y-3 sm:grid-cols-8" data-testid="department-essentials">
+      <div className="grid grid-cols-4 gap-x-3 gap-y-5 sm:grid-cols-8 sm:gap-x-5" data-testid="department-essentials">
         {data.items.map((item, index) => (
-          <article key={item} className="min-w-0 bg-white text-center">
+          <article key={item} className="min-w-0 text-center">
             <div
               role="img"
               aria-label={item}
-              className="aspect-square w-full border border-slate-200 bg-white bg-no-repeat"
+              className="aspect-square w-full bg-white bg-no-repeat mix-blend-multiply"
               style={{
                 backgroundImage: `url(${data.spriteUrl})`,
                 backgroundPosition: SPRITE_POSITIONS[index],
                 backgroundSize: "400% 200%",
               }}
             />
-            <h3 className="mt-1.5 line-clamp-2 text-[10px] font-semibold leading-3 text-slate-800 sm:text-[11px] sm:leading-[14px]">{item}</h3>
+            <h3 className="mt-2 line-clamp-2 text-[11px] font-semibold leading-[14px] text-slate-900 sm:text-xs sm:leading-4">{item}</h3>
           </article>
         ))}
       </div>

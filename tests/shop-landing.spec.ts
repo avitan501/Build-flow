@@ -148,6 +148,15 @@ test("siding and roofing are separate departments with a complete request flow",
   await expect(page.getByRole("heading", { name: "Siding", exact: true })).toBeVisible()
   const essentials = page.getByTestId("department-essentials").locator("article")
   await expect(essentials).toHaveCount(8)
+  const presentation = await essentials.first().evaluate((element) => {
+    const image = element.querySelector("[role='img']")
+    return {
+      articleBackground: getComputedStyle(element).backgroundColor,
+      imageBorderWidth: image ? getComputedStyle(image).borderWidth : null,
+    }
+  })
+  expect(presentation.articleBackground).toBe("rgba(0, 0, 0, 0)")
+  expect(presentation.imageBorderWidth).toBe("0px")
   const positions = await essentials.locator("[role='img']").evaluateAll((elements) =>
     elements.map((element) => getComputedStyle(element).backgroundPosition),
   )
