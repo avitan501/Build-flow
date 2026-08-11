@@ -1,38 +1,25 @@
 import Image from "next/image";
+import Link from "next/link";
+import { ArrowRight, ClipboardList, PackageSearch, Phone, PhoneOff } from "lucide-react";
 
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
 import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase";
 
-const conciergePoints = [
+const contractorBenefits = [
   {
-    title: "Better pricing",
-    summary: "We compare supplier prices before you order.",
-    body: "Material prices change often. We check current options when you are ready to buy.",
+    title: "Stop calling store after store",
+    body: "Send your material request once. Your coordinator handles the supplier calls and follow-up.",
+    icon: PhoneOff,
   },
   {
-    title: "Product guidance",
-    summary: "We ask the right questions before pricing.",
-    body: "Clear specifications help you receive the correct material without paying for unnecessary extras.",
+    title: "Compare before you buy",
+    body: "We check suppliers and purchasing options to help you make a better buying decision.",
+    icon: PackageSearch,
   },
   {
-    title: "Surplus savings",
-    summary: "We search closeouts and liquidation inventory.",
-    body: "When suitable inventory is available, we help you use it to lower your material cost.",
-  },
-  {
-    title: "Bulk purchasing",
-    summary: "Larger orders can unlock better pricing.",
-    body: "We combine buying opportunities and reserve pricing when volume makes it worthwhile.",
-  },
-  {
-    title: "Smarter alternatives",
-    summary: "We suggest lower-cost products that still fit.",
-    body: "When the original request is expensive, we look for practical substitutes that meet the project need.",
-  },
-  {
-    title: "Specialty sourcing",
-    summary: "We help locate uncommon construction products.",
-    body: "Tell us the brand, size, finish, or specification and we will search beyond the usual local options.",
+    title: "Keep every order organized",
+    body: "Specifications, attachments, updates, and delivery details stay together by project.",
+    icon: ClipboardList,
   },
 ];
 
@@ -42,24 +29,6 @@ const coverageDots = [
   [52, 75], [57, 60], [64, 56], [70, 64], [80, 84], [75, 75], [76, 56], [80, 53], [82, 48], [84, 43],
   [85, 40], [87, 35], [89, 30], [91, 23], [80, 29], [79, 38], [68, 34], [73, 36], [66, 44], [62, 31], [93, 17],
 ] as const;
-
-function ConciergePoint({ point, index }: { point: (typeof conciergePoints)[number]; index: number }) {
-  return (
-    <details className="group overflow-hidden rounded-[22px] border border-white/80 bg-white shadow-[0_12px_34px_rgba(15,23,42,0.07)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(15,23,42,0.1)]">
-      <summary className="flex min-h-24 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0066cc] [&::-webkit-details-marker]:hidden">
-        <span className="flex min-w-0 items-start gap-4">
-          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-xs font-bold text-[#0066cc]">{String(index + 1).padStart(2, "0")}</span>
-          <span>
-            <span className="block text-base font-semibold text-[#071126] sm:text-lg">{point.title}</span>
-            <span className="mt-1 block text-sm leading-5 text-slate-600">{point.summary}</span>
-          </span>
-        </span>
-        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-300 text-xl font-light text-slate-600 transition group-open:rotate-45" aria-hidden="true">+</span>
-      </summary>
-      <p className="border-t border-slate-100 px-5 py-4 text-sm leading-6 text-slate-600">{point.body}</p>
-    </details>
-  );
-}
 
 export default function Home() {
   return (
@@ -73,41 +42,50 @@ export default function Home() {
             style={{ backgroundImage: "url(/images/buildflow-retail/hero.jpg)" }}
             aria-hidden="true"
           />
-          <div className="absolute inset-0 -z-10 bg-[#071126]/76" aria-hidden="true" />
-          <div className="mx-auto flex min-h-[19rem] max-w-6xl flex-col justify-end px-6 py-8 sm:min-h-[23rem] sm:px-9 sm:py-11 lg:px-10">
-            <h1 className="max-w-3xl text-3xl font-semibold leading-tight sm:text-5xl">
-              Concierge service for every construction need.
+          <div className="absolute inset-0 -z-10 bg-[#071126]/82" aria-hidden="true" />
+          <div className="mx-auto flex min-h-[31rem] max-w-6xl flex-col justify-end px-6 py-8 sm:min-h-[34rem] sm:px-9 sm:py-11 lg:px-10">
+            <p className="mb-4 text-xs font-bold uppercase tracking-[0.16em] text-sky-300">Avantia Build for contractors</p>
+            <h1 className="max-w-4xl text-4xl font-semibold leading-[1.08] sm:text-6xl">
+              Keep Your Crew Building. We’ll Handle the Materials.
             </h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
-              Better sourcing, clearer choices, and one place for every request.
+            <p className="mt-5 max-w-3xl text-base leading-7 text-slate-200 sm:text-xl sm:leading-8">
+              Send us what you need once. Your Avantia Build coordinator sources options, places orders, coordinates deliveries, and keeps everything organized by project.
             </p>
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+              <Link href="/shop" className="inline-flex min-h-13 items-center justify-center gap-2 rounded-lg bg-[#0784e3] px-6 text-sm font-bold text-white shadow-[0_12px_28px_rgba(7,132,227,0.3)] transition hover:bg-[#006fc4] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200">
+                Start my material request <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+              <a href="tel:+19292077156" className="inline-flex min-h-13 items-center justify-center gap-2 rounded-lg border border-white/40 bg-white/10 px-6 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30">
+                <Phone className="h-4 w-4" aria-hidden="true" /> Call a materials coordinator
+              </a>
+            </div>
+            <p className="mt-6 text-sm font-semibold text-slate-300">Fewer calls. Better buying decisions. Every order in one place.</p>
           </div>
         </section>
       </div>
 
-      <section className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-11 lg:px-10">
-        <div className="mb-5 max-w-2xl sm:mb-7">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">How we help</p>
-          <h2 className="mt-2 text-2xl font-semibold leading-tight text-[#071126] sm:text-3xl">A simpler way to source for a project.</h2>
+      <section className="mx-auto max-w-6xl px-4 py-9 sm:px-8 sm:py-12 lg:px-10">
+        <div className="mb-7 max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Your materials desk</p>
+          <h2 className="mt-2 text-2xl font-semibold leading-tight text-[#071126] sm:text-4xl">One request. One coordinator. No supplier runaround.</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">You stay focused on the crew and schedule. We handle the material calls, follow-up, and organization.</p>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          {conciergePoints.slice(0, 4).map((point, index) => <ConciergePoint key={point.title} point={point} index={index} />)}
+        <div className="grid overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.07)] md:grid-cols-3">
+          {contractorBenefits.map((point) => {
+            const Icon = point.icon;
+            return (
+              <article key={point.title} className="border-b border-slate-200 px-5 py-6 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0 sm:px-7">
+                <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-sky-50 text-[#0066cc]"><Icon className="h-5 w-5" aria-hidden="true" /></span>
+                <h3 className="mt-5 text-lg font-bold text-[#071126]">{point.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{point.body}</p>
+              </article>
+            );
+          })}
         </div>
-
-        <details className="group mt-3">
-          <summary className="mx-auto flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-[#0066cc] shadow-sm [&::-webkit-details-marker]:hidden">
-            <span className="group-open:hidden">More ways we help</span>
-            <span className="hidden group-open:inline">Show less</span>
-            <span className="text-lg font-light transition group-open:rotate-45" aria-hidden="true">+</span>
-          </summary>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            {conciergePoints.slice(4).map((point, index) => <ConciergePoint key={point.title} point={point} index={index + 4} />)}
-          </div>
-        </details>
-
-        <p className="pt-7 text-center text-sm font-semibold text-[#071126] sm:text-base">
-          Sourcing support for contractors, developers, design professionals, and property owners.
-        </p>
+        <div className="mt-5 flex flex-col items-start justify-between gap-4 rounded-[20px] bg-[#071126] px-5 py-5 text-white sm:flex-row sm:items-center sm:px-7">
+          <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-sky-300">One request. One coordinator.</p><p className="mt-1 text-lg font-semibold">Tell us what you need. We handle the rest.</p></div>
+          <Link href="/shop" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-5 text-sm font-bold text-[#071126]">Start your request <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+        </div>
       </section>
 
       <section className="px-3 sm:px-5" aria-labelledby="coverage-heading">
