@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto"
+import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
-import { createAdminClient } from "@/lib/supabase/admin"
+import { getSupabasePublicEnv } from "@/lib/supabase/env"
 
 function safeReferrerHost(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return null
@@ -32,11 +33,12 @@ export async function POST(request: Request) {
     if (!path.startsWith("/") || path.startsWith("/admin") || path.startsWith("/api") || sessionId.length < 12) return new NextResponse(null, { status: 204 })
     const userAgent = request.headers.get("user-agent") || ""
     const sessionHash = createHash("sha256").update(sessionId).digest("hex").slice(0, 32)
-    await createAdminClient().from("site_page_views").insert({
-      path,
-      referrer_host: safeReferrerHost(payload.referrer),
-      session_hash: sessionHash,
-      device_class: /android|iphone|ipad|mobile/i.test(userAgent) ? "mobile" : "desktop",
+    const { url, anonKey } = getSupabasePublicEnv()
+    await createClient(url, anonKey).rpc("record_site_page_view", {
+      p_path: path,
+      p_referrer_host: safeReferrerHost(payload.referrer),
+      p_session_hash: sessionHash,
+      p_device_class: /android|iphone|ipad|mobile/i.test(userAgent) ? "mobile" : "desktop",
     })
   } catch {
     // Analytics must never interrupt the customer experience.
