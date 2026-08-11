@@ -376,7 +376,38 @@ export async function sendClientRequestActionEmail(input: ClientRequestActionEma
 
 export async function sendProjectRequestNotificationEmail(input: ProjectRequestNotificationEmailInput): Promise<ProjectRequestNotificationEmailResult> {
   const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) return { owner: { status: "not_configured" }, client: { status: "not_configured" } }
+  const fallbackOrder = {
+    quoteId: input.requestId,
+    project: { name: input.projectName, address: input.projectAddress },
+    customer: {
+      email: input.clientEmail,
+      profile: { email: input.clientEmail, full_name: input.clientName, phone: input.clientPhone, company_name: null },
+    },
+    quoteItems: input.items.map((item) => ({
+      name: [item.name, ...item.details].join(" | "),
+      quantity: item.quantity,
+      unit: item.unit || "item",
+      unit_price: 0,
+      line_total: 0,
+    })),
+    cartDetails: [],
+    customLines: [],
+    subtotal: 0,
+    tax: 0,
+    total: 0,
+  }
+
+  if (!apiKey) {
+    const fallback = await sendWithSupabaseEmailFallback("send_order_notifications", {
+      order: fallbackOrder,
+      sendOwner: true,
+      sendClient: Boolean(input.clientEmail),
+    })
+    return {
+      owner: fallback.owner ?? fallback.result ?? { status: "not_configured" },
+      client: input.clientEmail ? fallback.client ?? fallback.result ?? { status: "not_configured" } : { status: "skipped" },
+    }
+  }
 
   const itemLines = input.items.flatMap((item) => [
     `${item.department}: ${item.name} - ${item.quantity} ${item.unit || "item"}`,
@@ -423,7 +454,11 @@ export async function sendProjectRequestNotificationEmail(input: ProjectRequestN
     idempotencyKey: `avantia-project-request-owner-${input.requestId}`,
   })
 
-  if (!input.clientEmail) return { owner, client: { status: "skipped" } }
+  if (!input.clientEmail) {
+    if (owner.status === "sent") return { owner, client: { status: "skipped" } }
+    const fallback = await sendWithSupabaseEmailFallback("send_order_notifications", { order: fallbackOrder, sendOwner: true, sendClient: false })
+    return { owner: fallback.owner ?? fallback.result ?? owner, client: { status: "skipped" } }
+  }
   const clientText = [
     `Hi ${input.clientName || "there"},`,
     "",
@@ -445,7 +480,16 @@ export async function sendProjectRequestNotificationEmail(input: ProjectRequestN
     replyTo: DEFAULT_TO,
     idempotencyKey: `avantia-project-request-client-${input.requestId}`,
   })
-  return { owner, client }
+  if (owner.status === "sent" && client.status === "sent") return { owner, client }
+  const fallback = await sendWithSupabaseEmailFallback("send_order_notifications", {
+    order: fallbackOrder,
+    sendOwner: owner.status !== "sent",
+    sendClient: client.status !== "sent",
+  })
+  return {
+    owner: owner.status === "sent" ? owner : fallback.owner ?? fallback.result ?? owner,
+    client: client.status === "sent" ? client : fallback.client ?? fallback.result ?? client,
+  }
 }
 
 export type QuoteIntakeEmailInput = {
