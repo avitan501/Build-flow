@@ -80,7 +80,7 @@ test("flooring uses the customer-facing name and framing uses its dedicated phot
   await expect(page.getByTestId("department-card").filter({ hasText: "Wood Floor" })).toHaveCount(0)
 
   const framingCard = page.getByTestId("department-card").filter({ hasText: "Framing" })
-  await expect(framingCard.locator('img[src*="framing-jobsite-v3.png"]')).toBeVisible()
+  await expect(framingCard.locator('img[src*="framing-jobsite-v3.webp"]')).toBeVisible()
 })
 
 test("retired departments are hidden and department symbols are visible", async ({ page }) => {
@@ -118,7 +118,6 @@ test("siding and roofing are separate departments with a complete request flow",
 
   await page.goto("/shop/siding")
   await expect(page.getByRole("heading", { name: "Siding", exact: true })).toBeVisible()
-  await expect(page.getByText("Upload blueprint or shopping list", { exact: true })).toBeVisible()
   const essentials = page.getByTestId("department-essentials").locator("article")
   await expect(essentials).toHaveCount(8)
   const positions = await essentials.locator("[role='img']").evaluateAll((elements) =>
@@ -127,7 +126,21 @@ test("siding and roofing are separate departments with a complete request flow",
   expect(new Set(positions).size).toBe(8)
   await expect(page.getByRole("heading", { name: "Available items" })).toHaveCount(0)
   await expect(page.getByText("Recommended next", { exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Start quick order" })).toHaveCount(0)
+  await page.getByText("Need Help With a Custom Siding Order?", { exact: true }).click()
   await expect(page.getByRole("heading", { name: "Place an order here" })).toBeVisible()
+  await expect(page.getByText("Attach blueprint or shopping list", { exact: true })).toBeVisible()
+
+  await page.goto("/shop/roofing")
+  await page.getByText("Need Help With a Custom Roofing Order?", { exact: true }).click()
+  await expect(page.getByRole("heading", { name: "Place an order here" })).toBeVisible()
+  await expect(page.getByText("Attach blueprint or shopping list", { exact: true })).toBeVisible()
+
+  await page.goto("/shop/window")
+  await expect(page.getByText("Upload your window schedule", { exact: true })).toHaveCount(0)
+  await page.getByText("Need Help With a Custom Window Order?", { exact: true }).click()
+  await expect(page.getByRole("heading", { name: "Place an order here" })).toBeVisible()
+  await expect(page.getByText("Attach blueprint or shopping list", { exact: true })).toBeVisible()
 })
 
 test("kitchen, tile, and drywall omit retired promotional and calculator cards", async ({ page }) => {

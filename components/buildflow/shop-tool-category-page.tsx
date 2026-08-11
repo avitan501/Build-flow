@@ -1,7 +1,5 @@
 import Image from "next/image"
-import Link from "next/link"
 
-import { uploadWindowScheduleAction } from "@/app/shop/window/actions"
 import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
 import { DepartmentEssentials } from "@/components/buildflow/department-essentials"
 import { DepartmentRequestComposer } from "@/components/buildflow/department-request-composer"
@@ -121,16 +119,6 @@ function CombinedUploadAction({ category, requestId, questionnaireDepartment }: 
   )
 }
 
-const windowUploadStatusMessages = {
-  "file-required": { tone: "error", text: "Choose a window schedule, blueprint, PDF, image, CSV, or Excel file." },
-  "file-too-large": { tone: "error", text: "File is too large. Keep it at 25 MB or below." },
-  "file-type-not-allowed": { tone: "error", text: "Allowed files: PDF, PNG, JPG, WEBP, CSV, XLS, or XLSX." },
-  "project-not-found": { tone: "error", text: "We could not confirm that project for your account." },
-  "storage-upload-failed": { tone: "error", text: "Upload failed before the file could be saved. Please try again." },
-  "metadata-insert-failed": { tone: "error", text: "Upload reached storage, but metadata could not be saved." },
-  "schedule-create-failed": { tone: "error", text: "The window schedule review could not be created." },
-} as const
-
 function EitanActions({
   projects,
   selectedProjectId,
@@ -147,7 +135,7 @@ function EitanActions({
       <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.08)]">
         <div className="relative min-h-[250px] bg-slate-900 sm:min-h-[330px]">
           <Image
-            src="/images/buildflow-retail/eitan-renovation.png"
+            src="/images/buildflow-retail/eitan-renovation.webp"
             alt="Residential renovation jobsite with window plans and materials"
             fill
             sizes="(min-width: 1024px) 58vw, 100vw"
@@ -172,84 +160,13 @@ function EitanActions({
   )
 }
 
-function WindowUploadActions({
-  projects,
-  selectedProjectId,
-  isSignedIn,
-  errorCode,
-  successCode,
-}: {
-  projects: ProjectRecord[]
-  selectedProjectId?: string
-  isSignedIn: boolean
-  errorCode?: string | null
-  successCode?: string | null
-}) {
-  const feedback =
-    (errorCode && windowUploadStatusMessages[errorCode as keyof typeof windowUploadStatusMessages]) ||
-    (successCode ? { tone: "success", text: "Window schedule uploaded." } : null)
-
-  return (
-    <section className="grid gap-3 sm:max-w-2xl sm:gap-4">
-      {feedback ? (
-        <div className={`rounded-[18px] border px-4 py-3 text-sm ${feedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-900"}`}>
-          {feedback.text}
-        </div>
-      ) : null}
-
-      <form action={uploadWindowScheduleAction} encType="multipart/form-data" className="grid gap-3 rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-        <div className="flex items-start justify-between gap-3">
-          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white">
-            <BlueprintIcon />
-          </span>
-          <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-700">
-            Sierra Pacific
-          </span>
-        </div>
-
-        <div>
-          <h2 className="text-base font-bold leading-5 text-slate-950">Upload your window schedule</h2>
-          <p className="mt-1 text-xs font-medium leading-4 text-slate-500">Blueprint, window schedule, takeoff, quote, PDF, photo, CSV, or Excel</p>
-        </div>
-
-        {isSignedIn ? (
-          projects.length > 0 ? (
-            <label className="grid gap-2 text-sm font-semibold text-slate-900">
-              <span>Project</span>
-              <select name="projectId" defaultValue={selectedProjectId || projects[0]?.id || ""} className="min-h-12 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900">
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <Link href="/projects/new" prefetch={false} className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 text-sm font-semibold text-sky-700">
-              Create project first
-            </Link>
-          )
-        ) : (
-          <Link href="/login" prefetch={false} className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-sky-200 bg-sky-50 px-4 text-sm font-semibold text-sky-700">
-            Sign in to upload
-          </Link>
-        )}
-
-        <input name="file" type="file" accept=".csv,.xls,.xlsx,.pdf,image/png,image/jpeg,image/webp" required disabled={!isSignedIn || projects.length === 0} className="block w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white disabled:opacity-60" />
-
-        <button type="submit" disabled={!isSignedIn || projects.length === 0} className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-55">
-          Extract window schedule
-        </button>
-      </form>
-    </section>
-  )
-}
-
-export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, successCode, questionnaireSnapshot }: ShopToolCategoryPageProps) {
+export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, questionnaireSnapshot }: ShopToolCategoryPageProps) {
   const essentials = getDepartmentEssentials(category.slug)
-  const usesStandardUpload = !["framing", "kitchen", "eitan", "window"].includes(category.slug)
+  const customOrderOnly = ["siding", "roofing", "window"].includes(category.slug)
+  const usesStandardUpload = !["framing", "kitchen", "eitan", "window", "siding", "roofing"].includes(category.slug)
   const usesEmbeddedQuickOrder = ["wood-floor", "sheet-rock", "tile-work", "door-and-molding", "framing", "electrical"].includes(category.slug)
   const composerHandlesUpload = usesEmbeddedQuickOrder
+  const usesCompactCustomOrder = usesEmbeddedQuickOrder || customOrderOnly
 
   return (
     <main className="min-h-screen bg-[#f7f8fa] px-4 py-4 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
@@ -257,22 +174,21 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
         <h1 className="text-[2rem] font-bold tracking-normal text-slate-950 sm:text-[2.4rem]">{category.label}</h1>
 
         {experience.showQuickOrder && usesEmbeddedQuickOrder && questionnaireSnapshot ? <EmbeddedMaterialQuickOrder snapshot={questionnaireSnapshot} category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} /> : null}
-        {experience.showQuickOrder && (!usesEmbeddedQuickOrder || !questionnaireSnapshot) ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
+        {experience.showQuickOrder && !customOrderOnly && (!usesEmbeddedQuickOrder || !questionnaireSnapshot) ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && usesStandardUpload && !composerHandlesUpload ? <CombinedUploadAction category={questionnaireDepartment} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && category.slug === "framing" ? <FramingUploadActions /> : null}
         {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}
         {experience.showPlanUpload && category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
-        {experience.showPlanUpload && category.slug === "window" ? <ManagerItemVisibility itemId="window-package"><WindowUploadActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} successCode={successCode} /></ManagerItemVisibility> : null}
 
         {!usesEmbeddedQuickOrder ? <DepartmentEssentials data={essentials} /> : null}
 
-        {experience.showChatToOrder && usesEmbeddedQuickOrder && questionnaireSnapshot ? (
+        {experience.showChatToOrder && usesCompactCustomOrder ? (
           <details className="group rounded-lg border border-slate-200 bg-white shadow-sm">
             <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left marker:content-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-sky-100">
               <span><span className="block text-base font-bold text-slate-950">Need Help With a Custom {category.label} Order?</span><span className="mt-0.5 block text-sm text-slate-500">Describe the request or attach a blueprint or shopping list.</span></span>
               <span aria-hidden="true" className="text-xl font-light text-slate-500 transition-transform group-open:rotate-45 motion-reduce:transition-none">+</span>
             </summary>
-            <div className="border-t border-slate-100 px-5 [&>section]:border-0"> <DepartmentRequestComposer category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} allowUpload={composerHandlesUpload && experience.showPlanUpload} /></div>
+            <div className="border-t border-slate-100 px-5 [&>section]:border-0"> <DepartmentRequestComposer category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} allowUpload={(composerHandlesUpload || customOrderOnly) && experience.showPlanUpload} /></div>
           </details>
         ) : experience.showChatToOrder ? <DepartmentRequestComposer category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} allowUpload={composerHandlesUpload && experience.showPlanUpload} /> : null}
       </section>
