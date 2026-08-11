@@ -11,11 +11,13 @@ export const MATERIAL_QUESTION_TYPES = [
   "gallons",
   "dropdown",
   "file_upload",
+  "item_list",
 ] as const
 
 export type MaterialQuestionType = (typeof MATERIAL_QUESTION_TYPES)[number]
 export type MaterialConditionalOperator = "equals" | "not_equals" | "includes_any" | "includes_all" | "is_answered"
-export type MaterialAnswerValue = string | number | string[] | { selected?: string | string[]; value?: number; unit?: string; notes?: string; other?: string; attachmentIds?: string[] } | null
+export type MaterialLineItem = { size: string; length: string; quantity: number }
+export type MaterialAnswerValue = string | number | string[] | { selected?: string | string[]; value?: number; unit?: string; notes?: string; other?: string; attachmentIds?: string[]; items?: MaterialLineItem[] } | null
 
 export type MaterialQuestionOption = {
   id: string
@@ -42,7 +44,7 @@ export type MaterialQuestion = {
   conditional_parent_question_id: string | null
   conditional_operator: MaterialConditionalOperator | null
   conditional_value: unknown
-  configuration: { units?: string[]; allowNotes?: boolean; maxFiles?: number }
+  configuration: { units?: string[]; allowNotes?: boolean; maxFiles?: number; itemSizes?: string[]; itemLengths?: string[] }
   options: MaterialQuestionOption[]
 }
 
@@ -116,6 +118,7 @@ export const MATERIAL_QUESTION_TYPE_LABELS: Record<MaterialQuestionType, string>
   gallons: "Gallons",
   dropdown: "Dropdown",
   file_upload: "File or plan upload",
+  item_list: "Repeatable item rows",
 }
 
 export function buildMaterialQuestionnaireSnapshot(category: MaterialQuestionnaireCategory): MaterialQuestionnaireSnapshot {
@@ -160,7 +163,7 @@ export function hasMaterialAnswer(value: MaterialAnswerValue) {
   if (value === null || value === undefined || value === "") return false
   if (Array.isArray(value)) return value.length > 0
   if (typeof value === "object") {
-    return Boolean(value.selected || value.value || value.unit || value.notes?.trim() || value.other?.trim() || value.attachmentIds?.length)
+    return Boolean(value.selected || value.value || value.unit || value.notes?.trim() || value.other?.trim() || value.attachmentIds?.length || value.items?.some((item) => item.size && item.length && item.quantity > 0))
   }
   return true
 }
@@ -178,6 +181,9 @@ export function hasCompleteMaterialAnswer(question: MaterialQuestion, value: Mat
   if (question.question_type === "quantity") {
     return Boolean(typeof value === "object" && value && !Array.isArray(value) && Number(value.value) > 0)
   }
+  if (question.question_type === "item_list") {
+    return Boolean(typeof value === "object" && value && !Array.isArray(value) && value.items?.length && value.items.every((item) => item.size && item.length && Number(item.quantity) > 0))
+  }
   return true
 }
 
@@ -193,6 +199,7 @@ export function formatMaterialAnswer(question: MaterialQuestion, value: Material
     const formattedValue = typeof value.value === "number" ? new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value.value) : value.value
     const parts = [selected, formattedValue, value.unit, value.other, value.notes].filter((entry) => entry !== undefined && entry !== "")
     if (value.attachmentIds?.length) parts.push(`${value.attachmentIds.length} file${value.attachmentIds.length === 1 ? "" : "s"}`)
+    if (value.items?.length) parts.push(value.items.map((item) => `${item.size} x ${item.length} - ${item.quantity}`).join("; "))
     return parts.join(" ")
   }
   if (typeof value === "string") {

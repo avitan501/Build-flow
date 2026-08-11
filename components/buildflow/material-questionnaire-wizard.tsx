@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, ChevronLeft, ChevronRight, FileUp, Pencil, X } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight, FileUp, Pencil, Plus, Trash2, X } from "lucide-react"
 import { useMemo, useState, useTransition } from "react"
 
 import {
@@ -36,6 +36,40 @@ function selectableValue(value: MaterialAnswerValue) {
 function withOther(value: MaterialAnswerValue, other: string): MaterialAnswerValue {
   const selected = selectableValue(value)
   return { selected: Array.isArray(selected) ? selected : typeof selected === "string" ? selected : undefined, other }
+}
+
+function LumberItemList({ question, value, onChange, disabled }: {
+  question: MaterialQuestion
+  value: MaterialAnswerValue
+  onChange: (value: MaterialAnswerValue) => void
+  disabled: boolean
+}) {
+  const storedItems = typeof value === "object" && value && !Array.isArray(value) ? value.items ?? [] : []
+  const items = storedItems.length ? storedItems : [{ size: "", length: "", quantity: 0 }]
+  const sizes = question.configuration.itemSizes ?? []
+  const lengths = question.configuration.itemLengths ?? []
+
+  function updateItem(index: number, field: "size" | "length" | "quantity", nextValue: string) {
+    const next = items.map((item, itemIndex) => itemIndex === index ? {
+      ...item,
+      [field]: field === "quantity" ? Math.max(0, Number(nextValue)) : nextValue,
+    } : item)
+    onChange({ items: next })
+  }
+
+  return (
+    <div className="grid gap-3">
+      {items.map((item, index) => (
+        <div key={index} className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_minmax(7rem,.7fr)_2.75rem] sm:items-end">
+          <label className="grid gap-1 text-xs font-semibold text-slate-600">Lumber size<select disabled={disabled} value={item.size} onChange={(event) => updateItem(index, "size", event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950"><option value="">Choose size</option>{sizes.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
+          <label className="grid gap-1 text-xs font-semibold text-slate-600">Length<select disabled={disabled} value={item.length} onChange={(event) => updateItem(index, "length", event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950"><option value="">Choose length</option>{lengths.map((length) => <option key={length} value={length}>{length}</option>)}</select></label>
+          <label className="grid gap-1 text-xs font-semibold text-slate-600">Quantity<input disabled={disabled} type="number" min="1" inputMode="numeric" value={item.quantity || ""} placeholder="0" onChange={(event) => updateItem(index, "quantity", event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
+          <button type="button" disabled={disabled || items.length === 1} onClick={() => onChange({ items: items.filter((_, itemIndex) => itemIndex !== index) })} className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-500 disabled:opacity-30" aria-label={`Remove lumber item ${index + 1}`}><Trash2 className="h-4 w-4" /></button>
+        </div>
+      ))}
+      <button type="button" disabled={disabled} onClick={() => onChange({ items: [...items, { size: "", length: "", quantity: 0 }] })} className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:border-slate-500"><Plus className="h-4 w-4" />Add Another Item</button>
+    </div>
+  )
 }
 
 function CardOptions({ question, value, onChange, disabled, compact = false }: { question: MaterialQuestion; value: MaterialAnswerValue; onChange: (value: MaterialAnswerValue, autoAdvance?: boolean) => void; disabled: boolean; compact?: boolean }) {
@@ -101,6 +135,9 @@ function QuestionControl({ question, value, onChange, disabled, onUpload, compac
   if (["single_select", "multi_select", "yes_no"].includes(question.question_type)) {
     return <CardOptions question={question} value={value} onChange={onChange} disabled={disabled} compact={compact} />
   }
+  if (question.question_type === "item_list") {
+    return <LumberItemList question={question} value={value} onChange={onChange} disabled={disabled} />
+  }
   if (question.question_type === "dropdown") {
     return <select id={controlId} name={question.question_key} aria-label={question.label} disabled={disabled} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} className="min-h-13 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"><option value="">Choose one</option>{question.options.map((option) => <option key={option.id} value={option.value}>{option.label}</option>)}</select>
   }
@@ -122,17 +159,22 @@ function QuestionControl({ question, value, onChange, disabled, onUpload, compac
 
 function configuratorGroupsFor(snapshot: MaterialQuestionnaireSnapshot) {
   const isDrywall = snapshot.category.slug.includes("sheetrock") || snapshot.category.slug.includes("drywall")
+  const isTile = snapshot.category.department_key === "Tile work"
+  const isDoor = snapshot.category.department_key === "Door and molding"
+  const isFraming = snapshot.category.department_key === "Framing"
   return [
-    { id: "material", title: "Material", description: isDrywall ? "Choose the board and performance type." : "Choose the flooring construction and appearance." },
-    { id: "size", title: "Size & Quantity", description: isDrywall ? "Set sheet dimensions, thickness, and quantity." : "Set the dimensions and the amount required." },
-    { id: "extras", title: "Accessories", description: isDrywall ? "Include screws, compound, and corner bead." : "Include the supporting materials needed on site." },
+    { id: "material", title: isDoor ? "Order Type" : "Material", description: isDrywall ? "Choose the board and performance type." : isTile ? "Choose the tile-setting materials." : isDoor ? "Choose molding, doors, or both." : isFraming ? "Build a lumber list for this project." : "Choose the flooring construction and appearance." },
+    { id: "size", title: "Size & Quantity", description: isDrywall ? "Set sheet dimensions, thickness, and quantity." : isTile ? "Enter the amount needed for each selected material." : isDoor ? "Add profile, length, door, and measurement details." : isFraming ? "Choose a common size and length for every lumber line." : "Set the dimensions and the amount required." },
+    { id: "extras", title: isDoor ? "Reference & Notes" : "Accessories", description: isDrywall ? "Include screws, compound, and corner bead." : isTile ? "Include underlayment and common installation supplies." : isDoor ? "Add catalog references and jobsite notes." : isFraming ? "Add any grade, treatment, or delivery requirements." : "Include the supporting materials needed on site." },
   ] as const
 }
 
 function configuratorGroupFor(question: MaterialQuestion) {
   const key = question.question_key.toLowerCase()
-  if (/(accessor|underlay|adhesive|glue|paper|nosing|transition|waste|bullnose|screw|compound|corner|bead)/.test(key)) return "extras"
-  if (/(width|length|area|square|quantity|amount|count|size|thickness)/.test(key)) return "size"
+  if (key === "lumber_items") return "material"
+  if (key === "lumber_grade") return "extras"
+  if (/(accessor|underlay|adhesive|glue|paper|nosing|transition|waste|bullnose|screw|compound|corner|bead|reference|catalog|note|spacer|waterproof|primer|sealant)/.test(key)) return "extras"
+  if (/(width|length|area|square|quantity|amount|count|size|thickness|sand|cement|mesh|measurement|door_type)/.test(key)) return "size"
   return "material"
 }
 

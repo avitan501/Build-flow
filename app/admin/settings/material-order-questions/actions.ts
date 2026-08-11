@@ -144,6 +144,8 @@ export async function updateMaterialQuestionAction(input: {
   conditionalOperator: MaterialConditionalOperator | ""
   conditionalValue: string
   quantityUnits: string
+  itemSizes: string
+  itemLengths: string
   allowNotes: boolean
 }): Promise<AdminResult> {
   const { supabase } = await requireAdminProfile()
@@ -154,6 +156,10 @@ export async function updateMaterialQuestionAction(input: {
   if (parentId === input.id) return { ok: false, error: "A question cannot depend on itself." }
   const configuration = {
     ...(input.questionType === "quantity" ? { units: input.quantityUnits.split(",").map((unit) => unit.trim()).filter(Boolean).slice(0, 12) } : {}),
+    ...(input.questionType === "item_list" ? {
+      itemSizes: input.itemSizes.split(",").map((entry) => entry.trim()).filter(Boolean).slice(0, 30),
+      itemLengths: input.itemLengths.split(",").map((entry) => entry.trim()).filter(Boolean).slice(0, 30),
+    } : {}),
     ...(input.allowNotes ? { allowNotes: true } : {}),
   }
   const { error } = await supabase.from("material_questions").update({

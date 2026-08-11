@@ -2,6 +2,9 @@ import type { MaterialQuestion, MaterialQuestionnaireSnapshot } from "@/lib/mate
 
 const CATEGORY_ID = "flooring-preview-category"
 const DRYWALL_CATEGORY_ID = "drywall-preview-category"
+const TILE_CATEGORY_ID = "tile-preview-category"
+const DOOR_CATEGORY_ID = "door-molding-preview-category"
+const FRAMING_CATEGORY_ID = "framing-preview-category"
 
 function options(questionId: string, entries: Array<[string, string]>) {
   return entries.map(([label, value], index) => ({
@@ -168,5 +171,56 @@ export const DRYWALL_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
     drywallQuestion({ id: "corner-bead-length", question_key: "corner_bead_length", label: "What length of corner bead do you need?", question_type: "linear_feet", unit: "linear ft.", sort_order: 200, conditional_parent_question_id: "needs-corner-bead", conditional_operator: "equals", conditional_value: "yes" }),
     drywallQuestion({ id: "corner-bead-pieces", question_key: "corner_bead_pieces", label: "How many pieces do you need?", question_type: "number", unit: "pieces", sort_order: 210, conditional_parent_question_id: "needs-corner-bead", conditional_operator: "equals", conditional_value: "yes" }),
     drywallQuestion({ id: "drywall-notes", question_key: "drywall_notes", label: "Do you have any specific requirements or notes?", question_type: "long_text", placeholder: "Add delivery, matching, or packaging details.", sort_order: 220 }),
+  ],
+}
+
+function tileQuestion(input: Partial<MaterialQuestion> & Pick<MaterialQuestion, "id" | "question_key" | "label" | "question_type" | "sort_order">) {
+  return question({ category_id: TILE_CATEGORY_ID, ...input })
+}
+
+export const TILE_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
+  category: { id: TILE_CATEGORY_ID, name: "Tile Quick Order", slug: "tile-quick-order-preview", department_key: "Tile work", description: "Configure tile-setting materials and jobsite accessories.", current_version: 1 },
+  questions: [
+    tileQuestion({ id: "thinset-type", question_key: "thinset_type", label: "What thinset do you need?", question_type: "single_select", is_required: true, sort_order: 10, options: options("thinset-type", [["MAPEI Ultraflex", "mapei-ultraflex"]]) }),
+    tileQuestion({ id: "thinset-quantity", question_key: "thinset_quantity", label: "How many bags of thinset do you need?", question_type: "number", unit: "50 lb. bags", placeholder: "Enter bags", is_required: true, sort_order: 20 }),
+    tileQuestion({ id: "fine-sand", question_key: "fine_sand_yards", label: "How much fine sand do you need?", question_type: "number", unit: "cu. yd.", placeholder: "Enter yards", sort_order: 30 }),
+    tileQuestion({ id: "portland-cement", question_key: "portland_cement_quantity", label: "How many bags of Portland cement do you need?", question_type: "number", unit: "50 lb. bags", placeholder: "Enter bags", sort_order: 40 }),
+    tileQuestion({ id: "wire-mesh", question_key: "wire_mesh_area", label: "How much tile wire mesh do you need?", question_type: "square_feet", unit: "sq. ft.", placeholder: "Enter square footage", sort_order: 50 }),
+    tileQuestion({ id: "tile-underlayment", question_key: "tile_underlayment", label: "What tile underlayment should we include?", question_type: "multi_select", sort_order: 60, options: options("tile-underlayment", [["Cement backer board", "cement-backer-board"], ["Uncoupling membrane", "uncoupling-membrane"], ["Waterproofing membrane", "waterproofing-membrane"], ["Self-leveling underlayment", "self-leveling-underlayment"], ["Not sure", "not-sure"]]) }),
+    tileQuestion({ id: "tile-accessories", question_key: "tile_accessories", label: "What other setting materials should we include?", help_text: "Select every item that applies.", question_type: "multi_select", sort_order: 70, options: options("tile-accessories", [["Grout", "grout"], ["Tile spacers", "tile-spacers"], ["Leveling clips", "leveling-clips"], ["Waterproofing", "waterproofing"], ["Primer", "primer"], ["Matching silicone / caulk", "matching-sealant"]]) }),
+    tileQuestion({ id: "tile-notes", question_key: "tile_notes", label: "Any tile, grout color, or delivery notes?", question_type: "long_text", placeholder: "Add tile size, grout color, floor condition, or delivery details.", sort_order: 80 }),
+  ],
+}
+
+function doorQuestion(input: Partial<MaterialQuestion> & Pick<MaterialQuestion, "id" | "question_key" | "label" | "question_type" | "sort_order">) {
+  return question({ category_id: DOOR_CATEGORY_ID, ...input })
+}
+
+export const DOOR_MOLDING_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
+  category: { id: DOOR_CATEGORY_ID, name: "Door & Molding Quick Order", slug: "door-molding-quick-order-preview", department_key: "Door and molding", description: "Configure molding profiles and door requirements.", current_version: 1 },
+  questions: [
+    doorQuestion({ id: "door-request-type", question_key: "request_type", label: "What are you ordering?", question_type: "multi_select", is_required: true, sort_order: 10, options: options("door-request-type", [["Molding", "molding"], ["Door", "door"]]) }),
+    doorQuestion({ id: "molding-type", question_key: "molding_type", label: "What type of molding do you need?", question_type: "single_select", sort_order: 20, allow_other: true, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["molding"], options: options("molding-type", [["Crown molding", "crown"], ["Baseboard", "baseboard"], ["Casing", "casing"], ["Chair rail", "chair-rail"], ["Panel molding", "panel-molding"], ["Shoe / quarter round", "shoe-quarter-round"], ["Other", "other"]]) }),
+    doorQuestion({ id: "molding-quantity", question_key: "molding_quantity", label: "How many pieces of molding do you need?", question_type: "number", unit: "pieces", placeholder: "Enter pieces", sort_order: 30, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["molding"] }),
+    doorQuestion({ id: "molding-length", question_key: "molding_length", label: "What molding length do you need?", question_type: "single_select", sort_order: 40, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["molding"], options: options("molding-length", [["8 ft.", "8-ft"], ["10 ft.", "10-ft"], ["12 ft.", "12-ft"], ["14 ft.", "14-ft"], ["16 ft.", "16-ft"], ["Random lengths", "random-lengths"], ["Not sure", "not-sure"]]) }),
+    doorQuestion({ id: "molding-catalog-reference", question_key: "molding_catalog_reference", label: "Garden State profile code or catalog link", help_text: "Enter the profile number or paste the molding page link.", question_type: "short_text", placeholder: "Example: WM 366 or catalog link", sort_order: 50, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["molding"] }),
+    doorQuestion({ id: "door-type", question_key: "door_type", label: "What type of door do you need?", question_type: "single_select", sort_order: 60, allow_other: true, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["door"], options: options("door-type", [["Interior prehung", "interior-prehung"], ["Interior slab", "interior-slab"], ["Exterior prehung", "exterior-prehung"], ["Exterior slab", "exterior-slab"], ["Other", "other"], ["Not sure", "not-sure"]]) }),
+    doorQuestion({ id: "door-quantity", question_key: "door_quantity", label: "How many doors do you need?", question_type: "number", unit: "doors", placeholder: "Enter quantity", sort_order: 70, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["door"] }),
+    doorQuestion({ id: "door-measurement-method", question_key: "door_measurement_method", label: "How should we confirm the door measurements?", question_type: "single_select", sort_order: 80, conditional_parent_question_id: "door-request-type", conditional_operator: "includes_any", conditional_value: ["door"], options: options("door-measurement-method", [["I have the measurements", "have-measurements"], ["Call me to arrange a jobsite measurement", "jobsite-measurement"]]) }),
+    doorQuestion({ id: "door-measurements", question_key: "door_measurements", label: "Enter the door measurements", help_text: "Include width, height, jamb depth, swing, and handing if known.", question_type: "long_text", placeholder: "Example: 36 in. x 80 in., 4 9/16 in. jamb, left-hand inswing", sort_order: 90, conditional_parent_question_id: "door-measurement-method", conditional_operator: "equals", conditional_value: "have-measurements" }),
+    doorQuestion({ id: "door-molding-notes", question_key: "order_notes", label: "Any matching, finish, or delivery notes?", question_type: "long_text", placeholder: "Add species, paint grade, finish, matching, or delivery details.", sort_order: 100 }),
+  ],
+}
+
+function framingQuestion(input: Partial<MaterialQuestion> & Pick<MaterialQuestion, "id" | "question_key" | "label" | "question_type" | "sort_order">) {
+  return question({ category_id: FRAMING_CATEGORY_ID, ...input })
+}
+
+export const FRAMING_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
+  category: { id: FRAMING_CATEGORY_ID, name: "Framing Lumber Quick Order", slug: "framing-lumber-quick-order-preview", department_key: "Framing", description: "Build a repeatable lumber list with common sizes and lengths.", current_version: 1 },
+  questions: [
+    framingQuestion({ id: "lumber-items", question_key: "lumber_items", label: "Add the lumber you need", help_text: "Use one row for each size and length. Add as many rows as needed.", question_type: "item_list", is_required: true, sort_order: 10, configuration: { itemSizes: ["1x2", "1x3", "1x4", "1x6", "1x8", "1x10", "1x12", "2x3", "2x4", "2x6", "2x8", "2x10", "2x12", "3x4", "4x4", "4x6", "6x6"], itemLengths: ["8 ft.", "10 ft.", "12 ft.", "14 ft.", "16 ft.", "18 ft.", "20 ft.", "24 ft."] } }),
+    framingQuestion({ id: "lumber-grade", question_key: "lumber_grade", label: "What lumber grade or treatment do you need?", question_type: "single_select", sort_order: 20, allow_other: true, options: options("lumber-grade", [["Standard framing lumber", "standard-framing"], ["Pressure treated", "pressure-treated"], ["Douglas Fir", "douglas-fir"], ["Select Structural", "select-structural"], ["Other", "other"], ["Not sure", "not-sure"]]) }),
+    framingQuestion({ id: "framing-notes", question_key: "framing_notes", label: "Any plywood, hardware, grade, or delivery notes?", question_type: "long_text", placeholder: "Add plywood, LVL, hangers, fasteners, treatment, or delivery details.", sort_order: 30 }),
   ],
 }

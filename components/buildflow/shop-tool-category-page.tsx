@@ -248,7 +248,7 @@ function WindowUploadActions({
 export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, successCode, questionnaireSnapshot }: ShopToolCategoryPageProps) {
   const essentials = getDepartmentEssentials(category.slug)
   const usesStandardUpload = !["framing", "kitchen", "eitan", "window"].includes(category.slug)
-  const usesEmbeddedQuickOrder = ["wood-floor", "sheet-rock"].includes(category.slug)
+  const usesEmbeddedQuickOrder = ["wood-floor", "sheet-rock", "tile-work", "door-and-molding", "framing"].includes(category.slug)
   const composerHandlesUpload = usesEmbeddedQuickOrder
 
   return (

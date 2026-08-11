@@ -215,6 +215,55 @@ test("sheetrock uses the compact on-page contractor configurator", async ({ page
   expect(widths.scrollWidth).toBe(widths.clientWidth)
 })
 
+test("tile uses an on-page materials configurator", async ({ page }) => {
+  await page.goto("/shop/tile-work")
+
+  await expect(page.getByRole("heading", { name: "Tile Quick Order" })).toBeVisible()
+  await expect(page.getByTestId("flooring-group-material").getByText("MAPEI Ultraflex", { exact: true })).toBeVisible()
+  await expect(page.getByLabel("How many bags of thinset do you need?")).toBeVisible()
+  await expect(page.getByLabel("How much fine sand do you need?")).toBeVisible()
+  await expect(page.getByLabel("How many bags of Portland cement do you need?")).toBeVisible()
+  await expect(page.getByLabel("How much tile wire mesh do you need?")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Cement backer board" })).toBeVisible()
+  await page.getByLabel("How many bags of thinset do you need?").fill("12")
+
+  const summary = (page.viewportSize()?.width ?? 0) >= 1024
+    ? page.getByTestId("flooring-order-summary")
+    : page.getByTestId("flooring-mobile-summary")
+  await expect(summary).toContainText("12")
+})
+
+test("door and molding reveals the matching order fields", async ({ page }) => {
+  await page.goto("/shop/door-and-molding")
+
+  await expect(page.getByRole("heading", { name: "Door & Molding Quick Order" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Molding Catalog" })).toHaveAttribute("href", "https://www.gardenstatelumber.com/products-programs/moulding/")
+  await page.getByRole("button", { name: "Molding" }).click()
+  await expect(page.getByText("Garden State profile code or catalog link", { exact: true })).toBeVisible()
+  await expect(page.getByText("What molding length do you need?", { exact: true })).toBeVisible()
+
+  await page.getByRole("button", { name: "Door", exact: true }).click()
+  await expect(page.getByRole("button", { name: "Call me to arrange a jobsite measurement" })).toBeVisible()
+  await page.getByRole("button", { name: "I have the measurements" }).click()
+  await expect(page.getByLabel("Enter the door measurements")).toBeVisible()
+})
+
+test("framing supports repeatable lumber order rows", async ({ page }) => {
+  await page.goto("/shop/framing")
+
+  await expect(page.getByRole("heading", { name: "Framing Lumber Quick Order" })).toBeVisible()
+  await expect(page.getByLabel("Lumber size")).toHaveCount(1)
+  await page.getByLabel("Lumber size").selectOption("2x4")
+  await page.getByLabel("Length").selectOption("12 ft.")
+  await page.getByLabel("Quantity").fill("40")
+  await page.getByRole("button", { name: "Add Another Item" }).click()
+  await expect(page.getByLabel("Lumber size")).toHaveCount(2)
+  await expect(page.getByRole("button", { name: "Remove lumber item 2" })).toBeEnabled()
+
+  const widths = await page.evaluate(() => ({ clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }))
+  expect(widths.scrollWidth).toBe(widths.clientWidth)
+})
+
 test("flooring review identifies the first required missing answer", async ({ page }) => {
   await page.goto("/shop/wood-floor")
 

@@ -6,7 +6,7 @@ import { applyDepartmentAddOns, createEmptyManagerAddOns, departmentExperienceFo
 import type { ProjectRecord } from "@/lib/projects"
 import { findShopToolCategory, type ShopToolSlug } from "@/lib/shop-tools"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { DRYWALL_QUESTIONNAIRE_PREVIEW, FLOORING_QUESTIONNAIRE_PREVIEW } from "@/lib/material-questionnaire-preview"
+import { DOOR_MOLDING_QUESTIONNAIRE_PREVIEW, DRYWALL_QUESTIONNAIRE_PREVIEW, FLOORING_QUESTIONNAIRE_PREVIEW, FRAMING_QUESTIONNAIRE_PREVIEW, TILE_QUESTIONNAIRE_PREVIEW } from "@/lib/material-questionnaire-preview"
 import { buildMaterialQuestionnaireSnapshot } from "@/lib/material-questionnaires"
 import { loadMaterialQuestionnaireForDepartment } from "@/lib/material-questionnaires-server"
 import type { PublicWorkflowState } from "@/lib/workflow-public"
@@ -82,6 +82,12 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
       ? FLOORING_QUESTIONNAIRE_PREVIEW
       : baseCategory.slug === "sheet-rock"
         ? DRYWALL_QUESTIONNAIRE_PREVIEW
+        : baseCategory.slug === "tile-work"
+          ? TILE_QUESTIONNAIRE_PREVIEW
+          : baseCategory.slug === "door-and-molding"
+            ? DOOR_MOLDING_QUESTIONNAIRE_PREVIEW
+            : baseCategory.slug === "framing"
+              ? FRAMING_QUESTIONNAIRE_PREVIEW
         : projectSession.questionnaireSnapshot
     : projectSession.questionnaireSnapshot
 

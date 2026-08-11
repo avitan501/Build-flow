@@ -1,6 +1,6 @@
 "use client"
 
-import { CheckCircle2, Pencil } from "lucide-react"
+import { CheckCircle2, ExternalLink, FileImage, Pencil, X } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
@@ -24,6 +24,8 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
   const [draftAnswers, setDraftAnswers] = useState<Record<string, MaterialAnswerValue>>({})
   const [completedAnswers, setCompletedAnswers] = useState<Record<string, MaterialAnswerValue> | null>(null)
   const [hydrated, setHydrated] = useState(false)
+  const [referenceFile, setReferenceFile] = useState<File | null>(null)
+  const allowsReferencePhoto = category === "Door and molding"
 
   useEffect(() => {
     let parsed: StoredDraft | null = null
@@ -74,11 +76,13 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
                 product={{ id: `${requestId}-quick-order`, name: `${displayCategory} Quick Order`, category, productType: "service", price: 0, unit: "Request" }}
                 questionnaireDepartment={category}
                 materialAnswers={answersForProject(completedAnswers)}
+                file={referenceFile}
                 label="Choose Project"
                 onAdded={() => window.sessionStorage.removeItem(`${MATERIAL_DRAFT_KEY}:${requestId}`)}
               />
               <button type="button" onClick={() => { setCompletedAnswers(null); storeDraft(completedAnswers, false) }} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:border-slate-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"><Pencil className="h-4 w-4" aria-hidden="true" />Edit Selections</button>
             </div>
+            {referenceFile ? <p className="mt-3 text-sm font-semibold text-slate-600">Reference attached: {referenceFile.name}</p> : null}
           </div>
           <div className="border-t border-emerald-100 bg-emerald-50/60 p-5 lg:border-l lg:border-t-0">
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-800">Order Summary</p>
@@ -96,7 +100,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <MaterialQuestionnaireWizard
         snapshot={snapshot}
         initialAnswers={draftAnswers}
@@ -112,6 +116,13 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
           return { ok: true }
         }}
       />
+      {allowsReferencePhoto ? <div className="grid gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
+        <div><p className="text-sm font-bold text-slate-950">Molding or door reference</p><p className="mt-1 text-xs leading-5 text-slate-500">Attach one photo, or enter a profile code in the questions above.</p></div>
+        <div className="flex flex-wrap items-center gap-2">
+          <a href="https://www.gardenstatelumber.com/products-programs/moulding/" target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700">Molding Catalog<ExternalLink className="h-4 w-4" /></a>
+          {referenceFile ? <button type="button" onClick={() => setReferenceFile(null)} className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"><span className="max-w-48 truncate">{referenceFile.name}</span><X className="h-4 w-4" /></button> : <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white"><FileImage className="h-4 w-4" />Add Photo<input type="file" accept="image/png,image/jpeg,image/webp,.pdf" className="sr-only" onChange={(event) => setReferenceFile(event.target.files?.[0] ?? null)} /></label>}
+        </div>
+      </div> : null}
     </section>
   )
 }
