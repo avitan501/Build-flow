@@ -16,7 +16,7 @@ export function AvantiaBuildLockup({ compact = false, showSlogan = false, classN
         width={1400}
         height={450}
         unoptimized
-        className={`${compact ? "w-[8.75rem] sm:w-[9.5rem]" : "w-[12rem] sm:w-[13.5rem]"} h-auto select-none object-contain [image-rendering:auto]`}
+        className={`${compact ? "w-[10rem] sm:w-[11rem]" : "w-[14rem] sm:w-[15.5rem]"} h-auto select-none object-contain [image-rendering:auto]`}
       />
       {showSlogan ? (
         <span className="mt-1 block truncate text-[0.65rem] font-medium normal-case tracking-normal text-slate-500">
