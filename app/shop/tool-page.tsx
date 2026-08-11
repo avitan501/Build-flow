@@ -63,7 +63,7 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
   const projects = projectSession.projects
   const selectedProjectId = projects.some((project) => project.id === params.project) ? params.project : ""
   const selectedAddress = selectedProjectId ? "" : params.address?.trim() || ""
-  const questionnaireSnapshot = process.env.VERCEL_ENV === "preview" && baseCategory.slug === "wood-floor"
+  const questionnaireSnapshot = process.env.VERCEL_ENV !== "production" && baseCategory.slug === "wood-floor"
     ? FLOORING_QUESTIONNAIRE_PREVIEW
     : projectSession.questionnaireSnapshot
 

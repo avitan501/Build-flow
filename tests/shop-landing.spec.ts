@@ -141,21 +141,58 @@ test("kitchen, tile, and drywall omit retired promotional and calculator cards",
   await expect(page.getByText("Drywall calculator", { exact: true })).toHaveCount(0)
 })
 
-test("flooring keeps quick order first and merges plan upload into the order request", async ({ page }) => {
+test("flooring uses a compact contractor configurator with a live summary", async ({ page }) => {
   await page.goto("/shop/wood-floor")
 
-  const quickOrder = page.getByText("Choose materials", { exact: true }).locator("..")
-  const orderRequest = page.getByRole("heading", { name: "Place an order here" })
-
-  await expect(page.getByRole("button", { name: /Start quick order/ })).toBeVisible()
-  await expect(page.getByText("Attach blueprint or shopping list", { exact: true })).toBeVisible()
+  await expect(page.getByText("Choose materials", { exact: true })).toHaveCount(0)
+  await expect(page.getByText("Answer a few quick questions", { exact: true })).toHaveCount(0)
+  await expect(page.getByTestId("flooring-group-material")).toBeVisible()
+  await expect(page.getByTestId("flooring-group-size")).toBeVisible()
+  await expect(page.getByTestId("flooring-group-extras")).toBeVisible()
   await expect(page.getByText("Wood floor calculator", { exact: true })).toHaveCount(0)
 
-  const positions = await Promise.all([
-    quickOrder.evaluate((element) => element.getBoundingClientRect().top),
-    orderRequest.evaluate((element) => element.getBoundingClientRect().top),
-  ])
-  expect(positions[0]).toBeLessThan(positions[1])
+  const redOak = page.getByRole("button", { name: "Red Oak" })
+  await redOak.click()
+  await expect(redOak).toHaveAttribute("aria-pressed", "true")
+  await page.getByRole("button", { name: "5″" }).click()
+  await page.getByLabel("How much flooring do you need?").fill("1200")
+  await page.getByRole("button", { name: "Flooring underlayment" }).click()
+
+  if ((page.viewportSize()?.width ?? 0) >= 1024) {
+    await expect(page.getByTestId("flooring-order-summary")).toContainText("1,200 sq. ft.")
+  } else {
+    await expect(page.getByTestId("flooring-mobile-summary")).toContainText("1,200 sq. ft.")
+  }
+
+  await page.reload()
+  await expect(page.getByRole("button", { name: "Red Oak" })).toHaveAttribute("aria-pressed", "true")
+  await expect(page.getByLabel("How much flooring do you need?")).toHaveValue("1200")
+
+  const restoredReview = (page.viewportSize()?.width ?? 0) >= 1024
+    ? page.getByTestId("flooring-order-summary").getByRole("button", { name: "Review Request" })
+    : page.getByTestId("flooring-mobile-summary").getByRole("button", { name: "Review" })
+  await restoredReview.click()
+  await expect(page.getByRole("heading", { name: "Review Your Request" })).toBeVisible()
+  await page.getByRole("button", { name: "Choose Project", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "Choose the Project for This Flooring Request" })).toBeVisible()
+
+  const widths = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }))
+  expect(widths.scrollWidth).toBe(widths.clientWidth)
+})
+
+test("flooring review identifies the first required missing answer", async ({ page }) => {
+  await page.goto("/shop/wood-floor")
+
+  const review = (page.viewportSize()?.width ?? 0) >= 1024
+    ? page.getByTestId("flooring-order-summary").getByRole("button", { name: "Review Request" })
+    : page.getByTestId("flooring-mobile-summary").getByRole("button", { name: "Review" })
+  await review.click()
+
+  await expect(page.getByText("Please answer: What wood species do you need?")).toBeVisible()
+  await expect(page.locator("#question-wood-type").getByText("This field is required.")).toBeVisible()
 })
 
 test("shop shows the sourcing brands and direct help actions", async ({ page }) => {
