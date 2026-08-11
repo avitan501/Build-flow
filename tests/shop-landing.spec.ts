@@ -101,7 +101,7 @@ test("retired departments are hidden and category photos stay clean", async ({ p
     border: getComputedStyle(element).borderWidth,
     shadow: getComputedStyle(element).boxShadow,
   }))
-  expect(cardStyle.background).toBe("rgba(0, 0, 0, 0)")
+  expect(["rgba(0, 0, 0, 0)", "oklab(0 0 0 / 0)"]).toContain(cardStyle.background)
   expect(cardStyle.border).toBe("0px")
   expect(cardStyle.shadow).toBe("none")
 })
@@ -244,8 +244,14 @@ test("flooring uses a compact contractor configurator with a live summary", asyn
     : page.getByTestId("flooring-mobile-summary").getByRole("button", { name: "Review" })
   await restoredReview.click()
   await expect(page.getByRole("heading", { name: "Review Your Request" })).toBeVisible()
-  await page.getByRole("button", { name: "Choose Project", exact: true }).click()
-  await expect(page.getByRole("heading", { name: "Choose the Project for This Flooring Request" })).toBeVisible()
+  await expect(page.getByText("Not answered", { exact: true })).toHaveCount(0)
+  await page.getByRole("button", { name: "Confirm Request", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "Confirm This Flooring Request" })).toBeVisible()
+  await page.getByRole("button", { name: /^Confirm Request:/ }).click()
+  await expect(page.getByRole("heading", { name: "Save and continue your request" })).toBeVisible()
+  const continueDialog = page.getByRole("dialog")
+  await expect(continueDialog.getByRole("link", { name: "Log in", exact: true })).toBeVisible()
+  await expect(continueDialog.getByRole("link", { name: "Create account", exact: true })).toBeVisible()
 
   const widths = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,

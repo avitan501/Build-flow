@@ -359,6 +359,12 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
   }
 
   const summaryRows = answeredQuestions
+  const reviewQuestionGroups = questionGroups
+    .map((group) => ({
+      ...group,
+      questions: group.questions.filter((question) => hasMaterialAnswer(answerForQuestion(question, answers))),
+    }))
+    .filter((group) => group.questions.length > 0)
 
   const content = (
     <section className={`${embedded ? "w-full" : "max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-[24px] border border-white/70 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.32)]"}`} aria-label={`${snapshot.category.name} material questions`}>
@@ -384,13 +390,13 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
           <div className={configurator ? "px-4 py-5 sm:px-6" : ""}>
             <div className="mb-5"><h3 className="text-xl font-bold text-slate-950">Review Your Request</h3><p className="mt-1 text-sm text-slate-600">Check the details before choosing a project.</p></div>
             <div className="grid gap-5">
-              {questionGroups.map((group) => (
+              {reviewQuestionGroups.map((group) => (
                 <section key={group.id}>
                   <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{group.title}</h4>
                   <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
                     {group.questions.map((question) => {
                       const index = visibleQuestions.findIndex((entry) => entry.id === question.id)
-                      return <button key={question.id} type="button" onClick={() => editQuestion(question, index)} className="flex min-h-14 w-full items-start justify-between gap-4 border-b border-slate-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-400"><span className="min-w-0"><span className="block text-xs font-semibold text-slate-500">{question.label}</span><span className="mt-0.5 block break-words text-sm font-bold text-slate-950">{formatMaterialAnswer(question, answerForQuestion(question, answers)) || "Not answered"}</span></span><Pencil className="mt-1 h-4 w-4 shrink-0 text-[#0071e3]" aria-hidden="true" /></button>
+                      return <button key={question.id} type="button" onClick={() => editQuestion(question, index)} className="flex min-h-14 w-full items-start justify-between gap-4 border-b border-slate-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-400"><span className="min-w-0"><span className="block text-xs font-semibold text-slate-500">{question.label}</span><span className="mt-0.5 block break-words text-sm font-bold text-slate-950">{formatMaterialAnswer(question, answerForQuestion(question, answers))}</span></span><Pencil className="mt-1 h-4 w-4 shrink-0 text-[#0071e3]" aria-hidden="true" /></button>
                     })}
                   </div>
                 </section>
@@ -434,7 +440,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
         {!configurator && error ? <div aria-live="polite" className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</div> : null}
       </div>
 
-      {!locked && (!configurator || reviewing) ? <footer className="grid gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:grid-cols-[auto_1fr_auto] sm:px-7"><button type="button" onClick={() => reviewing ? setReviewing(false) : setStep((value) => Math.max(0, value - 1))} disabled={!reviewing && (showAllQuestions || step === 0)} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 disabled:opacity-40"><ChevronLeft className="h-4 w-4" aria-hidden="true" />Back</button>{onSave && !requireCompletion ? <button type="button" disabled={isPending} onClick={() => save(false)} className="min-h-11 rounded-lg px-4 text-sm font-semibold text-slate-600 hover:bg-white">Save for Later</button> : <span />}{reviewing ? <button type="button" disabled={isPending} onClick={() => save(true)} className="min-h-11 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-50">{isPending ? "Saving…" : configurator ? "Choose Project" : "Save Request Details"}</button> : showAllQuestions ? <button type="button" onClick={reviewAll} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white">Review Answers<ChevronRight className="h-4 w-4" aria-hidden="true" /></button> : <button type="button" onClick={next} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white">{step >= visibleQuestions.length - 1 ? "Review" : "Next"}<ChevronRight className="h-4 w-4" aria-hidden="true" /></button>}</footer> : null}
+      {!locked && (!configurator || reviewing) ? <footer className="grid gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:grid-cols-[auto_1fr_auto] sm:px-7"><button type="button" onClick={() => reviewing ? setReviewing(false) : setStep((value) => Math.max(0, value - 1))} disabled={!reviewing && (showAllQuestions || step === 0)} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 disabled:opacity-40"><ChevronLeft className="h-4 w-4" aria-hidden="true" />Back</button>{onSave && !requireCompletion ? <button type="button" disabled={isPending} onClick={() => save(false)} className="min-h-11 rounded-lg px-4 text-sm font-semibold text-slate-600 hover:bg-white">Save for Later</button> : <span />}{reviewing ? <button type="button" disabled={isPending} onClick={() => save(true)} className="min-h-11 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-50">{isPending ? "Saving…" : configurator ? "Confirm Request" : "Save Request Details"}</button> : showAllQuestions ? <button type="button" onClick={reviewAll} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white">Review Answers<ChevronRight className="h-4 w-4" aria-hidden="true" /></button> : <button type="button" onClick={next} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white">{step >= visibleQuestions.length - 1 ? "Review" : "Next"}<ChevronRight className="h-4 w-4" aria-hidden="true" /></button>}</footer> : null}
     </section>
   )
 

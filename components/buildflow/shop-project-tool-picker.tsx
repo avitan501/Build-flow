@@ -214,39 +214,32 @@ export function ShopProjectToolPicker({
 
   return (
     <div className="grid gap-4">
-      <section className="max-w-4xl rounded-[20px] border border-black/[0.06] bg-white px-3 py-3 shadow-[0_10px_28px_rgba(0,0,0,0.05)] sm:px-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#0E2A4A] text-white shadow-[0_8px_20px_rgba(14,42,74,0.18)]">
+      <section className="max-w-3xl rounded-[18px] border border-black/[0.06] bg-white p-3 shadow-[0_8px_24px_rgba(0,0,0,0.045)] sm:p-3.5">
+        <button
+          type="button"
+          onClick={() => {
+            setProjectSearch("")
+            setAddressPickerOpen((open) => !open)
+          }}
+          aria-expanded={addressPickerOpen}
+          aria-controls="address-picker-panel"
+          className="group grid w-full min-w-0 grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 text-left outline-none"
+        >
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0E2A4A] text-white shadow-[0_6px_16px_rgba(14,42,74,0.16)]">
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 21s7-5.2 7-11a7 7 0 0 0-14 0c0 5.8 7 11 7 11Z" />
               <circle cx="12" cy="10" r="2.5" />
             </svg>
           </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#6e6e73]">Project address</p>
-            <button
-              type="button"
-              onClick={() => {
-                setProjectSearch("")
-                setAddressPickerOpen((open) => !open)
-              }}
-              aria-expanded={addressPickerOpen}
-              aria-controls="address-picker-panel"
-              className="mt-1 flex w-full min-w-0 items-center justify-between gap-3 text-left outline-none"
-            >
-              <span data-testid="project-address-value" className="min-w-0 text-base font-semibold leading-6 text-[#1d1d1f] [overflow-wrap:anywhere]">{selectedAddressLabel}</span>
-              <span className="inline-flex min-h-8 shrink-0 items-center rounded-full bg-slate-100 px-3 text-xs font-semibold text-[#0066cc]">{addressPickerOpen ? "Close" : selectedAddressLabel === "No selected address" ? "+ Add" : "Change"}</span>
-            </button>
-            {selectedAddressHelper ? <p aria-live="polite" className="mt-1 text-xs leading-5 text-slate-500">{selectedAddressHelper}</p> : null}
-          </div>
-          <Link
-            href="/projects"
-            prefetch={false}
-            className="hidden min-h-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-xs font-semibold text-[#1d1d1f] transition hover:bg-slate-50 sm:inline-flex"
-          >
-            My Projects
-          </Link>
-        </div>
+          <span className="min-w-0">
+            <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-[#6e6e73]">Project address</span>
+            <span data-testid="project-address-value" className="mt-0.5 block min-w-0 text-[15px] font-semibold leading-5 text-[#1d1d1f] [overflow-wrap:anywhere]">{selectedAddressLabel}</span>
+            {selectedAddressHelper ? <span aria-live="polite" className="mt-0.5 block text-[11px] leading-4 text-slate-500">{selectedAddressHelper}</span> : null}
+          </span>
+          <span className="inline-flex min-h-9 shrink-0 items-center rounded-full bg-slate-100 px-3 text-xs font-semibold text-[#0066cc] transition group-hover:bg-slate-200">
+            {addressPickerOpen ? "Close" : selectedAddressLabel === "No selected address" ? "Add" : "Change"}
+          </span>
+        </button>
         {projectCreated ? (
           <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
             Project saved and selected.
@@ -409,14 +402,14 @@ export function ShopProjectToolPicker({
                 href={href}
                 prefetch={false}
                 data-testid="department-card"
-                className="group flex min-w-0 touch-manipulation flex-col items-center rounded-[22px] bg-slate-200/0 p-1 text-center transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-slate-200/65 focus-visible:bg-slate-200/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.97]"
+                className="group flex min-w-0 touch-manipulation flex-col items-center rounded-[22px] bg-transparent p-1 text-center transition-colors duration-200 hover:bg-slate-200/65 focus-visible:bg-slate-200/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:bg-slate-300/55"
               >
-                <span className="relative block aspect-square w-full overflow-hidden rounded-[18px] bg-transparent">
+                <span className="relative block aspect-square w-full overflow-hidden rounded-[18px] bg-[#f5f5f7] transition-colors duration-200 group-hover:bg-slate-200/65 group-focus-visible:bg-slate-200/65">
                   {cutout ? (
                     <span
                       role="img"
                       aria-label={category.imageAlt}
-                      className="absolute inset-0 bg-transparent bg-no-repeat mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.04]"
+                      className="absolute inset-0 bg-transparent bg-no-repeat mix-blend-multiply"
                       style={{ backgroundImage: `url(${cutout.imageUrl})`, backgroundPosition: cutout.imagePosition, backgroundSize: "400% 200%" }}
                     />
                   ) : (
@@ -425,7 +418,7 @@ export function ShopProjectToolPicker({
                       alt={category.imageAlt}
                       fill
                       sizes="(max-width: 639px) 32vw, (max-width: 1023px) 24vw, 18vw"
-                      className="scale-[0.9] object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-[0.94]"
+                      className="scale-[0.9] object-contain mix-blend-multiply"
                     />
                   )}
                 </span>

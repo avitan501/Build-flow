@@ -71,15 +71,15 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
           <div className="p-5 sm:p-6">
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><CheckCircle2 className="h-6 w-6" aria-hidden="true" /></span>
             <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Request Ready</p>
-            <h2 className="mt-1 text-xl font-bold text-slate-950">Choose the Project for This {displayCategory} Request</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Your selections are saved on this device until the request is added successfully.</p>
+            <h2 className="mt-1 text-xl font-bold text-slate-950">Confirm This {displayCategory} Request</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Your selections are saved on this device. Confirm to connect the request to your account and project.</p>
             <div className="mt-5 flex flex-wrap gap-3">
               <AddToProjectButton
                 product={{ id: `${requestId}-quick-order`, name: `${displayCategory} Quick Order`, category, productType: "service", price: 0, unit: "Request" }}
                 questionnaireDepartment={category}
                 materialAnswers={answersForProject(completedAnswers)}
                 file={referenceFile}
-                label="Choose Project"
+                label="Confirm Request"
                 onAdded={() => window.sessionStorage.removeItem(`${MATERIAL_DRAFT_KEY}:${requestId}`)}
               />
               <button type="button" onClick={() => { setCompletedAnswers(null); storeDraft(completedAnswers, false) }} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:border-slate-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"><Pencil className="h-4 w-4" aria-hidden="true" />Edit Selections</button>
