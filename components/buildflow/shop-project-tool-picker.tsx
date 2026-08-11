@@ -409,14 +409,14 @@ export function ShopProjectToolPicker({
                 href={href}
                 prefetch={false}
                 data-testid="department-card"
-                className="group flex min-w-0 touch-manipulation flex-col items-center rounded-[22px] bg-transparent p-1 text-center transition duration-200 hover:-translate-y-0.5 hover:bg-slate-200/65 focus-visible:bg-slate-200/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.97]"
+                className="group flex min-w-0 touch-manipulation flex-col items-center rounded-[22px] bg-slate-200/0 p-1 text-center transition-[transform,background-color] duration-200 hover:-translate-y-0.5 hover:bg-slate-200/65 focus-visible:bg-slate-200/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.97]"
               >
-                <span className="relative block aspect-square w-full overflow-hidden rounded-[18px] bg-transparent mix-blend-multiply">
+                <span className="relative block aspect-square w-full overflow-hidden rounded-[18px] bg-transparent">
                   {cutout ? (
                     <span
                       role="img"
                       aria-label={category.imageAlt}
-                      className="absolute inset-0 bg-transparent bg-no-repeat transition duration-300 group-hover:scale-[1.04]"
+                      className="absolute inset-0 bg-transparent bg-no-repeat mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.04]"
                       style={{ backgroundImage: `url(${cutout.imageUrl})`, backgroundPosition: cutout.imagePosition, backgroundSize: "400% 200%" }}
                     />
                   ) : (
@@ -425,7 +425,7 @@ export function ShopProjectToolPicker({
                       alt={category.imageAlt}
                       fill
                       sizes="(max-width: 639px) 32vw, (max-width: 1023px) 24vw, 18vw"
-                      className="scale-[0.9] object-contain transition duration-300 group-hover:scale-[0.94]"
+                      className="scale-[0.9] object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-[0.94]"
                     />
                   )}
                 </span>

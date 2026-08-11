@@ -157,7 +157,8 @@ function QuestionControl({ question, value, onChange, disabled, onUpload, compac
     return <select id={controlId} name={question.question_key} aria-label={question.label} disabled={disabled} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} className="min-h-13 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"><option value="">Choose one</option>{question.options.map((option) => <option key={option.id} value={option.value}>{option.label}</option>)}</select>
   }
   if (question.question_type === "long_text") {
-    return <textarea id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} rows={compact ? 2 : 5} value={typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(event.target.value)} className={`w-full border border-slate-300 px-4 py-2.5 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50 ${compact ? "min-h-16 rounded-lg text-sm" : "rounded-2xl text-base"}`} />
+    if (compact) return <input id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} value={typeof value === "string" ? value : ""} placeholder={question.placeholder || "Add optional notes"} onChange={(event) => onChange(event.target.value)} className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50" />
+    return <textarea id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} rows={5} value={typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(event.target.value)} className="w-full rounded-2xl border border-slate-300 px-4 py-2.5 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50" />
   }
   if (question.question_type === "quantity") {
     const current = typeof value === "object" && value && !Array.isArray(value) ? value : {}
@@ -332,7 +333,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
         id={`question-${question.id}`}
         data-question-key={question.question_key}
         className={`${gridSpan} ${compactOptionalNote ? "scroll-mt-28 py-2" : compact || compactAccessory ? "scroll-mt-28 py-2.5 first:pt-0 last:pb-0" : "scroll-mt-24 pb-7"} min-w-0 border-b border-slate-100 last:border-b-0`}
-        aria-describedby={question.help_text ? `question-help-${question.id}` : undefined}
+        aria-describedby={question.help_text && !compactOptionalNote ? `question-help-${question.id}` : undefined}
       >
         {!compact ? <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Question {index + 1}</p> : null}
         <div className="flex items-start gap-3">
@@ -341,7 +342,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
             {question.label}{question.is_required ? <span aria-hidden="true" className="text-rose-500"> *</span> : compactOptionalNote ? <span className="ml-1 font-medium text-slate-400">Optional</span> : null}
           </legend>
         </div>
-        {question.help_text ? <p id={`question-help-${question.id}`} className={`${compact ? "mt-1 text-xs leading-5" : "mt-2 text-sm leading-6"} text-slate-600`}>{question.help_text}</p> : null}
+        {question.help_text && !compactOptionalNote ? <p id={`question-help-${question.id}`} className={`${compact ? "mt-1 text-xs leading-5" : "mt-2 text-sm leading-6"} text-slate-600`}>{question.help_text}</p> : null}
         <div className={compact || compactAccessory ? "mt-2" : "mt-4"}>
           <QuestionControl
             question={question}
