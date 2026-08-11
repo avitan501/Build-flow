@@ -21,11 +21,12 @@ test("home presents the contractor material coordination service", async ({ page
   expect(await brandSection.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
   const brandBox = await brands.boundingBox();
   const heroBox = await page.getByRole("heading", { name: "Keep Your Crew Building. We’ll Handle the Materials." }).boundingBox();
-  expect(brandBox?.y).toBeLessThan(heroBox?.y ?? Number.POSITIVE_INFINITY);
+  expect(brandBox?.y).toBeGreaterThan(heroBox?.y ?? Number.NEGATIVE_INFINITY);
   await expect(page.getByTestId("coverage-map").getByTestId("coverage-dot")).toHaveCount(41);
   const lockups = page.getByTestId("avantia-build-lockup");
   await expect(lockups.first()).toHaveAttribute("data-testid", "avantia-build-lockup");
-  await expect(lockups.locator("img")).toHaveCount(0);
+  await expect(lockups.first().locator("img")).toHaveAttribute("src", /avantia-build-rain-painter-animation\.gif/);
+  await expect(page.getByRole("img", { name: "Avantia Build animated logo" })).toBeVisible();
 
   const overflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflows).toBe(false);
@@ -33,6 +34,8 @@ test("home presents the contractor material coordination service", async ({ page
   if (test.info().project.name === "chromium-desktop") {
     const mainBox = await page.locator("main").first().boundingBox();
     expect(mainBox?.width).toBeGreaterThan(1300);
+    const islandWidths = await page.getByTestId("homepage-island").evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().width));
+    expect(Math.max(...islandWidths) - Math.min(...islandWidths)).toBeLessThan(2);
   }
 });
 

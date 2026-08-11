@@ -13,10 +13,10 @@ const SHOP_BRANDS = [
 
 export function ShopBrandShowcase({ compact = false, transparent = false }: { compact?: boolean; transparent?: boolean }) {
   return (
-    <section aria-labelledby="shop-brands-heading" className={`${compact ? "mx-auto max-w-6xl overflow-hidden" : "mt-8"} ${transparent ? "bg-transparent" : "bg-white"}`}>
+    <section aria-labelledby="shop-brands-heading" className={`${compact ? "mx-auto max-w-[88rem] overflow-hidden" : "mt-8"} ${transparent ? "bg-transparent" : "bg-white"}`}>
       <div className={`mx-auto w-full max-w-7xl px-4 sm:px-8 lg:px-10 ${compact ? "py-3 sm:py-4" : "py-8 sm:py-10"}`}>
         <div className="text-center">
-          <h2 id="shop-brands-heading" className={`${compact ? "text-lg sm:text-xl" : "text-2xl sm:text-3xl"} font-semibold tracking-normal text-[#1d1d1f]`}>Shop Our Brands</h2>
+          <h2 id="shop-brands-heading" className={`${compact ? "text-sm sm:text-base font-medium text-slate-500" : "text-2xl sm:text-3xl font-semibold text-[#1d1d1f]"} tracking-normal`}>Shop Our Brands</h2>
         </div>
 
         <div className={`${compact ? "mt-3" : "mt-6"} brand-marquee`} data-testid="shop-brand-grid">

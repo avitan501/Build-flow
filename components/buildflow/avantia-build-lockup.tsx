@@ -1,4 +1,4 @@
-import { HardHat } from "lucide-react";
+import Image from "next/image";
 
 type AvantiaBuildLockupProps = {
   compact?: boolean;
@@ -7,26 +7,19 @@ type AvantiaBuildLockupProps = {
   tone?: "navy" | "light";
 };
 
-export function AvantiaBuildLockup({ compact = false, showSlogan = false, className = "", tone = "navy" }: AvantiaBuildLockupProps) {
-  const foreground = tone === "light" ? "text-white" : "text-[#2b1409]";
-
+export function AvantiaBuildLockup({ compact = false, showSlogan = false, className = "" }: AvantiaBuildLockupProps) {
   return (
     <span className={`flex min-w-0 flex-col ${className}`} data-testid="avantia-build-lockup">
-      <span
-        className={`flex min-w-0 items-end whitespace-nowrap font-extrabold leading-none tracking-normal ${foreground}`}
-        style={{ fontFamily: "var(--font-poppins), sans-serif" }}
-        aria-label="Avantia Build"
-        translate="no"
-      >
-        <span className={`inline-flex ${compact ? "text-[0.98rem] sm:text-[1.08rem]" : "text-[1.45rem] sm:text-[1.68rem]"}`} aria-hidden="true">
-          av<span className="text-[#ff5b00]">a</span>ntia
-        </span>
-        <span className={`relative ${compact ? "ml-0.5 text-[0.65rem] sm:text-[0.7rem]" : "ml-1 text-[0.85rem] sm:text-[0.95rem]"} pb-[0.04em] font-bold`} aria-hidden="true">
-          buil<span className="relative inline-block">d<HardHat className={`absolute left-1/2 -translate-x-1/2 scale-x-125 fill-[#ff6a00] text-[#9a3412] ${compact ? "-top-[0.68rem] h-3 w-3.5" : "-top-[0.92rem] h-4 w-5"}`} strokeWidth={2.1} /></span>
-        </span>
-      </span>
+      <Image
+        src="/images/avantia/avantia-build-rain-painter-animation.gif"
+        alt="Avantia Build"
+        width={1400}
+        height={450}
+        unoptimized
+        className={`${compact ? "w-[6.9rem] sm:w-[7.6rem]" : "w-[10rem] sm:w-[11.5rem]"} h-auto object-contain`}
+      />
       {showSlogan ? (
-        <span className={`mt-1 block truncate text-[0.65rem] font-medium normal-case tracking-normal ${tone === "light" ? "text-white/70" : "text-slate-500"}`}>
+        <span className="mt-1 block truncate text-[0.65rem] font-medium normal-case tracking-normal text-slate-500">
           Everything it takes to build
         </span>
       ) : null}

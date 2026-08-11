@@ -35,12 +35,8 @@ export default function Home() {
     <main className="min-h-screen overflow-x-clip bg-[#f5f7fa] pb-4 text-slate-950">
       <RecoveryLinkHandler />
 
-      <div className="px-3 pt-3 sm:px-5 sm:pt-4">
-        <ShopBrandShowcase compact transparent />
-      </div>
-
       <div className="px-3 pt-3 sm:px-5 sm:pt-5">
-        <section className="relative isolate mx-auto max-w-[88rem] overflow-hidden rounded-[30px] bg-[#071126] text-white shadow-[0_24px_70px_rgba(7,17,38,0.24)] sm:rounded-[36px]">
+        <section data-testid="homepage-island" className="relative isolate mx-auto max-w-[88rem] overflow-hidden rounded-[30px] bg-[#071126] text-white shadow-[0_24px_70px_rgba(7,17,38,0.24)] sm:rounded-[36px]">
           <div
             className="absolute inset-0 -z-20 bg-cover bg-center"
             style={{ backgroundImage: "url(/images/buildflow-retail/hero.jpg)" }}
@@ -67,8 +63,24 @@ export default function Home() {
         </section>
       </div>
 
-      <section className="mx-auto max-w-6xl px-4 py-7 sm:px-8 sm:py-9 lg:px-10">
-        <div className="grid overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.07)] md:grid-cols-3">
+      <div className="px-3 pt-3 sm:px-5 sm:pt-5">
+        <div data-testid="homepage-island" className="mx-auto max-w-[88rem] overflow-hidden rounded-[24px] border border-slate-200/70 bg-[#fffaf4] shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+          <div className="relative h-[clamp(7rem,31vw,15rem)] w-full overflow-hidden">
+            <Image
+              src="/images/avantia/avantia-build-rain-painter-animation.gif"
+              alt="Avantia Build animated logo"
+              fill
+              unoptimized
+              sizes="(min-width: 1440px) 88rem, 100vw"
+              className="object-cover object-center"
+            />
+          </div>
+          <ShopBrandShowcase compact transparent />
+        </div>
+      </div>
+
+      <section className="px-3 py-7 sm:px-5 sm:py-9">
+        <div data-testid="homepage-island" className="mx-auto grid max-w-[88rem] overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.07)] md:grid-cols-3">
           {contractorBenefits.map((point) => {
             const Icon = point.icon;
             return (
@@ -83,7 +95,7 @@ export default function Home() {
       </section>
 
       <section className="mt-5 px-3 sm:px-5" aria-labelledby="coverage-heading">
-        <div className="mx-auto grid max-w-5xl items-center gap-3 overflow-hidden rounded-[22px] border border-slate-200/70 bg-white px-5 py-5 shadow-[0_12px_36px_rgba(15,23,42,0.06)] sm:px-7 sm:py-6 lg:grid-cols-[minmax(14rem,0.8fr)_minmax(0,1fr)]">
+        <div data-testid="homepage-island" className="mx-auto grid max-w-[88rem] items-center gap-3 overflow-hidden rounded-[22px] border border-slate-200/70 bg-white px-5 py-5 shadow-[0_12px_36px_rgba(15,23,42,0.06)] sm:px-7 sm:py-6 lg:grid-cols-[minmax(14rem,0.8fr)_minmax(0,1fr)]">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Nationwide sourcing</p>
             <h2 id="coverage-heading" className="mt-1.5 text-xl font-semibold leading-tight text-[#071126] sm:text-2xl">Covering 41 states.</h2>
