@@ -7,8 +7,8 @@ import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase";
 
 const contractorBenefits = [
   {
-    title: "Stop calling store after store",
-    body: "Send your material request once. Your coordinator handles the supplier calls and follow-up.",
+    title: "Send it once. We call the stores.",
+    body: "WhatsApp us anytime, 24/7. Your coordinator calls suppliers the next morning to check availability and keep your request moving.",
     icon: PhoneOff,
   },
   {
@@ -68,12 +68,7 @@ export default function Home() {
         </section>
       </div>
 
-      <section className="mx-auto max-w-6xl px-4 py-9 sm:px-8 sm:py-12 lg:px-10">
-        <div className="mb-7 max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Your materials desk</p>
-          <h2 className="mt-2 text-2xl font-semibold leading-tight text-[#071126] sm:text-4xl">One request. One coordinator. No supplier runaround.</h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">You stay focused on the crew and schedule. We handle the material calls, follow-up, and organization.</p>
-        </div>
+      <section className="mx-auto max-w-6xl px-4 py-7 sm:px-8 sm:py-9 lg:px-10">
         <div className="grid overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.07)] md:grid-cols-3">
           {contractorBenefits.map((point) => {
             const Icon = point.icon;
@@ -85,10 +80,6 @@ export default function Home() {
               </article>
             );
           })}
-        </div>
-        <div className="mt-5 flex flex-col items-start justify-between gap-4 rounded-[20px] bg-[#071126] px-5 py-5 text-white sm:flex-row sm:items-center sm:px-7">
-          <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-sky-300">One request. One coordinator.</p><p className="mt-1 text-lg font-semibold">Tell us what you need. We handle the rest.</p></div>
-          <Link href="/shop" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-5 text-sm font-bold text-[#071126]">Start your request <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
         </div>
       </section>
 

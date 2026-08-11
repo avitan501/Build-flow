@@ -18,10 +18,10 @@ export function AvantiaBuildLockup({ compact = false, showSlogan = false, classN
         aria-label="Avantia Build"
         translate="no"
       >
-        <span className={`inline-flex ${compact ? "text-[1.08rem] sm:text-[1.18rem]" : "text-[1.6rem] sm:text-[1.85rem]"}`} aria-hidden="true">
+        <span className={`inline-flex ${compact ? "text-[0.98rem] sm:text-[1.08rem]" : "text-[1.45rem] sm:text-[1.68rem]"}`} aria-hidden="true">
           av<span className="text-[#ff5b00]">a</span>ntia
         </span>
-        <span className={`relative ${compact ? "ml-1 text-[0.72rem] sm:text-[0.78rem]" : "ml-1.5 text-[0.94rem] sm:text-[1.05rem]"} pb-[0.04em] font-bold`} aria-hidden="true">
+        <span className={`relative ${compact ? "ml-0.5 text-[0.65rem] sm:text-[0.7rem]" : "ml-1 text-[0.85rem] sm:text-[0.95rem]"} pb-[0.04em] font-bold`} aria-hidden="true">
           buil<span className="relative inline-block">d<HardHat className={`absolute left-1/2 -translate-x-1/2 scale-x-125 fill-[#ff6a00] text-[#9a3412] ${compact ? "-top-[0.68rem] h-3 w-3.5" : "-top-[0.92rem] h-4 w-5"}`} strokeWidth={2.1} /></span>
         </span>
       </span>
