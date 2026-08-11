@@ -56,7 +56,10 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
   }
 
   const params = (await searchParams) ?? {}
-  const projectSession = await loadCurrentUserProjects(baseCategory.label)
+  // Keep the customer-facing "Flooring" label while using the legacy
+  // department key that existing admin questionnaire records are stored under.
+  const questionnaireDepartment = baseCategory.slug === "wood-floor" ? "Wood Floor" : baseCategory.label
+  const projectSession = await loadCurrentUserProjects(questionnaireDepartment)
   if (isDepartmentHidden(projectSession.addOns, baseCategory.label)) notFound()
   const category = applyDepartmentAddOns([baseCategory], projectSession.addOns)[0] ?? baseCategory
   const experience = departmentExperienceFor(projectSession.addOns, baseCategory.label)
@@ -70,7 +73,7 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
   return (
     <ShopToolCategoryPage
       category={category}
-      questionnaireDepartment={baseCategory.label}
+      questionnaireDepartment={questionnaireDepartment}
       experience={experience}
       projects={projects}
       selectedProjectId={selectedProjectId}
