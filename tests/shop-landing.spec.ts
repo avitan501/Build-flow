@@ -149,7 +149,7 @@ test("traffic endpoint accepts same-site events and blocks cross-site submission
 test("home shows the compact manufacturer brand showcase", async ({ page }) => {
   await page.goto("/")
 
-  await expect(page.getByRole("heading", { name: "Brands we source" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Brands we trust" })).toBeVisible()
   await expect(page.getByTestId("shop-brand-grid").getByRole("img")).toHaveCount(8)
 })
 
@@ -178,18 +178,18 @@ test("siding and roofing are separate departments with a complete request flow",
   await expect(page.getByRole("heading", { name: "Available items" })).toHaveCount(0)
   await expect(page.getByText("Recommended next", { exact: true })).toHaveCount(0)
   await expect(page.getByRole("button", { name: "Start quick order" })).toHaveCount(0)
-  await page.getByText("Need Help With a Custom Siding Order?", { exact: true }).click()
+  await expect(page.getByText("Need Help With a Custom Siding Order?", { exact: true })).toBeVisible()
   await expect(page.getByRole("heading", { name: "Place an order here" })).toBeVisible()
   await expect(page.getByText("Attach blueprint or shopping list", { exact: true })).toBeVisible()
 
   await page.goto("/shop/roofing")
-  await page.getByText("Need Help With a Custom Roofing Order?", { exact: true }).click()
+  await expect(page.getByText("Need Help With a Custom Roofing Order?", { exact: true })).toBeVisible()
   await expect(page.getByRole("heading", { name: "Place an order here" })).toBeVisible()
   await expect(page.getByText("Attach blueprint or shopping list", { exact: true })).toBeVisible()
 
   await page.goto("/shop/window")
   await expect(page.getByText("Upload your window schedule", { exact: true })).toHaveCount(0)
-  await page.getByText("Need Help With a Custom Window Order?", { exact: true }).click()
+  await expect(page.getByText("Need Help With a Custom Window Order?", { exact: true })).toBeVisible()
   await expect(page.getByRole("heading", { name: "Place an order here" })).toBeVisible()
   await expect(page.getByText("Attach blueprint or shopping list", { exact: true })).toBeVisible()
 })
@@ -222,7 +222,10 @@ test("flooring uses a compact contractor configurator with a live summary", asyn
   await expect(redOak).toHaveAttribute("aria-pressed", "true")
   await page.getByRole("button", { name: "5″" }).click()
   await page.getByLabel("How much flooring do you need?").fill("1200")
-  await page.getByRole("button", { name: "Flooring underlayment" }).click()
+  await page.getByRole("button", { name: "Yes" }).nth(0).click()
+  await page.getByLabel("How many square feet of underlayment?").fill("1200")
+  await expect(page.getByRole("button", { name: "Add 10%" })).toBeVisible()
+  await expect(page.getByText("Contractor order builder", { exact: true })).toHaveCount(0)
 
   if ((page.viewportSize()?.width ?? 0) >= 1024) {
     await expect(page.getByTestId("flooring-order-summary")).toContainText("1,200 sq. ft.")
@@ -266,6 +269,9 @@ test("sheetrock uses the compact on-page contractor configurator", async ({ page
   await expect(page.getByText("Drywall / Sheetrock", { exact: true })).toHaveCount(0)
   await expect(page.getByText("Do you need drywall tape?", { exact: true })).toBeVisible()
   await expect(page.getByText("Do you need metal studs?", { exact: true })).toBeVisible()
+  const sheetSizeBox = await page.locator("#question-sheet-size").boundingBox()
+  const thicknessBox = await page.locator("#question-thickness").boundingBox()
+  expect(sheetSizeBox?.y).toBe(thicknessBox?.y)
   const accessories = page.getByTestId("flooring-group-extras")
   await expect(accessories.getByText("Do you need drywall tape?", { exact: true })).toBeVisible()
   await expect(accessories.getByText("Do you need metal studs?", { exact: true })).toBeVisible()
@@ -293,9 +299,9 @@ test("tile uses an on-page materials configurator", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Tile Quick Order" })).toBeVisible()
   await expect(page.getByTestId("flooring-group-material")).toHaveCount(0)
   await expect(page.getByLabel("How many bags of MAPEI Ultraflex thinset do you need?")).toBeVisible()
-  await expect(page.getByLabel("How much fine sand do you need?")).toBeVisible()
+  await expect(page.getByLabel("How many yards of fine sand do you need?")).toBeVisible()
   await expect(page.getByLabel("How many bags of Portland cement do you need?")).toBeVisible()
-  await expect(page.getByLabel("How much tile wire mesh do you need?")).toBeVisible()
+  await expect(page.getByLabel("How many square feet of tile wire mesh do you need?")).toBeVisible()
   await expect(page.getByText("What tile underlayment should we include?", { exact: true })).toHaveCount(0)
   await expect(page.getByText("What other setting materials should we include?", { exact: true })).toHaveCount(0)
   await expect(page.getByText("Do you need liquid waterproofing membrane?", { exact: true })).toBeVisible()
@@ -331,6 +337,8 @@ test("electrical supports repeatable Romex and BX cable rows", async ({ page }) 
   await page.goto("/shop/electrical")
 
   await expect(page.getByRole("heading", { name: "Electrical Cable Quick Order" })).toBeVisible()
+  await expect(page.getByText("Contractor order builder", { exact: true })).toHaveCount(0)
+  await expect(page.getByText("Build a cable list for this project.", { exact: true })).toHaveCount(0)
   await expect(page.getByLabel("Cable type")).toHaveCount(1)
   await page.getByLabel("Cable type").selectOption("Romex")
   await page.getByLabel("Cable number").selectOption("12/2")
@@ -359,6 +367,7 @@ test("framing supports repeatable lumber order rows", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Remove lumber item 2" })).toBeEnabled()
   await expect(page.getByLabel("Lumber size").first().locator("option")).toHaveCount(7)
   await expect(page.getByLabel("Length").first().locator("option")).toHaveCount(5)
+  await expect(page.getByText("Upload blueprint or shopping list", { exact: true })).toHaveCount(0)
 
   const widths = await page.evaluate(() => ({ clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }))
   expect(widths.scrollWidth).toBe(widths.clientWidth)
@@ -379,8 +388,10 @@ test("flooring review identifies the first required missing answer", async ({ pa
 test("shop shows the sourcing brands and direct help actions", async ({ page }) => {
   await page.goto("/shop")
 
-  await expect(page.getByRole("heading", { name: "Brands we source" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Brands we trust" })).toBeVisible()
   await expect(page.getByTestId("shop-brand-grid").getByRole("img")).toHaveCount(8)
+  const brandCellBorders = await page.getByTestId("shop-brand-grid").locator(":scope > div").evaluateAll((cells) => cells.map((cell) => getComputedStyle(cell).borderWidth))
+  expect(brandCellBorders.every((border) => border === "0px")).toBe(true)
   await expect(page.getByRole("link", { name: "Call us" })).toHaveAttribute("href", "tel:+19292077156")
   await expect(page.getByRole("link", { name: "Text us" })).toHaveAttribute("href", "sms:+19292077156?body=Hi%20Avantia%20Build%2C%20I%20need%20help%20finding%20construction%20materials.")
 })

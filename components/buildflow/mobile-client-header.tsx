@@ -104,12 +104,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
     { href: "/shop", label: "Let's Work" },
     { href: "/projects", label: "My Projects" },
     ...(isAdmin ? [{ href: "/admin/build-map", label: "Manager" }] : []),
-    ...(isSignedIn
-      ? [
-          { href: "/account", label: "Account & Settings" },
-        ]
-      : []),
-  ], [isAdmin, isSignedIn]);
+  ], [isAdmin]);
 
   const requestLinks = useMemo<MobileMenuLink[]>(() => [
     { href: "/request-quote", label: "Request a Quote" },

@@ -409,7 +409,7 @@ export function ShopProjectToolPicker({
                 href={href}
                 prefetch={false}
                 data-testid="department-card"
-                className="group flex min-w-0 touch-manipulation flex-col items-center text-center transition duration-200 hover:-translate-y-0.5 active:scale-[0.97]"
+                className="group flex min-w-0 touch-manipulation flex-col items-center rounded-[22px] p-1 text-center transition duration-200 hover:-translate-y-0.5 hover:bg-slate-200/55 focus-visible:bg-slate-200/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.97]"
               >
                 <span className="relative block aspect-square w-full overflow-hidden bg-white mix-blend-multiply">
                   {cutout ? (

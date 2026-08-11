@@ -30,36 +30,6 @@ function QuickOrderAction({ category, questionnaireDepartment }: { category: Sho
   return <section className="flex max-w-2xl flex-col items-start justify-between gap-4 rounded-[20px] border border-sky-200 bg-sky-50 p-5 sm:flex-row sm:items-center"><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Choose materials</p><h2 className="mt-1 text-lg font-bold text-slate-950">Answer a few quick questions</h2><p className="mt-1 text-sm leading-6 text-slate-600">Select sizes, quantities, and accessories for this department.</p></div><AddToProjectButton product={{ id: `${category.slug}-quick-order`, name: `${category.label} Quick Order`, category: questionnaireDepartment, productType: "service", price: 0, unit: "Request" }} questionnaireDepartment={questionnaireDepartment} label="Start quick order" /></section>
 }
 
-function FramingUploadActions() {
-  const actions = [
-    {
-      label: "Upload blueprint or shopping list",
-      description: "Plan, list, photo, PDF, CSV, or spreadsheet",
-      accept: ".csv,.xls,.xlsx,.pdf,image/*",
-      icon: (
-        <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M8 6h13" />
-          <path d="M8 12h13" />
-          <path d="M8 18h13" />
-          <path d="M3 6h.01" />
-          <path d="M3 12h.01" />
-          <path d="M3 18h.01" />
-        </svg>
-      ),
-    },
-  ]
-
-  return (
-    <section className="grid max-w-xl gap-3 sm:gap-4">
-      {actions.map((action) => (
-        <ManagerItemVisibility key={action.label} itemId={`framing-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
-          <PlanRequestUploadCard requestId={`framing-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} category="Framing" label={action.label} description={action.description} accept={action.accept} icon={action.icon} />
-        </ManagerItemVisibility>
-      ))}
-    </section>
-  )
-}
-
 function KitchenActions() {
   const actions = [
     {
@@ -176,14 +146,13 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
         {experience.showQuickOrder && usesEmbeddedQuickOrder && questionnaireSnapshot ? <EmbeddedMaterialQuickOrder snapshot={questionnaireSnapshot} category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} /> : null}
         {experience.showQuickOrder && !customOrderOnly && (!usesEmbeddedQuickOrder || !questionnaireSnapshot) ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && usesStandardUpload && !composerHandlesUpload ? <CombinedUploadAction category={questionnaireDepartment} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
-        {experience.showPlanUpload && category.slug === "framing" ? <FramingUploadActions /> : null}
         {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}
         {experience.showPlanUpload && category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
 
         {!usesEmbeddedQuickOrder ? <DepartmentEssentials data={essentials} /> : null}
 
         {(customOrderOnly || experience.showChatToOrder) && usesCompactCustomOrder ? (
-          <details className="group rounded-lg border border-slate-200 bg-white shadow-sm">
+          <details open={customOrderOnly} className="group rounded-lg border border-slate-200 bg-white shadow-sm">
             <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left marker:content-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-sky-100">
               <span><span className="block text-base font-bold text-slate-950">Need Help With a Custom {category.label} Order?</span><span className="mt-0.5 block text-sm text-slate-500">Describe the request or attach a blueprint or shopping list.</span></span>
               <span aria-hidden="true" className="text-xl font-light text-slate-500 transition-transform group-open:rotate-45 motion-reduce:transition-none">+</span>

@@ -157,7 +157,7 @@ function QuestionControl({ question, value, onChange, disabled, onUpload, compac
     return <select id={controlId} name={question.question_key} aria-label={question.label} disabled={disabled} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} className="min-h-13 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"><option value="">Choose one</option>{question.options.map((option) => <option key={option.id} value={option.value}>{option.label}</option>)}</select>
   }
   if (question.question_type === "long_text") {
-    return <textarea id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} rows={5} value={typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(event.target.value)} className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50" />
+    return <textarea id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} rows={compact ? 2 : 5} value={typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(event.target.value)} className={`w-full border border-slate-300 px-4 py-3 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50 ${compact ? "min-h-20 rounded-lg text-sm" : "rounded-2xl text-base"}`} />
   }
   if (question.question_type === "quantity") {
     const current = typeof value === "object" && value && !Array.isArray(value) ? value : {}
@@ -179,9 +179,9 @@ function configuratorGroupsFor(snapshot: MaterialQuestionnaireSnapshot) {
   const isFraming = snapshot.category.department_key === "Framing"
   const isElectrical = snapshot.category.department_key === "Electrical"
   return [
-    { id: "material", title: isDoor ? "Choose Department" : "Material", description: isDrywall ? "Choose the board and performance type." : isTile ? "Choose the tile-setting materials." : isDoor ? "Select molding, doors, or both." : isFraming ? "Build a lumber list for this project." : isElectrical ? "Build a cable list for this project." : "Choose the flooring construction and appearance." },
+    { id: "material", title: isDoor ? "Choose Department" : isFraming ? "Lumber" : isElectrical ? "Cable" : "Material", description: isDrywall ? "Choose the board and performance type." : isTile ? "Choose the tile-setting materials." : isDoor ? "Select molding, doors, or both." : isFraming || isElectrical ? "" : "Choose the flooring construction and appearance." },
     { id: "size", title: "Size & Quantity", description: isDrywall ? "Set sheet dimensions, thickness, and quantity." : isTile ? "Enter the amount needed for each selected material." : isDoor ? "Add profile, length, door, and measurement details." : isFraming ? "Choose a common size and length for every lumber line." : isElectrical ? "Choose the cable, length, and quantity for every line." : "Set the dimensions and the amount required." },
-    { id: "extras", title: isDoor ? "Reference & Notes" : isTile ? "Waterproofing" : isElectrical ? "Notes" : "Accessories", description: isDrywall ? "Include screws, compound, tape, corner bead, and metal studs." : isTile ? "Add liquid waterproofing only when the job needs it." : isDoor ? "Add catalog references and jobsite notes." : isFraming ? "Add any hardware or delivery requirements." : isElectrical ? "Add conductor, packaging, or delivery details." : "Include the supporting materials needed on site." },
+    { id: "extras", title: isDoor ? "Reference & Notes" : isTile ? "Waterproofing" : isElectrical ? "Optional Notes" : "Accessories", description: isDrywall ? "Include screws, compound, tape, corner bead, and metal studs." : isTile ? "Add liquid waterproofing only when the job needs it." : isDoor ? "Add catalog references and jobsite notes." : isFraming ? "Add any hardware or delivery requirements." : isElectrical ? "" : "" },
   ] as const
 }
 
@@ -190,6 +190,7 @@ function configuratorGroupFor(question: MaterialQuestion) {
   if (key === "lumber_items" || key === "cable_items") return "material"
   if (key === "lumber_grade") return "extras"
   if (key === "drywall_type") return "size"
+  if (key === "waste_allowance") return "size"
   if (/(accessor|underlay|adhesive|glue|paper|nosing|transition|waste|bullnose|screw|compound|corner|bead|tape|stud|reference|catalog|note|spacer|waterproof|primer|sealant)/.test(key)) return "extras"
   if (/(width|length|area|square|quantity|amount|count|size|thickness|sand|cement|mesh|measurement|door_type)/.test(key)) return "size"
   return "material"
@@ -222,9 +223,9 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
   const showAllQuestions = displayMode === "all"
   const compact = density === "compact"
   const answeredQuestions = visibleQuestions.filter((question) => hasMaterialAnswer(answerForQuestion(question, answers)))
-  const completionPercent = visibleQuestions.length ? Math.round((answeredQuestions.length / visibleQuestions.length) * 100) : 100
   const requiredQuestions = visibleQuestions.filter((question) => question.is_required)
   const requiredAnswered = requiredQuestions.filter((question) => hasCompleteMaterialAnswer(question, answerForQuestion(question, answers))).length
+  const completionPercent = requiredQuestions.length ? Math.round((requiredAnswered / requiredQuestions.length) * 100) : 100
   const quantityQuestion = visibleQuestions.find((question) => question.question_type === "square_feet" || /area|square|count|quantity|amount/.test(question.question_key.toLowerCase()))
   const quantityAnswer = quantityQuestion ? answerForQuestion(quantityQuestion, answers) : null
   const quantityLabel = quantityQuestion && hasMaterialAnswer(quantityAnswer) ? formatMaterialAnswer(quantityQuestion, quantityAnswer) : ""
@@ -297,9 +298,12 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
   function renderQuestion(question: MaterialQuestion, index: number) {
     const hasError = errorQuestionId === question.id
     const singleSpecification = configurator && question.question_type === "single_select" && question.options.length === 1
+    const compactOptionalNote = compact && question.question_type === "long_text" && !question.is_required
+    const pairedConfiguratorQuestion = configurator && ["sheet_size", "thickness", "flooring_area", "waste_allowance"].includes(question.question_key)
+    const gridSpan = pairedConfiguratorQuestion ? "col-span-1" : "col-span-2"
     if (singleSpecification) {
       return (
-        <div key={question.id} id={`question-${question.id}`} className="flex min-h-12 scroll-mt-28 flex-col items-start justify-between gap-2 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:items-center sm:gap-4">
+        <div key={question.id} id={`question-${question.id}`} className={`${gridSpan} flex min-h-12 scroll-mt-28 flex-col items-start justify-between gap-2 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:items-center sm:gap-4`}>
           <p className="text-sm font-semibold text-slate-600">{question.label}</p>
           <span className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 text-sm font-bold text-slate-950"><Check className="h-3.5 w-3.5 text-[#0071e3]" aria-hidden="true" />{question.options[0].label}</span>
         </div>
@@ -309,14 +313,14 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
       <fieldset
         key={question.id}
         id={`question-${question.id}`}
-        className={`${compact ? "scroll-mt-28 py-3 first:pt-0 last:pb-0" : "scroll-mt-24 pb-7"} min-w-0 border-b border-slate-100 last:border-b-0`}
+        className={`${gridSpan} ${compactOptionalNote ? "scroll-mt-28 py-2" : compact ? "scroll-mt-28 py-3 first:pt-0 last:pb-0" : "scroll-mt-24 pb-7"} min-w-0 border-b border-slate-100 last:border-b-0`}
         aria-describedby={question.help_text ? `question-help-${question.id}` : undefined}
       >
         {!compact ? <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Question {index + 1}</p> : null}
         <div className="flex items-start gap-3">
           {question.configuration.imageUrl ? <span role="img" aria-label="" className="h-11 w-11 shrink-0 rounded-lg border border-[#e5e5e7] bg-white bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${question.configuration.imageUrl})`, backgroundPosition: question.configuration.imagePosition, backgroundSize: question.configuration.imageSprite ? "400% 200%" : undefined }} /> : null}
-          <legend className={`${compact ? "text-sm" : "mt-1 text-lg sm:text-xl"} font-bold leading-tight text-slate-950`}>
-            {question.label}{question.is_required ? <span aria-hidden="true" className="text-rose-500"> *</span> : null}
+          <legend className={`${compactOptionalNote ? "text-xs" : compact ? "text-sm" : "mt-1 text-lg sm:text-xl"} font-bold leading-tight text-slate-950`}>
+            {question.label}{question.is_required ? <span aria-hidden="true" className="text-rose-500"> *</span> : compactOptionalNote ? <span className="ml-1 font-medium text-slate-400">Optional</span> : null}
           </legend>
         </div>
         {question.help_text ? <p id={`question-help-${question.id}`} className={`${compact ? "mt-1 text-xs leading-5" : "mt-2 text-sm leading-6"} text-slate-600`}>{question.help_text}</p> : null}
@@ -342,16 +346,16 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
       <header className={`border-b border-slate-100 bg-white ${configurator ? "px-4 py-4 sm:px-6 sm:py-5" : compact ? "px-4 py-3 sm:px-5" : "px-5 py-4 sm:px-7"}`}>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">{configurator ? "Contractor order builder" : "Material order details"}</p>
-            <h2 className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">{snapshot.category.name}</h2>
-            {configurator ? <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">Set the material specifications, quantity, and jobsite accessories.</p> : requireCompletion ? <p className="mt-1 text-xs font-semibold text-slate-500">Required to complete this department request</p> : null}
+            {!configurator ? <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Material order details</p> : null}
+            <h2 className={`${configurator ? "" : "mt-1"} text-xl font-bold text-slate-950 sm:text-2xl`}>{snapshot.category.name}</h2>
+            {!configurator && requireCompletion ? <p className="mt-1 text-xs font-semibold text-slate-500">Required to complete this department request</p> : null}
           </div>
           {onClose && !requireCompletion ? <button type="button" onClick={onClose} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100" aria-label="Close questionnaire"><X className="h-5 w-5" /></button> : null}
         </div>
         {!reviewing ? configurator ? (
           <div className="mt-4 flex items-center gap-3">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100" aria-hidden="true"><div className="h-full rounded-full bg-[#0071e3] transition-[width] motion-reduce:transition-none" style={{ width: `${completionPercent}%` }} /></div>
-            <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-500">{answeredQuestions.length}/{visibleQuestions.length} answered</span>
+            <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-500">{requiredAnswered}/{requiredQuestions.length} required</span>
           </div>
         ) : showAllQuestions ? <p className="mt-3 text-xs font-semibold text-slate-500">{visibleQuestions.length} questions</p> : <div className="mt-4"><div className="flex justify-between text-xs font-semibold text-slate-500"><span>Question {Math.min(step + 1, visibleQuestions.length)} of {visibleQuestions.length}</span><span>{Math.round(progress)}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#0071e3] transition-[width] motion-reduce:transition-none" style={{ width: `${progress}%` }} /></div></div> : null}
       </header>
@@ -381,9 +385,9 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
                 <section key={group.id} data-testid={`flooring-group-${group.id}`} className="border-b border-[#d2d2d7] py-4 last:border-b-0 sm:py-5">
                   <div className="mb-1 flex items-center gap-3">
                     <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-950 text-xs font-bold text-white">{groupIndex + 1}</span>
-                    <div><h3 className="text-base font-bold text-slate-950">{group.title}</h3><p className="mt-0.5 text-xs leading-5 text-slate-500">{group.description}</p></div>
+                    <div><h3 className="text-base font-bold text-slate-950">{group.title}</h3>{group.description ? <p className="mt-0.5 text-xs leading-5 text-slate-500">{group.description}</p> : null}</div>
                   </div>
-                  <div className="ml-0 mt-2.5 sm:ml-10">{group.questions.map((question) => renderQuestion(question, visibleQuestions.findIndex((entry) => entry.id === question.id)))}</div>
+                  <div className="ml-0 mt-2.5 grid grid-cols-2 gap-x-3 sm:ml-10">{group.questions.map((question) => renderQuestion(question, visibleQuestions.findIndex((entry) => entry.id === question.id)))}</div>
                 </section>
               ))}
               {error ? <div aria-live="polite" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</div> : null}
@@ -393,6 +397,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0066cc]">Request Summary</p>
               <div className="mt-3 flex items-end justify-between gap-3"><p className="text-2xl font-bold tabular-nums text-slate-950">{completionPercent}%</p><p className="text-xs font-semibold text-slate-500">{requiredAnswered}/{requiredQuestions.length} required</p></div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#0071e3] transition-[width] motion-reduce:transition-none" style={{ width: `${completionPercent}%` }} /></div>
+              <p className="mt-2 text-[11px] leading-4 text-slate-500">Optional specifications, accessories, and notes are not included in the completion percentage.</p>
               {quantityLabel ? <div className="mt-5 rounded-lg border border-sky-100 bg-white px-4 py-3"><p className="text-xs font-semibold text-slate-500">Requested Quantity</p><p className="mt-1 text-lg font-bold tabular-nums text-slate-950">{quantityLabel}</p></div> : null}
               <dl className="mt-5 grid gap-3">
                 {summaryRows.map((question) => <div key={question.id} className="min-w-0"><dt className="truncate text-xs font-semibold text-slate-500">{question.label}</dt><dd className="mt-0.5 break-words text-sm font-bold text-slate-950">{formatMaterialAnswer(question, answerForQuestion(question, answers))}</dd></div>)}

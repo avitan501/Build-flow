@@ -14,7 +14,7 @@ const SPRITE_POSITIONS = [
 export function DepartmentEssentials({ data }: { data: DepartmentEssentialsData }) {
   return (
     <section aria-labelledby="department-essentials-heading" className="py-3 sm:py-5">
-      <h2 id="department-essentials-heading" className="mb-4 text-lg font-semibold text-slate-950 sm:text-xl">Department Essentials</h2>
+      <h2 id="department-essentials-heading" className="mb-4 text-lg font-semibold text-slate-950 sm:text-xl">Common materials</h2>
 
       <div className="grid grid-cols-4 gap-x-3 gap-y-5 sm:grid-cols-8 sm:gap-x-5" data-testid="department-essentials">
         {data.items.map((item, index) => (
