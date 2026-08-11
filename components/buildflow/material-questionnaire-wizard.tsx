@@ -404,7 +404,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
             </div>
           </div>
         ) : showAllQuestions ? configurator ? (
-          <div className="grid items-start lg:grid-cols-[minmax(0,1fr)_19rem]">
+          <div className="grid items-start lg:grid-cols-[minmax(0,1fr)_15rem]">
             <div className="min-w-0 px-4 pb-24 sm:px-6 sm:pb-24 lg:pb-6 lg:pr-8">
               {questionGroups.map((group, groupIndex) => (
                 <section key={group.id} data-testid={`flooring-group-${group.id}`} className="border-b border-[#d2d2d7] py-4 last:border-b-0 sm:py-5">
@@ -418,17 +418,17 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
               {error ? <div aria-live="polite" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</div> : null}
             </div>
 
-            <aside className="sticky top-24 hidden border-l border-slate-100 bg-slate-50/70 p-5 lg:block" data-testid="flooring-order-summary">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0066cc]">Request Summary</p>
-              <div className="mt-3 flex items-end justify-between gap-3"><p className="text-2xl font-bold tabular-nums text-slate-950">{completionPercent}%</p><p className="text-xs font-semibold text-slate-500">{requiredProgress.complete}/{requiredProgress.total} required fields</p></div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#0071e3] transition-[width] motion-reduce:transition-none" style={{ width: `${completionPercent}%` }} /></div>
-              <p className="mt-2 text-[11px] leading-4 text-slate-500">Optional specifications, accessories, and notes are not included in the completion percentage.</p>
-              {quantityLabel ? <div className="mt-5 rounded-lg border border-sky-100 bg-white px-4 py-3"><p className="text-xs font-semibold text-slate-500">Requested Quantity</p><p className="mt-1 text-lg font-bold tabular-nums text-slate-950">{quantityLabel}</p></div> : null}
-              <dl className="mt-5 grid gap-3">
-                {summaryRows.map((question) => <div key={question.id} className="min-w-0"><dt className="truncate text-xs font-semibold text-slate-500">{question.label}</dt><dd className="mt-0.5 break-words text-sm font-bold text-slate-950">{formatMaterialAnswer(question, answerForQuestion(question, answers))}</dd></div>)}
+            <aside className="sticky top-24 hidden border-l border-slate-100 bg-slate-50/70 p-3.5 lg:block" data-testid="flooring-order-summary">
+              <div className="flex items-center justify-between gap-3"><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#0066cc]">Request Summary</p><p className="text-lg font-bold tabular-nums text-slate-950">{completionPercent}%</p></div>
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#0071e3] transition-[width] motion-reduce:transition-none" style={{ width: `${completionPercent}%` }} /></div>
+              <p className="mt-1.5 text-[10px] font-semibold text-slate-500">{requiredProgress.complete}/{requiredProgress.total} required fields · optional details excluded</p>
+              {quantityLabel ? <div className="mt-3 rounded-lg border border-sky-100 bg-white px-3 py-2"><p className="text-[10px] font-semibold text-slate-500">Quantity</p><p className="mt-0.5 text-sm font-bold tabular-nums text-slate-950">{quantityLabel}</p></div> : null}
+              <dl className="mt-3 grid gap-2">
+                {summaryRows.slice(0, 3).map((question) => <div key={question.id} className="min-w-0"><dt className="truncate text-[10px] font-semibold text-slate-500">{question.label}</dt><dd className="truncate text-xs font-bold text-slate-950">{formatMaterialAnswer(question, answerForQuestion(question, answers))}</dd></div>)}
               </dl>
-              {!summaryRows.length ? <p className="mt-5 text-sm leading-6 text-slate-500">Your selections will appear here as you build the request.</p> : null}
-              <button type="button" onClick={reviewAll} className="mt-6 inline-flex min-h-12 w-full touch-manipulation items-center justify-center gap-1 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200">Review Request<ChevronRight className="h-4 w-4" aria-hidden="true" /></button>
+              {summaryRows.length > 3 ? <p className="mt-2 text-[10px] font-semibold text-slate-500">+{summaryRows.length - 3} more in review</p> : null}
+              {!summaryRows.length ? <p className="mt-3 text-xs leading-5 text-slate-500">Selections appear here.</p> : null}
+              <button type="button" onClick={reviewAll} className="mt-3 inline-flex min-h-10 w-full touch-manipulation items-center justify-center gap-1 rounded-lg bg-slate-950 px-4 text-xs font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200">Review Request<ChevronRight className="h-3.5 w-3.5" aria-hidden="true" /></button>
             </aside>
 
             <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+6.25rem)] z-40 mx-auto mt-3 flex min-h-12 w-[calc(100%-2.5rem)] max-w-[26rem] items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white/95 px-2 py-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.16)] backdrop-blur-lg lg:hidden" data-testid="flooring-mobile-summary">

@@ -19,8 +19,15 @@ import type { QualifyingQuestion } from "@/lib/shop-qualification"
 import { saveQuoteItemAnswersAction } from "@/app/projects/quote-request-actions"
 
 export function ExportRequestPdfButton() {
+  function printRequest() {
+    document.body.classList.add("request-printing")
+    window.addEventListener("afterprint", () => document.body.classList.remove("request-printing"), { once: true })
+    window.print()
+    window.setTimeout(() => document.body.classList.remove("request-printing"), 1000)
+  }
+
   return (
-    <button type="button" onClick={() => window.print()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 print:hidden">
+    <button type="button" onClick={printRequest} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 print:hidden">
       <Download className="h-4 w-4" aria-hidden="true" />
       Export PDF
     </button>
@@ -83,11 +90,12 @@ export function ProjectQuestionsForm({ projectId, questions, initialAnswers }: {
   const [editing, setEditing] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const requiredMissing = questions.filter((question) => question.required && !answers[question.id]?.trim())
+  const displayedQuestions = questions.map((question) => question.id === "contact_person" ? { ...question, required: false } : question)
+  const requiredMissing = displayedQuestions.filter((question) => question.required && !answers[question.id]?.trim())
 
   function save() {
     startTransition(async () => {
-      const result = await saveProjectAnswersAction({ projectId, answers: questions.map((question) => ({ questionId: question.id, value: answers[question.id] ?? "" })) })
+      const result = await saveProjectAnswersAction({ projectId, answers: displayedQuestions.map((question) => ({ questionId: question.id, value: answers[question.id] ?? "" })) })
       if (!result.ok) return setMessage(result.error)
       setMessage("Project details saved.")
       setEditing(false)
@@ -106,7 +114,7 @@ export function ProjectQuestionsForm({ projectId, questions, initialAnswers }: {
       </div>
       {editing ? (
         <div className="mt-4 grid gap-3">
-          {questions.map((question) => (
+          {displayedQuestions.map((question) => (
             <label key={question.id} className="grid gap-1.5 text-sm font-semibold text-slate-900">
               <span>{question.label}{question.required ? <span className="text-rose-500"> *</span> : null}</span>
               {question.question_type === "textarea" ? (
@@ -156,7 +164,9 @@ export function MaterialQuestionnaireRequestEditor({ response, savedAnswers, use
   locked: boolean
 }) {
   const router = useRouter()
+  const [editing, setEditing] = useState(response.status !== "complete")
   const initialAnswers = Object.fromEntries(savedAnswers.map((answer) => [answer.question_id || answer.question_key, answer.answer_value])) as Record<string, MaterialAnswerValue>
+  const answeredRows = savedAnswers.filter((answer) => answer.answer_display_snapshot.trim())
 
   async function save(answers: Record<string, MaterialAnswerValue>, complete: boolean) {
     const result = await saveMaterialQuestionnaireResponseAction({
@@ -166,7 +176,10 @@ export function MaterialQuestionnaireRequestEditor({ response, savedAnswers, use
       answers,
       complete,
     })
-    if (result.ok) router.refresh()
+    if (result.ok) {
+      if (complete) setEditing(false)
+      router.refresh()
+    }
     return result.ok ? { ok: true } : { ok: false, error: result.error }
   }
 
@@ -185,7 +198,19 @@ export function MaterialQuestionnaireRequestEditor({ response, savedAnswers, use
     return { ok: true, attachmentIds }
   }
 
-  return <MaterialQuestionnaireWizard snapshot={response.definition_snapshot} initialAnswers={initialAnswers} embedded locked={locked} onSave={save} onUpload={upload} />
+  if (!editing) {
+    return (
+      <div className="px-4 py-3 sm:px-5">
+        <dl className="grid gap-x-5 gap-y-2 sm:grid-cols-2">
+          {answeredRows.map((answer) => <div key={answer.question_key} className="min-w-0"><dt className="truncate text-[11px] font-semibold text-slate-500">{answer.question_label_snapshot}</dt><dd className="mt-0.5 break-words text-sm font-semibold text-slate-950">{answer.answer_display_snapshot}</dd></div>)}
+        </dl>
+        {!answeredRows.length ? <p className="text-sm text-slate-500">No details were provided.</p> : null}
+        {!locked ? <button type="button" onClick={() => setEditing(true)} className="mt-3 text-sm font-semibold text-[#0066cc] print:hidden">Edit details</button> : null}
+      </div>
+    )
+  }
+
+  return <div><MaterialQuestionnaireWizard snapshot={response.definition_snapshot} initialAnswers={initialAnswers} embedded locked={locked} onSave={save} onUpload={upload} />{!locked && response.status === "complete" ? <button type="button" onClick={() => setEditing(false)} className="mx-5 mb-4 text-sm font-semibold text-slate-600">Cancel</button> : null}</div>
 }
 
 export function QuoteItemAnswersEditor({ projectId, requestId, itemId, questions, initialAnswers, locked }: {

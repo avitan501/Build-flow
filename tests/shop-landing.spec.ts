@@ -230,7 +230,9 @@ test("flooring uses a compact contractor configurator with a live summary", asyn
   await expect(page.getByText("Contractor order builder", { exact: true })).toHaveCount(0)
 
   if ((page.viewportSize()?.width ?? 0) >= 1024) {
-    await expect(page.getByTestId("flooring-order-summary")).toContainText("1,200 sq. ft.")
+    const desktopSummary = page.getByTestId("flooring-order-summary")
+    await expect(desktopSummary).toContainText("1,200 sq. ft.")
+    expect((await desktopSummary.boundingBox())?.width ?? 999).toBeLessThanOrEqual(245)
   } else {
     await expect(page.getByTestId("flooring-mobile-summary")).toContainText("1,200 sq. ft.")
   }

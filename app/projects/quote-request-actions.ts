@@ -398,7 +398,7 @@ export async function submitQuoteRequestAction(input: { projectId: string; reque
 
   if (!items || items.length === 0) return { ok: false, error: "Add at least one item before submitting." }
   const answerMap = new Map((projectAnswers ?? []).map((answer) => [answer.question_id, answer.value?.trim()]))
-  const missingProjectQuestion = (questions ?? []).find((question) => !answerMap.get(question.id))
+  const missingProjectQuestion = (questions ?? []).find((question) => question.id !== "contact_person" && !answerMap.get(question.id))
   if (missingProjectQuestion) return { ok: false, error: `Complete the project question: ${missingProjectQuestion.label}` }
 
   const incompleteItem = items.find((item) => {

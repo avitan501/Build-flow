@@ -63,3 +63,38 @@ textarea {
     animation: none;
   }
 }
+
+@media print {
+  @page {
+    size: letter;
+    margin: 0.4in;
+  }
+
+  body.request-printing {
+    background: #ffffff !important;
+    color: #000000 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  body.request-printing header,
+  body.request-printing footer,
+  body.request-printing nav,
+  body.request-printing .fixed,
+  body.request-printing main > :not(.request-print-sheet) {
+    display: none !important;
+  }
+
+  body.request-printing main {
+    min-height: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  body.request-printing .request-print-sheet {
+    display: block !important;
+    width: 100% !important;
+    max-height: 9.7in;
+    overflow: hidden;
+  }
+}
