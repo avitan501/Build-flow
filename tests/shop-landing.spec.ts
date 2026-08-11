@@ -72,6 +72,14 @@ test("shop header keeps the animated Avantia logo beside material search", async
   await expect(page.locator("main").getByTestId("avantia-build-lockup")).toHaveCount(0)
   expect(await search.getByText("Search materials").evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
 
+  const headerSurface = await header.evaluate((element) => ({
+    backgroundColor: getComputedStyle(element).backgroundColor,
+    backgroundImage: getComputedStyle(element).backgroundImage,
+  }))
+  const logoSurface = await logo.evaluate((element) => getComputedStyle(element.closest("a")!).backgroundColor)
+  expect(headerSurface).toEqual({ backgroundColor: "rgb(255, 255, 255)", backgroundImage: "none" })
+  expect(logoSurface).toBe(headerSurface.backgroundColor)
+
   const positions = await Promise.all([logo.boundingBox(), search.boundingBox()])
   expect(positions[0]?.x).toBeLessThan(positions[1]?.x ?? Number.POSITIVE_INFINITY)
   expect(Math.abs((positions[0]?.y ?? 0) - (positions[1]?.y ?? 0))).toBeLessThan(12)
