@@ -5,6 +5,7 @@ import { getSessionWithProfile } from "@/lib/auth"
 import { applyDepartmentAddOns, createEmptyManagerAddOns, departmentExperienceFor, isDepartmentHidden } from "@/lib/manager-add-ons"
 import type { ProjectRecord } from "@/lib/projects"
 import { findShopToolCategory, type ShopToolSlug } from "@/lib/shop-tools"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { FLOORING_QUESTIONNAIRE_PREVIEW } from "@/lib/material-questionnaire-preview"
 import { buildMaterialQuestionnaireSnapshot } from "@/lib/material-questionnaires"
 import { loadMaterialQuestionnaireForDepartment } from "@/lib/material-questionnaires-server"
@@ -22,7 +23,13 @@ async function loadCurrentUserProjects(questionnaireDepartment: string) {
   if (!supabase) {
     return { projects: [], isSignedIn: false, addOns: createEmptyManagerAddOns(), questionnaireSnapshot: null }
   }
-  const questionnaire = await loadMaterialQuestionnaireForDepartment(supabase, questionnaireDepartment).catch(() => null)
+  let questionnaire = await loadMaterialQuestionnaireForDepartment(supabase, questionnaireDepartment).catch(() => null)
+  if (!questionnaire) {
+    // Questionnaire definitions are public storefront content, but older
+    // installations may not yet grant anonymous table reads. Keep the service
+    // role server-only and still filter the result to the active category.
+    questionnaire = await loadMaterialQuestionnaireForDepartment(createAdminClient(), questionnaireDepartment).catch(() => null)
+  }
   const questionnaireSnapshot = questionnaire ? buildMaterialQuestionnaireSnapshot(questionnaire) : null
   const { data: publicStateRow } = await supabase
     .from("workflow_public_catalog")
