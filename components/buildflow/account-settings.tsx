@@ -11,7 +11,11 @@ type AccountSettingsProps = {
   alternatePhone: string | null;
   feedbackCode?: string | null;
   feedbackTone?: "success" | "error" | null;
+  paymentStatus?: string | null;
+  hasSavedPaymentProfile?: boolean;
 };
+
+const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/5kQaEWb6q64N6FybJl97G00";
 
 const errorMessages: Record<string, string> = {
   name: "Enter a valid name.",
@@ -40,12 +44,25 @@ function SectionCard({ title, description, children }: { title: string; descript
   );
 }
 
-export function AccountSettings({ email, profile, alternateEmail, alternatePhone, feedbackCode, feedbackTone }: AccountSettingsProps) {
+export function AccountSettings({ email, profile, alternateEmail, alternatePhone, feedbackCode, feedbackTone, paymentStatus, hasSavedPaymentProfile = false }: AccountSettingsProps) {
   const feedbackText = feedbackCode
     ? feedbackTone === "error"
       ? errorMessages[feedbackCode] || "Account could not be updated."
       : successMessages[feedbackCode] || "Account updated."
     : null;
+  const paymentFeedback = paymentStatus === "saved"
+    ? { tone: "success", text: "Payment method saved securely with Stripe." }
+    : paymentStatus === "canceled"
+      ? { tone: "neutral", text: "Payment setup was canceled. Nothing was saved." }
+      : paymentStatus === "setup-unavailable"
+        ? { tone: "error", text: "Secure payment setup is not connected yet. You can still use the payment link below." }
+        : paymentStatus === "no-payment-profile"
+          ? { tone: "neutral", text: "Save a payment method first, then you can manage it here." }
+          : paymentStatus === "portal-error"
+            ? { tone: "error", text: "Stripe could not open payment settings. Please try again." }
+            : paymentStatus === "setup-error"
+              ? { tone: "error", text: "Stripe could not save that payment method. Please try again." }
+              : null;
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#eff6ff_0%,#f8fbff_48%,#ffffff_100%)] px-4 py-6 sm:px-6 sm:py-8">
@@ -63,6 +80,12 @@ export function AccountSettings({ email, profile, alternateEmail, alternatePhone
         {feedbackText ? (
           <div className={`rounded-[20px] border px-4 py-3 text-sm font-semibold ${feedbackTone === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
             {feedbackText}
+          </div>
+        ) : null}
+
+        {paymentFeedback ? (
+          <div className={`rounded-[20px] border px-4 py-3 text-sm font-semibold ${paymentFeedback.tone === "error" ? "border-red-200 bg-red-50 text-red-700" : paymentFeedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-700"}`}>
+            {paymentFeedback.text}
           </div>
         ) : null}
 
@@ -106,8 +129,25 @@ export function AccountSettings({ email, profile, alternateEmail, alternatePhone
             <Link href="/reset-password" className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white">Change password</Link>
           </SectionCard>
 
-          <SectionCard title="Payment privacy" description="Avantia Build does not ask for or save bank account or credit card information on this page.">
-            <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm leading-6 text-emerald-900">No payment information is stored in account settings.</p>
+          <SectionCard title="Payments" description="Pay or securely save a card or U.S. bank account with Stripe.">
+            <div className="grid gap-3">
+              <a href={STRIPE_PAYMENT_LINK} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white">
+                Pay securely
+              </a>
+              <form action="/api/stripe/setup" method="post">
+                <button type="submit" className="min-h-12 w-full rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-950">
+                  Save card or bank account
+                </button>
+              </form>
+              {hasSavedPaymentProfile ? (
+                <form action="/api/stripe/portal" method="post">
+                  <button type="submit" className="min-h-12 w-full rounded-full border border-slate-300 bg-slate-50 px-5 text-sm font-semibold text-slate-950">
+                    Manage saved payment methods
+                  </button>
+                </form>
+              ) : null}
+              <p className="text-xs leading-5 text-slate-500">Card and bank details are handled and stored by Stripe. Avantia Build does not receive or store full account numbers.</p>
+            </div>
           </SectionCard>
 
           <SectionCard title="Sign out" description="End this session on the current device.">

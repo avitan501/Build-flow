@@ -35,6 +35,10 @@ export default function Home() {
     <main className="min-h-screen overflow-x-clip bg-[#f5f7fa] pb-4 text-slate-950">
       <RecoveryLinkHandler />
 
+      <div className="px-3 pt-3 sm:px-5 sm:pt-4">
+        <ShopBrandShowcase compact transparent />
+      </div>
+
       <div className="px-3 pt-3 sm:px-5 sm:pt-5">
         <section className="relative isolate mx-auto max-w-[88rem] overflow-hidden rounded-[30px] bg-[#071126] text-white shadow-[0_24px_70px_rgba(7,17,38,0.24)] sm:rounded-[36px]">
           <div
@@ -87,10 +91,6 @@ export default function Home() {
           <Link href="/shop" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-5 text-sm font-bold text-[#071126]">Start your request <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
         </div>
       </section>
-
-      <div className="px-3 sm:px-5">
-        <ShopBrandShowcase compact />
-      </div>
 
       <section className="mt-5 px-3 sm:px-5" aria-labelledby="coverage-heading">
         <div className="mx-auto grid max-w-5xl items-center gap-3 overflow-hidden rounded-[22px] border border-slate-200/70 bg-white px-5 py-5 shadow-[0_12px_36px_rgba(15,23,42,0.06)] sm:px-7 sm:py-6 lg:grid-cols-[minmax(14rem,0.8fr)_minmax(0,1fr)]">
