@@ -56,8 +56,32 @@ export type ClientRequestActionEmailInput = {
   message: string
 }
 
+export type ProjectRequestNotificationEmailInput = {
+  requestId: string
+  requestTitle: string
+  projectName: string
+  projectAddress: string | null
+  clientName: string
+  clientEmail: string | null
+  clientPhone: string | null
+  items: Array<{
+    name: string
+    department: string
+    quantity: number
+    unit: string | null
+    details: string[]
+  }>
+  attachmentNames: string[]
+}
+
+export type ProjectRequestNotificationEmailResult = {
+  owner: EmailDeliveryResult
+  client: EmailDeliveryResult
+}
+
 const DEFAULT_TO = "avitanneto@gmail.com"
-const DEFAULT_FROM = "Avantia Build <onboarding@resend.dev>"
+const DEFAULT_FROM = "Avantia Build <office@build.avantiap.com>"
+const RESEND_TEST_FROM = "Avantia Build <onboarding@resend.dev>"
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
@@ -239,16 +263,16 @@ async function sendEmail(input: {
   idempotencyKey: string
   attachments?: Array<{ filename: string; content: string }>
 }): Promise<EmailDeliveryResult> {
-  try {
+  const deliver = async (from: string, idempotencyKey: string) => {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${input.apiKey}`,
         "Content-Type": "application/json",
-        "Idempotency-Key": input.idempotencyKey,
+        "Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify({
-        from: input.from,
+        from,
         to: [input.to],
         subject: input.subject,
         html: input.html,
@@ -259,8 +283,16 @@ async function sendEmail(input: {
     })
 
     const payload = (await response.json().catch(() => null)) as { id?: string; message?: string; error?: string } | null
-    if (!response.ok) return { status: "failed", error: payload?.message || payload?.error || `Resend returned ${response.status}` }
-    return { status: "sent", providerId: payload?.id ?? null }
+    if (!response.ok) return { status: "failed" as const, error: payload?.message || payload?.error || `Resend returned ${response.status}` }
+    return { status: "sent" as const, providerId: payload?.id ?? null }
+  }
+
+  try {
+    const primary = await deliver(input.from, input.idempotencyKey)
+    if (primary.status === "sent" || input.from !== DEFAULT_FROM) return primary
+
+    const fallback = await deliver(RESEND_TEST_FROM, `${input.idempotencyKey}-verified-owner-fallback`)
+    return fallback.status === "sent" ? fallback : primary
   } catch (error) {
     return { status: "failed", error: error instanceof Error ? error.message : "Unknown email error" }
   }
@@ -268,7 +300,7 @@ async function sendEmail(input: {
 
 export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmailInput): Promise<EmailDeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.QUOTE_SUBMISSION_FROM || DEFAULT_FROM
+  const from = DEFAULT_FROM
   const ownerEmail = DEFAULT_TO
   const subject = `Avantia Build request: ${input.requestTitle}`
   const text = `${input.message.trim()}\n\nAvantia Build\nEverything it takes to build`
@@ -308,7 +340,7 @@ export async function sendClientRequestActionEmail(input: ClientRequestActionEma
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) return { status: "not_configured" }
 
-  const from = process.env.QUOTE_SUBMISSION_FROM || DEFAULT_FROM
+  const from = DEFAULT_FROM
   const subject = `${input.actionLabel}: ${input.requestTitle}`
   const text = [
     `Client action: ${input.actionLabel}`,
@@ -340,6 +372,80 @@ export async function sendClientRequestActionEmail(input: ClientRequestActionEma
     replyTo: input.clientEmail || undefined,
     idempotencyKey: `avantia-client-action-${input.requestId}-${crypto.randomUUID()}`,
   })
+}
+
+export async function sendProjectRequestNotificationEmail(input: ProjectRequestNotificationEmailInput): Promise<ProjectRequestNotificationEmailResult> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) return { owner: { status: "not_configured" }, client: { status: "not_configured" } }
+
+  const itemLines = input.items.flatMap((item) => [
+    `${item.department}: ${item.name} - ${item.quantity} ${item.unit || "item"}`,
+    ...item.details.map((detail) => `  ${detail}`),
+  ])
+  const text = [
+    "New Avantia Build project request",
+    "",
+    `Request: ${input.requestTitle}`,
+    `Project: ${input.projectName}`,
+    `Address: ${input.projectAddress || "Not provided"}`,
+    `Client: ${input.clientName}`,
+    `Email: ${input.clientEmail || "Not provided"}`,
+    `Phone: ${input.clientPhone || "Not provided"}`,
+    "",
+    "Items:",
+    ...itemLines,
+    ...(input.attachmentNames.length ? ["", "Attachments:", ...input.attachmentNames.map((name) => `- ${name}`)] : []),
+  ].join("\n")
+  const html = `
+    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.55;max-width:680px;margin:0 auto">
+      <p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Avantia Build project request</p>
+      <h1 style="margin:0 0 18px;font-size:24px">${escapeHtml(input.requestTitle)}</h1>
+      <div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc">
+        <strong>Project:</strong> ${escapeHtml(input.projectName)}<br />
+        <strong>Address:</strong> ${escapeHtml(input.projectAddress || "Not provided")}<br />
+        <strong>Client:</strong> ${escapeHtml(input.clientName)}<br />
+        <strong>Email:</strong> ${escapeHtml(input.clientEmail || "Not provided")}<br />
+        <strong>Phone:</strong> ${escapeHtml(input.clientPhone || "Not provided")}
+      </div>
+      <h2 style="margin:24px 0 10px;font-size:17px">Items and selections</h2>
+      ${input.items.map((item) => `<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e2e8f0"><strong>${escapeHtml(item.department)}: ${escapeHtml(item.name)}</strong><br /><span>${item.quantity} ${escapeHtml(item.unit || "item")}</span>${item.details.length ? `<ul style="margin:8px 0 0;padding-left:18px">${item.details.map((detail) => `<li>${escapeHtml(detail)}</li>`).join("")}</ul>` : ""}</div>`).join("")}
+      ${input.attachmentNames.length ? `<h2 style="margin:24px 0 10px;font-size:17px">Attachments</h2><ul>${input.attachmentNames.map((name) => `<li>${escapeHtml(name)}</li>`).join("")}</ul>` : ""}
+    </div>
+  `
+  const owner = await sendEmail({
+    apiKey,
+    from: DEFAULT_FROM,
+    to: DEFAULT_TO,
+    subject: `New ${input.requestTitle}: ${input.projectName}`,
+    html,
+    text,
+    replyTo: input.clientEmail || undefined,
+    idempotencyKey: `avantia-project-request-owner-${input.requestId}`,
+  })
+
+  if (!input.clientEmail) return { owner, client: { status: "skipped" } }
+  const clientText = [
+    `Hi ${input.clientName || "there"},`,
+    "",
+    `We received your ${input.requestTitle}.`,
+    `Project: ${input.projectName}`,
+    "",
+    "Someone from Avantia Build will review it and get back to you within 24 hours.",
+    "",
+    "Avantia Build",
+    "You build. We handle the materials.",
+  ].join("\n")
+  const client = await sendEmail({
+    apiKey,
+    from: DEFAULT_FROM,
+    to: input.clientEmail,
+    subject: `We received your request: ${input.requestTitle}`,
+    html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.55;max-width:620px;margin:0 auto"><p>Hi ${escapeHtml(input.clientName || "there")},</p><h1 style="font-size:22px">We received your request</h1><p><strong>${escapeHtml(input.requestTitle)}</strong><br />Project: ${escapeHtml(input.projectName)}</p><p>Someone from Avantia Build will review it and get back to you within 24 hours.</p><p style="margin-top:24px"><strong>Avantia Build</strong><br /><span style="color:#64748b">You build. We handle the materials.</span></p></div>`,
+    text: clientText,
+    replyTo: DEFAULT_TO,
+    idempotencyKey: `avantia-project-request-client-${input.requestId}`,
+  })
+  return { owner, client }
 }
 
 export type QuoteIntakeEmailInput = {
@@ -411,7 +517,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
   }
 
   const to = DEFAULT_TO
-  const from = process.env.QUOTE_SUBMISSION_FROM || DEFAULT_FROM
+  const from = DEFAULT_FROM
   const fullName = `${input.firstName} ${input.lastName}`.trim()
   const address = [input.street, input.city, input.state, input.zip].filter(Boolean).join(", ")
   const departmentText = input.departments.join(", ") || "Not specified"
@@ -528,7 +634,7 @@ export async function sendCartSubmissionEmail(input: CartSubmissionEmailInput): 
   }
 
   const to = DEFAULT_TO
-  const from = process.env.QUOTE_SUBMISSION_FROM || DEFAULT_FROM
+  const from = DEFAULT_FROM
   const clientEmail = input.customer.email || input.customer.profile?.email || ""
   const owner = await sendEmail({
     apiKey,

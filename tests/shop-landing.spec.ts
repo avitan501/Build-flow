@@ -131,6 +131,7 @@ test("footer has the complete Avantia Build contact lockup", async ({ page }) =>
 
   const footer = page.locator("footer")
   await expect(footer.getByText("You build. We handle the materials.", { exact: true })).toBeVisible()
+  await expect(footer.getByRole("link", { name: "office@build.avantiap.com" })).toHaveAttribute("href", "mailto:office@build.avantiap.com")
   await expect(footer.getByRole("link", { name: "(929) 207-7156" })).toHaveAttribute("href", "tel:+19292077156")
   await expect(footer.getByRole("link", { name: "WhatsApp us" })).toHaveAttribute("href", "https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20with%20construction%20materials.")
   await expect(footer.getByTestId("avantia-build-lockup")).toBeVisible()

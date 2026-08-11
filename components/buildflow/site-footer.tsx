@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { MessageCircle } from "lucide-react"
+import { Mail, MessageCircle } from "lucide-react"
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 
@@ -14,6 +14,9 @@ export function SiteFooter() {
         </Link>
         <p className="mt-3 text-sm font-semibold text-slate-700">You build. We handle the materials.</p>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          <a href="mailto:office@build.avantiap.com" className="inline-flex min-h-10 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-[#0E2A4A] transition hover:border-sky-300 hover:bg-sky-50 hover:text-[#0066cc]">
+            <Mail className="h-4 w-4" aria-hidden="true" /> office@build.avantiap.com
+          </a>
           <a href="tel:+19292077156" className="inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-[#0E2A4A] transition hover:border-sky-300 hover:bg-sky-50 hover:text-[#0066cc]">
             (929) 207-7156
           </a>

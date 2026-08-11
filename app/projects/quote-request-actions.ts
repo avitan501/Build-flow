@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { getSessionWithProfile } from "@/lib/auth"
-import { sendClientRequestActionEmail } from "@/lib/cart-submission-email"
+import { sendClientRequestActionEmail, sendProjectRequestNotificationEmail } from "@/lib/cart-submission-email"
 import {
   buildMaterialQuestionnaireSnapshot,
   formatMaterialAnswer,
@@ -26,7 +26,96 @@ export type ClientRequestActionType = "addon" | "change" | "question" | "cancel"
 async function currentUser() {
   const session = await getSessionWithProfile()
   if (!session.supabase || !session.user) return null
-  return { supabase: session.supabase, user: session.user }
+  return { supabase: session.supabase, user: session.user, profile: session.profile }
+}
+
+type RequestNotificationStatus = "sent" | "failed" | "not_configured" | "skipped"
+
+async function notifyNewProjectRequest(
+  session: NonNullable<Awaited<ReturnType<typeof currentUser>>>,
+  projectId: string,
+  requestId: string,
+): Promise<{ owner: RequestNotificationStatus; client: RequestNotificationStatus }> {
+  const [{ data: request }, { data: project }, { data: items }, { data: responses }, { data: attachments }] = await Promise.all([
+    session.supabase.from("quote_requests").select("id,title").eq("id", requestId).eq("project_id", projectId).eq("owner_id", session.user.id).maybeSingle<{ id: string; title: string }>(),
+    session.supabase.from("projects").select("id,name,address").eq("id", projectId).eq("owner_id", session.user.id).maybeSingle<{ id: string; name: string; address: string | null }>(),
+    session.supabase.from("quote_request_items").select("id,name,department,quantity,unit,answers,metadata").eq("request_id", requestId).eq("owner_id", session.user.id).returns<Array<{ id: string; name: string; department: string; quantity: number; unit: string | null; answers: QuoteRequestAnswer[] | null; metadata: Record<string, unknown> | null }>>(),
+    session.supabase.from("material_questionnaire_responses").select("id,definition_snapshot").eq("request_id", requestId).eq("owner_id", session.user.id).returns<Array<{ id: string; definition_snapshot: MaterialQuestionnaireResponse["definition_snapshot"] }>>(),
+    session.supabase.from("quote_request_attachments").select("file_name").eq("request_id", requestId).eq("owner_id", session.user.id).returns<Array<{ file_name: string }>>(),
+  ])
+  if (!request || !project || !items?.length) return { owner: "failed", client: "skipped" }
+
+  const responseIds = (responses ?? []).map((response) => response.id)
+  const { data: materialAnswers } = responseIds.length
+    ? await session.supabase.from("material_request_answers").select("response_id,question_label_snapshot,answer_display_snapshot").in("response_id", responseIds).returns<Array<{ response_id: string; question_label_snapshot: string; answer_display_snapshot: string }>>()
+    : { data: [] as Array<{ response_id: string; question_label_snapshot: string; answer_display_snapshot: string }> }
+  const materialDetails = (responses ?? []).flatMap((response) => (materialAnswers ?? [])
+    .filter((answer) => answer.response_id === response.id && answer.answer_display_snapshot.trim())
+    .map((answer) => `${answer.question_label_snapshot}: ${answer.answer_display_snapshot}`))
+
+  const delivery = await sendProjectRequestNotificationEmail({
+    requestId,
+    requestTitle: request.title,
+    projectName: project.name,
+    projectAddress: project.address,
+    clientName: session.profile?.full_name || session.user.user_metadata?.full_name || session.user.email || "Client",
+    clientEmail: session.user.email || session.profile?.email || null,
+    clientPhone: session.profile?.phone || null,
+    items: items.map((item, index) => {
+      const requestDetails = typeof item.metadata?.request_details === "string" ? item.metadata.request_details.trim() : ""
+      const legacyAnswers = (item.answers ?? []).filter((answer) => answer.value.trim()).map((answer) => `${answer.label}: ${answer.value}`)
+      return {
+        name: item.name,
+        department: item.department,
+        quantity: item.quantity,
+        unit: item.unit,
+        details: [
+          ...(index === 0 ? materialDetails : []),
+          ...legacyAnswers,
+          ...(requestDetails ? [requestDetails] : []),
+        ],
+      }
+    }),
+    attachmentNames: (attachments ?? []).map((attachment) => attachment.file_name),
+  })
+  return { owner: delivery.owner.status, client: delivery.client.status }
+}
+
+async function finalizeNewProjectRequest(
+  session: NonNullable<Awaited<ReturnType<typeof currentUser>>>,
+  projectId: string,
+  requestId: string,
+) {
+  const { data: request } = await session.supabase
+    .from("quote_requests")
+    .select("id,title,status")
+    .eq("id", requestId)
+    .eq("project_id", projectId)
+    .eq("owner_id", session.user.id)
+    .maybeSingle<{ id: string; title: string; status: string }>()
+  if (!request || request.status !== "draft") return { owner: "skipped" as const, client: "skipped" as const }
+
+  const notification = await notifyNewProjectRequest(session, projectId, requestId)
+  const { error } = await session.supabase
+    .from("quote_requests")
+    .update({ status: "submitted", submitted_at: new Date().toISOString() })
+    .eq("id", requestId)
+    .eq("project_id", projectId)
+    .eq("owner_id", session.user.id)
+    .eq("status", "draft")
+  if (error) return { owner: "failed" as const, client: notification.client }
+
+  await createProjectEvent({
+    supabase: session.supabase,
+    projectId,
+    ownerId: session.user.id,
+    eventType: "status_changed",
+    source: "quotes",
+    title: `${request.title} received`,
+    description: notification.owner === "sent" ? "Owner and client notifications were processed." : "Request saved; owner email needs attention.",
+    metadata: { quote_request_id: requestId, owner_email: notification.owner, client_email: notification.client },
+  })
+  return notification
 }
 
 export async function getAddToProjectOptionsAction(): Promise<ActionResult<{
@@ -250,7 +339,7 @@ export async function saveMaterialQuestionnaireResponseAction(input: {
   responseId: string
   answers: Record<string, MaterialAnswerValue>
   complete: boolean
-}): Promise<ActionResult> {
+}): Promise<ActionResult<{ notification: { owner: RequestNotificationStatus; client: RequestNotificationStatus } }>> {
   const session = await currentUser()
   if (!session) return { ok: false, error: "Your session expired. Please sign in again.", authRequired: true }
 
@@ -299,9 +388,13 @@ export async function saveMaterialQuestionnaireResponseAction(input: {
     completed_at: input.complete ? new Date().toISOString() : null,
   }).eq("id", response.id)
   if (responseError) return { ok: false, error: "Answers saved, but completion status could not be updated." }
+  const notification = input.complete
+    ? await finalizeNewProjectRequest(session, input.projectId, input.requestId)
+    : { owner: "skipped" as const, client: "skipped" as const }
   revalidatePath(`/projects/${input.projectId}`)
   revalidatePath(`/projects/${input.projectId}/requests/${input.requestId}`)
-  return { ok: true, data: undefined }
+  revalidatePath("/owner/materials/requests")
+  return { ok: true, data: { notification } }
 }
 
 export async function saveQuoteItemAnswersAction(input: {
@@ -310,7 +403,7 @@ export async function saveQuoteItemAnswersAction(input: {
   itemId: string
   answers: QuoteRequestAnswer[]
   skipped?: boolean
-}): Promise<ActionResult> {
+}): Promise<ActionResult<{ notification: { owner: RequestNotificationStatus; client: RequestNotificationStatus } }>> {
   const session = await currentUser()
   if (!session) return { ok: false, error: "Your session expired. Please sign in again.", authRequired: true }
 
@@ -323,8 +416,13 @@ export async function saveQuoteItemAnswersAction(input: {
     .eq("owner_id", session.user.id)
 
   if (error) return { ok: false, error: "Could not save the answers." }
+  const notification = input.skipped
+    ? { owner: "skipped" as const, client: "skipped" as const }
+    : await finalizeNewProjectRequest(session, input.projectId, input.requestId)
   revalidatePath(`/projects/${input.projectId}`)
-  return { ok: true, data: undefined }
+  revalidatePath(`/projects/${input.projectId}/requests/${input.requestId}`)
+  revalidatePath("/owner/materials/requests")
+  return { ok: true, data: { notification } }
 }
 
 export async function updateProjectAction(input: {

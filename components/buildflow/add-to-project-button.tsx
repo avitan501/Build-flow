@@ -229,8 +229,9 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
         return
       }
       setAnswers({})
+      setQuestionnaireCompleted(true)
+      onAdded?.()
       router.refresh()
-      if (!skipped || questions.length === 0) setOpen(false)
     })
   }
 
@@ -306,7 +307,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
                 </div>
               ) : null}
 
-              {created && !created.materialResponse ? (
+              {created && !created.materialResponse && !questionnaireCompleted ? (
                 <div className="grid gap-4">
                   <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
                     Added to the project. Complete these details now or return before submitting.
