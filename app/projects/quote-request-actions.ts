@@ -474,16 +474,16 @@ export async function createClientRequestAction(input: {
     cancel: "Cancellation requested",
   }
   const label = labels[input.action]
-  await createProjectEvent({
-    supabase: session.supabase,
-    projectId: input.projectId,
-    ownerId: session.user.id,
-    eventType: input.action === "cancel" ? "status_changed" : "note_added",
+  const { error: eventError } = await session.supabase.from("project_events").insert({
+    project_id: input.projectId,
+    owner_id: session.user.id,
+    event_type: input.action === "cancel" ? "status_changed" : "note_added",
     source: "website",
     title: `${label}: ${request.title}`,
     description: message,
     metadata: { quote_request_id: input.requestId, client_action: input.action },
   })
+  if (eventError) return { ok: false, error: "Could not save this request update. Please try again." }
 
   const clientName = session.profile?.full_name || session.user.user_metadata?.full_name || session.user.email || "Client"
   const delivery = await sendClientRequestActionEmail({
