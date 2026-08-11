@@ -73,14 +73,19 @@ test("department categories use distinct unframed product cutouts", async ({ pag
   expect(new Set(sources).size).toBe(9)
 })
 
-test("flooring uses the customer-facing name and framing uses a lumber cutout", async ({ page }) => {
+test("customer-facing department names and category cutouts are clean", async ({ page }) => {
   await page.goto("/shop")
 
   await expect(page.getByTestId("department-card").filter({ hasText: "Flooring" })).toBeVisible()
   await expect(page.getByTestId("department-card").filter({ hasText: "Wood Floor" })).toHaveCount(0)
+  await expect(page.getByTestId("department-card").filter({ hasText: "Tile work" })).toHaveCount(0)
+  await expect(page.getByTestId("department-card").filter({ hasText: "Tile" })).toBeVisible()
 
   const framingCard = page.getByTestId("department-card").filter({ hasText: "Framing" })
   await expect(framingCard.getByRole("img", { name: /framing/i })).toHaveCSS("background-image", /lumber-grid\.webp/)
+
+  const electricalCard = page.getByTestId("department-card").filter({ hasText: "Electrical" })
+  await expect(electricalCard.getByRole("img")).toHaveAttribute("src", /electrical-bx-cutout\.jpg/)
 })
 
 test("retired departments are hidden and category photos stay clean", async ({ page }) => {
@@ -125,7 +130,7 @@ test("footer has the complete Avantia Build contact lockup", async ({ page }) =>
   const footer = page.locator("footer")
   await expect(footer.getByText("You build. We handle the materials.", { exact: true })).toBeVisible()
   await expect(footer.getByRole("link", { name: "(929) 207-7156" })).toHaveAttribute("href", "tel:+19292077156")
-  await expect(footer.locator("svg")).toBeVisible()
+  await expect(footer.getByTestId("avantia-build-lockup")).toBeVisible()
 })
 
 test("traffic endpoint accepts same-site events and blocks cross-site submissions", async ({ request }) => {

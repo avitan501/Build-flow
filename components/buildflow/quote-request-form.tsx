@@ -187,7 +187,7 @@ export function QuoteRequestForm({ mode = "request" }: { mode?: "request" | "bea
         <div>
           <p className="text-sm font-semibold text-slate-800">Choose relevant departments <span className="font-normal text-slate-500">Optional</span></p>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {departments.map((department) => <label key={department} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-900"><input type="checkbox" name="departments" value={department} className="h-4 w-4 accent-[#0071e3]" />{department}</label>)}
+            {departments.map((department) => <label key={department} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-900"><input type="checkbox" name="departments" value={department} className="h-4 w-4 accent-[#0071e3]" />{department === "Tile work" ? "Tile" : department}</label>)}
           </div>
         </div>
         <label className={labelClass}>{beatQuote ? "Anything we should know?" : "Project details or material list"} <span className="font-normal text-slate-500">Optional when attaching a file</span><textarea name="details" rows={5} maxLength={5000} placeholder={beatQuote ? "Tell us which items, delivery terms, or substitutions must stay the same." : "Tell us what you need, or attach your plan or list below."} className={`${inputClass} min-h-32 resize-y py-3`} /></label>

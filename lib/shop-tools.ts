@@ -57,8 +57,8 @@ export const SHOP_TOOL_CATEGORIES: ShopToolCategory[] = [
     slug: "electrical",
     label: "Electrical",
     description: "Romex, BX, cable, boxes, fittings, and electrical rough-in materials.",
-    imageUrl: "/images/buildflow-retail/electrical-cable-department-v1.webp",
-    imageAlt: "Electrical cable, boxes, fittings, and rough-in materials in a supply aisle",
+    imageUrl: "/images/buildflow-retail/electrical-bx-cutout.jpg",
+    imageAlt: "Coiled metal-clad electrical cable",
     symbols: ["shopping-list", "blueprint", "delivery"],
   },
   {

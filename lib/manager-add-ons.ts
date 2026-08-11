@@ -3,6 +3,7 @@ import { DEPARTMENT_SYMBOL_KEYS, type DepartmentSymbolKey, type ShopToolCategory
 
 const DEFAULT_HIDDEN_DEPARTMENTS = new Set(["Services", "Kitchen", "Eitan"])
 const DEFAULT_DEPARTMENT_DISPLAY_LABELS: Record<string, string> = {
+  "Tile work": "Tile",
   "Wood Floor": "Flooring",
 }
 

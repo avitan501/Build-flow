@@ -228,7 +228,7 @@ function electricalQuestion(input: Partial<MaterialQuestion> & Pick<MaterialQues
 export const ELECTRICAL_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
   category: { id: ELECTRICAL_CATEGORY_ID, name: "Electrical Cable Quick Order", slug: "electrical-cable-preview", department_key: "Electrical", description: "Build a repeatable Romex or BX cable list.", current_version: 1 },
   questions: [
-    electricalQuestion({ id: "cable-items", question_key: "cable_items", label: "Add the cable you need", help_text: "Use one row for each cable type and size.", question_type: "item_list", is_required: true, sort_order: 10, configuration: { itemMode: "cable", itemSizes: ["Romex", "BX"], cableNumbers: ["14/2", "14/3", "12/2", "12/3", "10/2", "10/3", "8/3", "6/3"], itemLengths: ["25 ft.", "50 ft.", "100 ft.", "250 ft.", "500 ft.", "1000 ft."], imageUrl: "/images/buildflow-retail/electrical-cable-department-v1.webp" } }),
+    electricalQuestion({ id: "cable-items", question_key: "cable_items", label: "Add the cable you need", help_text: "Use one row for each cable type and size.", question_type: "item_list", is_required: true, sort_order: 10, configuration: { itemMode: "cable", itemSizes: ["Romex", "BX"], cableNumbers: ["14/2", "14/3", "12/2", "12/3", "10/2", "10/3", "8/3", "6/3"], itemLengths: ["25 ft.", "50 ft.", "100 ft.", "250 ft.", "500 ft.", "1000 ft."], imageUrl: "/images/buildflow-retail/electrical-bx-cutout.jpg" } }),
     electricalQuestion({ id: "electrical-notes", question_key: "electrical_notes", label: "Any wire color, conductor, or delivery notes?", question_type: "long_text", placeholder: "Add copper or aluminum, color, voltage, packaging, or delivery details.", sort_order: 20 }),
   ],
 }

@@ -388,14 +388,14 @@ export function ShopProjectToolPicker({
         ) : null}
       </section>
 
-      <section className="min-w-0 py-5 sm:py-7">
+      <section className="min-w-0 py-4 sm:py-6">
         <div className="px-1">
           <div>
-            <h2 className="text-[1.85rem] font-semibold leading-tight text-[#1d1d1f] sm:text-[2.35rem]">What are you working on now?</h2>
+            <h2 className="max-w-[16ch] text-[1.75rem] font-semibold leading-[1.12] text-[#1d1d1f] sm:max-w-none sm:text-[2.3rem]">What are you working on now?</h2>
           </div>
         </div>
 
-        <div data-testid="department-grid" className="mt-5 grid w-full min-w-0 grid-cols-3 gap-3 px-1 pb-4 sm:grid-cols-4 sm:gap-4 lg:grid-cols-5">
+        <div data-testid="department-grid" className="mt-4 grid w-full min-w-0 grid-cols-3 gap-x-4 gap-y-5 px-1 pb-5 sm:grid-cols-4 sm:gap-x-6 sm:gap-y-7 lg:grid-cols-5">
           {visibleCategories.map((category) => {
             const isManagerCategory = managerCategorySlugs.has(category.slug)
             const href = isManagerCategory
@@ -409,7 +409,7 @@ export function ShopProjectToolPicker({
                 href={href}
                 prefetch={false}
                 data-testid="department-card"
-                className="group flex min-h-[128px] min-w-0 touch-manipulation flex-col items-center text-center transition duration-200 hover:-translate-y-0.5 active:scale-[0.97] sm:min-h-[154px]"
+                className="group flex min-w-0 touch-manipulation flex-col items-center text-center transition duration-200 hover:-translate-y-0.5 active:scale-[0.97]"
               >
                 <span className="relative block aspect-square w-full overflow-hidden bg-white mix-blend-multiply">
                   {cutout ? (
@@ -425,11 +425,11 @@ export function ShopProjectToolPicker({
                       alt={category.imageAlt}
                       fill
                       sizes="(max-width: 639px) 32vw, (max-width: 1023px) 24vw, 18vw"
-                      className="scale-[0.94] object-cover [mask-image:radial-gradient(ellipse_72%_62%_at_center,#000_58%,transparent_100%)] transition duration-300 group-hover:scale-[0.98]"
+                      className="scale-[0.9] object-contain transition duration-300 group-hover:scale-[0.94]"
                     />
                   )}
                 </span>
-                <span className="mt-2 block w-full min-w-0 px-1 text-[13px] font-semibold leading-4 text-[#1d1d1f] [overflow-wrap:anywhere] sm:text-[15px] sm:leading-5">
+                <span className="mt-1.5 block w-full min-w-0 px-0.5 text-[13px] font-semibold leading-4 text-[#1d1d1f] [overflow-wrap:anywhere] sm:mt-2 sm:text-[15px] sm:leading-5">
                   {category.label}
                 </span>
               </Link>
