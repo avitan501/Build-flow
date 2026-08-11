@@ -149,8 +149,8 @@ export function QuoteRequestForm({ mode = "request" }: { mode?: "request" | "bea
         <legend className="w-full px-5 pt-6 text-xl font-semibold text-slate-950 sm:px-8 sm:pt-8">1. Contact information</legend>
         <label className={`${labelClass} sm:col-span-2`}>Full name<input name="fullName" required autoComplete="name" placeholder="First and last name" className={inputClass} /></label>
         <label className={labelClass}>Email<input name="email" required type="email" autoComplete="email" className={inputClass} /></label>
-        <label className={labelClass}>Phone <span className="font-normal text-slate-500">Optional</span><input name="phone" type="tel" inputMode="tel" autoComplete="tel" className={inputClass} /></label>
-        <label className={labelClass}>Company <span className="font-normal text-slate-500">Optional</span><input name="company" autoComplete="organization" className={inputClass} /></label>
+        <label className={labelClass}>Phone<input name="phone" required type="tel" inputMode="tel" autoComplete="tel" className={inputClass} /></label>
+        <label className={labelClass}><span>Company <span className="font-normal text-slate-500">(optional)</span></span><input name="company" autoComplete="organization" className={inputClass} /></label>
       </fieldset>
 
       <fieldset className="grid gap-4 border-b border-slate-200 px-5 py-6 sm:grid-cols-2 sm:px-8 sm:py-8">

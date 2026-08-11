@@ -108,7 +108,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
 
   if (!firstName || !lastName) return error("Enter your full name, including first and last name.")
   if (!/^\S+@\S+\.\S+$/.test(email)) return error("Enter a valid email address.")
-  if (phone && phone.replace(/\D/g, "").length < 7) return error("Enter a valid phone number or leave it blank.")
+  if (phone.replace(/\D/g, "").length < 7) return error("Enter a valid phone number.")
 
   const uploaded = formData.get("attachment")
   const attachmentPath = field(formData, "attachmentPath", 300)
