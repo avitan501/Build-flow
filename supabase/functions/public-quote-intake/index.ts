@@ -131,11 +131,16 @@ function hasServiceRoleKey(request: Request) {
   return Boolean(token) && token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
 }
 
+function hasBearerToken(request: Request) {
+  return Boolean(request.headers.get("authorization")?.replace(/^Bearer\s+/i, ""))
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders })
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405)
   const serviceRoleRequest = hasServiceRoleKey(request)
-  if (!serviceRoleRequest && !hasValidPublicKey(request)) return json({ error: "unauthorized" }, 401)
+  const publicKeyRequest = hasValidPublicKey(request)
+  if (!serviceRoleRequest && !publicKeyRequest && !hasBearerToken(request)) return json({ error: "unauthorized" }, 401)
 
   let rawPayload: QuotePayload | EmailActionPayload
   try {
@@ -143,6 +148,8 @@ Deno.serve(async (request) => {
   } catch {
     return json({ error: "invalid_json" }, 400)
   }
+
+  if (!("action" in rawPayload) && !serviceRoleRequest && !publicKeyRequest) return json({ error: "unauthorized" }, 401)
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
