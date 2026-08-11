@@ -88,15 +88,19 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="px-3 sm:px-5" aria-labelledby="coverage-heading">
-        <div className="mx-auto grid max-w-6xl items-center gap-5 overflow-hidden rounded-[28px] border border-white bg-white px-5 py-7 shadow-[0_18px_48px_rgba(15,23,42,0.08)] sm:px-8 sm:py-9 lg:grid-cols-[minmax(15rem,0.7fr)_minmax(0,1.1fr)] lg:px-10">
+      <div className="px-3 sm:px-5">
+        <ShopBrandShowcase compact />
+      </div>
+
+      <section className="mt-5 px-3 sm:px-5" aria-labelledby="coverage-heading">
+        <div className="mx-auto grid max-w-5xl items-center gap-3 overflow-hidden rounded-[22px] border border-slate-200/70 bg-white px-5 py-5 shadow-[0_12px_36px_rgba(15,23,42,0.06)] sm:px-7 sm:py-6 lg:grid-cols-[minmax(14rem,0.8fr)_minmax(0,1fr)]">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Nationwide sourcing</p>
-            <h2 id="coverage-heading" className="mt-2 text-2xl font-semibold leading-tight text-[#071126] sm:text-3xl">Covering 41 states.</h2>
-            <p className="mt-3 max-w-md text-sm leading-6 text-slate-600 sm:text-base">Local projects or out-of-state jobs, we help source construction materials where your work takes you.</p>
+            <h2 id="coverage-heading" className="mt-1.5 text-xl font-semibold leading-tight text-[#071126] sm:text-2xl">Covering 41 states.</h2>
+            <p className="mt-2 max-w-md text-sm leading-5 text-slate-600">Local or out of state, we source materials where your work takes you.</p>
           </div>
-          <div className="relative mx-auto aspect-[16/9] w-full max-w-md overflow-hidden lg:max-w-xl" data-testid="coverage-map">
-            <Image src="/images/buildflow-retail/us-coverage-map.webp" alt="Map showing Avantia Build coverage across the United States" fill sizes="(min-width: 1024px) 58vw, 100vw" className="object-contain" />
+          <div className="relative mx-auto aspect-[16/9] w-full max-w-xs overflow-hidden sm:max-w-sm" data-testid="coverage-map">
+            <Image src="/images/buildflow-retail/us-coverage-map.webp" alt="Map showing Avantia Build coverage across the United States" fill sizes="(min-width: 640px) 24rem, 100vw" className="object-contain" />
             {coverageDots.map(([left, top]) => (
               <span
                 key={`${left}-${top}`}
@@ -110,10 +114,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      <div className="mt-8 px-3 sm:mt-10 sm:px-5">
-        <ShopBrandShowcase compact />
-      </div>
     </main>
   );
 }

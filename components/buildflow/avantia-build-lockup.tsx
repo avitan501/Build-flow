@@ -1,3 +1,5 @@
+import { HardHat } from "lucide-react";
+
 type AvantiaBuildLockupProps = {
   compact?: boolean;
   showSlogan?: boolean;
@@ -6,21 +8,21 @@ type AvantiaBuildLockupProps = {
 };
 
 export function AvantiaBuildLockup({ compact = false, showSlogan = false, className = "", tone = "navy" }: AvantiaBuildLockupProps) {
-  const foreground = tone === "light" ? "text-white" : "text-[#0E2A4A]";
+  const foreground = tone === "light" ? "text-white" : "text-[#2b1409]";
 
   return (
     <span className={`flex min-w-0 flex-col ${className}`} data-testid="avantia-build-lockup">
       <span
-        className={`flex min-w-0 items-baseline whitespace-nowrap font-extrabold leading-none tracking-normal ${foreground}`}
+        className={`flex min-w-0 items-end whitespace-nowrap font-extrabold leading-none tracking-normal ${foreground}`}
         style={{ fontFamily: "var(--font-poppins), sans-serif" }}
         aria-label="Avantia Build"
         translate="no"
       >
-        <span className={`inline-flex ${compact ? "text-[1.08rem] sm:text-[1.15rem]" : "text-[1.55rem] sm:text-[1.75rem]"}`} aria-hidden="true">
-          av<span className="bg-[linear-gradient(135deg,#1E9BFF_0%,#1FC9C6_24%,#2BD98A_42%,#7E5BEA_68%,#F0419E_86%,#FF5BC2_100%)] bg-clip-text text-transparent">a</span>n<span className="relative inline-flex"><HardHat className={`absolute left-1/2 -translate-x-1/2 text-[#D99A16] ${compact ? "-top-2 h-3 w-3" : "-top-3 h-4 w-4"}`} strokeWidth={2.4} />t</span>ia
+        <span className={`inline-flex ${compact ? "text-[1.08rem] sm:text-[1.18rem]" : "text-[1.6rem] sm:text-[1.85rem]"}`} aria-hidden="true">
+          av<span className="text-[#ff5b00]">a</span>ntia
         </span>
-        <span className={`${compact ? "ml-1 text-[0.78rem] sm:text-[0.82rem]" : "ml-1.5 text-[1.02rem] sm:text-[1.15rem]"} font-bold`} aria-hidden="true">
-          Build
+        <span className={`relative ${compact ? "ml-1 text-[0.72rem] sm:text-[0.78rem]" : "ml-1.5 text-[0.94rem] sm:text-[1.05rem]"} pb-[0.04em] font-bold`} aria-hidden="true">
+          buil<span className="relative inline-block">d<HardHat className={`absolute left-1/2 -translate-x-1/2 scale-x-125 fill-[#ff6a00] text-[#9a3412] ${compact ? "-top-[0.68rem] h-3 w-3.5" : "-top-[0.92rem] h-4 w-5"}`} strokeWidth={2.1} /></span>
         </span>
       </span>
       {showSlogan ? (
@@ -31,4 +33,3 @@ export function AvantiaBuildLockup({ compact = false, showSlogan = false, classN
     </span>
   );
 }
-import { HardHat } from "lucide-react";

@@ -407,15 +407,15 @@ test("flooring review identifies the first required missing answer", async ({ pa
   await expect(page.locator("#question-wood-type").getByText("This field is required.")).toBeVisible()
 })
 
-test("shop shows the sourcing brands and direct help actions", async ({ page }) => {
+test("shop shows the sourcing brands without duplicate contact actions", async ({ page }) => {
   await page.goto("/shop")
 
   await expect(page.getByRole("heading", { name: "Shop Our Brands" })).toBeVisible()
   await expect(page.getByTestId("shop-brand-grid").getByRole("img")).toHaveCount(8)
   const brandCellBorders = await page.getByTestId("shop-brand-grid").locator(":scope > div").evaluateAll((cells) => cells.map((cell) => getComputedStyle(cell).borderWidth))
   expect(brandCellBorders.every((border) => border === "0px")).toBe(true)
-  await expect(page.getByRole("link", { name: "Call us" })).toHaveAttribute("href", "tel:+19292077156")
-  await expect(page.getByRole("link", { name: "WhatsApp us" }).first()).toHaveAttribute("href", "https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20finding%20construction%20materials.")
+  await expect(page.getByText("Brand availability varies.")).toHaveCount(0)
+  await expect(page.getByRole("link", { name: "WhatsApp us" })).toHaveCount(1)
 })
 
 test("guest projects stay compact until the full list is requested", async ({ page }) => {

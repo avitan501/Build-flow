@@ -1,7 +1,4 @@
 import Image from "next/image"
-import { MessageCircle } from "lucide-react"
-
-const BUSINESS_WHATSAPP_URL = "https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20finding%20construction%20materials."
 
 const SHOP_BRANDS = [
   { name: "Andersen", logo: "/images/brands/andersen.svg", scale: "scale-95" },
@@ -16,19 +13,19 @@ const SHOP_BRANDS = [
 
 export function ShopBrandShowcase({ compact = false }: { compact?: boolean }) {
   return (
-    <section aria-labelledby="shop-brands-heading" className={`${compact ? "mx-auto mt-0 max-w-6xl overflow-hidden rounded-[28px]" : "mt-8"} bg-white`}>
-      <div className={`mx-auto w-full max-w-7xl px-4 sm:px-8 lg:px-10 ${compact ? "py-6 sm:py-8" : "py-10 sm:py-14"}`}>
+    <section aria-labelledby="shop-brands-heading" className={`${compact ? "mx-auto max-w-5xl overflow-hidden rounded-[22px] border border-slate-200/70 shadow-[0_12px_36px_rgba(15,23,42,0.06)]" : "mt-8"} bg-white`}>
+      <div className={`mx-auto w-full max-w-7xl px-4 sm:px-8 lg:px-10 ${compact ? "py-5 sm:py-6" : "py-8 sm:py-10"}`}>
         <div className="text-center">
-          <h2 id="shop-brands-heading" className="text-2xl font-semibold tracking-normal text-[#1d1d1f] sm:text-3xl">Shop Our Brands</h2>
+          <h2 id="shop-brands-heading" className={`${compact ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl"} font-semibold tracking-normal text-[#1d1d1f]`}>Shop Our Brands</h2>
         </div>
 
-        <div className={`${compact ? "mt-5" : "mt-7"} brand-marquee`} data-testid="shop-brand-grid">
+        <div className={`${compact ? "mt-3" : "mt-6"} brand-marquee`} data-testid="shop-brand-grid">
           <div className="brand-marquee-track">
             {[0, 1].map((groupIndex) => (
               <div key={groupIndex} className="brand-marquee-group" aria-hidden={groupIndex === 1}>
                 {SHOP_BRANDS.map((brand) => (
-                  <div key={`${groupIndex}-${brand.name}`} className="flex h-20 w-36 shrink-0 items-center justify-center px-4 sm:h-24 sm:w-44">
-                    <div className="relative h-9 w-full max-w-28 sm:h-10 sm:max-w-32">
+                  <div key={`${groupIndex}-${brand.name}`} className={`${compact ? "h-16 w-28 sm:h-18 sm:w-36" : "h-20 w-36 sm:h-24 sm:w-44"} flex shrink-0 items-center justify-center px-3 sm:px-4`}>
+                    <div className={`${compact ? "h-7 max-w-24 sm:h-8 sm:max-w-28" : "h-9 max-w-28 sm:h-10 sm:max-w-32"} relative w-full`}>
                       <Image
                         src={brand.logo}
                         alt={groupIndex === 0 ? `${brand.name} logo` : ""}
@@ -42,27 +39,6 @@ export function ShopBrandShowcase({ compact = false }: { compact?: boolean }) {
                 ))}
               </div>
             ))}
-          </div>
-        </div>
-
-        <p className="mt-4 text-center text-[11px] leading-5 text-slate-400">
-          Brand availability varies. All trademarks belong to their respective owners.
-        </p>
-      </div>
-
-      <div className="bg-[#0e2a4a] px-4 py-4 text-white sm:px-8">
-        <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-3 text-center sm:flex-row sm:text-left">
-          <div>
-            <h3 className="text-base font-semibold tracking-normal">Need help finding something?</h3>
-            <p className="mt-0.5 text-xs leading-5 text-white/70">Call or WhatsApp us with what you need.</p>
-          </div>
-          <div className="grid w-full grid-cols-2 gap-2 sm:w-auto">
-            <a href="tel:+19292077156" className="inline-flex min-h-10 items-center justify-center rounded-full bg-white px-4 text-xs font-semibold text-[#0e2a4a] transition hover:bg-slate-100">
-              Call us
-            </a>
-            <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-white/35 px-4 text-xs font-semibold text-white transition hover:bg-white/10">
-              <MessageCircle className="h-4 w-4" aria-hidden="true" /> WhatsApp us
-            </a>
           </div>
         </div>
       </div>

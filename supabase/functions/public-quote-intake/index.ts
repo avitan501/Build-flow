@@ -173,9 +173,44 @@ Deno.serve(async (request) => {
   }
 
   if ("action" in rawPayload && rawPayload.action === "send_order_notifications") {
-    if (!serviceRoleRequest) return json({ error: "forbidden" }, 403)
-    const order = rawPayload.order
+    let order = rawPayload.order
     if (!order?.quoteId || !order.project?.name || !Array.isArray(order.quoteItems)) return json({ error: "invalid_request" }, 400)
+
+    if (!serviceRoleRequest) {
+      const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || ""
+      const { data: authenticated, error: authenticationError } = await supabase.auth.getUser(token)
+      if (authenticationError || !authenticated.user) return json({ error: "forbidden" }, 403)
+
+      const { data: ownedRequest } = await supabase
+        .from("quote_requests")
+        .select("id,project_id")
+        .eq("id", order.quoteId)
+        .eq("owner_id", authenticated.user.id)
+        .maybeSingle<{ id: string; project_id: string }>()
+      if (!ownedRequest) return json({ error: "forbidden" }, 403)
+
+      const [{ data: project }, { data: profile }] = await Promise.all([
+        supabase.from("projects").select("name,address").eq("id", ownedRequest.project_id).eq("owner_id", authenticated.user.id).maybeSingle<{ name: string; address: string | null }>(),
+        supabase.from("profiles").select("email,full_name,phone,company_name").eq("id", authenticated.user.id).maybeSingle<{ email: string | null; full_name: string | null; phone: string | null; company_name: string | null }>(),
+      ])
+      if (!project) return json({ error: "project_not_found" }, 404)
+
+      const verifiedEmail = authenticated.user.email || profile?.email || null
+      order = {
+        ...order,
+        project: { name: project.name, address: project.address },
+        customer: {
+          email: verifiedEmail,
+          profile: {
+            email: verifiedEmail,
+            full_name: profile?.full_name || authenticated.user.user_metadata?.full_name || null,
+            phone: profile?.phone || null,
+            company_name: profile?.company_name || null,
+          },
+        },
+      }
+    }
+
     const clientEmail = order.customer?.email || order.customer?.profile?.email || ""
     const clientName = order.customer?.profile?.full_name || "Client"
     const itemLines = order.quoteItems.map((item) => `- ${item.name}: ${item.quantity} ${item.unit} = ${money(item.line_total)}`)

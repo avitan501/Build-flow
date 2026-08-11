@@ -77,6 +77,16 @@ async function notifyNewProjectRequest(
       }
     }),
     attachmentNames: (attachments ?? []).map((attachment) => attachment.file_name),
+  }, async (payload) => {
+    const { data, error } = await session.supabase.functions.invoke("public-quote-intake", {
+      body: { action: "send_order_notifications", ...payload },
+    })
+    if (error) return { result: { status: "failed" as const, error: error.message } }
+    return (data ?? { result: { status: "failed", error: "Email service returned an empty response" } }) as {
+      owner?: { status: "sent"; providerId: string | null } | { status: "not_configured" } | { status: "skipped" } | { status: "failed"; error: string }
+      client?: { status: "sent"; providerId: string | null } | { status: "not_configured" } | { status: "skipped" } | { status: "failed"; error: string }
+      result?: { status: "sent"; providerId: string | null } | { status: "not_configured" } | { status: "skipped" } | { status: "failed"; error: string }
+    }
   })
   return { owner: delivery.owner.status, client: delivery.client.status }
 }

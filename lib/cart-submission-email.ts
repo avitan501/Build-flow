@@ -79,6 +79,12 @@ export type ProjectRequestNotificationEmailResult = {
   client: EmailDeliveryResult
 }
 
+type ProjectRequestNotificationFallback = (payload: Record<string, unknown>) => Promise<{
+  owner?: EmailDeliveryResult
+  client?: EmailDeliveryResult
+  result?: EmailDeliveryResult
+}>
+
 const DEFAULT_TO = "avitanneto@gmail.com"
 const DEFAULT_FROM = "Avantia Build <office@build.avantiap.com>"
 const RESEND_TEST_FROM = "Avantia Build <onboarding@resend.dev>"
@@ -374,8 +380,12 @@ export async function sendClientRequestActionEmail(input: ClientRequestActionEma
   })
 }
 
-export async function sendProjectRequestNotificationEmail(input: ProjectRequestNotificationEmailInput): Promise<ProjectRequestNotificationEmailResult> {
+export async function sendProjectRequestNotificationEmail(
+  input: ProjectRequestNotificationEmailInput,
+  authenticatedFallback?: ProjectRequestNotificationFallback,
+): Promise<ProjectRequestNotificationEmailResult> {
   const apiKey = process.env.RESEND_API_KEY
+  const sendFallback = authenticatedFallback ?? ((payload: Record<string, unknown>) => sendWithSupabaseEmailFallback("send_order_notifications", payload))
   const fallbackOrder = {
     quoteId: input.requestId,
     project: { name: input.projectName, address: input.projectAddress },
@@ -398,7 +408,7 @@ export async function sendProjectRequestNotificationEmail(input: ProjectRequestN
   }
 
   if (!apiKey) {
-    const fallback = await sendWithSupabaseEmailFallback("send_order_notifications", {
+    const fallback = await sendFallback({
       order: fallbackOrder,
       sendOwner: true,
       sendClient: Boolean(input.clientEmail),
@@ -456,7 +466,7 @@ export async function sendProjectRequestNotificationEmail(input: ProjectRequestN
 
   if (!input.clientEmail) {
     if (owner.status === "sent") return { owner, client: { status: "skipped" } }
-    const fallback = await sendWithSupabaseEmailFallback("send_order_notifications", { order: fallbackOrder, sendOwner: true, sendClient: false })
+    const fallback = await sendFallback({ order: fallbackOrder, sendOwner: true, sendClient: false })
     return { owner: fallback.owner ?? fallback.result ?? owner, client: { status: "skipped" } }
   }
   const clientText = [
@@ -481,7 +491,7 @@ export async function sendProjectRequestNotificationEmail(input: ProjectRequestN
     idempotencyKey: `avantia-project-request-client-${input.requestId}`,
   })
   if (owner.status === "sent" && client.status === "sent") return { owner, client }
-  const fallback = await sendWithSupabaseEmailFallback("send_order_notifications", {
+  const fallback = await sendFallback({
     order: fallbackOrder,
     sendOwner: owner.status !== "sent",
     sendClient: client.status !== "sent",
