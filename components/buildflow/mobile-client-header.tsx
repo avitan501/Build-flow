@@ -204,7 +204,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
                 aria-controls="shop-search-overlay"
               >
                 <SearchIcon />
-                <span className="truncate text-sm text-slate-500">{shopQuery || "Search materials"}</span>
+                <span className="truncate text-xs text-slate-500 min-[400px]:text-sm">{shopQuery || "Search materials"}</span>
               </button>
             </>
           ) : (

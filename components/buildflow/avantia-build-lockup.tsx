@@ -10,9 +10,9 @@ type AvantiaBuildLockupProps = {
 
 export function AvantiaBuildLockup({ compact = false, header = false, showSlogan = false, className = "" }: AvantiaBuildLockupProps) {
   const widthClass = header
-    ? "w-[5.75rem] min-[390px]:w-[6.5rem] sm:w-[8rem] md:w-[9.5rem]"
+    ? "w-[6.25rem] min-[390px]:w-[7.25rem] sm:w-[8.75rem] md:w-[10rem]"
     : compact
-      ? "w-[10rem] sm:w-[11rem]"
+      ? "w-[11.25rem] sm:w-[12.25rem]"
       : "w-[14rem] sm:w-[15.5rem]";
 
   return (
