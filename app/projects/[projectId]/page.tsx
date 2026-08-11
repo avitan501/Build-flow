@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { ProjectInfoEditor, ProjectQuestionsForm, ProjectRequestActions, SubmitQuoteRequestButton } from "@/components/buildflow/project-workspace-controls"
+import { ProjectInfoEditor, ProjectQuestionsForm, ProjectRequestActions } from "@/components/buildflow/project-workspace-controls"
 import { requireSignedInProfile } from "@/lib/auth"
 import { PROJECT_UPLOAD_STORAGE_BUCKET, type ProjectEventRecord, type ProjectRecord, type ProjectUploadRecord } from "@/lib/projects"
 import {
@@ -139,7 +139,6 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
                           </div>
                           <p className="mt-1 text-xs text-slate-500">Updated {formatDate(request.updated_at)} · {requestItems.length} item{requestItems.length === 1 ? "" : "s"} · {requestAttachments.length} file{requestAttachments.length === 1 ? "" : "s"}</p>
                         </div>
-                        {request.status === "draft" ? <SubmitQuoteRequestButton projectId={project.id} requestId={request.id} /> : null}
                       </div>
                       <RequestProgress status={request.status} />
                       {departments.length ? <div className="mt-3 flex flex-wrap gap-1.5">{departments.map((department) => <span key={department} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">{department}</span>)}</div> : null}

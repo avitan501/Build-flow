@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { ExportRequestPdfButton, MaterialQuestionnaireRequestEditor, ProjectRequestActions, QuoteItemAnswersEditor, SubmitQuoteRequestButton } from "@/components/buildflow/project-workspace-controls"
+import { ExportRequestPdfButton, MaterialQuestionnaireRequestEditor, ProjectRequestActions, QuoteItemAnswersEditor } from "@/components/buildflow/project-workspace-controls"
 import { requireSignedInProfile } from "@/lib/auth"
 import { PROJECT_UPLOAD_STORAGE_BUCKET } from "@/lib/projects"
 import { quoteRequestProgressIndex, quoteRequestStatusClass, quoteRequestStatusLabel, QUOTE_REQUEST_PROGRESS_STEPS, type QuoteRequestItemRecord, type QuoteRequestRecord } from "@/lib/quote-requests"
@@ -85,7 +85,6 @@ export default async function QuoteRequestDetailPage({ params }: { params: Promi
             </article>
           )
         })}
-        {!locked ? <section className="rounded-[18px] border border-slate-200 bg-white p-4"><h2 className="font-semibold">Send this request</h2><p className="mt-1 mb-3 text-sm text-slate-600">Submit the saved order details for review.</p><SubmitQuoteRequestButton projectId={projectId} requestId={requestId} /></section> : null}
       </div>
     </main>
   )

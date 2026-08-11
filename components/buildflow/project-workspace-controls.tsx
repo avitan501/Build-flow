@@ -9,7 +9,6 @@ import {
   saveMaterialQuestionnaireResponseAction,
   saveQuoteAttachmentRecordAction,
   saveProjectAnswersAction,
-  submitQuoteRequestAction,
   updateProjectAction,
   createClientRequestAction,
   type ClientRequestActionType,
@@ -238,28 +237,6 @@ export function ProjectQuestionsForm({ projectId, questions, initialAnswers }: {
         </div>
       ) : null}
     </section>
-  )
-}
-
-export function SubmitQuoteRequestButton({ projectId, requestId }: { projectId: string; requestId: string }) {
-  const router = useRouter()
-  const [message, setMessage] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
-
-  function submit() {
-    startTransition(async () => {
-      const result = await submitQuoteRequestAction({ projectId, requestId })
-      if (!result.ok) return setMessage(result.error)
-      setMessage("Quote Request submitted for review.")
-      router.refresh()
-    })
-  }
-
-  return (
-    <div className="grid gap-2">
-      <button type="button" disabled={isPending} onClick={submit} className="inline-flex min-h-10 items-center justify-center rounded-full bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50">{isPending ? "Submitting..." : "Submit Request"}</button>
-      {message ? <p className="text-xs leading-5 text-slate-600">{message}</p> : null}
-    </div>
   )
 }
 
