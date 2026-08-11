@@ -42,7 +42,7 @@ export default function Home() {
             style={{ backgroundImage: "url(/images/buildflow-retail/hero.jpg)" }}
             aria-hidden="true"
           />
-          <div className="absolute inset-0 -z-10 bg-[#071126]/82" aria-hidden="true" />
+          <div className="absolute inset-0 -z-10 bg-[#071126]/68" aria-hidden="true" />
           <div className="mx-auto flex min-h-[31rem] max-w-6xl flex-col justify-end px-6 py-8 sm:min-h-[34rem] sm:px-9 sm:py-11 lg:px-10">
             <h1 className="max-w-4xl text-4xl font-semibold leading-[1.08] sm:text-6xl">
               Keep Your Crew Building. We’ll Handle the Materials.
