@@ -214,7 +214,7 @@ export function ShopProjectToolPicker({
 
   return (
     <div className="grid gap-4">
-      <section className="rounded-[24px] border border-black/[0.06] bg-white px-4 py-4 shadow-[0_12px_36px_rgba(0,0,0,0.05)] sm:px-5">
+      <section className="max-w-4xl rounded-[20px] border border-black/[0.06] bg-white px-3 py-3 shadow-[0_10px_28px_rgba(0,0,0,0.05)] sm:px-4">
         <div className="flex min-w-0 items-start gap-3">
           <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#0E2A4A] text-white shadow-[0_8px_20px_rgba(14,42,74,0.18)]">
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -235,7 +235,7 @@ export function ShopProjectToolPicker({
               className="mt-1 flex w-full min-w-0 items-center justify-between gap-3 text-left outline-none"
             >
               <span data-testid="project-address-value" className="min-w-0 text-base font-semibold leading-6 text-[#1d1d1f] [overflow-wrap:anywhere]">{selectedAddressLabel}</span>
-              <span className="shrink-0 text-sm font-semibold text-[#0066cc]">{addressPickerOpen ? "Close" : selectedAddressLabel === "No selected address" ? "Add" : "Change"}</span>
+              <span className="inline-flex min-h-8 shrink-0 items-center rounded-full bg-slate-100 px-3 text-xs font-semibold text-[#0066cc]">{addressPickerOpen ? "Close" : selectedAddressLabel === "No selected address" ? "+ Add" : "Change"}</span>
             </button>
             {selectedAddressHelper ? <p aria-live="polite" className="mt-1 text-xs leading-5 text-slate-500">{selectedAddressHelper}</p> : null}
           </div>
@@ -409,14 +409,14 @@ export function ShopProjectToolPicker({
                 href={href}
                 prefetch={false}
                 data-testid="department-card"
-                className="group flex min-w-0 touch-manipulation flex-col items-center rounded-[22px] p-1 text-center transition duration-200 hover:-translate-y-0.5 hover:bg-slate-200/55 focus-visible:bg-slate-200/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.97]"
+                className="group flex min-w-0 touch-manipulation flex-col items-center rounded-[22px] bg-transparent p-1 text-center transition duration-200 hover:-translate-y-0.5 hover:bg-slate-200/65 focus-visible:bg-slate-200/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.97]"
               >
-                <span className="relative block aspect-square w-full overflow-hidden bg-white mix-blend-multiply">
+                <span className="relative block aspect-square w-full overflow-hidden rounded-[18px] bg-transparent mix-blend-multiply">
                   {cutout ? (
                     <span
                       role="img"
                       aria-label={category.imageAlt}
-                      className="absolute inset-0 bg-white bg-no-repeat transition duration-300 group-hover:scale-[1.04]"
+                      className="absolute inset-0 bg-transparent bg-no-repeat transition duration-300 group-hover:scale-[1.04]"
                       style={{ backgroundImage: `url(${cutout.imageUrl})`, backgroundPosition: cutout.imagePosition, backgroundSize: "400% 200%" }}
                     />
                   ) : (

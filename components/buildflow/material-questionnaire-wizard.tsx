@@ -157,7 +157,7 @@ function QuestionControl({ question, value, onChange, disabled, onUpload, compac
     return <select id={controlId} name={question.question_key} aria-label={question.label} disabled={disabled} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} className="min-h-13 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"><option value="">Choose one</option>{question.options.map((option) => <option key={option.id} value={option.value}>{option.label}</option>)}</select>
   }
   if (question.question_type === "long_text") {
-    return <textarea id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} rows={compact ? 2 : 5} value={typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(event.target.value)} className={`w-full border border-slate-300 px-4 py-3 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50 ${compact ? "min-h-20 rounded-lg text-sm" : "rounded-2xl text-base"}`} />
+    return <textarea id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} rows={compact ? 2 : 5} value={typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(event.target.value)} className={`w-full border border-slate-300 px-4 py-2.5 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50 ${compact ? "min-h-16 rounded-lg text-sm" : "rounded-2xl text-base"}`} />
   }
   if (question.question_type === "quantity") {
     const current = typeof value === "object" && value && !Array.isArray(value) ? value : {}
@@ -210,6 +210,19 @@ function initialQuestionnaireAnswers(snapshot: MaterialQuestionnaireSnapshot, in
   return answers
 }
 
+function requiredFieldProgress(question: MaterialQuestion, value: MaterialAnswerValue) {
+  if (question.question_type !== "item_list") {
+    return { complete: hasCompleteMaterialAnswer(question, value) ? 1 : 0, total: 1 }
+  }
+
+  const items = typeof value === "object" && value && !Array.isArray(value) && value.items?.length
+    ? value.items
+    : [{ size: "", length: "", quantity: 0 }]
+  const fields = question.configuration.itemMode === "cable" ? ["size", "code", "length", "quantity"] as const : ["size", "length", "quantity"] as const
+  const complete = items.reduce((count, item) => count + fields.filter((field) => field === "quantity" ? Number(item.quantity) > 0 : Boolean(item[field])).length, 0)
+  return { complete, total: items.length * fields.length }
+}
+
 export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, displayMode = "steps", density = "comfortable", configurator = false, embedded = false, locked = false, requireCompletion = false, onAnswersChange, onClose, onSave, onUpload }: MaterialQuestionnaireWizardProps) {
   const [answers, setAnswers] = useState<Record<string, MaterialAnswerValue>>(() => initialQuestionnaireAnswers(snapshot, initialAnswers))
   const [step, setStep] = useState(0)
@@ -224,8 +237,11 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
   const compact = density === "compact"
   const answeredQuestions = visibleQuestions.filter((question) => hasMaterialAnswer(answerForQuestion(question, answers)))
   const requiredQuestions = visibleQuestions.filter((question) => question.is_required)
-  const requiredAnswered = requiredQuestions.filter((question) => hasCompleteMaterialAnswer(question, answerForQuestion(question, answers))).length
-  const completionPercent = requiredQuestions.length ? Math.round((requiredAnswered / requiredQuestions.length) * 100) : 100
+  const requiredProgress = requiredQuestions.reduce((totals, question) => {
+    const progress = requiredFieldProgress(question, answerForQuestion(question, answers))
+    return { complete: totals.complete + progress.complete, total: totals.total + progress.total }
+  }, { complete: 0, total: 0 })
+  const completionPercent = requiredProgress.total ? Math.round((requiredProgress.complete / requiredProgress.total) * 100) : 100
   const quantityQuestion = visibleQuestions.find((question) => question.question_type === "square_feet" || /area|square|count|quantity|amount/.test(question.question_key.toLowerCase()))
   const quantityAnswer = quantityQuestion ? answerForQuestion(quantityQuestion, answers) : null
   const quantityLabel = quantityQuestion && hasMaterialAnswer(quantityAnswer) ? formatMaterialAnswer(quantityQuestion, quantityAnswer) : ""
@@ -298,7 +314,8 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
   function renderQuestion(question: MaterialQuestion, index: number) {
     const hasError = errorQuestionId === question.id
     const singleSpecification = configurator && question.question_type === "single_select" && question.options.length === 1
-    const compactOptionalNote = compact && question.question_type === "long_text" && !question.is_required
+    const compactAccessory = configurator && configuratorGroupFor(question) === "extras"
+    const compactOptionalNote = (compact || compactAccessory) && question.question_type === "long_text" && !question.is_required
     const pairedConfiguratorQuestion = configurator && ["sheet_size", "thickness", "flooring_area", "waste_allowance"].includes(question.question_key)
     const gridSpan = pairedConfiguratorQuestion ? "col-span-1" : "col-span-2"
     if (singleSpecification) {
@@ -314,25 +331,25 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
         key={question.id}
         id={`question-${question.id}`}
         data-question-key={question.question_key}
-        className={`${gridSpan} ${compactOptionalNote ? "scroll-mt-28 py-2" : compact ? "scroll-mt-28 py-3 first:pt-0 last:pb-0" : "scroll-mt-24 pb-7"} min-w-0 border-b border-slate-100 last:border-b-0`}
+        className={`${gridSpan} ${compactOptionalNote ? "scroll-mt-28 py-2" : compact || compactAccessory ? "scroll-mt-28 py-2.5 first:pt-0 last:pb-0" : "scroll-mt-24 pb-7"} min-w-0 border-b border-slate-100 last:border-b-0`}
         aria-describedby={question.help_text ? `question-help-${question.id}` : undefined}
       >
         {!compact ? <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Question {index + 1}</p> : null}
         <div className="flex items-start gap-3">
-          {question.configuration.imageUrl ? <span role="img" aria-label="" className="h-11 w-11 shrink-0 rounded-lg border border-[#e5e5e7] bg-white bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${question.configuration.imageUrl})`, backgroundPosition: question.configuration.imagePosition, backgroundSize: question.configuration.imageSprite ? "400% 200%" : undefined }} /> : null}
-          <legend className={`${compactOptionalNote ? "text-xs" : compact ? "text-sm" : "mt-1 text-lg sm:text-xl"} font-bold leading-tight text-slate-950`}>
+          {question.configuration.imageUrl ? <span role="img" aria-label="" className={`${compactAccessory ? "h-9 w-9" : "h-11 w-11"} shrink-0 rounded-lg border border-[#e5e5e7] bg-white bg-contain bg-center bg-no-repeat`} style={{ backgroundImage: `url(${question.configuration.imageUrl})`, backgroundPosition: question.configuration.imagePosition, backgroundSize: question.configuration.imageSprite ? "400% 200%" : undefined }} /> : null}
+          <legend className={`${compactOptionalNote ? "text-xs" : compact || compactAccessory ? "text-sm" : "mt-1 text-lg sm:text-xl"} font-bold leading-tight text-slate-950`}>
             {question.label}{question.is_required ? <span aria-hidden="true" className="text-rose-500"> *</span> : compactOptionalNote ? <span className="ml-1 font-medium text-slate-400">Optional</span> : null}
           </legend>
         </div>
         {question.help_text ? <p id={`question-help-${question.id}`} className={`${compact ? "mt-1 text-xs leading-5" : "mt-2 text-sm leading-6"} text-slate-600`}>{question.help_text}</p> : null}
-        <div className={compact ? "mt-2.5" : "mt-4"}>
+        <div className={compact || compactAccessory ? "mt-2" : "mt-4"}>
           <QuestionControl
             question={question}
             value={answerForQuestion(question, answers)}
             onChange={(value, autoAdvance) => update(question.id, value, autoAdvance)}
             disabled={locked}
             onUpload={onUpload}
-            compact={compact}
+            compact={compact || compactAccessory}
           />
         </div>
         {hasError ? <p role="alert" className="mt-2 text-xs font-semibold text-rose-700">This field is required.</p> : null}
@@ -356,7 +373,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
         {!reviewing ? configurator ? (
           <div className="mt-4 flex items-center gap-3">
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100" aria-hidden="true"><div className="h-full rounded-full bg-[#0071e3] transition-[width] motion-reduce:transition-none" style={{ width: `${completionPercent}%` }} /></div>
-            <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-500">{requiredAnswered}/{requiredQuestions.length} required</span>
+            <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-500">{requiredProgress.complete}/{requiredProgress.total} required fields</span>
           </div>
         ) : showAllQuestions ? <p className="mt-3 text-xs font-semibold text-slate-500">{visibleQuestions.length} questions</p> : <div className="mt-4"><div className="flex justify-between text-xs font-semibold text-slate-500"><span>Question {Math.min(step + 1, visibleQuestions.length)} of {visibleQuestions.length}</span><span>{Math.round(progress)}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#0071e3] transition-[width] motion-reduce:transition-none" style={{ width: `${progress}%` }} /></div></div> : null}
       </header>
@@ -385,8 +402,8 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
               {questionGroups.map((group, groupIndex) => (
                 <section key={group.id} data-testid={`flooring-group-${group.id}`} className="border-b border-[#d2d2d7] py-4 last:border-b-0 sm:py-5">
                   <div className="mb-1 flex items-center gap-3">
-                    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-950 text-xs font-bold text-white">{groupIndex + 1}</span>
-                    <div><h3 className="text-base font-bold text-slate-950">{group.title}</h3>{group.description ? <p className="mt-0.5 text-xs leading-5 text-slate-500">{group.description}</p> : null}</div>
+                    <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-950 text-[11px] font-bold text-white">{groupIndex + 1}</span>
+                    <div><h3 className="text-sm font-bold text-slate-950">{group.title}</h3>{group.description ? <p className="mt-0.5 text-[11px] leading-4 text-slate-500">{group.description}</p> : null}</div>
                   </div>
                   <div className="ml-0 mt-2.5 grid grid-cols-2 gap-x-3 sm:ml-10">{group.questions.map((question) => renderQuestion(question, visibleQuestions.findIndex((entry) => entry.id === question.id)))}</div>
                 </section>
@@ -396,7 +413,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
 
             <aside className="sticky top-24 hidden border-l border-slate-100 bg-slate-50/70 p-5 lg:block" data-testid="flooring-order-summary">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#0066cc]">Request Summary</p>
-              <div className="mt-3 flex items-end justify-between gap-3"><p className="text-2xl font-bold tabular-nums text-slate-950">{completionPercent}%</p><p className="text-xs font-semibold text-slate-500">{requiredAnswered}/{requiredQuestions.length} required</p></div>
+              <div className="mt-3 flex items-end justify-between gap-3"><p className="text-2xl font-bold tabular-nums text-slate-950">{completionPercent}%</p><p className="text-xs font-semibold text-slate-500">{requiredProgress.complete}/{requiredProgress.total} required fields</p></div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-[#0071e3] transition-[width] motion-reduce:transition-none" style={{ width: `${completionPercent}%` }} /></div>
               <p className="mt-2 text-[11px] leading-4 text-slate-500">Optional specifications, accessories, and notes are not included in the completion percentage.</p>
               {quantityLabel ? <div className="mt-5 rounded-lg border border-sky-100 bg-white px-4 py-3"><p className="text-xs font-semibold text-slate-500">Requested Quantity</p><p className="mt-1 text-lg font-bold tabular-nums text-slate-950">{quantityLabel}</p></div> : null}
@@ -407,8 +424,8 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
               <button type="button" onClick={reviewAll} className="mt-6 inline-flex min-h-12 w-full touch-manipulation items-center justify-center gap-1 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200">Review Request<ChevronRight className="h-4 w-4" aria-hidden="true" /></button>
             </aside>
 
-            <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.35rem)] left-1/2 z-40 flex min-h-12 w-[calc(100%-2.5rem)] max-w-[26rem] -translate-x-1/2 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white/95 px-2 py-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.16)] backdrop-blur-lg lg:hidden" data-testid="flooring-mobile-summary">
-              <div className="min-w-0"><p className="truncate text-xs font-bold text-slate-950">{quantityLabel || `${answeredQuestions.length} selections`}</p><p className="text-[10px] font-semibold tabular-nums text-slate-500">{requiredAnswered}/{requiredQuestions.length} required</p></div>
+            <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+6.25rem)] z-40 mx-auto mt-3 flex min-h-12 w-[calc(100%-2.5rem)] max-w-[26rem] items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white/95 px-2 py-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.16)] backdrop-blur-lg lg:hidden" data-testid="flooring-mobile-summary">
+              <div className="min-w-0"><p className="truncate text-xs font-bold text-slate-950">{quantityLabel || `${answeredQuestions.length} selections`}</p><p className="text-[10px] font-semibold tabular-nums text-slate-500">{requiredProgress.complete}/{requiredProgress.total} required fields</p></div>
               <button type="button" onClick={reviewAll} className="inline-flex min-h-10 shrink-0 touch-manipulation items-center justify-center gap-1 rounded-lg bg-slate-950 px-3 text-xs font-semibold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200">Review<ChevronRight className="h-3.5 w-3.5" aria-hidden="true" /></button>
             </div>
           </div>
@@ -416,7 +433,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
         {!configurator && error ? <div aria-live="polite" className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</div> : null}
       </div>
 
-      {!locked && (!configurator || reviewing) ? <footer className="grid gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:grid-cols-[auto_1fr_auto] sm:px-7"><button type="button" onClick={() => reviewing ? setReviewing(false) : setStep((value) => Math.max(0, value - 1))} disabled={!reviewing && (showAllQuestions || step === 0)} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 disabled:opacity-40"><ChevronLeft className="h-4 w-4" aria-hidden="true" />Back</button>{onSave && !requireCompletion ? <button type="button" disabled={isPending} onClick={() => save(false)} className="min-h-11 rounded-lg px-4 text-sm font-semibold text-slate-600 hover:bg-white">Answer Later</button> : <span />}{reviewing ? <button type="button" disabled={isPending} onClick={() => save(true)} className="min-h-11 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-50">{isPending ? "Saving…" : configurator ? "Choose Project" : "Save & Finish"}</button> : showAllQuestions ? <button type="button" onClick={reviewAll} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white">Review Answers<ChevronRight className="h-4 w-4" aria-hidden="true" /></button> : <button type="button" onClick={next} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white">{step >= visibleQuestions.length - 1 ? "Review" : "Next"}<ChevronRight className="h-4 w-4" aria-hidden="true" /></button>}</footer> : null}
+      {!locked && (!configurator || reviewing) ? <footer className="grid gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:grid-cols-[auto_1fr_auto] sm:px-7"><button type="button" onClick={() => reviewing ? setReviewing(false) : setStep((value) => Math.max(0, value - 1))} disabled={!reviewing && (showAllQuestions || step === 0)} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 disabled:opacity-40"><ChevronLeft className="h-4 w-4" aria-hidden="true" />Back</button>{onSave && !requireCompletion ? <button type="button" disabled={isPending} onClick={() => save(false)} className="min-h-11 rounded-lg px-4 text-sm font-semibold text-slate-600 hover:bg-white">Save for Later</button> : <span />}{reviewing ? <button type="button" disabled={isPending} onClick={() => save(true)} className="min-h-11 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-50">{isPending ? "Saving…" : configurator ? "Choose Project" : "Save Request Details"}</button> : showAllQuestions ? <button type="button" onClick={reviewAll} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white">Review Answers<ChevronRight className="h-4 w-4" aria-hidden="true" /></button> : <button type="button" onClick={next} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white">{step >= visibleQuestions.length - 1 ? "Review" : "Next"}<ChevronRight className="h-4 w-4" aria-hidden="true" /></button>}</footer> : null}
     </section>
   )
 

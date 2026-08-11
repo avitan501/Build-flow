@@ -109,6 +109,8 @@ test("retired departments are hidden and category photos stay clean", async ({ p
 test("manager pages require authentication and stay out of the guest menu", async ({ page }) => {
   await page.goto("/")
   await page.getByRole("button", { name: "Open navigation menu" }).click()
+  const drawerWidth = await page.getByRole("complementary").evaluate((element) => element.getBoundingClientRect().width)
+  expect(drawerWidth).toBeLessThanOrEqual(288)
   await expect(page.getByRole("link", { name: "Manager", exact: true })).toHaveCount(0)
 
   await page.goto("/admin/build-map")
@@ -358,8 +360,19 @@ test("framing supports repeatable lumber order rows", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Framing Lumber Quick Order" })).toBeVisible()
   await expect(page.getByLabel("Lumber size")).toHaveCount(1)
   await page.getByLabel("Lumber size").selectOption("2x4")
+  if ((page.viewportSize()?.width ?? 0) >= 1024) {
+    await expect(page.getByTestId("flooring-order-summary").getByText("33%", { exact: true })).toBeVisible()
+  } else {
+    await expect(page.getByTestId("flooring-mobile-summary").getByText("1/3 required fields", { exact: true })).toBeVisible()
+  }
   await page.getByLabel("Length").selectOption("12 ft.")
+  if ((page.viewportSize()?.width ?? 0) >= 1024) {
+    await expect(page.getByTestId("flooring-order-summary").getByText("67%", { exact: true })).toBeVisible()
+  }
   await page.getByLabel("Quantity").fill("40")
+  if ((page.viewportSize()?.width ?? 0) >= 1024) {
+    await expect(page.getByTestId("flooring-order-summary").getByText("100%", { exact: true })).toBeVisible()
+  }
   await page.getByLabel("Douglas Fir").check()
   await page.getByLabel("Pressure Treated").check()
   await page.getByRole("button", { name: "Add Another Item" }).click()

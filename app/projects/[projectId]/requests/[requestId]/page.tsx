@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { MaterialQuestionnaireRequestEditor, QuoteItemAnswersEditor, SubmitQuoteRequestButton } from "@/components/buildflow/project-workspace-controls"
+import { ExportRequestPdfButton, MaterialQuestionnaireRequestEditor, QuoteItemAnswersEditor, SubmitQuoteRequestButton } from "@/components/buildflow/project-workspace-controls"
 import { requireSignedInProfile } from "@/lib/auth"
 import { PROJECT_UPLOAD_STORAGE_BUCKET } from "@/lib/projects"
 import { quoteRequestProgressIndex, quoteRequestStatusClass, quoteRequestStatusLabel, QUOTE_REQUEST_PROGRESS_STEPS, type QuoteRequestItemRecord, type QuoteRequestRecord } from "@/lib/quote-requests"
@@ -33,25 +33,26 @@ export default async function QuoteRequestDetailPage({ params }: { params: Promi
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] pb-28 text-slate-950 sm:pb-12">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-slate-200 bg-white print:border-0">
         <div className="mx-auto max-w-4xl px-4 py-5 sm:px-8">
-          <Link href={`/projects/${projectId}`} className="text-sm font-semibold text-[#0066cc]">Back to Project</Link>
+          <Link href={`/projects/${projectId}`} className="text-sm font-semibold text-[#0066cc] print:hidden">Back to Project</Link>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div><p className="text-[11px] font-semibold uppercase text-slate-500">Project Request</p><h1 className="mt-1 text-2xl font-semibold sm:text-3xl">{request.title}</h1></div>
-            <span className={`w-fit rounded-full border px-3 py-1.5 text-xs font-semibold uppercase ${quoteRequestStatusClass(request.status)}`}>{quoteRequestStatusLabel(request.status)}</span>
+            <div className="flex flex-wrap items-center gap-2"><span className={`w-fit rounded-full border px-3 py-1.5 text-xs font-semibold uppercase ${quoteRequestStatusClass(request.status)}`}>{quoteRequestStatusLabel(request.status)}</span><ExportRequestPdfButton /></div>
           </div>
         </div>
       </header>
 
       <div className="mx-auto grid max-w-4xl gap-4 px-4 py-5 sm:px-8">
-        <ol className="grid grid-cols-2 gap-2 rounded-[20px] border border-slate-200 bg-white p-3 sm:grid-cols-4" aria-label={`Request progress: ${quoteRequestStatusLabel(request.status)}`}>
+        <ol className="grid grid-cols-2 gap-2 rounded-[20px] border border-slate-200 bg-white p-3 sm:grid-cols-4 print:hidden" aria-label={`Request progress: ${quoteRequestStatusLabel(request.status)}`}>
           {QUOTE_REQUEST_PROGRESS_STEPS.map((label, index) => <li key={label} className={`rounded-xl px-2 py-2 text-[11px] font-semibold leading-4 ${index <= activeProgressIndex ? "bg-sky-50 text-sky-800" : "bg-slate-50 text-slate-400"}`}><span className="mr-1">{index + 1}.</span>{label}</li>)}
         </ol>
         {locked ? <div className="rounded-[18px] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">This request is locked while it is being reviewed.</div> : null}
-        {(materialResponses ?? []).map((response) => <article key={response.id} className="overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]"><div className="flex items-center justify-between border-b border-slate-100 px-5 py-3"><div><p className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#0066cc]">Category questionnaire</p><h2 className="mt-0.5 font-semibold">{response.category_name_snapshot}</h2></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{response.status === "complete" ? "Complete" : "Needs review"}</span></div><MaterialQuestionnaireRequestEditor response={response} savedAnswers={(materialAnswers ?? []).filter((answer) => answer.response_id === response.id)} userId={user.id} itemId={(items ?? [])[0]?.id ?? ""} locked={locked} /></article>)}
+        {(materialResponses ?? []).map((response) => <article key={response.id} className="overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] print:break-inside-avoid print:shadow-none"><div className="flex items-center justify-between border-b border-slate-100 px-5 py-3"><div><p className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#0066cc]">Order details</p><h2 className="mt-0.5 font-semibold">{response.category_name_snapshot}</h2></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{response.status === "complete" ? "Details saved" : "Needs review"}</span></div><MaterialQuestionnaireRequestEditor response={response} savedAnswers={(materialAnswers ?? []).filter((answer) => answer.response_id === response.id)} userId={user.id} itemId={(items ?? [])[0]?.id ?? ""} locked={locked} /></article>)}
         {(items ?? []).map((item) => {
           const qualificationTarget = { id: item.catalog_item_id || item.id, name: item.name, category: item.department, price: item.unit_price, productType: item.item_type === "material" ? "material" as const : "service" as const }
-          const questions = item.item_type === "file_upload" || item.item_type === "service"
+          const hasDepartmentQuestionnaire = Boolean((materialResponses ?? []).length)
+          const questions = hasDepartmentQuestionnaire ? [] : item.item_type === "file_upload" || item.item_type === "service"
             ? getQualificationSettingForPlanRequest(qualificationTarget.id, item.name, item.department).questions
             : getQualificationSettingForProduct(qualificationTarget).questions
           const itemFiles = files.filter((file) => file.item_id === item.id)

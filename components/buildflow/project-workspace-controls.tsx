@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
+import { Download } from "lucide-react"
 
 import {
   saveMaterialQuestionnaireResponseAction,
@@ -16,6 +17,15 @@ import { createClient } from "@/lib/supabase/client"
 import type { ProjectQuestionRecord } from "@/lib/quote-requests"
 import type { QualifyingQuestion } from "@/lib/shop-qualification"
 import { saveQuoteItemAnswersAction } from "@/app/projects/quote-request-actions"
+
+export function ExportRequestPdfButton() {
+  return (
+    <button type="button" onClick={() => window.print()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 print:hidden">
+      <Download className="h-4 w-4" aria-hidden="true" />
+      Export PDF
+    </button>
+  )
+}
 
 export function ProjectInfoEditor({ project }: { project: { id: string; name: string; address: string | null; status: "draft" | "active" | "archived" } }) {
   const router = useRouter()

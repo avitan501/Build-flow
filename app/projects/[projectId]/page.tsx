@@ -100,7 +100,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-8 sm:py-7 lg:grid-cols-[0.72fr_1.28fr]">
+      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-5 sm:px-8 sm:py-7 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="grid content-start gap-4">
           <section className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_8px_28px_rgba(15,23,42,0.05)]">
             <div className="flex items-center justify-between gap-3">
@@ -111,7 +111,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
             <div className="mt-4"><ProjectQuestionsForm projectId={project.id} questions={questionsResult.data ?? []} initialAnswers={initialAnswers} /></div>
           </section>
 
-          <Link href="/shop" className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(0,113,227,0.2)]">Open Let&apos;s Work</Link>
+          <Link href="/shop" className="inline-flex min-h-10 w-fit items-center justify-center rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(0,113,227,0.18)]">Add a Request</Link>
         </aside>
 
         <div className="grid content-start gap-4">

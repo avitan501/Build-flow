@@ -29,34 +29,24 @@ async function currentUser() {
 export async function getAddToProjectOptionsAction(): Promise<ActionResult<{
   userId: string
   projects: Array<{ id: string; name: string; address: string | null }>
-  drafts: Array<{ id: string; projectId: string; title: string }>
 }>> {
   const session = await currentUser()
   if (!session) return { ok: false, error: "Sign in to add this item to a project.", authRequired: true }
 
-  const [{ data: projects, error: projectsError }, { data: drafts, error: draftsError }] = await Promise.all([
-    session.supabase
-      .from("projects")
-      .select("id, name, address")
-      .eq("owner_id", session.user.id)
-      .neq("status", "archived")
-      .order("updated_at", { ascending: false }),
-    session.supabase
-      .from("quote_requests")
-      .select("id, project_id, title")
-      .eq("owner_id", session.user.id)
-      .eq("status", "draft")
-      .order("updated_at", { ascending: false }),
-  ])
+  const { data: projects, error: projectsError } = await session.supabase
+    .from("projects")
+    .select("id, name, address")
+    .eq("owner_id", session.user.id)
+    .neq("status", "archived")
+    .order("updated_at", { ascending: false })
 
-  if (projectsError || draftsError) return { ok: false, error: "Could not load your projects. Please try again." }
+  if (projectsError) return { ok: false, error: "Could not load your projects. Please try again." }
 
   return {
     ok: true,
     data: {
       userId: session.user.id,
       projects: (projects ?? []).map((project) => ({ id: project.id, name: project.name, address: project.address })),
-      drafts: (drafts ?? []).map((draft) => ({ id: draft.id, projectId: draft.project_id, title: draft.title })),
     },
   }
 }

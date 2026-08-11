@@ -38,7 +38,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
       />
       <aside
         aria-hidden={!open}
-        className={`fixed inset-y-0 left-0 z-[71] w-[88vw] max-w-[22rem] overflow-y-auto border-r border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f5f9ff_100%)] px-4 pb-8 pt-5 shadow-[0_24px_60px_rgba(15,23,42,0.18)] transition duration-200 ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-[71] w-[82vw] max-w-[18rem] overflow-y-auto border-r border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f5f9ff_100%)] px-3 pb-7 pt-4 shadow-[0_24px_60px_rgba(15,23,42,0.18)] transition duration-200 ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between gap-3">
           <Link href="/" prefetch={false} onClick={onClose} aria-label="Avantia Build home" className="flex min-w-0 items-center gap-3">
@@ -57,7 +57,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
           </button>
         </div>
 
-        <div className="mt-5 rounded-[26px] border border-sky-100 bg-white/90 p-3 shadow-[0_12px_30px_rgba(148,163,184,0.12)]">
+        <div className="mt-4 rounded-[20px] border border-sky-100 bg-white/90 p-2.5 shadow-[0_12px_30px_rgba(148,163,184,0.12)]">
           <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Navigation</p>
           <nav className="mt-2 grid gap-1.5" aria-label="Mobile full navigation">
             {primaryLinks.map((link) => {
@@ -85,7 +85,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
           </nav>
         </div>
 
-        {requestLinks.length ? <div className="mt-4 rounded-[26px] border border-sky-100 bg-white/90 p-3 shadow-[0_12px_30px_rgba(148,163,184,0.12)]">
+        {requestLinks.length ? <div className="mt-3 rounded-[20px] border border-sky-100 bg-white/90 p-2.5 shadow-[0_12px_30px_rgba(148,163,184,0.12)]">
           <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0066cc]">Requests</p>
           <nav className="mt-2 grid gap-1.5" aria-label="Request navigation">
             {requestLinks.map((link) => <Link key={`${link.label}-${link.href}`} href={link.href} prefetch={false} onClick={onClose} className={`flex min-h-12 items-center justify-between rounded-2xl px-3 text-sm font-semibold ${Boolean(pathname) && isActivePath(pathname, link.href) ? "bg-[#0E2A4A] text-white" : "text-slate-700 hover:bg-slate-50"}`}><span>{link.label}</span><span aria-hidden="true">›</span></Link>)}
