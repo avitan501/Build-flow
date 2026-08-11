@@ -132,6 +132,7 @@ test("footer has the complete Avantia Build contact lockup", async ({ page }) =>
   const footer = page.locator("footer")
   await expect(footer.getByText("You build. We handle the materials.", { exact: true })).toBeVisible()
   await expect(footer.getByRole("link", { name: "(929) 207-7156" })).toHaveAttribute("href", "tel:+19292077156")
+  await expect(footer.getByRole("link", { name: "WhatsApp us" })).toHaveAttribute("href", "https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20with%20construction%20materials.")
   await expect(footer.getByTestId("avantia-build-lockup")).toBeVisible()
 })
 
@@ -413,7 +414,7 @@ test("shop shows the sourcing brands and direct help actions", async ({ page }) 
   const brandCellBorders = await page.getByTestId("shop-brand-grid").locator(":scope > div").evaluateAll((cells) => cells.map((cell) => getComputedStyle(cell).borderWidth))
   expect(brandCellBorders.every((border) => border === "0px")).toBe(true)
   await expect(page.getByRole("link", { name: "Call us" })).toHaveAttribute("href", "tel:+19292077156")
-  await expect(page.getByRole("link", { name: "Text us" })).toHaveAttribute("href", "sms:+19292077156?body=Hi%20Avantia%20Build%2C%20I%20need%20help%20finding%20construction%20materials.")
+  await expect(page.getByRole("link", { name: "WhatsApp us" }).first()).toHaveAttribute("href", "https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20finding%20construction%20materials.")
 })
 
 test("guest projects stay compact until the full list is requested", async ({ page }) => {
