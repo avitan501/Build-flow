@@ -58,7 +58,6 @@ function buildCategoryFilterHref(category: string, projectId: string, address: s
 
 const CATEGORY_CUTOUTS: Partial<Record<string, { imageUrl: string; imagePosition: string }>> = {
   framing: { imageUrl: "/images/department-essentials/lumber-grid.webp", imagePosition: "0% 0%" },
-  "tile-work": { imageUrl: "/images/department-essentials/tile-grid.webp", imagePosition: "0% 0%" },
   "sheet-rock": { imageUrl: "/images/department-essentials/drywall-grid.webp", imagePosition: "0% 0%" },
   "door-and-molding": { imageUrl: "/images/department-essentials/moldings-grid.webp", imagePosition: "0% 0%" },
   "wood-floor": { imageUrl: "/images/department-essentials/flooring-grid.webp", imagePosition: "0% 0%" },
@@ -418,7 +417,7 @@ export function ShopProjectToolPicker({
                       alt={category.imageAlt}
                       fill
                       sizes="(max-width: 639px) 32vw, (max-width: 1023px) 24vw, 18vw"
-                      className="scale-[0.9] object-contain mix-blend-multiply"
+                      className={category.slug === "electrical" || category.slug === "tile-work" ? "object-cover" : "scale-[0.9] object-contain mix-blend-multiply"}
                     />
                   )}
                 </span>

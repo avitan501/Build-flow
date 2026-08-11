@@ -53,12 +53,55 @@ textarea {
   }
 }
 
+@keyframes brand-marquee-scroll {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.brand-marquee {
+  width: 100%;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+}
+
+.brand-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: brand-marquee-scroll 28s linear infinite;
+  will-change: transform;
+}
+
+.brand-marquee-group {
+  display: flex;
+  flex-shrink: 0;
+}
+
 .page-enter-motion {
   animation: page-enter 220ms ease-out;
   will-change: opacity, transform;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .brand-marquee {
+    overflow-x: auto;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .brand-marquee-track {
+    animation: none;
+  }
+
+  .brand-marquee-group:last-child {
+    display: none;
+  }
+
   .page-enter-motion {
     animation: none;
   }
@@ -70,6 +113,7 @@ textarea {
     margin: 0.4in;
   }
 
+  html.request-printing body,
   body.request-printing {
     background: #ffffff !important;
     color: #000000 !important;
@@ -77,22 +121,29 @@ textarea {
     -webkit-print-color-adjust: exact;
   }
 
-  body.request-printing header,
-  body.request-printing footer,
-  body.request-printing nav,
-  body.request-printing .fixed,
-  body.request-printing main > :not(.request-print-sheet) {
-    display: none !important;
+  html.request-printing body * {
+    visibility: hidden !important;
   }
 
+  html.request-printing main,
   body.request-printing main {
     min-height: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
   }
 
+  html.request-printing .request-print-sheet,
+  html.request-printing .request-print-sheet *,
+  body.request-printing .request-print-sheet,
+  body.request-printing .request-print-sheet * {
+    visibility: visible !important;
+  }
+
+  html.request-printing .request-print-sheet,
   body.request-printing .request-print-sheet {
     display: block !important;
+    position: absolute;
+    inset: 0;
     width: 100% !important;
     max-height: 9.7in;
     overflow: hidden;

@@ -85,7 +85,7 @@ test("customer-facing department names and category cutouts are clean", async ({
   await expect(framingCard.getByRole("img", { name: /framing/i })).toHaveCSS("background-image", /lumber-grid\.webp/)
 
   const electricalCard = page.getByTestId("department-card").filter({ hasText: "Electrical" })
-  await expect(electricalCard.getByRole("img")).toHaveAttribute("src", /electrical-bx-cutout\.jpg/)
+  await expect(electricalCard.getByRole("img")).toHaveAttribute("src", /electrical-cable-department-v1\.webp/)
 })
 
 test("retired departments are hidden and category photos stay clean", async ({ page }) => {
@@ -152,7 +152,7 @@ test("traffic endpoint accepts same-site events and blocks cross-site submission
 test("home shows the compact manufacturer brand showcase", async ({ page }) => {
   await page.goto("/")
 
-  await expect(page.getByRole("heading", { name: "Brands we trust" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Shop Our Brands" })).toBeVisible()
   await expect(page.getByTestId("shop-brand-grid").getByRole("img")).toHaveCount(8)
 })
 
@@ -409,7 +409,7 @@ test("flooring review identifies the first required missing answer", async ({ pa
 test("shop shows the sourcing brands and direct help actions", async ({ page }) => {
   await page.goto("/shop")
 
-  await expect(page.getByRole("heading", { name: "Brands we trust" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Shop Our Brands" })).toBeVisible()
   await expect(page.getByTestId("shop-brand-grid").getByRole("img")).toHaveCount(8)
   const brandCellBorders = await page.getByTestId("shop-brand-grid").locator(":scope > div").evaluateAll((cells) => cells.map((cell) => getComputedStyle(cell).borderWidth))
   expect(brandCellBorders.every((border) => border === "0px")).toBe(true)

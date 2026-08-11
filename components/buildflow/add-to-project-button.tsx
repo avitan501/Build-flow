@@ -261,7 +261,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
           <section role="dialog" aria-modal="true" aria-labelledby={`add-project-${product.id}`} className="max-h-[90vh] w-full max-w-md overflow-hidden rounded-[22px] border border-white/70 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.3)]">
             <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">{authRequired ? "Continue Request" : "Confirm Project Request"}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">{authRequired ? "Continue Request" : "Create New Project Request"}</p>
                 <h2 id={`add-project-${product.id}`} className="mt-1 truncate text-xl font-semibold text-slate-950">{product.name}</h2>
               </div>
               <button type="button" onClick={() => setOpen(false)} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-xl text-slate-500" aria-label="Close">
@@ -294,13 +294,14 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
               {options && options.projects.length > 0 && !created ? (
                 <div className="grid min-w-0 gap-4">
                   <label className="grid gap-2 text-sm font-semibold text-slate-900">
-                    Choose project
+                    Choose a project
                     <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className="min-h-12 min-w-0 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base">
                       {options.projects.map((project) => <option key={project.id} value={project.id}>{project.name}{project.address ? ` - ${project.address}` : ""}</option>)}
                     </select>
                   </label>
+                  <p className="text-xs leading-5 text-slate-500">This creates a new request inside the selected project.</p>
                   <button type="button" disabled={isPending} onClick={addItem} className="inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white disabled:opacity-50">
-                    {isPending ? "Creating..." : `Create ${product.category} Request`}
+                    {isPending ? "Creating..." : `Create New ${product.category} Request`}
                   </button>
                 </div>
               ) : null}

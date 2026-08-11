@@ -19,18 +19,30 @@ export function ShopBrandShowcase({ compact = false }: { compact?: boolean }) {
     <section aria-labelledby="shop-brands-heading" className={`${compact ? "mx-auto mt-0 max-w-6xl overflow-hidden rounded-[28px]" : "mt-8"} bg-white`}>
       <div className={`mx-auto w-full max-w-7xl px-4 sm:px-8 lg:px-10 ${compact ? "py-6 sm:py-8" : "py-10 sm:py-14"}`}>
         <div className="text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Trusted manufacturers</p>
-          <h2 id="shop-brands-heading" className="mt-2 text-2xl font-semibold tracking-normal text-[#1d1d1f] sm:text-3xl">Brands we trust</h2>
+          <h2 id="shop-brands-heading" className="text-2xl font-semibold tracking-normal text-[#1d1d1f] sm:text-3xl">Shop Our Brands</h2>
         </div>
 
-        <div className={`${compact ? "mt-5 gap-2 sm:gap-3" : "mt-7 gap-x-4 gap-y-5"} grid grid-cols-2 sm:grid-cols-4`} data-testid="shop-brand-grid">
-          {SHOP_BRANDS.map((brand) => (
-            <div key={brand.name} className="flex min-h-20 items-center justify-center bg-white px-4 py-4 sm:min-h-24">
-              <div className="relative h-9 w-full max-w-28 sm:h-10 sm:max-w-32">
-                <Image src={brand.logo} alt={`${brand.name} logo`} fill sizes="(max-width: 640px) 38vw, 160px" loading="eager" className={`object-contain ${brand.scale}`} />
+        <div className={`${compact ? "mt-5" : "mt-7"} brand-marquee`} data-testid="shop-brand-grid">
+          <div className="brand-marquee-track">
+            {[0, 1].map((groupIndex) => (
+              <div key={groupIndex} className="brand-marquee-group" aria-hidden={groupIndex === 1}>
+                {SHOP_BRANDS.map((brand) => (
+                  <div key={`${groupIndex}-${brand.name}`} className="flex h-20 w-36 shrink-0 items-center justify-center px-4 sm:h-24 sm:w-44">
+                    <div className="relative h-9 w-full max-w-28 sm:h-10 sm:max-w-32">
+                      <Image
+                        src={brand.logo}
+                        alt={groupIndex === 0 ? `${brand.name} logo` : ""}
+                        fill
+                        sizes="176px"
+                        loading="eager"
+                        className={`object-contain ${brand.scale}`}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         <p className="mt-4 text-center text-[11px] leading-5 text-slate-400">

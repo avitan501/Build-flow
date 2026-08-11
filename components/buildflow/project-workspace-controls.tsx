@@ -22,10 +22,19 @@ import { saveQuoteItemAnswersAction } from "@/app/projects/quote-request-actions
 
 export function ExportRequestPdfButton() {
   function printRequest() {
+    document.documentElement.classList.add("request-printing")
     document.body.classList.add("request-printing")
-    window.addEventListener("afterprint", () => document.body.classList.remove("request-printing"), { once: true })
-    window.print()
-    window.setTimeout(() => document.body.classList.remove("request-printing"), 1000)
+
+    const resetPrintMode = () => {
+      document.documentElement.classList.remove("request-printing")
+      document.body.classList.remove("request-printing")
+    }
+
+    window.addEventListener("afterprint", resetPrintMode, { once: true })
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => window.print())
+    })
+    window.setTimeout(resetPrintMode, 2000)
   }
 
   return (
