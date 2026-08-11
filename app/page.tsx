@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ClipboardList, MessageCircle, PackageSearch, PhoneOff } from "lucide-react";
+import { ArrowRight, ClipboardList, MessageCircle, PackageCheck, PackageSearch, PhoneOff } from "lucide-react";
 
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
 import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase";
@@ -36,26 +36,28 @@ export default function Home() {
       <RecoveryLinkHandler />
 
       <div className="px-3 pt-3 sm:px-5 sm:pt-5">
-        <section data-testid="homepage-island" className="relative isolate mx-auto max-w-[88rem] overflow-hidden rounded-[30px] bg-[#eef4f8] text-[#071126] shadow-[0_18px_54px_rgba(15,23,42,0.14)] sm:rounded-[36px]">
+        <section data-testid="homepage-island" className="relative isolate mx-auto max-w-[88rem] overflow-hidden rounded-[30px] bg-[#071126] text-white shadow-[0_22px_64px_rgba(7,17,38,0.22)] sm:rounded-[36px]">
           <div
             className="absolute inset-0 -z-20 bg-cover bg-center"
             style={{ backgroundImage: "url(/images/buildflow-retail/hero.jpg)" }}
             aria-hidden="true"
           />
-          <div className="absolute inset-0 -z-10 bg-white/78" aria-hidden="true" />
+          <div className="absolute inset-0 -z-10 bg-[#071126]/60" aria-hidden="true" />
           <div className="mx-auto flex min-h-[24rem] max-w-6xl flex-col justify-end px-6 py-7 sm:min-h-[27rem] sm:px-9 sm:py-9 lg:px-10">
             <h1 className="max-w-4xl text-4xl font-semibold leading-[1.08] sm:text-6xl">
               Keep Your Crew Building. We’ll Handle the Materials.
             </h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700 sm:text-xl sm:leading-8">
+            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-100 sm:text-xl sm:leading-8">
               Send us what you need once. Your Avantia Build coordinator sources options, places orders, coordinates deliveries, and keeps everything organized by project.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link href="/shop" className="inline-flex min-h-13 items-center justify-center gap-2 rounded-lg bg-[#0784e3] px-6 text-sm font-bold text-white shadow-[0_12px_28px_rgba(7,132,227,0.3)] transition hover:bg-[#006fc4] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200">
-                Start my material request <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              <Link href="/shop" className="group inline-flex min-h-14 items-center justify-between gap-4 rounded-lg bg-white px-3 py-2.5 text-sm font-bold text-[#071126] shadow-[0_14px_34px_rgba(0,0,0,0.24)] transition hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40 sm:min-w-64">
+                <span className="inline-flex items-center gap-3"><span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#e8f3ff] text-[#0071e3]"><PackageCheck className="h-5 w-5" aria-hidden="true" /></span>Request Materials</span>
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
               </Link>
-              <a href="https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20want%20to%20start%20a%20material%20order." target="_blank" rel="noreferrer" className="inline-flex min-h-13 items-center justify-center gap-2 rounded-lg bg-[#128c7e] px-6 text-sm font-bold text-white shadow-[0_10px_24px_rgba(18,140,126,0.22)] transition hover:bg-[#0f7a6e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
-                <MessageCircle className="h-4 w-4" aria-hidden="true" /> Start my order on WhatsApp
+              <a href="https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20want%20to%20start%20a%20material%20order." target="_blank" rel="noreferrer" className="group inline-flex min-h-14 items-center justify-between gap-4 rounded-lg border border-white/25 bg-[#128c7e] px-3 py-2.5 text-sm font-bold text-white shadow-[0_14px_34px_rgba(0,0,0,0.2)] transition hover:bg-[#0f7a6e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 sm:min-w-64">
+                <span className="inline-flex items-center gap-3"><span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white/15"><MessageCircle className="h-5 w-5" aria-hidden="true" /></span>Talk to a Coordinator</span>
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
               </a>
             </div>
           </div>
