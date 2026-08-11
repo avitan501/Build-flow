@@ -14,6 +14,7 @@ test("home presents the contractor material coordination service", async ({ page
   await expect(page.getByText("Your materials desk", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "One request. One coordinator. No supplier runaround." })).toHaveCount(0);
   await expect(page.getByText("Tell us what you need. We handle the rest.", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Fewer calls. Better buying decisions. Every order in one place.", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Covering 41 states." })).toBeVisible();
   const brands = page.getByRole("heading", { name: "Shop Our Brands" });
   await expect(brands).toBeVisible();

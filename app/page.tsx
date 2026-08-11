@@ -58,7 +58,6 @@ export default function Home() {
                 <Phone className="h-4 w-4" aria-hidden="true" /> Call a materials coordinator
               </a>
             </div>
-            <p className="mt-6 text-sm font-semibold text-slate-300">Fewer calls. Better buying decisions. Every order in one place.</p>
           </div>
         </section>
       </div>
