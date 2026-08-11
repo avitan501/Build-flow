@@ -46,6 +46,16 @@ export type ManagerClientReplyEmailInput = {
   message: string
 }
 
+export type ClientRequestActionEmailInput = {
+  requestId: string
+  requestTitle: string
+  projectName: string
+  clientName: string
+  clientEmail: string | null
+  actionLabel: string
+  message: string
+}
+
 const DEFAULT_TO = "avitanneto@gmail.com"
 const DEFAULT_FROM = "Avantia Build <onboarding@resend.dev>"
 
@@ -292,6 +302,44 @@ export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmail
     message: input.message,
   })
   return fallback.result ?? { status: "failed", error: "Website email could not be sent." }
+}
+
+export async function sendClientRequestActionEmail(input: ClientRequestActionEmailInput): Promise<EmailDeliveryResult> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) return { status: "not_configured" }
+
+  const from = process.env.QUOTE_SUBMISSION_FROM || DEFAULT_FROM
+  const subject = `${input.actionLabel}: ${input.requestTitle}`
+  const text = [
+    `Client action: ${input.actionLabel}`,
+    `Client: ${input.clientName}`,
+    `Email: ${input.clientEmail || "Not provided"}`,
+    `Project: ${input.projectName}`,
+    `Request: ${input.requestTitle}`,
+    "",
+    input.message,
+  ].join("\n")
+  const html = `
+    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.6;max-width:620px;margin:0 auto">
+      <h1 style="margin:0 0 16px;font-size:22px">${escapeHtml(input.actionLabel)}</h1>
+      <p><strong>Client:</strong> ${escapeHtml(input.clientName)}<br />
+      <strong>Email:</strong> ${escapeHtml(input.clientEmail || "Not provided")}<br />
+      <strong>Project:</strong> ${escapeHtml(input.projectName)}<br />
+      <strong>Request:</strong> ${escapeHtml(input.requestTitle)}</p>
+      <div style="margin-top:20px;padding:16px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;white-space:pre-wrap">${escapeHtml(input.message)}</div>
+    </div>
+  `
+
+  return sendEmail({
+    apiKey,
+    from,
+    to: DEFAULT_TO,
+    subject,
+    html,
+    text,
+    replyTo: input.clientEmail || undefined,
+    idempotencyKey: `avantia-client-action-${input.requestId}-${crypto.randomUUID()}`,
+  })
 }
 
 export type QuoteIntakeEmailInput = {

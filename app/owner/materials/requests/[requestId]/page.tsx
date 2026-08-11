@@ -8,7 +8,7 @@ import { requireOwnerAccess } from "@/lib/owner-access"
 import { quoteRequestStatusLabel, type QuoteRequestStatus } from "@/lib/quote-requests"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 
-type RequestDetails = { id: string; owner_id: string; title: string; status: QuoteRequestStatus; created_at: string; submitted_at: string | null; projects: { name: string; address: string | null } | null }
+type RequestDetails = { id: string; project_id: string; owner_id: string; title: string; status: QuoteRequestStatus; created_at: string; submitted_at: string | null; projects: { name: string; address: string | null } | null }
 type Attachment = { id: string; material_response_id: string | null; file_name: string; file_path: string; file_type: string | null }
 type RequestItem = { id: string; name: string; department: string; item_type: string; quantity: number; unit: string | null; answers: unknown }
 type LegacyAnswer = { questionId?: string; label?: string; value?: string; question?: string; answer?: string }
@@ -21,15 +21,17 @@ function legacyAnswers(value: unknown): LegacyAnswer[] {
 export default async function OwnerMaterialRequestPage({ params }: { params: Promise<{ requestId: string }> }) {
   const { requestId } = await params
   const { supabase } = await requireOwnerAccess()
-  const [{ data: request }, { data: responses }, { data: attachments }, { data: items }, { data: managerSettings }, { data: packages }] = await Promise.all([
-    supabase.from("quote_requests").select("id,owner_id,title,status,created_at,submitted_at,projects(name,address)").eq("id", requestId).maybeSingle<RequestDetails>(),
+  const [{ data: request }, { data: responses }, { data: attachments }, { data: items }, { data: managerSettings }, { data: packages }, { data: clientActionEvents }] = await Promise.all([
+    supabase.from("quote_requests").select("id,project_id,owner_id,title,status,created_at,submitted_at,projects(name,address)").eq("id", requestId).maybeSingle<RequestDetails>(),
     supabase.from("material_questionnaire_responses").select("id, request_id, project_id, owner_id, category_id, category_name_snapshot, category_slug_snapshot, definition_version, definition_snapshot, status, completed_at, created_at, updated_at").eq("request_id", requestId).order("created_at").returns<MaterialQuestionnaireResponse[]>(),
     supabase.from("quote_request_attachments").select("id,material_response_id,file_name,file_path,file_type").eq("request_id", requestId).returns<Attachment[]>(),
     supabase.from("quote_request_items").select("id,name,department,item_type,quantity,unit,answers").eq("request_id", requestId).order("created_at").returns<RequestItem[]>(),
     supabase.from("workflow_manager_settings").select("state").eq("id", "singleton").maybeSingle<{ state: { qualificationSettings?: { suppliers?: SupplierRoutingOption[] } } }>(),
     supabase.from("supplier_packages").select("id,department,supplier_id,status").eq("request_id", requestId).order("created_at").returns<SupplierPackage[]>(),
+    supabase.from("project_events").select("id,title,description,metadata,created_at").contains("metadata", { quote_request_id: requestId }).order("created_at", { ascending: false }).limit(20).returns<Array<{ id: string; title: string; description: string | null; metadata: Record<string, unknown>; created_at: string }>>(),
   ])
   if (!request) notFound()
+  const clientActions = (clientActionEvents ?? []).filter((event) => typeof event.metadata?.client_action === "string")
 
   const [{ data: profile }, answersResult] = await Promise.all([
     supabase.from("profiles").select("full_name,email,phone").eq("id", request.owner_id).maybeSingle<{ full_name: string | null; email: string | null; phone: string | null }>(),
@@ -53,6 +55,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
         </header>
         <CustomerRequestStatus requestId={request.id} status={request.status} />
         <RequestManagementPanel requestId={request.id} requestTitle={request.title} client={{ name: profile?.full_name || "Client", email: profile?.email || "", phone: profile?.phone || "" }} departments={departments} suppliers={suppliers} packages={packages ?? []} />
+        {clientActions.length ? <section className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-5"><h2 className="text-lg font-bold text-slate-950">Client updates</h2><div className="mt-3 divide-y divide-amber-200">{clientActions.map((event) => <article key={event.id} className="py-3 first:pt-0 last:pb-0"><div className="flex flex-wrap items-start justify-between gap-2"><h3 className="text-sm font-bold text-slate-900">{event.title}</h3><time className="text-xs text-slate-500">{new Date(event.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>{event.description ? <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{event.description}</p> : null}</article>)}</div></section> : null}
         <div className="mt-4 grid gap-4">
           <section className="rounded-lg border border-slate-200 bg-white p-5">
             <h2 className="text-xl font-bold">Requested items</h2>

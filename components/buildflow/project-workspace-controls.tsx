@@ -1,8 +1,9 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
-import { Download } from "lucide-react"
+import { CircleHelp, Download, Eye, MessageSquareText, PencilLine, Plus, XCircle } from "lucide-react"
 
 import {
   saveMaterialQuestionnaireResponseAction,
@@ -10,11 +11,13 @@ import {
   saveProjectAnswersAction,
   submitQuoteRequestAction,
   updateProjectAction,
+  createClientRequestAction,
+  type ClientRequestActionType,
 } from "@/app/projects/quote-request-actions"
 import { MaterialQuestionnaireWizard } from "@/components/buildflow/material-questionnaire-wizard"
 import type { MaterialAnswerValue, MaterialQuestion, MaterialQuestionnaireResponse, MaterialRequestAnswer } from "@/lib/material-questionnaires"
 import { createClient } from "@/lib/supabase/client"
-import type { ProjectQuestionRecord } from "@/lib/quote-requests"
+import type { ProjectQuestionRecord, QuoteRequestStatus } from "@/lib/quote-requests"
 import type { QualifyingQuestion } from "@/lib/shop-qualification"
 import { saveQuoteItemAnswersAction } from "@/app/projects/quote-request-actions"
 
@@ -31,6 +34,105 @@ export function ExportRequestPdfButton() {
       <Download className="h-4 w-4" aria-hidden="true" />
       Export PDF
     </button>
+  )
+}
+
+const requestActionContent: Record<ClientRequestActionType, { title: string; description: string; placeholder: string; submit: string }> = {
+  change: {
+    title: "Request a change",
+    description: "Tell us exactly what should be changed. Your current request will stay unchanged until our team reviews it.",
+    placeholder: "What would you like to change?",
+    submit: "Send Change Request",
+  },
+  question: {
+    title: "Ask a question",
+    description: "Send a question about pricing, availability, delivery, or any item in this request.",
+    placeholder: "Write your question",
+    submit: "Send Question",
+  },
+  cancel: {
+    title: "Request cancellation",
+    description: "Tell us why you want to cancel. We will confirm the cancellation before stopping any work.",
+    placeholder: "Reason for cancellation",
+    submit: "Request Cancellation",
+  },
+}
+
+export function ProjectRequestActions({ projectId, requestId, status, compact = false, showView = true }: {
+  projectId: string
+  requestId: string
+  status: QuoteRequestStatus
+  compact?: boolean
+  showView?: boolean
+}) {
+  const router = useRouter()
+  const [action, setAction] = useState<ClientRequestActionType | null>(null)
+  const [message, setMessage] = useState("")
+  const [feedback, setFeedback] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const detailsHref = `/projects/${projectId}/requests/${requestId}`
+  const addOnLabel = status === "draft" ? "Add Items" : "Add On"
+
+  function close() {
+    if (isPending) return
+    setAction(null)
+    setMessage("")
+    setError(null)
+  }
+
+  function submitAction() {
+    if (!action) return
+    startTransition(async () => {
+      const result = await createClientRequestAction({ projectId, requestId, action, message })
+      if (!result.ok) return setError(result.error)
+      setFeedback(result.data.notification === "sent" ? "Sent to Avantia Build." : "Saved. Our team can see it in this request.")
+      setAction(null)
+      setMessage("")
+      setError(null)
+      router.refresh()
+    })
+  }
+
+  const secondaryClass = "inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+
+  return (
+    <div className={compact ? "mt-4" : ""}>
+      <div className="flex flex-wrap gap-2">
+        {showView ? <Link href={detailsHref} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-slate-950 px-4 text-sm font-semibold text-white">
+          <Eye className="h-4 w-4" aria-hidden="true" /> View Request
+        </Link> : null}
+        <Link href={`/shop?project=${projectId}`} className={secondaryClass}>
+          <Plus className="h-4 w-4" aria-hidden="true" /> {addOnLabel}
+        </Link>
+        {status !== "closed" ? <button type="button" onClick={() => { setAction("change"); setFeedback(null) }} className={secondaryClass}><PencilLine className="h-4 w-4" aria-hidden="true" /> Make Change</button> : null}
+        <button type="button" onClick={() => { setAction("question"); setFeedback(null) }} className={secondaryClass}><CircleHelp className="h-4 w-4" aria-hidden="true" /> Ask Question</button>
+        {status !== "closed" ? <button type="button" onClick={() => { setAction("cancel"); setFeedback(null) }} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"><XCircle className="h-4 w-4" aria-hidden="true" /> Cancel Request</button> : null}
+      </div>
+      {feedback ? <p className="mt-2 text-sm font-medium text-emerald-700" role="status">{feedback}</p> : null}
+
+      {action ? (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-3 backdrop-blur-[2px] sm:items-center" role="dialog" aria-modal="true" aria-labelledby="client-request-action-title" onMouseDown={(event) => { if (event.currentTarget === event.target) close() }}>
+          <section className="w-full max-w-lg rounded-[20px] bg-white p-5 shadow-2xl sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div><h2 id="client-request-action-title" className="text-xl font-semibold text-slate-950">{requestActionContent[action].title}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{requestActionContent[action].description}</p></div>
+              <button type="button" onClick={close} aria-label="Close" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600">×</button>
+            </div>
+            <label className="mt-5 grid gap-2 text-sm font-semibold text-slate-900">
+              Message
+              <textarea autoFocus rows={4} value={message} onChange={(event) => setMessage(event.target.value)} placeholder={requestActionContent[action].placeholder} className="resize-none rounded-xl border border-slate-300 px-3 py-3 text-base font-normal outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-sky-100" />
+            </label>
+            {error ? <p className="mt-3 text-sm font-medium text-rose-700" role="alert">{error}</p> : null}
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <button type="button" onClick={close} disabled={isPending} className="min-h-11 rounded-full border border-slate-200 bg-white text-sm font-semibold text-slate-700">Keep Request</button>
+              <button type="button" onClick={submitAction} disabled={isPending || !message.trim()} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold text-white disabled:opacity-40 ${action === "cancel" ? "bg-rose-600" : "bg-[#0071e3]"}`}>
+                <MessageSquareText className="h-4 w-4" aria-hidden="true" />{isPending ? "Sending..." : requestActionContent[action].submit}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </div>
   )
 }
 

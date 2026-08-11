@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { getSessionWithProfile } from "@/lib/auth"
+import { sendClientRequestActionEmail } from "@/lib/cart-submission-email"
 import {
   buildMaterialQuestionnaireSnapshot,
   formatMaterialAnswer,
@@ -19,6 +20,8 @@ import { createProjectEvent } from "@/lib/projects"
 import type { QuoteRequestAnswer } from "@/lib/quote-requests"
 
 type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: string; authRequired?: boolean }
+
+export type ClientRequestActionType = "change" | "question" | "cancel"
 
 async function currentUser() {
   const session = await getSessionWithProfile()
@@ -440,4 +443,61 @@ export async function submitQuoteRequestAction(input: { projectId: string; reque
   })
   revalidatePath(`/projects/${input.projectId}`)
   return { ok: true, data: undefined }
+}
+
+export async function createClientRequestAction(input: {
+  projectId: string
+  requestId: string
+  action: ClientRequestActionType
+  message: string
+}): Promise<ActionResult<{ notification: "sent" | "saved" }>> {
+  const session = await getSessionWithProfile()
+  if (!session.supabase || !session.user) return { ok: false, error: "Your session expired.", authRequired: true }
+
+  const message = input.message.trim()
+  if (!message) return { ok: false, error: "Please add a short message." }
+  if (message.length > 4000) return { ok: false, error: "Keep the message under 4,000 characters." }
+
+  const { data: request } = await session.supabase
+    .from("quote_requests")
+    .select("id,title,status,projects(name)")
+    .eq("id", input.requestId)
+    .eq("project_id", input.projectId)
+    .eq("owner_id", session.user.id)
+    .maybeSingle<{ id: string; title: string; status: string; projects: { name: string } | null }>()
+  if (!request) return { ok: false, error: "Request not found." }
+  if (request.status === "closed") return { ok: false, error: "This request is already completed. Start an add-on request instead." }
+
+  const labels: Record<ClientRequestActionType, string> = {
+    change: "Change requested",
+    question: "Client question",
+    cancel: "Cancellation requested",
+  }
+  const label = labels[input.action]
+  await createProjectEvent({
+    supabase: session.supabase,
+    projectId: input.projectId,
+    ownerId: session.user.id,
+    eventType: input.action === "cancel" ? "status_changed" : "note_added",
+    source: "website",
+    title: `${label}: ${request.title}`,
+    description: message,
+    metadata: { quote_request_id: input.requestId, client_action: input.action },
+  })
+
+  const clientName = session.profile?.full_name || session.user.user_metadata?.full_name || session.user.email || "Client"
+  const delivery = await sendClientRequestActionEmail({
+    requestId: request.id,
+    requestTitle: request.title,
+    projectName: request.projects?.name || "Project",
+    clientName,
+    clientEmail: session.user.email || session.profile?.email || null,
+    actionLabel: label,
+    message,
+  })
+
+  revalidatePath(`/projects/${input.projectId}`)
+  revalidatePath(`/projects/${input.projectId}/requests/${input.requestId}`)
+  revalidatePath(`/owner/materials/requests/${input.requestId}`)
+  return { ok: true, data: { notification: delivery.status === "sent" ? "sent" : "saved" } }
 }

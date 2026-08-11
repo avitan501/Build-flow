@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { ProjectInfoEditor, ProjectQuestionsForm, SubmitQuoteRequestButton } from "@/components/buildflow/project-workspace-controls"
+import { ProjectInfoEditor, ProjectQuestionsForm, ProjectRequestActions, SubmitQuoteRequestButton } from "@/components/buildflow/project-workspace-controls"
 import { requireSignedInProfile } from "@/lib/auth"
 import { PROJECT_UPLOAD_STORAGE_BUCKET, type ProjectEventRecord, type ProjectRecord, type ProjectUploadRecord } from "@/lib/projects"
 import {
@@ -37,13 +37,12 @@ function formatActivityDate(value: string) {
 function RequestProgress({ status }: { status: QuoteRequestRecord["status"] }) {
   const activeIndex = quoteRequestProgressIndex(status)
   return (
-    <ol className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={`Request progress: ${quoteRequestStatusLabel(status)}`}>
+    <ol className="mt-4 grid grid-cols-4 gap-1" aria-label={`Request progress: ${quoteRequestStatusLabel(status)}`}>
       {QUOTE_REQUEST_PROGRESS_STEPS.map((label, index) => {
         const complete = index <= activeIndex
         return (
-          <li key={label} className={`rounded-xl border px-2.5 py-2 text-[11px] font-semibold leading-4 ${complete ? "border-sky-200 bg-sky-50 text-sky-800" : "border-slate-200 bg-white text-slate-400"}`}>
-            <span className={`mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${complete ? "bg-[#0071e3] text-white" : "bg-slate-100 text-slate-400"}`}>{index + 1}</span>
-            {label}
+          <li key={label} className={`border-t-2 pt-2 text-[10px] font-semibold leading-4 sm:text-[11px] ${complete ? "border-[#0071e3] text-slate-800" : "border-slate-200 text-slate-400"}`}>
+            <span className="block">{label}</span>
           </li>
         )
       })}
@@ -159,7 +158,7 @@ export default async function ProjectWorkspacePage({ params }: { params: Promise
                         })}
                         {requestItems.length > 3 ? <p className="text-xs text-slate-500">+{requestItems.length - 3} more</p> : null}
                       </div>
-                      <Link href={`/projects/${project.id}/requests/${request.id}`} className="mt-4 inline-flex text-sm font-semibold text-[#0066cc]">Open Request</Link>
+                      <ProjectRequestActions projectId={project.id} requestId={request.id} status={request.status} compact />
                     </article>
                   )
                 })}
