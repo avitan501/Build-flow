@@ -149,6 +149,7 @@ test("flooring uses a compact contractor configurator with a live summary", asyn
   await expect(page.getByTestId("flooring-group-material")).toBeVisible()
   await expect(page.getByTestId("flooring-group-size")).toBeVisible()
   await expect(page.getByTestId("flooring-group-extras")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Plain Sawn / Standard" })).toBeVisible()
   await expect(page.getByText("Wood floor calculator", { exact: true })).toHaveCount(0)
 
   const redOak = page.getByRole("button", { name: "Red Oak" })

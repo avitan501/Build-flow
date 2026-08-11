@@ -76,6 +76,7 @@ export const FLOORING_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
       question_type: "single_select",
       sort_order: 40,
       options: options("milling-cut", [
+        ["Plain Sawn / Standard", "plain-sawn-standard"],
         ["Rift & Quartered", "rift-and-quartered"],
         ["Rift Only", "rift-only"],
         ["Quartered Only", "quartered-only"],
