@@ -6,8 +6,8 @@ export default function RequestQuotePage() {
       <section className="border-b border-slate-200 bg-[#071126] px-5 py-8 text-white sm:px-8 sm:py-10">
         <div className="mx-auto max-w-5xl">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">Avantia Build</p>
-          <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Tell us what you need</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">Send your material list, plans, or project details. We will review everything and contact you within one business day.</p>
+          <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Get Pricing for Your Materials</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">Send your list, blueprint, or material details. We&apos;ll review it and follow up within one business day.</p>
         </div>
       </section>
       <div className="mx-auto max-w-5xl py-6 sm:px-6 sm:py-8">

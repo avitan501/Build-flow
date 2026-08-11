@@ -7,10 +7,10 @@ test("home presents the contractor material coordination service", async ({ page
   await expect(page.getByText("Avantia Build for contractors", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Request Materials" })).toHaveAttribute("href", "/shop");
   await expect(page.getByRole("link", { name: "Talk to a Coordinator" })).toHaveAttribute("href", "https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20want%20to%20start%20a%20material%20order.");
-  await expect(page.getByText("Send it once. We call the stores.", { exact: true })).toBeVisible();
-  await expect(page.getByText("WhatsApp us anytime, 24/7. Your coordinator calls suppliers the next morning to check availability and keep your request moving.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Compare before you buy", { exact: true })).toBeVisible();
-  await expect(page.getByText("Keep every project organized", { exact: true })).toBeVisible();
+  await expect(page.getByText("Send One List", { exact: true })).toBeVisible();
+  await expect(page.getByText("We handle supplier calls, availability, substitutions, and follow-up.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Compare Before You Buy", { exact: true })).toBeVisible();
+  await expect(page.getByText("Keep Every Project Organized", { exact: true })).toBeVisible();
   await expect(page.getByText("Your materials desk", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "One request. One coordinator. No supplier runaround." })).toHaveCount(0);
   await expect(page.getByText("Tell us what you need. We handle the rest.", { exact: true })).toHaveCount(0);
@@ -49,10 +49,10 @@ test("customer menu groups requests and omits retired order and start-building l
   await expect(navigation.getByRole("link", { name: "Let's Work", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "My Projects", exact: true })).toBeVisible();
   const requestNavigation = page.getByRole("navigation", { name: "Request navigation" });
-  const partnerQuote = requestNavigation.getByRole("link", { name: "Request a Quote", exact: true });
+  const partnerQuote = requestNavigation.getByRole("link", { name: "Get Material Pricing", exact: true });
   await expect(partnerQuote).toHaveAttribute("href", "/request-quote");
   await expect(partnerQuote).not.toHaveAttribute("target", "_blank");
-  await expect(requestNavigation.getByRole("link", { name: "Beat a Quote", exact: true })).toHaveAttribute("href", "/beat-a-quote");
+  await expect(requestNavigation.getByRole("link", { name: "Beat a Supplier Quote", exact: true })).toHaveAttribute("href", "/beat-a-quote");
   await expect(navigation.getByRole("link", { name: "Start Building", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "Quotes", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "Orders", exact: true })).toHaveCount(0);

@@ -7,18 +7,18 @@ import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase";
 
 const contractorBenefits = [
   {
-    title: "Send it once. We call the stores.",
-    body: "WhatsApp us anytime, 24/7. Your coordinator calls suppliers the next morning to check availability and keep your request moving.",
+    title: "Send One List",
+    body: "We handle supplier calls, availability, substitutions, and follow-up.",
     icon: PhoneOff,
   },
   {
-    title: "Compare before you buy",
-    body: "We check suppliers and purchasing options to help you make a better buying decision.",
+    title: "Compare Before You Buy",
+    body: "We compare products, pricing, availability, and delivery options.",
     icon: PackageSearch,
   },
   {
-    title: "Keep every project organized",
-    body: "Requests, specifications, attachments, quotes, invoices, and delivery updates stay together in one place.",
+    title: "Keep Every Project Organized",
+    body: "Requests, quotes, invoices, attachments, and updates stay together.",
     icon: ClipboardList,
   },
 ];

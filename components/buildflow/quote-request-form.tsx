@@ -18,7 +18,7 @@ function SubmitButton({ pending, beatQuote }: { pending: boolean; beatQuote: boo
   return (
     <button type="submit" disabled={pending} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white transition hover:bg-[#0068d1] disabled:cursor-wait disabled:opacity-65 sm:w-auto">
       {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-      {pending ? "Sending request..." : beatQuote ? "Send quote to beat" : "Send quote request"}
+      {pending ? "Sending request..." : beatQuote ? "Submit Quote for Review" : "Send for Pricing"}
     </button>
   )
 }
@@ -104,7 +104,7 @@ export function QuoteRequestForm({ mode = "request" }: { mode?: "request" | "bea
         <h2 className="mt-4 text-2xl font-semibold text-slate-950">Request received</h2>
         <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-700">{state.message}</p>
         {state.referenceId ? <p className="mt-3 text-sm font-semibold text-emerald-800">Reference: {state.referenceId}</p> : null}
-        <a href={beatQuote ? "/beat-a-quote" : "/request-quote"} className="mt-6 inline-flex min-h-11 items-center justify-center rounded-lg border border-emerald-300 bg-white px-4 text-sm font-semibold text-emerald-900">Start another request</a>
+        <a href={beatQuote ? "/beat-a-quote" : "/request-quote"} className="mt-6 inline-flex min-h-11 items-center justify-center rounded-lg border border-emerald-300 bg-white px-4 text-sm font-semibold text-emerald-900">{beatQuote ? "Upload Another Quote" : "Request More Pricing"}</a>
       </section>
     )
   }
@@ -153,8 +153,12 @@ export function QuoteRequestForm({ mode = "request" }: { mode?: "request" | "bea
         <label className={labelClass}><span>Company <span className="font-normal text-slate-500">(optional)</span></span><input name="company" autoComplete="organization" className={inputClass} /></label>
       </fieldset>
 
-      <fieldset className="grid gap-4 border-b border-slate-200 px-5 py-6 sm:grid-cols-2 sm:px-8 sm:py-8">
-        <legend className="w-full px-5 pt-6 text-xl font-semibold text-slate-950 sm:px-8 sm:pt-8">2. Project information</legend>
+      <details className="group border-b border-slate-200 bg-slate-50/70">
+        <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-sm font-semibold text-slate-900 marker:content-none sm:px-8">
+          <span>Add job-site details <span className="font-normal text-slate-500">(optional)</span></span>
+          <span aria-hidden="true" className="text-xl leading-none text-slate-400 transition group-open:rotate-45">+</span>
+        </summary>
+        <div className="grid gap-4 px-5 pb-6 sm:grid-cols-2 sm:px-8 sm:pb-8">
         <div className={`${labelClass} sm:col-span-2`}>
           <label htmlFor="quote-address">Job-site address <span className="font-normal text-slate-500">Optional</span></label>
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -180,22 +184,29 @@ export function QuoteRequestForm({ mode = "request" }: { mode?: "request" | "bea
             ))}
           </div>
         </fieldset>
-      </fieldset>
+        </div>
+      </details>
 
       <fieldset className="grid gap-5 px-5 py-6 sm:px-8 sm:py-8">
-        <legend className="w-full px-5 pt-6 text-xl font-semibold text-slate-950 sm:px-8 sm:pt-8">3. {beatQuote ? "Upload the store quote" : "What do you need?"}</legend>
-        <div>
-          <p className="text-sm font-semibold text-slate-800">Choose relevant departments <span className="font-normal text-slate-500">Optional</span></p>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {departments.map((department) => <label key={department} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-900"><input type="checkbox" name="departments" value={department} className="h-4 w-4 accent-[#0071e3]" />{department === "Tile work" ? "Tile" : department}</label>)}
-          </div>
-        </div>
-        <label className={labelClass}>{beatQuote ? "Anything we should know?" : "Project details or material list"} <span className="font-normal text-slate-500">Optional when attaching a file</span><textarea name="details" rows={5} maxLength={5000} placeholder={beatQuote ? "Tell us which items, delivery terms, or substitutions must stay the same." : "Tell us what you need, or attach your plan or list below."} className={`${inputClass} min-h-32 resize-y py-3`} /></label>
+        <legend className="w-full px-5 pt-6 text-xl font-semibold text-slate-950 sm:px-8 sm:pt-8">2. {beatQuote ? "Upload the supplier quote" : "What materials need pricing?"}</legend>
+        {!beatQuote ? <label className={labelClass}>Material details or list <span className="font-normal text-slate-500">Optional when attaching a file</span><textarea name="details" rows={5} maxLength={5000} placeholder="List the materials, quantities, brands, or specifications you need priced." className={`${inputClass} min-h-32 resize-y py-3`} /></label> : null}
         <label className="grid cursor-pointer gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-700 transition hover:border-sky-400 hover:bg-sky-50">
-          <span className="inline-flex items-center gap-2 font-semibold text-slate-900"><FileUp className="h-5 w-5 text-[#0071e3]" />{beatQuote ? "Attach the store quote" : "Attach a plan or material list"} <span className="font-normal text-slate-500">{beatQuote ? "Required" : "Optional"}</span></span>
+          <span className="inline-flex items-center gap-2 font-semibold text-slate-900"><FileUp className="h-5 w-5 text-[#0071e3]" />{beatQuote ? "Attach the supplier quote" : "Attach a plan or material list"} <span className="font-normal text-slate-500">{beatQuote ? "Required" : "Optional"}</span></span>
           <input ref={attachmentRef} type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => validateAttachment(event.currentTarget.files?.[0])} className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-slate-950 file:px-3 file:py-2 file:font-semibold file:text-white" />
           <span className="text-xs text-slate-500">PDF, JPG, PNG, or WebP. Maximum 25 MB.</span>
         </label>
+        {beatQuote ? <label className={labelClass}>Important details <span className="font-normal text-slate-500">(optional)</span><textarea name="details" rows={4} maxLength={5000} placeholder="Add any delivery terms, substitutions, or items that must stay the same." className={`${inputClass} min-h-28 resize-y py-3`} /></label> : null}
+        {!beatQuote ? (
+          <details className="group rounded-lg border border-slate-200 bg-slate-50/70">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-slate-800 marker:content-none">
+              <span>Choose departments <span className="font-normal text-slate-500">(optional)</span></span>
+              <span aria-hidden="true" className="text-lg leading-none text-slate-400 transition group-open:rotate-45">+</span>
+            </summary>
+            <div className="grid grid-cols-2 gap-2 border-t border-slate-200 p-3 sm:grid-cols-4">
+              {departments.map((department) => <label key={department} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-900"><input type="checkbox" name="departments" value={department} className="h-4 w-4 accent-[#0071e3]" />{department === "Tile work" ? "Tile" : department}</label>)}
+            </div>
+          </details>
+        ) : null}
 
         {fileError ? (
           <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800" role="alert">
