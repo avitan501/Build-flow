@@ -1,4 +1,3 @@
-import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { ShopProjectToolPicker } from "@/components/buildflow/shop-project-tool-picker"
 import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase"
 import { getSessionWithProfile } from "@/lib/auth"
@@ -54,12 +53,6 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
 
   return (
     <main className="min-h-screen w-full min-w-0 overflow-x-clip bg-[#f5f5f7] text-[#1d1d1f]">
-      <section className="border-b border-black/[0.05] bg-white">
-        <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-8 sm:py-7 lg:px-10">
-          <AvantiaBuildLockup />
-        </div>
-      </section>
-
       <section className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-8 sm:py-8 lg:px-10">
         <ShopProjectToolPicker
           key={`${selectedProjectId}:${selectedAddress}`}

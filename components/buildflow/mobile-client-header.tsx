@@ -170,7 +170,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
 
   return (
     <>
-      <div className="sticky top-0 z-[60] border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,255,0.94))] shadow-[0_8px_24px_rgba(148,163,184,0.1)] backdrop-blur">
+      <div data-testid="site-header" className="sticky top-0 z-[60] border-b border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,255,0.94))] shadow-[0_8px_24px_rgba(148,163,184,0.1)] backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-3 py-2.5 sm:px-5">
           <button type="button" aria-label="Open navigation menu" onClick={() => setMenuOpen(true)} className="inline-flex">
             <IconShell active={menuOpen}>
@@ -183,20 +183,30 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
           </button>
 
           {isShopPage ? (
-            <button
-              type="button"
-              onClick={() => {
-                setDraftQuery(shopQuery);
-                setShopSearchOpen(true);
-              }}
-              className={`flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-2xl border px-3 py-2 text-left shadow-sm transition ${shopSearchOpen || isActivePath(pathname, "/shop") ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))]" : "border-slate-200/90 bg-white/95"}`}
-              aria-haspopup="dialog"
-              aria-expanded={shopSearchOpen}
-              aria-controls="shop-search-overlay"
-            >
-              <SearchIcon />
-              <span className="truncate text-sm text-slate-500">{shopQuery || "Search materials"}</span>
-            </button>
+            <>
+              <Link
+                href="/"
+                prefetch={false}
+                aria-label="Avantia Build home"
+                className="flex min-h-10 shrink-0 items-center overflow-hidden rounded-lg bg-white transition active:scale-[0.99]"
+              >
+                <AvantiaBuildLockup header />
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftQuery(shopQuery);
+                  setShopSearchOpen(true);
+                }}
+                className={`flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-2xl border px-2.5 py-2 text-left shadow-sm transition sm:px-3 ${shopSearchOpen || isActivePath(pathname, "/shop") ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))]" : "border-slate-200/90 bg-white/95"}`}
+                aria-haspopup="dialog"
+                aria-expanded={shopSearchOpen}
+                aria-controls="shop-search-overlay"
+              >
+                <SearchIcon />
+                <span className="truncate text-sm text-slate-500">{shopQuery || "Search materials"}</span>
+              </button>
+            </>
           ) : (
             <Link href="/" prefetch={false} aria-label="Avantia Build home" className="flex min-h-10 min-w-0 flex-1 items-center px-1 md:flex-none">
               <span className="flex items-center transition active:scale-[0.99]">
@@ -224,7 +234,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
             <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isSignedIn ? "bg-[#0E2A4A] text-white" : "bg-slate-100 text-slate-700"}`}>
               <AccountIcon signedIn={isSignedIn} />
             </span>
-            <span className="min-w-0 truncate">{accountLabel}</span>
+            <span className={`min-w-0 truncate ${isShopPage ? "hidden sm:inline" : ""}`}>{accountLabel}</span>
           </Link>
 
         </div>

@@ -59,6 +59,24 @@ test("all departments wrap into downward rows without page overflow", async ({ p
   expect(widths.scrollWidth).toBe(widths.clientWidth)
 })
 
+test("shop header keeps the animated Avantia logo beside material search", async ({ page }) => {
+  await page.goto("/shop")
+
+  const header = page.getByTestId("site-header")
+  const logo = header.getByRole("img", { name: "Avantia Build" })
+  const search = header.getByRole("button", { name: /Search materials/ })
+
+  await expect(logo).toBeVisible()
+  await expect(logo).toHaveAttribute("src", /avantia-build-rain-painter-animation\.gif/)
+  await expect(search).toBeVisible()
+  await expect(page.locator("main").getByTestId("avantia-build-lockup")).toHaveCount(0)
+  expect(await search.getByText("Search materials").evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+
+  const positions = await Promise.all([logo.boundingBox(), search.boundingBox()])
+  expect(positions[0]?.x).toBeLessThan(positions[1]?.x ?? Number.POSITIVE_INFINITY)
+  expect(Math.abs((positions[0]?.y ?? 0) - (positions[1]?.y ?? 0))).toBeLessThan(12)
+})
+
 test("department categories use distinct unframed product cutouts", async ({ page }) => {
   await page.goto("/shop")
 
