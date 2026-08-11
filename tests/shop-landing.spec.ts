@@ -102,6 +102,34 @@ test("manager pages require authentication and stay out of the guest menu", asyn
 
   await page.goto("/admin/ai-tools")
   await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Fai-tools/)
+
+  await page.goto("/admin/traffic")
+  await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Ftraffic/)
+
+  await page.goto("/admin/ai-tools/order-test")
+  await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Fai-tools%2Forder-test/)
+})
+
+test("footer has the complete Avantia Build contact lockup", async ({ page }) => {
+  await page.goto("/")
+
+  const footer = page.locator("footer")
+  await expect(footer.getByText("You build. We handle the materials.", { exact: true })).toBeVisible()
+  await expect(footer.getByRole("link", { name: "(929) 207-7156" })).toHaveAttribute("href", "tel:+19292077156")
+  await expect(footer.locator("svg")).toBeVisible()
+})
+
+test("traffic endpoint accepts same-site events and blocks cross-site submissions", async ({ request }) => {
+  const accepted = await request.post("/api/site-traffic", {
+    data: { path: "/shop", sessionId: "playwright-traffic-session" },
+  })
+  expect(accepted.status()).toBe(204)
+
+  const blocked = await request.post("/api/site-traffic", {
+    headers: { origin: "https://malicious.example" },
+    data: { path: "/shop", sessionId: "cross-site-traffic-session" },
+  })
+  expect(blocked.status()).toBe(403)
 })
 
 test("home shows the compact manufacturer brand showcase", async ({ page }) => {

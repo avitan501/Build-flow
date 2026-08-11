@@ -128,6 +128,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
             { href: "/admin/users", label: "Customers" },
             { href: "/admin/vendors", label: "Suppliers" },
             { href: "/admin/ai-tools", label: "AI Tools" },
+            { href: "/admin/traffic", label: "Website Traffic" },
           ]
         : []),
     ];

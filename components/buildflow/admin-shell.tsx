@@ -2,6 +2,7 @@
 
 import {
   ChevronLeft,
+  BarChart3,
   ClipboardList,
   LayoutDashboard,
   Sparkles,
@@ -21,6 +22,7 @@ const managerLinks = [
   { href: "/admin/users", label: "Customers", icon: Users },
   { href: "/admin/vendors", label: "Suppliers", icon: Store },
   { href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles },
+  { href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 },
 ] as const;
 
 function isActive(pathname: string, href: string) {

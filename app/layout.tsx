@@ -6,6 +6,7 @@ import { AvantiaBuildClientShell } from "@/components/buildflow/buildflow-client
 import { MobileBottomDock } from "@/components/buildflow/mobile-bottom-dock";
 import { MobileClientHeader } from "@/components/buildflow/mobile-client-header";
 import { SiteFooter } from "@/components/buildflow/site-footer";
+import { TrafficTracker } from "@/components/buildflow/traffic-tracker";
 import { WorkflowSettingsHydrator } from "@/components/buildflow/workflow-settings-hydrator";
 import { getSessionWithProfile } from "@/lib/auth";
 import { isApprovedManagerIdentity } from "@/lib/owner-identity";
@@ -77,6 +78,7 @@ export default async function RootLayout({
           </Script>
         ) : null}
         <AvantiaBuildClientShell>
+          <TrafficTracker />
           <WorkflowSettingsHydrator state={publicStateRow?.state ?? null} />
           <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />
           {children}
