@@ -6,6 +6,7 @@ import { getSessionWithProfile } from "@/lib/auth"
 import {
   buildMaterialQuestionnaireSnapshot,
   formatMaterialAnswer,
+  hasCompleteMaterialAnswer,
   hasMaterialAnswer,
   isQuestionVisible,
   type MaterialAnswerValue,
@@ -264,20 +265,23 @@ export async function saveMaterialQuestionnaireResponseAction(input: {
     .maybeSingle<{ id: string; definition_snapshot: MaterialQuestionnaireResponse["definition_snapshot"] }>()
   if (!response) return { ok: false, error: "The material questionnaire was not found." }
 
-  const visible = response.definition_snapshot.questions.filter((question) => isQuestionVisible(question, input.answers))
+  const answerFor = (question: MaterialQuestionnaireResponse["definition_snapshot"]["questions"][number]) =>
+    input.answers[question.id] ?? input.answers[question.question_key]
+  const normalizedAnswers = Object.fromEntries(response.definition_snapshot.questions.map((question) => [question.id, answerFor(question)]))
+  const visible = response.definition_snapshot.questions.filter((question) => isQuestionVisible(question, normalizedAnswers))
   if (input.complete) {
-    const missing = visible.find((question) => question.is_required && !hasMaterialAnswer(input.answers[question.id]))
+    const missing = visible.find((question) => question.is_required && !hasCompleteMaterialAnswer(question, answerFor(question)))
     if (missing) return { ok: false, error: `Please answer: ${missing.label}` }
   }
 
-  const rows = visible.filter((question) => hasMaterialAnswer(input.answers[question.id])).map((question) => ({
+  const rows = visible.filter((question) => hasMaterialAnswer(answerFor(question))).map((question) => ({
     response_id: response.id,
     question_id: question.id,
     question_key: question.question_key,
     question_label_snapshot: question.label,
     question_type_snapshot: question.question_type,
-    answer_value: input.answers[question.id],
-    answer_display_snapshot: formatMaterialAnswer(question, input.answers[question.id]),
+    answer_value: answerFor(question),
+    answer_display_snapshot: formatMaterialAnswer(question, answerFor(question)),
     unit_snapshot: question.unit,
   }))
   const { data: existing } = await session.supabase.from("material_request_answers").select("id, question_key").eq("response_id", response.id).returns<Array<{ id: string; question_key: string }>>()

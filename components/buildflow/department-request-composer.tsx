@@ -18,6 +18,9 @@ export function DepartmentRequestComposer({ category, displayCategory = category
         <h2 className="mt-1 text-xl font-semibold text-slate-950 sm:text-2xl">Place an order here</h2>
         <p className="mt-1 text-sm text-slate-600">Write what you need or attach a blueprint or shopping list. We will keep everything with your project.</p>
         <textarea
+          aria-label="Describe your material request"
+          name="request_details"
+          autoComplete="off"
           value={details}
           onChange={(event) => setDetails(event.target.value)}
           rows={4}
@@ -41,7 +44,7 @@ export function DepartmentRequestComposer({ category, displayCategory = category
               <label className="flex min-h-16 cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition hover:border-sky-400 hover:bg-sky-50">
                 <FileUp className="h-5 w-5" />
                 <span>Attach blueprint or shopping list</span>
-                <input type="file" accept=".csv,.xls,.xlsx,.pdf,image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+                <input aria-label="Attach blueprint or shopping list" name="request_attachment" type="file" accept=".csv,.xls,.xlsx,.pdf,image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
               </label>
             )}
           </div>

@@ -165,6 +165,22 @@ export function hasMaterialAnswer(value: MaterialAnswerValue) {
   return true
 }
 
+export function hasCompleteMaterialAnswer(question: MaterialQuestion, value: MaterialAnswerValue) {
+  if (!hasMaterialAnswer(value)) return false
+  const selected = typeof value === "object" && value && !Array.isArray(value) ? value.selected : value
+  const selectedValues = Array.isArray(selected) ? selected : typeof selected === "string" ? [selected] : []
+  if (question.allow_other && selectedValues.includes("other")) {
+    return Boolean(typeof value === "object" && value && !Array.isArray(value) && value.other?.trim())
+  }
+  if (["number", "square_feet", "linear_feet", "gallons"].includes(question.question_type)) {
+    return typeof value === "number" ? Number.isFinite(value) && value > 0 : Number(value) > 0
+  }
+  if (question.question_type === "quantity") {
+    return Boolean(typeof value === "object" && value && !Array.isArray(value) && Number(value.value) > 0)
+  }
+  return true
+}
+
 export function formatMaterialAnswer(question: MaterialQuestion, value: MaterialAnswerValue) {
   if (!hasMaterialAnswer(value)) return ""
   if (Array.isArray(value)) {
@@ -174,14 +190,16 @@ export function formatMaterialAnswer(question: MaterialQuestion, value: Material
     const selected = Array.isArray(value.selected)
       ? value.selected.map((entry) => question.options.find((option) => option.value === entry)?.label ?? entry).join(", ")
       : value.selected ? question.options.find((option) => option.value === value.selected)?.label ?? value.selected : ""
-    const parts = [selected, value.value, value.unit, value.other, value.notes].filter((entry) => entry !== undefined && entry !== "")
+    const formattedValue = typeof value.value === "number" ? new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value.value) : value.value
+    const parts = [selected, formattedValue, value.unit, value.other, value.notes].filter((entry) => entry !== undefined && entry !== "")
     if (value.attachmentIds?.length) parts.push(`${value.attachmentIds.length} file${value.attachmentIds.length === 1 ? "" : "s"}`)
     return parts.join(" ")
   }
   if (typeof value === "string") {
     return question.options.find((option) => option.value === value)?.label ?? value
   }
-  return `${value}${question.unit ? ` ${question.unit}` : ""}`
+  const formatted = typeof value === "number" ? new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value) : value
+  return `${formatted}${question.unit ? ` ${question.unit}` : ""}`
 }
 
 export function slugifyMaterialCategory(value: string) {

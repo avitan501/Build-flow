@@ -30,6 +30,7 @@ type AddToProjectButtonProps = {
   details?: string
   questionnaireDepartment?: string
   materialAnswers?: Record<string, MaterialAnswerValue>
+  onAdded?: () => void
 }
 
 type Options = {
@@ -46,7 +47,7 @@ function PlusIcon() {
   )
 }
 
-export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Add to Project", file = null, questions: questionOverride, details, questionnaireDepartment, materialAnswers }: AddToProjectButtonProps) {
+export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Add to Project", file = null, questions: questionOverride, details, questionnaireDepartment, materialAnswers, onAdded }: AddToProjectButtonProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -162,6 +163,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
           return
         }
         setQuestionnaireCompleted(true)
+        onAdded?.()
       }
       setCreated({ projectId, ...result.data })
       router.refresh()
