@@ -13,6 +13,7 @@ import {
   type MaterialQuestionnaireResponse,
   type MaterialRequestAnswer,
 } from "@/lib/material-questionnaires"
+import { applyStorefrontQuestionnaireDefaults, storefrontQuestionnaireDefaultsForDepartment } from "@/lib/material-questionnaire-preview"
 import { loadMaterialQuestionnaireForDepartment } from "@/lib/material-questionnaires-server"
 import { createProjectEvent } from "@/lib/projects"
 import type { QuoteRequestAnswer } from "@/lib/quote-requests"
@@ -200,6 +201,11 @@ export async function addCatalogItemToProjectAction(input: {
     if (existing) {
       materialResponse = existing
     } else {
+      const databaseSnapshot = buildMaterialQuestionnaireSnapshot(materialCategory)
+      const storefrontDefaults = storefrontQuestionnaireDefaultsForDepartment(materialCategory.department_key)
+      const definitionSnapshot = storefrontDefaults
+        ? applyStorefrontQuestionnaireDefaults(databaseSnapshot, storefrontDefaults)
+        : databaseSnapshot
       const { data: inserted, error: responseError } = await session.supabase
         .from("material_questionnaire_responses")
         .insert({
@@ -210,7 +216,7 @@ export async function addCatalogItemToProjectAction(input: {
           category_name_snapshot: materialCategory.name,
           category_slug_snapshot: materialCategory.slug,
           definition_version: materialCategory.current_version,
-          definition_snapshot: buildMaterialQuestionnaireSnapshot(materialCategory),
+          definition_snapshot: definitionSnapshot,
         })
         .select("id, request_id, project_id, owner_id, category_id, category_name_snapshot, category_slug_snapshot, definition_version, definition_snapshot, status, completed_at, created_at, updated_at")
         .single<MaterialQuestionnaireResponse>()
@@ -276,7 +282,7 @@ export async function saveMaterialQuestionnaireResponseAction(input: {
 
   const rows = visible.filter((question) => hasMaterialAnswer(answerFor(question))).map((question) => ({
     response_id: response.id,
-    question_id: question.id,
+    question_id: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(question.id) ? question.id : null,
     question_key: question.question_key,
     question_label_snapshot: question.label,
     question_type_snapshot: question.question_type,

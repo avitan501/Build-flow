@@ -228,3 +228,83 @@ export const ELECTRICAL_QUESTIONNAIRE_PREVIEW: MaterialQuestionnaireSnapshot = {
     electricalQuestion({ id: "electrical-notes", question_key: "electrical_notes", label: "Any wire color, conductor, or delivery notes?", question_type: "long_text", placeholder: "Add copper or aluminum, color, voltage, packaging, or delivery details.", sort_order: 20 }),
   ],
 }
+
+const RETIRED_STOREFRONT_QUESTIONS: Partial<Record<string, Set<string>>> = {
+  "Wood Floor": new Set([
+    "flooring_accessories",
+    "flooring_type",
+    "finish_type",
+    "prefinished_details",
+    "installation_method",
+    "needs_bullnose",
+    "bullnose_length",
+    "needs_adhesive",
+    "adhesive_gallons",
+    "needs_underlayment",
+    "underlayment_area",
+  ]),
+  "Sheet rock": new Set(["custom_width", "custom_length"]),
+}
+
+function storefrontQuestionId(department: string, questionKey: string) {
+  return `storefront:${department.toLowerCase().replace(/[^a-z0-9]+/g, "-")}:${questionKey}`
+}
+
+export function applyStorefrontQuestionnaireDefaults(
+  databaseSnapshot: MaterialQuestionnaireSnapshot | null,
+  defaults: MaterialQuestionnaireSnapshot,
+): MaterialQuestionnaireSnapshot {
+  if (!databaseSnapshot) return defaults
+
+  const consumedDatabaseIds = new Set<string>()
+  const resolved = defaults.questions.map((defaultQuestion) => {
+    const exact = databaseSnapshot.questions.find((question) => question.question_key === defaultQuestion.question_key)
+    const noteAlias = defaultQuestion.question_type === "long_text"
+      ? databaseSnapshot.questions.find((question) => !consumedDatabaseIds.has(question.id) && question.question_type === "long_text" && /note|requirement/.test(question.question_key))
+      : null
+    const databaseQuestion = exact ?? noteAlias
+    if (databaseQuestion) consumedDatabaseIds.add(databaseQuestion.id)
+
+    return {
+      ...defaultQuestion,
+      id: databaseQuestion?.id ?? storefrontQuestionId(databaseSnapshot.category.department_key, defaultQuestion.question_key),
+      category_id: databaseSnapshot.category.id,
+      options: defaultQuestion.options.map((option) => ({
+        ...option,
+        id: databaseQuestion?.options.find((candidate) => candidate.value === option.value)?.id
+          ?? storefrontQuestionId(databaseSnapshot.category.department_key, `${defaultQuestion.question_key}:${option.value}`),
+        question_id: databaseQuestion?.id ?? storefrontQuestionId(databaseSnapshot.category.department_key, defaultQuestion.question_key),
+      })),
+    }
+  })
+
+  const resolvedByDefaultId = new Map(defaults.questions.map((question, index) => [question.id, resolved[index].id]))
+  const defaultsWithParents = resolved.map((question, index) => ({
+    ...question,
+    conditional_parent_question_id: defaults.questions[index].conditional_parent_question_id
+      ? resolvedByDefaultId.get(defaults.questions[index].conditional_parent_question_id!) ?? null
+      : null,
+  }))
+  const retired = RETIRED_STOREFRONT_QUESTIONS[databaseSnapshot.category.department_key] ?? new Set<string>()
+  const customQuestions = databaseSnapshot.questions
+    .filter((question) => !consumedDatabaseIds.has(question.id) && !retired.has(question.question_key))
+    .map((question, index) => ({
+      ...question,
+      sort_order: 10_000 + index,
+    }))
+
+  return {
+    category: databaseSnapshot.category,
+    questions: [...defaultsWithParents, ...customQuestions],
+  }
+}
+
+export function storefrontQuestionnaireDefaultsForDepartment(department: string) {
+  if (department === "Wood Floor") return FLOORING_QUESTIONNAIRE_PREVIEW
+  if (department === "Sheet rock") return DRYWALL_QUESTIONNAIRE_PREVIEW
+  if (department === "Tile work") return TILE_QUESTIONNAIRE_PREVIEW
+  if (department === "Door and molding") return DOOR_MOLDING_QUESTIONNAIRE_PREVIEW
+  if (department === "Framing") return FRAMING_QUESTIONNAIRE_PREVIEW
+  if (department === "Electrical") return ELECTRICAL_QUESTIONNAIRE_PREVIEW
+  return null
+}

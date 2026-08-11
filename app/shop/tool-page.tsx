@@ -6,7 +6,7 @@ import { applyDepartmentAddOns, createEmptyManagerAddOns, departmentExperienceFo
 import type { ProjectRecord } from "@/lib/projects"
 import { findShopToolCategory, type ShopToolSlug } from "@/lib/shop-tools"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { DOOR_MOLDING_QUESTIONNAIRE_PREVIEW, DRYWALL_QUESTIONNAIRE_PREVIEW, ELECTRICAL_QUESTIONNAIRE_PREVIEW, FLOORING_QUESTIONNAIRE_PREVIEW, FRAMING_QUESTIONNAIRE_PREVIEW, TILE_QUESTIONNAIRE_PREVIEW } from "@/lib/material-questionnaire-preview"
+import { applyStorefrontQuestionnaireDefaults, DOOR_MOLDING_QUESTIONNAIRE_PREVIEW, DRYWALL_QUESTIONNAIRE_PREVIEW, ELECTRICAL_QUESTIONNAIRE_PREVIEW, FLOORING_QUESTIONNAIRE_PREVIEW, FRAMING_QUESTIONNAIRE_PREVIEW, TILE_QUESTIONNAIRE_PREVIEW } from "@/lib/material-questionnaire-preview"
 import { buildMaterialQuestionnaireSnapshot } from "@/lib/material-questionnaires"
 import { loadMaterialQuestionnaireForDepartment } from "@/lib/material-questionnaires-server"
 import type { PublicWorkflowState } from "@/lib/workflow-public"
@@ -77,20 +77,21 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
   const projects = projectSession.projects
   const selectedProjectId = projects.some((project) => project.id === params.project) ? params.project : ""
   const selectedAddress = selectedProjectId ? "" : params.address?.trim() || ""
-  const questionnaireSnapshot = process.env.VERCEL_ENV !== "production"
-    ? baseCategory.slug === "wood-floor"
-      ? FLOORING_QUESTIONNAIRE_PREVIEW
-      : baseCategory.slug === "sheet-rock"
-        ? DRYWALL_QUESTIONNAIRE_PREVIEW
-        : baseCategory.slug === "tile-work"
-          ? TILE_QUESTIONNAIRE_PREVIEW
-          : baseCategory.slug === "door-and-molding"
-            ? DOOR_MOLDING_QUESTIONNAIRE_PREVIEW
-            : baseCategory.slug === "framing"
-              ? FRAMING_QUESTIONNAIRE_PREVIEW
-              : baseCategory.slug === "electrical"
-                ? ELECTRICAL_QUESTIONNAIRE_PREVIEW
-        : projectSession.questionnaireSnapshot
+  const storefrontDefaults = baseCategory.slug === "wood-floor"
+    ? FLOORING_QUESTIONNAIRE_PREVIEW
+    : baseCategory.slug === "sheet-rock"
+      ? DRYWALL_QUESTIONNAIRE_PREVIEW
+      : baseCategory.slug === "tile-work"
+        ? TILE_QUESTIONNAIRE_PREVIEW
+        : baseCategory.slug === "door-and-molding"
+          ? DOOR_MOLDING_QUESTIONNAIRE_PREVIEW
+          : baseCategory.slug === "framing"
+            ? FRAMING_QUESTIONNAIRE_PREVIEW
+            : baseCategory.slug === "electrical"
+              ? ELECTRICAL_QUESTIONNAIRE_PREVIEW
+              : null
+  const questionnaireSnapshot = storefrontDefaults
+    ? applyStorefrontQuestionnaireDefaults(projectSession.questionnaireSnapshot, storefrontDefaults)
     : projectSession.questionnaireSnapshot
 
   return (

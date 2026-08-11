@@ -191,7 +191,7 @@ function configuratorGroupFor(question: MaterialQuestion) {
   if (key === "lumber_grade") return "extras"
   if (key === "drywall_type") return "size"
   if (key === "waste_allowance") return "size"
-  if (/(accessor|underlay|adhesive|glue|paper|nosing|transition|waste|bullnose|screw|compound|corner|bead|tape|stud|reference|catalog|note|spacer|waterproof|primer|sealant)/.test(key)) return "extras"
+  if (/(accessor|underlay|adhesive|glue|paper|nosing|transition|waste|bullnose|screw|compound|corner|bead|tape|stud|reference|catalog|note|requirement|spacer|waterproof|primer|sealant)/.test(key)) return "extras"
   if (/(width|length|area|square|quantity|amount|count|size|thickness|sand|cement|mesh|measurement|door_type)/.test(key)) return "size"
   return "material"
 }
@@ -303,7 +303,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
     const gridSpan = pairedConfiguratorQuestion ? "col-span-1" : "col-span-2"
     if (singleSpecification) {
       return (
-        <div key={question.id} id={`question-${question.id}`} className={`${gridSpan} flex min-h-12 scroll-mt-28 flex-col items-start justify-between gap-2 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:items-center sm:gap-4`}>
+        <div key={question.id} id={`question-${question.id}`} data-question-key={question.question_key} className={`${gridSpan} flex min-h-12 scroll-mt-28 flex-col items-start justify-between gap-2 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:items-center sm:gap-4`}>
           <p className="text-sm font-semibold text-slate-600">{question.label}</p>
           <span className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 text-sm font-bold text-slate-950"><Check className="h-3.5 w-3.5 text-[#0071e3]" aria-hidden="true" />{question.options[0].label}</span>
         </div>
@@ -313,6 +313,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
       <fieldset
         key={question.id}
         id={`question-${question.id}`}
+        data-question-key={question.question_key}
         className={`${gridSpan} ${compactOptionalNote ? "scroll-mt-28 py-2" : compact ? "scroll-mt-28 py-3 first:pt-0 last:pb-0" : "scroll-mt-24 pb-7"} min-w-0 border-b border-slate-100 last:border-b-0`}
         aria-describedby={question.help_text ? `question-help-${question.id}` : undefined}
       >
