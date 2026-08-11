@@ -28,7 +28,11 @@ async function loadCurrentUserProjects(questionnaireDepartment: string) {
     // Questionnaire definitions are public storefront content, but older
     // installations may not yet grant anonymous table reads. Keep the service
     // role server-only and still filter the result to the active category.
-    questionnaire = await loadMaterialQuestionnaireForDepartment(createAdminClient(), questionnaireDepartment).catch(() => null)
+    try {
+      questionnaire = await loadMaterialQuestionnaireForDepartment(createAdminClient(), questionnaireDepartment).catch(() => null)
+    } catch {
+      questionnaire = null
+    }
   }
   const questionnaireSnapshot = questionnaire ? buildMaterialQuestionnaireSnapshot(questionnaire) : null
   const { data: publicStateRow } = await supabase
