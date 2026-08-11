@@ -38,6 +38,7 @@ function safeFileName(value: string) {
 }
 
 type QuoteIntakePayload = {
+  requestKind: "quote_request" | "beat_quote"
   referenceId: string
   firstName: string
   lastName: string
@@ -102,6 +103,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
   const zip = field(formData, "zip", 10)
   const timeframe = field(formData, "timeframe", 80)
   const details = field(formData, "details", 5000)
+  const requestKind = field(formData, "requestKind", 30) === "beat_quote" ? "beat_quote" : "quote_request"
   const departments = formData.getAll("departments").map((value) => String(value).trim()).filter(Boolean).slice(0, 12)
 
   if (!firstName || !lastName) return error("Enter your full name, including first and last name.")
@@ -132,11 +134,13 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     attachment = { filename, storagePath: attachmentPath, type: expectedType, size: attachmentSize }
   }
   if (details.length < 3 && !attachment) return error("Tell us what you need or attach a plan or material list.")
+  if (requestKind === "beat_quote" && !attachment) return error("Attach the store quote you want us to beat.")
 
   const referenceId = `AB-${randomUUID().slice(0, 8).toUpperCase()}`
   const fullName = `${firstName} ${lastName}`
   const address = addressInput || [street, city, state, zip].filter(Boolean).join(", ")
   const intakePayload: QuoteIntakePayload = {
+    requestKind,
     referenceId,
     firstName,
     lastName,
@@ -198,7 +202,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
 
     const { data: project, error: projectError } = await supabase.from("projects").insert({
       owner_id: clientId,
-      name: projectName || `Quote request ${referenceId}`,
+      name: projectName || `${requestKind === "beat_quote" ? "Beat a quote" : "Quote request"} ${referenceId}`,
       address: address || null,
       status: "active",
     }).select("id").single<{ id: string }>()
@@ -208,7 +212,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     const { data: request, error: requestError } = await supabase.from("quote_requests").insert({
       project_id: projectId,
       owner_id: clientId,
-      title: projectName ? `${projectName} quote request` : `Construction quote ${referenceId}`,
+      title: projectName ? `${projectName} ${requestKind === "beat_quote" ? "price comparison" : "quote request"}` : `${requestKind === "beat_quote" ? "Beat a quote" : "Construction quote"} ${referenceId}`,
       status: "submitted",
       submitted_at: new Date().toISOString(),
     }).select("id").single<{ id: string }>()
@@ -226,7 +230,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
       request_id: requestId,
       project_id: projectId,
       owner_id: clientId,
-      name: "Construction quote request",
+      name: requestKind === "beat_quote" ? "Beat a store quote" : "Construction quote request",
       department: departments.join(", ") || "General request",
       item_type: "custom_priced",
       quantity: 1,
@@ -234,7 +238,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
       unit_price: 0,
       qualification_status: "answered",
       answers,
-      metadata: { reference_id: referenceId, source: "public_quote_form", request_details: details },
+      metadata: { reference_id: referenceId, source: requestKind === "beat_quote" ? "beat_a_quote_form" : "public_quote_form", request_details: details },
     })
     if (itemError) throw new Error("request_item_create_failed")
 
@@ -284,7 +288,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     await supabase.from("quote_request_items").update({
       metadata: {
         reference_id: referenceId,
-        source: "public_quote_form",
+        source: requestKind === "beat_quote" ? "beat_a_quote_form" : "public_quote_form",
         request_details: details,
         email_delivery: {
           owner: emailDelivery.owner.status,

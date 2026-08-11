@@ -264,7 +264,7 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
         {experience.showPlanUpload && category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
         {experience.showPlanUpload && category.slug === "window" ? <ManagerItemVisibility itemId="window-package"><WindowUploadActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} successCode={successCode} /></ManagerItemVisibility> : null}
 
-        <DepartmentEssentials data={essentials} />
+        {category.slug !== "sheet-rock" ? <DepartmentEssentials data={essentials} /> : null}
 
         {experience.showChatToOrder && usesEmbeddedQuickOrder && questionnaireSnapshot ? (
           <details className="group rounded-lg border border-slate-200 bg-white shadow-sm">

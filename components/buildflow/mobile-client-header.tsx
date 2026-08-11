@@ -103,7 +103,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
     { href: "/", label: "Home" },
     { href: "/shop", label: "Let's Work" },
     { href: "/projects", label: "My Projects" },
-    { href: "/request-quote", label: "Request a Quote" },
     ...(isAdmin ? [{ href: "/admin/build-map", label: "Manager" }] : []),
     ...(isSignedIn
       ? [
@@ -111,6 +110,11 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
         ]
       : []),
   ], [isAdmin, isSignedIn]);
+
+  const requestLinks = useMemo<MobileMenuLink[]>(() => [
+    { href: "/request-quote", label: "Request a Quote" },
+    { href: "/beat-a-quote", label: "Beat a Quote" },
+  ], []);
 
   const adminLinks = useMemo<MobileMenuLink[]>(() => {
     if (!isAdmin && !isPreviewAdminEnabled) {
@@ -210,7 +214,8 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
               <Link href="/" className={`rounded-lg px-3 py-2 text-sm font-semibold ${pathname === "/" ? "bg-slate-100 text-slate-950" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}>Home</Link>
               <Link href="/shop" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Let&apos;s Work</Link>
               <Link href="/projects" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">My Projects</Link>
-              <Link href="/request-quote" className="rounded-lg bg-[#0E2A4A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163a63]">Request a Quote</Link>
+              <Link href="/request-quote" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Request a Quote</Link>
+              <Link href="/beat-a-quote" className="rounded-lg bg-[#0E2A4A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163a63]">Beat a Quote</Link>
             </nav>
           ) : null}
 
@@ -237,7 +242,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
         ) : null}
       </div>
 
-      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} primaryLinks={primaryLinks} adminLinks={adminLinks} isSignedIn={isSignedIn} />
+      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} primaryLinks={primaryLinks} requestLinks={requestLinks} adminLinks={adminLinks} isSignedIn={isSignedIn} />
 
       {shopSearchOpen ? (
         <div id="shop-search-overlay" role="dialog" aria-modal="true" className="fixed inset-0 z-[80] bg-white/96 backdrop-blur-sm">

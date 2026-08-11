@@ -32,6 +32,19 @@ test("quote request is an Avantia-branded internal workflow", async ({ page }) =
   }
 })
 
+test("beat a quote is a dedicated upload request", async ({ page }) => {
+  await page.goto("/beat-a-quote")
+
+  await expect(page.getByRole("heading", { name: "Let us beat the quote" })).toBeVisible()
+  await expect(page.getByText("Attach the store quote", { exact: false })).toBeVisible()
+  await expect(page.locator('input[name="requestKind"]')).toHaveValue("beat_quote")
+  await expect(page.getByRole("button", { name: "Send quote to beat" })).toBeVisible()
+
+  await page.getByRole("button", { name: "Open navigation menu" }).click()
+  await expect(page.getByRole("navigation", { name: "Request navigation" }).getByRole("link", { name: "Request a Quote" })).toBeVisible()
+  await expect(page.getByRole("navigation", { name: "Request navigation" }).getByRole("link", { name: "Beat a Quote" })).toBeVisible()
+})
+
 test("plan over the storage limit stays on the form and shows a useful error", async ({ page }) => {
   await page.goto("/request-quote")
   await page.getByLabel("Full name").fill("Large Plan Test Client")

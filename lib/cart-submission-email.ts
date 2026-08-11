@@ -295,6 +295,7 @@ export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmail
 }
 
 export type QuoteIntakeEmailInput = {
+  requestKind?: "quote_request" | "beat_quote"
   requestId?: string
   referenceId: string
   firstName: string
@@ -366,8 +367,9 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
   const fullName = `${input.firstName} ${input.lastName}`.trim()
   const address = [input.street, input.city, input.state, input.zip].filter(Boolean).join(", ")
   const departmentText = input.departments.join(", ") || "Not specified"
+  const beatQuote = input.requestKind === "beat_quote"
   const text = [
-    "New Avantia Build quote request",
+    beatQuote ? "New Avantia Build quote to beat" : "New Avantia Build quote request",
     "",
     `Reference: ${input.referenceId}`,
     `Customer: ${fullName}`,
@@ -389,8 +391,8 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
   ].join("\n")
   const html = `
     <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:680px;margin:0 auto">
-      <p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Avantia Build quote request</p>
-      <h1 style="margin:0 0 20px;font-size:24px">New request from ${escapeHtml(fullName)}</h1>
+      <p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">${beatQuote ? "Avantia Build price challenge" : "Avantia Build quote request"}</p>
+      <h1 style="margin:0 0 20px;font-size:24px">${beatQuote ? "New store quote to beat" : "New request"} from ${escapeHtml(fullName)}</h1>
       <div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc">
         <strong>Reference:</strong> ${escapeHtml(input.referenceId)}<br />
         <strong>Email:</strong> ${escapeHtml(input.email)}<br />
@@ -414,7 +416,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
     apiKey,
     from,
     to,
-    subject: `New quote request: ${input.projectName || fullName}`,
+    subject: `${beatQuote ? "New quote to beat" : "New quote request"}: ${input.projectName || fullName}`,
     html,
     text,
     replyTo: input.email,
@@ -425,7 +427,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
   const clientText = [
     `Hi ${input.firstName},`,
     "",
-    "We received your Avantia Build quote request.",
+    beatQuote ? "We received the store quote you want us to beat." : "We received your Avantia Build quote request.",
     `Reference: ${input.referenceId}`,
     `Project: ${input.projectName || "Not named"}`,
     "",
@@ -438,8 +440,8 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
         apiKey,
         from,
         to: input.email,
-        subject: `We received your quote request: ${input.projectName || input.referenceId}`,
-        html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:620px;margin:0 auto"><p>Hi ${escapeHtml(input.firstName)},</p><h1 style="font-size:22px">We received your quote request</h1><p><strong>Reference:</strong> ${escapeHtml(input.referenceId)}<br /><strong>Project:</strong> ${escapeHtml(input.projectName || "Not named")}</p><p>Our Avantia Build team will review the details and contact you if anything else is needed.</p><p style="margin-top:24px"><strong>Avantia Build</strong><br /><span style="color:#64748b">Everything it takes to build</span></p></div>`,
+        subject: `${beatQuote ? "We received your quote to beat" : "We received your quote request"}: ${input.projectName || input.referenceId}`,
+        html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:620px;margin:0 auto"><p>Hi ${escapeHtml(input.firstName)},</p><h1 style="font-size:22px">${beatQuote ? "We received your store quote" : "We received your quote request"}</h1><p><strong>Reference:</strong> ${escapeHtml(input.referenceId)}<br /><strong>Project:</strong> ${escapeHtml(input.projectName || "Not named")}</p><p>Our Avantia Build team will review the details and contact you if anything else is needed.</p><p style="margin-top:24px"><strong>Avantia Build</strong><br /><span style="color:#64748b">Everything it takes to build</span></p></div>`,
         text: clientText,
         replyTo: to,
         idempotencyKey: `avantia-intake-client-${input.referenceId}`,

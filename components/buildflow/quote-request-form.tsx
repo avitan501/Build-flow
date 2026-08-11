@@ -14,16 +14,17 @@ const maxAttachmentSize = 25 * 1024 * 1024
 const inputClass = "min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3.5 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
 const labelClass = "grid gap-1.5 text-sm font-semibold text-slate-800"
 
-function SubmitButton({ pending }: { pending: boolean }) {
+function SubmitButton({ pending, beatQuote }: { pending: boolean; beatQuote: boolean }) {
   return (
     <button type="submit" disabled={pending} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white transition hover:bg-[#0068d1] disabled:cursor-wait disabled:opacity-65 sm:w-auto">
       {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-      {pending ? "Sending request..." : "Send quote request"}
+      {pending ? "Sending request..." : beatQuote ? "Send quote to beat" : "Send quote request"}
     </button>
   )
 }
 
-export function QuoteRequestForm() {
+export function QuoteRequestForm({ mode = "request" }: { mode?: "request" | "beat" }) {
+  const beatQuote = mode === "beat"
   const [state, formAction, pending] = useActionState(submitQuoteRequestFormAction, initialState)
   const [uploadPending, startUploadTransition] = useTransition()
   const [address, setAddress] = useState("")
@@ -103,7 +104,7 @@ export function QuoteRequestForm() {
         <h2 className="mt-4 text-2xl font-semibold text-slate-950">Request received</h2>
         <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-700">{state.message}</p>
         {state.referenceId ? <p className="mt-3 text-sm font-semibold text-emerald-800">Reference: {state.referenceId}</p> : null}
-        <a href="/request-quote" className="mt-6 inline-flex min-h-11 items-center justify-center rounded-lg border border-emerald-300 bg-white px-4 text-sm font-semibold text-emerald-900">Start another request</a>
+        <a href={beatQuote ? "/beat-a-quote" : "/request-quote"} className="mt-6 inline-flex min-h-11 items-center justify-center rounded-lg border border-emerald-300 bg-white px-4 text-sm font-semibold text-emerald-900">Start another request</a>
       </section>
     )
   }
@@ -141,6 +142,7 @@ export function QuoteRequestForm() {
       className="overflow-hidden border-y border-slate-200 bg-white"
       data-testid="quote-request-form"
     >
+      <input type="hidden" name="requestKind" value={beatQuote ? "beat_quote" : "quote_request"} />
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="sr-only" aria-hidden="true" />
 
       <fieldset className="grid gap-4 border-b border-slate-200 px-5 py-6 sm:grid-cols-2 sm:px-8 sm:py-8">
@@ -181,16 +183,16 @@ export function QuoteRequestForm() {
       </fieldset>
 
       <fieldset className="grid gap-5 px-5 py-6 sm:px-8 sm:py-8">
-        <legend className="w-full px-5 pt-6 text-xl font-semibold text-slate-950 sm:px-8 sm:pt-8">3. What do you need?</legend>
+        <legend className="w-full px-5 pt-6 text-xl font-semibold text-slate-950 sm:px-8 sm:pt-8">3. {beatQuote ? "Upload the store quote" : "What do you need?"}</legend>
         <div>
           <p className="text-sm font-semibold text-slate-800">Choose relevant departments <span className="font-normal text-slate-500">Optional</span></p>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {departments.map((department) => <label key={department} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-900"><input type="checkbox" name="departments" value={department} className="h-4 w-4 accent-[#0071e3]" />{department}</label>)}
           </div>
         </div>
-        <label className={labelClass}>Project details or material list <span className="font-normal text-slate-500">Optional when attaching a file</span><textarea name="details" rows={5} maxLength={5000} placeholder="Tell us what you need, or attach your plan or list below." className={`${inputClass} min-h-32 resize-y py-3`} /></label>
+        <label className={labelClass}>{beatQuote ? "Anything we should know?" : "Project details or material list"} <span className="font-normal text-slate-500">Optional when attaching a file</span><textarea name="details" rows={5} maxLength={5000} placeholder={beatQuote ? "Tell us which items, delivery terms, or substitutions must stay the same." : "Tell us what you need, or attach your plan or list below."} className={`${inputClass} min-h-32 resize-y py-3`} /></label>
         <label className="grid cursor-pointer gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-700 transition hover:border-sky-400 hover:bg-sky-50">
-          <span className="inline-flex items-center gap-2 font-semibold text-slate-900"><FileUp className="h-5 w-5 text-[#0071e3]" />Attach a plan or material list <span className="font-normal text-slate-500">Optional</span></span>
+          <span className="inline-flex items-center gap-2 font-semibold text-slate-900"><FileUp className="h-5 w-5 text-[#0071e3]" />{beatQuote ? "Attach the store quote" : "Attach a plan or material list"} <span className="font-normal text-slate-500">{beatQuote ? "Required" : "Optional"}</span></span>
           <input ref={attachmentRef} type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => validateAttachment(event.currentTarget.files?.[0])} className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-slate-950 file:px-3 file:py-2 file:font-semibold file:text-white" />
           <span className="text-xs text-slate-500">PDF, JPG, PNG, or WebP. Maximum 25 MB.</span>
         </label>
@@ -206,7 +208,7 @@ export function QuoteRequestForm() {
 
         <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs leading-5 text-slate-500">By sending this request, you agree that Avantia Build may contact you about this project.</p>
-          <SubmitButton pending={pending || uploadPending || uploading} />
+          <SubmitButton pending={pending || uploadPending || uploading} beatQuote={beatQuote} />
         </div>
       </fieldset>
     </form>

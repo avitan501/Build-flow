@@ -16,7 +16,14 @@ export const MATERIAL_QUESTION_TYPES = [
 
 export type MaterialQuestionType = (typeof MATERIAL_QUESTION_TYPES)[number]
 export type MaterialConditionalOperator = "equals" | "not_equals" | "includes_any" | "includes_all" | "is_answered"
-export type MaterialLineItem = { size: string; length: string; quantity: number }
+export type MaterialLineItem = {
+  size: string
+  length: string
+  quantity: number
+  code?: string
+  douglasFir?: boolean
+  pressureTreated?: boolean
+}
 export type MaterialAnswerValue = string | number | string[] | { selected?: string | string[]; value?: number; unit?: string; notes?: string; other?: string; attachmentIds?: string[]; items?: MaterialLineItem[] } | null
 
 export type MaterialQuestionOption = {
@@ -44,7 +51,17 @@ export type MaterialQuestion = {
   conditional_parent_question_id: string | null
   conditional_operator: MaterialConditionalOperator | null
   conditional_value: unknown
-  configuration: { units?: string[]; allowNotes?: boolean; maxFiles?: number; itemSizes?: string[]; itemLengths?: string[] }
+  configuration: {
+    units?: string[]
+    allowNotes?: boolean
+    maxFiles?: number
+    itemSizes?: string[]
+    itemLengths?: string[]
+    itemMode?: "lumber" | "molding"
+    imageUrl?: string
+    imagePosition?: string
+    imageSprite?: boolean
+  }
   options: MaterialQuestionOption[]
 }
 
@@ -199,7 +216,12 @@ export function formatMaterialAnswer(question: MaterialQuestion, value: Material
     const formattedValue = typeof value.value === "number" ? new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value.value) : value.value
     const parts = [selected, formattedValue, value.unit, value.other, value.notes].filter((entry) => entry !== undefined && entry !== "")
     if (value.attachmentIds?.length) parts.push(`${value.attachmentIds.length} file${value.attachmentIds.length === 1 ? "" : "s"}`)
-    if (value.items?.length) parts.push(value.items.map((item) => `${item.size} x ${item.length} - ${item.quantity}`).join("; "))
+    if (value.items?.length) parts.push(value.items.map((item) => [
+      `${item.size || item.code || "Item"} x ${item.length} - ${item.quantity}`,
+      item.code ? `code ${item.code}` : "",
+      item.douglasFir ? "Douglas Fir" : "",
+      item.pressureTreated ? "Pressure Treated" : "",
+    ].filter(Boolean).join(", ")).join("; "))
     return parts.join(" ")
   }
   if (typeof value === "string") {

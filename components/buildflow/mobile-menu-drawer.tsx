@@ -17,6 +17,7 @@ type MobileMenuDrawerProps = {
   open: boolean;
   onClose: () => void;
   primaryLinks: MobileMenuLink[];
+  requestLinks?: MobileMenuLink[];
   adminLinks?: MobileMenuLink[];
   isSignedIn: boolean;
 };
@@ -25,7 +26,7 @@ function isActivePath(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`) || (href === "/search" && pathname === "/shop");
 }
 
-export function MobileMenuDrawer({ open, onClose, primaryLinks, adminLinks = [], isSignedIn }: MobileMenuDrawerProps) {
+export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [], adminLinks = [], isSignedIn }: MobileMenuDrawerProps) {
   const pathname = usePathname();
 
   return (
@@ -83,6 +84,13 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, adminLinks = [],
             })}
           </nav>
         </div>
+
+        {requestLinks.length ? <div className="mt-4 rounded-[26px] border border-sky-100 bg-white/90 p-3 shadow-[0_12px_30px_rgba(148,163,184,0.12)]">
+          <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0066cc]">Requests</p>
+          <nav className="mt-2 grid gap-1.5" aria-label="Request navigation">
+            {requestLinks.map((link) => <Link key={`${link.label}-${link.href}`} href={link.href} prefetch={false} onClick={onClose} className={`flex min-h-12 items-center justify-between rounded-2xl px-3 text-sm font-semibold ${Boolean(pathname) && isActivePath(pathname, link.href) ? "bg-[#0E2A4A] text-white" : "text-slate-700 hover:bg-slate-50"}`}><span>{link.label}</span><span aria-hidden="true">›</span></Link>)}
+          </nav>
+        </div> : null}
 
         {adminLinks.length > 0 ? (
           <div className="mt-4 rounded-[26px] border border-amber-100 bg-[linear-gradient(180deg,rgba(255,251,235,0.95),rgba(255,247,220,0.9))] p-3 shadow-[0_12px_28px_rgba(220,168,69,0.12)]">

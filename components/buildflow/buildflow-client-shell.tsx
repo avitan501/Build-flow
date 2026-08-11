@@ -15,7 +15,7 @@ export function AvantiaBuildClientShell({ children }: AvantiaBuildClientShellPro
   const isShopLanding = pathname === "/shop";
   const isShopFlow = Boolean(pathname?.startsWith("/shop/"));
   const isProjectFlow = Boolean(pathname?.startsWith("/projects"));
-  const isQuoteRequest = pathname === "/request-quote";
+  const isQuoteRequest = pathname === "/request-quote" || pathname === "/beat-a-quote";
   const isOwnerWorkspace = Boolean(pathname?.startsWith("/owner"));
   const isManagerPreview = Boolean(pathname?.startsWith("/preview-admin"));
 

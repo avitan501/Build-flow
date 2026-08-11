@@ -146,20 +146,24 @@ export async function updateMaterialQuestionAction(input: {
   quantityUnits: string
   itemSizes: string
   itemLengths: string
+  questionImageUrl: string
   allowNotes: boolean
 }): Promise<AdminResult> {
   const { supabase } = await requireAdminProfile()
   const label = cleanText(input.label, 500)
   if (!label) return { ok: false, error: "Question label is required." }
   if (!MATERIAL_QUESTION_TYPES.includes(input.questionType)) return { ok: false, error: "Choose a valid question type." }
+  const { data: existingQuestion } = await supabase.from("material_questions").select("configuration").eq("id", input.id).maybeSingle<{ configuration: Record<string, unknown> }>()
   const parentId = input.parentQuestionId || null
   if (parentId === input.id) return { ok: false, error: "A question cannot depend on itself." }
   const configuration = {
+    ...(existingQuestion?.configuration ?? {}),
     ...(input.questionType === "quantity" ? { units: input.quantityUnits.split(",").map((unit) => unit.trim()).filter(Boolean).slice(0, 12) } : {}),
     ...(input.questionType === "item_list" ? {
       itemSizes: input.itemSizes.split(",").map((entry) => entry.trim()).filter(Boolean).slice(0, 30),
       itemLengths: input.itemLengths.split(",").map((entry) => entry.trim()).filter(Boolean).slice(0, 30),
     } : {}),
+    imageUrl: cleanText(input.questionImageUrl, 1000) || undefined,
     ...(input.allowNotes ? { allowNotes: true } : {}),
   }
   const { error } = await supabase.from("material_questions").update({
