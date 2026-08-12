@@ -21,12 +21,11 @@ export function AvantiaBuildLockup({ compact = false, header = false, homepageHe
   return (
     <span className={`flex min-w-0 flex-col ${className}`} data-testid="avantia-build-lockup">
       <Image
-        src="/images/avantia/avantia-build-rain-painter-animation-navy.gif"
+        src="/images/avantia/avantia-build-lockup-navy.webp"
         alt="Avantia Build"
         width={1400}
         height={450}
         loading={header || homepageHeader ? "eager" : undefined}
-        unoptimized
         className={`${widthClass} h-auto select-none object-contain [image-rendering:auto]`}
       />
       {showSlogan ? (

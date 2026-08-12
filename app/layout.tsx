@@ -33,8 +33,8 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   metadataBase: new URL("https://build.avantiap.com"),
   applicationName: "Avantia Build",
-  title: "Avantia Build | Materials Priced & Delivered",
-  description: "Upload your list or choose materials. We compare suppliers and arrange jobsite delivery. No account needed.",
+  title: "Avantia Build | You Build. We Handle the Materials.",
+  description: "Send your plans or material list. We compare suppliers, organize the order, and arrange jobsite delivery.",
   manifest: "/manifest.webmanifest",
   alternates: {
     canonical: "/",
@@ -50,15 +50,15 @@ export const metadata: Metadata = {
     apple: "/images/avantia/avantia-app-icon-512.png",
   },
   openGraph: {
-    title: "Get Materials Priced & Delivered | Avantia Build",
-    description: "Upload your list or choose materials. We compare suppliers and arrange jobsite delivery. No account needed.",
+    title: "You Build. We Handle the Materials. | Avantia Build",
+    description: "Send your plans or material list. We compare suppliers, organize the order, and arrange jobsite delivery.",
     url: "/",
     siteName: "Avantia Build",
     locale: "en_US",
     type: "website",
     images: [
       {
-        url: "/images/avantia/avantia-build-share-v3.jpg",
+        url: "/images/avantia/avantia-build-share-v4.jpg",
         width: 1200,
         height: 630,
         alt: "Construction materials delivered to an active residential jobsite",
@@ -67,9 +67,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Get Materials Priced & Delivered | Avantia Build",
-    description: "Upload your list or choose materials. We compare suppliers and arrange jobsite delivery. No account needed.",
-    images: ["/images/avantia/avantia-build-share-v3.jpg"],
+    title: "You Build. We Handle the Materials. | Avantia Build",
+    description: "Send your plans or material list. We compare suppliers, organize the order, and arrange jobsite delivery.",
+    images: ["/images/avantia/avantia-build-share-v4.jpg"],
   },
 };
 

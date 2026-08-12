@@ -3,10 +3,10 @@ import { expect, test } from "@playwright/test";
 test("home presents the contractor material coordination service", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page).toHaveTitle("Avantia Build | Materials Priced & Delivered");
-  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", "Upload your list or choose materials. We compare suppliers and arrange jobsite delivery. No account needed.");
-  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", "https://build.avantiap.com/images/avantia/avantia-build-share-v3.jpg");
-  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "Get Materials Priced & Delivered | Avantia Build");
+  await expect(page).toHaveTitle("Avantia Build | You Build. We Handle the Materials.");
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", "Send your plans or material list. We compare suppliers, organize the order, and arrange jobsite delivery.");
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", "https://build.avantiap.com/images/avantia/avantia-build-share-v4.jpg");
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "You Build. We Handle the Materials. | Avantia Build");
   await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
   await expect(page.locator('meta[property="og:image:height"]')).toHaveAttribute("content", "630");
   await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute("content", "Avantia Build");
@@ -47,7 +47,7 @@ test("home presents the contractor material coordination service", async ({ page
   await expect(page.getByTestId("coverage-map").getByTestId("coverage-dot")).toHaveCount(41);
   const lockups = page.getByTestId("avantia-build-lockup");
   await expect(lockups.first()).toHaveAttribute("data-testid", "avantia-build-lockup");
-  await expect(lockups.first().locator("img")).toHaveAttribute("src", /avantia-build-rain-painter-animation-navy\.gif/);
+  await expect(lockups.first().locator("img")).toHaveAttribute("src", /avantia-build-lockup-navy/);
   await expect(page.getByTestId("site-header").getByRole("img", { name: "Avantia Build" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Avantia Build animated logo" })).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "Mobile homepage" })).toHaveCount(0);
