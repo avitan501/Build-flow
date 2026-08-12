@@ -5,6 +5,7 @@ test("quote request is an Avantia-branded internal workflow", async ({ page }) =
 
   await expect(page).toHaveURL(/\/request-quote$/)
   await expect(page.getByRole("heading", { name: "Get Pricing for Your Materials" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Back to Home" })).toHaveAttribute("href", "/")
   await expect(page.getByTestId("quote-request-form")).toBeVisible()
   await expect(page.getByText("BLDR", { exact: false })).toHaveCount(0)
   await expect(page.getByLabel("Full name")).toBeVisible()
@@ -41,6 +42,7 @@ test("beat a quote is a dedicated upload request", async ({ page }) => {
   await page.goto("/beat-a-quote")
 
   await expect(page.getByRole("heading", { name: "Upload a Quote. We'll Try to Beat It." })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Back to Home" })).toHaveAttribute("href", "/")
   await expect(page.getByText("Attach the supplier quote", { exact: false })).toBeVisible()
   await expect(page.locator('input[name="requestKind"]')).toHaveValue("beat_quote")
   await expect(page.getByRole("button", { name: "Submit Quote for Review" })).toBeVisible()

@@ -5,8 +5,8 @@ test("home presents the contractor material coordination service", async ({ page
 
   await expect(page.getByRole("heading", { name: "Keep Your Crew Building. We’ll Handle the Materials." })).toBeVisible();
   await expect(page.getByText("Avantia Build for contractors", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Request Materials" })).toHaveAttribute("href", "/shop");
-  await expect(page.getByRole("link", { name: "Talk to a Coordinator" })).toHaveAttribute("href", "https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20want%20to%20start%20a%20material%20order.");
+  await expect(page.getByRole("link", { name: "Start a Material Order" })).toHaveAttribute("href", "/shop");
+  await expect(page.getByRole("link", { name: "Message a Materials Coordinator" })).toHaveAttribute("href", "https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20want%20to%20start%20a%20material%20order.");
   await expect(page.getByText("Send One List", { exact: true })).toBeVisible();
   await expect(page.getByText("We handle supplier calls, availability, substitutions, and follow-up.", { exact: true })).toBeVisible();
   await expect(page.getByText("Compare Before You Buy", { exact: true })).toBeVisible();
