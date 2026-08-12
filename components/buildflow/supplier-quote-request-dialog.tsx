@@ -35,7 +35,7 @@ export function SupplierQuoteRequestDialog({
   function submit() {
     setError("")
     startTransition(async () => {
-      const result = await sendSupplierQuoteRequestAction({ supplierId, supplierEmail, materialList })
+      const result = await sendSupplierQuoteRequestAction({ supplierId, supplierName, supplierEmail, materialList })
       if (!result.ok) {
         setError(result.error)
         return

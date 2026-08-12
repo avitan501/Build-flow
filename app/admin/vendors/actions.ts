@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { sendSupplierQuoteRequestEmail } from "@/lib/cart-submission-email"
 import { requireStaffProfile } from "@/lib/auth"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 const JOB_ADDRESS = "280 Lawrence Ave, Lawrence, NY 11559"
 const MAX_MATERIAL_LIST_LENGTH = 20_000
@@ -15,11 +16,14 @@ type SendSupplierQuoteResult =
 
 export async function sendSupplierQuoteRequestAction(input: {
   supplierId: string
+  supplierName?: string
   supplierEmail: string | null
   materialList: string
 }): Promise<SendSupplierQuoteResult> {
-  const { supabase, user } = await requireStaffProfile("suppliers")
+  const { user } = await requireStaffProfile("suppliers")
+  const admin = createAdminClient()
   const supplierId = input.supplierId.trim()
+  const requestedSupplierName = input.supplierName?.trim().toLowerCase() || ""
   const requestedSupplierEmail = input.supplierEmail?.trim().toLowerCase() || ""
   const materialList = input.materialList.trim()
 
@@ -30,7 +34,7 @@ export async function sendSupplierQuoteRequestAction(input: {
   let supplier: SupplierRoutingOption | undefined
   for (let attempt = 0; attempt < 4 && !supplier; attempt += 1) {
     if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 250))
-    const { data: settings, error: settingsError } = await supabase
+    const { data: settings, error: settingsError } = await admin
       .from("workflow_manager_settings")
       .select("state")
       .eq("id", "singleton")
@@ -42,9 +46,12 @@ export async function sendSupplierQuoteRequestAction(input: {
     const supplierByEmail = requestedSupplierEmail
       ? suppliers.find((item) => item.email?.trim().toLowerCase() === requestedSupplierEmail)
       : undefined
+    const supplierByName = requestedSupplierName
+      ? suppliers.find((item) => item.name.trim().toLowerCase() === requestedSupplierName)
+      : undefined
     supplier = supplierById?.email?.trim().toLowerCase() === requestedSupplierEmail
       ? supplierById
-      : supplierByEmail ?? (!requestedSupplierEmail ? supplierById : undefined)
+      : supplierByEmail ?? supplierByName ?? (!requestedSupplierEmail ? supplierById : undefined)
   }
   if (!supplier) return { ok: false, error: "This supplier is no longer in the directory." }
 
@@ -54,7 +61,7 @@ export async function sendSupplierQuoteRequestAction(input: {
   }
 
   const subject = `Quote Request - ${JOB_ADDRESS}`
-  const { data: request, error: insertError } = await supabase
+  const { data: request, error: insertError } = await admin
     .from("supplier_quote_requests")
     .insert({
       supplier_id: supplier.id,
@@ -80,7 +87,7 @@ export async function sendSupplierQuoteRequestAction(input: {
   })
 
   if (delivery.status === "sent") {
-    await supabase
+    await admin
       .from("supplier_quote_requests")
       .update({ status: "sent", provider_message_id: delivery.providerId, sent_at: new Date().toISOString(), error_message: null })
       .eq("id", request.id)
@@ -93,7 +100,7 @@ export async function sendSupplierQuoteRequestAction(input: {
     : delivery.status === "skipped"
       ? "The email was not sent."
       : delivery.error
-  await supabase
+  await admin
     .from("supplier_quote_requests")
     .update({ status: "failed", error_message: error })
     .eq("id", request.id)
