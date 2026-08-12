@@ -191,6 +191,7 @@ export function SupplierRoutingManager({
   const [bulkItemStatus, setBulkItemStatus] = useState("")
   const [directorySaveState, setDirectorySaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const [directorySaveError, setDirectorySaveError] = useState("")
+  const [directoryNotice, setDirectoryNotice] = useState("")
   const [supplierDirty, setSupplierDirty] = useState(false)
   const [supplierFormError, setSupplierFormError] = useState("")
   const [supplierSavePending, startSupplierSave] = useTransition()
@@ -542,15 +543,33 @@ export function SupplierRoutingManager({
       setSupplierFormError("Wait for the current save to finish, then delete the supplier.")
       return
     }
-    const nextSuppliers = settings.suppliers.filter((supplier) => supplier.id !== supplierId)
     const supplier = settings.suppliers.find((entry) => entry.id === supplierId)
-    const assignmentMessage = nextSuppliers[0]
-      ? ` Its assignments will move to ${nextSuppliers[0].name}.`
-      : " The supplier directory will be empty."
-    if (!window.confirm(`Delete ${supplier?.name || "this supplier"}?${assignmentMessage} Sent request history will remain.`)) return
+    const remainingCount = Math.max(0, settings.suppliers.length - 1)
+    const assignmentMessage = remainingCount > 0
+      ? " Any active assignments will move to another current vendor."
+      : " The active vendor directory will be empty."
+    if (!window.confirm(`Delete only ${supplier?.name || "this supplier"}? The other ${remainingCount} active vendor${remainingCount === 1 ? "" : "s"} will remain.${assignmentMessage} Sent request history will remain.`)) return
 
     setSupplierFormError("")
+    setDirectoryNotice("")
     startSupplierSave(async () => {
+      const latest = await loadSupplierDirectoryAction()
+      if (!latest.ok) {
+        setSupplierFormError("The directory could not be synchronized before deletion. Nothing was deleted; refresh and try again.")
+        return
+      }
+
+      const staleRemovals = settings.suppliers.filter((entry) => !latest.settings.suppliers.some((current) => current.id === entry.id)).length
+      const latestSupplier = latest.settings.suppliers.find((entry) => entry.id === supplierId)
+      if (!latestSupplier) {
+        setSettings(latest.settings)
+        writeShopQualificationSettings(latest.settings)
+        setSelectedSupplierId(latest.settings.suppliers[0]?.id ?? "")
+        setSupplierDirty(false)
+        setDirectoryNotice(`${supplier?.name || "That vendor"} had already been deleted. The directory is now synchronized with ${latest.settings.suppliers.length} active vendor${latest.settings.suppliers.length === 1 ? "" : "s"}.`)
+        return
+      }
+
       const result = await deleteSupplierDirectoryEntryAction(supplierId)
       if (!result.ok) {
         setSupplierFormError(result.error)
@@ -558,11 +577,18 @@ export function SupplierRoutingManager({
       }
 
       const nextSettings = result.settings as ShopQualificationSettings
+      const removedNow = latest.settings.suppliers.filter((entry) => !nextSettings.suppliers.some((current) => current.id === entry.id))
       setSettings(nextSettings)
       writeShopQualificationSettings(nextSettings)
       setSelectedSupplierId(nextSettings.suppliers[0]?.id ?? "")
       setSupplierDirty(false)
       setDirectorySaveState("saved")
+      if (removedNow.length !== 1 || removedNow[0]?.id !== supplierId) {
+        setSupplierFormError("The server returned an unexpected directory change. The screen was synchronized; do not delete another vendor until this is reviewed.")
+        return
+      }
+      const syncMessage = staleRemovals > 0 ? ` ${staleRemovals} earlier deletion${staleRemovals === 1 ? " was" : "s were"} also synchronized before this delete.` : ""
+      setDirectoryNotice(`${latestSupplier.name} alone was deleted. ${nextSettings.suppliers.length} active vendor${nextSettings.suppliers.length === 1 ? " remains" : "s remain"}.${syncMessage}`)
     })
   }
 
@@ -623,6 +649,7 @@ export function SupplierRoutingManager({
       setSelectedSupplierId((current) => result.settings.suppliers.some((supplier) => supplier.id === current) ? current : result.settings.suppliers[0]?.id ?? "")
       setSupplierDirty(false)
       setDirectorySaveState("idle")
+      setDirectoryNotice(`Directory synchronized with the server: ${result.settings.suppliers.length} active vendor${result.settings.suppliers.length === 1 ? "" : "s"}.`)
     })
   }
 
@@ -1156,6 +1183,7 @@ export function SupplierRoutingManager({
 
           {activePanel === "suppliers" ? (
             <section className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
+              {directoryNotice ? <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 xl:col-span-2">{directoryNotice}</div> : null}
               <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_42px_rgba(15,23,42,0.07)]">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-slate-700">Supplier directory</p>
@@ -1195,7 +1223,7 @@ export function SupplierRoutingManager({
                     className="flex min-h-14 items-center gap-3 rounded-[18px] border border-slate-300 bg-white px-4 py-3 text-left text-slate-900 transition hover:border-emerald-400 hover:bg-emerald-50"
                   >
                     <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800"><Search className="h-4 w-4" /></span>
-                    <span><span className="block text-sm font-semibold">Add trial vendors</span><span className="mt-0.5 block text-xs text-slate-600">Browse {TRIAL_VENDOR_ENTRY_COUNT} department entries</span></span>
+                    <span><span className="block text-sm font-semibold">Add trial vendors</span><span className="mt-0.5 block text-xs text-slate-600">Open the reusable {TRIAL_VENDOR_ENTRY_COUNT}-entry source catalog</span></span>
                   </button>
                 </div>
               </section>
@@ -1360,6 +1388,9 @@ export function SupplierRoutingManager({
                     </header>
 
                     <div className="shrink-0 border-b border-slate-200 p-4 sm:px-6">
+                      <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
+                        <strong>Source catalog, not active vendors.</strong> These 90 reference entries always remain available so a deleted company can be added again. Your active vendors are only the companies shown in the Supplier directory behind this window.
+                      </div>
                       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_15rem]">
                         <label className="relative block">
                           <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />

@@ -100,15 +100,33 @@ export async function updateMaterialCategoryAction(input: {
       nextOverride,
     ],
   }
-  const nextState = {
-    qualificationSettings: currentState?.qualificationSettings ?? createEmptyQualificationSettings(),
-    addOns: nextAddOns,
+  let savedState: { qualificationSettings: ShopQualificationSettings; addOns: ManagerCatalogAddOns } | null = null
+  for (let attempt = 0; attempt < 3 && !savedState; attempt += 1) {
+    const { data: latest, error: latestError } = await supabase
+      .from("workflow_manager_settings")
+      .select("state,updated_at")
+      .eq("id", "singleton")
+      .maybeSingle<{ state: { qualificationSettings?: ShopQualificationSettings }; updated_at: string }>()
+    if (latestError || !latest) return { ok: false, error: "The category changed, but the current supplier settings could not be loaded." }
+
+    const nextState = {
+      qualificationSettings: latest.state.qualificationSettings ?? createEmptyQualificationSettings(),
+      addOns: nextAddOns,
+    }
+    const { data: updated, error: managerError } = await supabase
+      .from("workflow_manager_settings")
+      .update({ state: nextState, updated_by: user.id })
+      .eq("id", "singleton")
+      .eq("updated_at", latest.updated_at)
+      .select("id")
+      .maybeSingle<{ id: string }>()
+    if (managerError) return { ok: false, error: "Question settings were saved, but the manager display settings could not be updated." }
+    if (updated) savedState = nextState
   }
-  const [{ error: managerError }, { error: publicError }] = await Promise.all([
-    supabase.from("workflow_manager_settings").upsert({ id: "singleton", state: nextState, updated_by: user.id }),
-    supabase.from("workflow_public_catalog").upsert({ id: "singleton", state: publicWorkflowState(nextState), updated_by: user.id }),
-  ])
-  if (managerError || publicError) return { ok: false, error: "Question settings were saved, but the customer display settings could not be published." }
+
+  if (!savedState) return { ok: false, error: "Supplier settings changed in another tab. Refresh and publish the category again." }
+  const { error: publicError } = await supabase.from("workflow_public_catalog").upsert({ id: "singleton", state: publicWorkflowState(savedState), updated_by: user.id })
+  if (publicError) return { ok: false, error: "Question settings were saved, but the customer display settings could not be published." }
   refreshSettings()
   return { ok: true, data: undefined }
 }

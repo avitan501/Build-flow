@@ -202,26 +202,48 @@ export async function saveWorkflowManagerSettingsAction(input: { qualificationSe
   const { supabase, user, access } = await requireManagerPortalProfile()
   if (!access.owner) {
     if (!access.suppliers) return { ok: false, error: "Supplier management permission is required." }
-    const { error } = await supabase.rpc("staff_save_supplier_directory", {
-      suppliers: input.qualificationSettings.suppliers,
+    const { error } = await supabase.rpc("staff_update_supplier_routing_products", {
+      p_products: input.qualificationSettings.products,
     })
-    if (error) return { ok: false, error: "Could not save the supplier directory." }
+    if (error) return { ok: false, error: "Could not save supplier routing." }
     revalidatePath("/admin/vendors")
     return { ok: true }
   }
-  const [{ error: managerError }, { error: publicError }] = await Promise.all([
-    supabase.from("workflow_manager_settings").upsert({
-      id: "singleton",
-      state: input,
-      updated_by: user.id,
-    }),
-    supabase.from("workflow_public_catalog").upsert({
-      id: "singleton",
-      state: publicWorkflowState(input),
-      updated_by: user.id,
-    }),
-  ])
-  if (managerError || publicError) return { ok: false, error: "Could not save the shared manager settings." }
+
+  let savedState: { qualificationSettings: ShopQualificationSettings; addOns: ManagerCatalogAddOns } | null = null
+  for (let attempt = 0; attempt < 3 && !savedState; attempt += 1) {
+    const { data: current, error: readError } = await supabase
+      .from("workflow_manager_settings")
+      .select("state,updated_at")
+      .eq("id", "singleton")
+      .maybeSingle<{ state: { qualificationSettings?: ShopQualificationSettings }; updated_at: string }>()
+    if (readError || !current) return { ok: false, error: "Could not load the current manager settings. Nothing was changed." }
+
+    const nextState = {
+      qualificationSettings: {
+        ...input.qualificationSettings,
+        suppliers: current.state.qualificationSettings?.suppliers ?? [],
+      },
+      addOns: input.addOns,
+    }
+    const { data: updated, error: managerError } = await supabase
+      .from("workflow_manager_settings")
+      .update({ state: nextState, updated_by: user.id })
+      .eq("id", "singleton")
+      .eq("updated_at", current.updated_at)
+      .select("id")
+      .maybeSingle<{ id: string }>()
+    if (managerError) return { ok: false, error: "Could not save the shared manager settings." }
+    if (updated) savedState = nextState
+  }
+
+  if (!savedState) return { ok: false, error: "The supplier directory changed in another tab. Refresh and try the manager change again." }
+  const { error: publicError } = await supabase.from("workflow_public_catalog").upsert({
+    id: "singleton",
+    state: publicWorkflowState(savedState),
+    updated_by: user.id,
+  })
+  if (publicError) return { ok: false, error: "Manager settings saved, but the customer catalog could not be refreshed." }
   revalidatePath("/admin/vendors")
   revalidatePath("/shop")
   return { ok: true }
