@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { STAFF_EMAIL } from "@/lib/owner-identity";
+import { STAFF_EMAILS } from "@/lib/owner-identity";
 
 type CreateProfileBody = {
   userId?: string;
@@ -62,7 +62,8 @@ export async function POST(request: Request) {
     }
 
     const email = userData.user.email || requestedEmail || "";
-    const isPreapprovedStaff = email.trim().toLowerCase() === STAFF_EMAIL;
+    const normalizedEmail = email.trim().toLowerCase();
+    const isPreapprovedStaff = STAFF_EMAILS.some((staffEmail) => staffEmail === normalizedEmail);
 
     const { error: profileError } = await admin.from("profiles").upsert(
       {
