@@ -13,6 +13,8 @@ import { SHOP_CATEGORY_NAMES, SHOP_POPULAR_SEARCHES } from "@/lib/shop";
 type MobileClientHeaderProps = {
   isSignedIn: boolean;
   isAdmin: boolean;
+  isOwner?: boolean;
+  managerHref?: string;
   isPreviewAdminEnabled?: boolean;
   displayName?: string | null;
 };
@@ -74,7 +76,7 @@ function AccountIcon({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled = false, displayName = null }: MobileClientHeaderProps) {
+export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, managerHref = "/admin/build-map", isPreviewAdminEnabled = false, displayName = null }: MobileClientHeaderProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -103,8 +105,8 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
     { href: "/", label: "Home" },
     { href: "/shop", label: "Order Materials" },
     { href: "/projects", label: "My Projects" },
-    ...(isAdmin ? [{ href: "/admin/build-map", label: "Manager" }] : []),
-  ], [isAdmin]);
+    ...(isAdmin ? [{ href: managerHref, label: "Manager" }] : []),
+  ], [isAdmin, managerHref]);
 
   const requestLinks = useMemo<MobileMenuLink[]>(() => [
     { href: "/request-quote", label: "Get Material Pricing" },
@@ -119,15 +121,14 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
     return [
       ...(isAdmin
         ? [
-            { href: "/admin/build-map", label: "Dashboard" },
+            { href: managerHref, label: "Manager" },
             { href: "/admin/users", label: "Customers" },
             { href: "/admin/vendors", label: "Suppliers" },
-            { href: "/admin/ai-tools", label: "AI Tools" },
-            { href: "/admin/traffic", label: "Website Traffic" },
+            ...(isOwner ? [{ href: "/admin/ai-tools", label: "AI Tools" }, { href: "/admin/traffic", label: "Website Traffic" }] : []),
           ]
         : []),
     ];
-  }, [isAdmin, isPreviewAdminEnabled]);
+  }, [isAdmin, isOwner, isPreviewAdminEnabled, managerHref]);
 
   const normalizedQuery = draftQuery.trim().toLowerCase();
   const shopSuggestions = useMemo(() => {

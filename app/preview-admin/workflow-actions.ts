@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import { requireAdminProfile } from "@/lib/auth"
+import { requireAdminProfile, requireManagerPortalProfile } from "@/lib/auth"
 import type { ManagerCatalogAddOns } from "@/lib/manager-add-ons"
 import type { ShopQualificationSettings } from "@/lib/shop-qualification"
 import type { QuoteRequestStatus } from "@/lib/quote-requests"
@@ -199,7 +199,16 @@ export async function updateRequestStatusAction(input: { requestId: string; stat
 }
 
 export async function saveWorkflowManagerSettingsAction(input: { qualificationSettings: ShopQualificationSettings; addOns: ManagerCatalogAddOns }): Promise<ManagerResult> {
-  const { supabase, user } = await requireAdminProfile()
+  const { supabase, user, access } = await requireManagerPortalProfile()
+  if (!access.owner) {
+    if (!access.suppliers) return { ok: false, error: "Supplier management permission is required." }
+    const { error } = await supabase.rpc("staff_save_supplier_directory", {
+      suppliers: input.qualificationSettings.suppliers,
+    })
+    if (error) return { ok: false, error: "Could not save the supplier directory." }
+    revalidatePath("/admin/vendors")
+    return { ok: true }
+  }
   const [{ error: managerError }, { error: publicError }] = await Promise.all([
     supabase.from("workflow_manager_settings").upsert({
       id: "singleton",

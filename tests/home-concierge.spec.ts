@@ -73,7 +73,13 @@ test("coverage card grows as it enters focus", async ({ page }) => {
   const before = await card.evaluate((element) => Number(getComputedStyle(element).getPropertyValue("--coverage-scale")));
 
   await card.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(150);
+  await page.waitForFunction(
+    ({ testId, initialScale }) => {
+      const element = document.querySelector(`[data-testid="${testId}"]`);
+      return element && Number(getComputedStyle(element).getPropertyValue("--coverage-scale")) > initialScale;
+    },
+    { testId: "coverage-scroll-card", initialScale: before },
+  );
   const focused = await card.evaluate((element) => Number(getComputedStyle(element).getPropertyValue("--coverage-scale")));
 
   expect(focused).toBeGreaterThan(before);

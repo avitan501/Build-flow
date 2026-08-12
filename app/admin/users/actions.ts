@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireAdminProfile } from "@/lib/auth";
+import { requireAdminProfile, requireStaffProfile } from "@/lib/auth";
 
 type AdminAction = "approve" | "reject" | "suspend" | "change_role";
 type RoleValue = "admin" | "staff" | "client";
@@ -128,4 +128,19 @@ export async function suspendUser(formData: FormData) {
 
 export async function changeUserRole(formData: FormData) {
   await applyUserAction(formData, "change_role");
+}
+
+export async function updateCustomerContact(formData: FormData) {
+  const { supabase } = await requireStaffProfile("customers");
+  const userId = String(formData.get("userId") || "").trim();
+  if (!userId) throw new Error("Missing customer id.");
+
+  const { error } = await supabase.rpc("staff_update_customer_contact", {
+    customer_id: userId,
+    customer_full_name: String(formData.get("fullName") || ""),
+    customer_company_name: String(formData.get("companyName") || ""),
+    customer_phone: String(formData.get("phone") || ""),
+  });
+  if (error) throw new Error(error.message || "Failed to update customer contact.");
+  revalidatePath("/admin/users");
 }

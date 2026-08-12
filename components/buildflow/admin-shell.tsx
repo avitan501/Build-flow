@@ -17,13 +17,23 @@ import { useState, type ReactNode } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 
-const managerLinks = [
+const ownerLinks = [
   { href: "/admin/build-map", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "Customers", icon: Users },
   { href: "/admin/vendors", label: "Suppliers", icon: Store },
   { href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles },
   { href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 },
 ] as const;
+
+type ManagerAccess = { owner: boolean; customers: boolean; suppliers: boolean };
+
+function linksForAccess(access: ManagerAccess) {
+  if (access.owner) return ownerLinks;
+  return ownerLinks.filter((link) =>
+    (link.href === "/admin/users" && access.customers) ||
+    (link.href === "/admin/vendors" && access.suppliers),
+  );
+}
 
 function isActive(pathname: string, href: string) {
   const hrefPath = href.split("?")[0];
@@ -39,11 +49,13 @@ function isActive(pathname: string, href: string) {
   return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
 }
 
-function ManagerNavigation({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string; access: ManagerAccess; onNavigate?: () => void }) {
+  const managerLinks = linksForAccess(access);
+  const homeHref = access.owner ? "/admin/build-map" : access.customers ? "/admin/users" : "/admin/vendors";
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="border-b border-slate-200 px-5 py-5">
-        <Link href="/admin/build-map" onClick={onNavigate} aria-label="Avantia Build manager dashboard">
+        <Link href={homeHref} onClick={onNavigate} aria-label="Avantia Build manager portal">
           <AvantiaBuildLockup showSlogan />
         </Link>
         <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager Portal</p>
@@ -83,14 +95,14 @@ function ManagerNavigation({ pathname, onNavigate }: { pathname: string; onNavig
   );
 }
 
-export function AdminShell({ children }: { children: ReactNode }) {
+export function AdminShell({ children, access }: { children: ReactNode; access: ManagerAccess }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
       <aside className="sticky top-0 hidden h-screen border-r border-slate-200 lg:block">
-        <ManagerNavigation pathname={pathname} />
+        <ManagerNavigation pathname={pathname} access={access} />
       </aside>
 
       <div className="min-w-0">
@@ -123,7 +135,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         >
           <X className="h-5 w-5" />
         </button>
-        <ManagerNavigation pathname={pathname} onNavigate={() => setMenuOpen(false)} />
+        <ManagerNavigation pathname={pathname} access={access} onNavigate={() => setMenuOpen(false)} />
       </aside>
     </div>
   );

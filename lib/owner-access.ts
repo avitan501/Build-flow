@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { getSessionWithProfile } from "@/lib/auth";
-import { isApprovedManagerIdentity } from "@/lib/owner-identity";
+import { managerCapabilities } from "@/lib/owner-identity";
 
 export { isOwnerIdentity } from "@/lib/owner-identity";
 
@@ -13,12 +13,12 @@ export async function getOwnerAccessSession() {
     ...session,
     isOwner: Boolean(
       session.user &&
-        isApprovedManagerIdentity({
+        managerCapabilities({
           email,
           role: session.profile?.role,
           approvalStatus: session.profile?.approval_status,
           isActive: session.profile?.is_active,
-        }),
+        }).customers,
     ),
   };
 }

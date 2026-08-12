@@ -1,8 +1,9 @@
 import { Building2, ClipboardList, FolderKanban, Search, UserRoundCheck, Users } from "lucide-react"
 import Link from "next/link"
 
-import { approvePendingUser, changeUserRole, rejectUser, suspendUser } from "@/app/admin/users/actions"
-import { requireAdminProfile } from "@/lib/auth"
+import { approvePendingUser, changeUserRole, rejectUser, suspendUser, updateCustomerContact } from "@/app/admin/users/actions"
+import { requireStaffProfile } from "@/lib/auth"
+import { isApprovedManagerIdentity } from "@/lib/owner-identity"
 
 const roleOptions = ["admin", "staff", "client"] as const
 
@@ -49,7 +50,13 @@ function customerName(customer: Pick<CustomerRecord, "full_name" | "email"> | un
 }
 
 export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string; status?: string; customer?: string }> }) {
-  const { supabase, profile } = await requireAdminProfile()
+  const { supabase, profile, user } = await requireStaffProfile("customers")
+  const isOwner = isApprovedManagerIdentity({
+    email: user.email || profile?.email,
+    role: profile?.role,
+    approvalStatus: profile?.approval_status,
+    isActive: profile?.is_active,
+  })
   const params = await searchParams
   const view = params.view === "requests" ? "requests" : "customers"
   const search = params.q?.trim().toLowerCase() || ""
@@ -145,10 +152,11 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                   <div className="flex flex-wrap gap-2"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(customer.role)}`}>{customer.role}</span><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(customer.approval_status)}`}>{customer.approval_status}</span>{isSelf ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">Your account</span> : null}</div>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-4 border-y border-slate-100 py-3 text-sm"><span><strong>{projectCount.get(customer.id) ?? 0}</strong> projects</span><Link href={`/admin/users?view=requests&customer=${customer.id}`} className="font-semibold text-[#0066cc]"><strong>{requestCount.get(customer.id) ?? 0}</strong> requests</Link><span className="text-slate-500">Joined {formatDate(customer.created_at)}</span></div>
-                <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Manage account</summary><div className="mt-3 flex flex-wrap items-end gap-3 rounded-lg bg-slate-50 p-3">
+                <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Edit customer contact</summary><form action={updateCustomerContact} className="mt-3 grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3"><input type="hidden" name="userId" value={customer.id} /><label className="text-xs font-semibold text-slate-600">Name<input name="fullName" defaultValue={customer.full_name || ""} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label><label className="text-xs font-semibold text-slate-600">Company<input name="companyName" defaultValue={customer.company_name || ""} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label><label className="text-xs font-semibold text-slate-600">Phone<input name="phone" defaultValue={customer.phone || ""} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label><button type="submit" className="min-h-10 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white sm:col-span-3 sm:justify-self-start">Save contact</button></form></details>
+                {isOwner ? <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Owner account controls</summary><div className="mt-3 flex flex-wrap items-end gap-3 rounded-lg bg-slate-50 p-3">
                   <div className="flex flex-wrap gap-2"><form action={approvePendingUser}><input type="hidden" name="userId" value={customer.id} /><button type="submit" disabled={isSelf || customer.approval_status === "approved"} className="min-h-10 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white disabled:opacity-35">Approve</button></form><form action={suspendUser}><input type="hidden" name="userId" value={customer.id} /><button type="submit" disabled={isSelf || customer.approval_status === "suspended"} className="min-h-10 rounded-lg border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-800 disabled:opacity-35">Suspend</button></form><form action={rejectUser}><input type="hidden" name="userId" value={customer.id} /><button type="submit" disabled={isSelf || customer.approval_status === "rejected"} className="min-h-10 rounded-lg border border-rose-200 bg-white px-4 text-sm font-semibold text-rose-700 disabled:opacity-35">Reject</button></form></div>
                   <form action={changeUserRole} className="flex flex-wrap items-center gap-2"><input type="hidden" name="userId" value={customer.id} /><label className="text-xs font-semibold text-slate-600">Role <select name="role" defaultValue={customer.role} disabled={isSelf} className="ml-1 min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm">{roleOptions.map((role) => <option key={role}>{role}</option>)}</select></label><button type="submit" disabled={isSelf} className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-35">Save role</button></form>
-                </div></details>
+                </div></details> : null}
               </article>
             })}
             {filteredCustomers.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No customers match this search.</p> : null}
@@ -164,7 +172,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           </section>
         )}
 
-        {view === "customers" && audits.length ? <section className="mt-6 border-t border-slate-200 pt-5"><div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-[#0066cc]" /><h2 className="text-sm font-bold">Recent account changes</h2></div><div className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">{audits.map((audit, index) => <div key={`${audit.user_id}-${audit.created_at}-${index}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm"><span><strong>{customerName(customerMap.get(audit.user_id))}</strong> · {audit.action.replaceAll("_", " ")}{audit.new_role ? ` to ${audit.new_role}` : ""}</span><time className="text-xs text-slate-500">{formatDate(audit.created_at)}</time></div>)}</div></section> : null}
+        {view === "customers" && isOwner && audits.length ? <section className="mt-6 border-t border-slate-200 pt-5"><div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-[#0066cc]" /><h2 className="text-sm font-bold">Recent account changes</h2></div><div className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">{audits.map((audit, index) => <div key={`${audit.user_id}-${audit.created_at}-${index}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm"><span><strong>{customerName(customerMap.get(audit.user_id))}</strong> · {audit.action.replaceAll("_", " ")}{audit.new_role ? ` to ${audit.new_role}` : ""}</span><time className="text-xs text-slate-500">{formatDate(audit.created_at)}</time></div>)}</div></section> : null}
       </div>
     </main>
   )

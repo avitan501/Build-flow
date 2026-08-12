@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
-import { isApprovedManagerIdentity } from "@/lib/owner-identity";
+import { isApprovedManagerIdentity, managerCapabilities, type StaffCapability } from "@/lib/owner-identity";
 
 export type ProfileRecord = {
   id: string;
@@ -69,4 +69,30 @@ export async function requireAdminProfile() {
   }
 
   return session;
+}
+
+export async function requireStaffProfile(capability: StaffCapability) {
+  const session = await requireSignedInProfile();
+  const access = managerCapabilities({
+    email: session.user.email || session.profile?.email || null,
+    role: session.profile?.role,
+    approvalStatus: session.profile?.approval_status,
+    isActive: session.profile?.is_active,
+  });
+
+  if (!access[capability]) redirect("/");
+  return session;
+}
+
+export async function requireManagerPortalProfile() {
+  const session = await requireSignedInProfile();
+  const access = managerCapabilities({
+    email: session.user.email || session.profile?.email || null,
+    role: session.profile?.role,
+    approvalStatus: session.profile?.approval_status,
+    isActive: session.profile?.is_active,
+  });
+
+  if (!access.owner && !access.customers && !access.suppliers) redirect("/");
+  return { ...session, access };
 }

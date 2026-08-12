@@ -9,7 +9,7 @@ import { SiteFooter } from "@/components/buildflow/site-footer";
 import { TrafficTracker } from "@/components/buildflow/traffic-tracker";
 import { WorkflowSettingsHydrator } from "@/components/buildflow/workflow-settings-hydrator";
 import { getSessionWithProfile } from "@/lib/auth";
-import { isApprovedManagerIdentity } from "@/lib/owner-identity";
+import { managerCapabilities } from "@/lib/owner-identity";
 import { getSupabasePublicEnv, hasSupabasePublicEnv } from "@/lib/supabase/env";
 import type { PublicWorkflowState } from "@/lib/workflow-public";
 import "./globals.css";
@@ -80,15 +80,14 @@ export default async function RootLayout({
 }>) {
   const { supabase, user, profile } = await getSessionWithProfile();
   const isSignedIn = Boolean(user);
-  const isAdmin = Boolean(
-    user &&
-      isApprovedManagerIdentity({
-        email: user.email || profile?.email,
-        role: profile?.role,
-        approvalStatus: profile?.approval_status,
-        isActive: profile?.is_active,
-      }),
-  );
+  const managerAccess = managerCapabilities({
+    email: user?.email || profile?.email,
+    role: profile?.role,
+    approvalStatus: profile?.approval_status,
+    isActive: profile?.is_active,
+  });
+  const isAdmin = managerAccess.owner || managerAccess.customers || managerAccess.suppliers;
+  const managerHref = managerAccess.owner ? "/admin/build-map" : managerAccess.customers ? "/admin/users" : "/admin/vendors";
   const isPreviewAdminEnabled = process.env.VERCEL_ENV !== "production";
   const projectsHref = "/projects";
   const displayName = profile?.full_name?.trim() || user?.email?.split("@")[0] || null;
@@ -114,7 +113,7 @@ export default async function RootLayout({
         <AvantiaBuildClientShell>
           <TrafficTracker />
           <WorkflowSettingsHydrator state={publicStateRow?.state ?? null} />
-          <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />
+          <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isOwner={managerAccess.owner} managerHref={managerHref} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />
           {children}
           <SiteFooter />
           <MobileBottomDock projectsHref={projectsHref} />
