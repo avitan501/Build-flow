@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Check, ClipboardList, Clock3, FileUp, MessageCircle, PackageCheck, PackageSearch } from "lucide-react";
+import { ArrowRight, Check, Clock3, FileUp, MessageCircle, PackageSearch, Sparkles, Truck } from "lucide-react";
 
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
 import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase";
@@ -8,22 +8,29 @@ import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools";
 
 const orderSteps = [
   {
-    eyebrow: "Step 1",
-    title: "Send Your List",
-    body: "Choose materials or upload a list.",
+    title: "Upload",
+    body: "Plan or list",
+    icon: FileUp,
+  },
+  {
+    title: "Takeoff",
+    body: "AI prepares the list",
+    icon: Sparkles,
+  },
+  {
+    title: "Compare",
+    body: "Price and availability",
     icon: PackageSearch,
   },
   {
-    eyebrow: "Step 2",
-    title: "Get Pricing",
-    body: "We compare price and availability.",
-    icon: ClipboardList,
+    title: "Approve",
+    body: "You review the order",
+    icon: Check,
   },
   {
-    eyebrow: "Step 3",
-    title: "Approve Your Order",
-    body: "You approve. We arrange jobsite delivery.",
-    icon: PackageCheck,
+    title: "Deliver",
+    body: "We arrange the jobsite",
+    icon: Truck,
   },
 ];
 
@@ -78,20 +85,23 @@ export default function Home() {
           <div className="absolute inset-0 -z-10 bg-[#071126]/62 sm:bg-[linear-gradient(90deg,rgba(7,17,38,0.84)_0%,rgba(7,17,38,0.64)_48%,rgba(7,17,38,0.28)_100%)]" aria-hidden="true" />
           <div className="mx-auto flex min-h-[26rem] max-w-6xl flex-col justify-end px-6 py-7 sm:min-h-[30rem] sm:px-9 sm:py-9 lg:px-10">
             <div className="page-enter-motion">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-200">Material ordering made easy</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-200">Your construction materials desk</p>
             <h1 className="mt-2 max-w-4xl text-[2.5rem] font-semibold leading-[1.03] text-balance sm:text-6xl">
-              Get Materials Priced and Delivered.
+              You Build. We Handle the Materials.
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-6 text-slate-100 sm:text-xl sm:leading-8">
-              Upload your list or choose materials. We compare suppliers and arrange delivery to your jobsite.
+              Upload your plans or material list. We identify what you need, compare suppliers, organize the order, and coordinate delivery.
+            </p>
+            <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-sky-100 sm:text-base">
+              AI-assisted takeoffs. Verified by our team. Approved by you.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link href="/request-quote" className="group inline-flex min-h-14 items-center justify-between gap-4 rounded-lg bg-white px-3 py-2.5 text-sm font-bold text-[#071126] shadow-[0_14px_34px_rgba(0,0,0,0.24)] transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40 sm:min-w-64">
-                <span className="inline-flex items-center gap-3"><span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#e8f3ff] text-[#0071e3]"><FileUp className="h-5 w-5" aria-hidden="true" /></span>Upload List or Plan</span>
+              <Link href="/shop" className="group inline-flex min-h-14 items-center justify-between gap-4 rounded-lg bg-white px-3 py-2.5 text-sm font-bold text-[#071126] shadow-[0_14px_34px_rgba(0,0,0,0.24)] transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40 sm:min-w-64">
+                <span className="inline-flex items-center gap-3"><span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#e8f3ff] text-[#0071e3]"><PackageSearch className="h-5 w-5" aria-hidden="true" /></span>Start a Material Request</span>
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
-              <Link href="#departments" className="group inline-flex min-h-14 items-center justify-between gap-4 rounded-lg border border-white/45 bg-white/10 px-3 py-2.5 text-sm font-bold text-white shadow-[0_14px_34px_rgba(0,0,0,0.16)] backdrop-blur-sm transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30 sm:min-w-64">
-                <span className="inline-flex items-center gap-3"><span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white/15"><PackageSearch className="h-5 w-5" aria-hidden="true" /></span>Choose Materials</span>
+              <Link href="/request-quote" className="group inline-flex min-h-14 items-center justify-between gap-4 rounded-lg border border-white/45 bg-white/10 px-3 py-2.5 text-sm font-bold text-white shadow-[0_14px_34px_rgba(0,0,0,0.16)] backdrop-blur-sm transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30 sm:min-w-64">
+                <span className="inline-flex items-center gap-3"><span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white/15"><FileUp className="h-5 w-5" aria-hidden="true" /></span>Send Us Your Plans</span>
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
             </div>
@@ -107,6 +117,32 @@ export default function Home() {
           </div>
         </section>
       </div>
+
+      <section className="px-3 py-4 sm:px-5 sm:py-5" aria-labelledby="how-it-works-heading">
+        <div data-testid="homepage-island" className="mx-auto max-w-[88rem]">
+          <div className="mb-3 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">How it works</p>
+              <h2 id="how-it-works-heading" className="mt-1 text-xl font-semibold text-balance text-[#071126] sm:text-2xl">From plan to jobsite</h2>
+            </div>
+            <p className="hidden text-sm text-slate-500 sm:block">Five clear steps. You approve before we order.</p>
+          </div>
+          <ol className="grid grid-cols-5 overflow-hidden rounded-[18px] border border-slate-200 bg-slate-200">
+            {orderSteps.map((point) => {
+              const Icon = point.icon;
+              return (
+                <li key={point.title} className="grid min-h-[6.25rem] min-w-0 content-start justify-items-center gap-1 bg-white px-1 py-3 text-center sm:min-h-[7.5rem] sm:justify-items-start sm:gap-1.5 sm:px-4 sm:py-4 sm:text-left">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-50 text-[#0066cc]"><Icon className="h-4 w-4" aria-hidden="true" /></span>
+                  <div className="min-w-0">
+                    <h3 className="text-[11px] font-bold leading-4 text-[#071126] sm:mt-1 sm:text-sm">{point.title}</h3>
+                    <p className="hidden text-xs leading-5 text-slate-600 sm:block">{point.body}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      </section>
 
       <div className="px-3 py-2 sm:px-5 sm:py-3">
         <div data-testid="homepage-island" className="mx-auto max-w-[88rem] overflow-hidden">
@@ -129,30 +165,6 @@ export default function Home() {
                 <span className="mt-2 block min-w-0 text-[13px] font-semibold leading-4 text-[#071126] sm:text-sm">{department.label}</span>
               </Link>
             ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-3 py-6 sm:px-5 sm:py-8" aria-labelledby="how-it-works-heading">
-        <div data-testid="homepage-island" className="mx-auto max-w-[88rem]">
-          <div className="mb-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">How it works</p>
-            <h2 id="how-it-works-heading" className="mt-1 text-2xl font-semibold text-balance text-[#071126]">Three simple steps</h2>
-          </div>
-          <div className="grid overflow-hidden rounded-[20px] border border-slate-200 bg-white md:grid-cols-3">
-            {orderSteps.map((point) => {
-              const Icon = point.icon;
-              return (
-                <article key={point.title} className="grid grid-cols-[2.75rem_1fr] gap-3 border-b border-slate-200 px-5 py-5 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
-                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-sky-50 text-[#0066cc]"><Icon className="h-5 w-5" aria-hidden="true" /></span>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066cc]">{point.eyebrow}</p>
-                    <h3 className="mt-1 text-base font-bold text-[#071126]">{point.title}</h3>
-                    <p className="mt-1 text-sm leading-5 text-slate-600">{point.body}</p>
-                  </div>
-                </article>
-              );
-            })}
           </div>
         </div>
       </section>
