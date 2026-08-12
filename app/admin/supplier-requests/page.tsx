@@ -1,6 +1,7 @@
 import { AlertCircle, CheckCircle2, Clock3, Mail, Send } from "lucide-react"
 import Link from "next/link"
 
+import { DeleteSupplierQuoteRequestButton } from "@/components/buildflow/delete-supplier-quote-request-button"
 import { requireStaffProfile } from "@/lib/auth"
 
 type SupplierQuoteRequestRow = {
@@ -81,8 +82,9 @@ export default async function SupplierRequestsPage() {
                   <p className="mt-3 text-sm font-semibold text-slate-950">{request.subject}</p>
                   <p className="mt-1 text-sm text-slate-600">{request.job_address}</p>
                 </div>
-                <div className="shrink-0 text-sm text-slate-500">
+                <div className="flex shrink-0 flex-col items-end gap-3 text-sm text-slate-500">
                   <div className="flex items-center gap-2"><Clock3 className="h-4 w-4" />{formatDate(request.sent_at || request.created_at)}</div>
+                  <DeleteSupplierQuoteRequestButton requestId={request.id} supplierName={request.supplier_name} />
                 </div>
               </div>
 

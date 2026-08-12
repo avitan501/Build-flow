@@ -642,6 +642,8 @@ export function SupplierRoutingManager({
   }
 
   function removeProduct(productId: string) {
+    const product = addOns.products.find((entry) => entry.id === productId)
+    if (!window.confirm(`Remove ${product?.name || "this item"}? This cannot be undone.`)) return
     persistAddOns({
       ...addOns,
       products: addOns.products.filter((product) => product.id !== productId),
@@ -727,6 +729,8 @@ export function SupplierRoutingManager({
   }
 
   function removeService(serviceId: string) {
+    const service = addOns.services.find((entry) => entry.id === serviceId)
+    if (!window.confirm(`Remove ${service?.name || "this sub-department"}? Its questions will also be removed.`)) return
     const remainingProducts = { ...settings.products }
     delete remainingProducts[serviceId]
     const nextAddOns = {
@@ -759,6 +763,8 @@ export function SupplierRoutingManager({
   }
 
   function removeQuestion(questionId: string) {
+    const question = selectedSetting.questions.find((entry) => entry.id === questionId)
+    if (!window.confirm(`Remove the question “${question?.label || "this question"}”?`)) return
     updateSelectedSetting({ questions: selectedSetting.questions.filter((question) => question.id !== questionId) })
   }
 
@@ -1095,6 +1101,7 @@ export function SupplierRoutingManager({
                               <button
                                 type="button"
                                 onClick={() => {
+                                  if (!window.confirm("Remove this private supplier note?")) return
                                   updateSupplier(selectedSupplier.id, { notes: "" })
                                   setSupplierNotesOpen((current) => ({ ...current, [selectedSupplier.id]: false }))
                                 }}
