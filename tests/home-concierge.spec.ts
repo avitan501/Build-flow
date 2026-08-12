@@ -63,6 +63,23 @@ test("home presents the contractor material coordination service", async ({ page
   }
 });
 
+test("coverage card grows as it enters focus", async ({ page }) => {
+  await page.goto("/");
+  const card = page.getByTestId("coverage-scroll-card");
+  await expect(card).toBeVisible();
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(100);
+  const before = await card.evaluate((element) => Number(getComputedStyle(element).getPropertyValue("--coverage-scale")));
+
+  await card.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(150);
+  const focused = await card.evaluate((element) => Number(getComputedStyle(element).getPropertyValue("--coverage-scale")));
+
+  expect(focused).toBeGreaterThan(before);
+  expect(focused).toBeLessThanOrEqual(1);
+});
+
 test("customer menu groups requests and omits retired order and start-building links", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Open navigation menu" }).click();
