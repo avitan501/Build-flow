@@ -21,7 +21,7 @@ export function AvantiaBuildLockup({ compact = false, header = false, homepageHe
   return (
     <span className={`flex min-w-0 flex-col ${className}`} data-testid="avantia-build-lockup">
       <Image
-        src="/images/avantia/avantia-build-rain-painter-animation.gif"
+        src="/images/avantia/avantia-build-rain-painter-animation-navy.gif"
         alt="Avantia Build"
         width={1400}
         height={450}

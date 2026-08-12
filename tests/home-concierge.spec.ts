@@ -47,7 +47,7 @@ test("home presents the contractor material coordination service", async ({ page
   await expect(page.getByTestId("coverage-map").getByTestId("coverage-dot")).toHaveCount(41);
   const lockups = page.getByTestId("avantia-build-lockup");
   await expect(lockups.first()).toHaveAttribute("data-testid", "avantia-build-lockup");
-  await expect(lockups.first().locator("img")).toHaveAttribute("src", /avantia-build-rain-painter-animation\.gif/);
+  await expect(lockups.first().locator("img")).toHaveAttribute("src", /avantia-build-rain-painter-animation-navy\.gif/);
   await expect(page.getByTestId("site-header").getByRole("img", { name: "Avantia Build" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Avantia Build animated logo" })).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "Mobile homepage" })).toHaveCount(0);
