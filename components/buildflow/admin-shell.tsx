@@ -44,7 +44,7 @@ function isActive(pathname: string, href: string) {
     return pathname.startsWith("/admin/users");
   }
   if (href === "/admin/vendors") {
-    return pathname.startsWith("/admin/vendors") || pathname.startsWith("/admin/supplier-approvals");
+    return pathname.startsWith("/admin/vendors") || pathname.startsWith("/admin/supplier-approvals") || pathname.startsWith("/admin/supplier-requests");
   }
   return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
 }

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useMemo, useState } from "react"
 import { saveWorkflowManagerSettingsAction } from "@/app/preview-admin/workflow-actions"
 import { DepartmentSymbolBadges, DEPARTMENT_SYMBOL_OPTIONS } from "@/components/buildflow/department-symbol-badges"
+import { SupplierQuoteRequestDialog } from "@/components/buildflow/supplier-quote-request-dialog"
 
 import {
   buildManagerDepartmentOverride,
@@ -719,9 +720,10 @@ export function SupplierRoutingManager({
                 <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Suppliers</h1><p className="mt-2 text-sm text-slate-600">Manage supplier contacts and routed customer requests.</p></div>
                 <span className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">{settings.suppliers.length} total suppliers</span>
               </header>
-              <nav className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-white p-1" aria-label="Supplier directory and requests views">
+              <nav className="grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-white p-1" aria-label="Supplier directory and requests views">
                 <Link href="/admin/vendors" className="flex min-h-11 items-center justify-center rounded-md bg-slate-950 px-4 text-sm font-semibold text-white">Directory</Link>
-                <Link href="/admin/supplier-approvals" className="flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50">Requests</Link>
+                <Link href="/admin/supplier-approvals" className="flex min-h-11 items-center justify-center rounded-md px-2 text-center text-sm font-semibold text-slate-600 hover:bg-slate-50">Routed requests</Link>
+                <Link href="/admin/supplier-requests" className="flex min-h-11 items-center justify-center rounded-md px-2 text-center text-sm font-semibold text-slate-600 hover:bg-slate-50">Sent requests</Link>
               </nav>
             </>
           ) : (
@@ -908,7 +910,10 @@ export function SupplierRoutingManager({
                         <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{selectedSupplier.name}</h3>
                         <p className="mt-2 text-sm leading-6 text-slate-500">This is private manager data used for routing approved reports.</p>
                       </div>
-                      <button type="button" onClick={() => removeSupplier(selectedSupplier.id)} className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">Remove</button>
+                      <div className="flex flex-wrap gap-2">
+                        <SupplierQuoteRequestDialog supplierId={selectedSupplier.id} supplierName={selectedSupplier.name} supplierEmail={selectedSupplier.email || null} />
+                        <button type="button" onClick={() => removeSupplier(selectedSupplier.id)} className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">Remove</button>
+                      </div>
                     </div>
 
                     <div className="mt-6 grid gap-3 sm:grid-cols-2">

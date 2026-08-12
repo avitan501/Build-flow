@@ -3,7 +3,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 
 import { SupplierApprovalActions } from "@/components/buildflow/supplier-approval-actions"
-import { requireAdminProfile } from "@/lib/auth"
+import { requireStaffProfile } from "@/lib/auth"
 import type { MaterialQuestionnaireResponse, MaterialRequestAnswer } from "@/lib/material-questionnaires"
 
 type PackageRecord = { id: string; request_id: string; department: string; supplier_id: string | null; status: string; payload: Record<string, unknown>; created_at: string; approved_at: string | null; sent_at: string | null }
@@ -31,7 +31,7 @@ function legacyAnswers(value: unknown): LegacyAnswer[] {
 
 export default async function SupplierApprovalDetailPage({ params }: { params: Promise<{ packageId: string }> }) {
   const { packageId } = await params
-  const { supabase } = await requireAdminProfile()
+  const { supabase } = await requireStaffProfile("suppliers")
   const { data: pkg } = await supabase.from("supplier_packages").select("id,request_id,department,supplier_id,status,payload,created_at,approved_at,sent_at").eq("id", packageId).maybeSingle<PackageRecord>()
   if (!pkg) notFound()
 

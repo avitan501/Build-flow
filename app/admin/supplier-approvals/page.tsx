@@ -1,7 +1,7 @@
 import { CheckCircle2, CircleAlert, Clock3, PackageCheck, XCircle } from "lucide-react"
 import Link from "next/link"
 
-import { requireAdminProfile } from "@/lib/auth"
+import { requireStaffProfile } from "@/lib/auth"
 
 type PackageRow = {
   id: string
@@ -50,7 +50,7 @@ function formatDate(value: string) {
 export default async function SupplierApprovalsPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const params = await searchParams
   const view = filters.some((filter) => filter.value === params.view) ? params.view! : "pending"
-  const { supabase } = await requireAdminProfile()
+  const { supabase } = await requireStaffProfile("suppliers")
 
   const [{ data: packageRows, error }, { data: managerState }] = await Promise.all([
     supabase
@@ -95,9 +95,10 @@ export default async function SupplierApprovalsPage({ searchParams }: { searchPa
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Manage supplier contacts and routed customer requests.</p>
         </header>
 
-        <nav className="mt-6 grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-white p-1" aria-label="Supplier directory and requests views">
+        <nav className="mt-6 grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-white p-1" aria-label="Supplier directory and requests views">
           <Link href="/admin/vendors" className="flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50">Directory</Link>
-          <Link href="/admin/supplier-approvals" className="flex min-h-11 items-center justify-center rounded-md bg-slate-950 px-4 text-sm font-semibold text-white">Requests</Link>
+          <Link href="/admin/supplier-approvals" className="flex min-h-11 items-center justify-center rounded-md bg-slate-950 px-2 text-center text-sm font-semibold text-white">Routed requests</Link>
+          <Link href="/admin/supplier-requests" className="flex min-h-11 items-center justify-center rounded-md px-2 text-center text-sm font-semibold text-slate-600 hover:bg-slate-50">Sent requests</Link>
         </nav>
 
         <section className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Supplier request filters">

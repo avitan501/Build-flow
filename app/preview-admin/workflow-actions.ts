@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import { requireAdminProfile, requireManagerPortalProfile } from "@/lib/auth"
+import { requireAdminProfile, requireManagerPortalProfile, requireStaffProfile } from "@/lib/auth"
 import type { ManagerCatalogAddOns } from "@/lib/manager-add-ons"
 import type { ShopQualificationSettings } from "@/lib/shop-qualification"
 import type { QuoteRequestStatus } from "@/lib/quote-requests"
@@ -49,7 +49,7 @@ export async function deleteProjectQuestionAction(questionIdValue: string): Prom
 }
 
 export async function updateSupplierPackageAction(input: { packageId: string; status: "approved" | "cancelled" }): Promise<ManagerResult> {
-  const { supabase, user } = await requireAdminProfile()
+  const { supabase, user } = await requireStaffProfile("suppliers")
   const patch = input.status === "approved" ? { status: "approved", approved_by: user.id, approved_at: new Date().toISOString() } : { status: "cancelled" }
   const { error } = await supabase.from("supplier_packages").update(patch).eq("id", input.packageId).eq("status", "pending_approval")
   if (error) return { ok: false, error: "Could not update the supplier package." }
@@ -60,7 +60,7 @@ export async function updateSupplierPackageAction(input: { packageId: string; st
 }
 
 export async function assignSupplierPackageAction(input: { packageId: string; supplierId: string }): Promise<ManagerResult> {
-  const { supabase } = await requireAdminProfile()
+  const { supabase } = await requireStaffProfile("suppliers")
   const supplierId = input.supplierId.trim()
   if (!supplierId) return { ok: false, error: "Choose a supplier." }
 
@@ -85,7 +85,7 @@ export async function assignSupplierPackageAction(input: { packageId: string; su
 }
 
 export async function routeRequestToSupplierAction(input: { requestId: string; department: string; supplierId: string }): Promise<ManagerResult> {
-  const { supabase, user } = await requireAdminProfile()
+  const { supabase, user } = await requireStaffProfile("suppliers")
   const department = input.department.trim()
   const supplierId = input.supplierId.trim()
   if (!department || !supplierId) return { ok: false, error: "Choose a department and supplier." }
@@ -123,7 +123,7 @@ export async function routeRequestToSupplierAction(input: { requestId: string; d
 }
 
 export async function returnSupplierPackageForInfoAction(input: { packageId: string; requestId: string }): Promise<ManagerResult> {
-  const { supabase, user } = await requireAdminProfile()
+  const { supabase, user } = await requireStaffProfile("suppliers")
   const { data: pkg, error: packageError } = await supabase
     .from("supplier_packages")
     .select("request_id,payload")
