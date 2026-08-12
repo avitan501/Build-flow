@@ -39,12 +39,16 @@ export function SupplierQuoteRequestDialog({
   function submit() {
     setError("")
     startTransition(async () => {
-      const result = await sendSupplierQuoteRequestAction({ supplierId, supplierName, supplierEmail, materialList })
-      if (!result.ok) {
-        setError(result.error)
-        return
+      try {
+        const result = await sendSupplierQuoteRequestAction({ supplierId, materialList })
+        if (!result.ok) {
+          setError(result.error)
+          return
+        }
+        setSent(true)
+      } catch {
+        setError("The server could not send this request. Your material list is still here; please try again.")
       }
-      setSent(true)
     })
   }
 

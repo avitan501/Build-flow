@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState, useTransition } from "react"
+import { saveSupplierDirectoryEntryAction } from "@/app/admin/vendors/actions"
 import { saveWorkflowManagerSettingsAction } from "@/app/preview-admin/workflow-actions"
 import { DepartmentSymbolBadges, DEPARTMENT_SYMBOL_OPTIONS } from "@/components/buildflow/department-symbol-badges"
 import { QuoCallButton } from "@/components/buildflow/quo-call-button"
@@ -158,6 +159,9 @@ export function SupplierRoutingManager({
   const [bulkItemStatus, setBulkItemStatus] = useState("")
   const [directorySaveState, setDirectorySaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const [directorySaveError, setDirectorySaveError] = useState("")
+  const [supplierDirty, setSupplierDirty] = useState(false)
+  const [supplierFormError, setSupplierFormError] = useState("")
+  const [supplierSavePending, startSupplierSave] = useTransition()
   const pendingSaveRef = useRef<{ qualificationSettings: ShopQualificationSettings; addOns: ManagerCatalogAddOns } | null>(null)
   const saveRunningRef = useRef(false)
   const [supplierDraft, setSupplierDraft] = useState({
@@ -325,15 +329,21 @@ export function SupplierRoutingManager({
   }
 
   function updateSupplier(supplierId: string, patch: Partial<SupplierRoutingOption>) {
-    persist({
-      ...settings,
-      suppliers: settings.suppliers.map((supplier) => (supplier.id === supplierId ? { ...supplier, ...patch } : supplier)),
-    })
+    setSettings((current) => ({
+      ...current,
+      suppliers: current.suppliers.map((supplier) => (supplier.id === supplierId ? { ...supplier, ...patch } : supplier)),
+    }))
+    setSupplierDirty(true)
+    setSupplierFormError("")
   }
 
   function addSupplier() {
     const name = supplierDraft.name.trim()
     if (!name) return
+    if (directorySaveState === "saving") {
+      setSupplierFormError("Wait for the current directory update to finish, then add the supplier.")
+      return
+    }
 
     const supplier: SupplierRoutingOption = {
       id: makeId(name),
@@ -348,10 +358,48 @@ export function SupplierRoutingManager({
       deliveryNotes: supplierDraft.deliveryNotes.trim(),
     }
 
-    persist({ ...settings, suppliers: [...settings.suppliers.filter((entry) => entry.id !== supplier.id), supplier] })
-    setSelectedSupplierId(supplier.id)
-    setActivePanel("suppliers")
-    setSupplierDraft({ name: "", contactName: "", email: "", phone: "", whatsapp: "", portalUrl: "", preferredDeliveryMethod: "manual", deliveryNotes: "" })
+    setSupplierFormError("")
+    startSupplierSave(async () => {
+      try {
+        const result = await saveSupplierDirectoryEntryAction({ supplier, create: true })
+        if (!result.ok) {
+          setSupplierFormError(result.error)
+          return
+        }
+        setSettings((current) => ({ ...current, suppliers: [...current.suppliers.filter((entry) => entry.id !== result.supplier.id), result.supplier] }))
+        writeShopQualificationSettings({ ...settings, suppliers: [...settings.suppliers.filter((entry) => entry.id !== result.supplier.id), result.supplier] })
+        setSelectedSupplierId(result.supplier.id)
+        setActivePanel("suppliers")
+        setSupplierDirty(false)
+        setDirectorySaveState("saved")
+        setSupplierDraft({ name: "", contactName: "", email: "", phone: "", whatsapp: "", portalUrl: "", preferredDeliveryMethod: "manual", deliveryNotes: "" })
+      } catch {
+        setSupplierFormError("The server could not save this supplier. Please try again.")
+      }
+    })
+  }
+
+  function saveSelectedSupplier() {
+    if (!selectedSupplier) return
+    if (directorySaveState === "saving") {
+      setSupplierFormError("Wait for the current directory update to finish, then save this supplier.")
+      return
+    }
+    setSupplierFormError("")
+    startSupplierSave(async () => {
+      try {
+        const result = await saveSupplierDirectoryEntryAction({ supplier: selectedSupplier })
+        if (!result.ok) {
+          setSupplierFormError(result.error)
+          return
+        }
+        setSettings((current) => ({ ...current, suppliers: current.suppliers.map((entry) => entry.id === result.supplier.id ? result.supplier : entry) }))
+        setSupplierDirty(false)
+        setDirectorySaveState("saved")
+      } catch {
+        setSupplierFormError("The server could not save these changes. Please try again.")
+      }
+    })
   }
 
   function removeSupplier(supplierId: string) {
@@ -951,8 +999,8 @@ export function SupplierRoutingManager({
                           supplierId={selectedSupplier.id}
                           supplierName={selectedSupplier.name}
                           supplierEmail={selectedSupplier.email || null}
-                          directoryReady={directorySaveState !== "saving" && directorySaveState !== "error"}
-                          directoryStatus={directorySaveState === "saving" ? "Saving the latest supplier changes..." : directorySaveError || undefined}
+                          directoryReady={!supplierDirty && !supplierSavePending && directorySaveState !== "saving" && directorySaveState !== "error"}
+                          directoryStatus={supplierDirty ? "Save supplier changes before sending a quote." : supplierSavePending ? "Saving supplier changes..." : directorySaveState === "saving" ? "Saving the latest supplier changes..." : directorySaveError || undefined}
                         />
                         <button type="button" onClick={() => removeSupplier(selectedSupplier.id)} className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">Remove</button>
                       </div>
@@ -999,6 +1047,13 @@ export function SupplierRoutingManager({
                         <textarea value={selectedSupplier.deliveryNotes || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { deliveryNotes: event.target.value })} rows={4} className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
                     </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <button type="button" onClick={saveSelectedSupplier} disabled={!supplierDirty || supplierSavePending || directorySaveState === "saving"} className="min-h-11 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300">
+                        {supplierSavePending ? "Saving..." : "Save supplier changes"}
+                      </button>
+                      {supplierDirty ? <span className="text-xs font-semibold text-amber-700">Unsaved changes</span> : null}
+                    </div>
+                    {supplierFormError ? <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{supplierFormError}</p> : null}
 
                     <section className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
                       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -1043,8 +1098,9 @@ export function SupplierRoutingManager({
                     <select value={supplierDraft.preferredDeliveryMethod} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, preferredDeliveryMethod: event.target.value as SupplierDeliveryMethod }))} className="min-h-12 rounded-2xl border border-slate-300 bg-white px-4 text-sm font-medium">
                       {deliveryMethods.map((method) => <option key={method} value={method}>{methodLabel(method)}</option>)}
                     </select>
-                    <button type="button" onClick={addSupplier} className="min-h-12 rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white">Add supplier</button>
+                    <button type="button" onClick={addSupplier} disabled={supplierSavePending || directorySaveState === "saving" || !supplierDraft.name.trim()} className="min-h-12 rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300">{supplierSavePending ? "Saving..." : "Add supplier"}</button>
                   </div>
+                  {supplierFormError ? <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{supplierFormError}</p> : null}
                 </div>
               </section>
             </section>

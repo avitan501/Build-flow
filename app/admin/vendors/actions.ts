@@ -2,10 +2,8 @@
 
 import { revalidatePath } from "next/cache"
 
-import { sendSupplierQuoteRequestEmail } from "@/lib/cart-submission-email"
 import { requireStaffProfile } from "@/lib/auth"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
-import { createAdminClient } from "@/lib/supabase/admin"
 
 const JOB_ADDRESS = "280 Lawrence Ave, Lawrence, NY 11559"
 const MAX_MATERIAL_LIST_LENGTH = 20_000
@@ -14,45 +12,88 @@ type SendSupplierQuoteResult =
   | { ok: true; requestId: string }
   | { ok: false; error: string }
 
+type SaveSupplierResult =
+  | { ok: true; supplier: SupplierRoutingOption }
+  | { ok: false; error: string }
+
+function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | null {
+  const name = input.name.trim().slice(0, 160)
+  const email = input.email?.trim().toLowerCase().slice(0, 320) || ""
+  if (!name || (email && !/^\S+@\S+\.\S+$/.test(email))) return null
+
+  return {
+    ...input,
+    id: input.id.trim().slice(0, 160),
+    name,
+    contactLabel: input.contactLabel?.trim().slice(0, 160) || "Supplier contact",
+    contactName: input.contactName?.trim().slice(0, 160) || "",
+    email,
+    phone: input.phone?.trim().slice(0, 80) || "",
+    whatsapp: input.whatsapp?.trim().slice(0, 80) || "",
+    portalUrl: input.portalUrl?.trim().slice(0, 500) || "",
+    deliveryNotes: input.deliveryNotes?.trim().slice(0, 4_000) || "",
+  }
+}
+
+export async function saveSupplierDirectoryEntryAction(input: {
+  supplier: SupplierRoutingOption
+  create?: boolean
+}): Promise<SaveSupplierResult> {
+  const { supabase } = await requireStaffProfile("suppliers")
+  const supplier = cleanSupplier(input.supplier)
+  if (!supplier) return { ok: false, error: "Enter a supplier name and a valid email address." }
+
+  const { data: row, error: loadError } = await supabase
+    .from("workflow_manager_settings")
+    .select("state")
+    .eq("id", "singleton")
+    .maybeSingle<{ state: { qualificationSettings?: { suppliers?: SupplierRoutingOption[] } } }>()
+  if (loadError || !row?.state?.qualificationSettings) {
+    return { ok: false, error: "Could not load the supplier directory." }
+  }
+
+  const current = row.state.qualificationSettings.suppliers ?? []
+  const id = input.create && current.some((entry) => entry.id === supplier.id)
+    ? `${supplier.id}-${crypto.randomUUID().slice(0, 8)}`
+    : supplier.id
+  const savedSupplier = { ...supplier, id }
+  const next = [...current.filter((entry) => entry.id !== id), savedSupplier]
+  const { error: saveError } = await supabase.rpc("staff_save_supplier_directory", { suppliers: next })
+  if (saveError) return { ok: false, error: "Could not save the supplier. Please try again." }
+
+  const { data: verification, error: verificationError } = await supabase
+    .from("workflow_manager_settings")
+    .select("state")
+    .eq("id", "singleton")
+    .maybeSingle<{ state: { qualificationSettings?: { suppliers?: SupplierRoutingOption[] } } }>()
+  const persisted = verification?.state?.qualificationSettings?.suppliers?.find((entry) => entry.id === id)
+  if (verificationError || !persisted) {
+    return { ok: false, error: "The supplier was not confirmed in the directory. Please try again." }
+  }
+
+  revalidatePath("/admin/vendors")
+  return { ok: true, supplier: persisted }
+}
+
 export async function sendSupplierQuoteRequestAction(input: {
   supplierId: string
-  supplierName?: string
-  supplierEmail: string | null
   materialList: string
 }): Promise<SendSupplierQuoteResult> {
-  const { user } = await requireStaffProfile("suppliers")
-  const admin = createAdminClient()
+  const { supabase, user } = await requireStaffProfile("suppliers")
   const supplierId = input.supplierId.trim()
-  const requestedSupplierName = input.supplierName?.trim().toLowerCase() || ""
-  const requestedSupplierEmail = input.supplierEmail?.trim().toLowerCase() || ""
   const materialList = input.materialList.trim()
 
   if (!supplierId) return { ok: false, error: "Choose a supplier." }
   if (!materialList) return { ok: false, error: "Paste or enter the material list." }
   if (materialList.length > MAX_MATERIAL_LIST_LENGTH) return { ok: false, error: "The material list is too long." }
 
-  let supplier: SupplierRoutingOption | undefined
-  for (let attempt = 0; attempt < 4 && !supplier; attempt += 1) {
-    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 250))
-    const { data: settings, error: settingsError } = await admin
-      .from("workflow_manager_settings")
-      .select("state")
-      .eq("id", "singleton")
-      .maybeSingle<{ state: { qualificationSettings?: { suppliers?: SupplierRoutingOption[] } } }>()
-    if (settingsError) return { ok: false, error: "Could not load the supplier directory." }
-
-    const suppliers = settings?.state?.qualificationSettings?.suppliers ?? []
-    const supplierById = suppliers.find((item) => item.id === supplierId)
-    const supplierByEmail = requestedSupplierEmail
-      ? suppliers.find((item) => item.email?.trim().toLowerCase() === requestedSupplierEmail)
-      : undefined
-    const supplierByName = requestedSupplierName
-      ? suppliers.find((item) => item.name.trim().toLowerCase() === requestedSupplierName)
-      : undefined
-    supplier = supplierById?.email?.trim().toLowerCase() === requestedSupplierEmail
-      ? supplierById
-      : supplierByEmail ?? supplierByName ?? (!requestedSupplierEmail ? supplierById : undefined)
-  }
+  const { data: settings, error: settingsError } = await supabase
+    .from("workflow_manager_settings")
+    .select("state")
+    .eq("id", "singleton")
+    .maybeSingle<{ state: { qualificationSettings?: { suppliers?: SupplierRoutingOption[] } } }>()
+  if (settingsError) return { ok: false, error: "Could not load the supplier directory." }
+  const supplier = settings?.state?.qualificationSettings?.suppliers?.find((item) => item.id === supplierId)
   if (!supplier) return { ok: false, error: "This supplier is no longer in the directory." }
 
   const supplierEmail = supplier.email?.trim().toLowerCase() || ""
@@ -61,7 +102,7 @@ export async function sendSupplierQuoteRequestAction(input: {
   }
 
   const subject = `Quote Request - ${JOB_ADDRESS}`
-  const { data: request, error: insertError } = await admin
+  const { data: request, error: insertError } = await supabase
     .from("supplier_quote_requests")
     .insert({
       supplier_id: supplier.id,
@@ -77,30 +118,17 @@ export async function sendSupplierQuoteRequestAction(input: {
     .single<{ id: string }>()
   if (insertError || !request) return { ok: false, error: "Could not create the supplier request." }
 
-  const delivery = await sendSupplierQuoteRequestEmail({
-    requestId: request.id,
-    supplierName: supplier.name,
-    contactName: supplier.contactName || null,
-    recipientEmail: supplierEmail,
-    jobAddress: JOB_ADDRESS,
-    materialList,
+  const { data: delivery, error: deliveryError } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>("send-supplier-quote", {
+    body: { requestId: request.id },
   })
 
-  if (delivery.status === "sent") {
-    await admin
-      .from("supplier_quote_requests")
-      .update({ status: "sent", provider_message_id: delivery.providerId, sent_at: new Date().toISOString(), error_message: null })
-      .eq("id", request.id)
+  if (!deliveryError && delivery?.ok) {
     revalidatePath("/admin/supplier-requests")
     return { ok: true, requestId: request.id }
   }
 
-  const error = delivery.status === "not_configured"
-    ? "Website email is not configured."
-    : delivery.status === "skipped"
-      ? "The email was not sent."
-      : delivery.error
-  await admin
+  const error = delivery?.error || deliveryError?.message || "The supplier email could not be sent."
+  await supabase
     .from("supplier_quote_requests")
     .update({ status: "failed", error_message: error })
     .eq("id", request.id)
