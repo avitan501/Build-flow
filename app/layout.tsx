@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/images/avantia/avantia-build-share-v4.jpg",
+        url: "/images/avantia/avantia-build-share-v5.jpg",
         width: 1200,
         height: 630,
         alt: "Construction materials delivered to an active residential jobsite",
@@ -69,7 +69,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "You Build. We Handle the Materials. | Avantia Build",
     description: "Send your plans or material list. We compare suppliers, organize the order, and arrange jobsite delivery.",
-    images: ["/images/avantia/avantia-build-share-v4.jpg"],
+    images: ["/images/avantia/avantia-build-share-v5.jpg"],
   },
 };
 

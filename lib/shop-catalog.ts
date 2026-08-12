@@ -58,6 +58,22 @@ type ProductImageOverride = {
 }
 
 const PRODUCT_IMAGE_OVERRIDES_BY_SLUG: Record<string, ProductImageOverride> = {
+  "lightweight-joint-compound": {
+    imageUrl: "/images/materials/products-real/usg-all-purpose-joint-compound.webp",
+    imageAlt: "USG Sheetrock all-purpose joint compound bucket",
+    imageCategory: "Sheet rock",
+    imageSource: "Owner-provided product photo",
+    imageLicense: "Owner-provided asset",
+    imageCredit: "Avantia Build",
+  },
+  "drywall-paper-joint-tape": {
+    imageUrl: "/images/materials/products-real/usg-paper-joint-tape.webp",
+    imageAlt: "USG Sheetrock paper joint tape 250-foot roll",
+    imageCategory: "Sheet rock",
+    imageSource: "Owner-provided product photo",
+    imageLicense: "Owner-provided asset",
+    imageCredit: "Avantia Build",
+  },
   "mapei-ultraflex-1-white-thinset-tile-mortar": {
     imageUrl: "/images/materials/products-real/mapei-ultraflex-thinset.jpg",
     imageAlt: "White thinset tile mortar bag on a clean product background",
