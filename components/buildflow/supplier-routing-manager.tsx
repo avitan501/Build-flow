@@ -54,6 +54,7 @@ type DepartmentItemKind = "product" | "file-upload"
 type SupplierRoutingManagerProps = {
   catalogProducts?: ShopCatalogProduct[]
   initialSettings?: ShopQualificationSettings | null
+  initialDeletedSupplierIds?: string[]
   initialAddOns?: ManagerCatalogAddOns | null
   initialPanel?: ManagerPanel
   supplierDirectoryOnly?: boolean
@@ -165,11 +166,13 @@ function departmentShopHref(departmentLabel: string) {
 export function SupplierRoutingManager({
   catalogProducts = [],
   initialSettings = null,
+  initialDeletedSupplierIds = [],
   initialAddOns = null,
   initialPanel = "departments",
   supplierDirectoryOnly = false,
 }: SupplierRoutingManagerProps) {
   const [settings, setSettings] = useState<ShopQualificationSettings>(() => loadSettings(initialSettings))
+  const [deletedSupplierIds, setDeletedSupplierIds] = useState<string[]>(initialDeletedSupplierIds)
   const [addOns, setAddOns] = useState<ManagerCatalogAddOns>(() => loadAddOns(initialAddOns))
   const [activePanel, setActivePanel] = useState<ManagerPanel>(initialPanel)
   const [selectedTargetId, setSelectedTargetId] = useState(SERVICE_ASSIGNMENT_TARGETS[0]?.id ?? "")
@@ -265,14 +268,16 @@ export function SupplierRoutingManager({
     () => new Set(settings.suppliers.flatMap((supplier) => [normalizeVendorIdentity(supplier.name), supplier.email ? normalizeVendorIdentity(supplier.email) : ""]).filter(Boolean)),
     [settings.suppliers],
   )
+  const deletedSupplierIdSet = useMemo(() => new Set(deletedSupplierIds), [deletedSupplierIds])
   const filteredTrialEntries = useMemo(() => {
     const query = trialSearch.trim().toLowerCase()
     return TRIAL_VENDOR_ENTRIES.filter((entry) => {
+      if (deletedSupplierIdSet.has(`trial-${entry.sourceId}`)) return false
       if (trialDepartment !== "All departments" && entry.department !== trialDepartment) return false
       if (!query) return true
       return [entry.name, entry.department, entry.materials, entry.address].some((value) => value.toLowerCase().includes(query))
     })
-  }, [trialDepartment, trialSearch])
+  }, [deletedSupplierIdSet, trialDepartment, trialSearch])
   const shopDepartments = useMemo(() => applyDepartmentAddOns(SHOP_TOOL_CATEGORIES, addOns), [addOns])
   const selectedSupplierDepartments = useMemo(() => shopDepartments.filter((department) => {
     const explicit = settings.products[departmentRouteId(department.slug)]
@@ -559,6 +564,7 @@ export function SupplierRoutingManager({
       const latestSupplier = baselineSettings.suppliers.find((entry) => entry.id === supplierId)
       if (latest.ok && !latestSupplier) {
         setSettings(latest.settings)
+        setDeletedSupplierIds(latest.deletedSupplierIds)
         writeShopQualificationSettings(latest.settings)
         setSelectedSupplierId(latest.settings.suppliers[0]?.id ?? "")
         setSupplierDirty(false)
@@ -575,6 +581,7 @@ export function SupplierRoutingManager({
       const nextSettings = result.settings as ShopQualificationSettings
       const removedNow = baselineSettings.suppliers.filter((entry) => !nextSettings.suppliers.some((current) => current.id === entry.id))
       setSettings(nextSettings)
+      setDeletedSupplierIds((current) => [...new Set([...current, ...result.deletedSupplierIds, supplierId])])
       writeShopQualificationSettings(nextSettings)
       setSelectedSupplierId(nextSettings.suppliers[0]?.id ?? "")
       setSupplierDirty(false)
@@ -627,6 +634,7 @@ export function SupplierRoutingManager({
         return
       }
       setSettings(result.settings)
+      setDeletedSupplierIds(result.deletedSupplierIds)
       writeShopQualificationSettings(result.settings)
       setDirectorySaveState("saved")
     })
@@ -642,6 +650,7 @@ export function SupplierRoutingManager({
         return
       }
       setSettings(result.settings)
+      setDeletedSupplierIds(result.deletedSupplierIds)
       writeShopQualificationSettings(result.settings)
       setSelectedSupplierId((current) => result.settings.suppliers.some((supplier) => supplier.id === current) ? current : result.settings.suppliers[0]?.id ?? "")
       setSupplierDirty(false)
@@ -1386,7 +1395,7 @@ export function SupplierRoutingManager({
 
                     <div className="shrink-0 border-b border-slate-200 p-4 sm:px-6">
                       <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
-                        <strong>Source catalog, not active vendors.</strong> These 90 reference entries always remain available so a deleted company can be added again. Your active vendors are only the companies shown in the Supplier directory behind this window.
+                        <strong>Source catalog, not active vendors.</strong> Only companies shown in Supplier directory are active. Deleted trial vendors are hidden from this list and cannot return from an old browser request.
                       </div>
                       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_15rem]">
                         <label className="relative block">
