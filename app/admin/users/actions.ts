@@ -3,9 +3,78 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdminProfile, requireStaffProfile } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type AdminAction = "approve" | "reject" | "suspend" | "change_role";
 type RoleValue = "admin" | "staff" | "client";
+type DeletionTarget = "customer" | "project" | "request";
+type DeleteManagerRecordResult =
+  | { ok: true; warning?: string }
+  | { ok: false; error: string };
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validUuid(value: string) {
+  return UUID_PATTERN.test(value.trim());
+}
+
+async function cleanupQueuedFiles(targetType: DeletionTarget, targetId: string) {
+  const admin = createAdminClient();
+  const { data: queued, error: queueError } = await admin
+    .from("manager_file_deletion_queue")
+    .select("id,bucket_id,object_path")
+    .eq("target_type", targetType)
+    .eq("target_id", targetId)
+    .returns<Array<{ id: string; bucket_id: string; object_path: string }>>();
+
+  if (queueError) throw new Error("Could not load queued file cleanup.");
+  if (!queued?.length) return;
+
+  const byBucket = new Map<string, Array<{ id: string; objectPath: string }>>();
+  for (const file of queued) {
+    const entries = byBucket.get(file.bucket_id) ?? [];
+    entries.push({ id: file.id, objectPath: file.object_path });
+    byBucket.set(file.bucket_id, entries);
+  }
+
+  for (const [bucket, entries] of byBucket) {
+    for (let index = 0; index < entries.length; index += 1000) {
+      const chunk = entries.slice(index, index + 1000);
+      let removablePaths = chunk.map((file) => file.objectPath);
+
+      if (targetType !== "customer") {
+        const [{ data: uploads, error: uploadsError }, { data: attachments, error: attachmentsError }] = await Promise.all([
+          admin.from("project_uploads").select("file_path").in("file_path", removablePaths).returns<Array<{ file_path: string }>>(),
+          admin.from("quote_request_attachments").select("file_path").in("file_path", removablePaths).returns<Array<{ file_path: string }>>(),
+        ]);
+        if (uploadsError || attachmentsError) throw new Error("Could not verify uploaded file ownership.");
+
+        const stillReferenced = new Set([...(uploads ?? []), ...(attachments ?? [])].map((file) => file.file_path));
+        removablePaths = removablePaths.filter((filePath) => !stillReferenced.has(filePath));
+      }
+
+      if (removablePaths.length) {
+        const { error: storageError } = await admin.storage.from(bucket).remove(removablePaths);
+        if (storageError) throw new Error("Could not remove all uploaded files.");
+      }
+
+      const { error: dequeueError } = await admin
+        .from("manager_file_deletion_queue")
+        .delete()
+        .in("id", chunk.map((file) => file.id));
+      if (dequeueError) throw new Error("Could not complete queued file cleanup.");
+    }
+  }
+}
+
+function deletionError(message: string, target: DeletionTarget) {
+  if (message.includes(`${target}_not_found`)) return `This ${target} was already deleted.`;
+  if (message.includes("only_open_requests_can_be_deleted")) return "Only open requests can be deleted.";
+  if (message.includes("only_customer_accounts_can_be_deleted")) return "Staff and administrator accounts cannot be deleted here.";
+  if (message.includes("cannot_delete_current_account")) return "You cannot delete your own account.";
+  if (message.includes("customer_has_manager_history")) return "This account has manager history and cannot be deleted as a customer.";
+  return `Could not delete this ${target}. No unrelated records were changed.`;
+}
 
 async function applyUserAction(formData: FormData, action: AdminAction) {
   const { profile, supabase } = await requireAdminProfile();
@@ -143,4 +212,76 @@ export async function updateCustomerContact(formData: FormData) {
   });
   if (error) throw new Error(error.message || "Failed to update customer contact.");
   revalidatePath("/admin/users");
+}
+
+export async function deleteOpenRequestAction(requestId: string): Promise<DeleteManagerRecordResult> {
+  const { supabase } = await requireStaffProfile("customers");
+  const normalizedId = requestId.trim();
+  if (!validUuid(normalizedId)) return { ok: false, error: "This request could not be identified." };
+
+  const { error } = await supabase.rpc("staff_delete_customer_quote_request", { p_request_id: normalizedId });
+  if (error) return { ok: false, error: deletionError(error.message, "request") };
+
+  let warning: string | undefined;
+  try {
+    await cleanupQueuedFiles("request", normalizedId);
+  } catch {
+    warning = "The request was deleted. Its uploaded files are queued for cleanup.";
+  }
+
+  revalidatePath("/admin/users");
+  revalidatePath("/projects");
+  return { ok: true, warning };
+}
+
+export async function deleteProjectAction(projectId: string): Promise<DeleteManagerRecordResult> {
+  const { supabase } = await requireStaffProfile("customers");
+  const normalizedId = projectId.trim();
+  if (!validUuid(normalizedId)) return { ok: false, error: "This project could not be identified." };
+
+  const { error } = await supabase.rpc("staff_delete_customer_project", { p_project_id: normalizedId });
+  if (error) return { ok: false, error: deletionError(error.message, "project") };
+
+  let warning: string | undefined;
+  try {
+    await cleanupQueuedFiles("project", normalizedId);
+  } catch {
+    warning = "The project was deleted. Its uploaded files are queued for cleanup.";
+  }
+
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/projects");
+  revalidatePath("/projects");
+  return { ok: true, warning };
+}
+
+export async function deleteCustomerAction(customerId: string): Promise<DeleteManagerRecordResult> {
+  const { supabase } = await requireAdminProfile();
+  const normalizedId = customerId.trim();
+  if (!validUuid(normalizedId)) return { ok: false, error: "This customer could not be identified." };
+
+  const { error: prepareError } = await supabase.rpc("staff_prepare_customer_deletion", { p_customer_id: normalizedId });
+  if (prepareError) return { ok: false, error: deletionError(prepareError.message, "customer") };
+
+  try {
+    await cleanupQueuedFiles("customer", normalizedId);
+  } catch {
+    return { ok: false, error: "The customer was not deleted because uploaded files could not be removed. Please try again." };
+  }
+
+  const { error: deleteError } = await supabase.rpc("staff_delete_customer_account", { p_customer_id: normalizedId });
+  if (deleteError) return { ok: false, error: deletionError(deleteError.message, "customer") };
+
+  const admin = createAdminClient();
+  const { data: remaining, error: verifyError } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("id", normalizedId)
+    .maybeSingle<{ id: string }>();
+  if (verifyError || remaining) return { ok: false, error: "The customer deletion could not be verified. Refresh before trying again." };
+
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/projects");
+  revalidatePath("/projects");
+  return { ok: true };
 }

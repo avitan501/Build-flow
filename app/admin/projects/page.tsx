@@ -1,7 +1,8 @@
-import { WireframePageByKey } from "@/components/buildflow/wireframe-page-loader";
-import { requireAdminProfile } from "@/lib/auth";
+import { redirect } from "next/navigation";
+
+import { requireStaffProfile } from "@/lib/auth";
 
 export default async function AdminProjectsPage() {
-  await requireAdminProfile();
-  return <WireframePageByKey pageKey="admin-projects" />;
+  await requireStaffProfile("customers");
+  redirect("/admin/users?view=projects");
 }
