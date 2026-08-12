@@ -13,15 +13,15 @@ test("home presents the contractor material coordination service", async ({ page
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.webmanifest");
   await expect(page.getByRole("heading", { name: "Get Materials Priced and Delivered." })).toBeVisible();
   await expect(page.getByText("Avantia Build for contractors", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Upload Plan or List" })).toHaveAttribute("href", "/request-quote");
+  await expect(page.getByRole("link", { name: "Upload List or Plan" })).toHaveAttribute("href", "/request-quote");
   await expect(page.getByRole("link", { name: "Choose Materials" }).first()).toHaveAttribute("href", "#departments");
   await expect(page.getByRole("link", { name: "Need help? WhatsApp us" })).toHaveAttribute("href", "https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20starting%20a%20material%20order.");
   await expect(page.getByText("No account needed", { exact: true })).toBeVisible();
   await expect(page.getByText("Reply within 24 hours", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Choose Materials" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Three simple steps" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Upload Your Plan", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "AI Builds the Takeoff", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Send Your List", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Get Pricing", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Approve Your Order", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Framing", exact: true })).toHaveAttribute("href", "/shop/framing");
   await expect(page.getByRole("link", { name: "Electrical", exact: true })).toHaveAttribute("href", "/shop/electrical");
