@@ -1,6 +1,6 @@
 export const MANAGER_EMAIL = "avitanneto@gmail.com";
 export const STAFF_EMAILS = [
-  "carbugatti03@gmail.com",
+  "buildavantiap@gmail.com",
   "info@fivetownsbuilders.com",
 ] as const;
 
