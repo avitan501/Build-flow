@@ -101,7 +101,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
 
   const primaryLinks = useMemo<MobileMenuLink[]>(() => [
     { href: "/", label: "Home" },
-    { href: "/shop", label: "Let's Work" },
+    { href: "/shop", label: "Order Materials" },
     { href: "/projects", label: "My Projects" },
     ...(isAdmin ? [{ href: "/admin/build-map", label: "Manager" }] : []),
   ], [isAdmin]);
@@ -218,7 +218,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
           {!isShopPage ? (
             <nav className="hidden flex-1 items-center justify-center gap-1 md:flex" aria-label="Primary navigation">
               <Link href="/" className={`rounded-lg px-3 py-2 text-sm font-semibold ${pathname === "/" ? "bg-slate-100 text-slate-950" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}>Home</Link>
-              <Link href="/shop" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Let&apos;s Work</Link>
+              <Link href="/shop" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Order Materials</Link>
               <Link href="/projects" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">My Projects</Link>
               <Link href="/request-quote" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Get Material Pricing</Link>
               <Link href="/beat-a-quote" className="rounded-lg bg-[#0E2A4A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163a63]">Beat a Supplier Quote</Link>
@@ -238,7 +238,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
           </Link>
 
         </div>
-        {!isShopPage ? (
+        {!isShopPage && pathname !== "/" ? (
           <div className="border-t border-slate-200/70 px-3 py-2 md:hidden">
             <Link href="/request-quote" className="mx-auto flex min-h-9 max-w-md items-center justify-between rounded-full bg-[#0E2A4A] px-4 text-xs font-semibold text-white">
               <span>Need materials or pricing?</span>

@@ -81,7 +81,7 @@ export function MobileBottomDock({ projectsHref }: MobileBottomDockProps) {
               <path d="M5 9.5V21h14V9.5" />
             </svg>
           </DockItem>
-          <DockItem href={shopHref} label="Let's Work" active={isActivePath(pathname, "/shop")} accent>
+          <DockItem href={shopHref} label="Order Materials" active={isActivePath(pathname, "/shop")} accent>
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M3.5 11 12 4l8.5 7" />
               <path d="M5.5 10.5V20h13v-9.5" />

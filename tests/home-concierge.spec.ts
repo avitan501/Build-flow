@@ -7,14 +7,16 @@ test("home presents the contractor material coordination service", async ({ page
   await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", "Order construction materials, upload plans, compare supplier pricing, and coordinate deliveries—all in one place.");
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", "https://build.avantiap.com/images/avantia/avantia-app-icon-512.png?v=2");
   await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "Avantia Build | Construction Material Ordering");
-  await expect(page.getByRole("heading", { name: "Keep Your Crew Building. We’ll Handle the Materials." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Construction Materials, Priced and Organized for You." })).toBeVisible();
   await expect(page.getByText("Avantia Build for contractors", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Start a Material Order" })).toHaveAttribute("href", "/shop");
-  await expect(page.getByRole("link", { name: "Message a Materials Coordinator" })).toHaveAttribute("href", "https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20want%20to%20start%20a%20material%20order.");
-  await expect(page.getByText("Send One List", { exact: true })).toBeVisible();
-  await expect(page.getByText("We handle supplier calls, availability, substitutions, and follow-up.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Compare Before You Buy", { exact: true })).toBeVisible();
-  await expect(page.getByText("Keep Every Project Organized", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Choose a Department" })).toHaveAttribute("href", "/shop");
+  await expect(page.getByRole("link", { name: "Upload a List or Blueprint" })).toHaveAttribute("href", "/request-quote");
+  await expect(page.getByRole("link", { name: "Need help? Message a coordinator" })).toHaveAttribute("href", "https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20starting%20a%20material%20order.");
+  await expect(page.getByRole("heading", { name: "One request. Three simple steps." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Choose a Department", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Add Details or Upload", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "We Handle the Rest", exact: true })).toBeVisible();
+  await expect(page.getByText("Need materials or pricing?", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Your materials desk", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "One request. One coordinator. No supplier runaround." })).toHaveCount(0);
   await expect(page.getByText("Tell us what you need. We handle the rest.", { exact: true })).toHaveCount(0);
@@ -25,7 +27,7 @@ test("home presents the contractor material coordination service", async ({ page
   const brandSection = brands.locator("xpath=ancestor::section");
   expect(await brandSection.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
   const brandBox = await brands.boundingBox();
-  const heroBox = await page.getByRole("heading", { name: "Keep Your Crew Building. We’ll Handle the Materials." }).boundingBox();
+  const heroBox = await page.getByRole("heading", { name: "Construction Materials, Priced and Organized for You." }).boundingBox();
   expect(brandBox?.y).toBeGreaterThan(heroBox?.y ?? Number.NEGATIVE_INFINITY);
   await expect(page.getByTestId("coverage-map").getByTestId("coverage-dot")).toHaveCount(41);
   const lockups = page.getByTestId("avantia-build-lockup");
@@ -50,7 +52,7 @@ test("customer menu groups requests and omits retired order and start-building l
 
   const navigation = page.getByRole("navigation", { name: "Mobile full navigation" });
   await expect(navigation.getByRole("link", { name: "Home", exact: true })).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Let's Work", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Order Materials", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "My Projects", exact: true })).toBeVisible();
   const requestNavigation = page.getByRole("navigation", { name: "Request navigation" });
   const partnerQuote = requestNavigation.getByRole("link", { name: "Get Material Pricing", exact: true });
