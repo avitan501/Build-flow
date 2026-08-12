@@ -12,17 +12,21 @@ export function SupplierQuoteRequestDialog({
   supplierId,
   supplierName,
   supplierEmail,
+  directoryReady = true,
+  directoryStatus,
 }: {
   supplierId: string
   supplierName: string
   supplierEmail: string | null
+  directoryReady?: boolean
+  directoryStatus?: string
 }) {
   const [open, setOpen] = useState(false)
   const [materialList, setMaterialList] = useState("")
   const [error, setError] = useState("")
   const [sent, setSent] = useState(false)
   const [isPending, startTransition] = useTransition()
-  const canSend = Boolean(supplierEmail?.trim())
+  const canSend = Boolean(supplierEmail?.trim()) && directoryReady
 
   function close() {
     if (isPending) return
@@ -51,7 +55,7 @@ export function SupplierQuoteRequestDialog({
         disabled={!canSend}
         onClick={() => setOpen(true)}
         className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
-        title={canSend ? "Create a material quote request" : "Add a supplier email first"}
+        title={canSend ? "Create a material quote request" : directoryStatus || "Add a supplier email first"}
       >
         <Send className="h-4 w-4" />
         Request material quote

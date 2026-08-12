@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { saveWorkflowManagerSettingsAction } from "@/app/preview-admin/workflow-actions"
 import { DepartmentSymbolBadges, DEPARTMENT_SYMBOL_OPTIONS } from "@/components/buildflow/department-symbol-badges"
 import { SupplierQuoteRequestDialog } from "@/components/buildflow/supplier-quote-request-dialog"
@@ -70,7 +70,16 @@ function parseDepartmentItemList(value: string) {
 }
 
 function makeId(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `item-${Date.now()}`
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "item"
+}
+
+function nextQuestionId(label: string, questions: QualifyingQuestion[]) {
+  const base = makeId(label)
+  const used = new Set(questions.map((question) => question.id))
+  if (!used.has(base)) return base
+  let suffix = 2
+  while (used.has(`${base}-${suffix}`)) suffix += 1
+  return `${base}-${suffix}`
 }
 
 function methodLabel(method: SupplierDeliveryMethod | undefined) {
@@ -146,6 +155,10 @@ export function SupplierRoutingManager({
   })
   const [bulkItemText, setBulkItemText] = useState("")
   const [bulkItemStatus, setBulkItemStatus] = useState("")
+  const [directorySaveState, setDirectorySaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  const [directorySaveError, setDirectorySaveError] = useState("")
+  const pendingSaveRef = useRef<{ qualificationSettings: ShopQualificationSettings; addOns: ManagerCatalogAddOns } | null>(null)
+  const saveRunningRef = useRef(false)
   const [supplierDraft, setSupplierDraft] = useState({
     name: "",
     contactName: "",
@@ -246,16 +259,37 @@ export function SupplierRoutingManager({
     }, {})
   }, [assignmentTargets])
 
+  function queueManagerSave(qualificationSettings: ShopQualificationSettings, nextAddOns: ManagerCatalogAddOns) {
+    pendingSaveRef.current = { qualificationSettings, addOns: nextAddOns }
+    setDirectorySaveState("saving")
+    setDirectorySaveError("")
+    if (saveRunningRef.current) return
+
+    saveRunningRef.current = true
+    void (async () => {
+      let lastError = ""
+      while (pendingSaveRef.current) {
+        const pending = pendingSaveRef.current
+        pendingSaveRef.current = null
+        const result = await saveWorkflowManagerSettingsAction(pending)
+        lastError = result.ok ? "" : result.error
+      }
+      saveRunningRef.current = false
+      setDirectorySaveError(lastError)
+      setDirectorySaveState(lastError ? "error" : "saved")
+    })()
+  }
+
   function persist(next: ShopQualificationSettings) {
     setSettings(next)
     writeShopQualificationSettings(next)
-    void saveWorkflowManagerSettingsAction({ qualificationSettings: next, addOns })
+    queueManagerSave(next, addOns)
   }
 
   function persistAddOns(next: ManagerCatalogAddOns) {
     setAddOns(next)
     writeManagerAddOns(next)
-    void saveWorkflowManagerSettingsAction({ qualificationSettings: settings, addOns: next })
+    queueManagerSave(settings, next)
   }
 
   function persistAll(nextSettings: ShopQualificationSettings, nextAddOns: ManagerCatalogAddOns) {
@@ -263,7 +297,7 @@ export function SupplierRoutingManager({
     setAddOns(nextAddOns)
     writeShopQualificationSettings(nextSettings)
     writeManagerAddOns(nextAddOns)
-    void saveWorkflowManagerSettingsAction({ qualificationSettings: nextSettings, addOns: nextAddOns })
+    queueManagerSave(nextSettings, nextAddOns)
   }
 
   function updateSelectedSetting(patch: Partial<ProductQualificationSetting>) {
@@ -638,7 +672,7 @@ export function SupplierRoutingManager({
     if (!label) return
 
     const question: QualifyingQuestion = {
-      id: `${makeId(label)}-${Date.now()}`,
+      id: nextQuestionId(label, selectedSetting.questions),
       label,
       type: questionType,
       required: questionRequired,
@@ -661,7 +695,7 @@ export function SupplierRoutingManager({
     if (!label) return
 
     const question: QualifyingQuestion = {
-      id: `${makeId(label)}-${Date.now()}`,
+      id: nextQuestionId(label, draftQuestions),
       label,
       type: draftQuestionType,
       required: draftQuestionRequired,
@@ -911,10 +945,21 @@ export function SupplierRoutingManager({
                         <p className="mt-2 text-sm leading-6 text-slate-500">This is private manager data used for routing approved reports.</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <SupplierQuoteRequestDialog supplierId={selectedSupplier.id} supplierName={selectedSupplier.name} supplierEmail={selectedSupplier.email || null} />
+                        <SupplierQuoteRequestDialog
+                          supplierId={selectedSupplier.id}
+                          supplierName={selectedSupplier.name}
+                          supplierEmail={selectedSupplier.email || null}
+                          directoryReady={directorySaveState !== "saving" && directorySaveState !== "error"}
+                          directoryStatus={directorySaveState === "saving" ? "Saving the latest supplier changes..." : directorySaveError || undefined}
+                        />
                         <button type="button" onClick={() => removeSupplier(selectedSupplier.id)} className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">Remove</button>
                       </div>
                     </div>
+                    {directorySaveState !== "idle" ? (
+                      <p className={`mt-3 text-xs font-semibold ${directorySaveState === "error" ? "text-rose-700" : directorySaveState === "saved" ? "text-emerald-700" : "text-slate-500"}`}>
+                        {directorySaveState === "saving" ? "Saving supplier changes..." : directorySaveState === "saved" ? "Supplier changes saved." : directorySaveError}
+                      </p>
+                    ) : null}
 
                     <div className="mt-6 grid gap-3 sm:grid-cols-2">
                       <label className="grid gap-2 text-sm font-semibold text-slate-900">
