@@ -32,34 +32,44 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://build.avantiap.com"),
-  title: "Avantia Build | Construction Material Ordering",
-  description: "Order construction materials, upload plans, compare supplier pricing, and coordinate deliveries—all in one place.",
+  applicationName: "Avantia Build",
+  title: "Avantia Build | Materials Priced & Delivered",
+  description: "Upload your list or choose materials. We compare suppliers and arrange jobsite delivery. No account needed.",
+  manifest: "/manifest.webmanifest",
+  alternates: {
+    canonical: "/",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Avantia Build",
+    statusBarStyle: "default",
+  },
   icons: {
     icon: "/images/avantia/avantia-app-icon-512.png",
     shortcut: "/images/avantia/avantia-app-icon-512.png",
     apple: "/images/avantia/avantia-app-icon-512.png",
   },
   openGraph: {
-    title: "Avantia Build | Construction Material Ordering",
-    description: "Order construction materials, upload plans, compare supplier pricing, and coordinate deliveries—all in one place.",
+    title: "Get Materials Priced & Delivered | Avantia Build",
+    description: "Upload your list or choose materials. We compare suppliers and arrange jobsite delivery. No account needed.",
     url: "/",
     siteName: "Avantia Build",
     locale: "en_US",
     type: "website",
     images: [
       {
-        url: "/images/avantia/avantia-app-icon-512.png?v=2",
-        width: 512,
-        height: 512,
-        alt: "Avantia Build",
+        url: "/images/avantia/avantia-build-share-v3.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Construction materials delivered to an active residential jobsite",
       },
     ],
   },
   twitter: {
-    card: "summary",
-    title: "Avantia Build | Construction Material Ordering",
-    description: "Order construction materials, upload plans, compare supplier pricing, and coordinate deliveries—all in one place.",
-    images: ["/images/avantia/avantia-app-icon-512.png?v=2"],
+    card: "summary_large_image",
+    title: "Get Materials Priced & Delivered | Avantia Build",
+    description: "Upload your list or choose materials. We compare suppliers and arrange jobsite delivery. No account needed.",
+    images: ["/images/avantia/avantia-build-share-v3.jpg"],
   },
 };
 

@@ -85,9 +85,11 @@ type ProjectRequestNotificationFallback = (payload: Record<string, unknown>) => 
   result?: EmailDeliveryResult
 }>
 
+const SITE_URL = "https://build.avantiap.com"
+const COMPANY_EMAIL = "office@build.avantiap.com"
 const DEFAULT_TO = "avitanneto@gmail.com"
-const DEFAULT_FROM = "Avantia Build <office@build.avantiap.com>"
-const RESEND_TEST_FROM = "Avantia Build <onboarding@resend.dev>"
+const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL?.trim() || `Avantia Build <${COMPANY_EMAIL}>`
+const RESEND_TEST_FROM = "Avantia Build Requests <onboarding@resend.dev>"
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
@@ -307,7 +309,6 @@ async function sendEmail(input: {
 export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmailInput): Promise<EmailDeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY
   const from = DEFAULT_FROM
-  const ownerEmail = DEFAULT_TO
   const subject = `Avantia Build request: ${input.requestTitle}`
   const text = `${input.message.trim()}\n\nAvantia Build\nEverything it takes to build`
   const html = `
@@ -329,7 +330,7 @@ export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmail
       subject,
       html,
       text,
-      replyTo: ownerEmail,
+      replyTo: COMPANY_EMAIL,
       idempotencyKey: `avantia-manager-reply-${input.requestId}-${crypto.randomUUID()}`,
     })
     if (directResult.status === "sent") return directResult
@@ -487,7 +488,7 @@ export async function sendProjectRequestNotificationEmail(
     subject: `We received your request: ${input.requestTitle}`,
     html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.55;max-width:620px;margin:0 auto"><p>Hi ${escapeHtml(input.clientName || "there")},</p><h1 style="font-size:22px">We received your request</h1><p><strong>${escapeHtml(input.requestTitle)}</strong><br />Project: ${escapeHtml(input.projectName)}</p><p>Someone from Avantia Build will review it and get back to you within 24 hours.</p><p style="margin-top:24px"><strong>Avantia Build</strong><br /><span style="color:#64748b">You build. We handle the materials.</span></p></div>`,
     text: clientText,
-    replyTo: DEFAULT_TO,
+    replyTo: COMPANY_EMAIL,
     idempotencyKey: `avantia-project-request-client-${input.requestId}`,
   })
   if (owner.status === "sent" && client.status === "sent") return { owner, client }
@@ -576,6 +577,9 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
   const address = [input.street, input.city, input.state, input.zip].filter(Boolean).join(", ")
   const departmentText = input.departments.join(", ") || "Not specified"
   const beatQuote = input.requestKind === "beat_quote"
+  const requestUrl = input.requestId
+    ? `${SITE_URL}/owner/materials/requests/${encodeURIComponent(input.requestId)}`
+    : `${SITE_URL}/owner/materials/requests`
   const text = [
     beatQuote ? "New Avantia Build quote to beat" : "New Avantia Build quote request",
     "",
@@ -598,25 +602,32 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
     `Attachment: ${input.attachment?.filename || "None"}`,
   ].join("\n")
   const html = `
-    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:680px;margin:0 auto">
-      <p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">${beatQuote ? "Avantia Build price challenge" : "Avantia Build quote request"}</p>
-      <h1 style="margin:0 0 20px;font-size:24px">${beatQuote ? "New store quote to beat" : "New request"} from ${escapeHtml(fullName)}</h1>
-      <div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc">
-        <strong>Reference:</strong> ${escapeHtml(input.referenceId)}<br />
-        <strong>Email:</strong> ${escapeHtml(input.email)}<br />
-        <strong>Phone:</strong> ${escapeHtml(input.phone || "Not provided")}<br />
-        <strong>Company:</strong> ${escapeHtml(input.company || "Not provided")}<br />
-        <strong>Customer type:</strong> ${escapeHtml(input.customerType || "Not provided")}
+    <div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5">
+      <div style="max-width:680px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff">
+        <div style="padding:20px 22px;border-bottom:1px solid #e5eaf1">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="padding-right:12px"><img src="${SITE_URL}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px" /></td>
+            <td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br /><span style="font-size:13px;color:#64748b">Material request desk</span></td>
+          </tr></table>
+        </div>
+        <div style="padding:24px 22px">
+          <p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">${beatQuote ? "New quote to beat" : "New material request"}</p>
+          <h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">${escapeHtml(fullName)} sent a request</h1>
+          <p style="margin:10px 0 0;color:#475569">${escapeHtml(departmentText)}${input.timeframe ? ` &bull; Needed ${escapeHtml(input.timeframe)}` : ""}</p>
+          <p style="margin:22px 0"><a href="${requestUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Request</a></p>
+          <div style="padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc">
+            <strong>Reference:</strong> ${escapeHtml(input.referenceId)}<br />
+            <strong>Customer:</strong> ${escapeHtml(fullName)}<br />
+            <strong>Phone:</strong> ${escapeHtml(input.phone || "Not provided")}<br />
+            <strong>Email:</strong> ${escapeHtml(input.email)}${input.company ? `<br /><strong>Company:</strong> ${escapeHtml(input.company)}` : ""}
+          </div>
+          <h2 style="margin:24px 0 8px;font-size:17px">Job details</h2>
+          <p style="margin:0"><strong>Location:</strong> ${escapeHtml(address || "Not provided")}<br /><strong>Departments:</strong> ${escapeHtml(departmentText)}</p>
+          <h2 style="margin:24px 0 8px;font-size:17px">What they need</h2>
+          <p style="margin:0;white-space:pre-wrap">${escapeHtml(input.details || "See attached file")}</p>
+          ${input.attachment?.filename ? `<p style="margin:20px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(input.attachment.filename)}</p>` : ""}
+        </div>
       </div>
-      <h2 style="margin:24px 0 8px;font-size:17px">Project</h2>
-      <p><strong>Name:</strong> ${escapeHtml(input.projectName || "Not named")}<br />
-      <strong>Type:</strong> ${escapeHtml(input.projectType || "Not provided")}<br />
-      <strong>Job site:</strong> ${escapeHtml(address || "Not provided")}<br />
-      <strong>Needed:</strong> ${escapeHtml(input.timeframe || "Not provided")}<br />
-      <strong>Departments:</strong> ${escapeHtml(departmentText)}</p>
-      <h2 style="margin:24px 0 8px;font-size:17px">Request details</h2>
-      <p style="white-space:pre-wrap">${escapeHtml(input.details || "See attached file")}</p>
-      <p style="margin-top:20px;color:#64748b;font-size:13px">Attachment: ${escapeHtml(input.attachment?.filename || "None")}</p>
     </div>
   `
 
@@ -624,7 +635,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
     apiKey,
     from,
     to,
-    subject: `${beatQuote ? "New quote to beat" : "New quote request"}: ${input.projectName || fullName}`,
+    subject: `${beatQuote ? "NEW QUOTE TO BEAT" : "NEW MATERIAL REQUEST"} - ${fullName} - ${input.referenceId}`,
     html,
     text,
     replyTo: input.email,
@@ -648,10 +659,10 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
         apiKey,
         from,
         to: input.email,
-        subject: `${beatQuote ? "We received your quote to beat" : "We received your quote request"}: ${input.projectName || input.referenceId}`,
-        html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:620px;margin:0 auto"><p>Hi ${escapeHtml(input.firstName)},</p><h1 style="font-size:22px">${beatQuote ? "We received your store quote" : "We received your quote request"}</h1><p><strong>Reference:</strong> ${escapeHtml(input.referenceId)}<br /><strong>Project:</strong> ${escapeHtml(input.projectName || "Not named")}</p><p>Our Avantia Build team will review the details and contact you if anything else is needed.</p><p style="margin-top:24px"><strong>Avantia Build</strong><br /><span style="color:#64748b">Everything it takes to build</span></p></div>`,
+        subject: `${beatQuote ? "Quote received" : "Material request received"} - ${input.referenceId}`,
+        html: `<div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5"><div style="max-width:620px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff"><div style="padding:20px 22px;border-bottom:1px solid #e5eaf1"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:12px"><img src="${SITE_URL}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px" /></td><td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br /><span style="font-size:13px;color:#64748b">Materials priced and delivered</span></td></tr></table></div><div style="padding:24px 22px"><p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p><h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">Your request is in.</h1><p style="margin:12px 0;color:#475569">Hi ${escapeHtml(input.firstName)}, we will review your details and contact you within 24 hours.</p><div style="margin:20px 0;padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(input.referenceId)}${input.projectName ? `<br /><strong>Project:</strong> ${escapeHtml(input.projectName)}` : ""}</div><p style="margin:22px 0"><a href="${SITE_URL}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Avantia Build</a></p><p style="margin:0;color:#64748b;font-size:13px">Questions? Reply to this email or call (929) 207-7156.</p></div></div></div>`,
         text: clientText,
-        replyTo: to,
+        replyTo: COMPANY_EMAIL,
         idempotencyKey: `avantia-intake-client-${input.referenceId}`,
       })
 
@@ -708,7 +719,7 @@ export async function sendCartSubmissionEmail(input: CartSubmissionEmailInput): 
         subject: `We received your Avantia Build request: ${input.project.name}`,
         html: buildClientHtml(input),
         text: buildClientText(input),
-        replyTo: to,
+        replyTo: COMPANY_EMAIL,
         idempotencyKey: `avantia-order-client-${input.quoteId}`,
       })
     : { status: "skipped" as const }

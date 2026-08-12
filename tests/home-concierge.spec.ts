@@ -3,10 +3,14 @@ import { expect, test } from "@playwright/test";
 test("home presents the contractor material coordination service", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page).toHaveTitle("Avantia Build | Construction Material Ordering");
-  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", "Order construction materials, upload plans, compare supplier pricing, and coordinate deliveries—all in one place.");
-  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", "https://build.avantiap.com/images/avantia/avantia-app-icon-512.png?v=2");
-  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "Avantia Build | Construction Material Ordering");
+  await expect(page).toHaveTitle("Avantia Build | Materials Priced & Delivered");
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", "Upload your list or choose materials. We compare suppliers and arrange jobsite delivery. No account needed.");
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", "https://build.avantiap.com/images/avantia/avantia-build-share-v3.jpg");
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "Get Materials Priced & Delivered | Avantia Build");
+  await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
+  await expect(page.locator('meta[property="og:image:height"]')).toHaveAttribute("content", "630");
+  await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute("content", "Avantia Build");
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.webmanifest");
   await expect(page.getByRole("heading", { name: "Get Materials Priced and Delivered." })).toBeVisible();
   await expect(page.getByText("Avantia Build for contractors", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Upload List or Plan" })).toHaveAttribute("href", "/request-quote");
