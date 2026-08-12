@@ -13,8 +13,8 @@ export default function RequestQuotePage() {
             Back to Home
           </Link>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">Avantia Build</p>
-          <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Get Pricing for Your Materials</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">Send your list, blueprint, or material details. We&apos;ll review it and follow up within one business day.</p>
+          <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Turn Your Plan Into a Material Order</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">Upload a blueprint or list. AI prepares the takeoff, our team verifies the materials, and you approve before we place the order.</p>
         </div>
       </section>
       <div className="mx-auto max-w-5xl py-6 sm:px-6 sm:py-8">

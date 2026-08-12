@@ -9,20 +9,20 @@ import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools";
 const orderSteps = [
   {
     eyebrow: "Step 1",
-    title: "Send Your List",
-    body: "Choose materials or upload a list.",
+    title: "Upload Your Plan",
+    body: "Send a blueprint, material list, or photo.",
     icon: PackageSearch,
   },
   {
     eyebrow: "Step 2",
-    title: "Get Pricing",
-    body: "We compare price and availability.",
+    title: "AI Builds the Takeoff",
+    body: "AI extracts the materials. Our team checks every quantity.",
     icon: ClipboardList,
   },
   {
     eyebrow: "Step 3",
     title: "Approve Your Order",
-    body: "You approve. We arrange jobsite delivery.",
+    body: "You approve the list and pricing. We place the order and arrange delivery.",
     icon: PackageCheck,
   },
 ];
@@ -83,11 +83,11 @@ export default function Home() {
               Get Materials Priced and Delivered.
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-6 text-slate-100 sm:text-xl sm:leading-8">
-              Upload your list or choose materials. We compare suppliers and arrange delivery to your jobsite.
+              Upload a plan or list. AI prepares the material takeoff, our team verifies it, and you approve before we order.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Link href="/request-quote" className="group inline-flex min-h-14 items-center justify-between gap-4 rounded-lg bg-white px-3 py-2.5 text-sm font-bold text-[#071126] shadow-[0_14px_34px_rgba(0,0,0,0.24)] transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/40 sm:min-w-64">
-                <span className="inline-flex items-center gap-3"><span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#e8f3ff] text-[#0071e3]"><FileUp className="h-5 w-5" aria-hidden="true" /></span>Upload List or Plan</span>
+                <span className="inline-flex items-center gap-3"><span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#e8f3ff] text-[#0071e3]"><FileUp className="h-5 w-5" aria-hidden="true" /></span>Upload Plan or List</span>
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
               <Link href="#departments" className="group inline-flex min-h-14 items-center justify-between gap-4 rounded-lg border border-white/45 bg-white/10 px-3 py-2.5 text-sm font-bold text-white shadow-[0_14px_34px_rgba(0,0,0,0.16)] backdrop-blur-sm transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30 sm:min-w-64">
