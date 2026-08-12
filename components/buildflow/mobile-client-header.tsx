@@ -34,7 +34,7 @@ function isActivePath(pathname: string, href: string) {
 function IconShell({ active, premium = false, children }: { active: boolean; premium?: boolean; children: React.ReactNode }) {
   return (
     <span
-      className={`relative flex h-10 w-10 items-center justify-center rounded-2xl border transition active:scale-[0.98] ${
+      className={`relative flex h-11 w-11 items-center justify-center rounded-2xl border transition active:scale-[0.98] ${
         premium
           ? "border-fuchsia-200/80 bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.28),transparent_34%),radial-gradient(circle_at_top_right,rgba(96,165,250,0.32),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(238,244,255,0.96))] text-slate-950 shadow-[0_12px_26px_rgba(96,165,250,0.14)]"
           : active
@@ -172,7 +172,14 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
     <>
       <div data-testid="site-header" className="sticky top-0 z-[60] border-b border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(148,163,184,0.1)]">
         <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-3 py-2.5 sm:px-5">
-          <button type="button" aria-label="Open navigation menu" onClick={() => setMenuOpen(true)} className="inline-flex">
+          <button
+            type="button"
+            aria-label="Open navigation menu"
+            aria-expanded={menuOpen}
+            aria-controls="mobile-navigation-drawer"
+            onClick={() => setMenuOpen(true)}
+            className="inline-flex rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
+          >
             <IconShell active={menuOpen}>
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4 7h16" />
@@ -188,7 +195,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
                 href="/"
                 prefetch={false}
                 aria-label="Avantia Build home"
-                className="flex min-h-10 shrink-0 items-center overflow-hidden rounded-lg bg-white transition active:scale-[0.99]"
+              className="flex min-h-11 shrink-0 items-center overflow-hidden rounded-lg bg-white transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
               >
                 <AvantiaBuildLockup header />
               </Link>
@@ -208,9 +215,9 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
               </button>
             </>
           ) : (
-            <Link href="/" prefetch={false} aria-label="Avantia Build home" className="flex min-h-10 min-w-0 flex-1 items-center px-1 md:flex-none">
+            <Link href="/" prefetch={false} aria-label="Avantia Build home" className="flex min-h-11 min-w-0 flex-1 items-center rounded-lg px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 md:flex-none">
               <span className="flex items-center transition active:scale-[0.99]">
-                <AvantiaBuildLockup compact />
+                <AvantiaBuildLockup compact homepageHeader={pathname === "/"} />
               </span>
             </Link>
           )}
@@ -229,12 +236,12 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isPreviewAdminEnabled 
             href={isSignedIn ? "/account" : "/login"}
             prefetch={false}
             aria-label={isSignedIn ? `Open account for ${accountLabel}` : "Log in"}
-            className={`flex min-h-10 max-w-[7.75rem] shrink-0 items-center gap-1.5 rounded-2xl border px-2.5 text-xs font-bold shadow-sm transition active:scale-[0.98] ${pathname === "/account" ? "border-sky-200 bg-sky-50 text-[#0E2A4A]" : "border-slate-200/90 bg-white/95 text-[#0E2A4A]"}`}
+            className={`flex min-h-11 max-w-[7.75rem] shrink-0 items-center gap-1.5 rounded-2xl border px-2.5 text-xs font-bold shadow-sm transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 ${pathname === "/account" ? "border-sky-200 bg-sky-50 text-[#0E2A4A]" : "border-slate-200/90 bg-white/95 text-[#0E2A4A]"}`}
           >
             <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isSignedIn ? "bg-[#0E2A4A] text-white" : "bg-slate-100 text-slate-700"}`}>
               <AccountIcon signedIn={isSignedIn} />
             </span>
-            <span className={`min-w-0 truncate ${isShopPage ? "hidden sm:inline" : ""}`}>{accountLabel}</span>
+            <span className={`min-w-0 truncate ${isShopPage ? "hidden sm:inline" : pathname === "/" ? "hidden min-[390px]:inline" : ""}`}>{accountLabel}</span>
           </Link>
 
         </div>

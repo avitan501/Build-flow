@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 
@@ -28,6 +29,49 @@ function isActivePath(pathname: string, href: string) {
 
 export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [], adminLinks = [], isSignedIn }: MobileMenuDrawerProps) {
   const pathname = usePathname();
+  const drawerRef = useRef<HTMLElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const drawer = drawerRef.current;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const focusableSelector = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusable = drawer ? Array.from(drawer.querySelectorAll<HTMLElement>(focusableSelector)) : [];
+    focusable[0]?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab" || !drawer) return;
+      const currentFocusable = Array.from(drawer.querySelectorAll<HTMLElement>(focusableSelector));
+      const first = currentFocusable[0];
+      const last = currentFocusable.at(-1);
+      if (!first || !last) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+      previousFocusRef.current?.focus();
+    };
+  }, [onClose, open]);
 
   return (
     <>
@@ -37,7 +81,11 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
         onClick={onClose}
       />
       <aside
+        ref={drawerRef}
+        id="mobile-navigation-drawer"
+        aria-label="Site navigation"
         aria-hidden={!open}
+        inert={!open}
         className={`fixed inset-y-0 left-0 z-[71] w-[82vw] max-w-[18rem] overflow-y-auto border-r border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f5f9ff_100%)] px-3 pb-7 pt-4 shadow-[0_24px_60px_rgba(15,23,42,0.18)] transition duration-200 ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between gap-3">
@@ -48,7 +96,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
             type="button"
             onClick={onClose}
             aria-label="Close menu"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm active:scale-[0.98]"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
           >
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M6 6l12 12" />

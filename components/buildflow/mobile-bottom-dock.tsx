@@ -8,7 +8,7 @@ type MobileBottomDockProps = {
   projectsHref: string;
 };
 
-const HIDDEN_DOCK_PATHS = new Set(["/login", "/signup", "/reset-password", "/request-quote", "/beat-a-quote"]);
+const HIDDEN_DOCK_PATHS = new Set(["/", "/login", "/signup", "/reset-password", "/request-quote", "/beat-a-quote"]);
 
 function shouldShowDock(pathname: string) {
   return !HIDDEN_DOCK_PATHS.has(pathname) && !pathname.startsWith("/admin");
