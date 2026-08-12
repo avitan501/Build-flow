@@ -32,6 +32,7 @@ function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | nu
     whatsapp: input.whatsapp?.trim().slice(0, 80) || "",
     portalUrl: input.portalUrl?.trim().slice(0, 500) || "",
     deliveryNotes: input.deliveryNotes?.trim().slice(0, 4_000) || "",
+    notes: input.notes?.trim().slice(0, 4_000) || "",
   }
 }
 

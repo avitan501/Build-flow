@@ -1,5 +1,6 @@
 "use client"
 
+import { Plus, StickyNote, Trash2, X } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useRef, useState, useTransition } from "react"
 import { saveSupplierDirectoryEntryAction } from "@/app/admin/vendors/actions"
@@ -162,6 +163,9 @@ export function SupplierRoutingManager({
   const [supplierDirty, setSupplierDirty] = useState(false)
   const [supplierFormError, setSupplierFormError] = useState("")
   const [supplierSavePending, startSupplierSave] = useTransition()
+  const [supplierAddOpen, setSupplierAddOpen] = useState(false)
+  const [supplierDraftNotesOpen, setSupplierDraftNotesOpen] = useState(false)
+  const [supplierNotesOpen, setSupplierNotesOpen] = useState<Record<string, boolean>>({})
   const pendingSaveRef = useRef<{ qualificationSettings: ShopQualificationSettings; addOns: ManagerCatalogAddOns } | null>(null)
   const saveRunningRef = useRef(false)
   const [supplierDraft, setSupplierDraft] = useState({
@@ -173,6 +177,7 @@ export function SupplierRoutingManager({
     portalUrl: "",
     preferredDeliveryMethod: "manual" as SupplierDeliveryMethod,
     deliveryNotes: "",
+    notes: "",
   })
   const [questionLabel, setQuestionLabel] = useState("")
   const [questionType, setQuestionType] = useState<QualifyingQuestionType>("text")
@@ -356,6 +361,7 @@ export function SupplierRoutingManager({
       portalUrl: supplierDraft.portalUrl.trim(),
       preferredDeliveryMethod: supplierDraft.preferredDeliveryMethod,
       deliveryNotes: supplierDraft.deliveryNotes.trim(),
+      notes: supplierDraft.notes.trim(),
     }
 
     setSupplierFormError("")
@@ -372,7 +378,9 @@ export function SupplierRoutingManager({
         setActivePanel("suppliers")
         setSupplierDirty(false)
         setDirectorySaveState("saved")
-        setSupplierDraft({ name: "", contactName: "", email: "", phone: "", whatsapp: "", portalUrl: "", preferredDeliveryMethod: "manual", deliveryNotes: "" })
+        setSupplierDraft({ name: "", contactName: "", email: "", phone: "", whatsapp: "", portalUrl: "", preferredDeliveryMethod: "manual", deliveryNotes: "", notes: "" })
+        setSupplierDraftNotesOpen(false)
+        setSupplierAddOpen(false)
       } catch {
         setSupplierFormError("The server could not save this supplier. Please try again.")
       }
@@ -981,6 +989,17 @@ export function SupplierRoutingManager({
                       <span className={`mt-1 block text-xs ${supplier.id === selectedSupplier?.id ? "text-slate-300" : "text-slate-500"}`}>{methodLabel(supplier.preferredDeliveryMethod)} · {supplierReachLine(supplier)}</span>
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSupplierFormError("")
+                      setSupplierAddOpen(true)
+                    }}
+                    className="flex min-h-14 items-center gap-3 rounded-[18px] border border-dashed border-sky-300 bg-sky-50 px-4 py-3 text-left text-sky-800 transition hover:border-sky-500 hover:bg-sky-100"
+                  >
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm"><Plus className="h-4 w-4" /></span>
+                    <span><span className="block text-sm font-semibold">Add supplier</span><span className="mt-0.5 block text-xs text-sky-700">Create a new directory entry</span></span>
+                  </button>
                 </div>
               </section>
 
@@ -1002,7 +1021,7 @@ export function SupplierRoutingManager({
                           directoryReady={!supplierDirty && !supplierSavePending && directorySaveState !== "saving" && directorySaveState !== "error"}
                           directoryStatus={supplierDirty ? "Save supplier changes before sending a quote." : supplierSavePending ? "Saving supplier changes..." : directorySaveState === "saving" ? "Saving the latest supplier changes..." : directorySaveError || undefined}
                         />
-                        <button type="button" onClick={() => removeSupplier(selectedSupplier.id)} className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">Remove</button>
+                        <button type="button" onClick={() => removeSupplier(selectedSupplier.id)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700"><Trash2 className="h-4 w-4" />Delete supplier</button>
                       </div>
                     </div>
                     {directorySaveState !== "idle" ? (
@@ -1046,6 +1065,28 @@ export function SupplierRoutingManager({
                         Delivery instructions
                         <textarea value={selectedSupplier.deliveryNotes || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { deliveryNotes: event.target.value })} rows={4} className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
+                      <div className="sm:col-span-2">
+                        {supplierNotesOpen[selectedSupplier.id] || selectedSupplier.notes ? (
+                          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <label htmlFor={`supplier-note-${selectedSupplier.id}`} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900"><StickyNote className="h-4 w-4 text-amber-700" />Private note</label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateSupplier(selectedSupplier.id, { notes: "" })
+                                  setSupplierNotesOpen((current) => ({ ...current, [selectedSupplier.id]: false }))
+                                }}
+                                className="text-xs font-semibold text-rose-700"
+                              >
+                                Remove note
+                              </button>
+                            </div>
+                            <textarea id={`supplier-note-${selectedSupplier.id}`} value={selectedSupplier.notes || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { notes: event.target.value })} rows={3} placeholder="Internal details only your team should see" className="mt-3 w-full rounded-xl border border-amber-200 bg-white px-4 py-3 text-sm font-medium outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
+                          </div>
+                        ) : (
+                          <button type="button" onClick={() => setSupplierNotesOpen((current) => ({ ...current, [selectedSupplier.id]: true }))} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"><StickyNote className="h-4 w-4" />Add private note</button>
+                        )}
+                      </div>
                     </div>
                     <div className="mt-4 flex flex-wrap items-center gap-3">
                       <button type="button" onClick={saveSelectedSupplier} disabled={!supplierDirty || supplierSavePending || directorySaveState === "saving"} className="min-h-11 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300">
@@ -1087,22 +1128,34 @@ export function SupplierRoutingManager({
                   </>
                 ) : null}
 
-                <div className="mt-7 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                  <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Add supplier</h4>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <input value={supplierDraft.name} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, name: event.target.value }))} placeholder="Supplier name" className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
-                    <input value={supplierDraft.contactName} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, contactName: event.target.value }))} placeholder="Contact name" className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
-                    <input value={supplierDraft.email} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, email: event.target.value }))} placeholder="Email later, optional" className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
-                    <input value={supplierDraft.phone} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, phone: event.target.value }))} placeholder="Phone" className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
-                    <input value={supplierDraft.whatsapp} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, whatsapp: event.target.value }))} placeholder="WhatsApp" className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
-                    <select value={supplierDraft.preferredDeliveryMethod} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, preferredDeliveryMethod: event.target.value as SupplierDeliveryMethod }))} className="min-h-12 rounded-2xl border border-slate-300 bg-white px-4 text-sm font-medium">
-                      {deliveryMethods.map((method) => <option key={method} value={method}>{methodLabel(method)}</option>)}
-                    </select>
-                    <button type="button" onClick={addSupplier} disabled={supplierSavePending || directorySaveState === "saving" || !supplierDraft.name.trim()} className="min-h-12 rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300">{supplierSavePending ? "Saving..." : "Add supplier"}</button>
-                  </div>
-                  {supplierFormError ? <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{supplierFormError}</p> : null}
-                </div>
               </section>
+
+              {supplierAddOpen ? (
+                <div className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-950/45 p-3 backdrop-blur-[2px] sm:items-center" role="dialog" aria-modal="true" aria-labelledby="add-supplier-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !supplierSavePending) setSupplierAddOpen(false) }}>
+                  <section className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[22px] bg-white shadow-[0_28px_80px_rgba(15,23,42,0.35)]">
+                    <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
+                      <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-sky-700">Supplier directory</p><h2 id="add-supplier-title" className="mt-1 text-xl font-bold text-slate-950">Add a supplier</h2><p className="mt-1 text-sm text-slate-500">Add contact details now or complete optional fields later.</p></div>
+                      <button type="button" onClick={() => setSupplierAddOpen(false)} disabled={supplierSavePending} aria-label="Close add supplier" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40"><X className="h-5 w-5" /></button>
+                    </header>
+                    <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900">Supplier name <span className="sr-only">required</span><input autoFocus required value={supplierDraft.name} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, name: event.target.value }))} placeholder="Supplier or company name" className="min-h-12 rounded-xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900">Contact name <input value={supplierDraft.contactName} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, contactName: event.target.value }))} placeholder="Salesperson or contact" className="min-h-12 rounded-xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900">Phone <input inputMode="tel" value={supplierDraft.phone} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, phone: event.target.value }))} placeholder="Phone number" className="min-h-12 rounded-xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900">Email <span className="text-xs font-normal text-slate-500">Optional</span><input type="email" value={supplierDraft.email} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, email: event.target.value }))} placeholder="name@supplier.com" className="min-h-12 rounded-xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900">WhatsApp <input inputMode="tel" value={supplierDraft.whatsapp} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, whatsapp: event.target.value }))} placeholder="WhatsApp number" className="min-h-12 rounded-xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900">Best way to contact <select value={supplierDraft.preferredDeliveryMethod} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, preferredDeliveryMethod: event.target.value as SupplierDeliveryMethod }))} className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium">{deliveryMethods.map((method) => <option key={method} value={method}>{methodLabel(method)}</option>)}</select></label>
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900 sm:col-span-2">Supplier portal URL <span className="text-xs font-normal text-slate-500">Optional</span><input type="url" value={supplierDraft.portalUrl} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, portalUrl: event.target.value }))} placeholder="https://" className="min-h-12 rounded-xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900 sm:col-span-2">Delivery or contact instructions <span className="text-xs font-normal text-slate-500">Optional</span><textarea value={supplierDraft.deliveryNotes} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, deliveryNotes: event.target.value }))} rows={3} placeholder="Best hours, quote process, delivery area, or other instructions" className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
+                      <div className="sm:col-span-2">
+                        <label className="inline-flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700"><input type="checkbox" checked={supplierDraftNotesOpen} onChange={(event) => { setSupplierDraftNotesOpen(event.target.checked); if (!event.target.checked) setSupplierDraft((draft) => ({ ...draft, notes: "" })) }} />Add a private note</label>
+                        {supplierDraftNotesOpen ? <textarea value={supplierDraft.notes} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, notes: event.target.value }))} rows={3} placeholder="Internal note visible only to your team" className="mt-3 w-full rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm font-medium outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" /> : null}
+                      </div>
+                      {supplierFormError ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800 sm:col-span-2">{supplierFormError}</p> : null}
+                    </div>
+                    <footer className="sticky bottom-0 flex flex-col-reverse gap-2 border-t border-slate-200 bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-6"><button type="button" onClick={() => setSupplierAddOpen(false)} disabled={supplierSavePending} className="min-h-11 rounded-lg border border-slate-300 px-5 text-sm font-semibold text-slate-700 disabled:opacity-40">Cancel</button><button type="button" onClick={addSupplier} disabled={supplierSavePending || directorySaveState === "saving" || !supplierDraft.name.trim()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white disabled:bg-slate-300"><Plus className="h-4 w-4" />{supplierSavePending ? "Saving..." : "Add supplier"}</button></footer>
+                  </section>
+                </div>
+              ) : null}
             </section>
           ) : null}
 
