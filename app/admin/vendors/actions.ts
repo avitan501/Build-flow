@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { requireStaffProfile } from "@/lib/auth"
 import type { ShopQualificationSettings, SupplierRoutingOption } from "@/lib/shop-qualification"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 const JOB_ADDRESS = "280 Lawrence Ave, Lawrence, NY 11559"
 const MAX_MATERIAL_LIST_LENGTH = 20_000
@@ -70,15 +71,19 @@ export async function saveSupplierDirectoryEntryAction(input: {
 }
 
 export async function loadSupplierDirectoryAction(): Promise<LoadSupplierDirectoryResult> {
-  const { supabase } = await requireStaffProfile("suppliers")
-  const { data, error } = await supabase
-    .from("workflow_manager_settings")
-    .select("state")
-    .eq("id", "singleton")
-    .maybeSingle<{ state: { qualificationSettings?: ShopQualificationSettings } }>()
-  const settings = data?.state?.qualificationSettings
-  if (error || !settings) return { ok: false, error: "Could not refresh the supplier directory." }
-  return { ok: true, settings }
+  await requireStaffProfile("suppliers")
+  try {
+    const { data, error } = await createAdminClient()
+      .from("workflow_manager_settings")
+      .select("state")
+      .eq("id", "singleton")
+      .maybeSingle<{ state: { qualificationSettings?: ShopQualificationSettings } }>()
+    const settings = data?.state?.qualificationSettings
+    if (error || !settings) return { ok: false, error: "Could not refresh the supplier directory." }
+    return { ok: true, settings }
+  } catch {
+    return { ok: false, error: "Could not refresh the supplier directory." }
+  }
 }
 
 export async function saveSupplierRoutingProductsAction(

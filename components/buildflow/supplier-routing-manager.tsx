@@ -554,14 +554,10 @@ export function SupplierRoutingManager({
     setDirectoryNotice("")
     startSupplierSave(async () => {
       const latest = await loadSupplierDirectoryAction()
-      if (!latest.ok) {
-        setSupplierFormError("The directory could not be synchronized before deletion. Nothing was deleted; refresh and try again.")
-        return
-      }
-
-      const staleRemovals = settings.suppliers.filter((entry) => !latest.settings.suppliers.some((current) => current.id === entry.id)).length
-      const latestSupplier = latest.settings.suppliers.find((entry) => entry.id === supplierId)
-      if (!latestSupplier) {
+      const baselineSettings = latest.ok ? latest.settings : settings
+      const staleRemovals = latest.ok ? settings.suppliers.filter((entry) => !latest.settings.suppliers.some((current) => current.id === entry.id)).length : 0
+      const latestSupplier = baselineSettings.suppliers.find((entry) => entry.id === supplierId)
+      if (latest.ok && !latestSupplier) {
         setSettings(latest.settings)
         writeShopQualificationSettings(latest.settings)
         setSelectedSupplierId(latest.settings.suppliers[0]?.id ?? "")
@@ -577,18 +573,19 @@ export function SupplierRoutingManager({
       }
 
       const nextSettings = result.settings as ShopQualificationSettings
-      const removedNow = latest.settings.suppliers.filter((entry) => !nextSettings.suppliers.some((current) => current.id === entry.id))
+      const removedNow = baselineSettings.suppliers.filter((entry) => !nextSettings.suppliers.some((current) => current.id === entry.id))
       setSettings(nextSettings)
       writeShopQualificationSettings(nextSettings)
       setSelectedSupplierId(nextSettings.suppliers[0]?.id ?? "")
       setSupplierDirty(false)
       setDirectorySaveState("saved")
-      if (removedNow.length !== 1 || removedNow[0]?.id !== supplierId) {
+      if (nextSettings.suppliers.some((entry) => entry.id === supplierId) || (latest.ok && (removedNow.length !== 1 || removedNow[0]?.id !== supplierId))) {
         setSupplierFormError("The server returned an unexpected directory change. The screen was synchronized; do not delete another vendor until this is reviewed.")
         return
       }
       const syncMessage = staleRemovals > 0 ? ` ${staleRemovals} earlier deletion${staleRemovals === 1 ? " was" : "s were"} also synchronized before this delete.` : ""
-      setDirectoryNotice(`${latestSupplier.name} alone was deleted. ${nextSettings.suppliers.length} active vendor${nextSettings.suppliers.length === 1 ? " remains" : "s remain"}.${syncMessage}`)
+      const refreshMessage = latest.ok ? syncMessage : " The preliminary refresh was unavailable, so the atomic server response was used directly."
+      setDirectoryNotice(`${latestSupplier?.name || supplier?.name || "That vendor"} alone was deleted. ${nextSettings.suppliers.length} active vendor${nextSettings.suppliers.length === 1 ? " remains" : "s remain"}.${refreshMessage}`)
     })
   }
 
