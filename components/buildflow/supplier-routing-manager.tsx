@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useMemo, useRef, useState } from "react"
 import { saveWorkflowManagerSettingsAction } from "@/app/preview-admin/workflow-actions"
 import { DepartmentSymbolBadges, DEPARTMENT_SYMBOL_OPTIONS } from "@/components/buildflow/department-symbol-badges"
+import { QuoCallButton } from "@/components/buildflow/quo-call-button"
 import { SupplierQuoteRequestDialog } from "@/components/buildflow/supplier-quote-request-dialog"
 
 import {
@@ -945,6 +946,7 @@ export function SupplierRoutingManager({
                         <p className="mt-2 text-sm leading-6 text-slate-500">This is private manager data used for routing approved reports.</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        <QuoCallButton phone={selectedSupplier.phone || selectedSupplier.whatsapp || null} supplierName={selectedSupplier.name} />
                         <SupplierQuoteRequestDialog
                           supplierId={selectedSupplier.id}
                           supplierName={selectedSupplier.name}
