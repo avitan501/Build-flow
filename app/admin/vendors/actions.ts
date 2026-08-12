@@ -15,24 +15,37 @@ type SendSupplierQuoteResult =
 
 export async function sendSupplierQuoteRequestAction(input: {
   supplierId: string
+  supplierEmail: string | null
   materialList: string
 }): Promise<SendSupplierQuoteResult> {
   const { supabase, user } = await requireStaffProfile("suppliers")
   const supplierId = input.supplierId.trim()
+  const requestedSupplierEmail = input.supplierEmail?.trim().toLowerCase() || ""
   const materialList = input.materialList.trim()
 
   if (!supplierId) return { ok: false, error: "Choose a supplier." }
   if (!materialList) return { ok: false, error: "Paste or enter the material list." }
   if (materialList.length > MAX_MATERIAL_LIST_LENGTH) return { ok: false, error: "The material list is too long." }
 
-  const { data: settings, error: settingsError } = await supabase
-    .from("workflow_manager_settings")
-    .select("state")
-    .eq("id", "singleton")
-    .maybeSingle<{ state: { qualificationSettings?: { suppliers?: SupplierRoutingOption[] } } }>()
-  if (settingsError) return { ok: false, error: "Could not load the supplier directory." }
+  let supplier: SupplierRoutingOption | undefined
+  for (let attempt = 0; attempt < 4 && !supplier; attempt += 1) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 250))
+    const { data: settings, error: settingsError } = await supabase
+      .from("workflow_manager_settings")
+      .select("state")
+      .eq("id", "singleton")
+      .maybeSingle<{ state: { qualificationSettings?: { suppliers?: SupplierRoutingOption[] } } }>()
+    if (settingsError) return { ok: false, error: "Could not load the supplier directory." }
 
-  const supplier = settings?.state?.qualificationSettings?.suppliers?.find((item) => item.id === supplierId)
+    const suppliers = settings?.state?.qualificationSettings?.suppliers ?? []
+    const supplierById = suppliers.find((item) => item.id === supplierId)
+    const supplierByEmail = requestedSupplierEmail
+      ? suppliers.find((item) => item.email?.trim().toLowerCase() === requestedSupplierEmail)
+      : undefined
+    supplier = supplierById?.email?.trim().toLowerCase() === requestedSupplierEmail
+      ? supplierById
+      : supplierByEmail ?? (!requestedSupplierEmail ? supplierById : undefined)
+  }
   if (!supplier) return { ok: false, error: "This supplier is no longer in the directory." }
 
   const supplierEmail = supplier.email?.trim().toLowerCase() || ""
