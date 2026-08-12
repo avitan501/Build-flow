@@ -50,8 +50,8 @@ export const metadata: Metadata = {
     apple: "/images/avantia/avantia-app-icon-512.png",
   },
   openGraph: {
-    title: "You Build. We Handle the Materials. | Avantia Build",
-    description: "Upload your plans or material list. We compare suppliers, organize the order, and coordinate jobsite delivery.",
+    title: "Avantia Build | Materials Priced & Delivered",
+    description: "Send plans or a material list. WhatsApp: (929) 207-7156.",
     url: "/",
     siteName: "Avantia Build",
     locale: "en_US",
@@ -59,8 +59,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "You Build. We Handle the Materials. | Avantia Build",
-    description: "Upload your plans or material list. We compare suppliers, organize the order, and coordinate jobsite delivery.",
+    title: "Avantia Build | Materials Priced & Delivered",
+    description: "Send plans or a material list. WhatsApp: (929) 207-7156.",
   },
 };
 
