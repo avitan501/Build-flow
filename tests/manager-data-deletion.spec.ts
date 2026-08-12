@@ -6,9 +6,10 @@ import { expect, test } from "@playwright/test"
 const root = process.cwd()
 
 test("manager deletion functions target one record and protect privileged accounts", async () => {
-  const [sql, sharedUploadGuard] = await Promise.all([
+  const [sql, sharedUploadGuard, quotedRequestSupport] = await Promise.all([
     readFile(path.join(root, "supabase/migrations/20260812210000_add_manager_data_deletion.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260812213000_avoid_shared_upload_deletion.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260812214500_allow_quoted_request_deletion.sql"), "utf8"),
   ])
 
   expect(sql).toContain("delete from public.quote_requests where id = p_request_id")
@@ -20,6 +21,7 @@ test("manager deletion functions target one record and protect privileged accoun
   expect(sql).toContain("manager_file_deletion_queue")
   expect(sharedUploadGuard).toContain("other_attachment.request_id <> p_request_id")
   expect(sharedUploadGuard).toContain("other_upload.project_id <> p_project_id")
+  expect(quotedRequestSupport).toContain("('draft', 'submitted', 'in_review', 'quoted')")
   expect(sql).not.toMatch(/delete from public\.quote_requests\s*;/i)
   expect(sql).not.toMatch(/delete from public\.projects\s*;/i)
   expect(sql).not.toMatch(/delete from auth\.users\s*;/i)
@@ -33,6 +35,8 @@ test("customer manager exposes separate customer project and request deletion co
   ])
 
   expect(page).toContain('/admin/users?view=projects')
+  expect(page).toContain('new Set(["draft", "submitted", "in_review", "quoted"])')
+  expect(page).toContain('if (projectsResult.error) throw new Error("Failed to load customer projects.")')
   expect(page).toContain('kind="customer"')
   expect(page).toContain('kind="project"')
   expect(page).toContain('kind="request"')

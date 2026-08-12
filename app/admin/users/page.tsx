@@ -7,6 +7,7 @@ import { requireStaffProfile } from "@/lib/auth"
 import { isApprovedManagerIdentity } from "@/lib/owner-identity"
 
 const roleOptions = ["admin", "staff", "client"] as const
+const deletableRequestStatuses = new Set(["draft", "submitted", "in_review", "quoted"])
 
 type CustomerRecord = {
   id: string
@@ -94,6 +95,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
 
   if (customersResult.error) throw new Error("Failed to load customer accounts.")
   if (requestsResult.error) throw new Error("Failed to load customer requests.")
+  if (projectsResult.error) throw new Error("Failed to load customer projects.")
 
   const customers = customersResult.data ?? []
   const requests = requestsResult.data ?? []
@@ -128,7 +130,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
     return [project.name, project.address, customer?.full_name, customer?.email, customer?.company_name].filter(Boolean).join(" ").toLowerCase().includes(search)
   })
 
-  const openRequests = requests.filter((request) => !["completed", "closed", "cancelled"].includes(request.status)).length
+  const openRequests = requests.filter((request) => deletableRequestStatuses.has(request.status)).length
   const pendingCustomers = customers.filter((customer) => customer.approval_status === "pending").length
   const statuses = Array.from(new Set(requests.map((request) => request.status))).sort()
   const projectStatuses = Array.from(new Set(projects.map((project) => project.status))).sort()
@@ -207,9 +209,9 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
         ) : (
           <section className="mt-4 grid gap-3" aria-label="Customer requests">
             {params.customer ? <div className="flex items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm"><span>Showing requests for <strong>{customerName(customerMap.get(params.customer))}</strong></span><Link href="/admin/users?view=requests" className="font-semibold text-[#0066cc]">Clear</Link></div> : null}
-            {filteredRequests.map((request) => { const customer = customerMap.get(request.owner_id); const isOpen = ["draft", "submitted", "in_review"].includes(request.status); return <article key={request.id} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+            {filteredRequests.map((request) => { const customer = customerMap.get(request.owner_id); const isOpen = deletableRequestStatuses.has(request.status); return <article key={request.id} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
               <Link href={`/owner/materials/requests/${request.id}`} className="min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc]"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">{request.title}</h2><span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${badgeTone(request.status)}`}>{request.status.replaceAll("_", " ")}</span></div><p className="mt-1 text-sm text-slate-600">{request.projects?.name || "Project"}{request.projects?.address ? ` · ${request.projects.address}` : ""}</p><p className="mt-2 text-xs text-slate-500">{customerName(customer)} · Updated {formatDate(request.updated_at)}</p><div className="mt-3 flex flex-wrap gap-2">{request.material_questionnaire_responses.length ? request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{response.category_name_snapshot}</span>) : <span className="text-xs font-semibold text-slate-400">No questionnaire</span>}</div></Link>
-              {isOpen ? <DeleteManagerRecordButton id={request.id} kind="request" label={request.title} /> : <span className="text-xs font-semibold text-slate-400">Completed requests are retained</span>}
+              {isOpen ? <DeleteManagerRecordButton id={request.id} kind="request" label={request.title} /> : <span className="text-xs font-semibold text-slate-400">Closed requests are retained</span>}
             </article> })}
             {filteredRequests.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No requests match these filters.</p> : null}
           </section>

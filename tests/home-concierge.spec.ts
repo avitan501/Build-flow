@@ -6,7 +6,7 @@ test("home presents the contractor material coordination service", async ({ page
   await expect(page).toHaveTitle("Avantia Build | You Build. We Handle the Materials.");
   await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", "Send your plans or material list. We compare suppliers, organize the order, and arrange jobsite delivery.");
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /\/opengraph-image\?/);
-  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "You Build. We Handle the Materials. | Avantia Build");
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "Avantia Build | Materials Priced & Delivered");
   await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
   await expect(page.locator('meta[property="og:image:height"]')).toHaveAttribute("content", "630");
   await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute("content", "Avantia Build");
