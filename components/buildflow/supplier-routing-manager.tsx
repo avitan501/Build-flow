@@ -3,7 +3,7 @@
 import { Plus, StickyNote, Trash2, X } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useRef, useState, useTransition } from "react"
-import { saveSupplierDirectoryEntryAction } from "@/app/admin/vendors/actions"
+import { deleteSupplierDirectoryEntryAction, saveSupplierDirectoryEntryAction } from "@/app/admin/vendors/actions"
 import { saveWorkflowManagerSettingsAction } from "@/app/preview-admin/workflow-actions"
 import { DepartmentSymbolBadges, DEPARTMENT_SYMBOL_OPTIONS } from "@/components/buildflow/department-symbol-badges"
 import { QuoCallButton } from "@/components/buildflow/quo-call-button"
@@ -427,21 +427,27 @@ export function SupplierRoutingManager({
 
   function removeSupplier(supplierId: string) {
     const nextSuppliers = settings.suppliers.filter((supplier) => supplier.id !== supplierId)
-    if (nextSuppliers.length === 0) return
     const supplier = settings.suppliers.find((entry) => entry.id === supplierId)
-    if (!window.confirm(`Remove ${supplier?.name || "this supplier"}? Its assignments will move to ${nextSuppliers[0].name}.`)) return
+    const assignmentMessage = nextSuppliers[0]
+      ? ` Its assignments will move to ${nextSuppliers[0].name}.`
+      : " The supplier directory will be empty."
+    if (!window.confirm(`Delete ${supplier?.name || "this supplier"}?${assignmentMessage} Sent request history will remain.`)) return
 
-    persist({
-      ...settings,
-      suppliers: nextSuppliers,
-      products: Object.fromEntries(
-        Object.entries(settings.products).map(([targetId, setting]) => [
-          targetId,
-          setting.supplierId === supplierId ? { ...setting, supplierId: nextSuppliers[0].id } : setting,
-        ]),
-      ),
+    setSupplierFormError("")
+    startSupplierSave(async () => {
+      const result = await deleteSupplierDirectoryEntryAction(supplierId)
+      if (!result.ok) {
+        setSupplierFormError(result.error)
+        return
+      }
+
+      const nextSettings = result.settings as ShopQualificationSettings
+      setSettings(nextSettings)
+      writeShopQualificationSettings(nextSettings)
+      setSelectedSupplierId(nextSettings.suppliers[0]?.id ?? "")
+      setSupplierDirty(false)
+      setDirectorySaveState("saved")
     })
-    setSelectedSupplierId(nextSuppliers[0].id)
   }
 
   function toggleSupplierDepartment(departmentSlug: string, checked: boolean) {

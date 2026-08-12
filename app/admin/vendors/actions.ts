@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { requireStaffProfile } from "@/lib/auth"
-import type { SupplierRoutingOption } from "@/lib/shop-qualification"
+import type { ShopQualificationSettings, SupplierRoutingOption } from "@/lib/shop-qualification"
 
 const JOB_ADDRESS = "280 Lawrence Ave, Lawrence, NY 11559"
 const MAX_MATERIAL_LIST_LENGTH = 20_000
@@ -14,6 +14,10 @@ type SendSupplierQuoteResult =
 
 type SaveSupplierResult =
   | { ok: true; supplier: SupplierRoutingOption }
+  | { ok: false; error: string }
+
+type DeleteSupplierResult =
+  | { ok: true; settings: ShopQualificationSettings }
   | { ok: false; error: string }
 
 function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | null {
@@ -56,6 +60,26 @@ export async function saveSupplierDirectoryEntryAction(input: {
 
   revalidatePath("/admin/vendors")
   return { ok: true, supplier: persisted as SupplierRoutingOption }
+}
+
+export async function deleteSupplierDirectoryEntryAction(supplierId: string): Promise<DeleteSupplierResult> {
+  const { supabase } = await requireStaffProfile("suppliers")
+  const normalizedId = supplierId.trim()
+  if (!normalizedId) return { ok: false, error: "Choose a supplier to delete." }
+
+  const { data: settings, error } = await supabase.rpc("staff_delete_supplier_directory_entry", {
+    p_supplier_id: normalizedId,
+  })
+
+  if (error || !settings) {
+    const message = error?.message || ""
+    if (message.includes("supplier_not_found")) return { ok: false, error: "This supplier was already deleted. Refreshing the directory will remove it from the screen." }
+    return { ok: false, error: "Could not delete this supplier. Please try again." }
+  }
+
+  revalidatePath("/admin/vendors")
+  revalidatePath("/admin/supplier-approvals")
+  return { ok: true, settings: settings as ShopQualificationSettings }
 }
 
 export async function sendSupplierQuoteRequestAction(input: {
