@@ -1,9 +1,9 @@
 "use client"
 
-import { Plus, StickyNote, Trash2, X } from "lucide-react"
+import { Plus, RefreshCw, StickyNote, Trash2, X } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useRef, useState, useTransition } from "react"
-import { deleteSupplierDirectoryEntryAction, saveSupplierDirectoryEntryAction } from "@/app/admin/vendors/actions"
+import { deleteSupplierDirectoryEntryAction, loadSupplierDirectoryAction, saveSupplierDirectoryEntryAction, saveSupplierRoutingProductsAction } from "@/app/admin/vendors/actions"
 import { saveWorkflowManagerSettingsAction } from "@/app/preview-admin/workflow-actions"
 import { DepartmentSymbolBadges, DEPARTMENT_SYMBOL_OPTIONS } from "@/components/buildflow/department-symbol-badges"
 import { QuoCallButton } from "@/components/buildflow/quo-call-button"
@@ -387,8 +387,8 @@ export function SupplierRoutingManager({
           setSupplierFormError(result.error)
           return
         }
-        setSettings((current) => ({ ...current, suppliers: [...current.suppliers.filter((entry) => entry.id !== result.supplier.id), result.supplier] }))
-        writeShopQualificationSettings({ ...settings, suppliers: [...settings.suppliers.filter((entry) => entry.id !== result.supplier.id), result.supplier] })
+        setSettings(result.settings)
+        writeShopQualificationSettings(result.settings)
         setSelectedSupplierId(result.supplier.id)
         setActivePanel("suppliers")
         setSupplierDirty(false)
@@ -416,7 +416,8 @@ export function SupplierRoutingManager({
           setSupplierFormError(result.error)
           return
         }
-        setSettings((current) => ({ ...current, suppliers: current.suppliers.map((entry) => entry.id === result.supplier.id ? result.supplier : entry) }))
+        setSettings(result.settings)
+        writeShopQualificationSettings(result.settings)
         setSupplierDirty(false)
         setDirectorySaveState("saved")
       } catch {
@@ -426,6 +427,10 @@ export function SupplierRoutingManager({
   }
 
   function removeSupplier(supplierId: string) {
+    if (supplierSavePending || directorySaveState === "saving") {
+      setSupplierFormError("Wait for the current save to finish, then delete the supplier.")
+      return
+    }
     const nextSuppliers = settings.suppliers.filter((supplier) => supplier.id !== supplierId)
     const supplier = settings.suppliers.find((entry) => entry.id === supplierId)
     const assignmentMessage = nextSuppliers[0]
@@ -470,7 +475,44 @@ export function SupplierRoutingManager({
       const current = selectedSettingFor(settings, target.id, assignmentTargets)
       nextProducts[target.id] = { ...current, productId: target.id, supplierId }
     }
-    persist({ ...settings, products: nextProducts })
+    const nextSettings = { ...settings, products: nextProducts }
+    if (!supplierDirectoryOnly) {
+      persist(nextSettings)
+      return
+    }
+
+    setSettings(nextSettings)
+    writeShopQualificationSettings(nextSettings)
+    setDirectorySaveState("saving")
+    setDirectorySaveError("")
+    startSupplierSave(async () => {
+      const result = await saveSupplierRoutingProductsAction(nextProducts)
+      if (!result.ok) {
+        setDirectorySaveState("error")
+        setDirectorySaveError(result.error)
+        return
+      }
+      setSettings(result.settings)
+      writeShopQualificationSettings(result.settings)
+      setDirectorySaveState("saved")
+    })
+  }
+
+  function refreshSupplierDirectory() {
+    if (supplierSavePending || directorySaveState === "saving") return
+    setSupplierFormError("")
+    startSupplierSave(async () => {
+      const result = await loadSupplierDirectoryAction()
+      if (!result.ok) {
+        setSupplierFormError(result.error)
+        return
+      }
+      setSettings(result.settings)
+      writeShopQualificationSettings(result.settings)
+      setSelectedSupplierId((current) => result.settings.suppliers.some((supplier) => supplier.id === current) ? current : result.settings.suppliers[0]?.id ?? "")
+      setSupplierDirty(false)
+      setDirectorySaveState("idle")
+    })
   }
 
   function addCategory() {
@@ -1004,7 +1046,12 @@ export function SupplierRoutingManager({
           {activePanel === "suppliers" ? (
             <section className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
               <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_42px_rgba(15,23,42,0.07)]">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-700">Supplier directory</p>
+                  <button type="button" onClick={refreshSupplierDirectory} disabled={supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${supplierSavePending ? "animate-spin" : ""}`} />Refresh</button>
+                </div>
                 <div className="grid gap-2">
+                  {settings.suppliers.length === 0 ? <div className="rounded-[18px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center"><p className="text-sm font-semibold text-slate-800">No suppliers in the directory</p><p className="mt-1 text-xs leading-5 text-slate-500">Add your first supplier below. Sent request history remains separate.</p></div> : null}
                   {settings.suppliers.map((supplier) => (
                     <button
                       key={supplier.id}
@@ -1049,7 +1096,7 @@ export function SupplierRoutingManager({
                           directoryReady={!supplierDirty && !supplierSavePending && directorySaveState !== "saving" && directorySaveState !== "error"}
                           directoryStatus={supplierDirty ? "Save supplier changes before sending a quote." : supplierSavePending ? "Saving supplier changes..." : directorySaveState === "saving" ? "Saving the latest supplier changes..." : directorySaveError || undefined}
                         />
-                        <button type="button" onClick={() => removeSupplier(selectedSupplier.id)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700"><Trash2 className="h-4 w-4" />Delete supplier</button>
+                        <button type="button" onClick={() => removeSupplier(selectedSupplier.id)} disabled={supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 disabled:cursor-wait disabled:opacity-50"><Trash2 className="h-4 w-4" />{supplierSavePending ? "Working..." : "Delete supplier"}</button>
                       </div>
                     </div>
                     {directorySaveState !== "idle" ? (

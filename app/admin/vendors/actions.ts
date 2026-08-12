@@ -13,10 +13,14 @@ type SendSupplierQuoteResult =
   | { ok: false; error: string }
 
 type SaveSupplierResult =
-  | { ok: true; supplier: SupplierRoutingOption }
+  | { ok: true; supplier: SupplierRoutingOption; settings: ShopQualificationSettings }
   | { ok: false; error: string }
 
 type DeleteSupplierResult =
+  | { ok: true; settings: ShopQualificationSettings }
+  | { ok: false; error: string }
+
+type LoadSupplierDirectoryResult =
   | { ok: true; settings: ShopQualificationSettings }
   | { ok: false; error: string }
 
@@ -58,8 +62,45 @@ export async function saveSupplierDirectoryEntryAction(input: {
     return { ok: false, error: "Could not save the supplier. Refresh the page and try again." }
   }
 
+  const { data: managerState, error: loadError } = await supabase
+    .from("workflow_manager_settings")
+    .select("state")
+    .eq("id", "singleton")
+    .maybeSingle<{ state: { qualificationSettings?: ShopQualificationSettings } }>()
+  const settings = managerState?.state?.qualificationSettings
+  if (loadError || !settings) return { ok: false, error: "The supplier saved, but the directory could not refresh. Reload the page." }
+
   revalidatePath("/admin/vendors")
-  return { ok: true, supplier: persisted as SupplierRoutingOption }
+  return { ok: true, supplier: persisted as SupplierRoutingOption, settings }
+}
+
+export async function loadSupplierDirectoryAction(): Promise<LoadSupplierDirectoryResult> {
+  const { supabase } = await requireStaffProfile("suppliers")
+  const { data, error } = await supabase
+    .from("workflow_manager_settings")
+    .select("state")
+    .eq("id", "singleton")
+    .maybeSingle<{ state: { qualificationSettings?: ShopQualificationSettings } }>()
+  const settings = data?.state?.qualificationSettings
+  if (error || !settings) return { ok: false, error: "Could not refresh the supplier directory." }
+  return { ok: true, settings }
+}
+
+export async function saveSupplierRoutingProductsAction(
+  products: ShopQualificationSettings["products"],
+): Promise<LoadSupplierDirectoryResult> {
+  const { supabase } = await requireStaffProfile("suppliers")
+  const { data: settings, error } = await supabase.rpc("staff_update_supplier_routing_products", {
+    p_products: products,
+  })
+  if (error || !settings) {
+    const message = error?.message || ""
+    if (message.includes("supplier_not_found")) return { ok: false, error: "That supplier was removed. Refresh the directory and choose another supplier." }
+    return { ok: false, error: "Could not save department routing." }
+  }
+  revalidatePath("/admin/vendors")
+  revalidatePath("/admin/supplier-approvals")
+  return { ok: true, settings: settings as ShopQualificationSettings }
 }
 
 export async function deleteSupplierDirectoryEntryAction(supplierId: string): Promise<DeleteSupplierResult> {
