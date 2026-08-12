@@ -33,6 +33,7 @@ function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | nu
     portalUrl: input.portalUrl?.trim().slice(0, 500) || "",
     deliveryNotes: input.deliveryNotes?.trim().slice(0, 4_000) || "",
     notes: input.notes?.trim().slice(0, 4_000) || "",
+    trustLevel: input.trustLevel || "not-reviewed",
   }
 }
 
@@ -61,7 +62,7 @@ export async function sendSupplierQuoteRequestAction(input: {
   supplierId: string
   materialList: string
 }): Promise<SendSupplierQuoteResult> {
-  const { supabase, user } = await requireStaffProfile("suppliers")
+  const { supabase } = await requireStaffProfile("suppliers")
   const supplierId = input.supplierId.trim()
   const materialList = input.materialList.trim()
 
@@ -69,51 +70,31 @@ export async function sendSupplierQuoteRequestAction(input: {
   if (!materialList) return { ok: false, error: "Paste or enter the material list." }
   if (materialList.length > MAX_MATERIAL_LIST_LENGTH) return { ok: false, error: "The material list is too long." }
 
-  const { data: settings, error: settingsError } = await supabase
-    .from("workflow_manager_settings")
-    .select("state")
-    .eq("id", "singleton")
-    .maybeSingle<{ state: { qualificationSettings?: { suppliers?: SupplierRoutingOption[] } } }>()
-  if (settingsError) return { ok: false, error: "Could not load the supplier directory." }
-  const supplier = settings?.state?.qualificationSettings?.suppliers?.find((item) => item.id === supplierId)
-  if (!supplier) return { ok: false, error: "This supplier is no longer in the directory." }
-
-  const supplierEmail = supplier.email?.trim().toLowerCase() || ""
-  if (!/^\S+@\S+\.\S+$/.test(supplierEmail)) {
-    return { ok: false, error: "Add a valid email to this supplier before sending a request." }
+  const { data: requestId, error: insertError } = await supabase.rpc(
+    "staff_create_supplier_quote_request",
+    { p_supplier_id: supplierId, p_material_list: materialList, p_job_address: JOB_ADDRESS },
+  )
+  if (insertError || !requestId) {
+    const message = insertError?.message || ""
+    if (message.includes("supplier_not_found")) return { ok: false, error: "Refresh the supplier directory and try again." }
+    if (message.includes("supplier_email_required")) return { ok: false, error: "Add a valid email to this supplier before sending a request." }
+    return { ok: false, error: "Could not create the supplier request. Please try again." }
   }
 
-  const subject = `Quote Request - ${JOB_ADDRESS}`
-  const { data: request, error: insertError } = await supabase
-    .from("supplier_quote_requests")
-    .insert({
-      supplier_id: supplier.id,
-      supplier_name: supplier.name,
-      supplier_email: supplierEmail,
-      job_address: JOB_ADDRESS,
-      subject,
-      material_list: materialList,
-      status: "sending",
-      sent_by: user.id,
-    })
-    .select("id")
-    .single<{ id: string }>()
-  if (insertError || !request) return { ok: false, error: "Could not create the supplier request." }
-
   const { data: delivery, error: deliveryError } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>("send-supplier-quote", {
-    body: { requestId: request.id },
+    body: { requestId },
   })
 
   if (!deliveryError && delivery?.ok) {
     revalidatePath("/admin/supplier-requests")
-    return { ok: true, requestId: request.id }
+    return { ok: true, requestId: requestId as string }
   }
 
   const error = delivery?.error || deliveryError?.message || "The supplier email could not be sent."
   await supabase
     .from("supplier_quote_requests")
     .update({ status: "failed", error_message: error })
-    .eq("id", request.id)
+    .eq("id", requestId)
   revalidatePath("/admin/supplier-requests")
   return { ok: false, error }
 }

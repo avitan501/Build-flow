@@ -3,6 +3,7 @@ import type { ShopToolSlug } from "@/lib/shop-tools"
 
 export type QualifyingQuestionType = "text" | "textarea" | "select"
 export type SupplierDeliveryMethod = "email" | "phone" | "whatsapp" | "sms" | "portal" | "manual"
+export type SupplierTrustLevel = "not-reviewed" | "first-time" | "verified" | "trusted" | "preferred" | "do-not-use"
 
 export type QualifyingQuestion = {
   id: string
@@ -24,6 +25,7 @@ export type SupplierRoutingOption = {
   preferredDeliveryMethod?: SupplierDeliveryMethod
   deliveryNotes?: string
   notes?: string
+  trustLevel?: SupplierTrustLevel
 }
 
 export type ProductQualificationSetting = {

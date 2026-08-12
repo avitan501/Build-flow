@@ -37,6 +37,7 @@ import {
   type ShopQualificationSettings,
   type SupplierDeliveryMethod,
   type SupplierRoutingOption,
+  type SupplierTrustLevel,
 } from "@/lib/shop-qualification"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import { filterProductsForShopTool, SHOP_TOOL_CATEGORIES, type DepartmentSymbolKey, type ShopToolSlug } from "@/lib/shop-tools"
@@ -53,6 +54,14 @@ type SupplierRoutingManagerProps = {
 
 const questionTypes: QualifyingQuestionType[] = ["text", "textarea", "select"]
 const deliveryMethods: SupplierDeliveryMethod[] = ["email", "phone", "whatsapp", "sms", "portal", "manual"]
+const trustLevels: Array<{ value: SupplierTrustLevel; label: string }> = [
+  { value: "not-reviewed", label: "Not reviewed" },
+  { value: "first-time", label: "First-time trial" },
+  { value: "verified", label: "Verified" },
+  { value: "trusted", label: "Trusted" },
+  { value: "preferred", label: "Preferred" },
+  { value: "do-not-use", label: "Do not use" },
+]
 
 function loadSettings(initial?: ShopQualificationSettings | null): ShopQualificationSettings {
   if (initial) return initial
@@ -104,6 +113,10 @@ function supplierReachLine(supplier: SupplierRoutingOption) {
   if (supplier.phone) return supplier.phone
   if (supplier.whatsapp) return supplier.whatsapp
   return supplier.contactLabel || "Contact not set"
+}
+
+function trustLevelLabel(level: SupplierTrustLevel | undefined) {
+  return trustLevels.find((item) => item.value === level)?.label || "Not reviewed"
 }
 
 function selectedSettingFor(settings: ShopQualificationSettings, targetId: string, targets = SERVICE_ASSIGNMENT_TARGETS) {
@@ -178,6 +191,7 @@ export function SupplierRoutingManager({
     preferredDeliveryMethod: "manual" as SupplierDeliveryMethod,
     deliveryNotes: "",
     notes: "",
+    trustLevel: "not-reviewed" as SupplierTrustLevel,
   })
   const [questionLabel, setQuestionLabel] = useState("")
   const [questionType, setQuestionType] = useState<QualifyingQuestionType>("text")
@@ -362,6 +376,7 @@ export function SupplierRoutingManager({
       preferredDeliveryMethod: supplierDraft.preferredDeliveryMethod,
       deliveryNotes: supplierDraft.deliveryNotes.trim(),
       notes: supplierDraft.notes.trim(),
+      trustLevel: supplierDraft.trustLevel,
     }
 
     setSupplierFormError("")
@@ -378,7 +393,7 @@ export function SupplierRoutingManager({
         setActivePanel("suppliers")
         setSupplierDirty(false)
         setDirectorySaveState("saved")
-        setSupplierDraft({ name: "", contactName: "", email: "", phone: "", whatsapp: "", portalUrl: "", preferredDeliveryMethod: "manual", deliveryNotes: "", notes: "" })
+        setSupplierDraft({ name: "", contactName: "", email: "", phone: "", whatsapp: "", portalUrl: "", preferredDeliveryMethod: "manual", deliveryNotes: "", notes: "", trustLevel: "not-reviewed" })
         setSupplierDraftNotesOpen(false)
         setSupplierAddOpen(false)
       } catch {
@@ -987,6 +1002,7 @@ export function SupplierRoutingManager({
                     >
                       <span className="block text-sm font-semibold">{supplier.name}</span>
                       <span className={`mt-1 block text-xs ${supplier.id === selectedSupplier?.id ? "text-slate-300" : "text-slate-500"}`}>{methodLabel(supplier.preferredDeliveryMethod)} · {supplierReachLine(supplier)}</span>
+                      <span className={`mt-1 block text-[11px] font-semibold ${supplier.id === selectedSupplier?.id ? "text-sky-200" : "text-sky-700"}`}>{trustLevelLabel(supplier.trustLevel)}</span>
                     </button>
                   ))}
                   <button
@@ -1059,6 +1075,12 @@ export function SupplierRoutingManager({
                         Preferred delivery method
                         <select value={selectedSupplier.preferredDeliveryMethod || "manual"} onChange={(event) => updateSupplier(selectedSupplier.id, { preferredDeliveryMethod: event.target.value as SupplierDeliveryMethod })} className="min-h-12 rounded-2xl border border-slate-300 bg-white px-4 text-sm font-medium">
                           {deliveryMethods.map((method) => <option key={method} value={method}>{methodLabel(method)}</option>)}
+                        </select>
+                      </label>
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900">
+                        Trust level
+                        <select value={selectedSupplier.trustLevel || "not-reviewed"} onChange={(event) => updateSupplier(selectedSupplier.id, { trustLevel: event.target.value as SupplierTrustLevel })} className="min-h-12 rounded-2xl border border-slate-300 bg-white px-4 text-sm font-medium">
+                          {trustLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
                         </select>
                       </label>
                       <label className="grid gap-2 text-sm font-semibold text-slate-900 sm:col-span-2">
@@ -1144,6 +1166,7 @@ export function SupplierRoutingManager({
                       <label className="grid gap-2 text-sm font-semibold text-slate-900">Email <span className="text-xs font-normal text-slate-500">Optional</span><input type="email" value={supplierDraft.email} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, email: event.target.value }))} placeholder="name@supplier.com" className="min-h-12 rounded-xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
                       <label className="grid gap-2 text-sm font-semibold text-slate-900">WhatsApp <input inputMode="tel" value={supplierDraft.whatsapp} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, whatsapp: event.target.value }))} placeholder="WhatsApp number" className="min-h-12 rounded-xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
                       <label className="grid gap-2 text-sm font-semibold text-slate-900">Best way to contact <select value={supplierDraft.preferredDeliveryMethod} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, preferredDeliveryMethod: event.target.value as SupplierDeliveryMethod }))} className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium">{deliveryMethods.map((method) => <option key={method} value={method}>{methodLabel(method)}</option>)}</select></label>
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900">Trust level <select value={supplierDraft.trustLevel} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, trustLevel: event.target.value as SupplierTrustLevel }))} className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium">{trustLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}</select></label>
                       <label className="grid gap-2 text-sm font-semibold text-slate-900 sm:col-span-2">Supplier portal URL <span className="text-xs font-normal text-slate-500">Optional</span><input type="url" value={supplierDraft.portalUrl} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, portalUrl: event.target.value }))} placeholder="https://" className="min-h-12 rounded-xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
                       <label className="grid gap-2 text-sm font-semibold text-slate-900 sm:col-span-2">Delivery or contact instructions <span className="text-xs font-normal text-slate-500">Optional</span><textarea value={supplierDraft.deliveryNotes} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, deliveryNotes: event.target.value }))} rows={3} placeholder="Best hours, quote process, delivery area, or other instructions" className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
                       <div className="sm:col-span-2">
