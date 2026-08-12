@@ -321,7 +321,7 @@ export function readShopQualificationSettings(): ShopQualificationSettings {
 
     const settings = parsed as Partial<ShopQualificationSettings>
     return {
-      suppliers: Array.isArray(settings.suppliers) && settings.suppliers.length > 0 ? settings.suppliers.map(normalizeSupplierContact) : DEFAULT_SUPPLIERS,
+      suppliers: Array.isArray(settings.suppliers) ? settings.suppliers.map(normalizeSupplierContact) : DEFAULT_SUPPLIERS,
       products: settings.products && typeof settings.products === "object" ? settings.products : {},
     }
   } catch {
