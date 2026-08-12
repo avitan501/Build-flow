@@ -1,6 +1,6 @@
 "use client"
 
-import { Plus, RefreshCw, StickyNote, Trash2, X } from "lucide-react"
+import { Check, Plus, RefreshCw, Search, StickyNote, Trash2, X } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useRef, useState, useTransition } from "react"
 import { deleteSupplierDirectoryEntryAction, loadSupplierDirectoryAction, saveSupplierDirectoryEntryAction, saveSupplierRoutingProductsAction } from "@/app/admin/vendors/actions"
@@ -41,6 +41,13 @@ import {
 } from "@/lib/shop-qualification"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import { filterProductsForShopTool, SHOP_TOOL_CATEGORIES, type DepartmentSymbolKey, type ShopToolSlug } from "@/lib/shop-tools"
+import {
+  TRIAL_VENDOR_DEPARTMENTS,
+  TRIAL_VENDOR_ENTRIES,
+  TRIAL_VENDOR_ENTRY_COUNT,
+  TRIAL_VENDOR_UNIQUE_COUNT,
+  type TrialVendorEntry,
+} from "@/lib/trial-vendors"
 
 type ManagerPanel = "services" | "departments" | "suppliers"
 type DepartmentItemKind = "product" | "file-upload"
@@ -83,6 +90,17 @@ function parseDepartmentItemList(value: string) {
 
 function makeId(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "item"
+}
+
+function normalizeVendorIdentity(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "")
+}
+
+function mergePersistedSupplier(settings: ShopQualificationSettings, supplier: SupplierRoutingOption): ShopQualificationSettings {
+  return {
+    ...settings,
+    suppliers: [...settings.suppliers.filter((entry) => entry.id !== supplier.id), supplier],
+  }
 }
 
 function nextQuestionId(label: string, questions: QualifyingQuestion[]) {
@@ -177,6 +195,10 @@ export function SupplierRoutingManager({
   const [supplierFormError, setSupplierFormError] = useState("")
   const [supplierSavePending, startSupplierSave] = useTransition()
   const [supplierAddOpen, setSupplierAddOpen] = useState(false)
+  const [trialCatalogOpen, setTrialCatalogOpen] = useState(false)
+  const [trialDepartment, setTrialDepartment] = useState("All departments")
+  const [trialSearch, setTrialSearch] = useState("")
+  const [trialCatalogStatus, setTrialCatalogStatus] = useState("")
   const [supplierDraftNotesOpen, setSupplierDraftNotesOpen] = useState(false)
   const [supplierNotesOpen, setSupplierNotesOpen] = useState<Record<string, boolean>>({})
   const pendingSaveRef = useRef<{ qualificationSettings: ShopQualificationSettings; addOns: ManagerCatalogAddOns } | null>(null)
@@ -238,6 +260,18 @@ export function SupplierRoutingManager({
       : assignmentTargets.find((target) => target.id === selectedTargetId) ?? assignmentTargets[0] ?? SERVICE_ASSIGNMENT_TARGETS[0]
   const selectedSetting = useMemo(() => selectedSettingFor(settings, selectedTarget.id, assignmentTargets), [assignmentTargets, selectedTarget.id, settings])
   const selectedSupplier = settings.suppliers.find((supplier) => supplier.id === selectedSupplierId) ?? settings.suppliers[0] ?? null
+  const existingVendorIdentities = useMemo(
+    () => new Set(settings.suppliers.flatMap((supplier) => [normalizeVendorIdentity(supplier.name), supplier.email ? normalizeVendorIdentity(supplier.email) : ""]).filter(Boolean)),
+    [settings.suppliers],
+  )
+  const filteredTrialEntries = useMemo(() => {
+    const query = trialSearch.trim().toLowerCase()
+    return TRIAL_VENDOR_ENTRIES.filter((entry) => {
+      if (trialDepartment !== "All departments" && entry.department !== trialDepartment) return false
+      if (!query) return true
+      return [entry.name, entry.department, entry.materials, entry.address].some((value) => value.toLowerCase().includes(query))
+    })
+  }, [trialDepartment, trialSearch])
   const shopDepartments = useMemo(() => applyDepartmentAddOns(SHOP_TOOL_CATEGORIES, addOns), [addOns])
   const selectedSupplierDepartments = useMemo(() => shopDepartments.filter((department) => {
     const explicit = settings.products[departmentRouteId(department.slug)]
@@ -387,8 +421,11 @@ export function SupplierRoutingManager({
           setSupplierFormError(result.error)
           return
         }
-        setSettings(result.settings)
-        writeShopQualificationSettings(result.settings)
+        setSettings((current) => {
+          const next = mergePersistedSupplier(current, result.supplier)
+          writeShopQualificationSettings(next)
+          return next
+        })
         setSelectedSupplierId(result.supplier.id)
         setActivePanel("suppliers")
         setSupplierDirty(false)
@@ -416,12 +453,86 @@ export function SupplierRoutingManager({
           setSupplierFormError(result.error)
           return
         }
-        setSettings(result.settings)
-        writeShopQualificationSettings(result.settings)
+        setSettings((current) => {
+          const next = mergePersistedSupplier(current, result.supplier)
+          writeShopQualificationSettings(next)
+          return next
+        })
         setSupplierDirty(false)
         setDirectorySaveState("saved")
       } catch {
         setSupplierFormError("The server could not save these changes. Please try again.")
+      }
+    })
+  }
+
+  function addTrialVendor(entry: TrialVendorEntry) {
+    if (supplierDirty) {
+      setTrialCatalogStatus("Save the current supplier changes before adding a trial vendor.")
+      return
+    }
+    if (supplierSavePending || directorySaveState === "saving") return
+
+    const catalogDepartments = [...new Set(TRIAL_VENDOR_ENTRIES.filter((candidate) => candidate.sourceId === entry.sourceId).map((candidate) => candidate.department))]
+    const supplier: SupplierRoutingOption = {
+      id: `trial-${entry.sourceId}`,
+      name: entry.name,
+      contactLabel: entry.email || entry.phone || "Supplier contact",
+      email: entry.email,
+      phone: entry.phone,
+      portalUrl: entry.website,
+      preferredDeliveryMethod: "email",
+      deliveryNotes: "Confirm stock, lead time, delivery terms, and return policy before assigning customer requests.",
+      notes: "Imported from the screened Long Island material-only supplier directory.",
+      trustLevel: "first-time",
+      catalogDepartments,
+      address: entry.address,
+      materials: entry.materials,
+    }
+
+    setTrialCatalogStatus("")
+    startSupplierSave(async () => {
+      try {
+        const result = await saveSupplierDirectoryEntryAction({ supplier, create: true })
+        if (!result.ok) {
+          setTrialCatalogStatus(result.error)
+          return
+        }
+        setSettings((current) => {
+          const next = mergePersistedSupplier(current, result.supplier)
+          writeShopQualificationSettings(next)
+          return next
+        })
+        setSelectedSupplierId(result.supplier.id)
+        setSupplierDirty(false)
+        setDirectorySaveState("saved")
+        setTrialCatalogStatus(`${result.supplier.name} was added as a first-time trial vendor.`)
+      } catch {
+        setTrialCatalogStatus("The server could not add this trial vendor. Please try again.")
+      }
+    })
+  }
+
+  function keepSupplier(supplier: SupplierRoutingOption) {
+    if (supplierSavePending || directorySaveState === "saving") return
+    const keptSupplier = { ...supplier, trustLevel: "verified" as SupplierTrustLevel }
+    setSupplierFormError("")
+    startSupplierSave(async () => {
+      try {
+        const result = await saveSupplierDirectoryEntryAction({ supplier: keptSupplier })
+        if (!result.ok) {
+          setSupplierFormError(result.error)
+          return
+        }
+        setSettings((current) => {
+          const next = mergePersistedSupplier(current, result.supplier)
+          writeShopQualificationSettings(next)
+          return next
+        })
+        setSupplierDirty(false)
+        setDirectorySaveState("saved")
+      } catch {
+        setSupplierFormError("The server could not keep this supplier. Please try again.")
       }
     })
   }
@@ -1075,6 +1186,17 @@ export function SupplierRoutingManager({
                     <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm"><Plus className="h-4 w-4" /></span>
                     <span><span className="block text-sm font-semibold">Add supplier</span><span className="mt-0.5 block text-xs text-sky-700">Create a new directory entry</span></span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTrialCatalogStatus("")
+                      setTrialCatalogOpen(true)
+                    }}
+                    className="flex min-h-14 items-center gap-3 rounded-[18px] border border-slate-300 bg-white px-4 py-3 text-left text-slate-900 transition hover:border-emerald-400 hover:bg-emerald-50"
+                  >
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800"><Search className="h-4 w-4" /></span>
+                    <span><span className="block text-sm font-semibold">Add trial vendors</span><span className="mt-0.5 block text-xs text-slate-600">Browse {TRIAL_VENDOR_ENTRY_COUNT} department entries</span></span>
+                  </button>
                 </div>
               </section>
 
@@ -1084,8 +1206,12 @@ export function SupplierRoutingManager({
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Supplier profile</p>
-                        <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{selectedSupplier.name}</h3>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <h3 className="text-2xl font-semibold tracking-tight text-slate-950">{selectedSupplier.name}</h3>
+                          {selectedSupplier.trustLevel === "first-time" ? <span className="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-bold uppercase text-amber-900">Trial</span> : null}
+                        </div>
                         <p className="mt-2 text-sm leading-6 text-slate-500">This is private manager data used for routing approved reports.</p>
+                        {selectedSupplier.catalogDepartments?.length ? <p className="mt-2 text-xs font-semibold text-slate-600">Catalog departments: {selectedSupplier.catalogDepartments.join(", ")}</p> : null}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <QuoCallButton phone={selectedSupplier.phone || selectedSupplier.whatsapp || null} supplierName={selectedSupplier.name} />
@@ -1096,6 +1222,7 @@ export function SupplierRoutingManager({
                           directoryReady={!supplierDirty && !supplierSavePending && directorySaveState !== "saving" && directorySaveState !== "error"}
                           directoryStatus={supplierDirty ? "Save supplier changes before sending a quote." : supplierSavePending ? "Saving supplier changes..." : directorySaveState === "saving" ? "Saving the latest supplier changes..." : directorySaveError || undefined}
                         />
+                        {selectedSupplier.trustLevel === "first-time" ? <button type="button" onClick={() => keepSupplier(selectedSupplier)} disabled={supplierDirty || supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-50"><Check className="h-4 w-4" />Keep vendor</button> : null}
                         <button type="button" onClick={() => removeSupplier(selectedSupplier.id)} disabled={supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 disabled:cursor-wait disabled:opacity-50"><Trash2 className="h-4 w-4" />{supplierSavePending ? "Working..." : "Delete supplier"}</button>
                       </div>
                     </div>
@@ -1129,6 +1256,14 @@ export function SupplierRoutingManager({
                       <label className="grid gap-2 text-sm font-semibold text-slate-900">
                         Supplier portal URL
                         <input value={selectedSupplier.portalUrl || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { portalUrl: event.target.value })} className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
+                      </label>
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900 sm:col-span-2">
+                        Address
+                        <input value={selectedSupplier.address || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { address: event.target.value })} className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
+                      </label>
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900 sm:col-span-2">
+                        Materials sold
+                        <textarea value={selectedSupplier.materials || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { materials: event.target.value })} rows={3} className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
                       <label className="grid gap-2 text-sm font-semibold text-slate-900">
                         Preferred delivery method
@@ -1211,6 +1346,70 @@ export function SupplierRoutingManager({
                 ) : null}
 
               </section>
+
+              {trialCatalogOpen ? (
+                <div className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-950/45 p-3 backdrop-blur-[2px] sm:items-center" role="dialog" aria-modal="true" aria-labelledby="trial-vendor-catalog-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !supplierSavePending) setTrialCatalogOpen(false) }}>
+                  <section className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-[22px] bg-white shadow-[0_28px_80px_rgba(15,23,42,0.35)]">
+                    <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700">Trial vendor catalog</p>
+                        <h2 id="trial-vendor-catalog-title" className="mt-1 text-xl font-bold text-slate-950">Choose a trial vendor</h2>
+                        <p className="mt-1 text-sm text-slate-500">{TRIAL_VENDOR_ENTRY_COUNT} department entries · {TRIAL_VENDOR_UNIQUE_COUNT} unique material suppliers · 9 departments</p>
+                      </div>
+                      <button type="button" onClick={() => setTrialCatalogOpen(false)} disabled={supplierSavePending} aria-label="Close trial vendor catalog" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40"><X className="h-5 w-5" /></button>
+                    </header>
+
+                    <div className="shrink-0 border-b border-slate-200 p-4 sm:px-6">
+                      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_15rem]">
+                        <label className="relative block">
+                          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          <span className="sr-only">Search trial vendors</span>
+                          <input value={trialSearch} onChange={(event) => setTrialSearch(event.target.value)} placeholder="Search supplier, materials, or location" className="min-h-11 w-full rounded-lg border border-slate-300 pl-10 pr-4 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100" />
+                        </label>
+                        <label>
+                          <span className="sr-only">Filter trial vendors by department</span>
+                          <select value={trialDepartment} onChange={(event) => setTrialDepartment(event.target.value)} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium">
+                            <option>All departments</option>
+                            {TRIAL_VENDOR_DEPARTMENTS.map((department) => <option key={department}>{department}</option>)}
+                          </select>
+                        </label>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-slate-600">Showing {filteredTrialEntries.length} entries</p>
+                        {trialCatalogStatus ? <p role="status" className={`text-xs font-semibold ${trialCatalogStatus.includes("added") ? "text-emerald-700" : "text-rose-700"}`}>{trialCatalogStatus}</p> : null}
+                      </div>
+                    </div>
+
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                      {filteredTrialEntries.map((entry) => {
+                        const added = existingVendorIdentities.has(normalizeVendorIdentity(entry.name)) || existingVendorIdentities.has(normalizeVendorIdentity(entry.email))
+                        return (
+                          <div key={`${entry.department}:${entry.sourceId}`} className="grid gap-3 border-b border-slate-200 p-4 last:border-b-0 sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_auto] sm:items-center sm:px-6">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-sm font-bold text-slate-950">{entry.name}</h3>
+                                <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-700">{entry.department}</span>
+                              </div>
+                              <p className="mt-1 text-xs leading-5 text-slate-500">{entry.address}</p>
+                              <p className="mt-1 text-xs text-slate-600">{entry.phone} · {entry.email}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs leading-5 text-slate-700">{entry.materials}</p>
+                              <a href={entry.website} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs font-semibold text-sky-700 hover:underline">Open supplier website</a>
+                            </div>
+                            {added ? (
+                              <span className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-emerald-50 px-3 text-xs font-bold text-emerald-800"><Check className="h-4 w-4" />Already added</span>
+                            ) : (
+                              <button type="button" onClick={() => addTrialVendor(entry)} disabled={supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-3 text-xs font-bold text-white disabled:cursor-wait disabled:bg-slate-300"><Plus className="h-4 w-4" />{supplierSavePending ? "Adding..." : "Add as trial"}</button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <footer className="shrink-0 border-t border-slate-200 bg-white px-5 py-4 text-right sm:px-6"><button type="button" onClick={() => setTrialCatalogOpen(false)} disabled={supplierSavePending} className="min-h-11 rounded-lg border border-slate-300 px-5 text-sm font-semibold text-slate-700 disabled:opacity-40">Done</button></footer>
+                  </section>
+                </div>
+              ) : null}
 
               {supplierAddOpen ? (
                 <div className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-950/45 p-3 backdrop-blur-[2px] sm:items-center" role="dialog" aria-modal="true" aria-labelledby="add-supplier-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !supplierSavePending) setSupplierAddOpen(false) }}>

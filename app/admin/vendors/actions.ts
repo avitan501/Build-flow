@@ -13,7 +13,7 @@ type SendSupplierQuoteResult =
   | { ok: false; error: string }
 
 type SaveSupplierResult =
-  | { ok: true; supplier: SupplierRoutingOption; settings: ShopQualificationSettings }
+  | { ok: true; supplier: SupplierRoutingOption }
   | { ok: false; error: string }
 
 type DeleteSupplierResult =
@@ -42,6 +42,9 @@ function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | nu
     deliveryNotes: input.deliveryNotes?.trim().slice(0, 4_000) || "",
     notes: input.notes?.trim().slice(0, 4_000) || "",
     trustLevel: input.trustLevel || "not-reviewed",
+    catalogDepartments: Array.isArray(input.catalogDepartments) ? input.catalogDepartments.map((department) => department.trim().slice(0, 100)).filter(Boolean).slice(0, 20) : [],
+    address: input.address?.trim().slice(0, 500) || "",
+    materials: input.materials?.trim().slice(0, 2_000) || "",
   }
 }
 
@@ -62,16 +65,8 @@ export async function saveSupplierDirectoryEntryAction(input: {
     return { ok: false, error: "Could not save the supplier. Refresh the page and try again." }
   }
 
-  const { data: managerState, error: loadError } = await supabase
-    .from("workflow_manager_settings")
-    .select("state")
-    .eq("id", "singleton")
-    .maybeSingle<{ state: { qualificationSettings?: ShopQualificationSettings } }>()
-  const settings = managerState?.state?.qualificationSettings
-  if (loadError || !settings) return { ok: false, error: "The supplier saved, but the directory could not refresh. Reload the page." }
-
   revalidatePath("/admin/vendors")
-  return { ok: true, supplier: persisted as SupplierRoutingOption, settings }
+  return { ok: true, supplier: persisted as SupplierRoutingOption }
 }
 
 export async function loadSupplierDirectoryAction(): Promise<LoadSupplierDirectoryResult> {
