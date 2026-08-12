@@ -41,6 +41,7 @@ import {
 } from "@/lib/shop-qualification"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import { filterProductsForShopTool, SHOP_TOOL_CATEGORIES, type DepartmentSymbolKey, type ShopToolSlug } from "@/lib/shop-tools"
+import { supplierMatchesDirectorySearch } from "@/lib/supplier-directory-search"
 import {
   TRIAL_VENDOR_DEPARTMENTS,
   TRIAL_VENDOR_ENTRIES,
@@ -202,6 +203,7 @@ export function SupplierRoutingManager({
   const [trialCatalogOpen, setTrialCatalogOpen] = useState(false)
   const [trialDepartment, setTrialDepartment] = useState("All departments")
   const [trialSearch, setTrialSearch] = useState("")
+  const [supplierDirectorySearch, setSupplierDirectorySearch] = useState("")
   const [trialCatalogStatus, setTrialCatalogStatus] = useState("")
   const [supplierDraftNotesOpen, setSupplierDraftNotesOpen] = useState(false)
   const [supplierNotesOpen, setSupplierNotesOpen] = useState<Record<string, boolean>>({})
@@ -264,6 +266,12 @@ export function SupplierRoutingManager({
       : assignmentTargets.find((target) => target.id === selectedTargetId) ?? assignmentTargets[0] ?? SERVICE_ASSIGNMENT_TARGETS[0]
   const selectedSetting = useMemo(() => selectedSettingFor(settings, selectedTarget.id, assignmentTargets), [assignmentTargets, selectedTarget.id, settings])
   const selectedSupplier = settings.suppliers.find((supplier) => supplier.id === selectedSupplierId) ?? settings.suppliers[0] ?? null
+  const filteredDirectorySuppliers = useMemo(
+    () => settings.suppliers.filter((supplier) => supplierMatchesDirectorySearch(supplier, supplierDirectorySearch)),
+    [settings.suppliers, supplierDirectorySearch],
+  )
+  const selectedSupplierMatchesSearch = !supplierDirectorySearch.trim()
+    || filteredDirectorySuppliers.some((supplier) => supplier.id === selectedSupplier?.id)
   const existingVendorIdentities = useMemo(
     () => new Set(settings.suppliers.flatMap((supplier) => [normalizeVendorIdentity(supplier.name), supplier.email ? normalizeVendorIdentity(supplier.email) : ""]).filter(Boolean)),
     [settings.suppliers],
@@ -394,6 +402,12 @@ export function SupplierRoutingManager({
     }))
     setSupplierDirty(true)
     setSupplierFormError("")
+  }
+
+  function updateSupplierDirectorySearch(value: string) {
+    setSupplierDirectorySearch(value)
+    const firstMatch = settings.suppliers.find((supplier) => supplierMatchesDirectorySearch(supplier, value))
+    if (firstMatch) setSelectedSupplierId(firstMatch.id)
   }
 
   function addSupplier() {
@@ -1195,9 +1209,25 @@ export function SupplierRoutingManager({
                   <p className="text-sm font-semibold text-slate-700">Supplier directory</p>
                   <button type="button" onClick={refreshSupplierDirectory} disabled={supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${supplierSavePending ? "animate-spin" : ""}`} />Refresh</button>
                 </div>
+                <label className="relative mb-3 block">
+                  <span className="sr-only">Search active suppliers</span>
+                  <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="search"
+                    value={supplierDirectorySearch}
+                    onChange={(event) => updateSupplierDirectorySearch(event.target.value)}
+                    placeholder="Search vendor, supplier, or salesperson"
+                    className="min-h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-10 text-sm font-medium outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  />
+                  {supplierDirectorySearch ? <button type="button" onClick={() => updateSupplierDirectorySearch("")} aria-label="Clear supplier search" className="absolute right-1.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900"><X className="h-4 w-4" /></button> : null}
+                </label>
+                <p className="mb-3 text-xs font-semibold text-slate-500">
+                  {supplierDirectorySearch.trim() ? `${filteredDirectorySuppliers.length} of ${settings.suppliers.length} active vendors` : `${settings.suppliers.length} active vendor${settings.suppliers.length === 1 ? "" : "s"}`}
+                </p>
                 <div className="grid gap-2">
                   {settings.suppliers.length === 0 ? <div className="rounded-[18px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center"><p className="text-sm font-semibold text-slate-800">No suppliers in the directory</p><p className="mt-1 text-xs leading-5 text-slate-500">Add your first supplier below. Sent request history remains separate.</p></div> : null}
-                  {settings.suppliers.map((supplier) => (
+                  {settings.suppliers.length > 0 && filteredDirectorySuppliers.length === 0 ? <div className="rounded-[18px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center"><p className="text-sm font-semibold text-slate-800">No matching vendors</p><p className="mt-1 text-xs leading-5 text-slate-500">Try another company, salesperson, phone, email, material, or department.</p></div> : null}
+                  {filteredDirectorySuppliers.map((supplier) => (
                     <button
                       key={supplier.id}
                       type="button"
@@ -1235,7 +1265,7 @@ export function SupplierRoutingManager({
               </section>
 
               <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] sm:p-7">
-                {selectedSupplier ? (
+                {selectedSupplier && selectedSupplierMatchesSearch ? (
                   <>
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div>
@@ -1377,7 +1407,11 @@ export function SupplierRoutingManager({
                       </div>
                     </section>
                   </>
-                ) : null}
+                ) : (
+                  <div className="flex min-h-64 items-center justify-center rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-6 text-center">
+                    <div><Search className="mx-auto h-6 w-6 text-slate-400" /><p className="mt-3 text-sm font-semibold text-slate-800">No supplier profile matches this search</p><p className="mt-1 text-xs leading-5 text-slate-500">Clear the search or try another contact detail.</p></div>
+                  </div>
+                )}
 
               </section>
 
