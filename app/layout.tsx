@@ -51,25 +51,16 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "You Build. We Handle the Materials. | Avantia Build",
-    description: "Send your plans or material list. We compare suppliers, organize the order, and arrange jobsite delivery.",
+    description: "Upload your plans or material list. We compare suppliers, organize the order, and coordinate jobsite delivery.",
     url: "/",
     siteName: "Avantia Build",
     locale: "en_US",
     type: "website",
-    images: [
-      {
-        url: "/images/avantia/avantia-build-share-v5.jpg",
-        width: 1200,
-        height: 630,
-        alt: "Construction materials delivered to an active residential jobsite",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "You Build. We Handle the Materials. | Avantia Build",
-    description: "Send your plans or material list. We compare suppliers, organize the order, and arrange jobsite delivery.",
-    images: ["/images/avantia/avantia-build-share-v5.jpg"],
+    description: "Upload your plans or material list. We compare suppliers, organize the order, and coordinate jobsite delivery.",
   },
 };
 
