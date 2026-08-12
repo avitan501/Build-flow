@@ -31,11 +31,35 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Avantia Build",
-  description: "Everything it takes to build.",
+  metadataBase: new URL("https://build.avantiap.com"),
+  title: "Avantia Build | Construction Material Ordering",
+  description: "Order construction materials, upload plans, compare supplier pricing, and coordinate deliveries—all in one place.",
   icons: {
     icon: "/images/avantia/avantia-app-icon-512.png",
+    shortcut: "/images/avantia/avantia-app-icon-512.png",
     apple: "/images/avantia/avantia-app-icon-512.png",
+  },
+  openGraph: {
+    title: "Avantia Build | Construction Material Ordering",
+    description: "Order construction materials, upload plans, compare supplier pricing, and coordinate deliveries—all in one place.",
+    url: "/",
+    siteName: "Avantia Build",
+    locale: "en_US",
+    type: "website",
+    images: [
+      {
+        url: "/images/avantia/avantia-app-icon-512.png?v=2",
+        width: 512,
+        height: 512,
+        alt: "Avantia Build",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: "Avantia Build | Construction Material Ordering",
+    description: "Order construction materials, upload plans, compare supplier pricing, and coordinate deliveries—all in one place.",
+    images: ["/images/avantia/avantia-app-icon-512.png?v=2"],
   },
 };
 
