@@ -43,36 +43,17 @@ export async function saveSupplierDirectoryEntryAction(input: {
   const supplier = cleanSupplier(input.supplier)
   if (!supplier) return { ok: false, error: "Enter a supplier name and a valid email address." }
 
-  const { data: row, error: loadError } = await supabase
-    .from("workflow_manager_settings")
-    .select("state")
-    .eq("id", "singleton")
-    .maybeSingle<{ state: { qualificationSettings?: { suppliers?: SupplierRoutingOption[] } } }>()
-  if (loadError || !row?.state?.qualificationSettings) {
-    return { ok: false, error: "Could not load the supplier directory." }
-  }
-
-  const current = row.state.qualificationSettings.suppliers ?? []
-  const id = input.create && current.some((entry) => entry.id === supplier.id)
-    ? `${supplier.id}-${crypto.randomUUID().slice(0, 8)}`
-    : supplier.id
-  const savedSupplier = { ...supplier, id }
-  const next = [...current.filter((entry) => entry.id !== id), savedSupplier]
-  const { error: saveError } = await supabase.rpc("staff_save_supplier_directory", { suppliers: next })
-  if (saveError) return { ok: false, error: "Could not save the supplier. Please try again." }
-
-  const { data: verification, error: verificationError } = await supabase
-    .from("workflow_manager_settings")
-    .select("state")
-    .eq("id", "singleton")
-    .maybeSingle<{ state: { qualificationSettings?: { suppliers?: SupplierRoutingOption[] } } }>()
-  const persisted = verification?.state?.qualificationSettings?.suppliers?.find((entry) => entry.id === id)
-  if (verificationError || !persisted) {
-    return { ok: false, error: "The supplier was not confirmed in the directory. Please try again." }
+  const { data: persisted, error: saveError } = await supabase.rpc(
+    "staff_upsert_supplier_directory_entry",
+    { p_supplier: supplier, p_create: input.create ?? false },
+  )
+  if (saveError || !persisted) {
+    console.error("Supplier directory save failed", saveError)
+    return { ok: false, error: "Could not save the supplier. Refresh the page and try again." }
   }
 
   revalidatePath("/admin/vendors")
-  return { ok: true, supplier: persisted }
+  return { ok: true, supplier: persisted as SupplierRoutingOption }
 }
 
 export async function sendSupplierQuoteRequestAction(input: {
