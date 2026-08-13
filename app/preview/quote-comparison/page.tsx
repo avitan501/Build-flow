@@ -12,14 +12,23 @@ const comparison: QuoteComparisonRecord = {
   status: "review",
   currency: "USD",
   awarded_bid_id: null,
+  client_id: "client-jacob",
+  client_name_snapshot: "Jacob Darry",
+  client_email_snapshot: "jacob@example.com",
+  quote_number: "ABQ-280LAW",
+  client_quote_status: "draft",
+  expires_on: "2026-09-12",
+  client_message: "Pricing includes the listed materials and delivery to the jobsite.",
+  client_delivery_charge: 275,
+  quote_sent_at: null,
   created_at: "2026-08-13T12:00:00.000Z",
   updated_at: "2026-08-13T12:00:00.000Z",
 };
 
 const items: QuoteComparisonItemRecord[] = [
-  { id: "studs", comparison_id: comparison.id, description: "2 x 4 x 10 ft. studs", specification: "Douglas Fir", quantity: 400, unit: "piece", sort_order: 0, created_at: comparison.created_at, updated_at: comparison.updated_at },
-  { id: "osb", comparison_id: comparison.id, description: "3/4 in. OSB subfloor", specification: "4 x 8 ft. tongue-and-groove", quantity: 172, unit: "sheet", sort_order: 1, created_at: comparison.created_at, updated_at: comparison.updated_at },
-  { id: "nails", comparison_id: comparison.id, description: "3-1/4 in. framing nails", specification: "Collated", quantity: 20, unit: "box", sort_order: 2, created_at: comparison.created_at, updated_at: comparison.updated_at },
+  { id: "studs", comparison_id: comparison.id, description: "2 x 4 x 10 ft. studs", specification: "Douglas Fir", quantity: 400, unit: "piece", markup_percent: 15, client_unit_price: null, sort_order: 0, created_at: comparison.created_at, updated_at: comparison.updated_at },
+  { id: "osb", comparison_id: comparison.id, description: "3/4 in. OSB subfloor", specification: "4 x 8 ft. tongue-and-groove", quantity: 172, unit: "sheet", markup_percent: 15, client_unit_price: null, sort_order: 1, created_at: comparison.created_at, updated_at: comparison.updated_at },
+  { id: "nails", comparison_id: comparison.id, description: "3-1/4 in. framing nails", specification: "Collated", quantity: 20, unit: "box", markup_percent: 15, client_unit_price: null, sort_order: 2, created_at: comparison.created_at, updated_at: comparison.updated_at },
 ];
 
 function sampleBid(
@@ -63,6 +72,10 @@ export default function PublicQuoteComparisonPreviewPage() {
       suppliers={[]}
       projects={[]}
       departments={["Framing"]}
+      clients={[
+        { id: "client-jacob", name: "Jacob Darry", email: "jacob@example.com", companyName: "Darry Construction", phone: "(516) 555-0182" },
+        { id: "client-five-towns", name: "David Avitan", email: "info@fivetownsbuilders.com", companyName: "Five Towns Builders", phone: "(516) 555-0134" },
+      ]}
       previewMode
     />
   );

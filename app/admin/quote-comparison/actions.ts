@@ -4,7 +4,15 @@ import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireStaffProfile } from "@/lib/auth";
-import { analyzeQuoteComparison, type QuoteComparisonBidRecord, type QuoteComparisonItemRecord } from "@/lib/quote-comparison";
+import { sendClientQuoteEmail } from "@/lib/cart-submission-email";
+import { generateClientQuotePdf } from "@/lib/client-quote-pdf";
+import {
+  analyzeQuoteComparison,
+  buildClientQuoteSummary,
+  type QuoteComparisonBidRecord,
+  type QuoteComparisonItemRecord,
+  type QuoteComparisonRecord,
+} from "@/lib/quote-comparison";
 import type { SupplierRoutingOption } from "@/lib/shop-qualification";
 
 type ActionResult<T = undefined> = T extends undefined
@@ -22,9 +30,19 @@ function cleanMoney(value: number | null | undefined) {
   return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) / 100 : 0;
 }
 
+function cleanSignedMoney(value: number | null | undefined) {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) ? Math.round(amount * 100) / 100 : 0;
+}
+
 function cleanUnitPrice(value: number | null | undefined) {
   const amount = Number(value ?? 0);
   return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 10_000) / 10_000 : 0;
+}
+
+function cleanMarkup(value: number | null | undefined) {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) && amount >= 0 ? Math.min(Math.round(amount * 1000) / 1000, 10_000) : 0;
 }
 
 function cleanQuantity(value: number) {
@@ -272,6 +290,141 @@ export async function awardQuoteComparisonBidAction(input: {
   revalidatePath(comparisonPath(input.comparisonId));
   revalidatePath("/admin/quote-comparison");
   return { ok: true };
+}
+
+export async function saveClientQuoteAction(input: {
+  comparisonId: string;
+  clientId: string;
+  quoteNumber: string;
+  expiresOn: string | null;
+  clientMessage: string;
+  clientDeliveryCharge: number;
+  items: Array<{ itemId: string; markupPercent: number; clientUnitPrice: number }>;
+}): Promise<ActionResult> {
+  const { supabase } = await requireStaffProfile("suppliers");
+  const comparisonId = cleanText(input.comparisonId, 100);
+  const clientId = cleanText(input.clientId, 100);
+  const quoteNumber = cleanText(input.quoteNumber, 40).toUpperCase();
+  if (!comparisonId || !clientId) return { ok: false, error: "Choose a client before saving the quote." };
+  if (quoteNumber.length < 3) return { ok: false, error: "Enter a quote number." };
+  if (!input.items.length) return { ok: false, error: "Add materials and client pricing before saving." };
+  const expiresOn = input.expiresOn && /^\d{4}-\d{2}-\d{2}$/.test(input.expiresOn) ? input.expiresOn : null;
+
+  const { error } = await supabase.rpc("staff_save_quote_comparison_client_quote", {
+    p_comparison_id: comparisonId,
+    p_client_id: clientId,
+    p_quote_number: quoteNumber,
+    p_expires_on: expiresOn,
+    p_client_message: cleanText(input.clientMessage, 4000),
+    p_client_delivery_charge: cleanMoney(input.clientDeliveryCharge),
+    p_items: input.items.map((item) => ({
+      item_id: item.itemId,
+      markup_percent: cleanMarkup(item.markupPercent),
+      client_unit_price: cleanUnitPrice(item.clientUnitPrice),
+    })),
+  });
+  if (error) {
+    if (error.code === "23505") return { ok: false, error: "This quote number is already in use." };
+    if (error.message.includes("supplier_selection_required")) return { ok: false, error: "Select the winning supplier before preparing the client quote." };
+    if (error.message.includes("client_not_found")) return { ok: false, error: "Choose an active client with an email address." };
+    if (error.message.includes("client_prices_incomplete")) return { ok: false, error: "Every material needs a client price." };
+    console.error("Client quote save failed", error);
+    return { ok: false, error: "Could not save the client quote." };
+  }
+
+  revalidatePath(comparisonPath(comparisonId));
+  revalidatePath("/admin/quote-comparison");
+  return { ok: true };
+}
+
+export async function sendClientQuoteAction(comparisonId: string): Promise<ActionResult<{ recipient: string; providerId: string | null }>> {
+  const { supabase, user } = await requireStaffProfile("suppliers");
+  const safeComparisonId = cleanText(comparisonId, 100);
+  const [comparisonResult, itemsResult, bidsResult] = await Promise.all([
+    supabase.from("quote_comparisons").select("*").eq("id", safeComparisonId).maybeSingle<QuoteComparisonRecord>(),
+    supabase.from("quote_comparison_items").select("*").eq("comparison_id", safeComparisonId).order("sort_order").returns<QuoteComparisonItemRecord[]>(),
+    supabase.from("quote_comparison_bids").select("*,quote_comparison_prices(*)").eq("comparison_id", safeComparisonId).returns<QuoteComparisonBidRecord[]>(),
+  ]);
+  const comparison = comparisonResult.data;
+  const items = itemsResult.data ?? [];
+  const bids = bidsResult.data ?? [];
+  if (comparisonResult.error || itemsResult.error || bidsResult.error || !comparison) {
+    return { ok: false, error: "Could not load the saved client quote." };
+  }
+  if (!comparison.client_id || !comparison.client_email_snapshot) return { ok: false, error: "Choose a client and save the quote first." };
+  if (!comparison.awarded_bid_id) return { ok: false, error: "Select the winning supplier first." };
+  const selectedBid = bids.find((bid) => bid.id === comparison.awarded_bid_id);
+  const summary = buildClientQuoteSummary(items, selectedBid, comparison.client_delivery_charge);
+  if (!summary.complete) return { ok: false, error: "Every material needs a supplier cost and client price before sending." };
+  if (summary.clientTotal <= 0) return { ok: false, error: "The client quote total must be greater than zero." };
+
+  const pdf = await generateClientQuotePdf({
+    comparison,
+    clientName: comparison.client_name_snapshot || comparison.client_email_snapshot,
+    createdAt: new Date(),
+    summary,
+  });
+  const deliveryId = crypto.randomUUID();
+  const delivery = await sendClientQuoteEmail({
+    comparisonId: comparison.id,
+    quoteNumber: comparison.quote_number,
+    recipientName: comparison.client_name_snapshot || "Client",
+    recipientEmail: comparison.client_email_snapshot,
+    jobAddress: comparison.job_address,
+    expiresOn: comparison.expires_on,
+    message: comparison.client_message,
+    items: summary.lines.map((line) => ({
+      description: line.description,
+      specification: line.specification,
+      quantity: line.quantity,
+      unit: line.unit,
+      unitPrice: line.clientUnitPrice ?? 0,
+      lineTotal: line.clientLineTotal,
+    })),
+    deliveryCharge: summary.clientDeliveryCharge,
+    total: summary.clientTotal,
+    pdfBase64: pdf.toString("base64"),
+    idempotencyKey: `avantia-client-quote-${comparison.id}-${deliveryId}`,
+  });
+  const sent = delivery.status === "sent";
+  const { error: auditError } = await supabase.from("quote_comparison_client_deliveries").insert({
+    comparison_id: comparison.id,
+    recipient_name: comparison.client_name_snapshot || comparison.client_email_snapshot,
+    recipient_email: comparison.client_email_snapshot,
+    quote_number_snapshot: comparison.quote_number,
+    subject: `Avantia Build material quote ${comparison.quote_number}`,
+    client_total_snapshot: cleanMoney(summary.clientTotal),
+    profit_snapshot: cleanSignedMoney(summary.profit),
+    items_snapshot: summary.lines.map((line) => ({
+      description: line.description,
+      specification: line.specification,
+      quantity: line.quantity,
+      unit: line.unit,
+      unit_price: line.clientUnitPrice,
+      line_total: line.clientLineTotal,
+    })),
+    provider_id: sent ? delivery.providerId : null,
+    delivery_status: sent ? "sent" : "failed",
+    error_message: delivery.status === "failed" ? delivery.error : delivery.status === "not_configured" ? "Email is not configured." : "",
+    created_by: user.id,
+  });
+  if (auditError) console.error("Client quote delivery audit failed", auditError);
+
+  if (!sent) {
+    if (delivery.status === "not_configured") return { ok: false, error: "Website email is not configured." };
+    return { ok: false, error: delivery.status === "failed" ? delivery.error : "The client quote was not sent." };
+  }
+
+  const sentAt = new Date().toISOString();
+  const { error: statusError } = await supabase
+    .from("quote_comparisons")
+    .update({ client_quote_status: "sent", quote_sent_at: sentAt })
+    .eq("id", comparison.id);
+  if (statusError) console.error("Client quote sent status update failed", statusError);
+
+  revalidatePath(comparisonPath(comparison.id));
+  revalidatePath("/admin/quote-comparison");
+  return { ok: true, data: { recipient: comparison.client_email_snapshot, providerId: delivery.providerId } };
 }
 
 export async function reopenQuoteComparisonAction(comparisonId: string): Promise<ActionResult> {

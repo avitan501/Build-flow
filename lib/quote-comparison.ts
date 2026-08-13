@@ -1,6 +1,7 @@
 import type { SupplierTrustLevel } from "@/lib/shop-qualification";
 
 export type QuoteComparisonStatus = "draft" | "review" | "awarded" | "archived";
+export type ClientQuoteStatus = "draft" | "ready" | "sent" | "accepted" | "declined";
 
 export type QuoteComparisonRecord = {
   id: string;
@@ -13,6 +14,15 @@ export type QuoteComparisonRecord = {
   status: QuoteComparisonStatus;
   currency: "USD";
   awarded_bid_id: string | null;
+  client_id: string | null;
+  client_name_snapshot: string;
+  client_email_snapshot: string;
+  quote_number: string;
+  client_quote_status: ClientQuoteStatus;
+  expires_on: string | null;
+  client_message: string;
+  client_delivery_charge: number;
+  quote_sent_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -24,6 +34,8 @@ export type QuoteComparisonItemRecord = {
   specification: string;
   quantity: number;
   unit: string;
+  markup_percent: number;
+  client_unit_price: number | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -74,6 +86,33 @@ export type QuoteComparisonAnalysis = {
   isRecommended: boolean;
   isLowestCost: boolean;
   isFastest: boolean;
+};
+
+export type ClientQuoteLine = {
+  itemId: string;
+  description: string;
+  specification: string;
+  quantity: number;
+  unit: string;
+  supplierUnitCost: number | null;
+  markupPercent: number;
+  clientUnitPrice: number | null;
+  supplierLineCost: number;
+  clientLineTotal: number;
+  profit: number;
+};
+
+export type ClientQuoteSummary = {
+  lines: ClientQuoteLine[];
+  supplierMaterialCost: number;
+  supplierDeliveryAndTax: number;
+  supplierLandedCost: number;
+  clientMaterialSubtotal: number;
+  clientDeliveryCharge: number;
+  clientTotal: number;
+  profit: number;
+  marginPercent: number;
+  complete: boolean;
 };
 
 const trustScores: Record<SupplierTrustLevel, number> = {
@@ -213,6 +252,61 @@ export function analyzeQuoteComparison(
   if (recommendation) recommendation.isRecommended = true;
 
   return analyses.sort((a, b) => b.score - a.score || a.landedTotal - b.landedTotal);
+}
+
+export function buildClientQuoteSummary(
+  items: QuoteComparisonItemRecord[],
+  selectedBid: QuoteComparisonBidRecord | null | undefined,
+  clientDeliveryCharge: number,
+): ClientQuoteSummary {
+  const prices = new Map((selectedBid?.quote_comparison_prices ?? []).map((price) => [price.item_id, price]));
+  const lines = items.map<ClientQuoteLine>((item) => {
+    const supplierPrice = prices.get(item.id);
+    const supplierUnitCost = supplierPrice?.is_available && supplierPrice.unit_price !== null
+      ? positiveNumber(supplierPrice.unit_price)
+      : null;
+    const markupPercent = positiveNumber(item.markup_percent);
+    const clientUnitPrice = item.client_unit_price === null || item.client_unit_price === undefined
+      ? supplierUnitCost === null ? null : supplierUnitCost * (1 + markupPercent / 100)
+      : positiveNumber(item.client_unit_price);
+    const quantity = positiveNumber(item.quantity);
+    const supplierLineCost = (supplierUnitCost ?? 0) * quantity;
+    const clientLineTotal = (clientUnitPrice ?? 0) * quantity;
+
+    return {
+      itemId: item.id,
+      description: item.description,
+      specification: item.specification,
+      quantity,
+      unit: item.unit,
+      supplierUnitCost,
+      markupPercent,
+      clientUnitPrice,
+      supplierLineCost,
+      clientLineTotal,
+      profit: clientLineTotal - supplierLineCost,
+    };
+  });
+  const supplierMaterialCost = lines.reduce((total, line) => total + line.supplierLineCost, 0);
+  const supplierDeliveryAndTax = positiveNumber(selectedBid?.delivery_charge) + positiveNumber(selectedBid?.tax_amount);
+  const supplierLandedCost = supplierMaterialCost + supplierDeliveryAndTax;
+  const clientMaterialSubtotal = lines.reduce((total, line) => total + line.clientLineTotal, 0);
+  const safeClientDeliveryCharge = positiveNumber(clientDeliveryCharge);
+  const clientTotal = clientMaterialSubtotal + safeClientDeliveryCharge;
+  const profit = clientTotal - supplierLandedCost;
+
+  return {
+    lines,
+    supplierMaterialCost,
+    supplierDeliveryAndTax,
+    supplierLandedCost,
+    clientMaterialSubtotal,
+    clientDeliveryCharge: safeClientDeliveryCharge,
+    clientTotal,
+    profit,
+    marginPercent: clientTotal > 0 ? (profit / clientTotal) * 100 : 0,
+    complete: Boolean(selectedBid) && lines.length > 0 && lines.every((line) => line.supplierUnitCost !== null && line.clientUnitPrice !== null),
+  };
 }
 
 export function formatComparisonMoney(value: number) {

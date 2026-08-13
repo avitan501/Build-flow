@@ -19,6 +19,7 @@ export function AvantiaBuildClientShell({ children }: AvantiaBuildClientShellPro
   const isAiFlow = Boolean(pathname?.startsWith("/ai"));
   const isOwnerWorkspace = Boolean(pathname?.startsWith("/owner"));
   const isManagerPreview = Boolean(pathname?.startsWith("/preview-admin"));
+  const isQuoteComparisonPreview = Boolean(pathname?.startsWith("/preview/quote-comparison"));
 
   if (!useAppShell) {
     return <>{children}</>;
@@ -32,7 +33,7 @@ export function AvantiaBuildClientShell({ children }: AvantiaBuildClientShellPro
             ? "max-w-[96rem] lg:overflow-visible"
             : isManagerPreview
               ? "max-w-[96rem] lg:overflow-visible"
-              : isHome || isAccount || isShopLanding || isShopFlow || isProjectFlow || isQuoteRequest || isAiFlow
+            : isHome || isAccount || isShopLanding || isShopFlow || isProjectFlow || isQuoteRequest || isAiFlow || isQuoteComparisonPreview
               ? "max-w-[96rem] lg:overflow-visible"
               : "max-w-[31rem] lg:overflow-hidden"
         }`}

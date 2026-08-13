@@ -5,13 +5,14 @@ import { expect, test } from "@playwright/test";
 
 import {
   analyzeQuoteComparison,
+  buildClientQuoteSummary,
   type QuoteComparisonBidRecord,
   type QuoteComparisonItemRecord,
 } from "@/lib/quote-comparison";
 
 const items: QuoteComparisonItemRecord[] = [
-  { id: "studs", comparison_id: "comparison", description: "2 x 4 studs", specification: "10 ft.", quantity: 100, unit: "piece", sort_order: 0, created_at: "", updated_at: "" },
-  { id: "plywood", comparison_id: "comparison", description: "Plywood", specification: "3/4 in.", quantity: 20, unit: "sheet", sort_order: 1, created_at: "", updated_at: "" },
+  { id: "studs", comparison_id: "comparison", description: "2 x 4 studs", specification: "10 ft.", quantity: 100, unit: "piece", markup_percent: 20, client_unit_price: null, sort_order: 0, created_at: "", updated_at: "" },
+  { id: "plywood", comparison_id: "comparison", description: "Plywood", specification: "3/4 in.", quantity: 20, unit: "sheet", markup_percent: 20, client_unit_price: 36, sort_order: 1, created_at: "", updated_at: "" },
 ];
 
 function bid(
@@ -84,11 +85,29 @@ test("an empty supplier quote cannot receive a score or recommendation", () => {
   expect(result.find((entry) => entry.bidId === "priced")?.isRecommended).toBe(true);
 });
 
+test("client quote totals preserve private landed cost, profit, and margin", () => {
+  const selected = bid("selected", {
+    prices: [["studs", 5], ["plywood", 30]],
+    delivery: 100,
+    tax: 50,
+  });
+  const summary = buildClientQuoteSummary(items, selected, 200);
+
+  expect(summary.supplierMaterialCost).toBe(1100);
+  expect(summary.supplierLandedCost).toBe(1250);
+  expect(summary.clientMaterialSubtotal).toBe(1320);
+  expect(summary.clientTotal).toBe(1520);
+  expect(summary.profit).toBe(270);
+  expect(summary.marginPercent).toBeCloseTo(17.763, 2);
+  expect(summary.complete).toBe(true);
+});
+
 test("manager navigation and migration enforce supplier-scoped access", async () => {
   const root = process.cwd();
-  const [navigation, migration] = await Promise.all([
+  const [navigation, migration, clientQuoteMigration] = await Promise.all([
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260813171229_create_supplier_quote_comparisons.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260813200232_add_client_quotes_to_comparisons.sql"), "utf8"),
   ]);
 
   expect(navigation).toContain('{ href: "/admin/quote-comparison", label: "Quote Comparison"');
@@ -101,4 +120,8 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
   expect(migration).toContain("create or replace function public.staff_award_quote_comparison_bid");
   expect(migration).toContain("create or replace function public.staff_reopen_quote_comparison");
   expect(migration).not.toMatch(/grant\s+.+\s+to\s+anon/i);
+  expect(clientQuoteMigration).toContain("staff_save_quote_comparison_client_quote");
+  expect(clientQuoteMigration).toContain("quote_comparison_client_deliveries");
+  expect(clientQuoteMigration).toContain("security invoker");
+  expect(clientQuoteMigration).not.toMatch(/grant\s+.+\s+to\s+anon/i);
 });
