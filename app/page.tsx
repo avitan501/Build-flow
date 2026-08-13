@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Building2, Check, Clock3, FileUp, MessageCircle, PackageSearch, Sparkles, Truck } from "lucide-react";
+import { ArrowRight, Check, Clock3, FileUp, MessageCircle, PackageSearch, Sparkles, Truck } from "lucide-react";
 
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
 import { CoverageScrollSection } from "@/components/buildflow/coverage-scroll-section";
@@ -138,22 +138,17 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="border-y border-slate-200 bg-[#071126] px-3 py-7 text-white sm:px-5 sm:py-9" aria-labelledby="renovation-ai-heading">
-        <div data-testid="homepage-island" className="mx-auto grid max-w-[88rem] overflow-hidden lg:grid-cols-[minmax(0,1fr)_minmax(24rem,0.78fr)]">
-          <div className="flex flex-col justify-center px-3 py-5 sm:px-7 sm:py-8 lg:px-10">
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-sky-400/15 text-sky-200"><Sparkles className="h-5 w-5" aria-hidden="true" /></span>
-            <p className="mt-6 text-xs font-bold uppercase tracking-[0.16em] text-sky-300">No login required</p>
-            <h2 id="renovation-ai-heading" className="mt-2 max-w-2xl text-2xl font-semibold leading-tight sm:text-4xl">Estimate apartment renovation materials in a few questions.</h2>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">Choose the state, apartment mix, finish class, budget level, and work scope. Get material quantities, per-unit costs, and a portfolio purchasing range.</p>
-            <Link href="/ai/renovation-estimator" className="mt-7 inline-flex min-h-12 w-fit items-center justify-center gap-2 rounded-lg bg-white px-5 text-sm font-bold text-[#071126] transition hover:bg-sky-50" aria-label="Build renovation estimate">Build renovation estimate <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
-          </div>
-          <div className="relative min-h-[18rem] border-t border-white/15 bg-slate-800 sm:min-h-[22rem] lg:border-l lg:border-t-0">
-            <Image src="/images/buildflow-retail/eitan-renovation.webp" alt="Apartment renovation with plans and building materials" fill sizes="(min-width: 1024px) 44vw, 100vw" className="object-cover" />
-            <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3 rounded-lg bg-white/95 p-4 text-slate-950 shadow-[0_12px_30px_rgba(0,0,0,0.24)] backdrop-blur-sm">
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-[#0066cc]"><Building2 className="h-5 w-5" aria-hidden="true" /></span>
-              <div><p className="text-sm font-bold">One unit or a full portfolio</p><p className="mt-0.5 text-xs text-slate-600">Material planning across all 50 states and DC.</p></div>
+      <section className="border-y border-slate-200 bg-[#071126] px-3 py-8 text-white sm:px-5 sm:py-10" aria-labelledby="renovation-ai-heading">
+        <div data-testid="homepage-island" className="mx-auto flex max-w-[88rem] flex-col gap-6 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
+          <div className="max-w-3xl">
+            <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-sky-300">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-sky-400/15 text-sky-200"><Sparkles className="h-5 w-5" aria-hidden="true" /></span>
+              No login required
             </div>
+            <h2 id="renovation-ai-heading" className="mt-4 text-2xl font-semibold leading-tight sm:text-3xl">Estimate apartment renovation materials in a few questions.</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">Choose the apartment mix, location, finish class, budget, and work scope. Get material quantities and a portfolio purchasing range.</p>
           </div>
+          <Link href="/ai/renovation-estimator" className="inline-flex min-h-12 w-fit shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-5 text-sm font-bold text-[#071126] transition hover:bg-sky-50" aria-label="Build renovation estimate">Build renovation estimate <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
         </div>
       </section>
 
