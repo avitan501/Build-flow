@@ -73,6 +73,7 @@ function deletionError(message: string, target: DeletionTarget) {
   if (message.includes("only_customer_accounts_can_be_deleted")) return "Staff and administrator accounts cannot be deleted here.";
   if (message.includes("cannot_delete_current_account")) return "You cannot delete your own account.";
   if (message.includes("customer_has_manager_history")) return "This account has manager history and cannot be deleted as a customer.";
+  if (message.includes("customer_files_must_be_removed_first")) return "The customer was not deleted because uploaded files could not be removed. Please try again.";
   return `Could not delete this ${target}. No unrelated records were changed.`;
 }
 
@@ -263,16 +264,31 @@ export async function deleteCustomerAction(customerId: string): Promise<DeleteMa
   const { error: prepareError } = await supabase.rpc("staff_prepare_customer_deletion", { p_customer_id: normalizedId });
   if (prepareError) return { ok: false, error: deletionError(prepareError.message, "customer") };
 
+  let cleanupFailed = false;
   try {
     await cleanupQueuedFiles("customer", normalizedId);
-  } catch {
-    return { ok: false, error: "The customer was not deleted because uploaded files could not be removed. Please try again." };
+  } catch (error) {
+    cleanupFailed = true;
+    console.error("Customer file cleanup failed before account deletion.", error);
   }
 
   const { error: deleteError } = await supabase.rpc("staff_delete_customer_account", { p_customer_id: normalizedId });
   if (deleteError) return { ok: false, error: deletionError(deleteError.message, "customer") };
 
   const admin = createAdminClient();
+  let warning: string | undefined;
+  if (cleanupFailed) {
+    const { error: staleQueueError } = await admin
+      .from("manager_file_deletion_queue")
+      .delete()
+      .eq("target_type", "customer")
+      .eq("target_id", normalizedId);
+    if (staleQueueError) {
+      console.error("Customer was deleted, but stale file cleanup records remain.", staleQueueError);
+      warning = "The customer was deleted, but stale file-cleanup records remain for an administrator to review.";
+    }
+  }
+
   const { data: remaining, error: verifyError } = await admin
     .from("profiles")
     .select("id")
@@ -283,5 +299,5 @@ export async function deleteCustomerAction(customerId: string): Promise<DeleteMa
   revalidatePath("/admin/users");
   revalidatePath("/admin/projects");
   revalidatePath("/projects");
-  return { ok: true };
+  return warning ? { ok: true, warning } : { ok: true };
 }

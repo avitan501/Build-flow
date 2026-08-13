@@ -436,7 +436,7 @@ test("flooring review identifies the first required missing answer", async ({ pa
   await review.click()
 
   await expect(page.getByText("Please answer: What wood species do you need?")).toBeVisible()
-  await expect(page.locator("#question-wood-type").getByText("This field is required.")).toBeVisible()
+  await expect(page.locator('[data-question-key="wood_type"]').getByText("This field is required.")).toBeVisible()
 })
 
 test("shop shows the sourcing brands without duplicate contact actions", async ({ page }) => {
