@@ -19,6 +19,7 @@ type MobileMenuDrawerProps = {
   onClose: () => void;
   primaryLinks: MobileMenuLink[];
   requestLinks?: MobileMenuLink[];
+  moreLinks?: MobileMenuLink[];
   adminLinks?: MobileMenuLink[];
   isSignedIn: boolean;
 };
@@ -27,7 +28,7 @@ function isActivePath(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`) || (href === "/search" && pathname === "/shop");
 }
 
-export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [], adminLinks = [], isSignedIn }: MobileMenuDrawerProps) {
+export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [], moreLinks = [], adminLinks = [], isSignedIn }: MobileMenuDrawerProps) {
   const pathname = usePathname();
   const drawerRef = useRef<HTMLElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -139,6 +140,13 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
             {requestLinks.map((link) => <Link key={`${link.label}-${link.href}`} href={link.href} prefetch={false} onClick={onClose} className={`flex min-h-12 items-center justify-between rounded-2xl px-3 text-sm font-semibold ${Boolean(pathname) && isActivePath(pathname, link.href) ? "bg-[#0E2A4A] text-white" : "text-slate-700 hover:bg-slate-50"}`}><span>{link.label}</span><span aria-hidden="true">›</span></Link>)}
           </nav>
         </div> : null}
+
+        {moreLinks.length ? <details className="group mt-3 rounded-[20px] border border-slate-200 bg-white/90 p-2.5 shadow-[0_12px_30px_rgba(148,163,184,0.1)]">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-xl px-2 text-sm font-bold text-slate-800 marker:content-none"><span>More</span><span className="text-lg transition group-open:rotate-90" aria-hidden="true">›</span></summary>
+          <nav className="mt-1 grid gap-1" aria-label="More navigation">
+            {moreLinks.map((link) => <Link key={`${link.label}-${link.href}`} href={link.href} prefetch={false} onClick={onClose} className={`flex min-h-11 items-center justify-between rounded-xl px-3 text-sm font-semibold ${Boolean(pathname) && isActivePath(pathname, link.href) ? "bg-sky-50 text-[#0066cc]" : "text-slate-600 hover:bg-slate-50"}`}><span>{link.label}</span>{link.badge ? <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] uppercase tracking-[.1em] text-sky-700">{link.badge}</span> : null}</Link>)}
+          </nav>
+        </details> : null}
 
         {adminLinks.length > 0 ? (
           <div className="mt-4 rounded-[26px] border border-amber-100 bg-[linear-gradient(180deg,rgba(255,251,235,0.95),rgba(255,247,220,0.9))] p-3 shadow-[0_12px_28px_rgba(220,168,69,0.12)]">

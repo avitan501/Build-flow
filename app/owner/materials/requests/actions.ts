@@ -5,17 +5,32 @@ import { requireOwnerAccess } from "@/lib/owner-access"
 
 type ReplyResult = { ok: true; providerId: string | null } | { ok: false; error: string }
 
-export async function sendClientReplyAction(input: { requestId: string; message: string }): Promise<ReplyResult> {
-  const message = input.message.trim()
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+])
+
+export async function sendClientReplyAction(formData: FormData): Promise<ReplyResult> {
+  const requestId = String(formData.get("requestId") || "").trim()
+  const message = String(formData.get("message") || "").trim()
   if (!message) return { ok: false, error: "Write a message before sending." }
   if (message.length > 10_000) return { ok: false, error: "The message is too long." }
+
+  const attachmentValue = formData.get("attachment")
+  const attachment = attachmentValue instanceof File && attachmentValue.size > 0 ? attachmentValue : null
+  if (attachment && attachment.size > 10 * 1024 * 1024) return { ok: false, error: "Keep the attachment under 10 MB." }
+  if (attachment && !ALLOWED_ATTACHMENT_TYPES.has(attachment.type)) return { ok: false, error: "Attach a PDF, image, Word document, or Excel file." }
 
   const { supabase } = await requireOwnerAccess()
   const { data: request } = await supabase
     .from("quote_requests")
-    .select("id,title,owner_id")
-    .eq("id", input.requestId)
-    .maybeSingle<{ id: string; title: string; owner_id: string }>()
+    .select("id,title,owner_id,project_id")
+    .eq("id", requestId)
+    .maybeSingle<{ id: string; title: string; owner_id: string; project_id: string }>()
   if (!request) return { ok: false, error: "Request not found." }
 
   const { data: client } = await supabase
@@ -79,9 +94,24 @@ export async function sendClientReplyAction(input: { requestId: string; message:
     recipientEmail: client.email,
     message,
     items: emailItems,
+    attachment: attachment ? {
+      filename: attachment.name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 180) || "attachment",
+      content: Buffer.from(await attachment.arrayBuffer()).toString("base64"),
+    } : undefined,
   })
 
-  if (result.status === "sent") return { ok: true, providerId: result.providerId }
+  if (result.status === "sent") {
+    await supabase.from("project_events").insert({
+      project_id: request.project_id,
+      owner_id: request.owner_id,
+      event_type: "status_changed",
+      source: "admin",
+      title: "Reply emailed to client",
+      description: message.slice(0, 2000),
+      metadata: { quote_request_id: request.id, client_action: "email_reply", attachment_name: attachment?.name || null },
+    })
+    return { ok: true, providerId: result.providerId }
+  }
   if (result.status === "not_configured") return { ok: false, error: "Website email is not configured." }
   if (result.status === "skipped") return { ok: false, error: "Email was not sent." }
   return { ok: false, error: result.error }

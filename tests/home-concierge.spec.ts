@@ -87,7 +87,7 @@ test("coverage card grows as it enters focus", async ({ page }) => {
   expect(focused).toBeLessThanOrEqual(1);
 });
 
-test("customer menu groups requests and omits retired order and start-building links", async ({ page }) => {
+test("customer menu keeps four primary actions and puts Renovation AI under More", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Open navigation menu" }).click();
 
@@ -96,12 +96,13 @@ test("customer menu groups requests and omits retired order and start-building l
   await expect(page.getByRole("complementary", { name: "Site navigation" })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Home", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Order Materials", exact: true })).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "My Projects", exact: true })).toBeVisible();
-  const requestNavigation = page.getByRole("navigation", { name: "Request navigation" });
-  const partnerQuote = requestNavigation.getByRole("link", { name: "Get Material Pricing", exact: true });
+  const partnerQuote = navigation.getByRole("link", { name: "Get Material Pricing", exact: true });
   await expect(partnerQuote).toHaveAttribute("href", "/request-quote");
   await expect(partnerQuote).not.toHaveAttribute("target", "_blank");
-  await expect(requestNavigation.getByRole("link", { name: "Beat a Supplier Quote", exact: true })).toHaveAttribute("href", "/beat-a-quote");
+  await expect(navigation.getByRole("link", { name: "Beat a Supplier Quote", exact: true })).toHaveAttribute("href", "/beat-a-quote");
+  await expect(navigation.getByRole("link", { name: "My Projects", exact: true })).toHaveCount(0);
+  await page.getByRole("complementary", { name: "Site navigation" }).getByText("More", { exact: true }).click();
+  await expect(page.getByRole("navigation", { name: "More navigation" }).getByRole("link", { name: /Renovation AI/ })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Start Building", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "Quotes", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "Orders", exact: true })).toHaveCount(0);

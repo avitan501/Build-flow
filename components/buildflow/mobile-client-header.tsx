@@ -104,14 +104,12 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
   const primaryLinks = useMemo<MobileMenuLink[]>(() => [
     { href: "/", label: "Home" },
     { href: "/shop", label: "Order Materials" },
-    { href: "/ai/renovation-estimator", label: "Renovation AI", badge: "New" },
-    { href: "/projects", label: "My Projects" },
-    ...(isAdmin ? [{ href: managerHref, label: "Manager" }] : []),
-  ], [isAdmin, managerHref]);
-
-  const requestLinks = useMemo<MobileMenuLink[]>(() => [
     { href: "/request-quote", label: "Get Material Pricing" },
     { href: "/beat-a-quote", label: "Beat a Supplier Quote" },
+  ], []);
+
+  const moreLinks = useMemo<MobileMenuLink[]>(() => [
+    { href: "/ai/renovation-estimator", label: "Renovation AI", badge: "New" },
   ], []);
 
   const adminLinks = useMemo<MobileMenuLink[]>(() => {
@@ -228,10 +226,14 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
             <nav className="hidden flex-1 items-center justify-center gap-1 md:flex" aria-label="Primary navigation">
               <Link href="/" className={`rounded-lg px-3 py-2 text-sm font-semibold ${pathname === "/" ? "bg-slate-100 text-slate-950" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}>Home</Link>
               <Link href="/shop" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Order Materials</Link>
-              <Link href="/ai/renovation-estimator" className={`hidden rounded-lg px-3 py-2 text-sm font-semibold xl:inline-flex ${pathname.startsWith("/ai/renovation-estimator") ? "bg-sky-50 text-[#0066cc]" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}>Renovation AI</Link>
-              <Link href="/projects" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">My Projects</Link>
               <Link href="/request-quote" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Get Material Pricing</Link>
               <Link href="/beat-a-quote" className="rounded-lg bg-[#0E2A4A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163a63]">Beat a Supplier Quote</Link>
+              <details className="group relative">
+                <summary className="cursor-pointer list-none rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950 marker:content-none">More</summary>
+                <div className="absolute right-0 top-[calc(100%+.5rem)] w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
+                  <Link href="/ai/renovation-estimator" className={`flex min-h-11 items-center justify-between rounded-md px-3 text-sm font-semibold ${pathname.startsWith("/ai/renovation-estimator") ? "bg-sky-50 text-[#0066cc]" : "text-slate-700 hover:bg-slate-50"}`}><span>Renovation AI</span><span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] uppercase tracking-[.1em] text-sky-700">New</span></Link>
+                </div>
+              </details>
             </nav>
           ) : null}
 
@@ -258,7 +260,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
         ) : null}
       </div>
 
-      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} primaryLinks={primaryLinks} requestLinks={requestLinks} adminLinks={adminLinks} isSignedIn={isSignedIn} />
+      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} primaryLinks={primaryLinks} moreLinks={moreLinks} adminLinks={adminLinks} isSignedIn={isSignedIn} />
 
       {shopSearchOpen ? (
         <div id="shop-search-overlay" role="dialog" aria-modal="true" className="fixed inset-0 z-[80] bg-white/96 backdrop-blur-sm">

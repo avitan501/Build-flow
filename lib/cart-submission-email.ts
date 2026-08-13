@@ -45,6 +45,7 @@ export type ManagerClientReplyEmailInput = {
   recipientEmail: string
   message: string
   items: CustomerEmailItem[]
+  attachment?: { filename: string; content: string }
 }
 
 export type CustomerEmailItem = {
@@ -613,9 +614,13 @@ export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmail
       text,
       replyTo: COMPANY_EMAIL,
       idempotencyKey: `avantia-manager-reply-${input.requestId}-${crypto.randomUUID()}`,
+      attachments: input.attachment ? [input.attachment] : undefined,
     })
     if (directResult.status === "sent") return directResult
+    if (input.attachment) return directResult
   }
+
+  if (input.attachment) return { status: "not_configured" }
 
   const fallback = await sendWithSupabaseEmailFallback("send_manager_reply", {
     requestId: input.requestId,

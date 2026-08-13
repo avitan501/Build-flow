@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { revalidatePath } from "next/cache";
 
 import { requireAdminProfile, requireStaffProfile } from "@/lib/auth";
@@ -12,8 +14,9 @@ type DeleteManagerRecordResult =
   | { ok: true; warning?: string }
   | { ok: false; error: string };
 export type ManagerRequestLineInput = { name: string; quantity: number; unit: string };
+export type ManagerNewClientInput = { fullName: string; email: string; phone?: string; companyName?: string };
 export type CreateClientRequestResult =
-  | { ok: true; requestId: string }
+  | { ok: true; requestId: string; customerId: string }
   | { ok: false; error: string };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -220,18 +223,66 @@ export async function updateCustomerContact(formData: FormData) {
 }
 
 export async function createRequestForClientAction(input: {
-  customerId: string;
+  customerId?: string;
+  newClient?: ManagerNewClientInput;
   department: string;
   title?: string;
   lines: ManagerRequestLineInput[];
   notes?: string;
 }): Promise<CreateClientRequestResult> {
   const { user, profile } = await requireStaffProfile("customers");
-  const customerId = input.customerId.trim();
-  if (!validUuid(customerId)) return { ok: false, error: "Choose a valid customer." };
+  const admin = createAdminClient();
+  let customerId = input.customerId?.trim() || "";
+
+  if (input.newClient) {
+    const fullName = input.newClient.fullName.trim().replace(/\s+/g, " ").slice(0, 160);
+    const email = input.newClient.email.trim().toLowerCase().slice(0, 320);
+    const phone = input.newClient.phone?.trim().slice(0, 40) || null;
+    const companyName = input.newClient.companyName?.trim().slice(0, 180) || null;
+    if (fullName.length < 2) return { ok: false, error: "Enter the new client's name." };
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid client email address." };
+
+    const { data: existingClient, error: existingClientError } = await admin
+      .from("profiles")
+      .select("id,role,is_active")
+      .ilike("email", email)
+      .limit(1)
+      .maybeSingle<{ id: string; role: string; is_active: boolean }>();
+    if (existingClientError) return { ok: false, error: "Could not check the client directory." };
+    if (existingClient) {
+      if (existingClient.role !== "client") return { ok: false, error: "That email belongs to a staff account." };
+      if (!existingClient.is_active) return { ok: false, error: "That client account is inactive." };
+      customerId = existingClient.id;
+    } else {
+      const { data: authData, error: authError } = await admin.auth.admin.createUser({
+        email,
+        password: `${randomUUID()}Aa1!`,
+        email_confirm: true,
+        user_metadata: { full_name: fullName, phone, company_name: companyName },
+      });
+      if (authError || !authData.user) return { ok: false, error: "Could not create the new client account." };
+      customerId = authData.user.id;
+      const { error: profileError } = await admin.from("profiles").upsert({
+        id: customerId,
+        email,
+        full_name: fullName,
+        phone,
+        company_name: companyName,
+        role: "client",
+        approval_status: "approved",
+        is_active: true,
+      }, { onConflict: "id" });
+      if (profileError) {
+        await admin.auth.admin.deleteUser(customerId);
+        return { ok: false, error: "Could not save the new client profile." };
+      }
+    }
+  }
+
+  if (!validUuid(customerId)) return { ok: false, error: "Choose a client or add a new one." };
 
   const department = input.department.trim().slice(0, 100);
-  if (!department) return { ok: false, error: "Choose a department." };
+  const storedDepartment = department || "Unassigned";
 
   const lines = input.lines
     .map((line) => ({
@@ -247,7 +298,6 @@ export async function createRequestForClientAction(input: {
   }
 
   const notes = input.notes?.trim().slice(0, 4000) || "";
-  const admin = createAdminClient();
   const { data: customer, error: customerError } = await admin
     .from("profiles")
     .select("id,role,is_active")
@@ -278,7 +328,7 @@ export async function createRequestForClientAction(input: {
     projectId = project.id;
   }
 
-  const requestTitle = input.title?.trim().slice(0, 180) || `${department} request`;
+  const requestTitle = input.title?.trim().slice(0, 180) || (department ? `${department} request` : "Material request");
   const now = new Date().toISOString();
   const { data: request, error: requestError } = await admin
     .from("quote_requests")
@@ -293,7 +343,7 @@ export async function createRequestForClientAction(input: {
     owner_id: customerId,
     catalog_item_id: null,
     name: line.name,
-    department,
+    department: storedDepartment,
     item_type: "custom_priced",
     quantity: line.quantity,
     unit: line.unit,
@@ -323,7 +373,7 @@ export async function createRequestForClientAction(input: {
   revalidatePath("/admin/users");
   revalidatePath("/owner/materials/requests");
   revalidatePath(`/owner/materials/requests/${request.id}`);
-  return { ok: true, requestId: request.id };
+  return { ok: true, requestId: request.id, customerId };
 }
 
 export async function deleteOpenRequestAction(requestId: string): Promise<DeleteManagerRecordResult> {

@@ -7,6 +7,7 @@ import type { MaterialQuestionnaireResponse, MaterialRequestAnswer } from "@/lib
 import { requireOwnerAccess } from "@/lib/owner-access"
 import { quoteRequestStatusLabel, type QuoteRequestStatus } from "@/lib/quote-requests"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 type RequestDetails = { id: string; project_id: string; owner_id: string; title: string; status: QuoteRequestStatus; created_at: string; submitted_at: string | null; projects: { name: string; address: string | null } | null }
 type Attachment = { id: string; material_response_id: string | null; file_name: string; file_path: string; file_type: string | null }
@@ -20,8 +21,9 @@ function legacyAnswers(value: unknown): LegacyAnswer[] {
 
 export default async function OwnerMaterialRequestPage({ params }: { params: Promise<{ requestId: string }> }) {
   const { requestId } = await params
-  const { supabase } = await requireOwnerAccess()
-  const [{ data: request }, { data: responses }, { data: attachments }, { data: items }, { data: managerSettings }, { data: packages }, { data: clientActionEvents }] = await Promise.all([
+  await requireOwnerAccess()
+  const supabase = createAdminClient()
+  const [{ data: request, error: requestError }, { data: responses }, { data: attachments }, { data: items }, { data: managerSettings }, { data: packages }, { data: clientActionEvents }] = await Promise.all([
     supabase.from("quote_requests").select("id,project_id,owner_id,title,status,created_at,submitted_at,projects(name,address)").eq("id", requestId).maybeSingle<RequestDetails>(),
     supabase.from("material_questionnaire_responses").select("id, request_id, project_id, owner_id, category_id, category_name_snapshot, category_slug_snapshot, definition_version, definition_snapshot, status, completed_at, created_at, updated_at").eq("request_id", requestId).order("created_at").returns<MaterialQuestionnaireResponse[]>(),
     supabase.from("quote_request_attachments").select("id,material_response_id,file_name,file_path,file_type").eq("request_id", requestId).returns<Attachment[]>(),
@@ -30,6 +32,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
     supabase.from("supplier_packages").select("id,department,supplier_id,status").eq("request_id", requestId).order("created_at").returns<SupplierPackage[]>(),
     supabase.from("project_events").select("id,title,description,metadata,created_at").contains("metadata", { quote_request_id: requestId }).order("created_at", { ascending: false }).limit(20).returns<Array<{ id: string; title: string; description: string | null; metadata: Record<string, unknown>; created_at: string }>>(),
   ])
+  if (requestError) throw new Error(`Could not load this material request: ${requestError.message}`)
   if (!request) notFound()
   const clientActions = (clientActionEvents ?? []).filter((event) => typeof event.metadata?.client_action === "string")
 

@@ -16,7 +16,7 @@ test("quote request is an Avantia-branded internal workflow", async ({ page }) =
   await expect(page.getByText("Company (optional)", { exact: true })).toBeVisible()
   await expect(page.getByLabel(/Project name/)).toHaveCount(0)
   await expect(page.getByText(/I am a/)).toHaveCount(0)
-  await expect(page.getByRole("navigation", { name: "Mobile homepage" })).toHaveCount(0)
+  await expect(page.getByRole("navigation", { name: "Mobile homepage" })).toHaveCount((page.viewportSize()?.width ?? 0) < 1024 ? 1 : 0)
   await page.getByText("Add job-site details (optional)", { exact: true }).click()
   await expect(page.getByLabel(/Job-site address/)).toHaveAttribute("autocomplete", "street-address")
   await expect(page.getByRole("button", { name: "Use current location" })).toBeVisible()
@@ -47,11 +47,11 @@ test("beat a quote is a dedicated upload request", async ({ page }) => {
   await expect(page.locator('input[name="requestKind"]')).toHaveValue("beat_quote")
   await expect(page.getByRole("button", { name: "Submit Quote for Review" })).toBeVisible()
   await expect(page.getByRole("checkbox", { name: "Framing" })).toHaveCount(0)
-  await expect(page.getByRole("navigation", { name: "Mobile homepage" })).toHaveCount(0)
+  await expect(page.getByRole("navigation", { name: "Mobile homepage" })).toHaveCount((page.viewportSize()?.width ?? 0) < 1024 ? 1 : 0)
 
   await page.getByRole("button", { name: "Open navigation menu" }).click()
-  await expect(page.getByRole("navigation", { name: "Request navigation" }).getByRole("link", { name: "Get Material Pricing" })).toBeVisible()
-  await expect(page.getByRole("navigation", { name: "Request navigation" }).getByRole("link", { name: "Beat a Supplier Quote" })).toBeVisible()
+  await expect(page.getByRole("navigation", { name: "Mobile full navigation" }).getByRole("link", { name: "Get Material Pricing" })).toBeVisible()
+  await expect(page.getByRole("navigation", { name: "Mobile full navigation" }).getByRole("link", { name: "Beat a Supplier Quote" })).toBeVisible()
 })
 
 test("plan over the storage limit stays on the form and shows a useful error", async ({ page }) => {

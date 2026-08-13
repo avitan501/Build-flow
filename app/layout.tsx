@@ -80,7 +80,6 @@ export default async function RootLayout({
   const isAdmin = managerAccess.owner || managerAccess.customers || managerAccess.suppliers;
   const managerHref = managerAccess.owner ? "/admin/build-map" : managerAccess.customers ? "/admin/users" : "/admin/vendors";
   const isPreviewAdminEnabled = process.env.VERCEL_ENV !== "production";
-  const projectsHref = "/projects";
   const displayName = profile?.full_name?.trim() || user?.email?.split("@")[0] || null;
   const supabaseBrowserConfig = hasSupabasePublicEnv() ? getSupabasePublicEnv() : null;
   const serializedSupabaseConfig = supabaseBrowserConfig
@@ -107,7 +106,7 @@ export default async function RootLayout({
           <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isOwner={managerAccess.owner} managerHref={managerHref} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />
           {children}
           <SiteFooter />
-          <MobileBottomDock projectsHref={projectsHref} />
+          <MobileBottomDock />
         </AvantiaBuildClientShell>
       </body>
     </html>

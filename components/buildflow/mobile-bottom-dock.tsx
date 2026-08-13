@@ -4,11 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type MobileBottomDockProps = {
-  projectsHref: string;
-};
-
-const HIDDEN_DOCK_PATHS = new Set(["/", "/login", "/signup", "/reset-password", "/request-quote", "/beat-a-quote"]);
+const HIDDEN_DOCK_PATHS = new Set(["/", "/login", "/signup", "/reset-password"]);
 
 function shouldShowDock(pathname: string) {
   return !HIDDEN_DOCK_PATHS.has(pathname) && !pathname.startsWith("/admin") && !pathname.startsWith("/ai/renovation-estimator");
@@ -49,14 +45,14 @@ function DockItem({ href, label, active, children, accent = false }: { href: str
         />
         <span className="relative z-10">{children}</span>
       </span>
-      <span className={`mt-1 text-[10px] font-medium leading-none ${accent ? "text-slate-800" : active ? "text-slate-800" : "text-slate-500/95"}`}>
+      <span className={`mt-1 flex min-h-6 items-start justify-center text-[9px] font-medium leading-3 ${accent ? "text-slate-800" : active ? "text-slate-800" : "text-slate-500/95"}`}>
         {label}
       </span>
     </Link>
   );
 }
 
-export function MobileBottomDock({ projectsHref }: MobileBottomDockProps) {
+export function MobileBottomDock() {
   const pathname = usePathname();
 
   if (!pathname || !shouldShowDock(pathname)) {
@@ -91,12 +87,15 @@ export function MobileBottomDock({ projectsHref }: MobileBottomDockProps) {
               <path d="M18 6v3" />
             </svg>
           </DockItem>
-          <DockItem href={projectsHref} label="My Projects" active={isActivePath(pathname, "/projects")}>
+          <DockItem href="/request-quote" label="Get Material Pricing" active={isActivePath(pathname, "/request-quote")}>
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="4" width="7" height="7" rx="1.5" />
-              <rect x="14" y="4" width="7" height="7" rx="1.5" />
-              <rect x="3" y="13" width="7" height="7" rx="1.5" />
-              <rect x="14" y="13" width="7" height="7" rx="1.5" />
+              <path d="M4 5h16v14H4z" />
+              <path d="M7 9h10M7 13h6" />
+            </svg>
+          </DockItem>
+          <DockItem href="/beat-a-quote" label="Beat a Supplier Quote" active={isActivePath(pathname, "/beat-a-quote")}>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3v18M16 7.5c0-1.7-1.8-3-4-3s-4 1.3-4 3 1.5 2.7 4 3.2 4 1.5 4 3.3-1.8 3.5-4 3.5-4-1.3-4-3" />
             </svg>
           </DockItem>
         </nav>
