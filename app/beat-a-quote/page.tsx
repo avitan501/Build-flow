@@ -19,7 +19,7 @@ export default function BeatAQuotePage() {
       </section>
       <div className="mx-auto max-w-5xl py-6 sm:px-6 sm:py-8">
         <QuoteRequestForm mode="beat" />
-        <p className="px-5 py-5 text-center text-xs text-slate-500">Need help now? Call <a href="tel:+19292077156" className="font-semibold text-[#0066cc]">(929) 207-7156</a>.</p>
+        <p className="px-5 py-5 text-center text-xs text-slate-500">Need help now? Call <a href="tel:+15169088319" className="font-semibold text-[#0066cc]">(516) 908-8319</a>.</p>
       </div>
     </main>
   )

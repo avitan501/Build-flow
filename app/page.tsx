@@ -1,10 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Check, Clock3, FileUp, MessageCircle, PackageSearch, Sparkles, Truck } from "lucide-react";
+import { ArrowRight, Check, Clock3, FileUp, PackageSearch, Sparkles, Truck } from "lucide-react";
 
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
 import { CoverageScrollSection } from "@/components/buildflow/coverage-scroll-section";
 import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase";
+import { WhatsAppIcon } from "@/components/buildflow/whatsapp-icon";
 import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools";
 
 const orderSteps = [
@@ -102,8 +103,8 @@ export default function Home() {
             <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm font-semibold">
               <span className="inline-flex min-h-8 items-center gap-2 text-slate-100"><Check className="h-4 w-4 text-emerald-300" aria-hidden="true" />No account needed</span>
               <span className="inline-flex min-h-8 items-center gap-2 text-slate-100"><Clock3 className="h-4 w-4 text-sky-200" aria-hidden="true" />Reply within 24 hours</span>
-              <a href="https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20starting%20a%20material%20order." target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-md text-emerald-100 underline decoration-emerald-200/50 underline-offset-4 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
-                <MessageCircle className="h-4 w-4" aria-hidden="true" />
+              <a href="https://wa.me/15169088319?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20starting%20a%20material%20order." target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-md text-emerald-100 underline decoration-emerald-200/50 underline-offset-4 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                <WhatsAppIcon className="h-4 w-4" />
                 Need help? WhatsApp us
               </a>
             </div>

@@ -16,7 +16,7 @@ test("home presents the contractor material coordination service", async ({ page
   await expect(page.getByRole("link", { name: "Start a Material Request" })).toHaveAttribute("href", "/shop");
   await expect(page.getByRole("link", { name: "Send Us Your Plans" })).toHaveAttribute("href", "/request-quote");
   await expect(page.getByRole("heading", { name: "Estimate apartment renovation materials in a few questions." })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Need help? WhatsApp us" })).toHaveAttribute("href", "https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20starting%20a%20material%20order.");
+  await expect(page.getByRole("link", { name: "Need help? WhatsApp us" })).toHaveAttribute("href", "https://wa.me/15169088319?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20starting%20a%20material%20order.");
   await expect(page.getByText("No account needed", { exact: true })).toBeVisible();
   await expect(page.getByText("Reply within 24 hours", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Choose Materials" })).toBeVisible();

@@ -51,7 +51,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Avantia Build | Materials Priced & Delivered",
-    description: "Send plans or a material list. WhatsApp: (929) 207-7156.",
+    description: "Send plans or a material list. WhatsApp: (516) 908-8319.",
     url: "/",
     siteName: "Avantia Build",
     locale: "en_US",
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Avantia Build | Materials Priced & Delivered",
-    description: "Send plans or a material list. WhatsApp: (929) 207-7156.",
+    description: "Send plans or a material list. WhatsApp: (516) 908-8319.",
   },
 };
 

@@ -1,11 +1,12 @@
 "use client"
 
-import { ExternalLink, Mail, MessageCircle, Phone, Route } from "lucide-react"
+import { ExternalLink, Mail, Phone, Route } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition } from "react"
 
 import { routeRequestToSupplierAction } from "@/app/preview-admin/workflow-actions"
 import { sendClientReplyAction } from "@/app/owner/materials/requests/actions"
+import { WhatsAppIcon } from "@/components/buildflow/whatsapp-icon"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 
 type PackageRoute = { id: string; department: string; supplier_id: string | null; status: string }
@@ -91,7 +92,7 @@ export function RequestManagementPanel({
             <div className="mt-3 flex flex-wrap gap-2">
               {client.email ? <button type="button" onClick={sendClientEmail} disabled={pending || !clientMessage.trim()} className={`${actionClass} disabled:cursor-not-allowed disabled:opacity-50`}><Mail className="h-4 w-4" />{pending ? "Sending..." : "Send email"}</button> : null}
               {client.phone ? <a href={`tel:${client.phone}`} className={actionClass}><Phone className="h-4 w-4" />Call client</a> : null}
-              {client.phone ? <a href={whatsappLink(client.phone, clientMessage)} target="_blank" rel="noreferrer" className={actionClass}><MessageCircle className="h-4 w-4" />WhatsApp client</a> : null}
+              {client.phone ? <a href={whatsappLink(client.phone, clientMessage)} target="_blank" rel="noreferrer" className={actionClass}><WhatsAppIcon className="h-4 w-4" />WhatsApp client</a> : null}
             </div>
           </div>
 
@@ -101,7 +102,7 @@ export function RequestManagementPanel({
             <textarea value={supplierMessage} onChange={(event) => setSupplierMessage(event.target.value)} rows={4} disabled={!supplier} className="mt-3 w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100" />
             {supplier ? <div className="mt-3 flex flex-wrap gap-2">
               {supplier.email ? <a href={`mailto:${supplier.email}?subject=${encodeURIComponent(`Pricing request: ${requestTitle}`)}&body=${encodeURIComponent(supplierMessage)}`} className={actionClass}><Mail className="h-4 w-4" />Email supplier</a> : null}
-              {supplier.whatsapp || supplier.phone ? <a href={whatsappLink(supplier.whatsapp || supplier.phone || "", supplierMessage)} target="_blank" rel="noreferrer" className={actionClass}><MessageCircle className="h-4 w-4" />WhatsApp supplier</a> : null}
+              {supplier.whatsapp || supplier.phone ? <a href={whatsappLink(supplier.whatsapp || supplier.phone || "", supplierMessage)} target="_blank" rel="noreferrer" className={actionClass}><WhatsAppIcon className="h-4 w-4" />WhatsApp supplier</a> : null}
               {supplier.phone ? <a href={`tel:${supplier.phone}`} className={actionClass}><Phone className="h-4 w-4" />Call supplier</a> : null}
               {supplier.portalUrl ? <a href={supplier.portalUrl} target="_blank" rel="noreferrer" className={actionClass}><ExternalLink className="h-4 w-4" />Supplier portal</a> : null}
               {!supplier.email && !supplier.whatsapp && !supplier.phone && !supplier.portalUrl ? <p className="text-sm font-medium text-amber-700">Add a contact method in Supplier Directory before contacting this supplier.</p> : null}

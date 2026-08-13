@@ -56,7 +56,7 @@ export type ServiceAssignmentTarget = {
 }
 
 export const SHOP_QUALIFICATION_SETTINGS_STORAGE_KEY = "buildflow-shop-qualification-settings"
-export const AVANTIA_COMPANY_PHONE = "9292077156"
+export const AVANTIA_COMPANY_PHONE = "5169088319"
 
 export const DEFAULT_SUPPLIERS: SupplierRoutingOption[] = [
   { id: "buildflow-estimating", name: "Avantia Build estimating desk", contactLabel: "Company phone", contactName: "Estimating coordinator", phone: AVANTIA_COMPANY_PHONE, preferredDeliveryMethod: "phone", deliveryNotes: "Default internal queue for uncategorized service requests." },

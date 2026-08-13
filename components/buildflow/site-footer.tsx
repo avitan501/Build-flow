@@ -1,9 +1,10 @@
 import Link from "next/link"
-import { Mail, MessageCircle, Phone } from "lucide-react"
+import { Mail, Phone } from "lucide-react"
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
+import { WhatsAppIcon } from "@/components/buildflow/whatsapp-icon"
 
-const BUSINESS_WHATSAPP_URL = "https://wa.me/19292077156?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20with%20construction%20materials."
+const BUSINESS_WHATSAPP_URL = "https://wa.me/15169088319?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20with%20construction%20materials."
 
 export function SiteFooter() {
   return (
@@ -22,11 +23,11 @@ export function SiteFooter() {
           <a href="mailto:office@build.avantiap.com" className="inline-flex min-h-10 min-w-0 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:px-3 sm:text-sm">
             <Mail className="h-4 w-4 shrink-0" aria-hidden="true" /> <span className="truncate">office@build.avantiap.com</span>
           </a>
-          <a href="tel:+19292077156" aria-label="(929) 207-7156" className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:w-auto sm:gap-2 sm:px-3">
-            <Phone className="h-4 w-4" aria-hidden="true" /><span className="hidden text-sm font-semibold sm:inline">(929) 207-7156</span>
+          <a href="tel:+15169088319" aria-label="(516) 908-8319" className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:w-auto sm:gap-2 sm:px-3">
+            <Phone className="h-4 w-4" aria-hidden="true" /><span className="hidden text-sm font-semibold sm:inline">(516) 908-8319</span>
           </a>
           <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="WhatsApp us" className="group relative inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#128c7e] text-white transition hover:bg-[#0f7a6e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
-            <MessageCircle className="h-5 w-5" aria-hidden="true" />
+            <WhatsAppIcon className="h-5 w-5" />
             <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
               WhatsApp us
             </span>
