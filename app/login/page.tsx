@@ -8,7 +8,7 @@ import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { friendlyAuthError, isGoogleAuthEnabled } from "@/lib/auth-ui";
 import { createClient } from "@/lib/supabase/client";
-import { hasSupabaseBuildEnv, hasSupabasePublicEnv } from "@/lib/supabase/env";
+import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 import { authRedirectOrigin } from "@/lib/site-url";
 
 type LoginState = {
@@ -26,6 +26,7 @@ const initialState: LoginState = {
 };
 
 type LoginMode = "email" | "phone";
+type AuthConfigState = boolean | null;
 
 function sanitizeNextPath(value: string | null) {
   if (!value) return "/";
@@ -38,10 +39,18 @@ function subscribeToAuthConfig() {
   return () => undefined;
 }
 
+function getBrowserAuthConfig(): AuthConfigState {
+  return hasSupabasePublicEnv();
+}
+
+function getServerAuthConfig(): AuthConfigState {
+  return null;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const hasAuthConfig = useSyncExternalStore(subscribeToAuthConfig, hasSupabasePublicEnv, hasSupabaseBuildEnv);
+  const hasAuthConfig = useSyncExternalStore(subscribeToAuthConfig, getBrowserAuthConfig, getServerAuthConfig);
   const supabase = useMemo(() => (hasAuthConfig ? createClient() : null), [hasAuthConfig]);
   const callbackError = searchParams.get("error");
   const [form, setForm] = useState<LoginState>(initialState);
@@ -262,7 +271,7 @@ export default function LoginPage() {
             <p className="text-sm text-slate-500">Use your email or phone number with a password.</p>
           </div>
 
-          {!hasAuthConfig ? (
+          {hasAuthConfig === false ? (
             <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800">
               Auth is not connected on this preview yet. The page is visible, but login needs the public Supabase URL and anon key.
             </div>

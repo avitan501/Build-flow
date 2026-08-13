@@ -44,6 +44,18 @@ test("the email login field accepts a phone-password account", async ({ page }) 
   expect(pageErrors.filter((message) => message.includes("Hydration failed"))).toEqual([])
 })
 
+test("login hydrates cleanly when browser auth configuration becomes available", async ({ page }) => {
+  await configureTestAuth(page)
+  const pageErrors: string[] = []
+  page.on("pageerror", (error) => pageErrors.push(error.message))
+
+  await page.goto("/login")
+  await expect(page.getByTestId("login-form")).toHaveAttribute("data-hydrated", "true")
+  await expect(page.getByText("Auth is not connected on this preview yet.", { exact: false })).toHaveCount(0)
+
+  expect(pageErrors.filter((message) => message.includes("Hydration failed"))).toEqual([])
+})
+
 test("login shows Gmail when Google authentication is enabled", async ({ page }) => {
   await configureTestAuth(page)
   await page.route("**/auth/v1/settings", async (route) => {
