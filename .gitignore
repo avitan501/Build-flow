@@ -57,6 +57,7 @@ preview-*.log
 
 # local Supabase CLI state
 /supabase/.temp/
+/supabase/.branches/
 
 # local agent worktrees
 /.worktrees

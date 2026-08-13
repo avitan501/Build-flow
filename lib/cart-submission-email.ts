@@ -63,6 +63,28 @@ export type SupplierQuoteRequestEmailInput = {
   materialList: string
 }
 
+export type ClientQuoteEmailInput = {
+  comparisonId: string
+  quoteNumber: string
+  recipientName: string
+  recipientEmail: string
+  jobAddress: string
+  expiresOn: string | null
+  message: string
+  items: Array<{
+    description: string
+    specification: string
+    quantity: number
+    unit: string
+    unitPrice: number
+    lineTotal: number
+  }>
+  deliveryCharge: number
+  total: number
+  pdfBase64: string
+  idempotencyKey: string
+}
+
 export type ClientRequestActionEmailInput = {
   requestId: string
   requestTitle: string
@@ -108,6 +130,7 @@ const COMPANY_PHONE = "(516) 908-8319"
 const COMPANY_PHONE_LINK = "tel:+15169088319"
 const COMPANY_WHATSAPP_URL = "https://wa.me/15169088319"
 const CUSTOMER_EMAIL_LOGO_URL = `${SITE_URL}/images/avantia/avantia-build-rain-painter-animation.gif`
+const EMAIL_LOGO_URL = `${SITE_URL}/images/avantia/avantia-build-lockup-share.png`
 const DEFAULT_TO = "avitanneto@gmail.com"
 const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL?.trim() || `Avantia Build <${COMPANY_EMAIL}>`
 const RESEND_TEST_FROM = "Avantia Build Requests <onboarding@resend.dev>"
@@ -476,6 +499,84 @@ export async function sendSupplierQuoteRequestEmail(input: SupplierQuoteRequestE
     text,
     replyTo: COMPANY_EMAIL,
     idempotencyKey: `avantia-supplier-quote-${input.requestId}`,
+    allowTestFallback: false,
+  })
+}
+
+export async function sendClientQuoteEmail(input: ClientQuoteEmailInput): Promise<EmailDeliveryResult> {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) return { status: "not_configured" }
+
+  const subject = `Avantia Build material quote ${input.quoteNumber}`
+  const expiration = input.expiresOn
+    ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${input.expiresOn}T12:00:00`))
+    : "Not specified"
+  const itemText = input.items.map((item) => `${item.quantity} ${item.unit} - ${item.description}${item.specification ? ` (${item.specification})` : ""}: ${money(item.lineTotal)}`)
+  const text = [
+    `Hi ${input.recipientName},`,
+    "",
+    `Your Avantia Build material quote ${input.quoteNumber} is ready.`,
+    `Job location: ${input.jobAddress || "Not provided"}`,
+    `Valid through: ${expiration}`,
+    "",
+    "Materials:",
+    ...itemText,
+    ...(input.deliveryCharge > 0 ? [`Delivery: ${money(input.deliveryCharge)}`] : []),
+    `Total: ${money(input.total)}`,
+    ...(input.message.trim() ? ["", input.message.trim()] : []),
+    "",
+    "The full branded quote is attached as a PDF.",
+    "",
+    "Avantia Build",
+    COMPANY_EMAIL,
+    COMPANY_PHONE,
+    SITE_URL,
+  ].join("\n")
+  const html = `
+    <div style="margin:0;background:#eef2f6;padding:24px 10px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.55">
+      <div style="max-width:680px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:14px;background:#ffffff">
+        <div style="padding:18px 22px;border-bottom:1px solid #e5eaf1">
+          <a href="${SITE_URL}" style="display:inline-block;text-decoration:none"><img src="${EMAIL_LOGO_URL}" width="250" alt="Avantia Build" style="display:block;width:100%;max-width:250px;height:auto;border:0" /></a>
+        </div>
+        <div style="padding:24px 22px">
+          <p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Material quote</p>
+          <h1 style="margin:0;font-size:25px;line-height:1.25;color:#071126">Your quote is ready</h1>
+          <p style="margin:12px 0;color:#475569">Hi ${escapeHtml(input.recipientName)}, we prepared quote <strong>${escapeHtml(input.quoteNumber)}</strong> for your material request.</p>
+          <div style="margin:20px 0;padding:15px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc">
+            <strong>Job location:</strong> ${escapeHtml(input.jobAddress || "Not provided")}<br />
+            <strong>Valid through:</strong> ${escapeHtml(expiration)}
+          </div>
+          <table role="presentation" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#071126;color:#ffffff;text-align:left"><th>Material</th><th>Qty</th><th style="text-align:right">Price</th></tr></thead>
+            <tbody>${input.items.map((item) => `<tr><td style="border-bottom:1px solid #e5eaf1"><strong>${escapeHtml(item.description)}</strong>${item.specification ? `<br /><span style="color:#64748b">${escapeHtml(item.specification)}</span>` : ""}</td><td style="border-bottom:1px solid #e5eaf1">${item.quantity} ${escapeHtml(item.unit)}</td><td style="border-bottom:1px solid #e5eaf1;text-align:right">${money(item.lineTotal)}</td></tr>`).join("")}</tbody>
+          </table>
+          <div style="margin:18px 0 0;text-align:right;color:#475569">
+            ${input.deliveryCharge > 0 ? `<div>Delivery: ${money(input.deliveryCharge)}</div>` : ""}
+            <div style="margin-top:5px;font-size:19px;font-weight:700;color:#071126">Total: ${money(input.total)}</div>
+          </div>
+          ${input.message.trim() ? `<p style="margin:22px 0 0;white-space:pre-wrap;color:#475569">${escapeHtml(input.message.trim())}</p>` : ""}
+          <p style="margin:22px 0 0;color:#475569">The complete Avantia Build quote is attached as a PDF. Reply to this email with any questions or requested changes.</p>
+        </div>
+        <div style="padding:18px 22px;border-top:1px solid #e5eaf1;background:#f8fafc;color:#475569;font-size:13px;line-height:1.65">
+          <strong style="color:#071126">Avantia Build</strong><br />
+          <a href="${SITE_URL}" style="color:#0066cc;text-decoration:none">build.avantiap.com</a><br />
+          <a href="mailto:${COMPANY_EMAIL}" style="color:#0066cc;text-decoration:none">${COMPANY_EMAIL}</a><br />
+          <a href="${COMPANY_PHONE_LINK}" style="color:#0066cc;text-decoration:none">${COMPANY_PHONE}</a>
+          <span style="color:#94a3b8"> &middot; </span><a href="${COMPANY_WHATSAPP_URL}" style="color:#0066cc;text-decoration:none">WhatsApp us</a>
+        </div>
+      </div>
+    </div>`
+
+  return sendEmail({
+    apiKey,
+    from: DEFAULT_FROM,
+    to: input.recipientEmail,
+    subject,
+    html,
+    text,
+    replyTo: COMPANY_EMAIL,
+    idempotencyKey: input.idempotencyKey,
+    attachments: [{ filename: `${input.quoteNumber}.pdf`, content: input.pdfBase64 }],
     allowTestFallback: false,
   })
 }
