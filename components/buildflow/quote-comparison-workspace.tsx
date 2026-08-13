@@ -80,6 +80,7 @@ export function QuoteComparisonWorkspace({
   suppliers,
   projects,
   departments,
+  previewMode = false,
 }: {
   comparison: QuoteComparisonRecord;
   items: QuoteComparisonItemRecord[];
@@ -87,6 +88,7 @@ export function QuoteComparisonWorkspace({
   suppliers: SupplierRoutingOption[];
   projects: ProjectOption[];
   departments: string[];
+  previewMode?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -147,7 +149,7 @@ export function QuoteComparisonWorkspace({
   }), [bidDrafts, bids, items, priceDrafts]);
   const analyses = useMemo(() => analyzeQuoteComparison(items, liveBids), [items, liveBids]);
   const recommended = analyses.find((analysis) => analysis.isRecommended);
-  const locked = comparison.status === "awarded" || comparison.status === "archived";
+  const locked = previewMode || comparison.status === "awarded" || comparison.status === "archived";
 
   function run(action: () => Promise<{ ok: boolean; error?: string }>, successMessage: string, after?: () => void) {
     setError("");
@@ -223,7 +225,7 @@ export function QuoteComparisonWorkspace({
     <main className="min-h-screen bg-[#f5f5f7] pb-24 text-slate-950">
       <div className="border-b border-slate-200 bg-white px-4 py-5 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-[96rem]">
-          <Link href="/admin/quote-comparison" className="inline-flex items-center gap-2 text-sm font-bold text-[#0071e3]"><ArrowLeft className="h-4 w-4" /> All comparisons</Link>
+          {previewMode ? <span className="inline-flex items-center gap-2 text-sm font-bold text-[#0071e3]"><ArrowLeft className="h-4 w-4" /> Public design preview</span> : <Link href="/admin/quote-comparison" className="inline-flex items-center gap-2 text-sm font-bold text-[#0071e3]"><ArrowLeft className="h-4 w-4" /> All comparisons</Link>}
           <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -234,8 +236,8 @@ export function QuoteComparisonWorkspace({
             </div>
             <div className="flex flex-wrap gap-2">
               {!locked ? <button type="button" onClick={() => setShowDetails((value) => !value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800">Edit details</button> : null}
-              {locked ? <button type="button" onClick={() => run(() => reopenQuoteComparisonAction(comparison.id), "Comparison reopened.")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold"><RotateCcw className="h-4 w-4" /> Reopen</button> : null}
-              {comparison.status !== "archived" ? <button type="button" onClick={() => run(() => archiveQuoteComparisonAction(comparison.id), "Comparison archived.")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold"><Archive className="h-4 w-4" /> Archive</button> : null}
+              {locked && !previewMode ? <button type="button" onClick={() => run(() => reopenQuoteComparisonAction(comparison.id), "Comparison reopened.")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold"><RotateCcw className="h-4 w-4" /> Reopen</button> : null}
+              {!previewMode && comparison.status !== "archived" ? <button type="button" onClick={() => run(() => archiveQuoteComparisonAction(comparison.id), "Comparison archived.")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold"><Archive className="h-4 w-4" /> Archive</button> : null}
             </div>
           </div>
         </div>
@@ -256,7 +258,7 @@ export function QuoteComparisonWorkspace({
 
         {error ? <div role="alert" className="mb-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{error}</div> : null}
         {message ? <div role="status" className="mb-4 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">{message}</div> : null}
-        {locked ? <div className="mb-4 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">This comparison is locked. Reopen it to change materials, prices, or the selected supplier.</div> : null}
+        {locked ? <div className="mb-4 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">{previewMode ? "Sample data only. The manager version allows authorized staff to add materials, enter prices, and select a supplier." : "This comparison is locked. Reopen it to change materials, prices, or the selected supplier."}</div> : null}
 
         <section className="border border-slate-200 bg-white shadow-sm" aria-labelledby="materials-heading">
           <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -313,7 +315,7 @@ export function QuoteComparisonWorkspace({
           {!recommended && analyses.some((analysis) => analysis.pricedItemCount > 0) ? <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-amber-800"><AlertTriangle className="h-4 w-4" /> No reliable winner yet. Complete more line prices before selecting a supplier.</p> : null}
         </section>
 
-        <details className="mt-8 border-t border-slate-300 pt-4"><summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-slate-500"><ChevronDown className="h-4 w-4" /> Comparison controls</summary><div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={deleteComparison} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700"><Trash2 className="h-4 w-4" /> Delete comparison</button></div></details>
+        {!previewMode ? <details className="mt-8 border-t border-slate-300 pt-4"><summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-slate-500"><ChevronDown className="h-4 w-4" /> Comparison controls</summary><div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={deleteComparison} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700"><Trash2 className="h-4 w-4" /> Delete comparison</button></div></details> : null}
       </div>
     </main>
   );

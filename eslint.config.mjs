@@ -18,6 +18,7 @@ const eslintConfig = defineConfig([
     "playwright-report/**",
     "test-results/**",
     "public/pdf.worker.min.mjs",
+    "supabase/.temp/**",
   ]),
 ]);
 
