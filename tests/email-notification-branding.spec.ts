@@ -41,9 +41,9 @@ test("customer email chrome includes the animated logo and every company contact
   expect(html).toContain("avantia-build-rain-painter-animation.gif")
   expect(html).toContain("https://build.avantiap.com")
   expect(html).toContain("mailto:office@build.avantiap.com")
-  expect(html).toContain("tel:+19292077156")
-  expect(html).toContain("https://wa.me/19292077156")
-  expect(html).toContain("(929) 207-7156")
+  expect(html).toContain("tel:+15169088319")
+  expect(html).toContain("https://wa.me/15169088319")
+  expect(html).toContain("(516) 908-8319")
 })
 
 test("requested material list shows quantities and safely escapes selections", () => {
@@ -86,7 +86,7 @@ test("cart confirmation sent to the client includes the requested item list and 
   expect(clientDelivery?.html).toContain("5/8 in. drywall")
   expect(clientDelivery?.html).toContain("30 sheets")
   expect(clientDelivery?.html).toContain("office@build.avantiap.com")
-  expect(clientDelivery?.html).toContain("(929) 207-7156")
+  expect(clientDelivery?.html).toContain("(516) 908-8319")
   expect(clientDelivery?.text).toContain("Materials requested:")
   expect(clientDelivery?.text).toContain("- 5/8 in. drywall: 30 sheets")
 })
@@ -137,7 +137,7 @@ test("public quote confirmation includes the customer's request details", async 
   expect(clientDelivery?.html).toContain("Materials requested")
   expect(clientDelivery?.html).toContain("40 sheets of 5/8 in. fire-rated drywall")
   expect(clientDelivery?.html).toContain("material-list.pdf")
-  expect(clientDelivery?.html).toContain("(929) 207-7156")
+  expect(clientDelivery?.html).toContain("(516) 908-8319")
 })
 
 test("manager reply keeps the material list and company contacts in the email", async () => {

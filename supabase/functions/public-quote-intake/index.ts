@@ -55,9 +55,9 @@ const maxStoredFileSize = 25 * 1024 * 1024
 const temporaryUploadPrefix = "public-intake/"
 const siteUrl = "https://build.avantiap.com"
 const companyEmail = "office@build.avantiap.com"
-const companyPhone = "(929) 207-7156"
-const companyPhoneLink = "tel:+19292077156"
-const companyWhatsAppUrl = "https://wa.me/19292077156"
+const companyPhone = "(516) 908-8319"
+const companyPhoneLink = "tel:+15169088319"
+const companyWhatsAppUrl = "https://wa.me/15169088319"
 const customerEmailLogoUrl = `${siteUrl}/images/avantia/avantia-build-rain-painter-animation.gif`
 const corsHeaders = {
   "access-control-allow-origin": "*",
