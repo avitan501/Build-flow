@@ -11,6 +11,10 @@ type DeletionTarget = "customer" | "project" | "request";
 type DeleteManagerRecordResult =
   | { ok: true; warning?: string }
   | { ok: false; error: string };
+export type ManagerRequestLineInput = { name: string; quantity: number; unit: string };
+export type CreateClientRequestResult =
+  | { ok: true; requestId: string }
+  | { ok: false; error: string };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -213,6 +217,113 @@ export async function updateCustomerContact(formData: FormData) {
   });
   if (error) throw new Error(error.message || "Failed to update customer contact.");
   revalidatePath("/admin/users");
+}
+
+export async function createRequestForClientAction(input: {
+  customerId: string;
+  department: string;
+  title?: string;
+  lines: ManagerRequestLineInput[];
+  notes?: string;
+}): Promise<CreateClientRequestResult> {
+  const { user, profile } = await requireStaffProfile("customers");
+  const customerId = input.customerId.trim();
+  if (!validUuid(customerId)) return { ok: false, error: "Choose a valid customer." };
+
+  const department = input.department.trim().slice(0, 100);
+  if (!department) return { ok: false, error: "Choose a department." };
+
+  const lines = input.lines
+    .map((line) => ({
+      name: line.name.trim().slice(0, 300),
+      quantity: Number(line.quantity),
+      unit: line.unit.trim().slice(0, 40) || "each",
+    }))
+    .filter((line) => line.name);
+  if (!lines.length) return { ok: false, error: "Add at least one material item." };
+  if (lines.length > 50) return { ok: false, error: "Keep each request to 50 material lines or fewer." };
+  if (lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0 || line.quantity > 1_000_000)) {
+    return { ok: false, error: "Every item needs a valid quantity greater than zero." };
+  }
+
+  const notes = input.notes?.trim().slice(0, 4000) || "";
+  const admin = createAdminClient();
+  const { data: customer, error: customerError } = await admin
+    .from("profiles")
+    .select("id,role,is_active")
+    .eq("id", customerId)
+    .maybeSingle<{ id: string; role: string; is_active: boolean }>();
+  if (customerError || !customer || customer.role !== "client") return { ok: false, error: "This customer account is not available." };
+  if (!customer.is_active) return { ok: false, error: "This customer account is inactive." };
+
+  const { data: existingProject, error: projectLookupError } = await admin
+    .from("projects")
+    .select("id")
+    .eq("owner_id", customerId)
+    .eq("name", "Material Requests")
+    .neq("status", "archived")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (projectLookupError) return { ok: false, error: "Could not prepare the customer request workspace." };
+
+  let projectId = existingProject?.id || "";
+  if (!projectId) {
+    const { data: project, error: projectError } = await admin
+      .from("projects")
+      .insert({ owner_id: customerId, name: "Material Requests", status: "active" })
+      .select("id")
+      .single<{ id: string }>();
+    if (projectError || !project) return { ok: false, error: "Could not prepare the customer request workspace." };
+    projectId = project.id;
+  }
+
+  const requestTitle = input.title?.trim().slice(0, 180) || `${department} request`;
+  const now = new Date().toISOString();
+  const { data: request, error: requestError } = await admin
+    .from("quote_requests")
+    .insert({ project_id: projectId, owner_id: customerId, title: requestTitle, status: "submitted", submitted_at: now })
+    .select("id")
+    .single<{ id: string }>();
+  if (requestError || !request) return { ok: false, error: "Could not create the client request." };
+
+  const { error: itemError } = await admin.from("quote_request_items").insert(lines.map((line, index) => ({
+    request_id: request.id,
+    project_id: projectId,
+    owner_id: customerId,
+    catalog_item_id: null,
+    name: line.name,
+    department,
+    item_type: "custom_priced",
+    quantity: line.quantity,
+    unit: line.unit,
+    unit_price: 0,
+    qualification_status: "not_required",
+    metadata: {
+      created_by_manager: true,
+      created_by: user.id,
+      ...(index === 0 && notes ? { request_details: notes } : {}),
+    },
+  })));
+  if (itemError) {
+    await admin.from("quote_requests").delete().eq("id", request.id);
+    return { ok: false, error: "Could not save the material breakdown. No request was created." };
+  }
+
+  await admin.from("project_events").insert({
+    project_id: projectId,
+    owner_id: customerId,
+    event_type: "material_added",
+    source: "admin",
+    title: `${requestTitle} created by manager`,
+    description: `Created on behalf of the client by ${profile?.full_name || user.email || "a staff member"}.`,
+    metadata: { quote_request_id: request.id, created_by_manager: user.id },
+  });
+
+  revalidatePath("/admin/users");
+  revalidatePath("/owner/materials/requests");
+  revalidatePath(`/owner/materials/requests/${request.id}`);
+  return { ok: true, requestId: request.id };
 }
 
 export async function deleteOpenRequestAction(requestId: string): Promise<DeleteManagerRecordResult> {

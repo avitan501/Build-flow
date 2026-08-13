@@ -30,6 +30,32 @@ async function currentUser() {
 }
 
 type RequestNotificationStatus = "sent" | "failed" | "not_configured" | "skipped"
+const DIRECT_REQUEST_PROJECT_NAME = "Material Requests"
+
+async function ensureDirectRequestProject(
+  session: NonNullable<Awaited<ReturnType<typeof currentUser>>>,
+): Promise<{ id: string; name: string } | null> {
+  const { data: existing, error: existingError } = await session.supabase
+    .from("projects")
+    .select("id,name")
+    .eq("owner_id", session.user.id)
+    .eq("name", DIRECT_REQUEST_PROJECT_NAME)
+    .neq("status", "archived")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string; name: string }>()
+
+  if (existingError) return null
+  if (existing) return existing
+
+  const { data: created, error: createError } = await session.supabase
+    .from("projects")
+    .insert({ owner_id: session.user.id, name: DIRECT_REQUEST_PROJECT_NAME, status: "active" })
+    .select("id,name")
+    .single<{ id: string; name: string }>()
+
+  return createError ? null : created
+}
 
 async function notifyNewProjectRequest(
   session: NonNullable<Awaited<ReturnType<typeof currentUser>>>,
@@ -56,7 +82,7 @@ async function notifyNewProjectRequest(
   const delivery = await sendProjectRequestNotificationEmail({
     requestId,
     requestTitle: request.title,
-    projectName: project.name,
+    projectName: project.name === DIRECT_REQUEST_PROJECT_NAME ? "Material request" : project.name,
     projectAddress: project.address,
     clientName: session.profile?.full_name || session.user.user_metadata?.full_name || session.user.email || "Client",
     clientEmail: session.user.email || session.profile?.email || null,
@@ -130,25 +156,14 @@ async function finalizeNewProjectRequest(
 
 export async function getAddToProjectOptionsAction(): Promise<ActionResult<{
   userId: string
-  projects: Array<{ id: string; name: string; address: string | null }>
 }>> {
   const session = await currentUser()
-  if (!session) return { ok: false, error: "Sign in to add this item to a project.", authRequired: true }
-
-  const { data: projects, error: projectsError } = await session.supabase
-    .from("projects")
-    .select("id, name, address")
-    .eq("owner_id", session.user.id)
-    .neq("status", "archived")
-    .order("updated_at", { ascending: false })
-
-  if (projectsError) return { ok: false, error: "Could not load your projects. Please try again." }
+  if (!session) return { ok: false, error: "Sign in to submit this request.", authRequired: true }
 
   return {
     ok: true,
     data: {
       userId: session.user.id,
-      projects: (projects ?? []).map((project) => ({ id: project.id, name: project.name, address: project.address })),
     },
   }
 }
@@ -193,7 +208,7 @@ export async function saveQuoteAttachmentRecordAction(input: {
 }
 
 export async function addCatalogItemToProjectAction(input: {
-  projectId: string
+  projectId?: string
   requestId?: string
   requestTitle?: string
   product: {
@@ -208,19 +223,22 @@ export async function addCatalogItemToProjectAction(input: {
     details?: string
     questionnaireDepartment?: string
   }
-}): Promise<ActionResult<{ requestId: string; itemId: string; materialResponse: MaterialQuestionnaireResponse | null; materialAnswers: MaterialRequestAnswer[] }>> {
+}): Promise<ActionResult<{ projectId: string; requestId: string; itemId: string; materialResponse: MaterialQuestionnaireResponse | null; materialAnswers: MaterialRequestAnswer[] }>> {
   const session = await currentUser()
-  if (!session) return { ok: false, error: "Sign in to add this item to a project.", authRequired: true }
+  if (!session) return { ok: false, error: "Sign in to submit this request.", authRequired: true }
 
-  const { data: project } = await session.supabase
-    .from("projects")
-    .select("id, name")
-    .eq("id", input.projectId)
-    .eq("owner_id", session.user.id)
-    .neq("status", "archived")
-    .maybeSingle<{ id: string; name: string }>()
+  const requestedProjectId = input.projectId?.trim()
+  const project = requestedProjectId
+    ? (await session.supabase
+        .from("projects")
+        .select("id, name")
+        .eq("id", requestedProjectId)
+        .eq("owner_id", session.user.id)
+        .neq("status", "archived")
+        .maybeSingle<{ id: string; name: string }>()).data
+    : await ensureDirectRequestProject(session)
 
-  if (!project) return { ok: false, error: "Choose an active project." }
+  if (!project) return { ok: false, error: "Could not prepare your request. Please try again." }
 
   let requestId = input.requestId?.trim() || ""
   let createdRequest = false
@@ -340,7 +358,7 @@ export async function addCatalogItemToProjectAction(input: {
   })
 
   revalidatePath(`/projects/${project.id}`)
-  return { ok: true, data: { requestId, itemId: item.id, materialResponse, materialAnswers } }
+  return { ok: true, data: { projectId: project.id, requestId, itemId: item.id, materialResponse, materialAnswers } }
 }
 
 export async function saveMaterialQuestionnaireResponseAction(input: {

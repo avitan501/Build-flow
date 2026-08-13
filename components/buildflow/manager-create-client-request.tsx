@@ -1,0 +1,99 @@
+"use client"
+
+import { ClipboardPlus, Plus, Trash2, X } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useState, useTransition } from "react"
+import { createPortal } from "react-dom"
+
+import { createRequestForClientAction, type ManagerRequestLineInput } from "@/app/admin/users/actions"
+
+type CustomerOption = { id: string; name: string; email: string | null }
+type RequestLine = ManagerRequestLineInput & { key: string }
+
+const UNITS = ["each", "pieces", "sheets", "boxes", "bags", "bundles", "rolls", "linear ft.", "sq. ft.", "gallons", "yards"]
+
+function emptyLine(): RequestLine {
+  return { key: crypto.randomUUID(), name: "", quantity: 1, unit: "each" }
+}
+
+export function ManagerCreateClientRequest({
+  customers,
+  departments,
+  initialCustomerId = "",
+  compact = false,
+}: {
+  customers: CustomerOption[]
+  departments: string[]
+  initialCustomerId?: string
+  compact?: boolean
+}) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [customerId, setCustomerId] = useState(initialCustomerId || customers[0]?.id || "")
+  const [department, setDepartment] = useState(departments[0] || "General")
+  const [title, setTitle] = useState("")
+  const [lines, setLines] = useState<RequestLine[]>([{ key: "initial", name: "", quantity: 1, unit: "each" }])
+  const [notes, setNotes] = useState("")
+  const [showNotes, setShowNotes] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  function updateLine(key: string, patch: Partial<RequestLine>) {
+    setLines((current) => current.map((line) => line.key === key ? { ...line, ...patch } : line))
+  }
+
+  function close() {
+    if (isPending) return
+    setOpen(false)
+    setError(null)
+  }
+
+  function submit() {
+    setError(null)
+    startTransition(async () => {
+      const result = await createRequestForClientAction({ customerId, department, title, notes, lines })
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      setOpen(false)
+      router.push(`/owner/materials/requests/${result.requestId}`)
+      router.refresh()
+    })
+  }
+
+  return (
+    <>
+      <button type="button" disabled={!customers.length} onClick={() => setOpen(true)} className={compact ? "inline-flex min-h-10 items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-[#0066cc] disabled:opacity-40" : "inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-40"}>
+        <ClipboardPlus className="h-4 w-4" />Create request for client
+      </button>
+
+      {open && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[140] grid place-items-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-labelledby="manager-client-request-title" onMouseDown={(event) => { if (event.currentTarget === event.target) close() }}>
+        <section className="flex max-h-[min(92dvh,52rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_30px_90px_rgba(15,23,42,.35)]">
+          <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+            <div><p className="text-[11px] font-bold uppercase tracking-[.14em] text-[#0066cc]">Manager request</p><h2 id="manager-client-request-title" className="mt-1 text-xl font-bold text-slate-950">Create request for a client</h2><p className="mt-1 text-sm text-slate-500">Enter the order exactly as the client gave it to you.</p></div>
+            <button type="button" onClick={close} disabled={isPending} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500" aria-label="Close"><X className="h-5 w-5" /></button>
+          </header>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Client<select value={customerId} onChange={(event) => setCustomerId(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm">{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}{customer.email ? ` - ${customer.email}` : ""}</option>)}</select></label>
+              <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Department<select value={department} onChange={(event) => setDepartment(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm">{departments.map((item) => <option key={item}>{item}</option>)}</select></label>
+              <label className="grid gap-1.5 text-sm font-semibold text-slate-800 sm:col-span-2">Request name <span className="font-normal text-slate-400">(optional)</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${department} request`} maxLength={180} className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm" /></label>
+            </div>
+
+            <div className="mt-5 border-t border-slate-200 pt-5">
+              <div className="flex items-center justify-between gap-3"><div><h3 className="font-bold text-slate-950">Material list</h3><p className="text-xs text-slate-500">Add every item, quantity, and unit.</p></div><button type="button" onClick={() => setLines((current) => [...current, emptyLine()])} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700"><Plus className="h-4 w-4" />Add item</button></div>
+              <div className="mt-3 grid gap-3">{lines.map((line, index) => <div key={line.key} className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[minmax(0,1fr)_7rem_8rem_2.75rem] sm:items-end"><label className="grid gap-1 text-xs font-semibold text-slate-600">Item {index + 1}<input value={line.name} onChange={(event) => updateLine(line.key, { name: event.target.value })} placeholder="Example: 5/8 in. Type X drywall" className="min-h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label><label className="grid gap-1 text-xs font-semibold text-slate-600">Quantity<input type="number" min="0.01" step="any" value={line.quantity} onChange={(event) => updateLine(line.key, { quantity: Number(event.target.value) })} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label><label className="grid gap-1 text-xs font-semibold text-slate-600">Unit<select value={line.unit} onChange={(event) => updateLine(line.key, { unit: event.target.value })} className="min-h-11 rounded-lg border border-slate-300 bg-white px-2 text-sm">{UNITS.map((unit) => <option key={unit}>{unit}</option>)}</select></label><button type="button" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))} className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-500 disabled:opacity-30" aria-label={`Remove item ${index + 1}`}><Trash2 className="h-4 w-4" /></button></div>)}</div>
+            </div>
+
+            <div className="mt-4">{showNotes ? <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Request notes <span className="font-normal text-slate-400">(optional)</span><textarea rows={3} maxLength={4000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Delivery, brand, timing, or other instructions" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" /></label> : <button type="button" onClick={() => setShowNotes(true)} className="text-sm font-semibold text-[#0066cc]">+ Add optional notes</button>}</div>
+            {error ? <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{error}</div> : null}
+          </div>
+
+          <footer className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4"><button type="button" onClick={close} disabled={isPending} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700">Cancel</button><button type="button" onClick={submit} disabled={isPending || !customerId} className="min-h-11 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-40">{isPending ? "Creating..." : "Create client request"}</button></footer>
+        </section>
+      </div>, document.body) : null}
+    </>
+  )
+}

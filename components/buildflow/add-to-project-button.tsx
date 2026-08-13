@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
+import { createPortal } from "react-dom"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import {
@@ -36,7 +37,6 @@ type AddToProjectButtonProps = {
 
 type Options = {
   userId: string
-  projects: Array<{ id: string; name: string; address: string | null }>
 }
 
 function PlusIcon() {
@@ -47,13 +47,12 @@ function PlusIcon() {
   )
 }
 
-export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Add to Project", file = null, questions: questionOverride, details, questionnaireDepartment, materialAnswers, onAdded, autoOpen = false }: AddToProjectButtonProps) {
+export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Request Item", file = null, questions: questionOverride, details, questionnaireDepartment, materialAnswers, onAdded, autoOpen = false }: AddToProjectButtonProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [open, setOpen] = useState(false)
   const [options, setOptions] = useState<Options | null>(null)
-  const [projectId, setProjectId] = useState("")
   const [created, setCreated] = useState<{ projectId: string; requestId: string; itemId: string; materialResponse: MaterialQuestionnaireResponse | null; materialAnswers: MaterialRequestAnswer[] } | null>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
@@ -82,6 +81,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
 
   async function begin() {
     setOpen(true)
+    setOptions(null)
     setError(null)
     setCreated(null)
     setQuestionnaireCompleted(false)
@@ -97,15 +97,10 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
       return
     }
     setOptions(result.data)
-    const firstProject = result.data.projects[0]
-    setProjectId(firstProject?.id ?? "")
+    addItem(result.data)
   }
 
-  function addItem() {
-    if (!projectId) {
-      setError("Choose a project first.")
-      return
-    }
+  function addItem(context: Options) {
     if (file && file.size > 25 * 1024 * 1024) {
       setError("The attachment is larger than 25 MB. Choose a smaller file.")
       return
@@ -113,7 +108,6 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
     setError(null)
     startTransition(async () => {
       const result = await addCatalogItemToProjectAction({
-        projectId,
         requestId: undefined,
         requestTitle: `${product.category} request`,
         product: {
@@ -133,9 +127,9 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
         setError(result.error)
         return
       }
-      if (file && options) {
+      if (file) {
         const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-|-$/g, "") || "upload"
-        const filePath = `${options.userId}/${projectId}/${crypto.randomUUID()}-${safeName}`
+        const filePath = `${context.userId}/${result.data.projectId}/${crypto.randomUUID()}-${safeName}`
         const supabase = createClient()
         const { error: uploadError } = await supabase.storage.from("project-uploads").upload(filePath, file, { upsert: false })
         if (uploadError) {
@@ -143,7 +137,6 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
         } else {
           const attachmentResult = await saveQuoteAttachmentRecordAction({
             ...result.data,
-            projectId,
             fileName: file.name,
             filePath,
             fileType: file.type,
@@ -155,7 +148,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
       }
       if (materialAnswers && result.data.materialResponse) {
         const answersResult = await saveMaterialQuestionnaireResponseAction({
-          projectId,
+          projectId: result.data.projectId,
           requestId: result.data.requestId,
           responseId: result.data.materialResponse.id,
           answers: materialAnswers,
@@ -163,13 +156,23 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
         })
         if (!answersResult.ok) {
           setError(answersResult.error)
-          setCreated({ projectId, ...result.data })
+          setCreated(result.data)
           return
         }
         setQuestionnaireCompleted(true)
         onAdded?.()
       }
-      setCreated({ projectId, ...result.data })
+      if (!result.data.materialResponse && questions.length === 0) {
+        const finishResult = await saveQuoteItemAnswersAction({ ...result.data, answers: [] })
+        if (!finishResult.ok) {
+          setError(finishResult.error)
+          setCreated(result.data)
+          return
+        }
+        setQuestionnaireCompleted(true)
+        onAdded?.()
+      }
+      setCreated(result.data)
       router.refresh()
     })
   }
@@ -257,12 +260,12 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
         {compact ? null : <span>{label}</span>}
       </button>
 
-      {open ? (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/45 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 backdrop-blur-sm sm:items-center sm:p-6">
-          <section role="dialog" aria-modal="true" aria-labelledby={`add-project-${product.id}`} className="max-h-[90vh] w-full max-w-md overflow-hidden rounded-[22px] border border-white/70 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.3)]">
+      {open && typeof document !== "undefined" ? createPortal((
+        <div className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-slate-950/45 p-3 backdrop-blur-sm sm:p-6">
+          <section role="dialog" aria-modal="true" aria-labelledby={`add-project-${product.id}`} className="max-h-[min(90dvh,48rem)] w-full max-w-md overflow-hidden rounded-[22px] border border-white/70 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.3)]">
             <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">{authRequired ? "Continue Request" : "Create New Project Request"}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">{authRequired ? "Continue Request" : created ? "Request Ready" : "Submitting Request"}</p>
                 <h2 id={`add-project-${product.id}`} className="mt-1 truncate text-xl font-semibold text-slate-950">{product.name}</h2>
               </div>
               <button type="button" onClick={() => setOpen(false)} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-xl text-slate-500" aria-label="Close">
@@ -270,47 +273,26 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
               </button>
             </header>
 
-            <div className="max-h-[66vh] overflow-x-hidden overflow-y-auto px-5 py-5">
-              {!options && !error && !authRequired ? <p className="text-sm text-slate-600">Loading your projects...</p> : null}
+            <div className="max-h-[min(72dvh,38rem)] overflow-x-hidden overflow-y-auto px-5 py-5">
+              {!options && !error && !authRequired ? <p className="text-sm text-slate-600">Preparing your request...</p> : null}
 
               {authRequired ? (
                 <div className="grid gap-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-950">Save and continue your request</h3>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">Log in or create an account to connect this request to a project. Your answers will stay saved while you continue.</p>
+                    <h3 className="text-lg font-semibold text-slate-950">Sign in to send your request</h3>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">Your answers are saved on this device. After signing in, the request will continue automatically.</p>
                   </div>
                   <Link href={`/login?next=${encodeURIComponent(returnPath)}`} className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#0071e3] px-5 text-sm font-semibold text-white hover:bg-[#0066cc]">Log in</Link>
                   <Link href={`/signup?next=${encodeURIComponent(returnPath)}`} className="inline-flex min-h-12 items-center justify-center rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-800 hover:border-slate-500">Create account</Link>
                 </div>
               ) : null}
 
-              {options && options.projects.length === 0 ? (
-                <div className="rounded-[20px] border border-sky-100 bg-sky-50 p-4">
-                  <h3 className="font-semibold text-slate-950">Create a project first</h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">A project keeps the request, answers, and files together.</p>
-                  <Link href={`/projects/new?next=${encodeURIComponent(pathname)}`} className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white">New Project</Link>
-                </div>
-              ) : null}
-
-              {options && options.projects.length > 0 && !created ? (
-                <div className="grid min-w-0 gap-4">
-                  <label className="grid gap-2 text-sm font-semibold text-slate-900">
-                    Choose a project
-                    <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className="min-h-12 min-w-0 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base">
-                      {options.projects.map((project) => <option key={project.id} value={project.id}>{project.name}{project.address ? ` - ${project.address}` : ""}</option>)}
-                    </select>
-                  </label>
-                  <p className="text-xs leading-5 text-slate-500">This creates a new request inside the selected project.</p>
-                  <button type="button" disabled={isPending} onClick={addItem} className="inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white disabled:opacity-50">
-                    {isPending ? "Creating..." : `Create New ${product.category} Request`}
-                  </button>
-                </div>
-              ) : null}
+              {options && !created && isPending ? <div className="rounded-[20px] border border-sky-100 bg-sky-50 px-4 py-5 text-center text-sm font-semibold text-sky-900">Saving your request...</div> : null}
 
               {created && !created.materialResponse && !questionnaireCompleted ? (
                 <div className="grid gap-4">
                   <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
-                    Added to the project. Complete these details now or return before submitting.
+                    Request created. Add the remaining details to send it.
                   </div>
                   {questions.length > 0 ? questions.map((question) => (
                     <label key={question.id} className="grid gap-2 text-sm font-semibold text-slate-900">
@@ -324,7 +306,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
                       {questions.length > 0 ? "Save Answers" : "Done"}
                     </button>
                   </div>
-                  <Link href={`/projects/${created.projectId}`} className="text-center text-sm font-semibold text-[#0066cc]">Open project</Link>
+                  <Link href={`/projects/${created.projectId}/requests/${created.requestId}`} className="text-center text-sm font-semibold text-[#0066cc]">View request</Link>
                 </div>
               ) : null}
 
@@ -341,7 +323,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
             </div>
           </section>
         </div>
-      ) : null}
+      ), document.body) : null}
       {open && created?.materialResponse && !questionnaireCompleted ? (
         <MaterialQuestionnaireWizard
           snapshot={created.materialResponse.definition_snapshot}
