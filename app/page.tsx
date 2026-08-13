@@ -138,20 +138,6 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="border-y border-slate-200 bg-[#071126] px-3 py-8 text-white sm:px-5 sm:py-10" aria-labelledby="renovation-ai-heading">
-        <div data-testid="homepage-island" className="mx-auto flex max-w-[88rem] flex-col gap-6 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
-          <div className="max-w-3xl">
-            <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.16em] text-sky-300">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-sky-400/15 text-sky-200"><Sparkles className="h-5 w-5" aria-hidden="true" /></span>
-              No login required
-            </div>
-            <h2 id="renovation-ai-heading" className="mt-4 text-2xl font-semibold leading-tight sm:text-3xl">Estimate apartment renovation materials in a few questions.</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">Choose the apartment mix, location, finish class, budget, and work scope. Get material quantities and a portfolio purchasing range.</p>
-          </div>
-          <Link href="/ai/renovation-estimator" className="inline-flex min-h-12 w-fit shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-5 text-sm font-bold text-[#071126] transition hover:bg-sky-50" aria-label="Build renovation estimate">Build renovation estimate <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
-        </div>
-      </section>
-
       <div className="px-3 py-2 sm:px-5 sm:py-3">
         <div data-testid="homepage-island" className="mx-auto max-w-[88rem] overflow-hidden">
           <ShopBrandShowcase compact transparent />
