@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
+import { GoogleSignInIcon } from "@/components/buildflow/google-sign-in-icon";
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { friendlyAuthError, isGoogleAuthEnabled } from "@/lib/auth-ui";
 import { createClient } from "@/lib/supabase/client";
@@ -285,15 +286,18 @@ export default function SignupPage() {
           </form>
 
           {googleEnabled ? (
-          <div className="mt-4">
+          <div className="mt-5 border-t border-slate-200 pt-5">
+            <p className="mb-3 text-center text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Fastest way to create an account</p>
             <button
               type="button"
               onClick={handleGoogleSignIn}
               disabled={isSubmitting}
-              className="w-full rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+              className="flex min-h-14 w-full items-center justify-center gap-3 rounded-full border-2 border-slate-200 bg-white px-5 text-base font-semibold text-slate-800 shadow-sm transition hover:border-sky-200 hover:bg-sky-50/50 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {isSubmitting ? "Opening Gmail..." : "Continue with Gmail"}
+              <GoogleSignInIcon className="h-6 w-6 shrink-0" />
+              <span>{isSubmitting ? "Opening Google..." : "Continue with Google (Gmail)"}</span>
             </button>
+            <p className="mt-2 text-center text-xs text-slate-500">Use your existing Gmail account. No new password needed.</p>
           </div>
           ) : null}
 

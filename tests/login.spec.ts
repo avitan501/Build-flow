@@ -56,7 +56,7 @@ test("login hydrates cleanly when browser auth configuration becomes available",
   expect(pageErrors.filter((message) => message.includes("Hydration failed"))).toEqual([])
 })
 
-test("login shows Gmail when Google authentication is enabled", async ({ page }) => {
+test("login clearly shows Google Gmail authentication when enabled", async ({ page }) => {
   await configureTestAuth(page)
   await page.route("**/auth/v1/settings", async (route) => {
     await route.fulfill({
@@ -68,5 +68,8 @@ test("login shows Gmail when Google authentication is enabled", async ({ page })
 
   await page.goto("/login")
 
-  await expect(page.getByRole("button", { name: "Continue with Gmail" })).toBeVisible()
+  const googleButton = page.getByRole("button", { name: "Continue with Google (Gmail)" })
+  await expect(googleButton).toBeVisible()
+  await expect(googleButton.locator("svg")).toBeVisible()
+  await expect(page.getByText("Use your existing Gmail account. No new password needed.")).toBeVisible()
 })
