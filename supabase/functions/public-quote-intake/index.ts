@@ -27,7 +27,7 @@ type EmailDeliveryResult =
   | { status: "failed"; error: string }
 
 type EmailActionPayload =
-  | { action: "send_manager_reply"; requestId?: string; message?: string }
+  | { action: "send_manager_reply"; requestId?: string; message?: string; items?: CustomerEmailItem[] }
   | { action: "send_quote_notifications"; requestId?: string; quote?: QuotePayload; sendOwner?: boolean; sendClient?: boolean }
   | { action: "send_order_notifications"; order?: OrderNotificationPayload; sendOwner?: boolean; sendClient?: boolean }
   | { action: "prepare_upload"; filename?: string; type?: string; size?: number }
@@ -42,12 +42,23 @@ type OrderNotificationPayload = {
   total: number
 }
 
+type CustomerEmailItem = {
+  name: string
+  quantity?: number | null
+  unit?: string | null
+  details?: string[]
+}
+
 const allowedTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"])
 const maxInlineFileSize = 4 * 1024 * 1024
 const maxStoredFileSize = 25 * 1024 * 1024
 const temporaryUploadPrefix = "public-intake/"
 const siteUrl = "https://build.avantiap.com"
 const companyEmail = "office@build.avantiap.com"
+const companyPhone = "(929) 207-7156"
+const companyPhoneLink = "tel:+19292077156"
+const companyWhatsAppUrl = "https://wa.me/19292077156"
+const customerEmailLogoUrl = `${siteUrl}/images/avantia/avantia-build-rain-painter-animation.gif`
 const corsHeaders = {
   "access-control-allow-origin": "*",
   "access-control-allow-headers": "authorization, apikey, content-type",
@@ -78,6 +89,32 @@ function escapeHtml(value: string) {
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number.isFinite(value) ? value : 0)
+}
+
+function companyContactText() {
+  return ["Avantia Build", "Everything it takes to build", companyEmail, companyPhone, siteUrl, `WhatsApp: ${companyWhatsAppUrl}`].join("\n")
+}
+
+function itemQuantity(item: CustomerEmailItem) {
+  if (item.quantity === null || item.quantity === undefined) return ""
+  return `${item.quantity} ${item.unit?.trim() || "item"}`
+}
+
+function requestedItemsText(items: CustomerEmailItem[], emptyLabel = "See the request details or attached file.") {
+  if (!items.length) return emptyLabel
+  return items.flatMap((item) => [
+    `- ${item.name}${itemQuantity(item) ? `: ${itemQuantity(item)}` : ""}`,
+    ...(item.details ?? []).filter(Boolean).map((detail) => `  ${detail}`),
+  ]).join("\n")
+}
+
+function requestedItemsHtml(items: CustomerEmailItem[], emptyLabel = "See the request details or attached file.") {
+  if (!items.length) return `<p style="margin:8px 0 0;color:#64748b">${escapeHtml(emptyLabel)}</p>`
+  return `<div style="margin-top:10px;border:1px solid #dbe3ee;border-radius:10px;overflow:hidden">${items.map((item, index) => `<div style="padding:13px 14px;${index ? "border-top:1px solid #e5eaf1;" : ""}background:${index % 2 ? "#f8fafc" : "#ffffff"}"><strong style="color:#071126">${escapeHtml(item.name)}</strong>${itemQuantity(item) ? `<br><span style="color:#475569">${escapeHtml(itemQuantity(item))}</span>` : ""}${item.details?.length ? `<ul style="margin:7px 0 0;padding-left:18px;color:#475569">${item.details.filter(Boolean).map((detail) => `<li>${escapeHtml(detail)}</li>`).join("")}</ul>` : ""}</div>`).join("")}</div>`
+}
+
+function customerEmailShell(content: string) {
+  return `<div style="margin:0;background:#eef2f6;padding:24px 10px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.55"><div style="max-width:640px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:14px;background:#ffffff"><div style="padding:18px 22px;border-bottom:1px solid #e5eaf1;background:#ffffff"><a href="${siteUrl}" style="display:inline-block;text-decoration:none"><img src="${customerEmailLogoUrl}" width="280" alt="Avantia Build" style="display:block;width:100%;max-width:280px;height:auto;border:0"></a></div><div style="padding:24px 22px">${content}</div><div style="padding:18px 22px;border-top:1px solid #e5eaf1;background:#f8fafc;color:#475569;font-size:13px;line-height:1.65"><strong style="color:#071126;font-size:15px">Avantia Build</strong><br><span>Everything it takes to build</span><br><a href="${siteUrl}" style="color:#0066cc;text-decoration:none">build.avantiap.com</a><br><a href="mailto:${companyEmail}" style="color:#0066cc;text-decoration:none">${companyEmail}</a><br><a href="${companyPhoneLink}" style="color:#0066cc;text-decoration:none">${companyPhone}</a><span style="color:#94a3b8"> &middot; </span><a href="${companyWhatsAppUrl}" style="color:#0066cc;text-decoration:none">WhatsApp us</a></div></div></div>`
 }
 
 async function sendEmail(input: { to: string; subject: string; html: string; text: string; replyTo?: string; attachment?: QuotePayload["attachment"] }) {
@@ -162,6 +199,14 @@ Deno.serve(async (request) => {
     if (!serviceRoleRequest) return json({ error: "forbidden" }, 403)
     const requestId = String(rawPayload.requestId || "")
     const message = String(rawPayload.message || "").trim().slice(0, 5000)
+    const items = Array.isArray(rawPayload.items)
+      ? rawPayload.items.slice(0, 100).map((item) => ({
+          name: String(item.name || "Material item").slice(0, 300),
+          quantity: Number.isFinite(Number(item.quantity)) ? Number(item.quantity) : null,
+          unit: item.unit ? String(item.unit).slice(0, 80) : null,
+          details: Array.isArray(item.details) ? item.details.map((detail) => String(detail).slice(0, 1000)).slice(0, 100) : [],
+        }))
+      : []
     if (!requestId || message.length < 2) return json({ error: "invalid_request" }, 400)
 
     const { data: quoteRequest } = await supabase.from("quote_requests").select("title,owner_id").eq("id", requestId).maybeSingle<{ title: string; owner_id: string }>()
@@ -173,8 +218,8 @@ Deno.serve(async (request) => {
       to: recipient.email,
       subject: `Avantia Build request: ${quoteRequest.title}`,
       replyTo: companyEmail,
-      text: `${message}\n\nAvantia Build\nEverything it takes to build`,
-      html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.6;max-width:620px;margin:0 auto"><p style="white-space:pre-wrap">${escapeHtml(message)}</p><div style="margin-top:28px;padding-top:18px;border-top:1px solid #e2e8f0"><strong>Avantia Build</strong><br><span style="color:#64748b">Everything it takes to build</span><br><span style="color:#64748b;font-size:13px">Request: ${escapeHtml(quoteRequest.title)}</span></div></div>`,
+      text: `${message}\n\nRequest: ${quoteRequest.title}\n\nMaterials requested:\n${requestedItemsText(items)}\n\n${companyContactText()}`,
+      html: customerEmailShell(`<p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request update</p><h1 style="margin:0;font-size:24px;line-height:1.25;color:#071126">${escapeHtml(quoteRequest.title)}</h1><p style="margin:16px 0;white-space:pre-wrap;color:#334155">${escapeHtml(message)}</p><h2 style="margin:22px 0 0;font-size:17px;color:#071126">Materials requested</h2>${requestedItemsHtml(items)}`),
     })
     console.log("manager_reply_email", { requestId, status: result.status })
     return json({ result })
@@ -222,6 +267,7 @@ Deno.serve(async (request) => {
     const clientEmail = order.customer?.email || order.customer?.profile?.email || ""
     const clientName = order.customer?.profile?.full_name || "Client"
     const itemLines = order.quoteItems.map((item) => `- ${item.name}: ${item.quantity} ${item.unit} = ${money(item.line_total)}`)
+    const customerItems: CustomerEmailItem[] = order.quoteItems.map((item) => ({ name: item.name, quantity: item.quantity, unit: item.unit }))
     const ownerText = ["New Avantia Build order request", `Quote ID: ${order.quoteId}`, `Project: ${order.project.name}`, `Address: ${order.project.address || "Not provided"}`, `Customer: ${clientName}`, `Email: ${clientEmail || "Not provided"}`, `Phone: ${order.customer?.profile?.phone || "Not provided"}`, "", "Items:", ...itemLines, "", `Total: ${money(order.total)}`].join("\n")
     const owner = rawPayload.sendOwner === false
       ? { status: "skipped" as const }
@@ -238,8 +284,8 @@ Deno.serve(async (request) => {
           to: clientEmail,
           subject: `We received your Avantia Build request: ${order.project.name}`,
           replyTo: companyEmail,
-          text: `Hi ${clientName},\n\nWe received your request for ${order.project.name}. Our team will review it and contact you if anything else is needed.\n\nQuote ID: ${order.quoteId}\n\nAvantia Build`,
-          html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:620px;margin:auto"><p>Hi ${escapeHtml(clientName)},</p><h1 style="font-size:22px">We received your request</h1><p>Our team will review the details and contact you if anything else is needed.</p><p><strong>Project:</strong> ${escapeHtml(order.project.name)}<br><strong>Quote ID:</strong> ${escapeHtml(order.quoteId)}</p><p style="margin-top:24px"><strong>Avantia Build</strong></p></div>`,
+          text: `Hi ${clientName},\n\nWe received your request for ${order.project.name}. Our team will review it and contact you if anything else is needed.\n\nQuote ID: ${order.quoteId}\n\nMaterials requested:\n${requestedItemsText(customerItems)}\n\n${companyContactText()}`,
+          html: customerEmailShell(`<p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p><h1 style="margin:0;font-size:25px;line-height:1.25;color:#071126">We received your request</h1><p style="margin:12px 0;color:#475569">Hi ${escapeHtml(clientName)}, our team will review the details and contact you if anything else is needed.</p><div style="margin:20px 0;padding:15px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc"><strong>Project:</strong> ${escapeHtml(order.project.name)}<br><strong>Request ID:</strong> ${escapeHtml(order.quoteId)}</div><h2 style="margin:22px 0 0;font-size:17px;color:#071126">Materials requested</h2>${requestedItemsHtml(customerItems)}`),
         })
     console.log("order_notification_email", { quoteId: order.quoteId, owner: owner.status, client: client.status })
     return json({ owner, client })
@@ -268,7 +314,7 @@ Deno.serve(async (request) => {
     const fullName = `${payload.firstName} ${payload.lastName}`.trim()
     const address = [payload.street, payload.city, payload.state, payload.zip].filter(Boolean).join(", ")
     const departmentText = payload.departments.join(", ") || "Not selected"
-    const requestUrl = `${siteUrl}/owner/materials/requests/${encodeURIComponent(requestId)}`
+    const customerItems: CustomerEmailItem[] = [{ name: departmentText, details: [payload.details || "See the attached file."] }]
     const requestUrl = rawPayload.requestId
       ? `${siteUrl}/owner/materials/requests/${encodeURIComponent(rawPayload.requestId)}`
       : `${siteUrl}/owner/materials/requests`
@@ -289,8 +335,8 @@ Deno.serve(async (request) => {
           to: payload.email,
           subject: `Material request received - ${payload.referenceId}`,
           replyTo: companyEmail,
-          text: `Hi ${payload.firstName},\n\nWe received your Avantia Build quote request. Someone from our team will contact you within the next 24 hours.\n\nReference: ${payload.referenceId}\n\nAvantia Build`,
-          html: `<div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5"><div style="max-width:620px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff"><div style="padding:20px 22px;border-bottom:1px solid #e5eaf1"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:12px"><img src="${siteUrl}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px"></td><td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br><span style="font-size:13px;color:#64748b">Materials priced and delivered</span></td></tr></table></div><div style="padding:24px 22px"><p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p><h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">Your request is in.</h1><p style="margin:12px 0;color:#475569">Hi ${escapeHtml(payload.firstName)}, we will review your details and contact you within 24 hours.</p><div style="margin:20px 0;padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}</div><p style="margin:22px 0"><a href="${siteUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Avantia Build</a></p><p style="margin:0;color:#64748b;font-size:13px">Questions? Reply to this email or call (516) 908-8319.</p></div></div></div>`,
+          text: `Hi ${payload.firstName},\n\nWe received your Avantia Build quote request. Someone from our team will contact you within the next 24 hours.\n\nReference: ${payload.referenceId}\n\nMaterials requested:\n${requestedItemsText(customerItems)}${payload.attachment?.filename ? `\nAttachment: ${payload.attachment.filename}` : ""}\n\n${companyContactText()}`,
+          html: customerEmailShell(`<p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p><h1 style="margin:0;font-size:25px;line-height:1.25;color:#071126">Your request is in.</h1><p style="margin:12px 0;color:#475569">Hi ${escapeHtml(payload.firstName)}, we will review your details and contact you within 24 hours.</p><div style="margin:20px 0;padding:15px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}</div><h2 style="margin:22px 0 0;font-size:17px;color:#071126">Materials requested</h2>${requestedItemsHtml(customerItems)}${payload.attachment?.filename ? `<p style="margin:14px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(payload.attachment.filename)}</p>` : ""}<p style="margin:22px 0 0"><a href="${siteUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Avantia Build</a></p>`),
         })
     console.log("quote_notification_email", { referenceId: payload.referenceId, owner: owner.status, client: client.status })
     return json({ owner, client })
@@ -437,6 +483,8 @@ Deno.serve(async (request) => {
     }
 
     const departmentText = payload.departments.join(", ") || "Not selected"
+    const requestUrl = `${siteUrl}/owner/materials/requests/${encodeURIComponent(requestId)}`
+    const customerItems: CustomerEmailItem[] = [{ name: departmentText, details: [payload.details || "See the attached file."] }]
     const ownerText = [
       "New Avantia Build quote request",
       `Reference: ${payload.referenceId}`,
@@ -459,13 +507,13 @@ Deno.serve(async (request) => {
       html: `<div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5"><div style="max-width:680px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff"><div style="padding:20px 22px;border-bottom:1px solid #e5eaf1"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:12px"><img src="${siteUrl}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px"></td><td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br><span style="font-size:13px;color:#64748b">Material request desk</span></td></tr></table></div><div style="padding:24px 22px"><p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">New material request</p><h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">${escapeHtml(fullName)} sent a request</h1><p style="margin:10px 0 0;color:#475569">${escapeHtml(departmentText)}${payload.timeframe ? ` &bull; Needed ${escapeHtml(payload.timeframe)}` : ""}</p><p style="margin:22px 0"><a href="${requestUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Request</a></p><div style="padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}<br><strong>Customer:</strong> ${escapeHtml(fullName)}<br><strong>Phone:</strong> ${escapeHtml(payload.phone || "Not provided")}<br><strong>Email:</strong> ${escapeHtml(email)}${payload.company ? `<br><strong>Company:</strong> ${escapeHtml(payload.company)}` : ""}</div><h2 style="margin:24px 0 8px;font-size:17px">Job details</h2><p style="margin:0"><strong>Location:</strong> ${escapeHtml(address || "Not provided")}<br><strong>Departments:</strong> ${escapeHtml(departmentText)}</p><h2 style="margin:24px 0 8px;font-size:17px">What they need</h2><p style="margin:0;white-space:pre-wrap">${escapeHtml(payload.details || "See attached file")}</p>${payload.attachment?.filename ? `<p style="margin:20px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(payload.attachment.filename)}</p>` : ""}</div></div></div>`,
       attachment: payload.attachment,
     })
-    const clientText = `Hi ${payload.firstName},\n\nWe received your Avantia Build quote request. Someone from our team will contact you within the next 24 hours.\n\nReference: ${payload.referenceId}\nProject: ${payload.projectName || "Not named"}\n\nAvantia Build\nEverything it takes to build`
+    const clientText = `Hi ${payload.firstName},\n\nWe received your Avantia Build quote request. Someone from our team will contact you within the next 24 hours.\n\nReference: ${payload.referenceId}\nProject: ${payload.projectName || "Not named"}\n\nMaterials requested:\n${requestedItemsText(customerItems)}${payload.attachment?.filename ? `\nAttachment: ${payload.attachment.filename}` : ""}\n\n${companyContactText()}`
     const clientEmail = await sendEmail({
       to: email,
       subject: `Material request received - ${payload.referenceId}`,
       replyTo: companyEmail,
       text: clientText,
-      html: `<div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5"><div style="max-width:620px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff"><div style="padding:20px 22px;border-bottom:1px solid #e5eaf1"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:12px"><img src="${siteUrl}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px"></td><td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br><span style="font-size:13px;color:#64748b">Materials priced and delivered</span></td></tr></table></div><div style="padding:24px 22px"><p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p><h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">Your request is in.</h1><p style="margin:12px 0;color:#475569">Hi ${escapeHtml(payload.firstName)}, we will review your details and contact you within 24 hours.</p><div style="margin:20px 0;padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}${payload.projectName ? `<br><strong>Project:</strong> ${escapeHtml(payload.projectName)}` : ""}</div><p style="margin:22px 0"><a href="${siteUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Avantia Build</a></p><p style="margin:0;color:#64748b;font-size:13px">Questions? Reply to this email or call (516) 908-8319.</p></div></div></div>`,
+      html: customerEmailShell(`<p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p><h1 style="margin:0;font-size:25px;line-height:1.25;color:#071126">Your request is in.</h1><p style="margin:12px 0;color:#475569">Hi ${escapeHtml(payload.firstName)}, we will review your details and contact you within 24 hours.</p><div style="margin:20px 0;padding:15px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}${payload.projectName ? `<br><strong>Project:</strong> ${escapeHtml(payload.projectName)}` : ""}</div><h2 style="margin:22px 0 0;font-size:17px;color:#071126">Materials requested</h2>${requestedItemsHtml(customerItems)}${payload.attachment?.filename ? `<p style="margin:14px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(payload.attachment.filename)}</p>` : ""}<p style="margin:22px 0 0"><a href="${siteUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Avantia Build</a></p>`),
     })
 
     await supabase.from("quote_request_items").update({
