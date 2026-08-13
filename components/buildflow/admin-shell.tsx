@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   BarChart3,
   ClipboardList,
+  Columns3,
   LayoutDashboard,
   Sparkles,
   Menu,
@@ -21,6 +22,7 @@ const ownerLinks = [
   { href: "/admin/build-map", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "Customers", icon: Users },
   { href: "/admin/vendors", label: "Suppliers", icon: Store },
+  { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
   { href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles },
   { href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 },
 ] as const;
@@ -31,7 +33,8 @@ function linksForAccess(access: ManagerAccess) {
   if (access.owner) return ownerLinks;
   return ownerLinks.filter((link) =>
     (link.href === "/admin/users" && access.customers) ||
-    (link.href === "/admin/vendors" && access.suppliers),
+    (link.href === "/admin/vendors" && access.suppliers) ||
+    (link.href === "/admin/quote-comparison" && access.suppliers),
   );
 }
 
