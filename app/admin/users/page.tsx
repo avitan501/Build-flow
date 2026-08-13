@@ -3,7 +3,9 @@ import Link from "next/link"
 
 import { approvePendingUser, changeUserRole, rejectUser, suspendUser, updateCustomerContact } from "@/app/admin/users/actions"
 import { DeleteManagerRecordButton } from "@/components/buildflow/delete-manager-record-button"
+import { ManagerCreateClientRequest } from "@/components/buildflow/manager-create-client-request"
 import { requireStaffProfile } from "@/lib/auth"
+import { MATERIAL_DEPARTMENTS } from "@/lib/material-questionnaires"
 import { isApprovedManagerIdentity } from "@/lib/owner-identity"
 
 const roleOptions = ["admin", "staff", "client"] as const
@@ -73,7 +75,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const search = params.q?.trim().toLowerCase() || ""
   const status = params.status?.trim() || "all"
 
-  const [customersResult, requestsResult, projectsResult, auditResult] = await Promise.all([
+  const [customersResult, requestsResult, projectsResult, auditResult, categoriesResult] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, email, full_name, company_name, phone, role, approval_status, is_active, created_at")
@@ -91,6 +93,12 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
       .order("created_at", { ascending: false })
       .limit(6)
       .returns<AuditRecord[]>(),
+    supabase
+      .from("material_questionnaire_categories")
+      .select("department_key")
+      .eq("is_active", true)
+      .order("sort_order")
+      .returns<Array<{ department_key: string }>>(),
   ])
 
   if (customersResult.error) throw new Error("Failed to load customer accounts.")
@@ -101,6 +109,8 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const requests = requestsResult.data ?? []
   const projects = projectsResult.data ?? []
   const audits = auditResult.data ?? []
+  const managerCustomers = customers.filter((customer) => customer.role === "client" && customer.is_active).map((customer) => ({ id: customer.id, name: customerName(customer), email: customer.email }))
+  const departments = Array.from(new Set([...(categoriesResult.data ?? []).map((category) => category.department_key), ...MATERIAL_DEPARTMENTS]))
   const customerMap = new Map(customers.map((customer) => [customer.id, customer]))
   const requestCount = new Map<string, number>()
   const projectRequestCount = new Map<string, number>()
@@ -144,10 +154,9 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 pb-28 pt-6 text-slate-950 sm:px-8 sm:pb-12">
       <div className="mx-auto max-w-7xl">
-        <header className="border-b border-slate-200 pb-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager</p>
-          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">{pageTitle}</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{pageDescription}</p>
+        <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-6">
+          <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager</p><h1 className="mt-2 text-3xl font-bold sm:text-4xl">{pageTitle}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{pageDescription}</p></div>
+          <ManagerCreateClientRequest customers={managerCustomers} departments={departments} initialCustomerId={params.customer || ""} />
         </header>
 
         <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Customer and request overview">
@@ -180,7 +189,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
               return <article key={customer.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0"><h2 className="text-lg font-bold">{customerName(customer)}</h2><p className="mt-1 break-all text-sm text-slate-600">{customer.email || "No email"}</p><p className="mt-1 text-sm text-slate-500">{customer.company_name || "No company"}{customer.phone ? ` · ${customer.phone}` : " · No phone"}</p></div>
-                  <div className="flex flex-wrap gap-2"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(customer.role)}`}>{customer.role}</span><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(customer.approval_status)}`}>{customer.approval_status}</span>{isSelf ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">Your account</span> : null}</div>
+                  <div className="flex flex-wrap justify-end gap-2"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(customer.role)}`}>{customer.role}</span><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(customer.approval_status)}`}>{customer.approval_status}</span>{isSelf ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">Your account</span> : null}{customer.role === "client" && customer.is_active ? <ManagerCreateClientRequest customers={[{ id: customer.id, name: customerName(customer), email: customer.email }]} departments={departments} initialCustomerId={customer.id} compact /> : null}</div>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-4 border-y border-slate-100 py-3 text-sm"><Link href={`/admin/users?view=projects&customer=${customer.id}`} className="font-semibold text-[#0066cc]"><strong>{projectCount.get(customer.id) ?? 0}</strong> projects</Link><Link href={`/admin/users?view=requests&customer=${customer.id}`} className="font-semibold text-[#0066cc]"><strong>{requestCount.get(customer.id) ?? 0}</strong> requests</Link><span className="text-slate-500">Joined {formatDate(customer.created_at)}</span></div>
                 <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Edit customer contact</summary><form action={updateCustomerContact} className="mt-3 grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3"><input type="hidden" name="userId" value={customer.id} /><label className="text-xs font-semibold text-slate-600">Name<input name="fullName" defaultValue={customer.full_name || ""} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label><label className="text-xs font-semibold text-slate-600">Company<input name="companyName" defaultValue={customer.company_name || ""} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label><label className="text-xs font-semibold text-slate-600">Phone<input name="phone" defaultValue={customer.phone || ""} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label><button type="submit" className="min-h-10 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white sm:col-span-3 sm:justify-self-start">Save contact</button></form></details>
@@ -210,7 +219,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           <section className="mt-4 grid gap-3" aria-label="Customer requests">
             {params.customer ? <div className="flex items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm"><span>Showing requests for <strong>{customerName(customerMap.get(params.customer))}</strong></span><Link href="/admin/users?view=requests" className="font-semibold text-[#0066cc]">Clear</Link></div> : null}
             {filteredRequests.map((request) => { const customer = customerMap.get(request.owner_id); const isOpen = deletableRequestStatuses.has(request.status); return <article key={request.id} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-              <Link href={`/owner/materials/requests/${request.id}`} className="min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc]"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">{request.title}</h2><span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${badgeTone(request.status)}`}>{request.status.replaceAll("_", " ")}</span></div><p className="mt-1 text-sm text-slate-600">{request.projects?.name || "Project"}{request.projects?.address ? ` · ${request.projects.address}` : ""}</p><p className="mt-2 text-xs text-slate-500">{customerName(customer)} · Updated {formatDate(request.updated_at)}</p><div className="mt-3 flex flex-wrap gap-2">{request.material_questionnaire_responses.length ? request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{response.category_name_snapshot}</span>) : <span className="text-xs font-semibold text-slate-400">No questionnaire</span>}</div></Link>
+              <Link href={`/owner/materials/requests/${request.id}`} className="min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc]"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">{request.title}</h2><span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${badgeTone(request.status)}`}>{request.status.replaceAll("_", " ")}</span></div><p className="mt-1 text-sm text-slate-600">{request.projects?.name === "Material Requests" ? "Direct material request" : request.projects?.name || "Direct material request"}{request.projects?.name !== "Material Requests" && request.projects?.address ? ` · ${request.projects.address}` : ""}</p><p className="mt-2 text-xs text-slate-500">{customerName(customer)} · Updated {formatDate(request.updated_at)}</p><div className="mt-3 flex flex-wrap gap-2">{request.material_questionnaire_responses.length ? request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{response.category_name_snapshot}</span>) : <span className="text-xs font-semibold text-slate-400">Manual material list</span>}</div></Link>
               {isOpen ? <DeleteManagerRecordButton id={request.id} kind="request" label={request.title} /> : <span className="text-xs font-semibold text-slate-400">Closed requests are retained</span>}
             </article> })}
             {filteredRequests.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No requests match these filters.</p> : null}

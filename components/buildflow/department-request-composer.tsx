@@ -16,7 +16,7 @@ export function DepartmentRequestComposer({ category, displayCategory = category
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Order request</p>
         <h2 className="mt-1 text-xl font-semibold text-slate-950 sm:text-2xl">Place an order here</h2>
-        <p className="mt-1 text-sm text-slate-600">Write what you need or attach a blueprint or shopping list. We will keep everything with your project.</p>
+        <p className="mt-1 text-sm text-slate-600">Write what you need or attach a blueprint or shopping list. We will keep everything with your request.</p>
         <textarea
           aria-label="Describe your material request"
           name="request_details"

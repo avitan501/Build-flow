@@ -72,7 +72,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><CheckCircle2 className="h-6 w-6" aria-hidden="true" /></span>
             <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Request Ready</p>
             <h2 className="mt-1 text-xl font-bold text-slate-950">Confirm This {displayCategory} Request</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Your selections are saved on this device. Confirm to connect the request to your account and project.</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Your selections are saved on this device. Confirm to send the request from your account.</p>
             <div className="mt-5 flex flex-wrap gap-3">
               <AddToProjectButton
                 product={{ id: `${requestId}-quick-order`, name: `${displayCategory} Quick Order`, category, productType: "service", price: 0, unit: "Request" }}

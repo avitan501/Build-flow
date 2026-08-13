@@ -44,6 +44,14 @@ export type ManagerClientReplyEmailInput = {
   recipientName: string
   recipientEmail: string
   message: string
+  items: CustomerEmailItem[]
+}
+
+export type CustomerEmailItem = {
+  name: string
+  quantity?: number | null
+  unit?: string | null
+  details?: string[]
 }
 
 export type SupplierQuoteRequestEmailInput = {
@@ -96,6 +104,10 @@ type ProjectRequestNotificationFallback = (payload: Record<string, unknown>) => 
 
 const SITE_URL = "https://build.avantiap.com"
 const COMPANY_EMAIL = "office@build.avantiap.com"
+const COMPANY_PHONE = "(516) 908-8319"
+const COMPANY_PHONE_LINK = "tel:+15169088319"
+const COMPANY_WHATSAPP_URL = "https://wa.me/15169088319"
+const CUSTOMER_EMAIL_LOGO_URL = `${SITE_URL}/images/avantia/avantia-build-rain-painter-animation.gif`
 const DEFAULT_TO = "avitanneto@gmail.com"
 const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL?.trim() || `Avantia Build <${COMPANY_EMAIL}>`
 const RESEND_TEST_FROM = "Avantia Build Requests <onboarding@resend.dev>"
@@ -111,6 +123,84 @@ function escapeHtml(value: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;")
+}
+
+function companyContactText() {
+  return [
+    "Avantia Build",
+    "Everything it takes to build",
+    COMPANY_EMAIL,
+    COMPANY_PHONE,
+    SITE_URL,
+    `WhatsApp: ${COMPANY_WHATSAPP_URL}`,
+  ].join("\n")
+}
+
+function customerEmailHeader() {
+  return `
+    <div style="padding:18px 22px;border-bottom:1px solid #e5eaf1;background:#ffffff">
+      <a href="${SITE_URL}" style="display:inline-block;text-decoration:none">
+        <img src="${CUSTOMER_EMAIL_LOGO_URL}" width="280" alt="Avantia Build" style="display:block;width:100%;max-width:280px;height:auto;border:0" />
+      </a>
+    </div>
+  `
+}
+
+function customerEmailFooter() {
+  return `
+    <div style="padding:18px 22px;border-top:1px solid #e5eaf1;background:#f8fafc;color:#475569;font-size:13px;line-height:1.65">
+      <strong style="color:#071126;font-size:15px">Avantia Build</strong><br />
+      <span>Everything it takes to build</span><br />
+      <a href="${SITE_URL}" style="color:#0066cc;text-decoration:none">build.avantiap.com</a><br />
+      <a href="mailto:${COMPANY_EMAIL}" style="color:#0066cc;text-decoration:none">${COMPANY_EMAIL}</a><br />
+      <a href="${COMPANY_PHONE_LINK}" style="color:#0066cc;text-decoration:none">${COMPANY_PHONE}</a>
+      <span style="color:#94a3b8"> &middot; </span>
+      <a href="${COMPANY_WHATSAPP_URL}" style="color:#0066cc;text-decoration:none">WhatsApp us</a>
+    </div>
+  `
+}
+
+export function renderCustomerEmailShell(content: string) {
+  return `
+    <div style="margin:0;background:#eef2f6;padding:24px 10px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.55">
+      <div style="max-width:640px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:14px;background:#ffffff">
+        ${customerEmailHeader()}
+        <div style="padding:24px 22px">${content}</div>
+        ${customerEmailFooter()}
+      </div>
+    </div>
+  `
+}
+
+function itemQuantity(item: CustomerEmailItem) {
+  if (item.quantity === null || item.quantity === undefined) return ""
+  return `${item.quantity} ${item.unit?.trim() || "item"}`
+}
+
+export function renderRequestedItemsHtml(items: CustomerEmailItem[], emptyLabel = "See the request details or attached file.") {
+  if (items.length === 0) {
+    return `<p style="margin:8px 0 0;color:#64748b">${escapeHtml(emptyLabel)}</p>`
+  }
+
+  return `
+    <div style="margin-top:10px;border:1px solid #dbe3ee;border-radius:10px;overflow:hidden">
+      ${items.map((item, index) => `
+        <div style="padding:13px 14px;${index ? "border-top:1px solid #e5eaf1;" : ""}background:${index % 2 ? "#f8fafc" : "#ffffff"}">
+          <strong style="color:#071126">${escapeHtml(item.name)}</strong>
+          ${itemQuantity(item) ? `<br /><span style="color:#475569">${escapeHtml(itemQuantity(item))}</span>` : ""}
+          ${item.details?.length ? `<ul style="margin:7px 0 0;padding-left:18px;color:#475569">${item.details.filter(Boolean).map((detail) => `<li>${escapeHtml(detail)}</li>`).join("")}</ul>` : ""}
+        </div>
+      `).join("")}
+    </div>
+  `
+}
+
+function requestedItemsText(items: CustomerEmailItem[], emptyLabel = "See the request details or attached file.") {
+  if (items.length === 0) return emptyLabel
+  return items.flatMap((item) => [
+    `- ${item.name}${itemQuantity(item) ? `: ${itemQuantity(item)}` : ""}`,
+    ...(item.details ?? []).filter(Boolean).map((detail) => `  ${detail}`),
+  ]).join("\n")
 }
 
 function answerLines(details: Pick<ShopCartItemDetails | ShopCustomCartItem, "answers" | "qualificationStatus">) {
@@ -231,6 +321,7 @@ function buildHtml(input: CartSubmissionEmailInput) {
 
 function buildClientText(input: CartSubmissionEmailInput) {
   const profile = input.customer.profile
+  const items = cartCustomerItems(input)
   return [
     `Hi ${profile?.full_name || "there"},`,
     "",
@@ -239,34 +330,48 @@ function buildClientText(input: CartSubmissionEmailInput) {
     `Request ID: ${input.quoteId}`,
     `Project: ${input.project.name}`,
     `Address: ${input.project.address || "Not provided"}`,
-    `Items: ${input.quoteItems.length}`,
     `Estimated request total: ${money(input.total)}`,
+    "",
+    "Materials requested:",
+    requestedItemsText(items),
     "",
     "We will contact you if we need more information. This message confirms receipt and is not a final quote or invoice.",
     "",
-    "Avantia Build",
-    "Everything it takes to build",
+    companyContactText(),
   ].join("\n")
+}
+
+function cartCustomerItems(input: CartSubmissionEmailInput): CustomerEmailItem[] {
+  const detailSections = [
+    ...input.cartDetails.map((detail) => ({ title: detail.productName, lines: answerLines(detail) })),
+    ...input.customLines.map((item) => ({ title: item.name, lines: answerLines(item) })),
+  ]
+
+  return input.quoteItems.map((item) => ({
+    name: item.name,
+    quantity: item.quantity,
+    unit: item.unit,
+    details: detailSections.filter((section) => section.title === item.name).flatMap((section) => section.lines),
+  }))
 }
 
 function buildClientHtml(input: CartSubmissionEmailInput) {
   const profile = input.customer.profile
-  return `
-    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.5;max-width:620px;margin:0 auto">
-      <p>Hi ${escapeHtml(profile?.full_name || "there")},</p>
-      <h1 style="margin:12px 0;font-size:22px">We received your request</h1>
-      <p>Our Avantia Build team will review the materials and details you submitted.</p>
-      <div style="margin:20px 0;padding:16px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc">
-        <strong>Request ID:</strong> ${escapeHtml(input.quoteId)}<br />
-        <strong>Project:</strong> ${escapeHtml(input.project.name)}<br />
-        <strong>Address:</strong> ${escapeHtml(input.project.address || "Not provided")}<br />
-        <strong>Items:</strong> ${input.quoteItems.length}<br />
-        <strong>Estimated request total:</strong> ${money(input.total)}
-      </div>
-      <p>We will contact you if we need more information. This confirmation is not a final quote or invoice.</p>
-      <p style="margin-top:24px"><strong>Avantia Build</strong><br /><span style="color:#64748b">Everything it takes to build</span></p>
+  const items = cartCustomerItems(input)
+  return renderCustomerEmailShell(`
+    <p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p>
+    <h1 style="margin:0;font-size:25px;line-height:1.25;color:#071126">We received your request</h1>
+    <p style="margin:12px 0;color:#475569">Hi ${escapeHtml(profile?.full_name || "there")}, our team will review the materials and details you submitted.</p>
+    <div style="margin:20px 0;padding:15px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc">
+      <strong>Request ID:</strong> ${escapeHtml(input.quoteId)}<br />
+      <strong>Project:</strong> ${escapeHtml(input.project.name)}<br />
+      <strong>Address:</strong> ${escapeHtml(input.project.address || "Not provided")}<br />
+      <strong>Estimated request total:</strong> ${money(input.total)}
     </div>
-  `
+    <h2 style="margin:22px 0 0;font-size:17px;color:#071126">Materials requested</h2>
+    ${renderRequestedItemsHtml(items)}
+    <p style="margin:22px 0 0;color:#475569">We will contact you if we need more information. This confirmation is not a final quote or invoice.</p>
+  `)
 }
 
 async function sendEmail(input: {
@@ -379,17 +484,23 @@ export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmail
   const apiKey = process.env.RESEND_API_KEY
   const from = DEFAULT_FROM
   const subject = `Avantia Build request: ${input.requestTitle}`
-  const text = `${input.message.trim()}\n\nAvantia Build\nEverything it takes to build`
-  const html = `
-    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.6;max-width:620px;margin:0 auto">
-      <p style="white-space:pre-wrap">${escapeHtml(input.message.trim())}</p>
-      <div style="margin-top:28px;padding-top:18px;border-top:1px solid #e2e8f0">
-        <strong>Avantia Build</strong><br />
-        <span style="color:#64748b">Everything it takes to build</span><br />
-        <span style="color:#64748b;font-size:13px">Request: ${escapeHtml(input.requestTitle)}</span>
-      </div>
-    </div>
-  `
+  const text = [
+    input.message.trim(),
+    "",
+    `Request: ${input.requestTitle}`,
+    "",
+    "Materials requested:",
+    requestedItemsText(input.items),
+    "",
+    companyContactText(),
+  ].join("\n")
+  const html = renderCustomerEmailShell(`
+    <p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request update</p>
+    <h1 style="margin:0;font-size:24px;line-height:1.25;color:#071126">${escapeHtml(input.requestTitle)}</h1>
+    <p style="margin:16px 0;white-space:pre-wrap;color:#334155">${escapeHtml(input.message.trim())}</p>
+    <h2 style="margin:22px 0 0;font-size:17px;color:#071126">Materials requested</h2>
+    ${renderRequestedItemsHtml(input.items)}
+  `)
 
   if (apiKey) {
     const directResult = await sendEmail({
@@ -408,6 +519,7 @@ export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmail
   const fallback = await sendWithSupabaseEmailFallback("send_manager_reply", {
     requestId: input.requestId,
     message: input.message,
+    items: input.items,
   })
   return fallback.result ?? { status: "failed", error: "Website email could not be sent." }
 }
@@ -545,17 +657,33 @@ export async function sendProjectRequestNotificationEmail(
     `We received your ${input.requestTitle}.`,
     `Project: ${input.projectName}`,
     "",
+    "Materials requested:",
+    requestedItemsText(input.items),
+    ...(input.attachmentNames.length ? ["", "Attachments:", ...input.attachmentNames.map((name) => `- ${name}`)] : []),
+    "",
     "Someone from Avantia Build will review it and get back to you within 24 hours.",
     "",
-    "Avantia Build",
-    "You build. We handle the materials.",
+    companyContactText(),
   ].join("\n")
+  const clientHtml = renderCustomerEmailShell(`
+    <p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p>
+    <h1 style="margin:0;font-size:25px;line-height:1.25;color:#071126">We received your request</h1>
+    <p style="margin:12px 0;color:#475569">Hi ${escapeHtml(input.clientName || "there")}, someone from Avantia Build will review it and get back to you within 24 hours.</p>
+    <div style="margin:20px 0;padding:15px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc">
+      <strong>Request:</strong> ${escapeHtml(input.requestTitle)}<br />
+      <strong>Project:</strong> ${escapeHtml(input.projectName)}
+      ${input.projectAddress ? `<br /><strong>Address:</strong> ${escapeHtml(input.projectAddress)}` : ""}
+    </div>
+    <h2 style="margin:22px 0 0;font-size:17px;color:#071126">Materials requested</h2>
+    ${renderRequestedItemsHtml(input.items)}
+    ${input.attachmentNames.length ? `<h2 style="margin:22px 0 8px;font-size:17px;color:#071126">Attachments</h2><ul style="margin:0;padding-left:18px;color:#475569">${input.attachmentNames.map((name) => `<li>${escapeHtml(name)}</li>`).join("")}</ul>` : ""}
+  `)
   const client = await sendEmail({
     apiKey,
     from: DEFAULT_FROM,
     to: input.clientEmail,
     subject: `We received your request: ${input.requestTitle}`,
-    html: `<div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.55;max-width:620px;margin:0 auto"><p>Hi ${escapeHtml(input.clientName || "there")},</p><h1 style="font-size:22px">We received your request</h1><p><strong>${escapeHtml(input.requestTitle)}</strong><br />Project: ${escapeHtml(input.projectName)}</p><p>Someone from Avantia Build will review it and get back to you within 24 hours.</p><p style="margin-top:24px"><strong>Avantia Build</strong><br /><span style="color:#64748b">You build. We handle the materials.</span></p></div>`,
+    html: clientHtml,
     text: clientText,
     replyTo: COMPANY_EMAIL,
     idempotencyKey: `avantia-project-request-client-${input.requestId}`,
@@ -719,17 +847,37 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
     `Reference: ${input.referenceId}`,
     `Project: ${input.projectName || "Not named"}`,
     "",
+    "Materials requested:",
+    `Departments: ${departmentText}`,
+    input.details || "See the attached file.",
+    ...(input.attachment?.filename ? [`Attachment: ${input.attachment.filename}`] : []),
+    "",
     "Our team will review the details and contact you if anything else is needed.",
     "",
-    "Avantia Build",
-    "Everything it takes to build",
+    companyContactText(),
   ].join("\n")
+  const clientRequestItems: CustomerEmailItem[] = [{
+    name: departmentText,
+    details: [input.details || "See the attached file."],
+  }]
   const client = await sendEmail({
         apiKey,
         from,
         to: input.email,
         subject: `${beatQuote ? "Quote received" : "Material request received"} - ${input.referenceId}`,
-        html: `<div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5"><div style="max-width:620px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff"><div style="padding:20px 22px;border-bottom:1px solid #e5eaf1"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:12px"><img src="${SITE_URL}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px" /></td><td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br /><span style="font-size:13px;color:#64748b">Materials priced and delivered</span></td></tr></table></div><div style="padding:24px 22px"><p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p><h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">Your request is in.</h1><p style="margin:12px 0;color:#475569">Hi ${escapeHtml(input.firstName)}, we will review your details and contact you within 24 hours.</p><div style="margin:20px 0;padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(input.referenceId)}${input.projectName ? `<br /><strong>Project:</strong> ${escapeHtml(input.projectName)}` : ""}</div><p style="margin:22px 0"><a href="${SITE_URL}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Avantia Build</a></p><p style="margin:0;color:#64748b;font-size:13px">Questions? Reply to this email or call (516) 908-8319.</p></div></div></div>`,
+        html: renderCustomerEmailShell(`
+          <p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p>
+          <h1 style="margin:0;font-size:25px;line-height:1.25;color:#071126">Your request is in.</h1>
+          <p style="margin:12px 0;color:#475569">Hi ${escapeHtml(input.firstName)}, we will review your details and contact you within 24 hours.</p>
+          <div style="margin:20px 0;padding:15px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc">
+            <strong>Reference:</strong> ${escapeHtml(input.referenceId)}
+            ${input.projectName ? `<br /><strong>Project:</strong> ${escapeHtml(input.projectName)}` : ""}
+          </div>
+          <h2 style="margin:22px 0 0;font-size:17px;color:#071126">Materials requested</h2>
+          ${renderRequestedItemsHtml(clientRequestItems)}
+          ${input.attachment?.filename ? `<p style="margin:14px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(input.attachment.filename)}</p>` : ""}
+          <p style="margin:22px 0 0"><a href="${SITE_URL}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Avantia Build</a></p>
+        `),
         text: clientText,
         replyTo: COMPANY_EMAIL,
         idempotencyKey: `avantia-intake-client-${input.referenceId}`,

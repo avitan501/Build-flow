@@ -41,7 +41,7 @@ export function PlanRequestUploadCard({ requestId, label, description, category,
             <input type="file" accept={accept} className="sr-only" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
             {file ? "Change File" : "Choose File"}
           </label>
-          {file ? <AddToProjectButton product={product} file={file} questions={questions} questionnaireDepartment={questionnaireDepartment ?? category} className="w-full" label="Add Plan to Project" /> : null}
+          {file ? <AddToProjectButton product={product} file={file} questions={questions} questionnaireDepartment={questionnaireDepartment ?? category} className="w-full" label="Submit Plan Request" /> : null}
         </div>
       </div>
     </article>

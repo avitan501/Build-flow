@@ -22,13 +22,19 @@ test("projects use the full desktop workspace without clipping", async ({ page }
   expect(pageWidths.scrollWidth).toBe(pageWidths.clientWidth)
 })
 
-test("shop products use Add to Project and require sign in", async ({ page }) => {
+test("shop products start a direct request and require sign in", async ({ page }) => {
   await page.goto("/shop?category=Framing")
-  const addButton = page.getByRole("button", { name: /Add to Project:/ }).first()
+  const addButton = page.getByRole("button", { name: /Request Item:/ }).first()
   await expect(addButton).toBeVisible()
   await addButton.click()
-  await expect(page.getByRole("heading", { name: "Save and continue your request" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Sign in to send your request" })).toBeVisible()
   const continueDialog = page.getByRole("dialog")
+  await expect(continueDialog.getByText("Choose a project", { exact: true })).toHaveCount(0)
+  const dialogBox = await continueDialog.boundingBox()
+  const viewport = page.viewportSize()
+  expect(dialogBox).not.toBeNull()
+  expect(viewport).not.toBeNull()
+  expect(Math.abs((dialogBox!.y + dialogBox!.height / 2) - viewport!.height / 2)).toBeLessThan(12)
   await expect(continueDialog.getByRole("link", { name: "Create account", exact: true })).toBeVisible()
   await continueDialog.getByRole("link", { name: "Log in", exact: true }).click()
   await expect(page).toHaveURL(/\/login\?next=/)

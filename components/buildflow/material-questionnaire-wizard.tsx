@@ -2,6 +2,7 @@
 
 import { Check, ChevronLeft, ChevronRight, FileUp, Pencil, Plus, Trash2, X } from "lucide-react"
 import { useMemo, useState, useTransition } from "react"
+import { createPortal } from "react-dom"
 
 import {
   formatMaterialAnswer,
@@ -445,5 +446,6 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
   )
 
   if (embedded) return content
-  return <div className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-950/50 px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-8 backdrop-blur-sm sm:items-center sm:p-6">{content}</div>
+  if (typeof document === "undefined") return null
+  return createPortal(<div className="fixed inset-0 z-[110] grid place-items-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6">{content}</div>, document.body)
 }
