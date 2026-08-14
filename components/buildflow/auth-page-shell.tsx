@@ -11,7 +11,7 @@ export function AuthPageShell({ title, children }: { title: string; children: Re
           <AvantiaBuildLockup compact className="items-center" />
         </Link>
 
-        <h1 className="mt-10 text-center text-[1.75rem] font-semibold leading-tight text-[#1d1d1f] sm:mt-12 sm:text-[2rem]">
+        <h1 className="mt-9 text-center text-xl font-semibold leading-tight text-[#1d1d1f] sm:mt-10 sm:text-2xl">
           {title}
         </h1>
 

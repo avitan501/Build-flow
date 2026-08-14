@@ -112,6 +112,7 @@ test("phone-only signup sends a normalized number without exposing a personal ex
 test("authentication pages share the same compact centered design", async ({ page }) => {
   await page.goto("/login")
   await expect(page.getByRole("heading", { name: "Sign in to Avantia Build" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Sign in to Avantia Build" })).toHaveCSS("font-size", /^(20|24)px$/)
   await expect(page.getByTestId("avantia-build-lockup")).toBeVisible()
   await expect(page.getByPlaceholder("Email or phone number")).toHaveCount(1)
   await expect(page.locator("footer")).toHaveCount(0)

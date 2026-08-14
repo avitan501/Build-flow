@@ -186,15 +186,26 @@ test("traffic endpoint accepts same-site events and blocks cross-site submission
 })
 
 test("traffic dashboard exposes live status to the owner only", async () => {
-  const [trafficPage, navigation] = await Promise.all([
+  const [trafficPage, navigation, trafficFunctionMigration, trafficRlsMigration] = await Promise.all([
     readFile(path.join(process.cwd(), "app/admin/traffic/page.tsx"), "utf8"),
     readFile(path.join(process.cwd(), "components/buildflow/admin-shell.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "supabase/migrations/20260814022000_add_owner_site_traffic_reader.sql"), "utf8"),
+    readFile(path.join(process.cwd(), "supabase/migrations/20260814023000_use_owner_rls_for_site_traffic.sql"), "utf8"),
   ])
 
   expect(trafficPage).toContain("requireAdminProfile")
+  expect(trafficPage).toContain('.from("site_page_views")')
+  expect(trafficPage).not.toContain("createAdminClient")
+  expect(trafficPage).not.toContain("owner_read_site_traffic")
   expect(trafficPage).toContain("Tracking active")
   expect(trafficPage).not.toContain("requireManagerPortalProfile")
   expect(navigation).not.toContain('link.href === "/admin/traffic" ||')
+  expect(trafficFunctionMigration).toContain("lower(trim(profile.email)) = 'avitanneto@gmail.com'")
+  expect(trafficRlsMigration).toContain("drop function if exists public.owner_read_site_traffic")
+  expect(trafficRlsMigration).toContain("site_page_views_owner_read")
+  expect(trafficRlsMigration).toContain("auth.jwt() ->> 'email'")
+  expect(trafficRlsMigration).toContain("private.is_admin()")
+  expect(trafficRlsMigration).toContain("grant select on public.site_page_views to authenticated")
 })
 
 test("home shows the compact manufacturer brand showcase", async ({ page }) => {
