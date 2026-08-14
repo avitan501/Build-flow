@@ -13,7 +13,7 @@ test("home presents the contractor material coordination service", async ({ page
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.webmanifest");
   await expect(page.getByRole("heading", { name: "You Build. We Handle the Materials." })).toBeVisible();
   await expect(page.getByText("Avantia Build for contractors", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Start a Material Request" })).toHaveAttribute("href", "/shop");
+  await expect(page.getByRole("link", { name: "Start a Material Request", exact: true })).toHaveAttribute("href", "/shop");
   await expect(page.getByRole("link", { name: "Send Us Your Plans" })).toHaveAttribute("href", "/request-quote");
   await expect(page.getByRole("link", { name: /Watch the demo/ })).toHaveAttribute("href", "#product-demo");
   await expect(page.getByRole("heading", { name: "Estimate apartment renovation materials in a few questions." })).toHaveCount(0);
@@ -36,6 +36,13 @@ test("home presents the contractor material coordination service", async ({ page
   await expect(customVideo.locator('source[type="video/webm"]')).toHaveAttribute("src", "/videos/avantia-custom-request-demo.webm");
   await expect(customVideo.locator('track[kind="captions"]')).toHaveAttribute("src", "/videos/avantia-custom-request-demo.vtt");
   await expect(page.getByRole("link", { name: "Request a custom item" })).toHaveAttribute("href", "/request-quote");
+  const builderStory = page.getByTestId("homepage-builder-story");
+  const builderVideo = builderStory.locator("video");
+  await expect(builderStory).toBeVisible();
+  await expect(builderVideo).toHaveAttribute("poster", "/videos/avantia-builder-story-poster.png");
+  await expect(builderVideo.locator('source[type="video/mp4"]')).toHaveAttribute("src", "/videos/avantia-builder-story.mp4");
+  await expect(builderVideo.locator('source[type="video/webm"]')).toHaveAttribute("src", "/videos/avantia-builder-story.webm");
+  await expect(builderVideo.locator('track[kind="captions"]')).toHaveAttribute("src", "/videos/avantia-builder-story.vtt");
   await expect(page.getByRole("heading", { name: "From plan to jobsite" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Upload", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Takeoff", exact: true })).toBeVisible();

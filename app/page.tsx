@@ -235,6 +235,32 @@ export default function Home() {
             </video>
           </div>
         </div>
+        <div data-testid="homepage-builder-story" className="mt-4 grid overflow-hidden rounded-[22px] border border-slate-200 bg-[#071126] text-white shadow-[0_16px_42px_rgba(7,17,38,0.1)] lg:grid-cols-[minmax(0,1.28fr)_minmax(0,0.72fr)]">
+          <div className="p-2.5 sm:p-4">
+            <video
+              className="aspect-video w-full rounded-[16px] bg-black object-cover shadow-[0_14px_34px_rgba(0,0,0,0.3)]"
+              controls
+              playsInline
+              preload="metadata"
+              poster="/videos/avantia-builder-story-poster.png"
+              aria-label="Avantia Build story about a contractor whose crew is waiting for missing materials"
+            >
+              <source src="/videos/avantia-builder-story.mp4" type="video/mp4" />
+              <source src="/videos/avantia-builder-story.webm" type="video/webm" />
+              <track src="/videos/avantia-builder-story.vtt" kind="captions" srcLang="en" label="English" />
+              Your browser does not support the video player. You can still <a className="underline" href="/videos/avantia-builder-story.mp4">open the Avantia Build builder story video</a>.
+            </video>
+          </div>
+          <div className="flex flex-col justify-center px-6 py-7 sm:px-9">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-sky-200">Keep the job moving</p>
+            <h3 className="mt-2 text-2xl font-semibold leading-tight text-balance sm:text-3xl">Your crew should be building, not waiting for materials.</h3>
+            <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">Send one request. We source, compare, and coordinate the materials your job needs.</p>
+            <Link href="/shop" className="mt-5 inline-flex min-h-12 items-center justify-between gap-4 rounded-lg bg-white px-4 py-3 text-sm font-bold text-[#071126] transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-300/40">
+              Order materials now
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+        </div>
         </div>
       </section>
 
