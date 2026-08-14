@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 
 import { expect, test } from "@playwright/test"
+import { translateShopText } from "@/lib/shop-i18n"
 
 test("address selection closes and keeps one clear selected address", async ({ page }) => {
   const address = "123 Spruce Street, Cedarhurst, NY 11516"
@@ -394,6 +395,30 @@ test("shop language switch translates only the shop and persists the choice", as
   await expect(page.getByText("Cantidad", { exact: true })).toBeVisible()
   await expect(page.getByText("Edge profile", { exact: true })).toHaveCount(0)
 
+  await page.goto("/shop/wood-floor")
+  await expect(page.getByTestId("flooring-group-material").getByText("¿Qué material necesita?", { exact: true })).toBeVisible()
+  await expect(page.getByText("What wood grade do you prefer?", { exact: true })).toHaveCount(0)
+  expect(translateShopText("What wood grade do you prefer?", "es")).toBe("¿Qué grado de madera prefiere?")
+
+  await page.goto("/shop/framing")
+  await expect(page.getByPlaceholder("Agregue contrachapado, LVL, soportes, sujetadores, tratamiento o detalles de entrega.")).toBeVisible()
+
+  await page.goto("/shop/sheet-rock/drywall-calculator")
+  await expect(page.getByRole("heading", { name: "Calculadora de paneles de yeso" })).toBeVisible()
+  await expect(page.getByText("Extracción del plano", { exact: true })).toBeVisible()
+  await expect(page.getByText("Include ceiling", { exact: true })).toHaveCount(0)
+  await expect(page.getByText(/Estimate Sheetrock from a proposed floor plan/i)).toHaveCount(0)
+
+  await page.goto("/shop/wood-floor/flooring-calculator")
+  await expect(page.getByText("1. Cargar", { exact: true })).toBeVisible()
+  await expect(page.getByText("Extracción del plano de pisos", { exact: true })).toBeVisible()
+  await expect(page.getByText(/Extract room square footage from a floor plan/i)).toHaveCount(0)
+
+  await page.goto("/shop/tile-work/thinset-calculator")
+  await expect(page.getByText("Volver a azulejos", { exact: true })).toBeVisible()
+  await expect(page.getByText("La calculadora estará disponible aquí próximamente.", { exact: true })).toBeVisible()
+
+  await page.goto("/shop/sheet-rock")
   await page.reload()
   await expect(page.getByText("Tipo de panel", { exact: true })).toBeVisible()
   await page.getByRole("button", { name: "View shop in English" }).click()

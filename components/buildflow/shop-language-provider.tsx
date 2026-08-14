@@ -17,7 +17,7 @@ const ShopLanguageContext = createContext<ShopLanguageContextValue | null>(null)
 const textRecords = new WeakMap<Text, TextRecord>()
 const attributeRecords = new WeakMap<Element, Map<string, AttributeRecord>>()
 const TRANSLATED_ATTRIBUTES = ["aria-label", "alt", "placeholder", "title"] as const
-const SKIPPED_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "CODE", "PRE", "TEXTAREA"])
+const SKIPPED_SUBTREE_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "CODE", "PRE"])
 
 function updateTextNode(node: Text, spanish: boolean) {
   const record = textRecords.get(node)
@@ -63,20 +63,21 @@ function updateElementAttributes(element: Element, spanish: boolean) {
 
 function updateSurface(root: Node, spanish: boolean) {
   if (root instanceof Text) {
-    if (!root.parentElement || SKIPPED_TAGS.has(root.parentElement.tagName) || root.parentElement.closest("[data-no-shop-translation]")) return
+    if (!root.parentElement || root.parentElement.tagName === "TEXTAREA" || SKIPPED_SUBTREE_TAGS.has(root.parentElement.tagName) || root.parentElement.closest("[data-no-shop-translation]")) return
     updateTextNode(root, spanish)
     return
   }
   if (!(root instanceof Element || root instanceof Document || root instanceof DocumentFragment)) return
   if (root instanceof Element) {
-    if (SKIPPED_TAGS.has(root.tagName) || root.closest("[data-no-shop-translation]")) return
+    if (SKIPPED_SUBTREE_TAGS.has(root.tagName) || root.closest("[data-no-shop-translation]")) return
     updateElementAttributes(root, spanish)
   }
 
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const element = node instanceof Element ? node : node.parentElement
-      if (element && (SKIPPED_TAGS.has(element.tagName) || element.closest("[data-no-shop-translation]"))) return NodeFilter.FILTER_REJECT
+      if (element && (SKIPPED_SUBTREE_TAGS.has(element.tagName) || element.closest("[data-no-shop-translation]"))) return NodeFilter.FILTER_REJECT
+      if (node instanceof Text && element?.tagName === "TEXTAREA") return NodeFilter.FILTER_REJECT
       return NodeFilter.FILTER_ACCEPT
     },
   })

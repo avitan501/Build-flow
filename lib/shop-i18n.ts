@@ -290,6 +290,13 @@ const SPANISH_TEXT: Record<string, string> = {
   "Standard": "Estándar",
   "Any specific requirements or notes?": "¿Algún requisito o nota especial?",
   "Optional brand, finish, matching, or delivery details.": "Marca, acabado, combinación o detalles de entrega opcionales.",
+  "Hardwood Flooring": "Pisos de madera",
+  "What wood grade do you prefer?": "¿Qué grado de madera prefiere?",
+  "Select & Better": "Selecto o superior",
+  "#1 Common": "Común n.º 1",
+  "#2 Common": "Común n.º 2",
+  "Best Available": "Mejor disponible",
+  "No Preference": "Sin preferencia",
 
   "How many bags of MAPEI Ultraflex thinset do you need?": "¿Cuántas bolsas de mortero MAPEI Ultraflex necesita?",
   "How many yards of fine sand do you need?": "¿Cuántas yardas de arena fina necesita?",
@@ -560,7 +567,7 @@ const SPANISH_TEXT: Record<string, string> = {
   "Room takeoff": "Cálculo de la habitación",
   "Enter room dimensions and adjust waste before ordering.": "Ingrese las dimensiones y ajuste el desperdicio antes de pedir.",
   "Material list": "Lista de materiales",
-  "Use this as a planning estimate before final field verification.": "Use esto como estimación antes de la verificación final en la obra.",
+  "Use this as a planning estimate before final field verification.": "Use esta estimación para planificar antes de la verificación final en la obra.",
   "Net area": "Área neta",
   "Order area": "Área a pedir",
   "Sheet area": "Área por panel",
@@ -586,6 +593,185 @@ const SPANISH_TEXT: Record<string, string> = {
   "Add to request": "Agregar a la solicitud",
   "Rooms": "Habitaciones",
   "Room": "Habitación",
+  "Estimate Sheetrock from a proposed floor plan ruler takeoff, section height, and door/window schedules.": "Calcule el panel de yeso a partir de las medidas del plano propuesto, la altura de la sección y los cuadros de puertas y ventanas.",
+  "Plan extraction": "Extracción del plano",
+  "Upload a proposed floor plan, section sheet, or full plan PDF.": "Cargue un plano propuesto, una hoja de sección o el PDF completo del plano.",
+  "Sign in to save blueprint": "Inicie sesión para guardar el plano",
+  "Extract only": "Solo extraer",
+  "Ruler takeoff": "Cálculo con escala del plano",
+  "Measure proposed wall runs on the plan or type known linear feet.": "Mida los tramos de pared propuestos en el plano o ingrese los pies lineales conocidos.",
+  "Ruler length in": "Largo medido en pulg.",
+  "Scale in": "Escala en pulg.",
+  "Scale real ft": "Escala real en pies",
+  "Proposed wall linear ft": "Pies lineales de pared propuestos",
+  "Wall counting method": "Método para contar paredes",
+  "Section wall height ft": "Altura de pared de la sección en pies",
+  "Perimeter room walls": "Paredes perimetrales de la habitación",
+  "Interior partitions, one side": "Divisiones interiores, un lado",
+  "Interior partitions, both sides": "Divisiones interiores, ambos lados",
+  "Manual drywall face LF": "Pies lineales manuales de cara de panel",
+  "Interior partitions are counted on both drywall faces.": "Las divisiones interiores se cuentan por ambas caras del panel de yeso.",
+  "This method uses the linear feet as one drywall face.": "Este método usa los pies lineales como una sola cara de panel de yeso.",
+  "Calculated proposed LF": "Pies lineales propuestos calculados",
+  "Using ruler length and scale.": "Usando la medida y escala del plano.",
+  "Using typed linear feet.": "Usando los pies lineales ingresados.",
+  "Area uses": "El área usa",
+  "both drywall faces": "ambas caras del panel de yeso",
+  "one drywall face": "una cara del panel de yeso",
+  "Door and window schedule": "Cuadro de puertas y ventanas",
+  "Rows subtract openings from the proposed drywall area.": "Los renglones descuentan los huecos del área propuesta de panel de yeso.",
+  "Opening": "Hueco",
+  "No schedule rows yet. Add rows manually, or upload a plan above to extract door and window sizes.": "Aún no hay renglones en el cuadro. Agréguelos manualmente o cargue un plano para extraer las medidas de puertas y ventanas.",
+  "Extra opening area sq ft": "Área adicional de huecos en pies²",
+  "Outside corners": "Esquinas exteriores",
+  "Proposed area and sheets": "Área y paneles propuestos",
+  "Calculated from linear feet x section height, minus openings.": "Calculado con pies lineales por altura de sección, menos los huecos.",
+  "Copy list": "Copiar lista",
+  "Board size": "Tamaño del panel",
+  "Waste percent": "Porcentaje de desperdicio",
+  "Proposed area": "Área propuesta",
+  "Openings": "Huecos",
+  "Length ft": "Largo en pies",
+  "Width ft": "Ancho en pies",
+  "Wall height ft": "Altura de pared en pies",
+  "Door/window openings sq ft": "Huecos de puertas y ventanas en pies²",
+  "Confirm field conditions before ordering. Bathrooms should use moisture-resistant board, shower areas should use cement board, and garages usually need 5/8 Type X fire-rated board.": "Confirme las condiciones de la obra antes de pedir. En baños use panel resistente a la humedad, en duchas use panel de cemento y en garajes normalmente se requiere panel Tipo X de 5/8 pulg.",
+  "Review plan scale and field conditions before ordering. Bathrooms should use moisture-resistant board, shower areas should use cement board, and garages usually need 5/8 Type X fire-rated board.": "Revise la escala del plano y las condiciones de la obra antes de pedir. En baños use panel resistente a la humedad, en duchas use panel de cemento y en garajes normalmente se requiere panel Tipo X de 5/8 pulg.",
+  "4x8 standard": "4x8 estándar",
+  "Ready": "Listo",
+  "Preparing upload": "Preparando carga",
+  "Uploading blueprint": "Cargando plano",
+  "Reading plan": "Leyendo plano",
+  "Review numbers": "Revisar cantidades",
+  "Saving PDF": "Guardando PDF",
+  "PDF saved": "PDF guardado",
+  "Needs attention": "Requiere atención",
+  "Choose project first": "Primero elija un proyecto",
+  "Upload blueprint + read takeoff": "Cargar plano y leer el cálculo",
+  "Extracting plan...": "Extrayendo plano...",
+  "Apply extracted values": "Aplicar valores extraídos",
+  "Saving reviewed PDF...": "Guardando PDF revisado...",
+  "Save reviewed takeoff PDF": "Guardar PDF del cálculo revisado",
+  "Extracted plan values applied": "Se aplicaron los valores extraídos del plano",
+  "Plan takeoff copied": "Cálculo del plano copiado",
+  "Choose a proposed floor plan, section sheet, or full plan PDF first.": "Primero elija un plano propuesto, una hoja de sección o el PDF completo del plano.",
+  "Sign in and choose a project before saving the blueprint for review.": "Inicie sesión y elija un proyecto antes de guardar el plano para revisión.",
+  "Preparing blueprint upload...": "Preparando la carga del plano...",
+  "Uploading blueprint to project storage...": "Cargando el plano en el proyecto...",
+  "Blueprint upload failed before takeoff could run. Please try again.": "La carga del plano falló antes de ejecutar el cálculo. Inténtelo de nuevo.",
+  "Reading plan and preparing review values...": "Leyendo el plano y preparando los valores para revisión...",
+  "Saved takeoff failed. Please try again.": "No se pudo guardar el cálculo. Inténtelo de nuevo.",
+  "Upload and read the blueprint before saving the reviewed takeoff PDF.": "Cargue y lea el plano antes de guardar el PDF del cálculo revisado.",
+  "Saving reviewed takeoff PDF...": "Guardando el PDF del cálculo revisado...",
+  "Reviewed takeoff PDF save failed. Please try again.": "No se pudo guardar el PDF del cálculo revisado. Inténtelo de nuevo.",
+  "Blueprint saved. Review the takeoff values before creating the PDF.": "Plano guardado. Revise los valores del cálculo antes de crear el PDF.",
+  "Could not prepare the blueprint upload. Please try again.": "No se pudo preparar la carga del plano. Inténtelo de nuevo.",
+  "Automatic plan extraction failed. Use the ruler inputs below or try a clearer plan sheet.": "La extracción automática falló. Use las medidas y la escala o pruebe con un plano más claro.",
+  "Blueprint uploaded, but the saved file could not be read for takeoff.": "El plano se cargó, pero no se pudo leer el archivo guardado para el cálculo.",
+  "Blueprint was saved, but the takeoff could not read both wall linear feet and wall height. Add the measurements manually, then save the reviewed PDF.": "El plano se guardó, pero no se pudieron leer los pies lineales y la altura de pared. Agregue las medidas manualmente y guarde el PDF revisado.",
+  "Blueprint saved and values extracted. Review the numbers below, then save the reviewed takeoff PDF.": "Plano guardado y valores extraídos. Revise las cantidades y guarde el PDF del cálculo revisado.",
+  "Sign in before saving a blueprint and takeoff PDF.": "Inicie sesión antes de guardar un plano y su PDF de cálculo.",
+  "Save the blueprint to this project before creating the reviewed takeoff PDF.": "Guarde el plano en este proyecto antes de crear el PDF del cálculo revisado.",
+  "Wall linear feet and section wall height are required before saving the reviewed takeoff PDF.": "Se requieren los pies lineales y la altura de pared antes de guardar el PDF revisado.",
+  "The reviewed values are ready, but the takeoff PDF could not be saved.": "Los valores revisados están listos, pero no se pudo guardar el PDF del cálculo.",
+  "The reviewed PDF was created, but it could not be added to project documents.": "Se creó el PDF revisado, pero no se pudo agregar a los documentos del proyecto.",
+  "Reviewed drywall takeoff PDF saved to the project documents.": "El PDF revisado del cálculo de panel de yeso se guardó en los documentos del proyecto.",
+  "Sign in before saving a reviewed takeoff PDF.": "Inicie sesión antes de guardar un PDF de cálculo revisado.",
+  "Extract room square footage from a floor plan, choose which rooms get wood floor, and save a reviewed takeoff with a marked plan attachment.": "Extraiga los pies cuadrados de cada habitación, elija cuáles llevarán piso de madera y guarde el cálculo revisado con el plano marcado.",
+  "1. Upload": "1. Cargar",
+  "2. Exclude rooms": "2. Excluir habitaciones",
+  "3. Material": "3. Material",
+  "4. Documents": "4. Documentos",
+  "Flooring plan extraction": "Extracción del plano de pisos",
+  "Upload a floor plan, finish plan, room schedule, PDF, or image.": "Cargue un plano, plano de acabados, cuadro de habitaciones, PDF o imagen.",
+  "Save to project": "Guardar en el proyecto",
+  "Choose project before upload": "Elija un proyecto antes de cargar",
+  "Upload plan + read rooms": "Cargar plano y leer habitaciones",
+  "Sign in to save flooring plan": "Inicie sesión para guardar el plano de pisos",
+  "Extracting rooms...": "Extrayendo habitaciones...",
+  "Uploading plan": "Cargando plano",
+  "Reading rooms": "Leyendo habitaciones",
+  "Review rooms": "Revisar habitaciones",
+  "Saving PDFs": "Guardando archivos PDF",
+  "Saved": "Guardado",
+  "Plan saved. Review rooms before creating the wood floor PDF.": "Plano guardado. Revise las habitaciones antes de crear el PDF de pisos de madera.",
+  "Open project documents": "Abrir documentos del proyecto",
+  "Open project": "Abrir proyecto",
+  "Apply extracted rooms": "Aplicar habitaciones extraídas",
+  "Review exclude boxes": "Revisar áreas excluidas",
+  "Client material source": "Fuente del material del cliente",
+  "The takeoff PDF will show where the selected wood floor came from.": "El PDF del cálculo mostrará de dónde proviene el piso de madera seleccionado.",
+  "Grade": "Grado",
+  "Wood floor material": "Material de piso de madera",
+  "10% waste by default. Transitions and reducers are excluded for now.": "Se incluye 10% de desperdicio. Las transiciones y reductores no están incluidos por ahora.",
+  "Copy": "Copiar",
+  "Sq ft per box": "Pies² por caja",
+  "Selected area": "Área seleccionada",
+  "Boxes": "Cajas",
+  "Cost": "Costo",
+  "Continue to documents": "Continuar a documentos",
+  "Documents": "Documentos",
+  "Save the reviewed takeoff PDF and the source-proof marked plan after the room boxes are correct.": "Guarde el PDF revisado y el plano marcado después de confirmar las áreas de las habitaciones.",
+  "Saving reviewed PDFs...": "Guardando archivos PDF revisados...",
+  "Save reviewed takeoff + marked plan": "Guardar cálculo revisado y plano marcado",
+  "Room selection": "Selección de habitaciones",
+  "Use the marked boxes to exclude any room you do not want in the order.": "Use las áreas marcadas para excluir cualquier habitación que no desee incluir en el pedido.",
+  "Show all bathrooms": "Mostrar todos los baños",
+  "Show excluded rooms": "Mostrar habitaciones excluidas",
+  "Include allowed": "Incluir permitidas",
+  "Remove kitchen/baths": "Quitar cocina y baños",
+  "Remove kitchens": "Quitar cocinas",
+  "Remove halls": "Quitar pasillos",
+  "No rooms yet. Upload a plan above or add rooms manually.": "Aún no hay habitaciones. Cargue un plano o agréguelas manualmente.",
+  "Include": "Incluir",
+  "Room name": "Nombre de la habitación",
+  "Area sq ft": "Área en pies²",
+  "Floor": "Piso",
+  "Bathroom": "Baño",
+  "Basement": "Sótano",
+  "Hallway": "Pasillo",
+  "Bedroom": "Dormitorio",
+  "Living": "Sala",
+  "Closet": "Clóset",
+  "Other": "Otro",
+  "No floor shown": "No se indica el piso",
+  "First floor": "Primer piso",
+  "Second floor": "Segundo piso",
+  "Attic": "Ático",
+  "Continue to material": "Continuar al material",
+  "Plan marker": "Marca del plano",
+  "Schedule": "Cuadro",
+  "Manual": "Manual",
+  "Plan label": "Etiqueta del plano",
+  "Reviewed": "Revisado",
+  "High": "Alta",
+  "Medium": "Media",
+  "Low": "Baja",
+  "Marked": "Marcado",
+  "Source proof": "Prueba de origen",
+  "Choose a wood floor plan, finish plan, or room schedule first.": "Primero elija un plano de pisos, plano de acabados o cuadro de habitaciones.",
+  "Sign in and choose a project before saving the flooring plan.": "Inicie sesión y elija un proyecto antes de guardar el plano de pisos.",
+  "Preparing flooring plan upload...": "Preparando la carga del plano de pisos...",
+  "Uploading flooring plan to project storage...": "Cargando el plano de pisos en el proyecto...",
+  "Flooring plan upload failed before takeoff could run. Please try again.": "La carga del plano de pisos falló antes de ejecutar el cálculo. Inténtelo de nuevo.",
+  "Reading rooms and floor areas...": "Leyendo habitaciones y áreas de piso...",
+  "Saved wood floor takeoff failed. Please try again.": "No se pudo guardar el cálculo de pisos de madera. Inténtelo de nuevo.",
+  "Upload and read the plan before saving the reviewed wood floor PDFs.": "Cargue y lea el plano antes de guardar los archivos PDF revisados.",
+  "Saving reviewed wood floor PDFs...": "Guardando los archivos PDF revisados de pisos de madera...",
+  "Reviewed wood floor PDF save failed. Please try again.": "No se pudo guardar el PDF revisado de pisos de madera. Inténtelo de nuevo.",
+  "Rooms extracted. Review selected rooms before ordering.": "Habitaciones extraídas. Revise las habitaciones seleccionadas antes de pedir.",
+  "Automatic wood floor extraction failed. Try a clearer plan or enter rooms manually.": "La extracción automática falló. Pruebe con un plano más claro o ingrese las habitaciones manualmente.",
+  "Uploaded plan path does not match this project.": "La ruta del plano cargado no corresponde a este proyecto.",
+  "Plan uploaded, but the saved file could not be read for takeoff.": "El plano se cargó, pero no se pudo leer el archivo guardado para el cálculo.",
+  "Sign in before saving a wood floor takeoff.": "Inicie sesión antes de guardar un cálculo de pisos de madera.",
+  "Save the plan to this project before creating the reviewed wood floor PDF.": "Guarde el plano en este proyecto antes de crear el PDF revisado de pisos de madera.",
+  "Select at least one room with square footage before saving the wood floor takeoff.": "Seleccione al menos una habitación con pies cuadrados antes de guardar el cálculo.",
+  "The saved plan could not be downloaded for marker attachment.": "No se pudo descargar el plano guardado para agregar las marcas.",
+  "The reviewed values are ready, but the PDF attachments could not be saved.": "Los valores revisados están listos, pero no se pudieron guardar los archivos PDF adjuntos.",
+  "Reviewed wood floor takeoff PDF and marked plan attachment saved to the project documents.": "El PDF revisado y el plano marcado se guardaron en los documentos del proyecto.",
+  "Sign in before saving a reviewed wood floor PDF.": "Inicie sesión antes de guardar un PDF revisado de pisos de madera.",
+  "Back to Tile": "Volver a azulejos",
+  "Calculator flow will be added here.": "La calculadora estará disponible aquí próximamente.",
 
   "Let's Work": "Trabajemos",
   "Materials": "Materiales",
@@ -609,6 +795,8 @@ const SPANISH_TEXT: Record<string, string> = {
   "bags": "bolsas",
   "gallons": "galones",
   "doors": "puertas",
+  "ft": "pies",
+  "sq ft": "pies²",
 
   "Window schedule review": "Revisión del cuadro de ventanas",
   "Review extracted windows before quoting or supplier pricing.": "Revise las ventanas extraídas antes de cotizar o solicitar precios al proveedor.",
@@ -673,6 +861,53 @@ function translatePattern(value: string) {
 
   match = value.match(/^Reference attached: (.+)$/)
   if (match) return `Referencia adjunta: ${match[1]}`
+
+  match = value.match(/^Selected file: (.+)$/)
+  if (match) return `Archivo seleccionado: ${match[1]}`
+
+  match = value.match(/^PDF saved: (.+)$/)
+  if (match) return `PDF guardado: ${match[1]}`
+
+  match = value.match(/^Marked plan: (.+)$/)
+  if (match) return `Plano marcado: ${match[1]}`
+
+  match = value.match(/^Project: (.+)$/)
+  if (match) return `Proyecto: ${match[1]}`
+
+  match = value.match(/^Exclude (.+)$/)
+  if (match) return `Excluir ${translateShopText(match[1], "es")}`
+
+  match = value.match(/^([\d,.]+) (sq ft|ft|sheets|boxes|rolls|buckets|pieces)$/)
+  if (match) {
+    const singular = Number(match[1].replaceAll(",", "")) === 1
+    const units: Record<string, [string, string]> = {
+      sheets: ["panel", "paneles"],
+      boxes: ["caja", "cajas"],
+      rolls: ["rollo", "rollos"],
+      buckets: ["cubeta", "cubetas"],
+      pieces: ["pieza", "piezas"],
+    }
+    const translatedUnit = units[match[2]] ? units[match[2]][singular ? 0 : 1] : translateShopText(match[2], "es")
+    return `${match[1]} ${translatedUnit}`
+  }
+
+  match = value.match(/^([\d/.-]+) in board, (.+) sheets, ([\d,.]+) sq ft each$/)
+  if (match) return `Panel de ${match[1]} pulg., paneles ${match[2]}, ${match[3]} pies² cada uno`
+
+  match = value.match(/^About ([\d,.]+) screws, estimated at ([\d,.]+) per (.+) box$/)
+  if (match) return `Aproximadamente ${match[1]} tornillos, calculados a ${match[2]} por caja de ${match[3]}`
+
+  match = value.match(/^About ([\d,.]+) linear ft, estimated with ([\d,.]+) ft rolls$/)
+  if (match) return `Aproximadamente ${match[1]} pies lineales, calculados con rollos de ${match[2]} pies`
+
+  match = value.match(/^Estimated with ([\d,.]+) gal buckets at about ([\d,.]+) sq ft each$/)
+  if (match) return `Calculado con cubetas de ${match[1]} galones que cubren aproximadamente ${match[2]} pies² cada una`
+
+  match = value.match(/^([\d,.]+) ft pieces for ([\d,.]+) outside corners$/)
+  if (match) return `Piezas de ${match[1]} pies para ${match[2]} esquinas exteriores`
+
+  match = value.match(/^Invoice delivery line: \$([\d,.]+)\. Installation from source: (.+)\. Transitions and reducers are still excluded from this takeoff\.$/)
+  if (match) return `Entrega indicada en la factura: $${match[1]}. Instalación de la fuente: ${match[2]}. Las transiciones y reductores no están incluidos en este cálculo.`
 
   match = value.match(/^Your (.+) request was created\. Someone from Avantia Build will get back to you within 24 hours\.$/)
   if (match) return `Su solicitud de ${translateShopText(match[1], "es").toLowerCase()} fue creada. Alguien de Avantia Build le responderá dentro de 24 horas.`

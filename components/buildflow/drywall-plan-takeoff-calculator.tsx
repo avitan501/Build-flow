@@ -178,11 +178,9 @@ export function DrywallPlanTakeoffCalculator({
   const [wallCountingMethod, setWallCountingMethod] = useState<WallCountingMethod>("interior-both-sides");
   const [height, setHeight] = useState("8");
   const [manualOpeningArea, setManualOpeningArea] = useState("0");
-  const [ceilingArea, setCeilingArea] = useState("0");
   const [outsideCorners, setOutsideCorners] = useState("0");
   const [wastePercent, setWastePercent] = useState("10");
   const [sheetLength, setSheetLength] = useState("8");
-  const [includeCeiling, setIncludeCeiling] = useState(false);
   const [openings, setOpenings] = useState<OpeningInputRow[]>([]);
   const [copyStatus, setCopyStatus] = useState("");
   const [appliedResultKey, setAppliedResultKey] = useState("");
@@ -201,8 +199,7 @@ export function DrywallPlanTakeoffCalculator({
     const wallArea = linearFeet * wallHeight * wallSideMultiplier;
     const scheduleOpeningArea = openings.reduce((total, row) => total + openingArea(row), 0);
     const openingsArea = scheduleOpeningArea + numberValue(manualOpeningArea);
-    const ceiling = includeCeiling ? numberValue(ceilingArea) : 0;
-    const proposedArea = wallArea + ceiling;
+    const proposedArea = wallArea;
     const netArea = Math.max(0, proposedArea - openingsArea);
     const waste = Math.min(numberValue(wastePercent), 35);
     const orderArea = netArea * (1 + waste / 100);
@@ -257,7 +254,7 @@ export function DrywallPlanTakeoffCalculator({
       sheetSqft,
       rows,
     };
-  }, [ceilingArea, height, includeCeiling, manualOpeningArea, measuredOnPlan, openings, outsideCorners, scalePlanInches, scaleRealFeet, sheetLength, typedLinearFeet, wallCountingMethod, wastePercent]);
+  }, [height, manualOpeningArea, measuredOnPlan, openings, outsideCorners, scalePlanInches, scaleRealFeet, sheetLength, typedLinearFeet, wallCountingMethod, wastePercent]);
 
   const canSaveReviewedPdf = Boolean(isSignedIn && savedBlueprint?.blueprintUploadId) && calculation.linearFeet > 0 && numberValue(height) > 0;
 
@@ -276,11 +273,6 @@ export function DrywallPlanTakeoffCalculator({
 
     if (result.wallHeightFeet) {
       setHeight(formatInputNumber(result.wallHeightFeet, 2));
-    }
-
-    if (result.ceilingAreaSqft) {
-      setCeilingArea(formatInputNumber(result.ceilingAreaSqft, 2));
-      setIncludeCeiling(true);
     }
 
     if (result.outsideCorners) {
@@ -498,7 +490,7 @@ export function DrywallPlanTakeoffCalculator({
         blueprintUploadId: savedBlueprint.blueprintUploadId,
         proposedLinearFeet: calculation.linearFeet,
         wallHeightFeet: numberValue(height),
-        ceilingAreaSqft: includeCeiling ? numberValue(ceilingArea) : null,
+        ceilingAreaSqft: null,
         outsideCorners: numberValue(outsideCorners),
         openings: reviewedOpeningRows(),
         wastePercent: numberValue(wastePercent),
@@ -814,7 +806,7 @@ export function DrywallPlanTakeoffCalculator({
             </button>
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
               Board size
               <select value={sheetLength} onChange={(event) => setSheetLength(event.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-bold text-slate-950 outline-none focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100">
@@ -827,18 +819,7 @@ export function DrywallPlanTakeoffCalculator({
               Waste percent
               <input value={wastePercent} onChange={(event) => setWastePercent(event.target.value)} inputMode="decimal" className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-bold text-slate-950 outline-none focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100" />
             </label>
-            <label className="flex min-h-12 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800">
-              Include ceiling
-              <input type="checkbox" checked={includeCeiling} onChange={(event) => setIncludeCeiling(event.target.checked)} className="h-5 w-5 accent-sky-600" />
-            </label>
           </div>
-
-          {includeCeiling ? (
-            <label className="mt-3 grid gap-1.5 text-sm font-semibold text-slate-700">
-              Proposed ceiling area sq ft
-              <input value={ceilingArea} onChange={(event) => setCeilingArea(event.target.value)} inputMode="decimal" className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-bold text-slate-950 outline-none focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100" />
-            </label>
-          ) : null}
 
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div className="rounded-2xl bg-slate-50 p-3">

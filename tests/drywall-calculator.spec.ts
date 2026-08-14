@@ -9,6 +9,8 @@ test("drywall calculator loads on desktop and mobile", async ({ page }) => {
 
   const bodyText = await body.innerText();
   expect(bodyText).not.toContain("This page couldn't load");
+  expect(bodyText).not.toContain("Include ceiling");
+  expect(bodyText).not.toContain("Proposed ceiling area");
 });
 
 test("wood floor calculator loads on desktop and mobile", async ({ page }) => {

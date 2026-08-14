@@ -56,7 +56,6 @@ export function DrywallCalculator() {
   const [outsideCorners, setOutsideCorners] = useState("4")
   const [wastePercent, setWastePercent] = useState("10")
   const [sheetLength, setSheetLength] = useState("8")
-  const [includeCeiling, setIncludeCeiling] = useState(true)
   const [copyStatus, setCopyStatus] = useState("")
 
   const calculation = useMemo(() => {
@@ -70,8 +69,7 @@ export function DrywallCalculator() {
     const sheetSqft = 4 * boardLength
 
     const wallArea = 2 * (roomLength + roomWidth) * wallHeight
-    const ceilingArea = includeCeiling ? roomLength * roomWidth : 0
-    const netArea = Math.max(0, wallArea + ceilingArea - openings)
+    const netArea = Math.max(0, wallArea - openings)
     const orderArea = netArea * (1 + waste / 100)
     const sheets = roundUp(orderArea / sheetSqft)
     const screwCount = roundUp(sheets * 32)
@@ -111,13 +109,12 @@ export function DrywallCalculator() {
 
     return {
       wallArea,
-      ceilingArea,
       netArea,
       orderArea,
       sheetSqft,
       rows,
     }
-  }, [height, includeCeiling, length, openingArea, outsideCorners, sheetLength, wastePercent, width])
+  }, [height, length, openingArea, outsideCorners, sheetLength, wastePercent, width])
 
   async function copyMaterialList() {
     const text = calculation.rows.map((row) => `${row.label}: ${row.quantity} - ${row.detail}`).join("\n")
@@ -170,7 +167,7 @@ export function DrywallCalculator() {
           </label>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3">
           <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
             Board size
             <select value={sheetLength} onChange={(event) => setSheetLength(event.target.value)} className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-bold text-slate-950 outline-none focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100">
@@ -178,10 +175,6 @@ export function DrywallCalculator() {
               <option value="10">4x10</option>
               <option value="12">4x12</option>
             </select>
-          </label>
-          <label className="flex min-h-12 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800">
-            Include ceiling
-            <input type="checkbox" checked={includeCeiling} onChange={(event) => setIncludeCeiling(event.target.checked)} className="h-5 w-5 accent-sky-600" />
           </label>
         </div>
       </div>
