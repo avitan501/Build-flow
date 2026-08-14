@@ -1,6 +1,6 @@
 import { BarChart3, Eye, Monitor, Smartphone, Users } from "lucide-react"
 
-import { requireManagerPortalProfile } from "@/lib/auth"
+import { requireAdminProfile } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 type TrafficRow = { path: string; referrer_host: string | null; session_hash: string; device_class: "mobile" | "desktop"; created_at: string }
@@ -17,7 +17,7 @@ function pageLabel(path: string) {
 }
 
 export default async function WebsiteTrafficPage() {
-  await requireManagerPortalProfile()
+  await requireAdminProfile()
   const now = new Date()
   const start = new Date(now)
   start.setUTCDate(start.getUTCDate() - 30)

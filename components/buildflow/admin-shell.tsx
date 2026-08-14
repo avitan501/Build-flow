@@ -40,7 +40,6 @@ function linksForAccess(access: ManagerAccess) {
     (link.href === "/admin/users" && access.customers) ||
     (link.href === "/admin/vendors" && access.suppliers) ||
     (link.href === "/admin/quote-comparison" && access.suppliers) ||
-    link.href === "/admin/traffic" ||
     link.href === QUO_INBOX_URL,
   );
 }

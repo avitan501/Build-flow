@@ -4,7 +4,7 @@ import { ClipboardPlus, Plus, Trash2, UserPlus, X } from "lucide-react"
 import { useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
-import { createRequestForClientAction, type ManagerNewClientInput, type ManagerRequestLineInput } from "@/app/admin/users/actions"
+import type { CreateClientRequestResult, ManagerNewClientInput, ManagerRequestLineInput } from "@/app/admin/users/actions"
 
 type CustomerOption = { id: string; name: string; email: string | null }
 type RequestLine = ManagerRequestLineInput & { key: string }
@@ -19,12 +19,10 @@ export function ManagerCreateClientRequest({
   customers,
   departments,
   initialCustomerId = "",
-  compact = false,
 }: {
   customers: CustomerOption[]
   departments: string[]
   initialCustomerId?: string
-  compact?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [clientSelection, setClientSelection] = useState(initialCustomerId || (customers.length ? "" : "new"))
@@ -51,14 +49,25 @@ export function ManagerCreateClientRequest({
   function submit() {
     setError(null)
     startTransition(async () => {
-      const result = await createRequestForClientAction({
-        customerId: addingClient ? undefined : clientSelection,
-        newClient: addingClient ? newClient : undefined,
-        department,
-        title,
-        notes,
-        lines,
-      })
+      let result: CreateClientRequestResult
+      try {
+        const response = await fetch("/api/admin/client-requests", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            customerId: addingClient ? undefined : clientSelection,
+            newClient: addingClient ? newClient : undefined,
+            department,
+            title,
+            notes,
+            lines,
+          }),
+        })
+        result = await response.json() as CreateClientRequestResult
+      } catch {
+        setError("The request could not reach the server. Please try again.")
+        return
+      }
       if (!result.ok) {
         setError(result.error)
         return
@@ -70,7 +79,7 @@ export function ManagerCreateClientRequest({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={compact ? "inline-flex min-h-10 items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-[#0066cc]" : "inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white shadow-sm"}>
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white shadow-sm">
         <ClipboardPlus className="h-4 w-4" />Create request for client
       </button>
 

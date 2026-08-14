@@ -25,9 +25,10 @@ test("direct checkout removes project selection and preserves manager request de
 })
 
 test("manager can create a structured request on behalf of a client", async () => {
-  const [component, actions, customerPage, inboxPage] = await Promise.all([
+  const [component, actions, apiRoute, customerPage, inboxPage] = await Promise.all([
     readFile(path.join(root, "components/buildflow/manager-create-client-request.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/users/actions.ts"), "utf8"),
+    readFile(path.join(root, "app/api/admin/client-requests/route.ts"), "utf8"),
     readFile(path.join(root, "app/admin/users/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/page.tsx"), "utf8"),
   ])
@@ -38,6 +39,7 @@ test("manager can create a structured request on behalf of a client", async () =
   expect(component).not.toContain("clientMode")
   expect(component).toContain('value="new"')
   expect(component).toContain("No department")
+  expect(component).toContain('fetch("/api/admin/client-requests"')
   expect(component).toContain("window.location.assign")
   expect(component).toContain("Add item")
   expect(component).toContain("grid place-items-center")
@@ -47,8 +49,27 @@ test("manager can create a structured request on behalf of a client", async () =
   expect(actions).toContain('status: "submitted"')
   expect(actions).toContain('const storedDepartment = department || "Unassigned"')
   expect(actions).toContain("admin.auth.admin.createUser")
-  expect(customerPage).toContain("ManagerCreateClientRequest")
+  expect(apiRoute).toContain("createRequestForClientAction")
+  expect(apiRoute).toContain("sameOrigin")
+  expect(apiRoute).toContain("No order was submitted")
+  expect(customerPage.match(/<ManagerCreateClientRequest/g)).toHaveLength(1)
   expect(inboxPage).toContain("ManagerCreateClientRequest")
+})
+
+test("manager request endpoint rejects unsafe or invalid submissions before database access", async ({ request }) => {
+  const crossSite = await request.post("/api/admin/client-requests", {
+    headers: { origin: "https://malicious.example", "content-type": "application/json" },
+    data: {},
+  })
+  expect(crossSite.status()).toBe(403)
+  expect(await crossSite.json()).toEqual({ ok: false, error: "This request was blocked for security." })
+
+  const invalidFormat = await request.post("/api/admin/client-requests", {
+    headers: { "content-type": "text/plain" },
+    data: "invalid",
+  })
+  expect(invalidFormat.status()).toBe(415)
+  expect(await invalidFormat.json()).toEqual({ ok: false, error: "The request format was not accepted." })
 })
 
 test("manager reply composer supports templates attachments email and text", async () => {

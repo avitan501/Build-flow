@@ -116,7 +116,7 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
   expect(navigation).toContain("https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602");
   expect(navigation.indexOf('label: "Calls & Messages"')).toBeGreaterThan(navigation.indexOf('label: "Website Traffic"'));
   expect(navigation).toContain('link.href === QUO_INBOX_URL');
-  expect(navigation).toContain('link.href === "/admin/traffic"');
+  expect(navigation).not.toContain('link.href === "/admin/traffic" ||');
   expect(navigation).toContain('target={external ? "_blank" : undefined}');
   expect(migration).toContain("alter table public.quote_comparisons enable row level security");
   expect(migration).toContain("private.has_staff_capability('suppliers')");

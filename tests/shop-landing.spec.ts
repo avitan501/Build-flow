@@ -185,16 +185,16 @@ test("traffic endpoint accepts same-site events and blocks cross-site submission
   expect(blocked.status()).toBe(403)
 })
 
-test("traffic dashboard exposes live status to approved manager portal users", async () => {
+test("traffic dashboard exposes live status to the owner only", async () => {
   const [trafficPage, navigation] = await Promise.all([
     readFile(path.join(process.cwd(), "app/admin/traffic/page.tsx"), "utf8"),
     readFile(path.join(process.cwd(), "components/buildflow/admin-shell.tsx"), "utf8"),
   ])
 
-  expect(trafficPage).toContain("requireManagerPortalProfile")
+  expect(trafficPage).toContain("requireAdminProfile")
   expect(trafficPage).toContain("Tracking active")
-  expect(trafficPage).not.toContain("requireAdminProfile")
-  expect(navigation).toContain('link.href === "/admin/traffic"')
+  expect(trafficPage).not.toContain("requireManagerPortalProfile")
+  expect(navigation).not.toContain('link.href === "/admin/traffic" ||')
 })
 
 test("home shows the compact manufacturer brand showcase", async ({ page }) => {
