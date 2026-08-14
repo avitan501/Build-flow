@@ -27,13 +27,14 @@ test("direct checkout removes project selection and preserves manager request de
 })
 
 test("manager can create a structured request on behalf of a client", async () => {
-  const [component, actions, apiRoute, requestMigration, customerPage, inboxPage] = await Promise.all([
+  const [component, actions, apiRoute, requestMigration, customerPage, inboxPage, clientFunction] = await Promise.all([
     readFile(path.join(root, "components/buildflow/manager-create-client-request.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/users/actions.ts"), "utf8"),
     readFile(path.join(root, "app/api/admin/client-requests/route.ts"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260814024500_create_client_request_atomically.sql"), "utf8"),
     readFile(path.join(root, "app/admin/users/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/page.tsx"), "utf8"),
+    readFile(path.join(root, "supabase/functions/create-manager-client/index.ts"), "utf8"),
   ])
 
   expect(component).toContain("Create request for a client")
@@ -52,7 +53,13 @@ test("manager can create a structured request on behalf of a client", async () =
   expect(actions).toContain('requireStaffProfile("customers")')
   expect(actions).toContain('supabase.rpc("staff_create_client_request"')
   expect(actions).toContain('const storedDepartment = department || "Unassigned"')
-  expect(actions).toContain("admin.auth.admin.createUser")
+  expect(actions).toContain('supabase.functions.invoke<{')
+  expect(actions).toContain('>("create-manager-client"')
+  expect(actions).not.toContain("Add the new client from the customer directory first")
+  expect(clientFunction).toContain("admin.auth.admin.createUser")
+  expect(clientFunction).toContain("can_manage_customers")
+  expect(clientFunction).toContain("admin.auth.getUser(token)")
+  expect(clientFunction).toContain('return json({ ok: true, customerId }, 201)')
   expect(requestMigration).toContain("create or replace function public.staff_create_client_request")
   expect(requestMigration).toContain("jsonb_array_length(p_lines) > 50")
   expect(requestMigration).toContain("'created_by_manager', true")

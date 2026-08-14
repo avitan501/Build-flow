@@ -1,7 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-
 import { revalidatePath } from "next/cache";
 
 import { requireAdminProfile, requireStaffProfile } from "@/lib/auth";
@@ -278,34 +276,19 @@ export async function createRequestForClientAction(input: {
       if (!existingClient.is_active) return { ok: false, error: "That client account is inactive." };
       customerId = existingClient.id;
     } else {
-      let admin: ReturnType<typeof createAdminClient>;
-      try {
-        admin = createAdminClient();
-      } catch {
-        return { ok: false, error: "Add the new client from the customer directory first, then create the request." };
-      }
-      const { data: authData, error: authError } = await admin.auth.admin.createUser({
-        email,
-        password: `${randomUUID()}Aa1!`,
-        email_confirm: true,
-        user_metadata: { full_name: fullName, phone, company_name: companyName },
+      const { data: createdClient, error: createClientError } = await supabase.functions.invoke<{
+        ok?: boolean;
+        customerId?: string;
+        error?: string;
+      }>("create-manager-client", {
+        body: { fullName, email, phone, companyName },
       });
-      if (authError || !authData.user) return { ok: false, error: "Could not create the new client account." };
-      customerId = authData.user.id;
-      const { error: profileError } = await admin.from("profiles").upsert({
-        id: customerId,
-        email,
-        full_name: fullName,
-        phone,
-        company_name: companyName,
-        role: "client",
-        approval_status: "approved",
-        is_active: true,
-      }, { onConflict: "id" });
-      if (profileError) {
-        await admin.auth.admin.deleteUser(customerId);
-        return { ok: false, error: "Could not save the new client profile." };
+      if (createClientError || !createdClient?.ok || !validUuid(createdClient.customerId || "")) {
+        if (createdClient?.error === "email_in_use_by_staff") return { ok: false, error: "That email belongs to a staff account." };
+        if (createdClient?.error === "client_inactive") return { ok: false, error: "That client account is inactive." };
+        return { ok: false, error: "Could not create the new client. Please try again." };
       }
+      customerId = createdClient.customerId || "";
     }
   }
 
