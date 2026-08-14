@@ -57,6 +57,8 @@ test("manager can create a structured request on behalf of a client", async () =
   expect(actions).toContain('>("create-manager-client"')
   expect(actions).not.toContain("Add the new client from the customer directory first")
   expect(clientFunction).toContain("admin.auth.admin.createUser")
+  expect(clientFunction).toContain('password: `${crypto.randomUUID()}Aa1!`')
+  expect(clientFunction).not.toContain('`${crypto.randomUUID()}${crypto.randomUUID()}Aa1!`')
   expect(clientFunction).toContain("can_manage_customers")
   expect(clientFunction).toContain("admin.auth.getUser(token)")
   expect(clientFunction).toContain('return json({ ok: true, customerId }, 201)')

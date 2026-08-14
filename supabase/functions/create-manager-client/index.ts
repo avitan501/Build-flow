@@ -72,7 +72,7 @@ Deno.serve(async (request) => {
 
   const { data: authData, error: authError } = await admin.auth.admin.createUser({
     email,
-    password: `${crypto.randomUUID()}${crypto.randomUUID()}Aa1!`,
+    password: `${crypto.randomUUID()}Aa1!`,
     email_confirm: true,
     user_metadata: { full_name: fullName, phone, company_name: companyName },
   })
