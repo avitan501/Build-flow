@@ -4,7 +4,6 @@ import Link from "next/link";
 import { QuoteComparisonCreateForm } from "@/components/buildflow/quote-comparison-create-form";
 import { requireStaffProfile } from "@/lib/auth";
 import { quoteComparisonStatusLabel, type QuoteComparisonRecord } from "@/lib/quote-comparison";
-import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools";
 
 type ProjectOption = { id: string; name: string; address: string | null };
 type CountRow = { comparison_id: string };
@@ -47,8 +46,6 @@ export default async function QuoteComparisonPage() {
   const active = comparisons.filter((comparison) => !["awarded", "archived"].includes(comparison.status)).length;
   const awarded = comparisons.filter((comparison) => comparison.status === "awarded").length;
   const quoteCount = [...bidCounts.values()].reduce((total, count) => total + count, 0);
-  const departments = [...new Set(SHOP_TOOL_CATEGORIES.map((department) => department.label))];
-
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 pb-16 pt-6 text-slate-950 sm:px-8 lg:px-10">
       <div className="mx-auto max-w-7xl">
@@ -58,7 +55,7 @@ export default async function QuoteComparisonPage() {
             <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Supplier Quote Comparison</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Enter supplier pricing side by side. The system checks delivered cost, missing items, lead time, and supplier trust before recommending a winner.</p>
           </div>
-          <QuoteComparisonCreateForm projects={projects} departments={departments} enabled={schemaReady} />
+          <QuoteComparisonCreateForm enabled={schemaReady} />
         </header>
 
         {!schemaReady ? (

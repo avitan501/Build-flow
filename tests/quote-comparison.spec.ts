@@ -142,3 +142,14 @@ test("selecting a supplier saves the current price draft before awarding it", as
   expect(workspace).toContain("Save prices & select supplier");
   expect(workspace).toContain("prices saved and supplier selected");
 });
+
+test("new comparison asks only for a comparison name", async () => {
+  const form = await readFile(path.join(process.cwd(), "components/buildflow/quote-comparison-create-form.tsx"), "utf8");
+
+  expect(form).toContain("Name this comparison");
+  expect(form).toContain("Comparison name");
+  expect(form).not.toContain("No project selected");
+  expect(form).not.toContain("Choose department");
+  expect(form).not.toContain("Delivery address");
+  expect(form).toContain('department: "", jobAddress: "", projectId: null');
+});
