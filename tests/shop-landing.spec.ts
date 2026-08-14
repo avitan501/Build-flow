@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises"
+import path from "node:path"
+
 import { expect, test } from "@playwright/test"
 
 test("address selection closes and keeps one clear selected address", async ({ page }) => {
@@ -180,6 +183,18 @@ test("traffic endpoint accepts same-site events and blocks cross-site submission
     data: { path: "/shop", sessionId: "cross-site-traffic-session" },
   })
   expect(blocked.status()).toBe(403)
+})
+
+test("traffic dashboard exposes live status to approved manager portal users", async () => {
+  const [trafficPage, navigation] = await Promise.all([
+    readFile(path.join(process.cwd(), "app/admin/traffic/page.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "components/buildflow/admin-shell.tsx"), "utf8"),
+  ])
+
+  expect(trafficPage).toContain("requireManagerPortalProfile")
+  expect(trafficPage).toContain("Tracking active")
+  expect(trafficPage).not.toContain("requireAdminProfile")
+  expect(navigation).toContain('link.href === "/admin/traffic"')
 })
 
 test("home shows the compact manufacturer brand showcase", async ({ page }) => {

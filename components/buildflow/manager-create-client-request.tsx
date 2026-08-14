@@ -27,8 +27,7 @@ export function ManagerCreateClientRequest({
   compact?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  const [clientMode, setClientMode] = useState<"existing" | "new">(customers.length ? "existing" : "new")
-  const [customerId, setCustomerId] = useState(initialCustomerId || customers[0]?.id || "")
+  const [clientSelection, setClientSelection] = useState(initialCustomerId || (customers.length ? "" : "new"))
   const [newClient, setNewClient] = useState<ManagerNewClientInput>({ fullName: "", email: "", phone: "", companyName: "" })
   const [department, setDepartment] = useState("")
   const [title, setTitle] = useState("")
@@ -37,6 +36,7 @@ export function ManagerCreateClientRequest({
   const [showNotes, setShowNotes] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const addingClient = clientSelection === "new"
 
   function updateLine(key: string, patch: Partial<RequestLine>) {
     setLines((current) => current.map((line) => line.key === key ? { ...line, ...patch } : line))
@@ -52,8 +52,8 @@ export function ManagerCreateClientRequest({
     setError(null)
     startTransition(async () => {
       const result = await createRequestForClientAction({
-        customerId: clientMode === "existing" ? customerId : undefined,
-        newClient: clientMode === "new" ? newClient : undefined,
+        customerId: addingClient ? undefined : clientSelection,
+        newClient: addingClient ? newClient : undefined,
         department,
         title,
         notes,
@@ -83,23 +83,16 @@ export function ManagerCreateClientRequest({
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <span className="text-sm font-semibold text-slate-800">Client</span>
-                <div className="mt-1.5 grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
-                  <button type="button" disabled={!customers.length} onClick={() => setClientMode("existing")} className={`min-h-10 rounded-md px-3 text-sm font-semibold ${clientMode === "existing" ? "bg-white text-slate-950 shadow-sm" : "text-slate-600"} disabled:opacity-40`}>Existing client</button>
-                  <button type="button" onClick={() => setClientMode("new")} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold ${clientMode === "new" ? "bg-white text-slate-950 shadow-sm" : "text-slate-600"}`}><UserPlus className="h-4 w-4" />New client</button>
-                </div>
-              </div>
-              {clientMode === "existing" ? (
-                <label className="grid gap-1.5 text-sm font-semibold text-slate-800 sm:col-span-2">Choose client<select value={customerId} onChange={(event) => setCustomerId(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">Choose a client</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}{customer.email ? ` - ${customer.email}` : ""}</option>)}</select></label>
-              ) : (
+              <label className="grid gap-1.5 text-sm font-semibold text-slate-800 sm:col-span-2">Choose client<select value={clientSelection} onChange={(event) => { setClientSelection(event.target.value); setError(null) }} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">Choose a client</option><option value="new">+ Add new client</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}{customer.email ? ` - ${customer.email}` : ""}</option>)}</select></label>
+              {addingClient ? (
                 <div className="grid gap-4 rounded-lg border border-sky-100 bg-sky-50/60 p-4 sm:col-span-2 sm:grid-cols-2">
+                  <div className="flex items-center gap-2 text-sm font-bold text-slate-950 sm:col-span-2"><UserPlus className="h-4 w-4 text-[#0066cc]" />Add new client</div>
                   <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Full name<input value={newClient.fullName} onChange={(event) => setNewClient((current) => ({ ...current, fullName: event.target.value }))} autoComplete="name" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label>
                   <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Email<input type="email" value={newClient.email} onChange={(event) => setNewClient((current) => ({ ...current, email: event.target.value }))} autoComplete="email" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label>
                   <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Phone <span className="font-normal text-slate-400">(optional)</span><input type="tel" value={newClient.phone} onChange={(event) => setNewClient((current) => ({ ...current, phone: event.target.value }))} autoComplete="tel" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label>
                   <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Company <span className="font-normal text-slate-400">(optional)</span><input value={newClient.companyName} onChange={(event) => setNewClient((current) => ({ ...current, companyName: event.target.value }))} autoComplete="organization" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label>
                 </div>
-              )}
+              ) : null}
               <label className="grid gap-1.5 text-sm font-semibold text-slate-800 sm:col-span-2">Department <span className="font-normal text-slate-400">(optional)</span><select value={department} onChange={(event) => setDepartment(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">No department</option>{departments.map((item) => <option key={item}>{item}</option>)}</select></label>
               <label className="grid gap-1.5 text-sm font-semibold text-slate-800 sm:col-span-2">Request name <span className="font-normal text-slate-400">(optional)</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={department ? `${department} request` : "Material request"} maxLength={180} className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm" /></label>
             </div>
@@ -113,7 +106,7 @@ export function ManagerCreateClientRequest({
             {error ? <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{error}</div> : null}
           </div>
 
-          <footer className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4"><button type="button" onClick={close} disabled={isPending} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700">Cancel</button><button type="button" onClick={submit} disabled={isPending || (clientMode === "existing" ? !customerId : !newClient.fullName.trim() || !newClient.email.trim())} className="min-h-11 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-40">{isPending ? "Creating..." : "Create client request"}</button></footer>
+          <footer className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4"><button type="button" onClick={close} disabled={isPending} className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700">Cancel</button><button type="button" onClick={submit} disabled={isPending || !clientSelection || (addingClient && (!newClient.fullName.trim() || !newClient.email.trim()))} className="min-h-11 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-40">{isPending ? "Creating..." : "Create client request"}</button></footer>
         </section>
       </div>, document.body) : null}
     </>

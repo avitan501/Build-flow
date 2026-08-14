@@ -24,12 +24,12 @@ const QUO_INBOX_URL = "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78
 
 const ownerLinks = [
   { href: "/admin/build-map", label: "Dashboard", icon: LayoutDashboard },
-  { href: QUO_INBOX_URL, label: "Calls & Messages", icon: PhoneCall },
   { href: "/admin/users", label: "Customers", icon: Users },
   { href: "/admin/vendors", label: "Suppliers", icon: Store },
   { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
   { href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles },
   { href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 },
+  { href: QUO_INBOX_URL, label: "Calls & Messages", icon: PhoneCall },
 ] as const;
 
 type ManagerAccess = { owner: boolean; customers: boolean; suppliers: boolean };
@@ -39,7 +39,9 @@ function linksForAccess(access: ManagerAccess) {
   return ownerLinks.filter((link) =>
     (link.href === "/admin/users" && access.customers) ||
     (link.href === "/admin/vendors" && access.suppliers) ||
-    (link.href === "/admin/quote-comparison" && access.suppliers),
+    (link.href === "/admin/quote-comparison" && access.suppliers) ||
+    link.href === "/admin/traffic" ||
+    link.href === QUO_INBOX_URL,
   );
 }
 

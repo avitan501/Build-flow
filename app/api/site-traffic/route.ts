@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
-import { getSupabasePublicEnv } from "@/lib/supabase/env"
+import { getSupabasePublicEnv, hasSupabaseBuildEnv } from "@/lib/supabase/env"
 
 function safeReferrerHost(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return null
@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     }
   }
   if (/bot|crawler|spider|preview/i.test(request.headers.get("user-agent") || "")) return new NextResponse(null, { status: 204 })
+  if (!hasSupabaseBuildEnv()) return new NextResponse(null, { status: 204 })
 
   try {
     const payload = await request.json() as { path?: unknown; sessionId?: unknown; referrer?: unknown }
@@ -34,14 +35,15 @@ export async function POST(request: Request) {
     const userAgent = request.headers.get("user-agent") || ""
     const sessionHash = createHash("sha256").update(sessionId).digest("hex").slice(0, 32)
     const { url, anonKey } = getSupabasePublicEnv()
-    await createClient(url, anonKey).rpc("record_site_page_view", {
+    const { error } = await createClient(url, anonKey).rpc("record_site_page_view", {
       p_path: path,
       p_referrer_host: safeReferrerHost(payload.referrer),
       p_session_hash: sessionHash,
       p_device_class: /android|iphone|ipad|mobile/i.test(userAgent) ? "mobile" : "desktop",
     })
-  } catch {
-    // Analytics must never interrupt the customer experience.
+    if (error) console.error("Site traffic recording failed.", { code: error.code })
+  } catch (error) {
+    console.error("Site traffic recording failed.", error instanceof Error ? error.message : "Unknown error")
   }
   return new NextResponse(null, { status: 204 })
 }

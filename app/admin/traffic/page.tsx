@@ -1,6 +1,6 @@
 import { BarChart3, Eye, Monitor, Smartphone, Users } from "lucide-react"
 
-import { requireAdminProfile } from "@/lib/auth"
+import { requireManagerPortalProfile } from "@/lib/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 type TrafficRow = { path: string; referrer_host: string | null; session_hash: string; device_class: "mobile" | "desktop"; created_at: string }
@@ -17,7 +17,7 @@ function pageLabel(path: string) {
 }
 
 export default async function WebsiteTrafficPage() {
-  await requireAdminProfile()
+  await requireManagerPortalProfile()
   const now = new Date()
   const start = new Date(now)
   start.setUTCDate(start.getUTCDate() - 30)
@@ -41,6 +41,9 @@ export default async function WebsiteTrafficPage() {
   })
   const maxDaily = Math.max(...daily.map((day) => day.value), 1)
   const maxPage = Math.max(topPages[0]?.[1] || 0, 1)
+  const latestView = rows[0]?.created_at
+    ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York", timeZoneName: "short" }).format(new Date(rows[0].created_at))
+    : null
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-8 lg:px-10">
@@ -48,7 +51,7 @@ export default async function WebsiteTrafficPage() {
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager Portal</p>
         <h1 className="mt-2 text-3xl font-bold text-slate-950">Website Traffic</h1>
         <p className="mt-2 text-sm text-slate-600">Customer website activity from the last 30 days. Manager pages are excluded.</p>
-        {error ? <p className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Traffic data is not available yet. Tracking will begin after the database update is active.</p> : null}
+        {error ? <p className="mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">Traffic data could not load. Refresh the page; if it continues, the database connection needs attention.</p> : latestView ? <p className="mt-4 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Tracking active · Last view {latestView}</p> : <p className="mt-4 inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">Tracking active · Waiting for the first visit</p>}
 
         <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[{ label: "Views today", value: todayViews, icon: Eye }, { label: "Views in 7 days", value: sevenDayRows.length, icon: BarChart3 }, { label: "Visitors in 30 days", value: uniqueSessions, icon: Users }, { label: "Total 30-day views", value: rows.length, icon: Eye }].map((metric) => <div key={metric.label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><metric.icon className="h-5 w-5 text-[#0066cc]" /><p className="mt-4 text-2xl font-bold tabular-nums text-slate-950">{metric.value.toLocaleString()}</p><p className="mt-1 text-xs font-semibold text-slate-500">{metric.label}</p></div>)}

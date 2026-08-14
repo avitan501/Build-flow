@@ -33,7 +33,10 @@ test("manager can create a structured request on behalf of a client", async () =
   ])
 
   expect(component).toContain("Create request for a client")
-  expect(component).toContain("New client")
+  expect(component).toContain("+ Add new client")
+  expect(component).not.toContain("Existing client")
+  expect(component).not.toContain("clientMode")
+  expect(component).toContain('value="new"')
   expect(component).toContain("No department")
   expect(component).toContain("window.location.assign")
   expect(component).toContain("Add item")
