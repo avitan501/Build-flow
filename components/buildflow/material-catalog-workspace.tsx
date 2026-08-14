@@ -51,6 +51,25 @@ function cellKey(itemId: string, supplierId: string) {
   return `${itemId}::${supplierId}`
 }
 
+const RETAIL_CATALOG_SUPPLIER_IDS = new Set(["lowes-retail-catalog", "home-depot-retail-catalog"])
+
+function isRetailCatalogSupplier(supplier: CatalogSupplier) {
+  return RETAIL_CATALOG_SUPPLIER_IDS.has(supplier.id)
+}
+
+function retailItemUrl(supplier: CatalogSupplier, item: MaterialCatalogItem) {
+  const query = [item.name, item.measurement, item.thickness].filter(Boolean).join(" ")
+  const encodedQuery = encodeURIComponent(query)
+
+  if (supplier.id === "lowes-retail-catalog") return `https://www.lowes.com/search?searchTerm=${encodedQuery}`
+  if (supplier.id === "home-depot-retail-catalog") return `https://www.homedepot.com/s/${encodedQuery}`
+  return supplier.portalUrl ?? ""
+}
+
+function supplierColumnWidth(supplier: CatalogSupplier) {
+  return isRetailCatalogSupplier(supplier) ? 108 : 132
+}
+
 function emptyEditor(category: string): EditorDraft {
   const prefix = category.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() || "MAT"
   return { category, itemCode: `${prefix}-NEW`, name: "", description: "", measurement: "", thickness: "", defaultQuantity: "1", unit: "each", imageUrl: "", status: "active" }
@@ -326,7 +345,7 @@ export function MaterialCatalogWorkspace({
               <label className="min-w-0 flex-1"><span className="sr-only">Supplier price column</span><select value={mobileSupplier?.id ?? ""} onChange={(event) => setMobileSupplierId(event.target.value)} disabled={!mobileSupplier} className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold"><option value="">No eligible supplier</option>{visibleSuppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select></label>
               <button type="button" onClick={() => moveMobileSupplier(1)} disabled={visibleSuppliers.length < 2} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-35" aria-label="Next supplier"><ChevronRight className="h-4 w-4" /></button>
             </div>
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500"><span>{mobileSupplier ? `${mobileSupplier.email || mobileSupplier.phone || "Online store"} · ${visibleSuppliers.findIndex((supplier) => supplier.id === mobileSupplier.id) + 1} of ${visibleSuppliers.length}` : `No supplier added to ${selectedCategory}.`}</span>{mobileSupplier?.portalUrl ? <a href={mobileSupplier.portalUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-[#0066cc]"><ExternalLink className="h-3.5 w-3.5" />Open website</a> : null}</div>
+            <p className="mt-2 text-xs text-slate-500">{mobileSupplier ? `${mobileSupplier.email || mobileSupplier.phone || "Online store"} · ${visibleSuppliers.findIndex((supplier) => supplier.id === mobileSupplier.id) + 1} of ${visibleSuppliers.length}` : `No supplier added to ${selectedCategory}.`}</p>
           </header>
           <div className="divide-y divide-slate-200">
             {categoryItems.map((item) => {
@@ -341,9 +360,12 @@ export function MaterialCatalogWorkspace({
                   <button type="button" onClick={() => setEditor(itemEditor(item))} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-sky-50 hover:text-[#0066cc]" aria-label={`Edit ${item.name}`}><Pencil className="h-3.5 w-3.5" /></button>
                   <button type="button" onClick={() => deleteItem(item)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-700" aria-label={`Delete ${item.name}`}><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
-                {supplier && draft ? <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-2 border-t border-slate-100 px-3 py-2.5">
+                {supplier && draft ? <div className="border-t border-slate-100 px-3 py-2.5">
+                  {isRetailCatalogSupplier(supplier) ? <a href={retailItemUrl(supplier, item)} target="_blank" rel="noreferrer" className="mb-2 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-[#0066cc]"><ExternalLink className="h-3.5 w-3.5" />Find this item at {supplier.name}</a> : null}
+                  <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-2">
                   <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-slate-400">$</span><input aria-label={`${supplier.name} unit price for ${item.name}`} inputMode="decimal" value={draft.unitPrice} onChange={(event) => updatePrice(item.id, supplier.id, { unitPrice: event.target.value.replace(/[^0-9.]/g, "") })} placeholder="Unit price" className="h-10 w-full rounded-lg border border-slate-300 bg-white pl-6 pr-3 text-sm tabular-nums" /></div>
                   <div className="flex gap-1"><select aria-label={`${supplier.name} availability for ${item.name}`} value={draft.availability} onChange={(event) => updatePrice(item.id, supplier.id, { availability: event.target.value as PriceDraft["availability"] })} className={`h-10 min-w-0 flex-1 rounded-lg border px-2 text-xs font-semibold ${draft.availability === "not_available" ? "border-rose-200 bg-rose-50 text-rose-700" : draft.availability === "available" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-600"}`}><option value="unknown">Unknown</option><option value="available">Available</option><option value="not_available">N/A</option></select>{saved || dirtyKeys.has(key) ? <span className={`inline-flex h-10 w-8 shrink-0 items-center justify-center rounded-lg ${dirtyKeys.has(key) ? "bg-amber-100 text-amber-700" : "bg-emerald-50 text-emerald-700"}`} title={dirtyKeys.has(key) ? "Unsaved change" : "Saved"}>{dirtyKeys.has(key) ? <Pencil className="h-3 w-3" /> : <Check className="h-3 w-3" />}</span> : null}</div>
+                  </div>
                 </div> : null}
               </article>
             })}
@@ -353,11 +375,11 @@ export function MaterialCatalogWorkspace({
 
         <section className="mt-3 hidden max-w-full overflow-auto overscroll-x-contain rounded-lg border border-slate-300 bg-white shadow-sm md:block" aria-label={`${selectedCategory} supplier pricing matrix`}>
           {!visibleSuppliers.length ? <div className="flex min-h-14 items-center justify-between gap-3 border-b border-slate-200 bg-sky-50 px-3 py-2 text-sm"><span className="font-semibold text-slate-700">No supplier added to {selectedCategory}.</span><button type="button" onClick={openCatalogSuppliers} className="shrink-0 font-bold text-[#0066cc]">Add supplier</button></div> : null}
-          <table className="border-collapse text-left text-xs" style={{ minWidth: `${320 + visibleSuppliers.length * 172}px` }}>
+          <table className="border-collapse text-left text-xs" style={{ minWidth: `${280 + visibleSuppliers.reduce((total, supplier) => total + supplierColumnWidth(supplier), 0)}px` }}>
             <thead className="sticky top-0 z-30 bg-slate-100">
               <tr>
-                <th className="sticky left-0 z-40 w-[320px] min-w-[320px] border-b border-r border-slate-300 bg-slate-100 px-3 py-2 font-bold">Item</th>
-                {visibleSuppliers.map((supplier) => <th key={supplier.id} className="w-[172px] min-w-[172px] border-b border-r border-slate-300 px-2 py-2 align-top"><span className="block truncate font-bold" title={supplier.name}>{supplier.name}</span><span className="mt-0.5 block truncate text-[10px] font-normal text-slate-500">{supplier.email || supplier.phone || "Online store"}</span>{supplier.portalUrl ? <a href={supplier.portalUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-[#0066cc]"><ExternalLink className="h-3 w-3" />Open website</a> : null}</th>)}
+                <th className="sticky left-0 z-40 w-[280px] min-w-[280px] border-b border-r border-slate-300 bg-slate-100 px-3 py-2 font-bold">Item</th>
+                {visibleSuppliers.map((supplier) => <th key={supplier.id} style={{ width: supplierColumnWidth(supplier), minWidth: supplierColumnWidth(supplier) }} className="border-b border-r border-slate-300 px-1.5 py-2 align-top"><span className="block truncate font-bold" title={supplier.name}>{supplier.name}</span>{!isRetailCatalogSupplier(supplier) ? <span className="mt-0.5 block truncate text-[9px] font-normal text-slate-500">{supplier.email || supplier.phone || "Contact not set"}</span> : null}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -374,7 +396,8 @@ export function MaterialCatalogWorkspace({
                   const key = cellKey(item.id, supplier.id)
                   const draft = draftFor(item.id, supplier.id)
                   const saved = initialPriceMap.get(key)
-                  return <td key={supplier.id} className={`border-b border-r border-slate-200 p-1.5 align-top ${dirtyKeys.has(key) ? "bg-amber-50" : ""}`}>
+                  return <td key={supplier.id} style={{ width: supplierColumnWidth(supplier), minWidth: supplierColumnWidth(supplier) }} className={`border-b border-r border-slate-200 p-1 align-top ${dirtyKeys.has(key) ? "bg-amber-50" : ""}`}>
+                    {isRetailCatalogSupplier(supplier) ? <a href={retailItemUrl(supplier, item)} target="_blank" rel="noreferrer" aria-label={`Find ${item.name} at ${supplier.name}`} title={`Find ${item.name} at ${supplier.name}`} className="mb-1 inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-1 text-[9px] font-bold text-[#0066cc]"><ExternalLink className="h-3 w-3 shrink-0" />Shop item</a> : null}
                     <div className="relative"><span className="absolute left-2 top-1/2 -translate-y-1/2 font-semibold text-slate-400">$</span><input aria-label={`${supplier.name} unit price for ${item.name}`} inputMode="decimal" value={draft.unitPrice} onChange={(event) => updatePrice(item.id, supplier.id, { unitPrice: event.target.value.replace(/[^0-9.]/g, "") })} placeholder="Price" className="h-8 w-full rounded-md border border-slate-300 bg-white pl-5 pr-2 text-xs tabular-nums" /></div>
                     <div className="mt-1 flex gap-1">
                       <select aria-label={`${supplier.name} availability for ${item.name}`} value={draft.availability} onChange={(event) => updatePrice(item.id, supplier.id, { availability: event.target.value as PriceDraft["availability"] })} className={`h-7 min-w-0 flex-1 rounded-md border px-1 text-[10px] font-semibold ${draft.availability === "not_available" ? "border-rose-200 bg-rose-50 text-rose-700" : draft.availability === "available" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-600"}`}><option value="unknown">Unknown</option><option value="available">Available</option><option value="not_available">N/A</option></select>
