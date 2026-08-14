@@ -20,9 +20,14 @@ export function AvantiaBuildClientShell({ children }: AvantiaBuildClientShellPro
   const isOwnerWorkspace = Boolean(pathname?.startsWith("/owner"));
   const isManagerPreview = Boolean(pathname?.startsWith("/preview-admin"));
   const isQuoteComparisonPreview = Boolean(pathname?.startsWith("/preview/quote-comparison"));
+  const isAuthFlow = pathname === "/login" || pathname === "/signup" || pathname === "/reset-password";
 
   if (!useAppShell) {
     return <>{children}</>;
+  }
+
+  if (isAuthFlow) {
+    return <div className="min-h-screen bg-white">{children}</div>;
   }
 
   return (

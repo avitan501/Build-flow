@@ -4,16 +4,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
+import { AuthPageShell } from "@/components/buildflow/auth-page-shell";
 import { createClient } from "@/lib/supabase/client";
-import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 import { authRedirectOrigin } from "@/lib/site-url";
+import { useAuthConfig } from "@/lib/use-auth-config";
 
 type ResetState = "loading" | "request" | "ready" | "success" | "error";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
-  const hasAuthConfig = hasSupabasePublicEnv();
+  const hasAuthConfig = useAuthConfig();
   const supabase = useMemo(() => (hasAuthConfig ? createClient() : null), [hasAuthConfig]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,6 +26,8 @@ export default function ResetPasswordPage() {
     let cancelled = false;
 
     async function initializeRecovery() {
+      if (hasAuthConfig === null) return;
+
       if (!supabase) {
         if (!cancelled) {
           setStatus("request");
@@ -90,7 +92,7 @@ export default function ResetPasswordPage() {
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [hasAuthConfig, supabase]);
 
   async function handleResetRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -175,37 +177,26 @@ export default function ResetPasswordPage() {
   const isRecoveryMode = status === "ready" || (status === "success" && message?.includes("Redirecting"));
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#eff6ff_0%,#f8fbff_48%,#ffffff_100%)] px-6 py-10 sm:px-8 sm:py-14">
-      <section className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-md items-center">
-        <div className="w-full rounded-[32px] border border-sky-100 bg-white/95 p-7 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur sm:p-8">
-          <div className="flex items-center gap-3">
-            <AvantiaBuildLockup showSlogan />
-          </div>
-
-          <div className="mt-8 space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
-              {isRecoveryMode ? "Set new password" : "Forgot password"}
-            </h1>
-            <p className="text-sm text-slate-500">
-              {isRecoveryMode ? "Choose a new password to finish recovery." : "Enter your email to receive a reset link."}
-            </p>
-          </div>
+    <AuthPageShell title={isRecoveryMode ? "Set a new password" : "Reset your password"}>
+          <p className="mb-6 text-center text-sm text-[#6e6e73]">
+            {isRecoveryMode ? "Choose a new password." : "Enter your email to receive a reset link."}
+          </p>
 
           {status === "loading" ? (
-            <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">Loading...</div>
+            <div className="rounded-xl border border-[#d2d2d7] bg-[#f5f5f7] px-4 py-3 text-sm text-[#6e6e73]">Loading...</div>
           ) : null}
 
           {status !== "loading" && !isRecoveryMode ? (
-            <form className="mt-8 space-y-4" onSubmit={handleResetRequest}>
-              <label className="block text-sm font-medium text-slate-700">
-                <span className="mb-2 block">Email</span>
+            <form className="space-y-3" onSubmit={handleResetRequest}>
+              <label className="block">
+                <span className="sr-only">Email</span>
                 <input
                   required
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                  placeholder="name@company.com"
+                  className="min-h-14 w-full rounded-[14px] border border-[#d2d2d7] bg-white px-4 text-base text-[#1d1d1f] outline-none transition placeholder:text-[#6e6e73] focus:border-[#0071e3] focus:ring-4 focus:ring-[#0071e3]/10"
+                  placeholder="Email address"
                 />
               </label>
 
@@ -222,7 +213,7 @@ export default function ResetPasswordPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(2,132,199,0.22)] transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
+                className="min-h-14 w-full rounded-[14px] bg-[#0071e3] px-5 text-base font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSubmitting ? "Sending..." : "Send reset link"}
               </button>
@@ -230,9 +221,9 @@ export default function ResetPasswordPage() {
           ) : null}
 
           {status !== "loading" && isRecoveryMode ? (
-            <form className="mt-8 space-y-4" onSubmit={handlePasswordUpdate}>
-              <label className="block text-sm font-medium text-slate-700">
-                <span className="mb-2 block">New password</span>
+            <form className="space-y-3" onSubmit={handlePasswordUpdate}>
+              <label className="block">
+                <span className="sr-only">New password</span>
                 <input
                   required
                   type="password"
@@ -240,13 +231,13 @@ export default function ResetPasswordPage() {
                   disabled={status !== "ready" || isSubmitting}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100 disabled:opacity-60"
+                  className="min-h-14 w-full rounded-[14px] border border-[#d2d2d7] bg-white px-4 text-base text-[#1d1d1f] outline-none transition placeholder:text-[#6e6e73] focus:border-[#0071e3] focus:ring-4 focus:ring-[#0071e3]/10 disabled:opacity-60"
                   placeholder="Enter a new password"
                 />
               </label>
 
-              <label className="block text-sm font-medium text-slate-700">
-                <span className="mb-2 block">Confirm new password</span>
+              <label className="block">
+                <span className="sr-only">Confirm new password</span>
                 <input
                   required
                   type="password"
@@ -254,7 +245,7 @@ export default function ResetPasswordPage() {
                   disabled={status !== "ready" || isSubmitting}
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100 disabled:opacity-60"
+                  className="min-h-14 w-full rounded-[14px] border border-[#d2d2d7] bg-white px-4 text-base text-[#1d1d1f] outline-none transition placeholder:text-[#6e6e73] focus:border-[#0071e3] focus:ring-4 focus:ring-[#0071e3]/10 disabled:opacity-60"
                   placeholder="Repeat the new password"
                 />
               </label>
@@ -272,23 +263,21 @@ export default function ResetPasswordPage() {
               <button
                 type="submit"
                 disabled={status !== "ready" || isSubmitting}
-                className="w-full rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(2,132,199,0.22)] transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
+                className="min-h-14 w-full rounded-[14px] bg-[#0071e3] px-5 text-base font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSubmitting ? "Saving..." : "Set new password"}
               </button>
             </form>
           ) : null}
 
-          <div className="mt-6 flex items-center justify-between gap-4 text-sm">
-            <Link href="/login" className="font-medium text-sky-700 hover:text-sky-800">
-              Back to login
+          <div className="mt-6 flex items-center justify-center gap-6 text-sm">
+            <Link href="/login" className="font-medium text-[#0066cc] hover:text-[#004f9e]">
+              Sign in
             </Link>
-            <Link href="/signup" className="font-medium text-slate-700 hover:text-slate-950">
+            <Link href="/signup" className="font-medium text-[#0066cc] hover:text-[#004f9e]">
               Create account
             </Link>
           </div>
-        </div>
-      </section>
-    </main>
+    </AuthPageShell>
   );
 }

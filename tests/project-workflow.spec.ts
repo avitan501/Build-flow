@@ -38,5 +38,5 @@ test("shop products start a direct request and require sign in", async ({ page }
   await expect(continueDialog.getByRole("link", { name: "Create account", exact: true })).toBeVisible()
   await continueDialog.getByRole("link", { name: "Log in", exact: true }).click()
   await expect(page).toHaveURL(/\/login\?next=/)
-  await expect(page.getByRole("heading", { name: "Log in", exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Sign in to Avantia Build", exact: true })).toBeVisible()
 })

@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
-import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
+import { AuthPageShell } from "@/components/buildflow/auth-page-shell";
 import { GoogleSignInIcon } from "@/components/buildflow/google-sign-in-icon";
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { friendlyAuthError, isGoogleAuthEnabled } from "@/lib/auth-ui";
 import { createClient } from "@/lib/supabase/client";
-import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 import { authRedirectOrigin } from "@/lib/site-url";
+import { useAuthConfig } from "@/lib/use-auth-config";
 
 type FormState = {
   fullName: string;
@@ -37,7 +37,7 @@ function sanitizeNextPath(value: string | null) {
 export default function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const hasAuthConfig = hasSupabasePublicEnv();
+  const hasAuthConfig = useAuthConfig();
   const supabase = useMemo(() => (hasAuthConfig ? createClient() : null), [hasAuthConfig]);
   const [form, setForm] = useState<FormState>(initialState);
   const [mode, setMode] = useState<SignupMode>(searchParams.get("mode") === "phone" ? "phone" : "email");
@@ -47,6 +47,10 @@ export default function SignupPage() {
   const [googleEnabled, setGoogleEnabled] = useState(false);
   const redirectPath = sanitizeNextPath(searchParams.get("next"));
   const nextQuery = redirectPath === "/" ? "" : `?next=${encodeURIComponent(redirectPath)}`;
+
+  const markFormReady = useCallback((formElement: HTMLFormElement | null) => {
+    if (formElement) formElement.dataset.hydrated = "true";
+  }, []);
 
   useEffect(() => {
     if (!supabase) return;
@@ -174,25 +178,14 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#eff6ff_0%,#f8fbff_48%,#ffffff_100%)] px-6 py-10 sm:px-8 sm:py-14">
-      <section className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-md items-center">
-        <div className="w-full rounded-[32px] border border-sky-100 bg-white/95 p-7 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur sm:p-8">
-          <div className="flex items-center gap-3">
-            <AvantiaBuildLockup showSlogan />
-          </div>
+    <AuthPageShell title="Create your account">
+      {hasAuthConfig === false ? (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800">
+          Authentication is temporarily unavailable.
+        </div>
+      ) : null}
 
-          <div className="mt-8 space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Create account</h1>
-            <p className="text-sm text-slate-500">Create an email account or a free phone-number password login.</p>
-          </div>
-
-          {!hasAuthConfig ? (
-            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800">
-              Auth is not connected on this preview yet. The page is visible, but signup needs the public Supabase URL and anon key.
-            </div>
-          ) : null}
-
-          <div className="mt-8 grid grid-cols-2 gap-2 rounded-full bg-slate-100 p-1">
+          <div className="grid grid-cols-2 gap-1 rounded-[14px] bg-[#f5f5f7] p-1">
             <button
               type="button"
               onClick={() => {
@@ -200,7 +193,7 @@ export default function SignupPage() {
                 setError(null);
                 setMessage(null);
               }}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${mode === "email" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}
+              className={`min-h-11 rounded-[11px] px-4 text-sm font-semibold transition ${mode === "email" ? "bg-white text-[#1d1d1f] shadow-sm" : "text-[#6e6e73]"}`}
             >
               Email
             </button>
@@ -211,60 +204,60 @@ export default function SignupPage() {
                 setError(null);
                 setMessage(null);
               }}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${mode === "phone" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}
+              className={`min-h-11 rounded-[11px] px-4 text-sm font-semibold transition ${mode === "phone" ? "bg-white text-[#1d1d1f] shadow-sm" : "text-[#6e6e73]"}`}
             >
               Phone
             </button>
           </div>
 
-          <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-            <label className="block text-sm font-medium text-slate-700">
-              <span className="mb-2 block">Name</span>
+          <form ref={markFormReady} className="mt-5 space-y-3" onSubmit={handleSubmit} data-testid="signup-form">
+            <label className="block">
+              <span className="sr-only">Name</span>
               <input
                 required
                 value={form.fullName}
                 onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                placeholder="John Builder"
+                className="min-h-14 w-full rounded-[14px] border border-[#d2d2d7] bg-white px-4 text-base text-[#1d1d1f] outline-none transition placeholder:text-[#6e6e73] focus:border-[#0071e3] focus:ring-4 focus:ring-[#0071e3]/10"
+                placeholder="Full name"
               />
             </label>
 
-            <label className="block text-sm font-medium text-slate-700">
-              <span className="mb-2 block">Phone number</span>
+            <label className="block">
+              <span className="sr-only">Phone number</span>
               <input
                 required={mode === "phone"}
                 type="tel"
                 inputMode="tel"
                 value={form.phone}
                 onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                className="min-h-14 w-full rounded-[14px] border border-[#d2d2d7] bg-white px-4 text-base text-[#1d1d1f] outline-none transition placeholder:text-[#6e6e73] focus:border-[#0071e3] focus:ring-4 focus:ring-[#0071e3]/10"
                 placeholder="Phone number"
               />
             </label>
 
             {mode === "email" ? (
-              <label className="block text-sm font-medium text-slate-700">
-                <span className="mb-2 block">Email</span>
+              <label className="block">
+                <span className="sr-only">Email</span>
                 <input
                   required
                   type="email"
                   value={form.email}
                   onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                  placeholder="name@company.com"
+                  className="min-h-14 w-full rounded-[14px] border border-[#d2d2d7] bg-white px-4 text-base text-[#1d1d1f] outline-none transition placeholder:text-[#6e6e73] focus:border-[#0071e3] focus:ring-4 focus:ring-[#0071e3]/10"
+                  placeholder="Email address"
                 />
               </label>
             ) : null}
 
-            <label className="block text-sm font-medium text-slate-700">
-              <span className="mb-2 block">Password</span>
+            <label className="block">
+              <span className="sr-only">Password</span>
               <input
                 required
                 type="password"
                 minLength={8}
                 value={form.password}
                 onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                className="min-h-14 w-full rounded-[14px] border border-[#d2d2d7] bg-white px-4 text-base text-[#1d1d1f] outline-none transition placeholder:text-[#6e6e73] focus:border-[#0071e3] focus:ring-4 focus:ring-[#0071e3]/10"
                 placeholder="Create a password"
               />
             </label>
@@ -279,19 +272,19 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(2,132,199,0.22)] transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
+              className="min-h-14 w-full rounded-[14px] bg-[#0071e3] px-5 text-base font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? "Creating account..." : "Create account"}
             </button>
           </form>
 
           {googleEnabled ? (
-          <div className="mt-5 border-t border-slate-200 pt-5">
+          <div className="mt-5 border-t border-[#d2d2d7] pt-5">
             <button
               type="button"
               onClick={handleGoogleSignIn}
               disabled={isSubmitting}
-              className="flex min-h-14 w-full items-center justify-center gap-3 rounded-full border-2 border-slate-200 bg-white px-5 text-base font-semibold text-slate-800 shadow-sm transition hover:border-sky-200 hover:bg-sky-50/50 disabled:cursor-not-allowed disabled:opacity-70"
+              className="flex min-h-14 w-full items-center justify-center gap-3 rounded-[14px] border border-[#d2d2d7] bg-white px-5 text-base font-semibold text-[#1d1d1f] transition hover:border-[#a1a1a6] hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <GoogleSignInIcon className="h-6 w-6 shrink-0" />
               <span>{isSubmitting ? "Opening Google..." : "Continue with Google"}</span>
@@ -299,16 +292,14 @@ export default function SignupPage() {
           </div>
           ) : null}
 
-          <div className="mt-6 flex items-center justify-between gap-4 text-sm">
-            <Link href={`/login${nextQuery}`} className="font-medium text-sky-700 hover:text-sky-800">
-              Back to login
+          <div className="mt-6 flex items-center justify-center gap-6 text-sm">
+            <Link href={`/login${nextQuery}`} className="font-medium text-[#0066cc] hover:text-[#004f9e]">
+              Sign in
             </Link>
-            <Link href="/reset-password" className="font-medium text-slate-700 hover:text-slate-950">
+            <Link href="/reset-password" className="font-medium text-[#0066cc] hover:text-[#004f9e]">
               Forgot password?
             </Link>
           </div>
-        </div>
-      </section>
-    </main>
+    </AuthPageShell>
   );
 }

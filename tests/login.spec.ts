@@ -37,7 +37,7 @@ test("the email login field accepts a phone-password account", async ({ page }) 
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-hydrated", "true")
   await page.getByPlaceholder("Email or phone number").fill("3475675077")
   await page.getByPlaceholder("Password").fill("test-password")
-  await page.getByRole("button", { name: "Log in", exact: true }).click()
+  await page.getByRole("button", { name: "Sign in", exact: true }).click()
 
   await expect(page.getByText("Invalid login credentials")).toBeVisible()
   expect(submittedEmail).toBe("phone-13475675077@phone-login.buildflow.local")
@@ -91,8 +91,9 @@ test("phone-only signup sends a normalized number without exposing a personal ex
   })
 
   await page.goto("/signup?mode=phone")
+  await expect(page.getByTestId("signup-form")).toHaveAttribute("data-hydrated", "true")
   await expect(page.getByText("347 567 5077")).toHaveCount(0)
-  await page.getByPlaceholder("John Builder").fill("Test Builder")
+  await page.getByPlaceholder("Full name").fill("Test Builder")
   await page.getByPlaceholder("Phone number").fill("516-555-0123")
   await page.getByPlaceholder("Create a password").fill("test-password")
   const signupRequest = page.waitForRequest((request) =>
@@ -106,4 +107,22 @@ test("phone-only signup sends a normalized number without exposing a personal ex
     phone: "+15165550123",
     password: "test-password",
   })
+})
+
+test("authentication pages share the same compact centered design", async ({ page }) => {
+  await page.goto("/login")
+  await expect(page.getByRole("heading", { name: "Sign in to Avantia Build" })).toBeVisible()
+  await expect(page.getByTestId("avantia-build-lockup")).toBeVisible()
+  await expect(page.getByPlaceholder("Email or phone number")).toHaveCount(1)
+  await expect(page.locator("footer")).toHaveCount(0)
+
+  await page.goto("/signup")
+  await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible()
+  await expect(page.getByTestId("avantia-build-lockup")).toBeVisible()
+  await expect(page.locator("footer")).toHaveCount(0)
+
+  await page.goto("/reset-password")
+  await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible()
+  await expect(page.getByTestId("avantia-build-lockup")).toBeVisible()
+  await expect(page.locator("footer")).toHaveCount(0)
 })

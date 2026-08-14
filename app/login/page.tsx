@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
-import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
+import { AuthPageShell } from "@/components/buildflow/auth-page-shell";
 import { GoogleSignInIcon } from "@/components/buildflow/google-sign-in-icon";
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { friendlyAuthError, isGoogleAuthEnabled } from "@/lib/auth-ui";
 import { createClient } from "@/lib/supabase/client";
-import { hasSupabasePublicEnv } from "@/lib/supabase/env";
 import { authRedirectOrigin } from "@/lib/site-url";
+import { useAuthConfig } from "@/lib/use-auth-config";
 
 type LoginState = {
   credential: string;
@@ -22,8 +22,6 @@ const initialState: LoginState = {
   password: "",
 };
 
-type AuthConfigState = boolean | null;
-
 function sanitizeNextPath(value: string | null) {
   if (!value) return "/";
   if (!value.startsWith("/")) return "/";
@@ -31,22 +29,10 @@ function sanitizeNextPath(value: string | null) {
   return value;
 }
 
-function subscribeToAuthConfig() {
-  return () => undefined;
-}
-
-function getBrowserAuthConfig(): AuthConfigState {
-  return hasSupabasePublicEnv();
-}
-
-function getServerAuthConfig(): AuthConfigState {
-  return null;
-}
-
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const hasAuthConfig = useSyncExternalStore(subscribeToAuthConfig, getBrowserAuthConfig, getServerAuthConfig);
+  const hasAuthConfig = useAuthConfig();
   const supabase = useMemo(() => (hasAuthConfig ? createClient() : null), [hasAuthConfig]);
   const callbackError = searchParams.get("error");
   const [form, setForm] = useState<LoginState>(initialState);
@@ -163,44 +149,36 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#eff6ff_0%,#f8fbff_48%,#ffffff_100%)] px-5 py-6 sm:px-8 sm:py-10">
-      <section className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-md items-center">
-        <div className="w-full rounded-3xl border border-sky-100 bg-white/95 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur sm:p-7">
-          <div className="flex items-center gap-3">
-            <AvantiaBuildLockup />
-          </div>
+    <AuthPageShell title="Sign in to Avantia Build">
+      {hasAuthConfig === false ? (
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800">
+          Authentication is temporarily unavailable.
+        </div>
+      ) : null}
 
-          <h1 className="mt-6 text-2xl font-semibold text-slate-950">Log in</h1>
+      {googleEnabled ? (
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={isSubmitting}
+          className="flex min-h-14 w-full items-center justify-center gap-3 rounded-[14px] border border-[#d2d2d7] bg-white px-4 text-[0.95rem] font-semibold text-[#1d1d1f] transition hover:border-[#a1a1a6] hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <GoogleSignInIcon className="h-5 w-5 shrink-0" />
+          <span>{isSubmitting ? "Opening Google..." : "Continue with Google"}</span>
+        </button>
+      ) : null}
 
-          {hasAuthConfig === false ? (
-            <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800">
-              Auth is not connected on this preview yet. The page is visible, but login needs the public Supabase URL and anon key.
-            </div>
-          ) : null}
+      {googleEnabled ? (
+        <div className="my-5 flex items-center gap-3" aria-hidden="true">
+          <span className="h-px flex-1 bg-[#d2d2d7]" />
+          <span className="text-xs font-medium text-[#86868b]">or</span>
+          <span className="h-px flex-1 bg-[#d2d2d7]" />
+        </div>
+      ) : null}
 
-          {googleEnabled ? (
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={isSubmitting}
-              className="mt-5 flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-sky-200 hover:bg-sky-50/50 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              <GoogleSignInIcon className="h-5 w-5 shrink-0" />
-              <span>{isSubmitting ? "Opening Google..." : "Continue with Google"}</span>
-            </button>
-          ) : null}
-
-          {googleEnabled ? (
-            <div className="my-4 flex items-center gap-3" aria-hidden="true">
-              <span className="h-px flex-1 bg-slate-200" />
-              <span className="text-xs font-medium text-slate-400">or</span>
-              <span className="h-px flex-1 bg-slate-200" />
-            </div>
-          ) : null}
-
-          <form ref={markFormReady} className={`${googleEnabled ? "" : "mt-5"} space-y-3`} onSubmit={handleSubmit} data-testid="login-form">
-            <label className="block text-sm font-medium text-slate-700">
-              <span className="mb-1.5 block">Email or phone number</span>
+      <form ref={markFormReady} className={`${googleEnabled ? "" : "mt-1"} space-y-3`} onSubmit={handleSubmit} data-testid="login-form">
+            <label className="block">
+              <span className="sr-only">Email or phone number</span>
               <input
                 required
                 type="text"
@@ -211,47 +189,45 @@ export default function LoginPage() {
                   setError(null)
                   setForm((current) => ({ ...current, credential: event.target.value }))
                 }}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                className="min-h-14 w-full rounded-[14px] border border-[#d2d2d7] bg-white px-4 text-base text-[#1d1d1f] outline-none transition placeholder:text-[#6e6e73] focus:border-[#0071e3] focus:ring-4 focus:ring-[#0071e3]/10"
                 placeholder="Email or phone number"
               />
             </label>
 
-            <label className="block text-sm font-medium text-slate-700">
-              <span className="mb-1.5 block">Password</span>
+            <label className="block">
+              <span className="sr-only">Password</span>
               <input
                 required
                 type="password"
                 autoComplete="current-password"
                 value={form.password}
                 onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
+                className="min-h-14 w-full rounded-[14px] border border-[#d2d2d7] bg-white px-4 text-base text-[#1d1d1f] outline-none transition placeholder:text-[#6e6e73] focus:border-[#0071e3] focus:ring-4 focus:ring-[#0071e3]/10"
                 placeholder="Password"
               />
             </label>
 
             {error ? (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">{error}</div>
             ) : null}
 
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(2,132,199,0.22)] transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
+              className="min-h-14 w-full rounded-[14px] bg-[#0071e3] px-5 text-base font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSubmitting ? "Logging in..." : "Log in"}
+              {isSubmitting ? "Signing in..." : "Sign in"}
             </button>
-          </form>
+      </form>
 
-          <div className="mt-4 flex items-center justify-between gap-4 text-sm">
-            <Link href="/reset-password" className="font-medium text-sky-700 hover:text-sky-800">
-              Forgot password?
-            </Link>
-            <Link href={`/signup${nextQuery}`} className="font-medium text-slate-700 hover:text-slate-950">
-              Create account
-            </Link>
-          </div>
-        </div>
-      </section>
-    </main>
+      <div className="mt-6 flex items-center justify-center gap-6 text-sm">
+        <Link href="/reset-password" className="font-medium text-[#0066cc] hover:text-[#004f9e]">
+          Forgot password?
+        </Link>
+        <Link href={`/signup${nextQuery}`} className="font-medium text-[#0066cc] hover:text-[#004f9e]">
+          Create account
+        </Link>
+      </div>
+    </AuthPageShell>
   );
 }

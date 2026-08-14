@@ -1,12 +1,20 @@
+"use client"
+
 import Link from "next/link"
 import { Mail, Phone } from "lucide-react"
+import { usePathname } from "next/navigation"
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { WhatsAppIcon } from "@/components/buildflow/whatsapp-icon"
 
 const BUSINESS_WHATSAPP_URL = "https://wa.me/15169088319?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20with%20construction%20materials."
+const HIDDEN_PATHS = new Set(["/login", "/signup", "/reset-password"])
 
 export function SiteFooter() {
+  const pathname = usePathname()
+
+  if (pathname && HIDDEN_PATHS.has(pathname)) return null
+
   return (
     <footer className="border-t border-slate-200 bg-[#eef3f8] px-4 pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-6 sm:pt-6">
       <div className="mx-auto grid max-w-[88rem] items-center gap-4 rounded-[18px] border border-slate-200 bg-white px-5 py-4 shadow-[0_10px_30px_rgba(7,17,38,0.05)] sm:grid-cols-[minmax(15rem,1fr)_auto] sm:px-6">
