@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Check, Clock3, FileUp, PackageSearch, Sparkles, Truck } from "lucide-react";
+import { ArrowRight, Check, Clock3, FileUp, PackageSearch, PlayCircle, Sparkles, Truck } from "lucide-react";
 
 import { RecoveryLinkHandler } from "@/components/auth/recovery-link-handler";
 import { CoverageScrollSection } from "@/components/buildflow/coverage-scroll-section";
@@ -107,6 +107,10 @@ export default function Home() {
                 <span className="inline-flex items-center gap-3"><span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white/15"><FileUp className="h-5 w-5" aria-hidden="true" /></span>Send Us Your Plans</span>
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
+              <a href="#product-demo" className="group inline-flex min-h-14 items-center justify-between gap-4 rounded-lg border border-sky-200/45 bg-[#071126]/35 px-3 py-2.5 text-sm font-bold text-white shadow-[0_14px_34px_rgba(0,0,0,0.16)] backdrop-blur-sm transition-colors hover:bg-[#071126]/55 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30 sm:min-w-56">
+                <span className="inline-flex items-center gap-3"><span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-sky-300/15 text-sky-100"><PlayCircle className="h-5 w-5" aria-hidden="true" /></span>Watch the demo</span>
+                <span className="text-xs font-semibold text-sky-100">20 sec</span>
+              </a>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm font-semibold">
               <span className="inline-flex min-h-8 items-center gap-2 text-slate-100"><Check className="h-4 w-4 text-emerald-300" aria-hidden="true" />No account needed</span>
@@ -168,6 +172,40 @@ export default function Home() {
                 <span className="mt-2 block min-w-0 text-[13px] font-semibold leading-4 text-[#071126] sm:text-sm">{department.label}</span>
               </Link>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="product-demo" className="scroll-mt-24 px-3 py-4 sm:px-5 sm:py-6" aria-labelledby="product-demo-heading">
+        <div data-testid="homepage-demo" className="mx-auto grid max-w-[88rem] overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_20px_54px_rgba(7,17,38,0.09)] lg:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.7fr)]">
+          <div className="bg-[#071126] p-2.5 sm:p-4">
+            <video
+              className="aspect-video w-full rounded-[18px] bg-[#071126] object-cover shadow-[0_16px_42px_rgba(0,0,0,0.28)]"
+              controls
+              playsInline
+              preload="metadata"
+              poster="/videos/avantia-materials-demo-phone-poster.png"
+              aria-label="Avantia Build material request walkthrough on an iPhone"
+            >
+              <source src="/videos/avantia-materials-demo-phone.mp4" type="video/mp4" />
+              <source src="/videos/avantia-materials-demo-phone.webm" type="video/webm" />
+              <track src="/videos/avantia-materials-demo-phone.vtt" kind="captions" srcLang="en" label="English" />
+              Your browser does not support the video player. You can still <a href="/videos/avantia-materials-demo-phone.mp4">open the Avantia Build phone demo video</a>.
+            </video>
+          </div>
+          <div className="flex flex-col justify-center px-6 py-8 sm:px-9 sm:py-10 lg:px-8">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#0066cc]">Under 20 seconds</p>
+            <h2 id="product-demo-heading" className="mt-2 text-3xl font-semibold leading-tight tracking-[-0.035em] text-balance text-[#071126] sm:text-4xl">See how fast ordering can be.</h2>
+            <p className="mt-4 text-sm leading-6 text-slate-600 sm:text-base sm:leading-7">Choose the material, add the quantity and delivery notes, then review the complete request in one place.</p>
+            <ul className="mt-6 grid gap-3 text-sm font-semibold text-[#071126]">
+              {["Choose size and quantity", "Add delivery notes", "Review the complete order", "Confirm when everything looks right"].map((point) => (
+                <li key={point} className="flex items-center gap-3"><span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><Check className="h-3.5 w-3.5" aria-hidden="true" /></span>{point}</li>
+              ))}
+            </ul>
+            <Link href="/shop" className="mt-7 inline-flex min-h-12 items-center justify-between gap-4 rounded-lg bg-[#0071e3] px-4 py-3 text-sm font-bold text-white shadow-[0_12px_28px_rgba(0,113,227,0.22)] transition-colors hover:bg-[#0066cc] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200">
+              Start your request
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
           </div>
         </div>
       </section>
