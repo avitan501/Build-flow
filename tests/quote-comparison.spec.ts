@@ -6,6 +6,7 @@ import { expect, test } from "@playwright/test";
 import {
   analyzeQuoteComparison,
   buildClientQuoteSummary,
+  calculateQuoteTax,
   type QuoteComparisonBidRecord,
   type QuoteComparisonItemRecord,
 } from "@/lib/quote-comparison";
@@ -20,7 +21,7 @@ function bid(
   options: {
     prices: Array<[string, number | null]>;
     delivery?: number;
-    tax?: number;
+    taxPercent?: number;
     lead?: number | null;
     trust?: QuoteComparisonBidRecord["trust_level_snapshot"];
   },
@@ -32,7 +33,8 @@ function bid(
     supplier_name_snapshot: id,
     trust_level_snapshot: options.trust ?? "verified",
     delivery_charge: options.delivery ?? 0,
-    tax_amount: options.tax ?? 0,
+    tax_amount: 0,
+    tax_percent: options.taxPercent ?? 0,
     lead_time_days: options.lead ?? null,
     notes: "",
     status: "received",
@@ -89,25 +91,32 @@ test("client quote totals preserve private landed cost, profit, and margin", () 
   const selected = bid("selected", {
     prices: [["studs", 5], ["plywood", 30]],
     delivery: 100,
-    tax: 50,
+    taxPercent: 5,
   });
   const summary = buildClientQuoteSummary(items, selected, 200);
 
   expect(summary.supplierMaterialCost).toBe(1100);
-  expect(summary.supplierLandedCost).toBe(1250);
+  expect(summary.supplierLandedCost).toBe(1255);
   expect(summary.clientMaterialSubtotal).toBe(1320);
   expect(summary.clientTotal).toBe(1520);
-  expect(summary.profit).toBe(270);
-  expect(summary.marginPercent).toBeCloseTo(17.763, 2);
+  expect(summary.profit).toBe(265);
+  expect(summary.marginPercent).toBeCloseTo(17.434, 2);
   expect(summary.complete).toBe(true);
+});
+
+test("supplier tax is calculated as a percentage of the material subtotal", () => {
+  expect(calculateQuoteTax(1_000, 8.875)).toBe(88.75);
+  expect(calculateQuoteTax(1_000, 150)).toBe(1_000);
+  expect(calculateQuoteTax(1_000, -5)).toBe(0);
 });
 
 test("manager navigation and migration enforce supplier-scoped access", async () => {
   const root = process.cwd();
-  const [navigation, migration, clientQuoteMigration] = await Promise.all([
+  const [navigation, migration, clientQuoteMigration, taxMigration] = await Promise.all([
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260813171229_create_supplier_quote_comparisons.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260813200232_add_client_quotes_to_comparisons.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260814153520_add_quote_tax_percentage.sql"), "utf8"),
   ]);
 
   expect(navigation).toContain('{ href: "/admin/quote-comparison", label: "Quote Comparison"');
@@ -130,6 +139,12 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
   expect(clientQuoteMigration).toContain("quote_comparison_client_deliveries");
   expect(clientQuoteMigration).toContain("security invoker");
   expect(clientQuoteMigration).not.toMatch(/grant\s+.+\s+to\s+anon/i);
+  expect(taxMigration).toContain("add column if not exists tax_percent");
+  expect(taxMigration).toContain("check (tax_percent >= 0 and tax_percent <= 100)");
+  expect(taxMigration).toContain("p_tax_percent numeric");
+  expect(taxMigration).toContain("security invoker");
+  expect(taxMigration).toContain("bid.tax_percent / 100");
+  expect(taxMigration).not.toMatch(/grant\s+.+\s+to\s+anon/i);
 });
 
 test("selecting a supplier saves the current price draft before awarding it", async () => {
@@ -141,6 +156,16 @@ test("selecting a supplier saves the current price draft before awarding it", as
   expect(awardCall).toBeGreaterThan(saveCall);
   expect(workspace).toContain("Save prices & select supplier");
   expect(workspace).toContain("prices saved and supplier selected");
+});
+
+test("supplier quote workspace captures tax as a percentage", async () => {
+  const workspace = await readFile(path.join(process.cwd(), "components/buildflow/quote-comparison-workspace.tsx"), "utf8");
+  const actions = await readFile(path.join(process.cwd(), "app/admin/quote-comparison/actions.ts"), "utf8");
+
+  expect(workspace).toContain("Tax percentage");
+  expect(workspace).toContain('placeholder="8.875"');
+  expect(workspace).not.toContain("Tax amount");
+  expect(actions).toContain("p_tax_percent: cleanTaxPercent(input.taxPercent)");
 });
 
 test("new comparison asks only for a comparison name", async () => {

@@ -45,6 +45,11 @@ function cleanMarkup(value: number | null | undefined) {
   return Number.isFinite(amount) && amount >= 0 ? Math.min(Math.round(amount * 1000) / 1000, 10_000) : 0;
 }
 
+function cleanTaxPercent(value: number | null | undefined) {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) && amount >= 0 ? Math.min(Math.round(amount * 10_000) / 10_000, 100) : 0;
+}
+
 function cleanQuantity(value: number) {
   const quantity = Number(value);
   return Number.isFinite(quantity) && quantity > 0 ? Math.min(quantity, 100_000_000) : null;
@@ -233,7 +238,7 @@ export async function saveQuoteComparisonBidAction(input: {
   comparisonId: string;
   bidId: string;
   deliveryCharge: number;
-  taxAmount: number;
+  taxPercent: number;
   leadTimeDays: number | null;
   notes: string;
   prices: Array<{ itemId: string; unitPrice: number | null; isAvailable: boolean }>;
@@ -244,7 +249,7 @@ export async function saveQuoteComparisonBidAction(input: {
     p_comparison_id: input.comparisonId,
     p_bid_id: input.bidId,
     p_delivery_charge: cleanMoney(input.deliveryCharge),
-    p_tax_amount: cleanMoney(input.taxAmount),
+    p_tax_percent: cleanTaxPercent(input.taxPercent),
     p_lead_time_days: leadTime,
     p_notes: cleanText(input.notes, 4000),
     p_prices: input.prices.map((price) => ({

@@ -57,6 +57,7 @@ export type QuoteComparisonBidRecord = {
   trust_level_snapshot: SupplierTrustLevel;
   delivery_charge: number;
   tax_amount: number;
+  tax_percent: number;
   lead_time_days: number | null;
   notes: string;
   status: "received" | "declined" | "awarded";
@@ -129,6 +130,12 @@ function positiveNumber(value: number | null | undefined) {
   return Number.isFinite(number) && number >= 0 ? number : 0;
 }
 
+export function calculateQuoteTax(subtotal: number, taxPercent: number | null | undefined) {
+  const safeSubtotal = positiveNumber(subtotal);
+  const percent = Math.min(100, positiveNumber(taxPercent));
+  return Math.round(safeSubtotal * percent) / 100;
+}
+
 function leadTimeScore(days: number | null) {
   if (days === null || !Number.isFinite(days)) return 3;
   if (days <= 2) return 10;
@@ -182,7 +189,7 @@ export function analyzeQuoteComparison(
     }
 
     const completeness = items.length === 0 ? 0 : pricedItemCount / items.length;
-    const landedTotal = comparisonSubtotal + positiveNumber(bid.delivery_charge) + positiveNumber(bid.tax_amount);
+    const landedTotal = comparisonSubtotal + positiveNumber(bid.delivery_charge) + calculateQuoteTax(comparisonSubtotal, bid.tax_percent);
     const blocked = bid.trust_level_snapshot === "do-not-use" || bid.status === "declined";
 
     return {
@@ -288,7 +295,7 @@ export function buildClientQuoteSummary(
     };
   });
   const supplierMaterialCost = lines.reduce((total, line) => total + line.supplierLineCost, 0);
-  const supplierDeliveryAndTax = positiveNumber(selectedBid?.delivery_charge) + positiveNumber(selectedBid?.tax_amount);
+  const supplierDeliveryAndTax = positiveNumber(selectedBid?.delivery_charge) + calculateQuoteTax(supplierMaterialCost, selectedBid?.tax_percent);
   const supplierLandedCost = supplierMaterialCost + supplierDeliveryAndTax;
   const clientMaterialSubtotal = lines.reduce((total, line) => total + line.clientLineTotal, 0);
   const safeClientDeliveryCharge = positiveNumber(clientDeliveryCharge);

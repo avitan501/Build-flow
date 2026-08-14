@@ -54,7 +54,7 @@ import type { SupplierRoutingOption } from "@/lib/shop-qualification";
 type ProjectOption = { id: string; name: string; address: string | null };
 type BidDraft = {
   deliveryCharge: string;
-  taxAmount: string;
+  taxPercent: string;
   leadTimeDays: string;
   notes: string;
 };
@@ -115,7 +115,7 @@ export function QuoteComparisonWorkspace({
   const [supplierId, setSupplierId] = useState("");
   const [bidDrafts, setBidDrafts] = useState<Record<string, BidDraft>>(() => Object.fromEntries(bids.map((bid) => [bid.id, {
     deliveryCharge: String(bid.delivery_charge || ""),
-    taxAmount: String(bid.tax_amount || ""),
+    taxPercent: String(bid.tax_percent || ""),
     leadTimeDays: bid.lead_time_days === null ? "" : String(bid.lead_time_days),
     notes: bid.notes,
   }])));
@@ -140,7 +140,7 @@ export function QuoteComparisonWorkspace({
     return {
       ...bid,
       delivery_charge: moneyInput(draft?.deliveryCharge ?? ""),
-      tax_amount: moneyInput(draft?.taxAmount ?? ""),
+      tax_percent: Math.min(100, moneyInput(draft?.taxPercent ?? "")),
       lead_time_days: draft?.leadTimeDays ? Number(draft.leadTimeDays) : null,
       notes: draft?.notes ?? "",
       quote_comparison_prices: items.map((item) => {
@@ -209,7 +209,7 @@ export function QuoteComparisonWorkspace({
         comparisonId: comparison.id,
         bidId: bid.id,
         deliveryCharge: bid.delivery_charge,
-        taxAmount: bid.tax_amount,
+        taxPercent: bid.tax_percent,
         leadTimeDays: bid.lead_time_days,
         notes: bid.notes,
         prices: (bid.quote_comparison_prices ?? []).map((price) => ({ itemId: price.item_id, unitPrice: price.unit_price, isAvailable: price.is_available })),
@@ -245,7 +245,7 @@ export function QuoteComparisonWorkspace({
         comparisonId: comparison.id,
         bidId: bid.id,
         deliveryCharge: bid.delivery_charge,
-        taxAmount: bid.tax_amount,
+        taxPercent: bid.tax_percent,
         leadTimeDays: bid.lead_time_days,
         notes: bid.notes,
         prices: (bid.quote_comparison_prices ?? []).map((price) => ({
@@ -364,7 +364,7 @@ export function QuoteComparisonWorkspace({
                 <tbody>
                   {items.map((item) => <tr key={item.id} className="border-b border-slate-100"><th className="sticky left-0 z-10 bg-white px-5 py-3"><p className="text-sm font-bold">{item.description}</p><p className="mt-1 text-xs font-medium text-slate-500">{item.quantity.toLocaleString()} {item.unit}{item.specification ? ` · ${item.specification}` : ""}</p></th>{bids.map((bid) => { const key = `${bid.id}:${item.id}`; const price = priceDrafts[key] ?? { unitPrice: "", isAvailable: true }; return <td key={bid.id} className="border-l border-slate-100 px-4 py-3 align-top"><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">$</span><input type="number" min="0" step="0.01" value={price.unitPrice} disabled={locked || !price.isAvailable} onChange={(event) => setPriceDrafts((current) => ({ ...current, [key]: { ...price, unitPrice: event.target.value } }))} placeholder="0.00" aria-label={`${bid.supplier_name_snapshot} unit price for ${item.description}`} className="min-h-10 w-full rounded-lg border border-slate-300 pl-7 pr-2 text-right text-sm font-bold tabular-nums disabled:bg-slate-100 disabled:text-slate-400" /></div><label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-slate-500"><input type="checkbox" checked={!price.isAvailable} disabled={locked} onChange={(event) => setPriceDrafts((current) => ({ ...current, [key]: { ...price, isAvailable: !event.target.checked, unitPrice: event.target.checked ? "" : price.unitPrice } }))} /> Not available</label></td>; })}</tr>)}
                   <tr className="border-b border-slate-200 bg-slate-50"><th className="sticky left-0 bg-slate-50 px-5 py-3 text-sm font-bold">Delivery charge</th>{bids.map((bid) => <td key={bid.id} className="border-l border-slate-200 px-4 py-3"><input type="number" min="0" step="0.01" value={bidDrafts[bid.id]?.deliveryCharge ?? ""} disabled={locked} onChange={(event) => setBidDrafts((current) => ({ ...current, [bid.id]: { ...current[bid.id], deliveryCharge: event.target.value } }))} className="min-h-10 w-full rounded-lg border border-slate-300 px-3 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /></td>)}</tr>
-                  <tr className="border-b border-slate-200 bg-slate-50"><th className="sticky left-0 bg-slate-50 px-5 py-3 text-sm font-bold">Tax amount</th>{bids.map((bid) => <td key={bid.id} className="border-l border-slate-200 px-4 py-3"><input type="number" min="0" step="0.01" value={bidDrafts[bid.id]?.taxAmount ?? ""} disabled={locked} onChange={(event) => setBidDrafts((current) => ({ ...current, [bid.id]: { ...current[bid.id], taxAmount: event.target.value } }))} className="min-h-10 w-full rounded-lg border border-slate-300 px-3 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /></td>)}</tr>
+                  <tr className="border-b border-slate-200 bg-slate-50"><th className="sticky left-0 bg-slate-50 px-5 py-3 text-sm font-bold">Tax percentage</th>{bids.map((bid) => <td key={bid.id} className="border-l border-slate-200 px-4 py-3"><div className="relative"><input type="number" min="0" max="100" step="0.001" value={bidDrafts[bid.id]?.taxPercent ?? ""} disabled={locked} onChange={(event) => setBidDrafts((current) => ({ ...current, [bid.id]: { ...current[bid.id], taxPercent: event.target.value } }))} placeholder="8.875" className="min-h-10 w-full rounded-lg border border-slate-300 pl-3 pr-8 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">%</span></div></td>)}</tr>
                   <tr className="bg-slate-50"><th className="sticky left-0 bg-slate-50 px-5 py-3 text-sm font-bold">Lead time in days</th>{bids.map((bid) => <td key={bid.id} className="border-l border-slate-200 px-4 py-3"><input type="number" min="0" step="1" value={bidDrafts[bid.id]?.leadTimeDays ?? ""} disabled={locked} onChange={(event) => setBidDrafts((current) => ({ ...current, [bid.id]: { ...current[bid.id], leadTimeDays: event.target.value } }))} className="min-h-10 w-full rounded-lg border border-slate-300 px-3 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /></td>)}</tr>
                 </tbody>
               </table>

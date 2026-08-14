@@ -36,7 +36,7 @@ function sampleBid(
   name: string,
   trust: QuoteComparisonBidRecord["trust_level_snapshot"],
   delivery: number,
-  tax: number,
+  taxPercent: number,
   leadTime: number,
   prices: Array<[string, number | null, boolean?]>,
 ): QuoteComparisonBidRecord {
@@ -47,7 +47,8 @@ function sampleBid(
     supplier_name_snapshot: name,
     trust_level_snapshot: trust,
     delivery_charge: delivery,
-    tax_amount: tax,
+    tax_amount: 0,
+    tax_percent: taxPercent,
     lead_time_days: leadTime,
     notes: "",
     status: "received",
