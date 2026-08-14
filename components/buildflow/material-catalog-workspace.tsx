@@ -253,7 +253,7 @@ export function MaterialCatalogWorkspace({
               return <article key={item.id} className={dirtyKeys.has(key) ? "bg-amber-50" : "bg-white"}>
                 <div className="flex items-center gap-2 px-3 py-2.5">
                   {item.image_url ? <button type="button" onClick={() => setEditor(itemEditor(item))} className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white"><Image src={item.image_url} alt="" fill sizes="36px" className="object-contain" /></button> : <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-400"><ImageIcon className="h-4 w-4" /></span>}
-                  <div className="min-w-0 flex-1"><p className="text-sm font-bold leading-4 text-slate-950">{item.name}</p><p className="mt-1 text-[10px] text-slate-500">{item.item_code} · {Number(item.default_quantity).toLocaleString()} {item.unit}{item.status === "inactive" ? " · inactive" : ""}</p></div>
+                  <div className="min-w-0 flex-1"><p className="text-sm font-bold leading-4 text-slate-950">{item.name}</p><p className="mt-1 text-[10px] text-slate-500">{item.item_code} · price per {item.unit}{item.status === "inactive" ? " · inactive" : ""}</p></div>
                   <button type="button" onClick={() => setEditor(itemEditor(item))} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-sky-50 hover:text-[#0066cc]" aria-label={`Edit ${item.name}`}><Pencil className="h-3.5 w-3.5" /></button>
                   <button type="button" onClick={() => deleteItem(item)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-700" aria-label={`Delete ${item.name}`}><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
@@ -268,11 +268,10 @@ export function MaterialCatalogWorkspace({
         </section>
 
         <section className="mt-3 hidden max-w-full overflow-auto overscroll-x-contain rounded-lg border border-slate-300 bg-white shadow-sm md:block" aria-label={`${selectedCategory} supplier pricing matrix`}>
-          <table className="border-collapse text-left text-xs" style={{ minWidth: `${460 + Math.max(visibleSuppliers.length, 1) * 172}px` }}>
+          <table className="border-collapse text-left text-xs" style={{ minWidth: `${320 + Math.max(visibleSuppliers.length, 1) * 172}px` }}>
             <thead className="sticky top-0 z-30 bg-slate-100">
               <tr>
                 <th className="sticky left-0 z-40 w-[320px] min-w-[320px] border-b border-r border-slate-300 bg-slate-100 px-3 py-2 font-bold">Item</th>
-                <th className="w-[140px] min-w-[140px] border-b border-r border-slate-300 px-3 py-2 font-bold">Sample quantity</th>
                 {visibleSuppliers.map((supplier) => <th key={supplier.id} className="w-[172px] min-w-[172px] border-b border-r border-slate-300 px-2 py-2 align-top"><span className="block truncate font-bold" title={supplier.name}>{supplier.name}</span><span className="mt-0.5 block truncate text-[10px] font-normal text-slate-500">{supplier.email || supplier.phone || "Contact not set"}</span></th>)}
               </tr>
             </thead>
@@ -281,12 +280,11 @@ export function MaterialCatalogWorkspace({
                 <td className="sticky left-0 z-20 border-b border-r border-slate-200 bg-white px-3 py-2 group-even:bg-[#fafafa]">
                   <div className="flex items-center gap-2">
                     {item.image_url ? <button type="button" onClick={() => setEditor(itemEditor(item))} className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white"><Image src={item.image_url} alt="" fill sizes="36px" className="object-contain" /></button> : <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-400"><ImageIcon className="h-4 w-4" /></span>}
-                    <div className="min-w-0 flex-1"><p className="font-bold leading-4 text-slate-950">{item.name}</p><p className="mt-0.5 text-[10px] text-slate-500">{item.item_code}{item.status === "inactive" ? " · inactive" : ""}</p></div>
+                    <div className="min-w-0 flex-1"><p className="font-bold leading-4 text-slate-950">{item.name}</p><p className="mt-0.5 text-[10px] text-slate-500">{item.item_code} · price per {item.unit}{item.status === "inactive" ? " · inactive" : ""}</p></div>
                     <button type="button" onClick={() => setEditor(itemEditor(item))} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-sky-50 hover:text-[#0066cc]" aria-label={`Edit ${item.name}`}><Pencil className="h-3.5 w-3.5" /></button>
                     <button type="button" onClick={() => deleteItem(item)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-700" aria-label={`Delete ${item.name}`}><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
                 </td>
-                <td className="border-b border-r border-slate-200 px-3 py-2 align-middle"><p className="font-bold tabular-nums">{Number(item.default_quantity).toLocaleString()}</p><p className="text-[10px] text-slate-500">{item.unit}</p></td>
                 {visibleSuppliers.map((supplier) => {
                   const key = cellKey(item.id, supplier.id)
                   const draft = draftFor(item.id, supplier.id)
@@ -313,7 +311,6 @@ export function MaterialCatalogWorkspace({
             <label className="grid gap-1 text-xs font-bold">Category<select value={editor.category} onChange={(event) => setEditor({ ...editor, category: event.target.value })} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal">{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
             <label className="grid gap-1 text-xs font-bold">Item code<input value={editor.itemCode} onChange={(event) => setEditor({ ...editor, itemCode: event.target.value })} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal uppercase" /></label>
             <label className="grid gap-1 text-xs font-bold sm:col-span-2">Material name<input value={editor.name} onChange={(event) => setEditor({ ...editor, name: event.target.value })} autoFocus className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
-            <label className="grid gap-1 text-xs font-bold">Sample quantity<input type="number" min="0.01" step="0.01" value={editor.defaultQuantity} onChange={(event) => setEditor({ ...editor, defaultQuantity: event.target.value })} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
             <label className="grid gap-1 text-xs font-bold">Unit<select value={editor.unit} onChange={(event) => setEditor({ ...editor, unit: event.target.value })} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal">{unitOptions.map((unit) => <option key={unit}>{unit}</option>)}</select></label>
             <label className="grid gap-1 text-xs font-bold sm:col-span-2">Description <span className="font-normal text-slate-400">optional</span><textarea value={editor.description} onChange={(event) => setEditor({ ...editor, description: event.target.value })} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
             <label className="grid gap-1 text-xs font-bold sm:col-span-2">Small product image URL <span className="font-normal text-slate-400">optional</span><input value={editor.imageUrl} onChange={(event) => setEditor({ ...editor, imageUrl: event.target.value })} placeholder="/images/materials/..." className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>

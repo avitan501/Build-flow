@@ -31,6 +31,8 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(workspace).toContain("Add supplier")
   expect(workspace).toContain("not_available")
   expect(workspace).toContain("Save item")
+  expect(workspace).not.toContain("Sample quantity")
+  expect(workspace).toContain("price per {item.unit}")
   expect(actions).toContain("extractMaterialCatalogItemsFromPdf")
   expect(actions).toContain("deleteMaterialCatalogItemAction")
   expect(migration).toContain("create table if not exists public.material_catalog_items")
