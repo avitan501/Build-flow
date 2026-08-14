@@ -17,11 +17,12 @@ test("manager navigation groups secondary tools and keeps calls last", async () 
 })
 
 test("manager catalog is protected, seeded, editable, and supplier based", async () => {
-  const [page, workspace, actions, migration, parser] = await Promise.all([
+  const [page, workspace, actions, migration, specificationMigration, parser] = await Promise.all([
     readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/catalog/actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260814033000_create_manager_material_catalog.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260814155841_add_catalog_measurements_and_common_items.sql"), "utf8"),
     readFile(path.join(root, "lib/material-catalog-pdf.ts"), "utf8"),
   ])
   expect(page).toContain("requireManagerPortalProfile")
@@ -38,11 +39,15 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(workspace).toContain("catalogSupplierIds[selectedCategory]")
   expect(workspace).toContain("not_available")
   expect(workspace).toContain("Save item")
+  expect(workspace).toContain("Measurement / size")
+  expect(workspace).toContain("Thickness / gauge")
   expect(workspace).not.toContain("Sample quantity")
   expect(workspace).toContain("price per {item.unit}")
   expect(actions).toContain("extractMaterialCatalogItemsFromPdf")
   expect(actions).toContain("deleteMaterialCatalogItemAction")
   expect(actions).toContain("catalogEnabledDepartments")
+  expect(actions).toContain("measurement: clean(input.measurement")
+  expect(actions).toContain("thickness: clean(input.thickness")
   expect(actions).toContain('requireStaffProfile("suppliers")')
   expect(actions).toContain("supplierIsAddedToCatalogDepartment(supplier, department)")
   expect(migration).toContain("create table if not exists public.material_catalog_items")
@@ -50,6 +55,11 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(migration).toContain("private.is_admin_or_staff()")
   expect(migration).toContain("on delete cascade")
   expect(migration.match(/'Simple Material Comparison PDF'/g)?.length).toBe(103)
+  expect(specificationMigration).toContain("add column if not exists measurement")
+  expect(specificationMigration).toContain("add column if not exists thickness")
+  expect(specificationMigration).toContain("FRA-020")
+  expect(specificationMigration).toContain("ELE-020")
+  expect(specificationMigration).not.toContain("delete from public.material_catalog_items")
   expect(parser).toContain("parseMaterialComparisonText")
   expect(parser).toContain("No quantity, unit, and material rows were found")
 })

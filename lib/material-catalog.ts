@@ -21,6 +21,8 @@ export type MaterialCatalogItem = {
   item_code: string
   name: string
   description: string
+  measurement: string
+  thickness: string
   default_quantity: number
   unit: string
   image_url: string | null

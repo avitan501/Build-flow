@@ -37,6 +37,8 @@ type EditorDraft = {
   itemCode: string
   name: string
   description: string
+  measurement: string
+  thickness: string
   defaultQuantity: string
   unit: string
   imageUrl: string
@@ -51,7 +53,7 @@ function cellKey(itemId: string, supplierId: string) {
 
 function emptyEditor(category: string): EditorDraft {
   const prefix = category.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() || "MAT"
-  return { category, itemCode: `${prefix}-NEW`, name: "", description: "", defaultQuantity: "1", unit: "each", imageUrl: "", status: "active" }
+  return { category, itemCode: `${prefix}-NEW`, name: "", description: "", measurement: "", thickness: "", defaultQuantity: "1", unit: "each", imageUrl: "", status: "active" }
 }
 
 function itemEditor(item: MaterialCatalogItem): EditorDraft {
@@ -61,6 +63,8 @@ function itemEditor(item: MaterialCatalogItem): EditorDraft {
     itemCode: item.item_code,
     name: item.name,
     description: item.description,
+    measurement: item.measurement,
+    thickness: item.thickness,
     defaultQuantity: String(item.default_quantity),
     unit: item.unit,
     imageUrl: item.image_url ?? "",
@@ -118,7 +122,7 @@ export function MaterialCatalogWorkspace({
     if (item.category !== selectedCategory) return false
     if (!showInactive && item.status === "inactive") return false
     const needle = itemSearch.trim().toLowerCase()
-    return !needle || `${item.item_code} ${item.name} ${item.description} ${item.unit}`.toLowerCase().includes(needle)
+    return !needle || `${item.item_code} ${item.name} ${item.description} ${item.measurement} ${item.thickness} ${item.unit}`.toLowerCase().includes(needle)
   }), [initialItems, itemSearch, selectedCategory, showInactive])
   const eligibleCatalogSupplierPool = useMemo(() => suppliers.filter((supplier) => (
     hasRoutableSupplierTrust(supplier.trustLevel) && supplierServesMaterialDepartment(supplier, selectedCategory)
@@ -240,6 +244,8 @@ export function MaterialCatalogWorkspace({
         itemCode: editor.itemCode,
         name: editor.name,
         description: editor.description,
+        measurement: editor.measurement,
+        thickness: editor.thickness,
         defaultQuantity: Number(editor.defaultQuantity),
         unit: editor.unit,
         imageUrl: editor.imageUrl,
@@ -331,7 +337,7 @@ export function MaterialCatalogWorkspace({
               return <article key={item.id} className={dirtyKeys.has(key) ? "bg-amber-50" : "bg-white"}>
                 <div className="flex items-center gap-2 px-3 py-2.5">
                   {item.image_url ? <button type="button" onClick={() => setEditor(itemEditor(item))} className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white"><Image src={item.image_url} alt="" fill sizes="36px" className="object-contain" /></button> : <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-400"><ImageIcon className="h-4 w-4" /></span>}
-                  <div className="min-w-0 flex-1"><p className="text-sm font-bold leading-4 text-slate-950">{item.name}</p><p className="mt-1 text-[10px] text-slate-500">{item.item_code} · price per {item.unit}{item.status === "inactive" ? " · inactive" : ""}</p></div>
+                  <div className="min-w-0 flex-1"><p className="text-sm font-bold leading-4 text-slate-950">{item.name}</p>{item.measurement || item.thickness ? <p className="mt-1 text-[11px] font-semibold text-slate-600">{[item.measurement, item.thickness].filter(Boolean).join(" · ")}</p> : null}<p className="mt-1 text-[10px] text-slate-500">{item.item_code} · price per {item.unit}{item.status === "inactive" ? " · inactive" : ""}</p></div>
                   <button type="button" onClick={() => setEditor(itemEditor(item))} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-sky-50 hover:text-[#0066cc]" aria-label={`Edit ${item.name}`}><Pencil className="h-3.5 w-3.5" /></button>
                   <button type="button" onClick={() => deleteItem(item)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-700" aria-label={`Delete ${item.name}`}><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
@@ -359,7 +365,7 @@ export function MaterialCatalogWorkspace({
                 <td className="sticky left-0 z-20 border-b border-r border-slate-200 bg-white px-3 py-2 group-even:bg-[#fafafa]">
                   <div className="flex items-center gap-2">
                     {item.image_url ? <button type="button" onClick={() => setEditor(itemEditor(item))} className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white"><Image src={item.image_url} alt="" fill sizes="36px" className="object-contain" /></button> : <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-400"><ImageIcon className="h-4 w-4" /></span>}
-                    <div className="min-w-0 flex-1"><p className="font-bold leading-4 text-slate-950">{item.name}</p><p className="mt-0.5 text-[10px] text-slate-500">{item.item_code} · price per {item.unit}{item.status === "inactive" ? " · inactive" : ""}</p></div>
+                    <div className="min-w-0 flex-1"><p className="font-bold leading-4 text-slate-950">{item.name}</p>{item.measurement || item.thickness ? <p className="mt-0.5 text-[10px] font-semibold text-slate-600">{[item.measurement, item.thickness].filter(Boolean).join(" · ")}</p> : null}<p className="mt-0.5 text-[10px] text-slate-500">{item.item_code} · price per {item.unit}{item.status === "inactive" ? " · inactive" : ""}</p></div>
                     <button type="button" onClick={() => setEditor(itemEditor(item))} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-sky-50 hover:text-[#0066cc]" aria-label={`Edit ${item.name}`}><Pencil className="h-3.5 w-3.5" /></button>
                     <button type="button" onClick={() => deleteItem(item)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-700" aria-label={`Delete ${item.name}`}><Trash2 className="h-3.5 w-3.5" /></button>
                   </div>
@@ -408,6 +414,8 @@ export function MaterialCatalogWorkspace({
             <label className="grid gap-1 text-xs font-bold">Category<select value={editor.category} onChange={(event) => setEditor({ ...editor, category: event.target.value })} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal">{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
             <label className="grid gap-1 text-xs font-bold">Item code<input value={editor.itemCode} onChange={(event) => setEditor({ ...editor, itemCode: event.target.value })} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal uppercase" /></label>
             <label className="grid gap-1 text-xs font-bold sm:col-span-2">Material name<input value={editor.name} onChange={(event) => setEditor({ ...editor, name: event.target.value })} autoFocus className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
+            <label className="grid gap-1 text-xs font-bold">Measurement / size <span className="font-normal text-slate-400">optional</span><input value={editor.measurement} onChange={(event) => setEditor({ ...editor, measurement: event.target.value })} placeholder="Example: 4 x 8 ft." className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
+            <label className="grid gap-1 text-xs font-bold">Thickness / gauge <span className="font-normal text-slate-400">optional</span><input value={editor.thickness} onChange={(event) => setEditor({ ...editor, thickness: event.target.value })} placeholder="Example: 5/8 in. or 12/2" className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
             <label className="grid gap-1 text-xs font-bold">Unit<select value={editor.unit} onChange={(event) => setEditor({ ...editor, unit: event.target.value })} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal">{unitOptions.map((unit) => <option key={unit}>{unit}</option>)}</select></label>
             <label className="grid gap-1 text-xs font-bold sm:col-span-2">Description <span className="font-normal text-slate-400">optional</span><textarea value={editor.description} onChange={(event) => setEditor({ ...editor, description: event.target.value })} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
             <label className="grid gap-1 text-xs font-bold sm:col-span-2">Small product image URL <span className="font-normal text-slate-400">optional</span><input value={editor.imageUrl} onChange={(event) => setEditor({ ...editor, imageUrl: event.target.value })} placeholder="/images/materials/..." className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>

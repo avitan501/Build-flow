@@ -24,6 +24,8 @@ type CatalogItemInput = {
   itemCode: string
   name: string
   description?: string
+  measurement?: string
+  thickness?: string
   defaultQuantity: number
   unit: string
   imageUrl?: string
@@ -85,6 +87,8 @@ export async function saveMaterialCatalogItemAction(input: CatalogItemInput): Pr
     item_code: itemCode,
     name,
     description: clean(input.description, 2000),
+    measurement: clean(input.measurement, 160),
+    thickness: clean(input.thickness, 160),
     default_quantity: Math.round(quantity * 100) / 100,
     unit,
     image_url: clean(input.imageUrl, 1000) || null,
