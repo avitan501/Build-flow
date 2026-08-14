@@ -84,10 +84,11 @@ test("manager request endpoint rejects unsafe or invalid submissions before data
 })
 
 test("manager reply composer supports templates attachments email and text", async () => {
-  const [panel, actions, email] = await Promise.all([
+  const [panel, actions, email, edgeFunction] = await Promise.all([
     readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8"),
     readFile(path.join(root, "lib/cart-submission-email.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/send-supplier-quote/index.ts"), "utf8"),
   ])
 
   expect(panel).toContain("REPLY_BLOCKS")
@@ -98,5 +99,40 @@ test("manager reply composer supports templates attachments email and text", asy
   expect(actions).toContain('formData.get("attachment")')
   expect(actions).toContain("10 * 1024 * 1024")
   expect(actions).toContain('client_action: "email_reply"')
+  expect(actions).toContain('action: "send_client_reply"')
+  expect(actions).toContain('supabase.functions.invoke')
   expect(email).toContain("attachments: input.attachment ? [input.attachment] : undefined")
+  expect(edgeFunction).toContain('action === "send_client_reply"')
+  expect(edgeFunction).toContain("can_manage_customers")
+})
+
+test("manager can review and send one request to multiple suppliers", async () => {
+  const [panel, page, draft, actions] = await Promise.all([
+    readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8"),
+    readFile(path.join(root, "app/owner/materials/requests/[requestId]/supplier-request/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/supplier-request-draft.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/vendors/actions.ts"), "utf8"),
+  ])
+
+  expect(panel).toContain('type="checkbox"')
+  expect(panel).toContain("Create request for")
+  expect(panel).toContain("supplier-request?")
+  expect(panel).not.toContain("Save supplier routing")
+  expect(page).toContain("quote_request_items")
+  expect(page).toContain("supplierIds.includes")
+  expect(draft).toContain("Shipping or job address")
+  expect(draft).toContain("Email subject")
+  expect(draft).toContain("Items and request details")
+  expect(draft).toContain("sendSupplierQuoteRequestsAction")
+  expect(actions).toContain("for (const supplierId of supplierIds)")
+  expect(actions).toContain('body: { requestId }')
+})
+
+test("supplier directory opens a compact profile dialog above the list", async () => {
+  const manager = await readFile(path.join(root, "components/buildflow/supplier-routing-manager.tsx"), "utf8")
+  expect(manager).toContain("supplierProfileOpen")
+  expect(manager).toContain('role="dialog"')
+  expect(manager).toContain('aria-labelledby="supplier-profile-title"')
+  expect(manager).toContain("max-h-[94dvh]")
+  expect(manager).toContain("Department routing ·")
 })

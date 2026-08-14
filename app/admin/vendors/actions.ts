@@ -12,6 +12,18 @@ type SendSupplierQuoteResult =
   | { ok: true; requestId: string }
   | { ok: false; error: string }
 
+export type SupplierQuoteDeliveryResult = {
+  supplierId: string
+  supplierName: string
+  requestId: string | null
+  ok: boolean
+  error: string | null
+}
+
+type SendSupplierQuoteBatchResult =
+  | { ok: true; sentCount: number; results: SupplierQuoteDeliveryResult[] }
+  | { ok: false; error: string; results: SupplierQuoteDeliveryResult[] }
+
 type SaveSupplierResult =
   | { ok: true; supplier: SupplierRoutingOption }
   | { ok: false; error: string }
@@ -150,39 +162,86 @@ export async function sendSupplierQuoteRequestAction(input: {
   supplierId: string
   materialList: string
 }): Promise<SendSupplierQuoteResult> {
-  const { supabase } = await requireStaffProfile("suppliers")
-  const supplierId = input.supplierId.trim()
-  const materialList = input.materialList.trim()
-
-  if (!supplierId) return { ok: false, error: "Choose a supplier." }
-  if (!materialList) return { ok: false, error: "Paste or enter the material list." }
-  if (materialList.length > MAX_MATERIAL_LIST_LENGTH) return { ok: false, error: "The material list is too long." }
-
-  const { data: requestId, error: insertError } = await supabase.rpc(
-    "staff_create_supplier_quote_request",
-    { p_supplier_id: supplierId, p_material_list: materialList, p_job_address: JOB_ADDRESS },
-  )
-  if (insertError || !requestId) {
-    const message = insertError?.message || ""
-    if (message.includes("supplier_not_found")) return { ok: false, error: "Refresh the supplier directory and try again." }
-    if (message.includes("supplier_email_required")) return { ok: false, error: "Add a valid email to this supplier before sending a request." }
-    return { ok: false, error: "Could not create the supplier request. Please try again." }
-  }
-
-  const { data: delivery, error: deliveryError } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>("send-supplier-quote", {
-    body: { requestId },
+  const result = await sendSupplierQuoteRequestsAction({
+    supplierIds: [input.supplierId],
+    materialList: input.materialList,
+    jobAddress: JOB_ADDRESS,
+    subject: `Quote Request - ${JOB_ADDRESS}`,
   })
+  const delivery = result.results[0]
+  if (result.ok && delivery?.ok && delivery.requestId) return { ok: true, requestId: delivery.requestId }
+  return { ok: false, error: delivery?.error || (result.ok ? "The supplier email could not be sent." : result.error) }
+}
 
-  if (!deliveryError && delivery?.ok) {
-    revalidatePath("/admin/supplier-requests")
-    return { ok: true, requestId: requestId as string }
+export async function sendSupplierQuoteRequestsAction(input: {
+  supplierIds: string[]
+  materialList: string
+  jobAddress: string
+  subject: string
+}): Promise<SendSupplierQuoteBatchResult> {
+  const { supabase } = await requireStaffProfile("suppliers")
+  const supplierIds = [...new Set(input.supplierIds.map((supplierId) => supplierId.trim()).filter(Boolean))]
+  const materialList = input.materialList.trim()
+  const jobAddress = input.jobAddress.trim().slice(0, 500)
+  const subject = input.subject.trim().slice(0, 300)
+
+  if (!supplierIds.length) return { ok: false, error: "Choose at least one supplier.", results: [] }
+  if (supplierIds.length > 20) return { ok: false, error: "Choose no more than 20 suppliers at one time.", results: [] }
+  if (!materialList) return { ok: false, error: "Paste or enter the material list.", results: [] }
+  if (materialList.length > MAX_MATERIAL_LIST_LENGTH) return { ok: false, error: "The material list is too long.", results: [] }
+  if (!jobAddress) return { ok: false, error: "Enter the shipping or job address.", results: [] }
+  if (!subject) return { ok: false, error: "Enter an email subject.", results: [] }
+
+  const results: SupplierQuoteDeliveryResult[] = []
+  for (const supplierId of supplierIds) {
+    const { data: requestId, error: insertError } = await supabase.rpc(
+      "staff_create_supplier_quote_request",
+      { p_supplier_id: supplierId, p_material_list: materialList, p_job_address: jobAddress },
+    )
+    if (insertError || !requestId) {
+      const message = insertError?.message || ""
+      const error = message.includes("supplier_not_found")
+        ? "Supplier is no longer in the directory."
+        : message.includes("supplier_email_required")
+          ? "Add a valid email to this supplier before sending."
+          : "Could not create this supplier request."
+      results.push({ supplierId, supplierName: supplierId, requestId: null, ok: false, error })
+      continue
+    }
+
+    const { data: requestRow, error: subjectError } = await supabase
+      .from("supplier_quote_requests")
+      .update({ subject })
+      .eq("id", requestId)
+      .select("supplier_name")
+      .maybeSingle<{ supplier_name: string }>()
+    const supplierName = requestRow?.supplier_name || supplierId
+    if (subjectError || !requestRow) {
+      const error = "Could not save the email subject. Nothing was sent."
+      await supabase.from("supplier_quote_requests").update({ status: "failed", error_message: error }).eq("id", requestId)
+      results.push({ supplierId, supplierName, requestId: requestId as string, ok: false, error })
+      continue
+    }
+
+    const { data: delivery, error: deliveryError } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>("send-supplier-quote", {
+      body: { requestId },
+    })
+
+    if (!deliveryError && delivery?.ok) {
+      results.push({ supplierId, supplierName, requestId: requestId as string, ok: true, error: null })
+      continue
+    }
+
+    const error = delivery?.error || deliveryError?.message || "The supplier email could not be sent."
+    await supabase
+      .from("supplier_quote_requests")
+      .update({ status: "failed", error_message: error })
+      .eq("id", requestId)
+    results.push({ supplierId, supplierName, requestId: requestId as string, ok: false, error })
   }
 
-  const error = delivery?.error || deliveryError?.message || "The supplier email could not be sent."
-  await supabase
-    .from("supplier_quote_requests")
-    .update({ status: "failed", error_message: error })
-    .eq("id", requestId)
   revalidatePath("/admin/supplier-requests")
-  return { ok: false, error }
+  const sentCount = results.filter((result) => result.ok).length
+  if (!sentCount) return { ok: false, error: "No supplier emails were sent. Review the results below.", results }
+  return { ok: true, sentCount, results }
 }

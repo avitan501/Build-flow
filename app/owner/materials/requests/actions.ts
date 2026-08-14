@@ -87,20 +87,34 @@ export async function sendClientReplyAction(formData: FormData): Promise<ReplyRe
     }
   })
 
-  const result = await sendManagerClientReplyEmail({
+  const attachmentPayload = attachment ? {
+    filename: attachment.name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 180) || "attachment",
+    content: Buffer.from(await attachment.arrayBuffer()).toString("base64"),
+  } : undefined
+  const emailInput = {
     requestId: request.id,
     requestTitle: request.title,
     recipientName: client.full_name || "Client",
     recipientEmail: client.email,
     message,
     items: emailItems,
-    attachment: attachment ? {
-      filename: attachment.name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 180) || "attachment",
-      content: Buffer.from(await attachment.arrayBuffer()).toString("base64"),
-    } : undefined,
-  })
+    attachment: attachmentPayload,
+  }
+  const directResult = await sendManagerClientReplyEmail(emailInput)
+  let sent = directResult.status === "sent"
+  let providerId = directResult.status === "sent" ? directResult.providerId : null
+  let deliveryError = directResult.status === "failed" ? directResult.error : "Website email is not configured."
 
-  if (result.status === "sent") {
+  if (!sent && directResult.status !== "skipped") {
+    const { data: fallback, error: fallbackError } = await supabase.functions.invoke<{ ok?: boolean; providerId?: string | null; error?: string }>("send-supplier-quote", {
+      body: { action: "send_client_reply", requestId: request.id, message, items: emailItems, attachment: attachmentPayload },
+    })
+    sent = !fallbackError && Boolean(fallback?.ok)
+    providerId = fallback?.providerId || null
+    deliveryError = fallback?.error || fallbackError?.message || deliveryError
+  }
+
+  if (sent) {
     await supabase.from("project_events").insert({
       project_id: request.project_id,
       owner_id: request.owner_id,
@@ -110,9 +124,8 @@ export async function sendClientReplyAction(formData: FormData): Promise<ReplyRe
       description: message.slice(0, 2000),
       metadata: { quote_request_id: request.id, client_action: "email_reply", attachment_name: attachment?.name || null },
     })
-    return { ok: true, providerId: result.providerId }
+    return { ok: true, providerId }
   }
-  if (result.status === "not_configured") return { ok: false, error: "Website email is not configured." }
-  if (result.status === "skipped") return { ok: false, error: "Email was not sent." }
-  return { ok: false, error: result.error }
+  if (directResult.status === "skipped") return { ok: false, error: "Email was not sent." }
+  return { ok: false, error: deliveryError }
 }

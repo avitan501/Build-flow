@@ -178,6 +178,7 @@ export function SupplierRoutingManager({
   const [activePanel, setActivePanel] = useState<ManagerPanel>(initialPanel)
   const [selectedTargetId, setSelectedTargetId] = useState(SERVICE_ASSIGNMENT_TARGETS[0]?.id ?? "")
   const [selectedSupplierId, setSelectedSupplierId] = useState(settings.suppliers[0]?.id ?? DEFAULT_SUPPLIERS[0]?.id ?? "")
+  const [supplierProfileOpen, setSupplierProfileOpen] = useState(false)
   const [selectedDepartmentLabel, setSelectedDepartmentLabel] = useState("Framing")
   const [categoryDraft, setCategoryDraft] = useState<{ label: string; description: string; imageUrl: string; symbols: DepartmentSymbolKey[] }>({ label: "", description: "", imageUrl: "", symbols: [] })
   const [departmentEditOpen, setDepartmentEditOpen] = useState(false)
@@ -1202,8 +1203,8 @@ export function SupplierRoutingManager({
           ) : null}
 
           {activePanel === "suppliers" ? (
-            <section className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
-              {directoryNotice ? <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 xl:col-span-2">{directoryNotice}</div> : null}
+            <section className="grid gap-5">
+              {directoryNotice ? <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">{directoryNotice}</div> : null}
               <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_42px_rgba(15,23,42,0.07)]">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-slate-700">Supplier directory</p>
@@ -1231,7 +1232,10 @@ export function SupplierRoutingManager({
                     <button
                       key={supplier.id}
                       type="button"
-                      onClick={() => setSelectedSupplierId(supplier.id)}
+                      onClick={() => {
+                        setSelectedSupplierId(supplier.id)
+                        setSupplierProfileOpen(true)
+                      }}
                       className={`rounded-[18px] border px-4 py-3 text-left transition ${supplier.id === selectedSupplier?.id ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-slate-50 text-slate-950 hover:border-sky-200 hover:bg-white"}`}
                     >
                       <span className="block text-sm font-semibold">{supplier.name}</span>
@@ -1264,18 +1268,18 @@ export function SupplierRoutingManager({
                 </div>
               </section>
 
-              <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] sm:p-7">
-                {selectedSupplier && selectedSupplierMatchesSearch ? (
+              {supplierProfileOpen && selectedSupplier ? (
+                <div className="fixed inset-0 z-[105] flex items-end justify-center bg-slate-950/45 p-3 backdrop-blur-[2px] sm:items-start sm:overflow-y-auto sm:py-6" role="dialog" aria-modal="true" aria-labelledby="supplier-profile-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !supplierSavePending) setSupplierProfileOpen(false) }}>
+                  <section className="max-h-[94dvh] w-full max-w-3xl overflow-y-auto rounded-[18px] border border-slate-200 bg-white p-4 shadow-[0_28px_80px_rgba(15,23,42,0.35)] sm:p-5">
+                {selectedSupplierMatchesSearch ? (
                   <>
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="sticky -top-4 z-10 -mx-4 -mt-4 flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-4 sm:-top-5 sm:-mx-5 sm:-mt-5 sm:flex-row sm:items-start sm:justify-between sm:px-5">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Supplier profile</p>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <h3 className="text-2xl font-semibold tracking-tight text-slate-950">{selectedSupplier.name}</h3>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Supplier profile</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <h3 id="supplier-profile-title" className="text-xl font-bold text-slate-950">{selectedSupplier.name}</h3>
                           {selectedSupplier.trustLevel === "first-time" ? <span className="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-bold uppercase text-amber-900">Trial</span> : null}
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-slate-500">This is private manager data used for routing approved reports.</p>
-                        {selectedSupplier.catalogDepartments?.length ? <p className="mt-2 text-xs font-semibold text-slate-600">Catalog departments: {selectedSupplier.catalogDepartments.join(", ")}</p> : null}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <QuoCallButton phone={selectedSupplier.phone || selectedSupplier.whatsapp || null} supplierName={selectedSupplier.name} />
@@ -1288,6 +1292,7 @@ export function SupplierRoutingManager({
                         />
                         {selectedSupplier.trustLevel === "first-time" ? <button type="button" onClick={() => keepSupplier(selectedSupplier)} disabled={supplierDirty || supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-50"><Check className="h-4 w-4" />Keep vendor</button> : null}
                         <button type="button" onClick={() => removeSupplier(selectedSupplier.id)} disabled={supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 disabled:cursor-wait disabled:opacity-50"><Trash2 className="h-4 w-4" />{supplierSavePending ? "Working..." : "Delete supplier"}</button>
+                        <button type="button" onClick={() => setSupplierProfileOpen(false)} disabled={supplierSavePending} aria-label="Close supplier profile" className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-600"><X className="h-5 w-5" /></button>
                       </div>
                     </div>
                     {directorySaveState !== "idle" ? (
@@ -1296,54 +1301,54 @@ export function SupplierRoutingManager({
                       </p>
                     ) : null}
 
-                    <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                      <label className="grid gap-2 text-sm font-semibold text-slate-900">
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <label className="grid gap-1 text-sm font-semibold text-slate-900">
                         Supplier name
-                        <input value={selectedSupplier.name} onChange={(event) => updateSupplier(selectedSupplier.id, { name: event.target.value })} className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
+                        <input value={selectedSupplier.name} onChange={(event) => updateSupplier(selectedSupplier.id, { name: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
-                      <label className="grid gap-2 text-sm font-semibold text-slate-900">
+                      <label className="grid gap-1 text-sm font-semibold text-slate-900">
                         Contact name
-                        <input value={selectedSupplier.contactName || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { contactName: event.target.value, contactLabel: event.target.value || selectedSupplier.contactLabel })} className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
+                        <input value={selectedSupplier.contactName || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { contactName: event.target.value, contactLabel: event.target.value || selectedSupplier.contactLabel })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
-                      <label className="grid gap-2 text-sm font-semibold text-slate-900">
+                      <label className="grid gap-1 text-sm font-semibold text-slate-900">
                         Email
-                        <input value={selectedSupplier.email || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { email: event.target.value })} className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
+                        <input value={selectedSupplier.email || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { email: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
-                      <label className="grid gap-2 text-sm font-semibold text-slate-900">
+                      <label className="grid gap-1 text-sm font-semibold text-slate-900">
                         Phone
-                        <input value={selectedSupplier.phone || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { phone: event.target.value })} className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
+                        <input value={selectedSupplier.phone || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { phone: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
-                      <label className="grid gap-2 text-sm font-semibold text-slate-900">
+                      <label className="grid gap-1 text-sm font-semibold text-slate-900">
                         WhatsApp
-                        <input value={selectedSupplier.whatsapp || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { whatsapp: event.target.value })} className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
+                        <input value={selectedSupplier.whatsapp || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { whatsapp: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
-                      <label className="grid gap-2 text-sm font-semibold text-slate-900">
+                      <label className="grid gap-1 text-sm font-semibold text-slate-900">
                         Supplier portal URL
-                        <input value={selectedSupplier.portalUrl || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { portalUrl: event.target.value })} className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
+                        <input value={selectedSupplier.portalUrl || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { portalUrl: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
-                      <label className="grid gap-2 text-sm font-semibold text-slate-900 sm:col-span-2">
+                      <label className="grid gap-1 text-sm font-semibold text-slate-900 sm:col-span-2">
                         Address
-                        <input value={selectedSupplier.address || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { address: event.target.value })} className="min-h-12 rounded-2xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
+                        <input value={selectedSupplier.address || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { address: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
-                      <label className="grid gap-2 text-sm font-semibold text-slate-900 sm:col-span-2">
+                      <label className="grid gap-1 text-sm font-semibold text-slate-900 sm:col-span-2">
                         Materials sold
-                        <textarea value={selectedSupplier.materials || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { materials: event.target.value })} rows={3} className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
+                        <textarea value={selectedSupplier.materials || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { materials: event.target.value })} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
-                      <label className="grid gap-2 text-sm font-semibold text-slate-900">
+                      <label className="grid gap-1 text-sm font-semibold text-slate-900">
                         Preferred delivery method
-                        <select value={selectedSupplier.preferredDeliveryMethod || "manual"} onChange={(event) => updateSupplier(selectedSupplier.id, { preferredDeliveryMethod: event.target.value as SupplierDeliveryMethod })} className="min-h-12 rounded-2xl border border-slate-300 bg-white px-4 text-sm font-medium">
+                        <select value={selectedSupplier.preferredDeliveryMethod || "manual"} onChange={(event) => updateSupplier(selectedSupplier.id, { preferredDeliveryMethod: event.target.value as SupplierDeliveryMethod })} className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium">
                           {deliveryMethods.map((method) => <option key={method} value={method}>{methodLabel(method)}</option>)}
                         </select>
                       </label>
-                      <label className="grid gap-2 text-sm font-semibold text-slate-900">
+                      <label className="grid gap-1 text-sm font-semibold text-slate-900">
                         Trust level
-                        <select value={selectedSupplier.trustLevel || "not-reviewed"} onChange={(event) => updateSupplier(selectedSupplier.id, { trustLevel: event.target.value as SupplierTrustLevel })} className="min-h-12 rounded-2xl border border-slate-300 bg-white px-4 text-sm font-medium">
+                        <select value={selectedSupplier.trustLevel || "not-reviewed"} onChange={(event) => updateSupplier(selectedSupplier.id, { trustLevel: event.target.value as SupplierTrustLevel })} className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium">
                           {trustLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
                         </select>
                       </label>
-                      <label className="grid gap-2 text-sm font-semibold text-slate-900 sm:col-span-2">
+                      <label className="grid gap-1 text-sm font-semibold text-slate-900 sm:col-span-2">
                         Delivery instructions
-                        <textarea value={selectedSupplier.deliveryNotes || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { deliveryNotes: event.target.value })} rows={4} className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
+                        <textarea value={selectedSupplier.deliveryNotes || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { deliveryNotes: event.target.value })} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
                       <div className="sm:col-span-2">
                         {supplierNotesOpen[selectedSupplier.id] || selectedSupplier.notes ? (
@@ -1377,21 +1382,17 @@ export function SupplierRoutingManager({
                     </div>
                     {supplierFormError ? <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{supplierFormError}</p> : null}
 
-                    <section className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                    <details className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <summary className="cursor-pointer text-sm font-bold text-slate-950">Department routing · {selectedSupplierDepartments.length} assigned</summary>
                       <div className="flex flex-wrap items-end justify-between gap-3">
-                        <div>
-                          <h4 className="text-base font-semibold text-slate-950">Department routing</h4>
-                          <p className="mt-1 text-sm leading-6 text-slate-500">These are the same active departments customers see in Let&apos;s Work.</p>
-                        </div>
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">{selectedSupplierDepartments.length} assigned</span>
                       </div>
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
                         {shopDepartments.map((department) => {
                           const explicit = settings.products[departmentRouteId(department.slug)]
                           const targets = assignmentTargets.filter((target) => target.departmentSlug === department.slug)
                           const checked = explicit ? explicit.supplierId === selectedSupplier.id : targets.length > 0 && targets.every((target) => selectedSettingFor(settings, target.id, assignmentTargets).supplierId === selectedSupplier.id)
                           return (
-                            <label key={department.slug} className={`flex min-h-14 items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${checked ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white"}`}>
+                            <label key={department.slug} className={`flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-sm ${checked ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white"}`}>
                               <input
                                 type="checkbox"
                                 checked={checked}
@@ -1399,13 +1400,12 @@ export function SupplierRoutingManager({
                               />
                               <span>
                                 <span className="block font-semibold text-slate-950">{department.label}</span>
-                                <span className="mt-1 block text-xs text-slate-500">Let&apos;s Work department</span>
                               </span>
                             </label>
                           )
                         })}
                       </div>
-                    </section>
+                    </details>
                   </>
                 ) : (
                   <div className="flex min-h-64 items-center justify-center rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-6 text-center">
@@ -1413,7 +1413,9 @@ export function SupplierRoutingManager({
                   </div>
                 )}
 
-              </section>
+                  </section>
+                </div>
+              ) : null}
 
               {trialCatalogOpen ? (
                 <div className="fixed inset-0 z-[110] flex items-end justify-center bg-slate-950/45 p-3 backdrop-blur-[2px] sm:items-center" role="dialog" aria-modal="true" aria-labelledby="trial-vendor-catalog-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !supplierSavePending) setTrialCatalogOpen(false) }}>
