@@ -164,6 +164,7 @@ const SPANISH_TEXT: Record<string, string> = {
   "Tap to add": "Toque para agregar",
   "Add configured item": "Agregar artículo configurado",
   "Enlarge product image": "Ampliar imagen del producto",
+  "Product image preview": "Vista ampliada del producto",
   "Close image": "Cerrar imagen",
   "Tap the small image to enlarge": "Toque la imagen pequeña para ampliarla",
 

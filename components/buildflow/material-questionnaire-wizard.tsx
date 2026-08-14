@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, ChevronLeft, ChevronRight, FileUp, Pencil, Plus, Trash2, X } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight, FileUp, Pencil, Plus, Trash2, X, ZoomIn } from "lucide-react"
 import { useMemo, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
@@ -231,6 +231,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
   const [reviewing, setReviewing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorQuestionId, setErrorQuestionId] = useState<string | null>(null)
+  const [productImagePreview, setProductImagePreview] = useState<MaterialQuestion | null>(null)
   const [isPending, startTransition] = useTransition()
   const visibleQuestions = useMemo(() => snapshot.questions.filter((question) => isQuestionVisible(question, answers)), [answers, snapshot.questions])
   const current = visibleQuestions[Math.min(step, Math.max(visibleQuestions.length - 1, 0))]
@@ -251,6 +252,30 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
     ...group,
     questions: visibleQuestions.filter((question) => configuratorGroupFor(question) === group.id),
   })).filter((group) => group.questions.length > 0)
+  const usesRightAlignedProductImages = configurator && ["Wood Floor", "Tile work"].includes(snapshot.category.department_key)
+
+  function productImageButton(question: MaterialQuestion, compactImage = false) {
+    if (!question.configuration.imageUrl) return null
+    return (
+      <button
+        type="button"
+        data-testid={`product-question-image-${question.question_key}`}
+        onClick={() => setProductImagePreview(question)}
+        className={`${compactImage ? "h-12 w-12" : "h-16 w-16"} group relative shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-[border-color,box-shadow] hover:border-slate-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100`}
+        aria-label="Enlarge product image"
+      >
+        <span
+          className="absolute inset-1 bg-contain bg-center bg-no-repeat"
+          style={{
+            backgroundImage: `url(${question.configuration.imageUrl})`,
+            backgroundPosition: question.configuration.imagePosition,
+            backgroundSize: question.configuration.imageSprite ? "400% 200%" : undefined,
+          }}
+        />
+        <span className="absolute bottom-0.5 right-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-950/82 text-white shadow-sm" aria-hidden="true"><ZoomIn className="h-3 w-3" /></span>
+      </button>
+    )
+  }
 
   function update(questionId: string, value: MaterialAnswerValue, autoAdvance = false) {
     const nextAnswers = { ...answers, [questionId]: value }
@@ -319,12 +344,24 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
     const compactAccessory = configurator && configuratorGroupFor(question) === "extras"
     const compactOptionalNote = (compact || compactAccessory) && question.question_type === "long_text" && !question.is_required
     const pairedConfiguratorQuestion = configurator && ["sheet_size", "thickness", "flooring_area", "waste_allowance"].includes(question.question_key)
-    const gridSpan = pairedConfiguratorQuestion ? "col-span-1" : "col-span-2"
+    const gridSpan = pairedConfiguratorQuestion ? "col-span-1" : "col-span-1 sm:col-span-2"
+    const rightAlignedImage = usesRightAlignedProductImages && Boolean(question.configuration.imageUrl)
     if (singleSpecification) {
+      if (!rightAlignedImage) {
+        return (
+          <div key={question.id} id={`question-${question.id}`} data-question-key={question.question_key} className={`${gridSpan} flex min-h-12 scroll-mt-28 flex-col items-start justify-between gap-2 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:items-center sm:gap-4`}>
+            <p className="text-sm font-semibold text-slate-600">{question.label}</p>
+            <span className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 text-sm font-bold text-slate-950"><Check className="h-3.5 w-3.5 text-[#0071e3]" aria-hidden="true" />{question.options[0].label}</span>
+          </div>
+        )
+      }
       return (
-        <div key={question.id} id={`question-${question.id}`} data-question-key={question.question_key} className={`${gridSpan} flex min-h-12 scroll-mt-28 flex-col items-start justify-between gap-2 border-b border-slate-100 py-3 last:border-b-0 sm:flex-row sm:items-center sm:gap-4`}>
-          <p className="text-sm font-semibold text-slate-600">{question.label}</p>
-          <span className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 text-sm font-bold text-slate-950"><Check className="h-3.5 w-3.5 text-[#0071e3]" aria-hidden="true" />{question.options[0].label}</span>
+        <div key={question.id} id={`question-${question.id}`} data-question-key={question.question_key} className={`${gridSpan} grid min-h-12 scroll-mt-28 grid-cols-[minmax(0,1fr)_4rem] items-center gap-3 border-b border-slate-100 py-3 last:border-b-0 sm:gap-4`}>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-600">{question.label}</p>
+            <span className="mt-1.5 inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 text-sm font-bold text-slate-950"><Check className="h-3.5 w-3.5 shrink-0 text-[#0071e3]" aria-hidden="true" />{question.options[0].label}</span>
+          </div>
+          {productImageButton(question)}
         </div>
       )
     }
@@ -337,13 +374,18 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
         aria-describedby={question.help_text && !compactOptionalNote ? `question-help-${question.id}` : undefined}
       >
         {!compact ? <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Question {index + 1}</p> : null}
-        <div className="flex items-start gap-3">
-          {question.configuration.imageUrl ? <span role="img" aria-label="" className={`${compactAccessory ? "h-9 w-9" : "h-11 w-11"} shrink-0 rounded-lg border border-[#e5e5e7] bg-white bg-contain bg-center bg-no-repeat`} style={{ backgroundImage: `url(${question.configuration.imageUrl})`, backgroundPosition: question.configuration.imagePosition, backgroundSize: question.configuration.imageSprite ? "400% 200%" : undefined }} /> : null}
-          <legend className={`${compactOptionalNote ? "text-xs" : compact || compactAccessory ? "text-sm" : "mt-1 text-lg sm:text-xl"} font-bold leading-tight text-slate-950`}>
-            {question.label}{question.is_required ? <span aria-hidden="true" className="text-rose-500"> *</span> : compactOptionalNote ? <span className="ml-1 font-medium text-slate-400">Optional</span> : null}
-          </legend>
+        <div className={rightAlignedImage ? `grid ${compactAccessory ? "grid-cols-[minmax(0,1fr)_3rem]" : "grid-cols-[minmax(0,1fr)_4rem]"} items-start gap-3` : ""}>
+          <div className="min-w-0">
+            <div className="flex items-start gap-3">
+              {!rightAlignedImage && question.configuration.imageUrl ? <span role="img" aria-label="" className={`${compactAccessory ? "h-9 w-9" : "h-11 w-11"} shrink-0 rounded-lg border border-[#e5e5e7] bg-white bg-contain bg-center bg-no-repeat`} style={{ backgroundImage: `url(${question.configuration.imageUrl})`, backgroundPosition: question.configuration.imagePosition, backgroundSize: question.configuration.imageSprite ? "400% 200%" : undefined }} /> : null}
+              <legend className={`${compactOptionalNote ? "text-xs" : compact || compactAccessory ? "text-sm" : "mt-1 text-lg sm:text-xl"} font-bold leading-tight text-slate-950`}>
+                {question.label}{question.is_required ? <span aria-hidden="true" className="text-rose-500"> *</span> : compactOptionalNote ? <span className="ml-1 font-medium text-slate-400">Optional</span> : null}
+              </legend>
+            </div>
+            {question.help_text && !compactOptionalNote ? <p id={`question-help-${question.id}`} className={`${compact ? "mt-1 text-xs leading-5" : "mt-2 text-sm leading-6"} text-slate-600`}>{question.help_text}</p> : null}
+          </div>
+          {rightAlignedImage ? productImageButton(question, compactAccessory) : null}
         </div>
-        {question.help_text && !compactOptionalNote ? <p id={`question-help-${question.id}`} className={`${compact ? "mt-1 text-xs leading-5" : "mt-2 text-sm leading-6"} text-slate-600`}>{question.help_text}</p> : null}
         <div className={compact || compactAccessory ? "mt-2" : "mt-4"}>
           <QuestionControl
             question={question}
@@ -413,7 +455,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
                     <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-950 text-[11px] font-bold text-white">{groupIndex + 1}</span>
                     <div><h3 className="text-sm font-bold text-slate-950">{group.title}</h3>{group.description ? <p className="mt-0.5 text-[11px] leading-4 text-slate-500">{group.description}</p> : null}</div>
                   </div>
-                  <div className="ml-0 mt-2.5 grid grid-cols-2 gap-x-3 sm:ml-10">{group.questions.map((question) => renderQuestion(question, visibleQuestions.findIndex((entry) => entry.id === question.id)))}</div>
+                  <div className="ml-0 mt-2.5 grid grid-cols-1 gap-x-3 sm:ml-10 sm:grid-cols-2">{group.questions.map((question) => renderQuestion(question, visibleQuestions.findIndex((entry) => entry.id === question.id)))}</div>
                 </section>
               ))}
               {error ? <div aria-live="polite" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</div> : null}
@@ -442,6 +484,23 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
       </div>
 
       {!locked && (!configurator || reviewing) ? <footer className="grid gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:grid-cols-[auto_1fr_auto] sm:px-7"><button type="button" onClick={() => reviewing ? setReviewing(false) : setStep((value) => Math.max(0, value - 1))} disabled={!reviewing && (showAllQuestions || step === 0)} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 disabled:opacity-40"><ChevronLeft className="h-4 w-4" aria-hidden="true" />Back</button>{onSave && !requireCompletion ? <button type="button" disabled={isPending} onClick={() => save(false)} className="min-h-11 rounded-lg px-4 text-sm font-semibold text-slate-600 hover:bg-white">Save for Later</button> : <span />}{reviewing ? <button type="button" disabled={isPending} onClick={() => save(true)} className="min-h-11 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-50">{isPending ? "Saving…" : configurator ? "Confirm Request" : "Save Request Details"}</button> : showAllQuestions ? <button type="button" onClick={reviewAll} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white">Review Answers<ChevronRight className="h-4 w-4" aria-hidden="true" /></button> : <button type="button" onClick={next} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white">{step >= visibleQuestions.length - 1 ? "Review" : "Next"}<ChevronRight className="h-4 w-4" aria-hidden="true" /></button>}</footer> : null}
+
+      {productImagePreview && typeof document !== "undefined" ? createPortal(
+        <div className="fixed inset-0 z-[160] grid place-items-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-label="Product image preview" onClick={() => setProductImagePreview(null)}>
+          <div className="relative h-[min(72vh,36rem)] w-[min(92vw,44rem)] rounded-lg bg-white p-6" onClick={(event) => event.stopPropagation()}>
+            <span
+              className="absolute inset-6 bg-contain bg-center bg-no-repeat"
+              style={{
+                backgroundImage: `url(${productImagePreview.configuration.imageUrl})`,
+                backgroundPosition: productImagePreview.configuration.imagePosition,
+                backgroundSize: productImagePreview.configuration.imageSprite ? "400% 200%" : undefined,
+              }}
+            />
+            <button type="button" onClick={() => setProductImagePreview(null)} className="absolute right-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-white" aria-label="Close image"><X className="h-5 w-5" /></button>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
     </section>
   )
 
