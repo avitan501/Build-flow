@@ -177,7 +177,8 @@ export default function Home() {
       </section>
 
       <section id="product-demo" className="scroll-mt-24 px-3 py-4 sm:px-5 sm:py-6" aria-labelledby="product-demo-heading">
-        <div data-testid="homepage-demo" className="mx-auto grid max-w-[88rem] overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_20px_54px_rgba(7,17,38,0.09)] lg:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.7fr)]">
+        <div className="mx-auto max-w-[88rem]">
+        <div data-testid="homepage-demo" className="grid overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_20px_54px_rgba(7,17,38,0.09)] lg:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.7fr)]">
           <div className="bg-[#071126] p-2.5 sm:p-4">
             <video
               className="aspect-video w-full rounded-[18px] bg-[#071126] object-cover shadow-[0_16px_42px_rgba(0,0,0,0.28)]"
@@ -207,6 +208,33 @@ export default function Home() {
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
+        </div>
+        <div data-testid="homepage-custom-demo" className="mt-4 grid overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_16px_42px_rgba(7,17,38,0.07)] lg:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
+          <div className="flex flex-col justify-center px-6 py-7 sm:px-9 lg:order-1">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#0066cc]">Can&apos;t find the item?</p>
+            <h3 className="mt-2 text-2xl font-semibold leading-tight text-balance text-[#071126] sm:text-3xl">Send a custom material request.</h3>
+            <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">Add a photo, link, or description. Our team will identify the item and help source it.</p>
+            <Link href="/request-quote" className="mt-5 inline-flex min-h-12 items-center justify-between gap-4 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-[#071126] transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200">
+              Request a custom item
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
+          <div className="bg-[#071126] p-2.5 sm:p-4 lg:order-2">
+            <video
+              className="aspect-video w-full rounded-[16px] bg-[#071126] object-cover shadow-[0_14px_34px_rgba(0,0,0,0.24)]"
+              controls
+              playsInline
+              preload="metadata"
+              poster="/videos/avantia-custom-request-demo-poster.png"
+              aria-label="Avantia Build custom material request walkthrough"
+            >
+              <source src="/videos/avantia-custom-request-demo.mp4" type="video/mp4" />
+              <source src="/videos/avantia-custom-request-demo.webm" type="video/webm" />
+              <track src="/videos/avantia-custom-request-demo.vtt" kind="captions" srcLang="en" label="English" />
+              Your browser does not support the video player. You can still <a href="/videos/avantia-custom-request-demo.mp4">open the Avantia Build custom request demo video</a>.
+            </video>
+          </div>
+        </div>
         </div>
       </section>
 

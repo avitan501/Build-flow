@@ -28,6 +28,14 @@ test("home presents the contractor material coordination service", async ({ page
   await expect(video.locator('source[type="video/mp4"]')).toHaveAttribute("src", "/videos/avantia-materials-demo-phone.mp4");
   await expect(video.locator('source[type="video/webm"]')).toHaveAttribute("src", "/videos/avantia-materials-demo-phone.webm");
   await expect(video.locator('track[kind="captions"]')).toHaveAttribute("src", "/videos/avantia-materials-demo-phone.vtt");
+  const customDemo = page.getByTestId("homepage-custom-demo");
+  const customVideo = customDemo.locator("video");
+  await expect(customDemo).toBeVisible();
+  await expect(customVideo).toHaveAttribute("poster", "/videos/avantia-custom-request-demo-poster.png");
+  await expect(customVideo.locator('source[type="video/mp4"]')).toHaveAttribute("src", "/videos/avantia-custom-request-demo.mp4");
+  await expect(customVideo.locator('source[type="video/webm"]')).toHaveAttribute("src", "/videos/avantia-custom-request-demo.webm");
+  await expect(customVideo.locator('track[kind="captions"]')).toHaveAttribute("src", "/videos/avantia-custom-request-demo.vtt");
+  await expect(page.getByRole("link", { name: "Request a custom item" })).toHaveAttribute("href", "/request-quote");
   await expect(page.getByRole("heading", { name: "From plan to jobsite" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Upload", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Takeoff", exact: true })).toBeVisible();
