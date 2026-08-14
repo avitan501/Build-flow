@@ -18,6 +18,10 @@ export type ManagerNewClientInput = { fullName: string; email: string; phone?: s
 export type CreateClientRequestResult =
   | { ok: true; requestId: string; customerId: string }
   | { ok: false; error: string };
+export type CustomerContactUpdateState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -207,19 +211,40 @@ export async function changeUserRole(formData: FormData) {
   await applyUserAction(formData, "change_role");
 }
 
-export async function updateCustomerContact(formData: FormData) {
+export async function updateCustomerContact(
+  _previousState: CustomerContactUpdateState,
+  formData: FormData,
+): Promise<CustomerContactUpdateState> {
   const { supabase } = await requireStaffProfile("customers");
   const userId = String(formData.get("userId") || "").trim();
-  if (!userId) throw new Error("Missing customer id.");
+  if (!validUuid(userId)) return { status: "error", message: "This customer could not be identified." };
+
+  const fullName = String(formData.get("fullName") || "").trim().replace(/\s+/g, " ").slice(0, 160);
+  const companyName = String(formData.get("companyName") || "").trim().replace(/\s+/g, " ").slice(0, 180);
+  const phone = String(formData.get("phone") || "").trim().slice(0, 80);
+  if (fullName.length < 2) return { status: "error", message: "Enter the customer's name." };
 
   const { error } = await supabase.rpc("staff_update_customer_contact", {
     customer_id: userId,
-    customer_full_name: String(formData.get("fullName") || ""),
-    customer_company_name: String(formData.get("companyName") || ""),
-    customer_phone: String(formData.get("phone") || ""),
+    customer_full_name: fullName,
+    customer_company_name: companyName,
+    customer_phone: phone,
   });
-  if (error) throw new Error(error.message || "Failed to update customer contact.");
+  if (error) return { status: "error", message: "The contact could not be saved. Please try again." };
+
+  const { data: saved, error: verifyError } = await supabase
+    .from("profiles")
+    .select("full_name,company_name,phone,role")
+    .eq("id", userId)
+    .maybeSingle<{ full_name: string | null; company_name: string | null; phone: string | null; role: string }>();
+  const expectedCompany = companyName || null;
+  const expectedPhone = phone || null;
+  if (verifyError || !saved || saved.role !== "client" || saved.full_name !== fullName || saved.company_name !== expectedCompany || saved.phone !== expectedPhone) {
+    return { status: "error", message: "The contact was not changed. Refresh the page and try again." };
+  }
+
   revalidatePath("/admin/users");
+  return { status: "success", message: "Contact saved." };
 }
 
 export async function createRequestForClientAction(input: {

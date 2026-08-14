@@ -60,3 +60,23 @@ test("customer manager exposes separate customer project and request deletion co
   expect(actions).toContain("export async function changeUserRole")
   expect(actions).toContain('const { profile, supabase } = await requireAdminProfile()')
 })
+
+test("customer directory only lists clients and verifies contact updates", async () => {
+  const [page, actions, form] = await Promise.all([
+    readFile(path.join(root, "app/admin/users/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/users/actions.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/customer-contact-form.tsx"), "utf8"),
+  ])
+
+  expect(page).toContain('const clientCustomers = customers.filter((customer) => customer.role === "client")')
+  expect(page).toContain("const filteredCustomers = clientCustomers.filter")
+  expect(page).not.toContain('aria-label="Customer and request overview"')
+  expect(page).toContain("clientCustomers.length")
+  expect(page).toContain("CustomerContactForm")
+  expect(actions).toContain('select("full_name,company_name,phone,role")')
+  expect(actions).toContain('saved.role !== "client"')
+  expect(actions).toContain('message: "Contact saved."')
+  expect(form).toContain("useActionState")
+  expect(form).toContain('pending ? "Saving..." : "Save contact"')
+  expect(form).toContain('role="status"')
+})

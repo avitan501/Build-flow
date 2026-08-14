@@ -1,7 +1,8 @@
-import { Building2, ClipboardList, FolderKanban, Search, UserRoundCheck, Users } from "lucide-react"
+import { Building2, ClipboardList, FolderKanban, Search, Users } from "lucide-react"
 import Link from "next/link"
 
-import { approvePendingUser, changeUserRole, rejectUser, suspendUser, updateCustomerContact } from "@/app/admin/users/actions"
+import { approvePendingUser, changeUserRole, rejectUser, suspendUser } from "@/app/admin/users/actions"
+import { CustomerContactForm } from "@/components/buildflow/customer-contact-form"
 import { DeleteManagerRecordButton } from "@/components/buildflow/delete-manager-record-button"
 import { ManagerCreateClientRequest } from "@/components/buildflow/manager-create-client-request"
 import { requireStaffProfile } from "@/lib/auth"
@@ -106,10 +107,11 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   if (projectsResult.error) throw new Error("Failed to load customer projects.")
 
   const customers = customersResult.data ?? []
+  const clientCustomers = customers.filter((customer) => customer.role === "client")
   const requests = requestsResult.data ?? []
   const projects = projectsResult.data ?? []
   const audits = auditResult.data ?? []
-  const managerCustomers = customers.filter((customer) => customer.role === "client" && customer.is_active).map((customer) => ({ id: customer.id, name: customerName(customer), email: customer.email }))
+  const managerCustomers = clientCustomers.filter((customer) => customer.is_active).map((customer) => ({ id: customer.id, name: customerName(customer), email: customer.email }))
   const departments = Array.from(new Set([...(categoriesResult.data ?? []).map((category) => category.department_key), ...MATERIAL_DEPARTMENTS]))
   const customerMap = new Map(customers.map((customer) => [customer.id, customer]))
   const requestCount = new Map<string, number>()
@@ -121,7 +123,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   }
   for (const project of projects) projectCount.set(project.owner_id, (projectCount.get(project.owner_id) ?? 0) + 1)
 
-  const filteredCustomers = customers.filter((customer) => {
+  const filteredCustomers = clientCustomers.filter((customer) => {
     if (!search) return true
     return [customer.full_name, customer.email, customer.company_name, customer.phone].filter(Boolean).join(" ").toLowerCase().includes(search)
   })
@@ -141,7 +143,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   })
 
   const openRequests = requests.filter((request) => deletableRequestStatuses.has(request.status)).length
-  const pendingCustomers = customers.filter((customer) => customer.approval_status === "pending").length
+  const pendingCustomers = clientCustomers.filter((customer) => customer.approval_status === "pending").length
   const statuses = Array.from(new Set(requests.map((request) => request.status))).sort()
   const projectStatuses = Array.from(new Set(projects.map((project) => project.status))).sort()
   const pageTitle = view === "customers" ? "Customer Directory" : view === "projects" ? "Customer Projects" : "Customer Requests"
@@ -159,19 +161,10 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           <ManagerCreateClientRequest customers={managerCustomers} departments={departments} initialCustomerId={params.customer || ""} />
         </header>
 
-        <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Customer and request overview">
-          {[
-            { label: "Customers", value: customers.length, icon: Users },
-            { label: "Pending approval", value: pendingCustomers, icon: UserRoundCheck },
-            { label: "Projects", value: projects.length, icon: FolderKanban },
-            { label: "Open requests", value: openRequests, icon: ClipboardList },
-          ].map(({ label, value, icon: Icon }) => <div key={label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-slate-500 sm:text-sm">{label}</p><Icon className="h-4 w-4 text-[#0066cc]" /></div><p className="mt-2 text-2xl font-bold">{value}</p></div>)}
-        </section>
-
         <nav className="mt-6 grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-white p-1" aria-label="Customers, projects, and requests views">
-          <Link href="/admin/users?view=customers" className={`flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold ${view === "customers" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Users className="h-4 w-4" />Customers</Link>
-          <Link href="/admin/users?view=projects" className={`flex min-h-11 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold ${view === "projects" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><FolderKanban className="h-4 w-4" />Projects</Link>
-          <Link href="/admin/users?view=requests" className={`flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold ${view === "requests" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><ClipboardList className="h-4 w-4" />Requests</Link>
+          <Link href="/admin/users?view=customers" className={`flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold ${view === "customers" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Users className="h-4 w-4 shrink-0" /><span className="truncate">Customers</span><span className={`rounded-full px-2 py-0.5 text-xs ${view === "customers" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}>{clientCustomers.length}</span>{pendingCustomers ? <span className="hidden text-xs text-amber-600 lg:inline">{pendingCustomers} pending</span> : null}</Link>
+          <Link href="/admin/users?view=projects" className={`flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold ${view === "projects" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><FolderKanban className="h-4 w-4 shrink-0" /><span className="truncate">Projects</span><span className={`rounded-full px-2 py-0.5 text-xs ${view === "projects" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}>{projects.length}</span></Link>
+          <Link href="/admin/users?view=requests" className={`flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold ${view === "requests" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><ClipboardList className="h-4 w-4 shrink-0" /><span className="truncate">Requests</span><span className={`rounded-full px-2 py-0.5 text-xs ${view === "requests" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}>{openRequests}</span></Link>
         </nav>
 
         <form className="mt-4 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto_auto]" action="/admin/users">
@@ -192,7 +185,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                   <div className="flex flex-wrap justify-end gap-2"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(customer.role)}`}>{customer.role}</span><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(customer.approval_status)}`}>{customer.approval_status}</span>{isSelf ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">Your account</span> : null}</div>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-4 border-y border-slate-100 py-3 text-sm"><Link href={`/admin/users?view=projects&customer=${customer.id}`} className="font-semibold text-[#0066cc]"><strong>{projectCount.get(customer.id) ?? 0}</strong> projects</Link><Link href={`/admin/users?view=requests&customer=${customer.id}`} className="font-semibold text-[#0066cc]"><strong>{requestCount.get(customer.id) ?? 0}</strong> requests</Link><span className="text-slate-500">Joined {formatDate(customer.created_at)}</span></div>
-                <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Edit customer contact</summary><form action={updateCustomerContact} className="mt-3 grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3"><input type="hidden" name="userId" value={customer.id} /><label className="text-xs font-semibold text-slate-600">Name<input name="fullName" defaultValue={customer.full_name || ""} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label><label className="text-xs font-semibold text-slate-600">Company<input name="companyName" defaultValue={customer.company_name || ""} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label><label className="text-xs font-semibold text-slate-600">Phone<input name="phone" defaultValue={customer.phone || ""} className="mt-1 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label><button type="submit" className="min-h-10 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white sm:col-span-3 sm:justify-self-start">Save contact</button></form></details>
+                <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Edit customer contact</summary><CustomerContactForm customer={{ id: customer.id, fullName: customer.full_name || "", companyName: customer.company_name || "", phone: customer.phone || "" }} /></details>
                 {isOwner ? <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Owner-only account controls</summary><div className="mt-3 flex flex-wrap items-end gap-3 rounded-lg bg-slate-50 p-3">
                   <div className="flex flex-wrap gap-2"><form action={approvePendingUser}><input type="hidden" name="userId" value={customer.id} /><button type="submit" disabled={isSelf || customer.approval_status === "approved"} className="min-h-10 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white disabled:opacity-35">Approve</button></form><form action={suspendUser}><input type="hidden" name="userId" value={customer.id} /><button type="submit" disabled={isSelf || customer.approval_status === "suspended"} className="min-h-10 rounded-lg border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-800 disabled:opacity-35">Suspend</button></form><form action={rejectUser}><input type="hidden" name="userId" value={customer.id} /><button type="submit" disabled={isSelf || customer.approval_status === "rejected"} className="min-h-10 rounded-lg border border-rose-200 bg-white px-4 text-sm font-semibold text-rose-700 disabled:opacity-35">Reject</button></form></div>
                   <form action={changeUserRole} className="flex flex-wrap items-center gap-2"><input type="hidden" name="userId" value={customer.id} /><label className="text-xs font-semibold text-slate-600">Role <select name="role" defaultValue={customer.role} disabled={isSelf} className="ml-1 min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm">{roleOptions.map((role) => <option key={role}>{role}</option>)}</select></label><button type="submit" disabled={isSelf} className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-35">Save role</button></form>
