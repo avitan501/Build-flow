@@ -71,7 +71,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
           <div className="p-5 sm:p-6">
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><CheckCircle2 className="h-6 w-6" aria-hidden="true" /></span>
             <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">Request Ready</p>
-            <h2 className="mt-1 text-xl font-bold text-slate-950">Confirm This {displayCategory} Request</h2>
+            <h2 className="mt-1 text-xl font-bold text-slate-950">{`Confirm This ${displayCategory} Request`}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">Your selections are saved on this device. Confirm to send the request from your account.</p>
             <div className="mt-5 flex flex-wrap gap-3">
               <AddToProjectButton
@@ -85,7 +85,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
               />
               <button type="button" onClick={() => { setCompletedAnswers(null); storeDraft(completedAnswers, false) }} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:border-slate-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"><Pencil className="h-4 w-4" aria-hidden="true" />Edit Selections</button>
             </div>
-            {referenceFile ? <p className="mt-3 text-sm font-semibold text-slate-600">Reference attached: {referenceFile.name}</p> : null}
+            {referenceFile ? <p className="mt-3 text-sm font-semibold text-slate-600">{`Reference attached: ${referenceFile.name}`}</p> : null}
           </div>
           <div className="border-t border-emerald-100 bg-emerald-50/60 p-5 lg:border-l lg:border-t-0">
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-800">Order Summary</p>

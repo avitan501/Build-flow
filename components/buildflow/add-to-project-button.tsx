@@ -313,7 +313,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
               {created && questionnaireCompleted ? (
                 <div className="grid gap-4">
                   <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
-                    Your {product.category} request was created. Someone from Avantia Build will get back to you within 24 hours.
+                    {`Your ${product.category} request was created. Someone from Avantia Build will get back to you within 24 hours.`}
                   </div>
                   <Link href={`/projects/${created.projectId}/requests/${created.requestId}`} className="text-center text-sm font-semibold text-[#0066cc]">View request</Link>
                 </div>

@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { Languages } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { MobileMenuDrawer, type MobileMenuLink } from "@/components/buildflow/mobile-menu-drawer";
+import { useShopLanguage } from "@/components/buildflow/shop-language-provider";
 import { placeholderImageMetadata } from "@/lib/shop-catalog";
 import { SHOP_CATEGORY_NAMES, SHOP_POPULAR_SEARCHES } from "@/lib/shop";
 
@@ -80,6 +82,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { language, setLanguage } = useShopLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const [shopSearchOpen, setShopSearchOpen] = useState(false);
   const [draftQuery, setDraftQuery] = useState("");
@@ -171,7 +174,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
   return (
     <>
       <div data-testid="site-header" className="sticky top-0 z-[60] border-b border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(148,163,184,0.1)]">
-        <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-3 py-2.5 sm:px-5">
+        <div className="mx-auto flex w-full max-w-7xl items-center gap-1.5 px-2 py-2.5 min-[360px]:gap-2 min-[360px]:px-3 sm:px-5">
           <button
             type="button"
             aria-label="Open navigation menu"
@@ -209,9 +212,12 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
                 aria-haspopup="dialog"
                 aria-expanded={shopSearchOpen}
                 aria-controls="shop-search-overlay"
+                aria-label={shopQuery ? `Search materials: ${shopQuery}` : "Search materials"}
               >
                 <SearchIcon />
-                <span className="truncate text-xs text-slate-500 min-[400px]:text-sm">{shopQuery || "Search materials"}</span>
+                <span data-testid="shop-search-label" className="hidden min-w-0 truncate text-xs text-slate-500 min-[390px]:block min-[430px]:text-sm">
+                  {shopQuery ? shopQuery : <><span className="min-[430px]:hidden">Search</span><span className="hidden min-[430px]:inline">Search materials</span></>}
+                </span>
               </button>
             </>
           ) : (
@@ -237,11 +243,25 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
             </nav>
           ) : null}
 
+          {isShopPage ? (
+            <button
+              type="button"
+              onClick={() => setLanguage(language === "en" ? "es" : "en")}
+              className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-2xl border border-slate-200/90 bg-white/95 px-0 text-xs font-bold text-[#0E2A4A] shadow-sm transition hover:border-sky-200 hover:bg-sky-50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 min-[360px]:px-2"
+              aria-label={language === "en" ? "Ver tienda en español" : "View shop in English"}
+              title={language === "en" ? "Ver tienda en español" : "View shop in English"}
+              data-no-shop-translation
+            >
+              <Languages className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden min-[360px]:inline">{language === "en" ? "ES" : "EN"}</span>
+            </button>
+          ) : null}
+
           <Link
             href={isSignedIn ? "/account" : "/login"}
             prefetch={false}
             aria-label={isSignedIn ? `Open account for ${accountLabel}` : "Log in"}
-            className={`flex min-h-11 max-w-[7.75rem] shrink-0 items-center gap-1.5 rounded-2xl border px-2.5 text-xs font-bold shadow-sm transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 ${pathname === "/account" ? "border-sky-200 bg-sky-50 text-[#0E2A4A]" : "border-slate-200/90 bg-white/95 text-[#0E2A4A]"}`}
+            className={`flex min-h-11 max-w-[7.75rem] shrink-0 items-center gap-1.5 rounded-2xl border px-2 text-xs font-bold shadow-sm transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 min-[360px]:px-2.5 ${pathname === "/account" ? "border-sky-200 bg-sky-50 text-[#0E2A4A]" : "border-slate-200/90 bg-white/95 text-[#0E2A4A]"}`}
           >
             <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isSignedIn ? "bg-[#0E2A4A] text-white" : "bg-slate-100 text-slate-700"}`}>
               <AccountIcon signedIn={isSignedIn} />
@@ -340,7 +360,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-semibold text-slate-900">{category}</span>
-                            <span className="block truncate text-xs text-slate-500">Browse {category.toLowerCase()} materials</span>
+                            <span className="block truncate text-xs text-slate-500">{`Browse ${category.toLowerCase()} materials`}</span>
                           </span>
                           <span className="text-slate-400"><SearchIcon /></span>
                         </button>

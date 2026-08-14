@@ -70,10 +70,10 @@ test("shop header keeps the animated Avantia logo beside material search", async
   const search = header.getByRole("button", { name: /Search materials/ })
 
   await expect(logo).toBeVisible()
-  await expect(logo).toHaveAttribute("src", /avantia-build-painter-ava\.svg/)
+  await expect(logo).toHaveAttribute("src", /avantia-build-lockup-animated\.webp/)
   await expect(search).toBeVisible()
   await expect(page.locator("main").getByTestId("avantia-build-lockup")).toHaveCount(0)
-  expect(await search.getByText("Search materials").evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  expect(await search.getByTestId("shop-search-label").evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
 
   const headerSurface = await header.evaluate((element) => ({
     backgroundColor: getComputedStyle(element).backgroundColor,
@@ -86,6 +86,17 @@ test("shop header keeps the animated Avantia logo beside material search", async
   const positions = await Promise.all([logo.boundingBox(), search.boundingBox()])
   expect(positions[0]?.x).toBeLessThan(positions[1]?.x ?? Number.POSITIVE_INFINITY)
   expect(Math.abs((positions[0]?.y ?? 0) - (positions[1]?.y ?? 0))).toBeLessThan(12)
+
+  await page.setViewportSize({ width: 320, height: 844 })
+  const narrowHeader = await header.evaluate((element) => {
+    const row = element.firstElementChild
+    const boxes = row ? Array.from(row.children).map((child) => child.getBoundingClientRect()) : []
+    return {
+      overlaps: boxes.some((box, index) => index > 0 && box.left < boxes[index - 1].right - 0.5),
+      pageOverflows: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    }
+  })
+  expect(narrowHeader).toEqual({ overlaps: false, pageOverflows: false })
 })
 
 test("department categories use distinct unframed product cutouts", async ({ page }) => {
@@ -343,6 +354,12 @@ test("sheetrock uses the compact on-page contractor configurator", async ({ page
   await expect(page.getByRole("button", { name: "4 ft. x 8 ft." })).toBeVisible()
   await expect(page.getByRole("button", { name: "Moisture resistant" })).toBeVisible()
   await expect(page.getByRole("button", { name: "5/8 in." })).toBeVisible()
+  await expect(page.getByText("Quantity", { exact: true })).toBeVisible()
+  await expect(page.getByRole("group", { name: "Drywall sheet quantity" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Ceiling", exact: true })).toHaveCount(0)
+  await expect(page.getByText("Edge profile", { exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Tapered edge", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Square edge", exact: true })).toHaveCount(0)
   await expect(page.getByText("Drywall screws", { exact: true })).toBeVisible()
   await expect(page.getByText("Need Help With a Custom Sheet rock Order?", { exact: true })).toBeVisible()
   await expect(page.getByRole("heading", { name: "Department Essentials" })).toHaveCount(0)
@@ -361,6 +378,30 @@ test("sheetrock uses the compact on-page contractor configurator", async ({ page
     scrollWidth: document.documentElement.scrollWidth,
   }))
   expect(widths.scrollWidth).toBe(widths.clientWidth)
+})
+
+test("shop language switch translates only the shop and persists the choice", async ({ page }) => {
+  await page.goto("/shop")
+
+  await page.getByRole("button", { name: "Ver tienda en español" }).click()
+  await expect(page.getByRole("heading", { name: "¿En qué está trabajando ahora?" })).toBeVisible()
+  await expect(page.getByTestId("department-card").filter({ hasText: "Estructura" }).first()).toBeVisible()
+  await expect(page.getByRole("button", { name: "View shop in English" })).toBeVisible()
+
+  await page.goto("/shop/sheet-rock")
+  await expect(page.getByRole("heading", { name: "Panel de yeso", exact: true })).toBeVisible()
+  await expect(page.getByText("Tipo de panel", { exact: true })).toBeVisible()
+  await expect(page.getByText("Cantidad", { exact: true })).toBeVisible()
+  await expect(page.getByText("Edge profile", { exact: true })).toHaveCount(0)
+
+  await page.reload()
+  await expect(page.getByText("Tipo de panel", { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "View shop in English" }).click()
+  await expect(page.getByText("Board type", { exact: true })).toBeVisible()
+
+  await page.goto("/")
+  await expect(page.locator("html")).toHaveAttribute("lang", "en")
+  await expect(page.getByText("Estructura", { exact: true })).toHaveCount(0)
 })
 
 test("tile uses an on-page materials configurator", async ({ page }) => {

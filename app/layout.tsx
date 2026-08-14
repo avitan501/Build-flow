@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Poppins } from "next/font/google";
+import { cookies } from "next/headers";
 import Script from "next/script";
 
 import { AvantiaBuildClientShell } from "@/components/buildflow/buildflow-client-shell";
 import { MobileBottomDock } from "@/components/buildflow/mobile-bottom-dock";
 import { MobileClientHeader } from "@/components/buildflow/mobile-client-header";
 import { SiteFooter } from "@/components/buildflow/site-footer";
+import { ShopLanguageProvider } from "@/components/buildflow/shop-language-provider";
 import { TrafficTracker } from "@/components/buildflow/traffic-tracker";
 import { WorkflowSettingsHydrator } from "@/components/buildflow/workflow-settings-hydrator";
 import { getSessionWithProfile } from "@/lib/auth";
 import { managerCapabilities } from "@/lib/owner-identity";
+import { parseShopLanguage, SHOP_LANGUAGE_COOKIE } from "@/lib/shop-i18n";
 import { getSupabasePublicEnv, hasSupabasePublicEnv } from "@/lib/supabase/env";
 import type { PublicWorkflowState } from "@/lib/workflow-public";
 import "./globals.css";
@@ -70,6 +73,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const { supabase, user, profile } = await getSessionWithProfile();
+  const cookieStore = await cookies();
+  const shopLanguage = parseShopLanguage(cookieStore.get(SHOP_LANGUAGE_COOKIE)?.value);
   const isSignedIn = Boolean(user);
   const managerAccess = managerCapabilities({
     email: user?.email || profile?.email,
@@ -91,7 +96,7 @@ export default async function RootLayout({
 
   return (
     <html
-      lang="en"
+      lang={shopLanguage}
       className={`${geistSans.variable} ${geistMono.variable} ${poppins.variable} h-full antialiased`}
     >
       <body className="min-h-full">
@@ -100,14 +105,16 @@ export default async function RootLayout({
             {`window.__AVANTIA_SUPABASE__=${serializedSupabaseConfig}`}
           </Script>
         ) : null}
-        <AvantiaBuildClientShell>
-          <TrafficTracker disabled={isAdmin} />
-          <WorkflowSettingsHydrator state={publicStateRow?.state ?? null} />
-          <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isOwner={managerAccess.owner} managerHref={managerHref} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />
-          {children}
-          <SiteFooter />
-          <MobileBottomDock />
-        </AvantiaBuildClientShell>
+        <ShopLanguageProvider initialLanguage={shopLanguage}>
+          <AvantiaBuildClientShell>
+            <TrafficTracker disabled={isAdmin} />
+            <WorkflowSettingsHydrator state={publicStateRow?.state ?? null} />
+            <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isOwner={managerAccess.owner} managerHref={managerHref} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />
+            {children}
+            <SiteFooter />
+            <MobileBottomDock />
+          </AvantiaBuildClientShell>
+        </ShopLanguageProvider>
       </body>
     </html>
   );

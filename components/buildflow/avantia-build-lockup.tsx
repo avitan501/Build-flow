@@ -2,7 +2,6 @@ import Image from "next/image";
 
 type AvantiaBuildLockupProps = {
   compact?: boolean;
-  footer?: boolean;
   header?: boolean;
   homepageHeader?: boolean;
   showSlogan?: boolean;
@@ -10,13 +9,11 @@ type AvantiaBuildLockupProps = {
   tone?: "navy" | "light";
 };
 
-export function AvantiaBuildLockup({ compact = false, footer = false, header = false, homepageHeader = false, showSlogan = false, className = "" }: AvantiaBuildLockupProps) {
-  const widthClass = footer
-    ? "w-[9.75rem] sm:w-[10.5rem]"
-    : homepageHeader
+export function AvantiaBuildLockup({ compact = false, header = false, homepageHeader = false, showSlogan = false, className = "" }: AvantiaBuildLockupProps) {
+  const widthClass = homepageHeader
     ? "w-[12.5rem] min-[390px]:w-[14rem] sm:w-[15rem] md:w-[10.5rem] lg:w-[12.5rem]"
     : header
-    ? "w-[6.25rem] min-[390px]:w-[7.25rem] sm:w-[8.75rem] md:w-[10rem]"
+    ? "w-[5rem] min-[360px]:w-[6.25rem] min-[430px]:w-[7.25rem] sm:w-[8.75rem] md:w-[10rem]"
     : compact
       ? "w-[11.25rem] sm:w-[12.25rem]"
       : "w-[14rem] sm:w-[15.5rem]";
@@ -24,10 +21,10 @@ export function AvantiaBuildLockup({ compact = false, footer = false, header = f
   return (
     <span className={`flex min-w-0 flex-col ${className}`} data-testid="avantia-build-lockup">
       <Image
-        src="/images/avantia/avantia-build-painter-ava.svg"
+        src="/images/avantia/avantia-build-lockup-animated.webp"
         alt="Avantia Build"
-        width={620}
-        height={180}
+        width={1400}
+        height={450}
         loading="eager"
         unoptimized
         className={`${widthClass} h-auto select-none object-contain [image-rendering:auto]`}

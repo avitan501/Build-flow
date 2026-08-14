@@ -156,7 +156,7 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
         {(customOrderOnly || experience.showChatToOrder) && usesCompactCustomOrder ? (
           <details open={customOrderOnly} className="group rounded-lg border border-slate-200 bg-white shadow-sm">
             <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left marker:content-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-sky-100">
-              <span><span className="block text-base font-bold text-slate-950">Need Help With a Custom {category.label} Order?</span><span className="mt-0.5 block text-sm text-slate-500">Describe the request or attach a blueprint or shopping list.</span></span>
+              <span><span className="block text-base font-bold text-slate-950">{`Need Help With a Custom ${category.label} Order?`}</span><span className="mt-0.5 block text-sm text-slate-500">Describe the request or attach a blueprint or shopping list.</span></span>
               <span aria-hidden="true" className="text-xl font-light text-slate-500 transition-transform group-open:rotate-45 motion-reduce:transition-none">+</span>
             </summary>
             <div className="border-t border-slate-100 px-5 [&>section]:border-0"> <DepartmentRequestComposer category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} allowUpload={customOrderOnly || (composerHandlesUpload && experience.showPlanUpload)} /></div>

@@ -424,7 +424,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
                 <div className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-sky-800 shadow-sm">Filtered view</div>
                 <h2 className="mt-3 text-2xl font-bold tracking-normal text-slate-950">{activeCategoryLabel}</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Showing only {activeCategoryLabel.toLowerCase()} items. Use the section buttons above to switch focus.
+                  {`Showing only ${activeCategoryLabel.toLowerCase()} items. Use the section buttons above to switch focus.`}
                 </p>
               </div>
               <button type="button" onClick={clearFilters} className="inline-flex h-11 items-center justify-center rounded-2xl bg-slate-950 px-5 text-sm font-bold text-white transition hover:bg-slate-800">
@@ -545,7 +545,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-slate-900">{supplier.name}</span>
-                  <span className="block text-xs text-slate-500">{supplier.count} item{supplier.count === 1 ? "" : "s"}</span>
+                  <span className="block text-xs text-slate-500">{`${supplier.count} item${supplier.count === 1 ? "" : "s"}`}</span>
                 </span>
               </button>
             ))}
@@ -577,7 +577,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
         <section className="flex flex-col gap-3 rounded-[28px] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="min-w-0">
             <h2 className="truncate text-xl font-bold tracking-normal text-slate-950 sm:text-2xl">{resultLabel}</h2>
-            <p className="mt-1 text-sm font-medium text-slate-500">{activeCategoryProducts.length} items ready to browse</p>
+            <p className="mt-1 text-sm font-medium text-slate-500">{`${activeCategoryProducts.length} items ready to browse`}</p>
           </div>
 
           <label className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 sm:w-auto">

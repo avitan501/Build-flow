@@ -83,7 +83,7 @@ function LumberItemList({ question, value, onChange, disabled }: {
           </div> : moldingMode ? <p className="text-xs text-slate-500">Enter a catalog code above or attach a molding photo below.</p> : null}
         </div>
       ))}
-      <button type="button" disabled={disabled} onClick={() => onChange({ items: [...items, emptyItem] })} className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:border-slate-500"><Plus className="h-4 w-4" />Add Another {moldingMode ? "Molding" : cableMode ? "Cable" : "Item"}</button>
+      <button type="button" disabled={disabled} onClick={() => onChange({ items: [...items, emptyItem] })} className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:border-slate-500"><Plus className="h-4 w-4" />{`Add Another ${moldingMode ? "Molding" : cableMode ? "Cable" : "Item"}`}</button>
     </div>
   )
 }
