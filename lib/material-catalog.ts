@@ -1,3 +1,5 @@
+import type { SupplierTrustLevel } from "@/lib/shop-qualification"
+
 export const MATERIAL_CATALOG_CATEGORIES = [
   "Framing",
   "Electrical",
@@ -8,6 +10,7 @@ export const MATERIAL_CATALOG_CATEGORIES = [
   "Siding",
   "Roofing",
   "Windows",
+  "Others",
 ] as const
 
 export type MaterialCatalogCategory = (typeof MATERIAL_CATALOG_CATEGORIES)[number]
@@ -44,5 +47,62 @@ export type CatalogSupplier = {
   name: string
   email?: string
   phone?: string
-  materials?: string[]
+  materials?: string | string[]
+  trustLevel?: SupplierTrustLevel
+  catalogDepartments?: string[]
+}
+
+const DEPARTMENT_ALIASES: Record<string, MaterialCatalogCategory> = {
+  "door and molding": "Door & Molding",
+  "doors and molding": "Door & Molding",
+  "door & molding": "Door & Molding",
+  drywall: "Sheet Rock",
+  "sheet rock": "Sheet Rock",
+  sheetrock: "Sheet Rock",
+  "tile work": "Tile",
+  window: "Windows",
+  windows: "Windows",
+  "wood floor": "Flooring",
+  "wood flooring": "Flooring",
+  unassigned: "Others",
+  general: "Others",
+  "general request": "Others",
+  other: "Others",
+  others: "Others",
+}
+
+const ROUTABLE_SUPPLIER_TRUST_LEVELS: SupplierTrustLevel[] = ["first-time", "verified", "trusted", "preferred"]
+
+export function normalizeMaterialCatalogDepartment(value: string | null | undefined) {
+  const trimmed = String(value ?? "").trim().replace(/\s+/g, " ")
+  if (!trimmed) return "Others"
+  const normalized = trimmed.toLowerCase()
+  const known = MATERIAL_CATALOG_CATEGORIES.find((category) => category.toLowerCase() === normalized)
+  return known ?? DEPARTMENT_ALIASES[normalized] ?? trimmed
+}
+
+export function materialCatalogDepartmentOptions(...sources: Array<Iterable<string>>) {
+  const values = [...MATERIAL_CATALOG_CATEGORIES, ...sources.flatMap((source) => [...source].map(normalizeMaterialCatalogDepartment))]
+  return values.filter((value, index) => value && values.indexOf(value) === index)
+}
+
+export function hasRoutableSupplierTrust(level: SupplierTrustLevel | null | undefined) {
+  return ROUTABLE_SUPPLIER_TRUST_LEVELS.includes(level ?? "not-reviewed")
+}
+
+export function supplierServesMaterialDepartment(
+  supplier: Pick<CatalogSupplier, "catalogDepartments">,
+  department: string,
+) {
+  const expected = normalizeMaterialCatalogDepartment(department)
+  return (supplier.catalogDepartments ?? []).some((entry) => normalizeMaterialCatalogDepartment(entry) === expected)
+}
+
+export function supplierCanReceiveDepartmentRequest(
+  supplier: Pick<CatalogSupplier, "catalogDepartments" | "email" | "trustLevel">,
+  department: string,
+) {
+  return Boolean(supplier.email?.trim())
+    && hasRoutableSupplierTrust(supplier.trustLevel)
+    && supplierServesMaterialDepartment(supplier, department)
 }

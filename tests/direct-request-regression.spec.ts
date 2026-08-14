@@ -138,5 +138,5 @@ test("supplier directory opens a compact profile dialog above the list", async (
   expect(manager).toContain('role="dialog"')
   expect(manager).toContain('aria-labelledby="supplier-profile-title"')
   expect(manager).toContain("max-h-[94dvh]")
-  expect(manager).toContain("Department routing ·")
+  expect(manager).toContain("Automatic service routing ·")
 })

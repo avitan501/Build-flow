@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, FileUp, ImageIcon, PackagePlus, Pencil, Plus, Save, Search, Store, Trash2, X } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight, FileUp, ImageIcon, PackagePlus, Pencil, Plus, Save, Search, Store, Trash2, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -15,6 +15,9 @@ import {
 } from "@/app/admin/catalog/actions"
 import {
   MATERIAL_CATALOG_CATEGORIES,
+  hasRoutableSupplierTrust,
+  materialCatalogDepartmentOptions,
+  supplierServesMaterialDepartment,
   type CatalogSupplier,
   type MaterialCatalogItem,
   type MaterialCatalogSupplierPrice,
@@ -67,15 +70,18 @@ export function MaterialCatalogWorkspace({
   initialItems,
   initialPrices,
   suppliers,
+  departments,
 }: {
   initialItems: MaterialCatalogItem[]
   initialPrices: MaterialCatalogSupplierPrice[]
   suppliers: CatalogSupplier[]
+  departments: string[]
 }) {
   const router = useRouter()
   const [selectedCategory, setSelectedCategory] = useState(initialItems[0]?.category || MATERIAL_CATALOG_CATEGORIES[0])
   const [itemSearch, setItemSearch] = useState("")
   const [supplierSearch, setSupplierSearch] = useState("")
+  const [mobileSupplierId, setMobileSupplierId] = useState("")
   const [showInactive, setShowInactive] = useState(false)
   const [editor, setEditor] = useState<EditorDraft | null>(null)
   const [notice, setNotice] = useState("")
@@ -89,7 +95,7 @@ export function MaterialCatalogWorkspace({
     supplierSku: price.supplier_sku,
   }])))
 
-  const categories = useMemo(() => Array.from(new Set([...MATERIAL_CATALOG_CATEGORIES, ...initialItems.map((item) => item.category)])), [initialItems])
+  const categories = useMemo(() => materialCatalogDepartmentOptions(departments, initialItems.map((item) => item.category)), [departments, initialItems])
   const categoryItems = useMemo(() => initialItems.filter((item) => {
     if (item.category !== selectedCategory) return false
     if (!showInactive && item.status === "inactive") return false
@@ -98,8 +104,20 @@ export function MaterialCatalogWorkspace({
   }), [initialItems, itemSearch, selectedCategory, showInactive])
   const visibleSuppliers = useMemo(() => {
     const needle = supplierSearch.trim().toLowerCase()
-    return suppliers.filter((supplier) => !needle || `${supplier.name} ${supplier.email ?? ""} ${supplier.phone ?? ""} ${(supplier.materials ?? []).join(" ")}`.toLowerCase().includes(needle))
-  }, [supplierSearch, suppliers])
+    return suppliers.filter((supplier) => {
+      if (!hasRoutableSupplierTrust(supplier.trustLevel) || !supplierServesMaterialDepartment(supplier, selectedCategory)) return false
+      const materials = Array.isArray(supplier.materials) ? supplier.materials.join(" ") : supplier.materials ?? ""
+      return !needle || `${supplier.name} ${supplier.email ?? ""} ${supplier.phone ?? ""} ${materials}`.toLowerCase().includes(needle)
+    })
+  }, [selectedCategory, supplierSearch, suppliers])
+  const mobileSupplier = visibleSuppliers.find((supplier) => supplier.id === mobileSupplierId) ?? visibleSuppliers[0] ?? null
+
+  function moveMobileSupplier(direction: -1 | 1) {
+    if (!mobileSupplier || visibleSuppliers.length < 2) return
+    const currentIndex = visibleSuppliers.findIndex((supplier) => supplier.id === mobileSupplier.id)
+    const nextIndex = (currentIndex + direction + visibleSuppliers.length) % visibleSuppliers.length
+    setMobileSupplierId(visibleSuppliers[nextIndex].id)
+  }
 
   function draftFor(itemId: string, supplierId: string): PriceDraft {
     const key = cellKey(itemId, supplierId)
@@ -217,7 +235,39 @@ export function MaterialCatalogWorkspace({
         {notice ? <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900" role="status">{notice}</p> : null}
         {error ? <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800" role="alert">{error}</p> : null}
 
-        <section className="mt-3 overflow-auto rounded-lg border border-slate-300 bg-white shadow-sm" aria-label={`${selectedCategory} supplier pricing matrix`}>
+        <section className="mt-3 overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm md:hidden" aria-label={`${selectedCategory} mobile supplier pricing`}>
+          <header className="border-b border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => moveMobileSupplier(-1)} disabled={visibleSuppliers.length < 2} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-35" aria-label="Previous supplier"><ChevronLeft className="h-4 w-4" /></button>
+              <label className="min-w-0 flex-1"><span className="sr-only">Supplier price column</span><select value={mobileSupplier?.id ?? ""} onChange={(event) => setMobileSupplierId(event.target.value)} disabled={!mobileSupplier} className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold"><option value="">No eligible supplier</option>{visibleSuppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select></label>
+              <button type="button" onClick={() => moveMobileSupplier(1)} disabled={visibleSuppliers.length < 2} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-35" aria-label="Next supplier"><ChevronRight className="h-4 w-4" /></button>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">{mobileSupplier ? `${mobileSupplier.email || mobileSupplier.phone || "Contact not set"} · ${visibleSuppliers.findIndex((supplier) => supplier.id === mobileSupplier.id) + 1} of ${visibleSuppliers.length}` : `Assign an eligible supplier to ${selectedCategory} in Supplier Directory.`}</p>
+          </header>
+          <div className="divide-y divide-slate-200">
+            {categoryItems.map((item) => {
+              const supplier = mobileSupplier
+              const key = supplier ? cellKey(item.id, supplier.id) : ""
+              const draft = supplier ? draftFor(item.id, supplier.id) : null
+              const saved = supplier ? initialPriceMap.get(key) : null
+              return <article key={item.id} className={dirtyKeys.has(key) ? "bg-amber-50" : "bg-white"}>
+                <div className="flex items-center gap-2 px-3 py-2.5">
+                  {item.image_url ? <button type="button" onClick={() => setEditor(itemEditor(item))} className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white"><Image src={item.image_url} alt="" fill sizes="36px" className="object-contain" /></button> : <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-400"><ImageIcon className="h-4 w-4" /></span>}
+                  <div className="min-w-0 flex-1"><p className="text-sm font-bold leading-4 text-slate-950">{item.name}</p><p className="mt-1 text-[10px] text-slate-500">{item.item_code} · {Number(item.default_quantity).toLocaleString()} {item.unit}{item.status === "inactive" ? " · inactive" : ""}</p></div>
+                  <button type="button" onClick={() => setEditor(itemEditor(item))} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-sky-50 hover:text-[#0066cc]" aria-label={`Edit ${item.name}`}><Pencil className="h-3.5 w-3.5" /></button>
+                  <button type="button" onClick={() => deleteItem(item)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-700" aria-label={`Delete ${item.name}`}><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+                {supplier && draft ? <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-2 border-t border-slate-100 px-3 py-2.5">
+                  <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-slate-400">$</span><input aria-label={`${supplier.name} unit price for ${item.name}`} inputMode="decimal" value={draft.unitPrice} onChange={(event) => updatePrice(item.id, supplier.id, { unitPrice: event.target.value.replace(/[^0-9.]/g, "") })} placeholder="Unit price" className="h-10 w-full rounded-lg border border-slate-300 bg-white pl-6 pr-3 text-sm tabular-nums" /></div>
+                  <div className="flex gap-1"><select aria-label={`${supplier.name} availability for ${item.name}`} value={draft.availability} onChange={(event) => updatePrice(item.id, supplier.id, { availability: event.target.value as PriceDraft["availability"] })} className={`h-10 min-w-0 flex-1 rounded-lg border px-2 text-xs font-semibold ${draft.availability === "not_available" ? "border-rose-200 bg-rose-50 text-rose-700" : draft.availability === "available" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-600"}`}><option value="unknown">Unknown</option><option value="available">Available</option><option value="not_available">N/A</option></select>{saved || dirtyKeys.has(key) ? <span className={`inline-flex h-10 w-8 shrink-0 items-center justify-center rounded-lg ${dirtyKeys.has(key) ? "bg-amber-100 text-amber-700" : "bg-emerald-50 text-emerald-700"}`} title={dirtyKeys.has(key) ? "Unsaved change" : "Saved"}>{dirtyKeys.has(key) ? <Pencil className="h-3 w-3" /> : <Check className="h-3 w-3" />}</span> : null}</div>
+                </div> : null}
+              </article>
+            })}
+          </div>
+          {!categoryItems.length ? <div className="grid min-h-48 place-items-center p-8 text-center"><div><PackagePlus className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 font-bold">No matching items</p><button type="button" onClick={() => setEditor(emptyEditor(selectedCategory))} className="mt-2 text-sm font-semibold text-[#0066cc]">Add the first item</button></div></div> : null}
+        </section>
+
+        <section className="mt-3 hidden max-w-full overflow-auto overscroll-x-contain rounded-lg border border-slate-300 bg-white shadow-sm md:block" aria-label={`${selectedCategory} supplier pricing matrix`}>
           <table className="border-collapse text-left text-xs" style={{ minWidth: `${460 + Math.max(visibleSuppliers.length, 1) * 172}px` }}>
             <thead className="sticky top-0 z-30 bg-slate-100">
               <tr>

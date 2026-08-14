@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { MATERIAL_CATALOG_CATEGORIES, type CatalogSupplier } from "@/lib/material-catalog"
@@ -37,8 +38,17 @@ function clean(value: unknown, max: number) {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max)
 }
 
-function validCategory(value: string) {
-  return (MATERIAL_CATALOG_CATEGORIES as readonly string[]).includes(value)
+async function validCategory(supabase: SupabaseClient, value: string) {
+  if ((MATERIAL_CATALOG_CATEGORIES as readonly string[]).includes(value)) return true
+  const [{ data: existing }, { data: settings }] = await Promise.all([
+    supabase.from("material_catalog_items").select("id").eq("category", value).limit(1).maybeSingle<{ id: string }>(),
+    supabase
+      .from("workflow_manager_settings")
+      .select("state")
+      .eq("id", "singleton")
+      .maybeSingle<{ state: { addOns?: { categories?: Array<{ label?: string }> } } }>(),
+  ])
+  return Boolean(existing) || (settings?.state?.addOns?.categories ?? []).some((category) => category.label?.trim() === value)
 }
 
 async function managerContext() {
@@ -54,7 +64,7 @@ export async function saveMaterialCatalogItemAction(input: CatalogItemInput): Pr
   const name = clean(input.name, 300)
   const quantity = Number(input.defaultQuantity)
   const unit = clean(input.unit, 40) || "each"
-  if (!validCategory(category)) return { ok: false, error: "Choose a catalog category." }
+  if (!await validCategory(supabase, category)) return { ok: false, error: "Choose a catalog category." }
   if (!itemCode || !name) return { ok: false, error: "Item code and material name are required." }
   if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 100_000_000) return { ok: false, error: "Enter a valid default quantity." }
 

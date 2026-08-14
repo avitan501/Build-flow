@@ -1,12 +1,13 @@
 import { MaterialCatalogWorkspace } from "@/components/buildflow/material-catalog-workspace"
 import { requireManagerPortalProfile } from "@/lib/auth"
-import type { CatalogSupplier, MaterialCatalogItem, MaterialCatalogSupplierPrice } from "@/lib/material-catalog"
+import type { ManagerCatalogAddOns } from "@/lib/manager-add-ons"
+import { materialCatalogDepartmentOptions, type CatalogSupplier, type MaterialCatalogItem, type MaterialCatalogSupplierPrice } from "@/lib/material-catalog"
 
 export default async function ManagerMaterialCatalogPage() {
   const { supabase } = await requireManagerPortalProfile()
   if (!supabase) return null
 
-  const [itemsResult, pricesResult, suppliersResult] = await Promise.all([
+  const [itemsResult, pricesResult, suppliersResult, settingsResult] = await Promise.all([
     supabase
       .from("material_catalog_items")
       .select("id,category,item_code,name,description,default_quantity,unit,image_url,status,source,sort_order,created_at,updated_at")
@@ -19,6 +20,11 @@ export default async function ManagerMaterialCatalogPage() {
       .select("item_id,supplier_id,supplier_name_snapshot,supplier_sku,unit_price,availability,notes,updated_at")
       .returns<MaterialCatalogSupplierPrice[]>(),
     supabase.rpc("staff_load_catalog_suppliers"),
+    supabase
+      .from("workflow_manager_settings")
+      .select("state")
+      .eq("id", "singleton")
+      .maybeSingle<{ state: { addOns?: ManagerCatalogAddOns } }>(),
   ])
 
   if (itemsResult.error || pricesResult.error || suppliersResult.error) {
@@ -26,5 +32,9 @@ export default async function ManagerMaterialCatalogPage() {
   }
 
   const suppliers = Array.isArray(suppliersResult.data) ? suppliersResult.data as CatalogSupplier[] : []
-  return <MaterialCatalogWorkspace initialItems={itemsResult.data ?? []} initialPrices={pricesResult.data ?? []} suppliers={suppliers} />
+  const departments = materialCatalogDepartmentOptions(
+    (itemsResult.data ?? []).map((item) => item.category),
+    (settingsResult.data?.state?.addOns?.categories ?? []).map((category) => category.label),
+  )
+  return <MaterialCatalogWorkspace initialItems={itemsResult.data ?? []} initialPrices={pricesResult.data ?? []} suppliers={suppliers} departments={departments} />
 }

@@ -1,0 +1,56 @@
+import { readFile } from "node:fs/promises"
+import path from "node:path"
+
+import { expect, test } from "@playwright/test"
+
+import {
+  materialCatalogDepartmentOptions,
+  normalizeMaterialCatalogDepartment,
+  supplierCanReceiveDepartmentRequest,
+  supplierServesMaterialDepartment,
+} from "../lib/material-catalog"
+
+const root = process.cwd()
+
+test("material departments normalize old request labels and include Others", () => {
+  expect(normalizeMaterialCatalogDepartment("Sheet rock")).toBe("Sheet Rock")
+  expect(normalizeMaterialCatalogDepartment("Door and molding")).toBe("Door & Molding")
+  expect(normalizeMaterialCatalogDepartment("Wood Floor")).toBe("Flooring")
+  expect(normalizeMaterialCatalogDepartment("Unassigned")).toBe("Others")
+  expect(materialCatalogDepartmentOptions(["Custom Millwork"])).toContain("Others")
+  expect(materialCatalogDepartmentOptions(["Custom Millwork"])).toContain("Custom Millwork")
+})
+
+test("supplier routing requires category, email, and an approved trust level", () => {
+  const trialSupplier = {
+    catalogDepartments: ["Framing", "Sheet Rock"],
+    email: "quotes@example.com",
+    trustLevel: "first-time" as const,
+  }
+  expect(supplierServesMaterialDepartment(trialSupplier, "Sheet rock")).toBe(true)
+  expect(supplierCanReceiveDepartmentRequest(trialSupplier, "Framing")).toBe(true)
+  expect(supplierCanReceiveDepartmentRequest({ ...trialSupplier, trustLevel: "not-reviewed" }, "Framing")).toBe(false)
+  expect(supplierCanReceiveDepartmentRequest({ ...trialSupplier, trustLevel: "do-not-use" }, "Framing")).toBe(false)
+  expect(supplierCanReceiveDepartmentRequest({ ...trialSupplier, email: "" }, "Framing")).toBe(false)
+  expect(supplierCanReceiveDepartmentRequest(trialSupplier, "Electrical")).toBe(false)
+})
+
+test("supplier categories and routing filters are enforced in the manager UI and server draft", async () => {
+  const [directory, requestPanel, supplierDraftPage, catalog] = await Promise.all([
+    readFile(path.join(root, "components/buildflow/supplier-routing-manager.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8"),
+    readFile(path.join(root, "app/owner/materials/requests/[requestId]/supplier-request/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8"),
+  ])
+
+  expect(directory).toContain("Categories supplied")
+  expect(directory).toContain("catalogDepartments")
+  expect(requestPanel).toContain("supplierCanReceiveDepartmentRequest")
+  expect(requestPanel).toContain("Choose a department first.")
+  expect(supplierDraftPage).toContain("supplierCanReceiveDepartmentRequest")
+  expect(supplierDraftPage).toContain("requestDepartments.has(department)")
+  expect(catalog).toContain("supplierServesMaterialDepartment")
+  expect(catalog).toContain("Previous supplier")
+  expect(catalog).toContain("Next supplier")
+  expect(catalog).toContain("md:hidden")
+})

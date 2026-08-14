@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 
 import { SupplierRequestDraft } from "@/components/buildflow/supplier-request-draft"
+import { normalizeMaterialCatalogDepartment, supplierCanReceiveDepartmentRequest } from "@/lib/material-catalog"
 import { requireOwnerAccess } from "@/lib/owner-access"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 
@@ -26,7 +27,7 @@ export default async function SupplierRequestDraftPage({
   searchParams,
 }: {
   params: Promise<{ requestId: string }>
-  searchParams: Promise<{ department?: string; supplier?: string | string[] }>
+  searchParams: Promise<{ department?: string | string[]; supplier?: string | string[] }>
 }) {
   const [{ requestId }, query] = await Promise.all([params, searchParams])
   const supplierIds = [...new Set((Array.isArray(query.supplier) ? query.supplier : [query.supplier]).filter((value): value is string => Boolean(value)).map((value) => value.trim()).filter(Boolean))]
@@ -40,10 +41,13 @@ export default async function SupplierRequestDraftPage({
   ])
   if (!request) notFound()
 
-  const department = query.department?.trim() || "All departments"
-  const matchingItems = department === "All departments" ? (items ?? []) : (items ?? []).filter((item) => item.department === department)
+  const departmentValue = Array.isArray(query.department) ? query.department[0] : query.department
+  const department = normalizeMaterialCatalogDepartment(departmentValue)
+  const requestDepartments = new Set((items ?? []).map((item) => normalizeMaterialCatalogDepartment(item.department)))
+  if (!departmentValue?.trim() || !requestDepartments.has(department)) redirect(`/owner/materials/requests/${requestId}`)
+  const matchingItems = (items ?? []).filter((item) => normalizeMaterialCatalogDepartment(item.department) === department)
   const selectedSuppliers = (managerSettings?.state?.qualificationSettings?.suppliers ?? [])
-    .filter((supplier) => supplierIds.includes(supplier.id) && supplier.email?.trim())
+    .filter((supplier) => supplierIds.includes(supplier.id) && supplierCanReceiveDepartmentRequest(supplier, department))
     .map((supplier) => ({ id: supplier.id, name: supplier.name, email: supplier.email!.trim() }))
   if (!selectedSuppliers.length) redirect(`/owner/materials/requests/${requestId}`)
 

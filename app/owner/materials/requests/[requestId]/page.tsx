@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status"
 import { RequestManagementPanel } from "@/components/buildflow/request-management-panel"
+import { normalizeMaterialCatalogDepartment } from "@/lib/material-catalog"
 import type { MaterialQuestionnaireResponse, MaterialRequestAnswer } from "@/lib/material-questionnaires"
 import { requireOwnerAccess } from "@/lib/owner-access"
 import { quoteRequestStatusLabel, type QuoteRequestStatus } from "@/lib/quote-requests"
@@ -44,8 +45,8 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
   const signedFiles = await Promise.all((attachments ?? []).map(async (file) => ({ ...file, url: (await supabase.storage.from("project-uploads").createSignedUrl(file.file_path, 1800)).data?.signedUrl ?? null })))
   const generalFiles = signedFiles.filter((file) => !file.material_response_id)
   const suppliers = managerSettings?.state?.qualificationSettings?.suppliers ?? []
-  const departments = Array.from(new Set((items ?? []).map((item) => item.department).filter(Boolean)))
-  if (!departments.length) departments.push("General request")
+  const departments = Array.from(new Set((items ?? []).map((item) => normalizeMaterialCatalogDepartment(item.department))))
+  if (!departments.length) departments.push("Others")
   const projectLabel = request.projects?.name === "Material Requests" ? request.projects.address : request.projects?.name
 
   return (

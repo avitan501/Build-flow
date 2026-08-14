@@ -22,6 +22,7 @@ import {
   writeManagerAddOns,
   type ManagerCatalogAddOns,
 } from "@/lib/manager-add-ons"
+import { materialCatalogDepartmentOptions } from "@/lib/material-catalog"
 import {
   DEFAULT_PLAN_UPLOAD_QUESTIONS,
   DEFAULT_SERVICE_QUESTIONS,
@@ -59,6 +60,7 @@ type SupplierRoutingManagerProps = {
   initialAddOns?: ManagerCatalogAddOns | null
   initialPanel?: ManagerPanel
   supplierDirectoryOnly?: boolean
+  catalogDepartments?: string[]
 }
 
 const questionTypes: QualifyingQuestionType[] = ["text", "textarea", "select"]
@@ -171,6 +173,7 @@ export function SupplierRoutingManager({
   initialAddOns = null,
   initialPanel = "departments",
   supplierDirectoryOnly = false,
+  catalogDepartments = [],
 }: SupplierRoutingManagerProps) {
   const [settings, setSettings] = useState<ShopQualificationSettings>(() => loadSettings(initialSettings))
   const [deletedSupplierIds, setDeletedSupplierIds] = useState<string[]>(initialDeletedSupplierIds)
@@ -221,6 +224,7 @@ export function SupplierRoutingManager({
     deliveryNotes: "",
     notes: "",
     trustLevel: "not-reviewed" as SupplierTrustLevel,
+    catalogDepartments: [] as string[],
   })
   const [questionLabel, setQuestionLabel] = useState("")
   const [questionType, setQuestionType] = useState<QualifyingQuestionType>("text")
@@ -288,6 +292,10 @@ export function SupplierRoutingManager({
     })
   }, [deletedSupplierIdSet, trialDepartment, trialSearch])
   const shopDepartments = useMemo(() => applyDepartmentAddOns(SHOP_TOOL_CATEGORIES, addOns), [addOns])
+  const catalogDepartmentOptions = useMemo(
+    () => materialCatalogDepartmentOptions(catalogDepartments, addOns.categories.map((category) => category.label)),
+    [addOns.categories, catalogDepartments],
+  )
   const selectedSupplierDepartments = useMemo(() => shopDepartments.filter((department) => {
     const explicit = settings.products[departmentRouteId(department.slug)]
     if (explicit) return explicit.supplierId === selectedSupplier?.id
@@ -432,6 +440,7 @@ export function SupplierRoutingManager({
       deliveryNotes: supplierDraft.deliveryNotes.trim(),
       notes: supplierDraft.notes.trim(),
       trustLevel: supplierDraft.trustLevel,
+      catalogDepartments: supplierDraft.catalogDepartments,
     }
 
     setSupplierFormError("")
@@ -451,7 +460,7 @@ export function SupplierRoutingManager({
         setActivePanel("suppliers")
         setSupplierDirty(false)
         setDirectorySaveState("saved")
-        setSupplierDraft({ name: "", contactName: "", email: "", phone: "", whatsapp: "", portalUrl: "", preferredDeliveryMethod: "manual", deliveryNotes: "", notes: "", trustLevel: "not-reviewed" })
+        setSupplierDraft({ name: "", contactName: "", email: "", phone: "", whatsapp: "", portalUrl: "", preferredDeliveryMethod: "manual", deliveryNotes: "", notes: "", trustLevel: "not-reviewed", catalogDepartments: [] })
         setSupplierDraftNotesOpen(false)
         setSupplierAddOpen(false)
       } catch {
@@ -1240,7 +1249,7 @@ export function SupplierRoutingManager({
                     >
                       <span className="block text-sm font-semibold">{supplier.name}</span>
                       <span className={`mt-1 block text-xs ${supplier.id === selectedSupplier?.id ? "text-slate-300" : "text-slate-500"}`}>{methodLabel(supplier.preferredDeliveryMethod)} · {supplierReachLine(supplier)}</span>
-                      <span className={`mt-1 block text-[11px] font-semibold ${supplier.id === selectedSupplier?.id ? "text-sky-200" : "text-sky-700"}`}>{trustLevelLabel(supplier.trustLevel)}</span>
+                      <span className={`mt-1 block text-[11px] font-semibold ${supplier.id === selectedSupplier?.id ? "text-sky-200" : "text-sky-700"}`}>{trustLevelLabel(supplier.trustLevel)} · {supplier.catalogDepartments?.length ?? 0} categor{supplier.catalogDepartments?.length === 1 ? "y" : "ies"}</span>
                     </button>
                   ))}
                   <button
@@ -1346,6 +1355,16 @@ export function SupplierRoutingManager({
                           {trustLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
                         </select>
                       </label>
+                      <fieldset className="sm:col-span-2">
+                        <legend className="text-sm font-semibold text-slate-900">Categories supplied</legend>
+                        <p className="mt-1 text-xs text-slate-500">Requests and catalog pricing use these categories to find this supplier.</p>
+                        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                          {catalogDepartmentOptions.map((department) => {
+                            const checked = selectedSupplier.catalogDepartments?.includes(department) ?? false
+                            return <label key={department} className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${checked ? "border-sky-300 bg-sky-50 text-slate-950" : "border-slate-200 bg-white text-slate-600"}`}><input type="checkbox" checked={checked} onChange={(event) => updateSupplier(selectedSupplier.id, { catalogDepartments: event.target.checked ? [...new Set([...(selectedSupplier.catalogDepartments ?? []), department])] : (selectedSupplier.catalogDepartments ?? []).filter((entry) => entry !== department) })} className="h-4 w-4 accent-[#0071e3]" />{department}</label>
+                          })}
+                        </div>
+                      </fieldset>
                       <label className="grid gap-1 text-sm font-semibold text-slate-900 sm:col-span-2">
                         Delivery instructions
                         <textarea value={selectedSupplier.deliveryNotes || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { deliveryNotes: event.target.value })} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
@@ -1383,7 +1402,7 @@ export function SupplierRoutingManager({
                     {supplierFormError ? <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{supplierFormError}</p> : null}
 
                     <details className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                      <summary className="cursor-pointer text-sm font-bold text-slate-950">Department routing · {selectedSupplierDepartments.length} assigned</summary>
+                      <summary className="cursor-pointer text-sm font-bold text-slate-950">Automatic service routing · {selectedSupplierDepartments.length} assigned</summary>
                       <div className="flex flex-wrap items-end justify-between gap-3">
                       </div>
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -1499,6 +1518,16 @@ export function SupplierRoutingManager({
                       <label className="grid gap-2 text-sm font-semibold text-slate-900">WhatsApp <input inputMode="tel" value={supplierDraft.whatsapp} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, whatsapp: event.target.value }))} placeholder="WhatsApp number" className="min-h-12 rounded-xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
                       <label className="grid gap-2 text-sm font-semibold text-slate-900">Best way to contact <select value={supplierDraft.preferredDeliveryMethod} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, preferredDeliveryMethod: event.target.value as SupplierDeliveryMethod }))} className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium">{deliveryMethods.map((method) => <option key={method} value={method}>{methodLabel(method)}</option>)}</select></label>
                       <label className="grid gap-2 text-sm font-semibold text-slate-900">Trust level <select value={supplierDraft.trustLevel} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, trustLevel: event.target.value as SupplierTrustLevel }))} className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium">{trustLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}</select></label>
+                      <fieldset className="sm:col-span-2">
+                        <legend className="text-sm font-semibold text-slate-900">Categories supplied</legend>
+                        <p className="mt-1 text-xs font-normal text-slate-500">Choose every material department this supplier can quote.</p>
+                        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                          {catalogDepartmentOptions.map((department) => {
+                            const checked = supplierDraft.catalogDepartments.includes(department)
+                            return <label key={department} className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${checked ? "border-sky-300 bg-sky-50 text-slate-950" : "border-slate-200 bg-white text-slate-600"}`}><input type="checkbox" checked={checked} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, catalogDepartments: event.target.checked ? [...draft.catalogDepartments, department] : draft.catalogDepartments.filter((entry) => entry !== department) }))} className="h-4 w-4 accent-[#0071e3]" />{department}</label>
+                          })}
+                        </div>
+                      </fieldset>
                       <label className="grid gap-2 text-sm font-semibold text-slate-900 sm:col-span-2">Supplier portal URL <span className="text-xs font-normal text-slate-500">Optional</span><input type="url" value={supplierDraft.portalUrl} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, portalUrl: event.target.value }))} placeholder="https://" className="min-h-12 rounded-xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
                       <label className="grid gap-2 text-sm font-semibold text-slate-900 sm:col-span-2">Delivery or contact instructions <span className="text-xs font-normal text-slate-500">Optional</span><textarea value={supplierDraft.deliveryNotes} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, deliveryNotes: event.target.value }))} rows={3} placeholder="Best hours, quote process, delivery area, or other instructions" className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
                       <div className="sm:col-span-2">
