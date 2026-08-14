@@ -22,6 +22,8 @@ test("direct checkout removes project selection and preserves manager request de
   expect(ownerDetail).toContain("Request breakdown")
   expect(ownerDetail).toContain("request_details")
   expect(ownerDetail).toContain("answer_display_snapshot")
+  expect(ownerDetail).toContain("const { supabase } = await requireOwnerAccess()")
+  expect(ownerDetail).not.toContain("createAdminClient")
 })
 
 test("manager can create a structured request on behalf of a client", async () => {
@@ -41,6 +43,8 @@ test("manager can create a structured request on behalf of a client", async () =
   expect(component).toContain('value="new"')
   expect(component).toContain("No department")
   expect(component).toContain('fetch("/api/admin/client-requests"')
+  expect(component).toContain('/owner/materials/requests?created=')
+  expect(component).not.toContain('window.location.assign(`/owner/materials/requests/${result.requestId}`)')
   expect(component).toContain("window.location.assign")
   expect(component).toContain("Add item")
   expect(component).toContain("grid place-items-center")
@@ -60,6 +64,7 @@ test("manager can create a structured request on behalf of a client", async () =
   expect(apiRoute).toContain("No order was submitted")
   expect(customerPage.match(/<ManagerCreateClientRequest/g)).toHaveLength(1)
   expect(inboxPage).toContain("ManagerCreateClientRequest")
+  expect(inboxPage).toContain("Client request created successfully")
 })
 
 test("manager request endpoint rejects unsafe or invalid submissions before database access", async ({ request }) => {

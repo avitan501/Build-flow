@@ -73,7 +73,7 @@ export function ManagerCreateClientRequest({
         return
       }
       setOpen(false)
-      window.location.assign(`/owner/materials/requests/${result.requestId}`)
+      window.location.assign(`/owner/materials/requests?created=${encodeURIComponent(result.requestId)}`)
     })
   }
 

@@ -7,7 +7,6 @@ import type { MaterialQuestionnaireResponse, MaterialRequestAnswer } from "@/lib
 import { requireOwnerAccess } from "@/lib/owner-access"
 import { quoteRequestStatusLabel, type QuoteRequestStatus } from "@/lib/quote-requests"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
-import { createAdminClient } from "@/lib/supabase/admin"
 
 type RequestDetails = { id: string; project_id: string; owner_id: string; title: string; status: QuoteRequestStatus; created_at: string; submitted_at: string | null; projects: { name: string; address: string | null } | null }
 type Attachment = { id: string; material_response_id: string | null; file_name: string; file_path: string; file_type: string | null }
@@ -21,8 +20,7 @@ function legacyAnswers(value: unknown): LegacyAnswer[] {
 
 export default async function OwnerMaterialRequestPage({ params }: { params: Promise<{ requestId: string }> }) {
   const { requestId } = await params
-  await requireOwnerAccess()
-  const supabase = createAdminClient()
+  const { supabase } = await requireOwnerAccess()
   const [{ data: request, error: requestError }, { data: responses }, { data: attachments }, { data: items }, { data: managerSettings }, { data: packages }, { data: clientActionEvents }] = await Promise.all([
     supabase.from("quote_requests").select("id,project_id,owner_id,title,status,created_at,submitted_at,projects(name,address)").eq("id", requestId).maybeSingle<RequestDetails>(),
     supabase.from("material_questionnaire_responses").select("id, request_id, project_id, owner_id, category_id, category_name_snapshot, category_slug_snapshot, definition_version, definition_snapshot, status, completed_at, created_at, updated_at").eq("request_id", requestId).order("created_at").returns<MaterialQuestionnaireResponse[]>(),
