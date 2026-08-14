@@ -238,7 +238,7 @@ export default function SignupPage() {
                 value={form.phone}
                 onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100"
-                placeholder="347 567 5077"
+                placeholder="Phone number"
               />
             </label>
 
@@ -287,7 +287,6 @@ export default function SignupPage() {
 
           {googleEnabled ? (
           <div className="mt-5 border-t border-slate-200 pt-5">
-            <p className="mb-3 text-center text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Fastest way to create an account</p>
             <button
               type="button"
               onClick={handleGoogleSignIn}
@@ -295,9 +294,8 @@ export default function SignupPage() {
               className="flex min-h-14 w-full items-center justify-center gap-3 rounded-full border-2 border-slate-200 bg-white px-5 text-base font-semibold text-slate-800 shadow-sm transition hover:border-sky-200 hover:bg-sky-50/50 disabled:cursor-not-allowed disabled:opacity-70"
             >
               <GoogleSignInIcon className="h-6 w-6 shrink-0" />
-              <span>{isSubmitting ? "Opening Google..." : "Continue with Google (Gmail)"}</span>
+              <span>{isSubmitting ? "Opening Google..." : "Continue with Google"}</span>
             </button>
-            <p className="mt-2 text-center text-xs text-slate-500">Use your existing Gmail account. No new password needed.</p>
           </div>
           ) : null}
 

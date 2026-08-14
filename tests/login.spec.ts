@@ -36,7 +36,7 @@ test("the email login field accepts a phone-password account", async ({ page }) 
   await page.goto("/login")
   await expect(page.getByTestId("login-form")).toHaveAttribute("data-hydrated", "true")
   await page.getByPlaceholder("Email or phone number").fill("3475675077")
-  await page.getByPlaceholder("Enter your password").first().fill("test-password")
+  await page.getByPlaceholder("Password").fill("test-password")
   await page.getByRole("button", { name: "Log in", exact: true }).click()
 
   await expect(page.getByText("Invalid login credentials")).toBeVisible()
@@ -68,8 +68,42 @@ test("login clearly shows Google Gmail authentication when enabled", async ({ pa
 
   await page.goto("/login")
 
-  const googleButton = page.getByRole("button", { name: "Continue with Google (Gmail)" })
+  const googleButton = page.getByRole("button", { name: "Continue with Google" })
   await expect(googleButton).toBeVisible()
   await expect(googleButton.locator("svg")).toBeVisible()
-  await expect(page.getByText("Use your existing Gmail account. No new password needed.")).toBeVisible()
+  await expect(page.getByText("Fastest way to log in")).toHaveCount(0)
+  await expect(page.getByText("Use your existing Gmail account. No new password needed.")).toHaveCount(0)
+  await expect(page.getByText("Your session stays active", { exact: false })).toHaveCount(0)
+  await expect(page.getByText("347 567 5077")).toHaveCount(0)
+})
+
+test("phone-only signup sends a normalized number without exposing a personal example", async ({ page }) => {
+  await configureTestAuth(page)
+  let signupPayload: { fullName?: string; phone?: string; password?: string } = {}
+
+  await page.route("**/api/auth/phone-password/signup", async (route) => {
+    signupPayload = route.request().postDataJSON() as typeof signupPayload
+    await route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Test signup response." }),
+    })
+  })
+
+  await page.goto("/signup?mode=phone")
+  await expect(page.getByText("347 567 5077")).toHaveCount(0)
+  await page.getByPlaceholder("John Builder").fill("Test Builder")
+  await page.getByPlaceholder("Phone number").fill("516-555-0123")
+  await page.getByPlaceholder("Create a password").fill("test-password")
+  const signupRequest = page.waitForRequest((request) =>
+    request.url().includes("/api/auth/phone-password/signup") && request.method() === "POST",
+  )
+  await page.getByRole("button", { name: "Create account", exact: true }).click()
+  await signupRequest
+
+  expect(signupPayload).toEqual({
+    fullName: "Test Builder",
+    phone: "+15165550123",
+    password: "test-password",
+  })
 })
