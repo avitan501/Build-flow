@@ -1,6 +1,8 @@
 import { BarChart3, Eye, Monitor, Smartphone, Users } from "lucide-react"
 
+import { TrafficInternalFilterStatus } from "@/components/buildflow/traffic-internal-filter-status"
 import { requireAdminProfile } from "@/lib/auth"
+import { FILTERED_TRAFFIC_START } from "@/lib/site-traffic"
 
 type TrafficRow = { path: string; referrer_host: string | null; session_hash: string; device_class: "mobile" | "desktop"; created_at: string }
 
@@ -18,8 +20,9 @@ function pageLabel(path: string) {
 export default async function WebsiteTrafficPage() {
   const { supabase } = await requireAdminProfile()
   const now = new Date()
-  const start = new Date(now)
-  start.setUTCDate(start.getUTCDate() - 30)
+  const thirtyDaysAgo = new Date(now)
+  thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 30)
+  const start = new Date(Math.max(thirtyDaysAgo.getTime(), new Date(FILTERED_TRAFFIC_START).getTime()))
   let rows: TrafficRow[] = []
   let loadError = false
   try {
@@ -62,7 +65,8 @@ export default async function WebsiteTrafficPage() {
       <div className="mx-auto max-w-7xl">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager Portal</p>
         <h1 className="mt-2 text-3xl font-bold text-slate-950">Website Traffic</h1>
-        <p className="mt-2 text-sm text-slate-600">Customer website activity from the last 30 days. Manager pages are excluded.</p>
+        <p className="mt-2 text-sm text-slate-600">External customer activity since internal filtering was enabled. Owner, employee, test, and automated visits are excluded.</p>
+        <TrafficInternalFilterStatus />
         {loadError ? <p className="mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">Traffic data is temporarily unavailable. The rest of the manager portal is still working.</p> : latestView ? <p className="mt-4 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">Tracking active · Last view {latestView}</p> : <p className="mt-4 inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">Tracking active · Waiting for the first visit</p>}
 
         <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">

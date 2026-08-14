@@ -25,10 +25,11 @@ test("direct checkout removes project selection and preserves manager request de
 })
 
 test("manager can create a structured request on behalf of a client", async () => {
-  const [component, actions, apiRoute, customerPage, inboxPage] = await Promise.all([
+  const [component, actions, apiRoute, requestMigration, customerPage, inboxPage] = await Promise.all([
     readFile(path.join(root, "components/buildflow/manager-create-client-request.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/users/actions.ts"), "utf8"),
     readFile(path.join(root, "app/api/admin/client-requests/route.ts"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260814024500_create_client_request_atomically.sql"), "utf8"),
     readFile(path.join(root, "app/admin/users/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/page.tsx"), "utf8"),
   ])
@@ -45,10 +46,15 @@ test("manager can create a structured request on behalf of a client", async () =
   expect(component).toContain("grid place-items-center")
   expect(actions).toContain("createRequestForClientAction")
   expect(actions).toContain('requireStaffProfile("customers")')
-  expect(actions).toContain('created_by_manager: true')
-  expect(actions).toContain('status: "submitted"')
+  expect(actions).toContain('supabase.rpc("staff_create_client_request"')
   expect(actions).toContain('const storedDepartment = department || "Unassigned"')
   expect(actions).toContain("admin.auth.admin.createUser")
+  expect(requestMigration).toContain("create or replace function public.staff_create_client_request")
+  expect(requestMigration).toContain("jsonb_array_length(p_lines) > 50")
+  expect(requestMigration).toContain("'created_by_manager', true")
+  expect(requestMigration).toContain("'submitted', now()")
+  expect(requestMigration).toContain("private.has_staff_capability('customers')")
+  expect(requestMigration).toContain("revoke all on function public.staff_create_client_request")
   expect(apiRoute).toContain("createRequestForClientAction")
   expect(apiRoute).toContain("sameOrigin")
   expect(apiRoute).toContain("No order was submitted")

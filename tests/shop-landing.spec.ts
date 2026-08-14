@@ -186,9 +186,13 @@ test("traffic endpoint accepts same-site events and blocks cross-site submission
 })
 
 test("traffic dashboard exposes live status to the owner only", async () => {
-  const [trafficPage, navigation, trafficFunctionMigration, trafficRlsMigration] = await Promise.all([
+  const [trafficPage, navigation, tracker, layout, trafficApi, filterStatus, trafficFunctionMigration, trafficRlsMigration] = await Promise.all([
     readFile(path.join(process.cwd(), "app/admin/traffic/page.tsx"), "utf8"),
     readFile(path.join(process.cwd(), "components/buildflow/admin-shell.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "components/buildflow/traffic-tracker.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "app/layout.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "app/api/site-traffic/route.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "components/buildflow/traffic-internal-filter-status.tsx"), "utf8"),
     readFile(path.join(process.cwd(), "supabase/migrations/20260814022000_add_owner_site_traffic_reader.sql"), "utf8"),
     readFile(path.join(process.cwd(), "supabase/migrations/20260814023000_use_owner_rls_for_site_traffic.sql"), "utf8"),
   ])
@@ -198,8 +202,15 @@ test("traffic dashboard exposes live status to the owner only", async () => {
   expect(trafficPage).not.toContain("createAdminClient")
   expect(trafficPage).not.toContain("owner_read_site_traffic")
   expect(trafficPage).toContain("Tracking active")
+  expect(trafficPage).toContain("FILTERED_TRAFFIC_START")
+  expect(trafficPage).toContain("Owner, employee, test, and automated visits are excluded")
   expect(trafficPage).not.toContain("requireManagerPortalProfile")
   expect(navigation).not.toContain('link.href === "/admin/traffic" ||')
+  expect(tracker).toContain("navigator.webdriver")
+  expect(tracker).toContain("TRAFFIC_EXCLUSION_KEY")
+  expect(layout).toContain("<TrafficTracker disabled={isAdmin} />")
+  expect(trafficApi).toContain("playwright|headless|codex")
+  expect(filterStatus).toContain('localStorage.setItem(TRAFFIC_EXCLUSION_KEY, "1")')
   expect(trafficFunctionMigration).toContain("lower(trim(profile.email)) = 'avitanneto@gmail.com'")
   expect(trafficRlsMigration).toContain("drop function if exists public.owner_read_site_traffic")
   expect(trafficRlsMigration).toContain("site_page_views_owner_read")

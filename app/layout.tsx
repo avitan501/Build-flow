@@ -101,7 +101,7 @@ export default async function RootLayout({
           </Script>
         ) : null}
         <AvantiaBuildClientShell>
-          <TrafficTracker />
+          <TrafficTracker disabled={isAdmin} />
           <WorkflowSettingsHydrator state={publicStateRow?.state ?? null} />
           <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isOwner={managerAccess.owner} managerHref={managerHref} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />
           {children}

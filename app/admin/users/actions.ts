@@ -230,8 +230,7 @@ export async function createRequestForClientAction(input: {
   lines: ManagerRequestLineInput[];
   notes?: string;
 }): Promise<CreateClientRequestResult> {
-  const { user, profile } = await requireStaffProfile("customers");
-  const admin = createAdminClient();
+  const { supabase } = await requireStaffProfile("customers");
   let customerId = input.customerId?.trim() || "";
 
   if (input.newClient) {
@@ -242,7 +241,7 @@ export async function createRequestForClientAction(input: {
     if (fullName.length < 2) return { ok: false, error: "Enter the new client's name." };
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid client email address." };
 
-    const { data: existingClient, error: existingClientError } = await admin
+    const { data: existingClient, error: existingClientError } = await supabase
       .from("profiles")
       .select("id,role,is_active")
       .ilike("email", email)
@@ -254,6 +253,12 @@ export async function createRequestForClientAction(input: {
       if (!existingClient.is_active) return { ok: false, error: "That client account is inactive." };
       customerId = existingClient.id;
     } else {
+      let admin: ReturnType<typeof createAdminClient>;
+      try {
+        admin = createAdminClient();
+      } catch {
+        return { ok: false, error: "Add the new client from the customer directory first, then create the request." };
+      }
       const { data: authData, error: authError } = await admin.auth.admin.createUser({
         email,
         password: `${randomUUID()}Aa1!`,
@@ -298,82 +303,26 @@ export async function createRequestForClientAction(input: {
   }
 
   const notes = input.notes?.trim().slice(0, 4000) || "";
-  const { data: customer, error: customerError } = await admin
-    .from("profiles")
-    .select("id,role,is_active")
-    .eq("id", customerId)
-    .maybeSingle<{ id: string; role: string; is_active: boolean }>();
-  if (customerError || !customer || customer.role !== "client") return { ok: false, error: "This customer account is not available." };
-  if (!customer.is_active) return { ok: false, error: "This customer account is inactive." };
-
-  const { data: existingProject, error: projectLookupError } = await admin
-    .from("projects")
-    .select("id")
-    .eq("owner_id", customerId)
-    .eq("name", "Material Requests")
-    .neq("status", "archived")
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle<{ id: string }>();
-  if (projectLookupError) return { ok: false, error: "Could not prepare the customer request workspace." };
-
-  let projectId = existingProject?.id || "";
-  if (!projectId) {
-    const { data: project, error: projectError } = await admin
-      .from("projects")
-      .insert({ owner_id: customerId, name: "Material Requests", status: "active" })
-      .select("id")
-      .single<{ id: string }>();
-    if (projectError || !project) return { ok: false, error: "Could not prepare the customer request workspace." };
-    projectId = project.id;
-  }
-
   const requestTitle = input.title?.trim().slice(0, 180) || (department ? `${department} request` : "Material request");
-  const now = new Date().toISOString();
-  const { data: request, error: requestError } = await admin
-    .from("quote_requests")
-    .insert({ project_id: projectId, owner_id: customerId, title: requestTitle, status: "submitted", submitted_at: now })
-    .select("id")
-    .single<{ id: string }>();
-  if (requestError || !request) return { ok: false, error: "Could not create the client request." };
-
-  const { error: itemError } = await admin.from("quote_request_items").insert(lines.map((line, index) => ({
-    request_id: request.id,
-    project_id: projectId,
-    owner_id: customerId,
-    catalog_item_id: null,
-    name: line.name,
-    department: storedDepartment,
-    item_type: "custom_priced",
-    quantity: line.quantity,
-    unit: line.unit,
-    unit_price: 0,
-    qualification_status: "not_required",
-    metadata: {
-      created_by_manager: true,
-      created_by: user.id,
-      ...(index === 0 && notes ? { request_details: notes } : {}),
-    },
-  })));
-  if (itemError) {
-    await admin.from("quote_requests").delete().eq("id", request.id);
-    return { ok: false, error: "Could not save the material breakdown. No request was created." };
-  }
-
-  await admin.from("project_events").insert({
-    project_id: projectId,
-    owner_id: customerId,
-    event_type: "material_added",
-    source: "admin",
-    title: `${requestTitle} created by manager`,
-    description: `Created on behalf of the client by ${profile?.full_name || user.email || "a staff member"}.`,
-    metadata: { quote_request_id: request.id, created_by_manager: user.id },
+  const { data: requestId, error: requestError } = await supabase.rpc("staff_create_client_request", {
+    p_customer_id: customerId,
+    p_department: storedDepartment,
+    p_title: requestTitle,
+    p_lines: lines,
+    p_notes: notes,
   });
+  if (requestError || !validUuid(String(requestId || ""))) {
+    const message = requestError?.message || "";
+    if (message.includes("client_inactive")) return { ok: false, error: "This customer account is inactive." };
+    if (message.includes("client_not_available")) return { ok: false, error: "This customer account is not available." };
+    if (message.includes("invalid_material")) return { ok: false, error: "Check every material name, quantity, and unit." };
+    return { ok: false, error: "The request could not be saved. No order was submitted." };
+  }
 
   revalidatePath("/admin/users");
   revalidatePath("/owner/materials/requests");
-  revalidatePath(`/owner/materials/requests/${request.id}`);
-  return { ok: true, requestId: request.id, customerId };
+  revalidatePath(`/owner/materials/requests/${requestId}`);
+  return { ok: true, requestId: String(requestId), customerId };
 }
 
 export async function deleteOpenRequestAction(requestId: string): Promise<DeleteManagerRecordResult> {

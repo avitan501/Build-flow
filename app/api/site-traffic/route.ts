@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       return new NextResponse(null, { status: 403 })
     }
   }
-  if (/bot|crawler|spider|preview/i.test(request.headers.get("user-agent") || "")) return new NextResponse(null, { status: 204 })
+  if (/bot|crawler|spider|preview|playwright|headless|codex/i.test(request.headers.get("user-agent") || "")) return new NextResponse(null, { status: 204 })
   if (!hasSupabaseBuildEnv()) return new NextResponse(null, { status: 204 })
 
   try {
