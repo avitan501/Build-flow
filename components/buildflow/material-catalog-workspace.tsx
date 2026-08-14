@@ -97,6 +97,7 @@ export function MaterialCatalogWorkspace({
   const [catalogSupplierSearch, setCatalogSupplierSearch] = useState("")
   const [mobileSupplierId, setMobileSupplierId] = useState("")
   const [catalogSupplierOpen, setCatalogSupplierOpen] = useState(false)
+  const [catalogSupplierDepartment, setCatalogSupplierDepartment] = useState(initialItems[0]?.category || MATERIAL_CATALOG_CATEGORIES[0])
   const [catalogSupplierDraftIds, setCatalogSupplierDraftIds] = useState<string[]>([])
   const [catalogSupplierIds, setCatalogSupplierIds] = useState<Record<string, string[]>>(() => initialCatalogSupplierIds(suppliers))
   const [showInactive, setShowInactive] = useState(false)
@@ -122,6 +123,9 @@ export function MaterialCatalogWorkspace({
   const eligibleCatalogSupplierPool = useMemo(() => suppliers.filter((supplier) => (
     hasRoutableSupplierTrust(supplier.trustLevel) && supplierServesMaterialDepartment(supplier, selectedCategory)
   )), [selectedCategory, suppliers])
+  const departmentSupplierPool = useMemo(() => suppliers.filter((supplier) => (
+    hasRoutableSupplierTrust(supplier.trustLevel) && supplierServesMaterialDepartment(supplier, catalogSupplierDepartment)
+  )), [catalogSupplierDepartment, suppliers])
   const visibleSuppliers = useMemo(() => {
     const needle = supplierSearch.trim().toLowerCase()
     return eligibleCatalogSupplierPool.filter((supplier) => {
@@ -132,11 +136,17 @@ export function MaterialCatalogWorkspace({
   }, [catalogSupplierIds, eligibleCatalogSupplierPool, selectedCategory, supplierSearch])
   const eligibleCatalogSuppliers = useMemo(() => {
     const needle = catalogSupplierSearch.trim().toLowerCase()
-    return eligibleCatalogSupplierPool.filter((supplier) => {
+    return departmentSupplierPool.filter((supplier) => {
       const materials = Array.isArray(supplier.materials) ? supplier.materials.join(" ") : supplier.materials ?? ""
       return !needle || `${supplier.name} ${supplier.email ?? ""} ${supplier.phone ?? ""} ${materials}`.toLowerCase().includes(needle)
     })
-  }, [catalogSupplierSearch, eligibleCatalogSupplierPool])
+  }, [catalogSupplierSearch, departmentSupplierPool])
+  const savedCatalogSupplierIds = useMemo(() => (
+    (catalogSupplierIds[catalogSupplierDepartment] ?? []).filter((id) => departmentSupplierPool.some((supplier) => supplier.id === id))
+  ), [catalogSupplierDepartment, catalogSupplierIds, departmentSupplierPool])
+  const catalogSupplierSelectionChanged = useMemo(() => (
+    [...catalogSupplierDraftIds].sort().join("|") !== [...savedCatalogSupplierIds].sort().join("|")
+  ), [catalogSupplierDraftIds, savedCatalogSupplierIds])
   const mobileSupplier = visibleSuppliers.find((supplier) => supplier.id === mobileSupplierId) ?? visibleSuppliers[0] ?? null
 
   function moveMobileSupplier(direction: -1 | 1) {
@@ -152,6 +162,7 @@ export function MaterialCatalogWorkspace({
       return
     }
     const eligibleIds = new Set(eligibleCatalogSupplierPool.map((supplier) => supplier.id))
+    setCatalogSupplierDepartment(selectedCategory)
     setCatalogSupplierDraftIds((catalogSupplierIds[selectedCategory] ?? []).filter((id) => eligibleIds.has(id)))
     setCatalogSupplierSearch("")
     setCatalogSupplierOpen(true)
@@ -162,11 +173,22 @@ export function MaterialCatalogWorkspace({
     setCatalogSupplierDraftIds((current) => current.includes(supplierId) ? current.filter((id) => id !== supplierId) : [...current, supplierId])
   }
 
+  function changeCatalogSupplierDepartment(department: string) {
+    if (department === catalogSupplierDepartment || catalogSupplierSelectionChanged) return
+    const eligibleIds = new Set(suppliers
+      .filter((supplier) => hasRoutableSupplierTrust(supplier.trustLevel) && supplierServesMaterialDepartment(supplier, department))
+      .map((supplier) => supplier.id))
+    setCatalogSupplierDepartment(department)
+    setCatalogSupplierDraftIds((catalogSupplierIds[department] ?? []).filter((id) => eligibleIds.has(id)))
+    setCatalogSupplierSearch("")
+  }
+
   function saveCatalogSuppliers() {
     startTransition(async () => {
-      const result = await saveCatalogDepartmentSuppliersAction({ department: selectedCategory, supplierIds: catalogSupplierDraftIds })
+      const result = await saveCatalogDepartmentSuppliersAction({ department: catalogSupplierDepartment, supplierIds: catalogSupplierDraftIds })
       if (!result.ok) return setError(result.error)
-      setCatalogSupplierIds((current) => ({ ...current, [selectedCategory]: result.data.supplierIds }))
+      setCatalogSupplierIds((current) => ({ ...current, [catalogSupplierDepartment]: result.data.supplierIds }))
+      setSelectedCategory(catalogSupplierDepartment)
       setMobileSupplierId("")
       setCatalogSupplierOpen(false)
       setNotice(result.message)
@@ -362,17 +384,20 @@ export function MaterialCatalogWorkspace({
       </div>
 
       {catalogSupplierOpen && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[155] grid place-items-center overflow-y-auto bg-slate-950/50 p-3" role="dialog" aria-modal="true" aria-labelledby="catalog-supplier-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !pending) setCatalogSupplierOpen(false) }}>
-        <section className="w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-2xl">
-          <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0066cc]">{selectedCategory}</p><h2 id="catalog-supplier-title" className="mt-0.5 text-lg font-bold">Catalog suppliers</h2><p className="mt-1 text-xs text-slate-500">Choose only the suppliers you want as price columns in this department.</p></div><button type="button" onClick={() => setCatalogSupplierOpen(false)} disabled={pending} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200" aria-label="Close"><X className="h-4 w-4" /></button></header>
+        <section className="w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-2xl">
+          <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0066cc]">{catalogSupplierDepartment}</p><h2 id="catalog-supplier-title" className="mt-0.5 text-lg font-bold">Catalog suppliers</h2><p className="mt-1 text-xs text-slate-500">Suppliers are filtered by the departments selected in Supplier Settings.</p></div><button type="button" onClick={() => setCatalogSupplierOpen(false)} disabled={pending} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200" aria-label="Close"><X className="h-4 w-4" /></button></header>
           <div className="p-4">
+            <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Filter suppliers by department">
+              {categories.map((category) => <button key={category} type="button" onClick={() => changeCatalogSupplierDepartment(category)} disabled={pending || (catalogSupplierSelectionChanged && category !== catalogSupplierDepartment)} className={`min-h-9 shrink-0 rounded-lg border px-3 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 ${category === catalogSupplierDepartment ? "border-slate-950 bg-slate-950 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-sky-400"}`}>{category}</button>)}
+            </div>
             <label className="relative block"><span className="sr-only">Search available suppliers</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={catalogSupplierSearch} onChange={(event) => setCatalogSupplierSearch(event.target.value)} placeholder="Search supplier" className="h-10 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-sm" /></label>
             <div className="mt-3 max-h-[50dvh] divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
               {eligibleCatalogSuppliers.map((supplier) => <label key={supplier.id} className="flex min-h-12 cursor-pointer items-center gap-3 px-3 py-2 hover:bg-slate-50"><input type="checkbox" checked={catalogSupplierDraftIds.includes(supplier.id)} onChange={() => toggleCatalogSupplier(supplier.id)} className="h-4 w-4 rounded border-slate-300 accent-[#0071e3]" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-950">{supplier.name}</span><span className="block truncate text-xs text-slate-500">{supplier.email || supplier.phone || "Contact not set"}</span></span></label>)}
-              {!eligibleCatalogSuppliers.length ? <div className="px-4 py-8 text-center"><p className="text-sm font-semibold text-slate-700">No eligible suppliers for {selectedCategory}.</p><p className="mt-1 text-xs text-slate-500">Assign this category and an approved trust level in Supplier Directory first.</p></div> : null}
+              {!eligibleCatalogSuppliers.length ? <div className="px-4 py-8 text-center"><p className="text-sm font-semibold text-slate-700">No eligible suppliers for {catalogSupplierDepartment}.</p><p className="mt-1 text-xs text-slate-500">Assign this department and an approved trust level in Supplier Settings first.</p></div> : null}
             </div>
             <Link href="/admin/vendors" className="mt-3 inline-flex text-sm font-semibold text-[#0066cc]">Create or edit a supplier in Supplier Directory</Link>
           </div>
-          <footer className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3"><span className="text-xs font-semibold text-slate-500">{catalogSupplierDraftIds.length} selected</span><div className="flex gap-2"><button type="button" onClick={() => setCatalogSupplierOpen(false)} disabled={pending} className="min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold">Cancel</button><button type="button" onClick={saveCatalogSuppliers} disabled={pending} className="min-h-10 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40">{pending ? "Saving..." : "Save suppliers"}</button></div></footer>
+          <footer className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3"><span className="text-xs font-semibold text-slate-500">{catalogSupplierDraftIds.length} selected{catalogSupplierSelectionChanged ? " · Save before changing department" : ""}</span><div className="flex gap-2"><button type="button" onClick={() => setCatalogSupplierOpen(false)} disabled={pending} className="min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold">Cancel</button><button type="button" onClick={saveCatalogSuppliers} disabled={pending} className="min-h-10 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40">{pending ? "Saving..." : "Save suppliers"}</button></div></footer>
         </section>
       </div>, document.body) : null}
 
