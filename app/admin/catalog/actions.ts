@@ -3,8 +3,15 @@
 import { revalidatePath } from "next/cache"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import { requireManagerPortalProfile } from "@/lib/auth"
-import { MATERIAL_CATALOG_CATEGORIES, type CatalogSupplier } from "@/lib/material-catalog"
+import { requireManagerPortalProfile, requireStaffProfile } from "@/lib/auth"
+import {
+  MATERIAL_CATALOG_CATEGORIES,
+  hasRoutableSupplierTrust,
+  normalizeMaterialCatalogDepartment,
+  supplierIsAddedToCatalogDepartment,
+  supplierServesMaterialDepartment,
+  type CatalogSupplier,
+} from "@/lib/material-catalog"
 import { extractMaterialCatalogItemsFromPdf } from "@/lib/material-catalog-pdf"
 
 type ActionResult<T = undefined> = T extends undefined
@@ -30,6 +37,11 @@ type CatalogPriceInput = {
   availability: "available" | "not_available" | "unknown"
   supplierSku?: string
   notes?: string
+}
+
+type CatalogSupplierMembershipInput = {
+  department: string
+  supplierIds: string[]
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -131,12 +143,25 @@ export async function saveMaterialCatalogPricesAction(inputs: CatalogPriceInput[
   const suppliers = Array.isArray(supplierData) ? supplierData as CatalogSupplier[] : []
   if (supplierError) return { ok: false, error: "The Supplier Directory could not be loaded." }
   const supplierMap = new Map(suppliers.map((supplier) => [supplier.id, supplier]))
+  const itemIds = [...new Set(inputs.map((input) => input.itemId))]
+  if (itemIds.some((id) => !UUID_PATTERN.test(id))) return { ok: false, error: "A catalog item or supplier is no longer available." }
+  const { data: itemData, error: itemError } = await supabase
+    .from("material_catalog_items")
+    .select("id,category")
+    .in("id", itemIds)
+    .returns<Array<{ id: string; category: string }>>()
+  if (itemError) return { ok: false, error: "The catalog items could not be verified." }
+  const itemDepartmentMap = new Map((itemData ?? []).map((item) => [item.id, normalizeMaterialCatalogDepartment(item.category)]))
 
   const rows = []
   for (const input of inputs) {
     const supplier = supplierMap.get(input.supplierId)
+    const department = itemDepartmentMap.get(input.itemId)
     const price = input.unitPrice === null || input.unitPrice === undefined ? null : Number(input.unitPrice)
-    if (!UUID_PATTERN.test(input.itemId) || !supplier) return { ok: false, error: "A catalog item or supplier is no longer available." }
+    if (!UUID_PATTERN.test(input.itemId) || !supplier || !department) return { ok: false, error: "A catalog item or supplier is no longer available." }
+    if (!hasRoutableSupplierTrust(supplier.trustLevel) || !supplierServesMaterialDepartment(supplier, department) || !supplierIsAddedToCatalogDepartment(supplier, department)) {
+      return { ok: false, error: "This supplier is not added to that catalog department." }
+    }
     if (price !== null && (!Number.isFinite(price) || price < 0 || price > 100_000_000)) return { ok: false, error: "Check the supplier prices before saving." }
     rows.push({
       item_id: input.itemId,
@@ -155,6 +180,54 @@ export async function saveMaterialCatalogPricesAction(inputs: CatalogPriceInput[
   if (error) return { ok: false, error: "The supplier prices could not be saved." }
   revalidatePath("/admin/catalog")
   return { ok: true, data: { saved: rows.length }, message: `${rows.length} supplier price ${rows.length === 1 ? "cell" : "cells"} saved.` }
+}
+
+export async function saveCatalogDepartmentSuppliersAction(
+  input: CatalogSupplierMembershipInput,
+): Promise<ActionResult<{ supplierIds: string[] }>> {
+  const { supabase } = await requireStaffProfile("suppliers")
+  const department = normalizeMaterialCatalogDepartment(clean(input.department, 100))
+  if (!await validCategory(supabase, department)) return { ok: false, error: "Choose a catalog department." }
+
+  const supplierIds = [...new Set((input.supplierIds ?? []).map((id) => clean(id, 160)).filter(Boolean))]
+  if (supplierIds.length > 100) return { ok: false, error: "Add no more than 100 suppliers to one department." }
+
+  const { data, error } = await supabase.rpc("staff_load_catalog_suppliers")
+  const suppliers = Array.isArray(data) ? data as CatalogSupplier[] : []
+  if (error) return { ok: false, error: "The Supplier Directory could not be loaded." }
+
+  const eligibleIds = new Set(suppliers
+    .filter((supplier) => hasRoutableSupplierTrust(supplier.trustLevel) && supplierServesMaterialDepartment(supplier, department))
+    .map((supplier) => supplier.id))
+  if (supplierIds.some((id) => !eligibleIds.has(id))) {
+    return { ok: false, error: "One selected supplier is not eligible for this department. Refresh and try again." }
+  }
+
+  const selectedIds = new Set(supplierIds)
+  for (const supplier of suppliers) {
+    const shouldBeSelected = selectedIds.has(supplier.id)
+    if (supplierIsAddedToCatalogDepartment(supplier, department) === shouldBeSelected) continue
+    const currentDepartments = (supplier.catalogEnabledDepartments ?? []).map(normalizeMaterialCatalogDepartment)
+    const nextDepartments = shouldBeSelected
+      ? [...new Set([...currentDepartments, department])]
+      : currentDepartments.filter((entry) => entry !== department)
+
+    const { error: saveError } = await supabase.rpc("staff_upsert_supplier_directory_entry", {
+      p_supplier: { ...supplier, catalogEnabledDepartments: nextDepartments },
+      p_create: false,
+    })
+    if (saveError) return { ok: false, error: "The catalog supplier selection could not be saved. Refresh and try again." }
+  }
+
+  revalidatePath("/admin/catalog")
+  revalidatePath("/admin/vendors")
+  return {
+    ok: true,
+    data: { supplierIds },
+    message: supplierIds.length
+      ? `${supplierIds.length} supplier${supplierIds.length === 1 ? "" : "s"} added to ${department}.`
+      : `All supplier columns removed from ${department}.`,
+  }
 }
 
 export async function importMaterialCatalogPdfAction(formData: FormData): Promise<ActionResult<{ imported: number; skipped: number }>> {

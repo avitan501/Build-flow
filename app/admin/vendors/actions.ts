@@ -72,6 +72,7 @@ function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | nu
     notes: input.notes?.trim().slice(0, 4_000) || "",
     trustLevel: input.trustLevel || "not-reviewed",
     catalogDepartments: Array.isArray(input.catalogDepartments) ? input.catalogDepartments.map((department) => department.trim().slice(0, 100)).filter(Boolean).slice(0, 20) : [],
+    catalogEnabledDepartments: Array.isArray(input.catalogEnabledDepartments) ? input.catalogEnabledDepartments.map((department) => department.trim().slice(0, 100)).filter(Boolean).slice(0, 20) : [],
     address: input.address?.trim().slice(0, 500) || "",
     materials: input.materials?.trim().slice(0, 2_000) || "",
   }
@@ -98,6 +99,7 @@ export async function saveSupplierDirectoryEntryAction(input: {
   }
 
   revalidatePath("/admin/vendors")
+  revalidatePath("/admin/catalog")
   return { ok: true, supplier: persisted as SupplierRoutingOption }
 }
 

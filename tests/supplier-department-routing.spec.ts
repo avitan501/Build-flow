@@ -7,6 +7,7 @@ import {
   materialCatalogDepartmentOptions,
   normalizeMaterialCatalogDepartment,
   supplierCanReceiveDepartmentRequest,
+  supplierIsAddedToCatalogDepartment,
   supplierServesMaterialDepartment,
 } from "../lib/material-catalog"
 
@@ -33,6 +34,8 @@ test("supplier routing requires category, email, and an approved trust level", (
   expect(supplierCanReceiveDepartmentRequest({ ...trialSupplier, trustLevel: "do-not-use" }, "Framing")).toBe(false)
   expect(supplierCanReceiveDepartmentRequest({ ...trialSupplier, email: "" }, "Framing")).toBe(false)
   expect(supplierCanReceiveDepartmentRequest(trialSupplier, "Electrical")).toBe(false)
+  expect(supplierIsAddedToCatalogDepartment({ catalogEnabledDepartments: ["Sheet rock"] }, "Sheet Rock")).toBe(true)
+  expect(supplierIsAddedToCatalogDepartment({ catalogEnabledDepartments: [] }, "Sheet Rock")).toBe(false)
 })
 
 test("supplier categories and routing filters are enforced in the manager UI and server draft", async () => {

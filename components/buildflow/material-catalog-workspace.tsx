@@ -10,6 +10,7 @@ import { createPortal } from "react-dom"
 import {
   deleteMaterialCatalogItemAction,
   importMaterialCatalogPdfAction,
+  saveCatalogDepartmentSuppliersAction,
   saveMaterialCatalogItemAction,
   saveMaterialCatalogPricesAction,
 } from "@/app/admin/catalog/actions"
@@ -17,6 +18,7 @@ import {
   MATERIAL_CATALOG_CATEGORIES,
   hasRoutableSupplierTrust,
   materialCatalogDepartmentOptions,
+  normalizeMaterialCatalogDepartment,
   supplierServesMaterialDepartment,
   type CatalogSupplier,
   type MaterialCatalogItem,
@@ -66,6 +68,17 @@ function itemEditor(item: MaterialCatalogItem): EditorDraft {
   }
 }
 
+function initialCatalogSupplierIds(suppliers: CatalogSupplier[]) {
+  const selections: Record<string, string[]> = {}
+  for (const supplier of suppliers) {
+    for (const department of supplier.catalogEnabledDepartments ?? []) {
+      const normalized = normalizeMaterialCatalogDepartment(department)
+      selections[normalized] = [...new Set([...(selections[normalized] ?? []), supplier.id])]
+    }
+  }
+  return selections
+}
+
 export function MaterialCatalogWorkspace({
   initialItems,
   initialPrices,
@@ -81,7 +94,11 @@ export function MaterialCatalogWorkspace({
   const [selectedCategory, setSelectedCategory] = useState(initialItems[0]?.category || MATERIAL_CATALOG_CATEGORIES[0])
   const [itemSearch, setItemSearch] = useState("")
   const [supplierSearch, setSupplierSearch] = useState("")
+  const [catalogSupplierSearch, setCatalogSupplierSearch] = useState("")
   const [mobileSupplierId, setMobileSupplierId] = useState("")
+  const [catalogSupplierOpen, setCatalogSupplierOpen] = useState(false)
+  const [catalogSupplierDraftIds, setCatalogSupplierDraftIds] = useState<string[]>([])
+  const [catalogSupplierIds, setCatalogSupplierIds] = useState<Record<string, string[]>>(() => initialCatalogSupplierIds(suppliers))
   const [showInactive, setShowInactive] = useState(false)
   const [editor, setEditor] = useState<EditorDraft | null>(null)
   const [notice, setNotice] = useState("")
@@ -102,14 +119,24 @@ export function MaterialCatalogWorkspace({
     const needle = itemSearch.trim().toLowerCase()
     return !needle || `${item.item_code} ${item.name} ${item.description} ${item.unit}`.toLowerCase().includes(needle)
   }), [initialItems, itemSearch, selectedCategory, showInactive])
+  const eligibleCatalogSupplierPool = useMemo(() => suppliers.filter((supplier) => (
+    hasRoutableSupplierTrust(supplier.trustLevel) && supplierServesMaterialDepartment(supplier, selectedCategory)
+  )), [selectedCategory, suppliers])
   const visibleSuppliers = useMemo(() => {
     const needle = supplierSearch.trim().toLowerCase()
-    return suppliers.filter((supplier) => {
-      if (!hasRoutableSupplierTrust(supplier.trustLevel) || !supplierServesMaterialDepartment(supplier, selectedCategory)) return false
+    return eligibleCatalogSupplierPool.filter((supplier) => {
+      if (!(catalogSupplierIds[selectedCategory] ?? []).includes(supplier.id)) return false
       const materials = Array.isArray(supplier.materials) ? supplier.materials.join(" ") : supplier.materials ?? ""
       return !needle || `${supplier.name} ${supplier.email ?? ""} ${supplier.phone ?? ""} ${materials}`.toLowerCase().includes(needle)
     })
-  }, [selectedCategory, supplierSearch, suppliers])
+  }, [catalogSupplierIds, eligibleCatalogSupplierPool, selectedCategory, supplierSearch])
+  const eligibleCatalogSuppliers = useMemo(() => {
+    const needle = catalogSupplierSearch.trim().toLowerCase()
+    return eligibleCatalogSupplierPool.filter((supplier) => {
+      const materials = Array.isArray(supplier.materials) ? supplier.materials.join(" ") : supplier.materials ?? ""
+      return !needle || `${supplier.name} ${supplier.email ?? ""} ${supplier.phone ?? ""} ${materials}`.toLowerCase().includes(needle)
+    })
+  }, [catalogSupplierSearch, eligibleCatalogSupplierPool])
   const mobileSupplier = visibleSuppliers.find((supplier) => supplier.id === mobileSupplierId) ?? visibleSuppliers[0] ?? null
 
   function moveMobileSupplier(direction: -1 | 1) {
@@ -117,6 +144,35 @@ export function MaterialCatalogWorkspace({
     const currentIndex = visibleSuppliers.findIndex((supplier) => supplier.id === mobileSupplier.id)
     const nextIndex = (currentIndex + direction + visibleSuppliers.length) % visibleSuppliers.length
     setMobileSupplierId(visibleSuppliers[nextIndex].id)
+  }
+
+  function openCatalogSuppliers() {
+    if (dirtyKeys.size) {
+      setError("Save price changes before changing supplier columns.")
+      return
+    }
+    const eligibleIds = new Set(eligibleCatalogSupplierPool.map((supplier) => supplier.id))
+    setCatalogSupplierDraftIds((catalogSupplierIds[selectedCategory] ?? []).filter((id) => eligibleIds.has(id)))
+    setCatalogSupplierSearch("")
+    setCatalogSupplierOpen(true)
+    setError("")
+  }
+
+  function toggleCatalogSupplier(supplierId: string) {
+    setCatalogSupplierDraftIds((current) => current.includes(supplierId) ? current.filter((id) => id !== supplierId) : [...current, supplierId])
+  }
+
+  function saveCatalogSuppliers() {
+    startTransition(async () => {
+      const result = await saveCatalogDepartmentSuppliersAction({ department: selectedCategory, supplierIds: catalogSupplierDraftIds })
+      if (!result.ok) return setError(result.error)
+      setCatalogSupplierIds((current) => ({ ...current, [selectedCategory]: result.data.supplierIds }))
+      setMobileSupplierId("")
+      setCatalogSupplierOpen(false)
+      setNotice(result.message)
+      setError("")
+      router.refresh()
+    })
   }
 
   function draftFor(itemId: string, supplierId: string): PriceDraft {
@@ -204,13 +260,13 @@ export function MaterialCatalogWorkspace({
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0066cc]">Manager catalog</p>
             <h1 className="mt-1 text-2xl font-bold sm:text-3xl">Materials & supplier pricing</h1>
-            <p className="mt-1 text-sm text-slate-600">Edit one category at a time. Supplier Directory contacts become price columns automatically.</p>
+            <p className="mt-1 text-sm text-slate-600">Edit one category at a time. Only suppliers you add become price columns.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold hover:border-sky-400">
               <FileUp className="h-4 w-4" />Import PDF<input type="file" accept="application/pdf,.pdf" className="sr-only" disabled={pending} onChange={(event) => { importPdf(event.target.files?.[0] ?? null); event.currentTarget.value = "" }} />
             </label>
-            <Link href="/admin/vendors" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold hover:border-sky-400"><Store className="h-4 w-4" />Add supplier</Link>
+            <button type="button" onClick={openCatalogSuppliers} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold hover:border-sky-400"><Store className="h-4 w-4" />Add supplier</button>
             <button type="button" onClick={() => setEditor(emptyEditor(selectedCategory))} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Add item</button>
           </div>
         </header>
@@ -242,7 +298,7 @@ export function MaterialCatalogWorkspace({
               <label className="min-w-0 flex-1"><span className="sr-only">Supplier price column</span><select value={mobileSupplier?.id ?? ""} onChange={(event) => setMobileSupplierId(event.target.value)} disabled={!mobileSupplier} className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold"><option value="">No eligible supplier</option>{visibleSuppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select></label>
               <button type="button" onClick={() => moveMobileSupplier(1)} disabled={visibleSuppliers.length < 2} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-35" aria-label="Next supplier"><ChevronRight className="h-4 w-4" /></button>
             </div>
-            <p className="mt-2 text-xs text-slate-500">{mobileSupplier ? `${mobileSupplier.email || mobileSupplier.phone || "Contact not set"} · ${visibleSuppliers.findIndex((supplier) => supplier.id === mobileSupplier.id) + 1} of ${visibleSuppliers.length}` : `Assign an eligible supplier to ${selectedCategory} in Supplier Directory.`}</p>
+            <p className="mt-2 text-xs text-slate-500">{mobileSupplier ? `${mobileSupplier.email || mobileSupplier.phone || "Contact not set"} · ${visibleSuppliers.findIndex((supplier) => supplier.id === mobileSupplier.id) + 1} of ${visibleSuppliers.length}` : `No supplier added to ${selectedCategory}.`}</p>
           </header>
           <div className="divide-y divide-slate-200">
             {categoryItems.map((item) => {
@@ -268,7 +324,8 @@ export function MaterialCatalogWorkspace({
         </section>
 
         <section className="mt-3 hidden max-w-full overflow-auto overscroll-x-contain rounded-lg border border-slate-300 bg-white shadow-sm md:block" aria-label={`${selectedCategory} supplier pricing matrix`}>
-          <table className="border-collapse text-left text-xs" style={{ minWidth: `${320 + Math.max(visibleSuppliers.length, 1) * 172}px` }}>
+          {!visibleSuppliers.length ? <div className="flex min-h-14 items-center justify-between gap-3 border-b border-slate-200 bg-sky-50 px-3 py-2 text-sm"><span className="font-semibold text-slate-700">No supplier added to {selectedCategory}.</span><button type="button" onClick={openCatalogSuppliers} className="shrink-0 font-bold text-[#0066cc]">Add supplier</button></div> : null}
+          <table className="border-collapse text-left text-xs" style={{ minWidth: `${320 + visibleSuppliers.length * 172}px` }}>
             <thead className="sticky top-0 z-30 bg-slate-100">
               <tr>
                 <th className="sticky left-0 z-40 w-[320px] min-w-[320px] border-b border-r border-slate-300 bg-slate-100 px-3 py-2 font-bold">Item</th>
@@ -303,6 +360,21 @@ export function MaterialCatalogWorkspace({
           {!categoryItems.length ? <div className="grid min-h-48 place-items-center p-8 text-center"><div><PackagePlus className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 font-bold">No matching items</p><button type="button" onClick={() => setEditor(emptyEditor(selectedCategory))} className="mt-2 text-sm font-semibold text-[#0066cc]">Add the first item</button></div></div> : null}
         </section>
       </div>
+
+      {catalogSupplierOpen && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[155] grid place-items-center overflow-y-auto bg-slate-950/50 p-3" role="dialog" aria-modal="true" aria-labelledby="catalog-supplier-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !pending) setCatalogSupplierOpen(false) }}>
+        <section className="w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-2xl">
+          <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0066cc]">{selectedCategory}</p><h2 id="catalog-supplier-title" className="mt-0.5 text-lg font-bold">Catalog suppliers</h2><p className="mt-1 text-xs text-slate-500">Choose only the suppliers you want as price columns in this department.</p></div><button type="button" onClick={() => setCatalogSupplierOpen(false)} disabled={pending} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200" aria-label="Close"><X className="h-4 w-4" /></button></header>
+          <div className="p-4">
+            <label className="relative block"><span className="sr-only">Search available suppliers</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={catalogSupplierSearch} onChange={(event) => setCatalogSupplierSearch(event.target.value)} placeholder="Search supplier" className="h-10 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-sm" /></label>
+            <div className="mt-3 max-h-[50dvh] divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+              {eligibleCatalogSuppliers.map((supplier) => <label key={supplier.id} className="flex min-h-12 cursor-pointer items-center gap-3 px-3 py-2 hover:bg-slate-50"><input type="checkbox" checked={catalogSupplierDraftIds.includes(supplier.id)} onChange={() => toggleCatalogSupplier(supplier.id)} className="h-4 w-4 rounded border-slate-300 accent-[#0071e3]" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-950">{supplier.name}</span><span className="block truncate text-xs text-slate-500">{supplier.email || supplier.phone || "Contact not set"}</span></span></label>)}
+              {!eligibleCatalogSuppliers.length ? <div className="px-4 py-8 text-center"><p className="text-sm font-semibold text-slate-700">No eligible suppliers for {selectedCategory}.</p><p className="mt-1 text-xs text-slate-500">Assign this category and an approved trust level in Supplier Directory first.</p></div> : null}
+            </div>
+            <Link href="/admin/vendors" className="mt-3 inline-flex text-sm font-semibold text-[#0066cc]">Create or edit a supplier in Supplier Directory</Link>
+          </div>
+          <footer className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3"><span className="text-xs font-semibold text-slate-500">{catalogSupplierDraftIds.length} selected</span><div className="flex gap-2"><button type="button" onClick={() => setCatalogSupplierOpen(false)} disabled={pending} className="min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold">Cancel</button><button type="button" onClick={saveCatalogSuppliers} disabled={pending} className="min-h-10 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40">{pending ? "Saving..." : "Save suppliers"}</button></div></footer>
+        </section>
+      </div>, document.body) : null}
 
       {editor && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[150] grid place-items-center overflow-y-auto bg-slate-950/50 p-3" role="dialog" aria-modal="true" aria-labelledby="catalog-item-editor-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !pending) setEditor(null) }}>
         <section className="w-full max-w-xl overflow-hidden rounded-lg bg-white shadow-2xl">

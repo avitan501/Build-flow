@@ -50,6 +50,7 @@ export type CatalogSupplier = {
   materials?: string | string[]
   trustLevel?: SupplierTrustLevel
   catalogDepartments?: string[]
+  catalogEnabledDepartments?: string[]
 }
 
 const DEPARTMENT_ALIASES: Record<string, MaterialCatalogCategory> = {
@@ -96,6 +97,14 @@ export function supplierServesMaterialDepartment(
 ) {
   const expected = normalizeMaterialCatalogDepartment(department)
   return (supplier.catalogDepartments ?? []).some((entry) => normalizeMaterialCatalogDepartment(entry) === expected)
+}
+
+export function supplierIsAddedToCatalogDepartment(
+  supplier: Pick<CatalogSupplier, "catalogEnabledDepartments">,
+  department: string,
+) {
+  const expected = normalizeMaterialCatalogDepartment(department)
+  return (supplier.catalogEnabledDepartments ?? []).some((entry) => normalizeMaterialCatalogDepartment(entry) === expected)
 }
 
 export function supplierCanReceiveDepartmentRequest(

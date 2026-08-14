@@ -27,6 +27,7 @@ export type SupplierRoutingOption = {
   notes?: string
   trustLevel?: SupplierTrustLevel
   catalogDepartments?: string[]
+  catalogEnabledDepartments?: string[]
   address?: string
   materials?: string
 }
