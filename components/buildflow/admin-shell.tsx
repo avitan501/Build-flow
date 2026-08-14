@@ -5,9 +5,11 @@ import {
   BarChart3,
   ClipboardList,
   Columns3,
+  ExternalLink,
   LayoutDashboard,
   Sparkles,
   Menu,
+  PhoneCall,
   Store,
   Users,
   X,
@@ -18,8 +20,11 @@ import { useState, type ReactNode } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 
+const QUO_INBOX_URL = "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
+
 const ownerLinks = [
   { href: "/admin/build-map", label: "Dashboard", icon: LayoutDashboard },
+  { href: QUO_INBOX_URL, label: "Calls & Messages", icon: PhoneCall },
   { href: "/admin/users", label: "Customers", icon: Users },
   { href: "/admin/vendors", label: "Suppliers", icon: Store },
   { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
@@ -67,18 +72,22 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Manager navigation">
         {managerLinks.map((link) => {
           const Icon = link.icon;
-          const active = isActive(pathname, link.href);
+          const external = link.href.startsWith("https://");
+          const active = !external && isActive(pathname, link.href);
           return (
             <Link
               key={link.href}
               href={link.href}
               onClick={onNavigate}
+              target={external ? "_blank" : undefined}
+              rel={external ? "noopener noreferrer" : undefined}
               className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
                 active ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"
               }`}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              <span>{link.label}</span>
+              <span className="min-w-0 flex-1">{link.label}</span>
+              {external ? <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" /> : null}
             </Link>
           );
         })}

@@ -112,6 +112,9 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
 
   expect(navigation).toContain('{ href: "/admin/quote-comparison", label: "Quote Comparison"');
   expect(navigation).toContain('link.href === "/admin/quote-comparison" && access.suppliers');
+  expect(navigation).toContain('label: "Calls & Messages"');
+  expect(navigation).toContain("https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602");
+  expect(navigation).toContain('target={external ? "_blank" : undefined}');
   expect(migration).toContain("alter table public.quote_comparisons enable row level security");
   expect(migration).toContain("private.has_staff_capability('suppliers')");
   expect(migration).toContain("created_by = (select auth.uid())");
