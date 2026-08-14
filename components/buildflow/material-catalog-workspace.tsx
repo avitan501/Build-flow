@@ -29,6 +29,7 @@ type PriceDraft = {
   unitPrice: string
   availability: "available" | "not_available" | "unknown"
   supplierSku: string
+  productUrl: string
 }
 
 type EditorDraft = {
@@ -55,15 +56,6 @@ const RETAIL_CATALOG_SUPPLIER_IDS = new Set(["lowes-retail-catalog", "home-depot
 
 function isRetailCatalogSupplier(supplier: CatalogSupplier) {
   return RETAIL_CATALOG_SUPPLIER_IDS.has(supplier.id)
-}
-
-function retailItemUrl(supplier: CatalogSupplier, item: MaterialCatalogItem) {
-  const query = [item.name, item.measurement, item.thickness].filter(Boolean).join(" ")
-  const encodedQuery = encodeURIComponent(query)
-
-  if (supplier.id === "lowes-retail-catalog") return `https://www.lowes.com/search?searchTerm=${encodedQuery}`
-  if (supplier.id === "home-depot-retail-catalog") return `https://www.homedepot.com/s/${encodedQuery}`
-  return supplier.portalUrl ?? ""
 }
 
 function supplierColumnWidth(supplier: CatalogSupplier) {
@@ -134,6 +126,7 @@ export function MaterialCatalogWorkspace({
     unitPrice: price.unit_price === null ? "" : String(price.unit_price),
     availability: price.availability,
     supplierSku: price.supplier_sku,
+    productUrl: price.product_url ?? "",
   }])))
 
   const categories = useMemo(() => materialCatalogDepartmentOptions(departments, initialItems.map((item) => item.category)), [departments, initialItems])
@@ -222,7 +215,7 @@ export function MaterialCatalogWorkspace({
 
   function draftFor(itemId: string, supplierId: string): PriceDraft {
     const key = cellKey(itemId, supplierId)
-    return priceDrafts[key] ?? { unitPrice: "", availability: "unknown", supplierSku: "" }
+    return priceDrafts[key] ?? { unitPrice: "", availability: "unknown", supplierSku: "", productUrl: "" }
   }
 
   function updatePrice(itemId: string, supplierId: string, patch: Partial<PriceDraft>) {
@@ -231,6 +224,28 @@ export function MaterialCatalogWorkspace({
     setDirtyKeys((current) => new Set(current).add(key))
     setNotice("")
     setError("")
+  }
+
+  function setExactProductLink(item: MaterialCatalogItem, supplier: CatalogSupplier) {
+    const current = draftFor(item.id, supplier.id).productUrl
+    const value = window.prompt(`Paste the exact ${supplier.name} product-page URL for ${item.name}. Leave blank to remove it.`, current)
+    if (value === null) return
+    const productUrl = value.trim()
+    if (productUrl) {
+      try {
+        const url = new URL(productUrl)
+        const hostname = url.hostname.toLowerCase().replace(/^www\./, "")
+        const hasProductId = /\/\d+\/?$/.test(url.pathname)
+        const valid = url.protocol === "https:" && (
+          (supplier.id === "lowes-retail-catalog" && hostname === "lowes.com" && url.pathname.startsWith("/pd/") && hasProductId)
+          || (supplier.id === "home-depot-retail-catalog" && hostname === "homedepot.com" && url.pathname.startsWith("/p/") && hasProductId)
+        )
+        if (!valid) return setError(`Paste an exact ${supplier.name} product page, not a search or category page.`)
+      } catch {
+        return setError("Enter a complete HTTPS product-page URL.")
+      }
+    }
+    updatePrice(item.id, supplier.id, { productUrl })
   }
 
   function savePrices() {
@@ -243,6 +258,7 @@ export function MaterialCatalogWorkspace({
         unitPrice: draft.unitPrice.trim() === "" ? null : Number(draft.unitPrice),
         availability: draft.availability,
         supplierSku: draft.supplierSku,
+        productUrl: draft.productUrl,
       }
     })
     startTransition(async () => {
@@ -361,7 +377,7 @@ export function MaterialCatalogWorkspace({
                   <button type="button" onClick={() => deleteItem(item)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-700" aria-label={`Delete ${item.name}`}><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
                 {supplier && draft ? <div className="border-t border-slate-100 px-3 py-2.5">
-                  {isRetailCatalogSupplier(supplier) ? <a href={retailItemUrl(supplier, item)} target="_blank" rel="noreferrer" className="mb-2 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-[#0066cc]"><ExternalLink className="h-3.5 w-3.5" />Find this item at {supplier.name}</a> : null}
+                  {isRetailCatalogSupplier(supplier) ? draft.productUrl ? <a href={draft.productUrl} target="_blank" rel="noreferrer" className="mb-2 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-800"><ExternalLink className="h-3.5 w-3.5" />Open exact item at {supplier.name}</a> : <button type="button" onClick={() => setExactProductLink(item, supplier)} className="mb-2 inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-bold text-amber-800">Exact link needed</button> : null}
                   <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-2">
                   <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-slate-400">$</span><input aria-label={`${supplier.name} unit price for ${item.name}`} inputMode="decimal" value={draft.unitPrice} onChange={(event) => updatePrice(item.id, supplier.id, { unitPrice: event.target.value.replace(/[^0-9.]/g, "") })} placeholder="Unit price" className="h-10 w-full rounded-lg border border-slate-300 bg-white pl-6 pr-3 text-sm tabular-nums" /></div>
                   <div className="flex gap-1"><select aria-label={`${supplier.name} availability for ${item.name}`} value={draft.availability} onChange={(event) => updatePrice(item.id, supplier.id, { availability: event.target.value as PriceDraft["availability"] })} className={`h-10 min-w-0 flex-1 rounded-lg border px-2 text-xs font-semibold ${draft.availability === "not_available" ? "border-rose-200 bg-rose-50 text-rose-700" : draft.availability === "available" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-600"}`}><option value="unknown">Unknown</option><option value="available">Available</option><option value="not_available">N/A</option></select>{saved || dirtyKeys.has(key) ? <span className={`inline-flex h-10 w-8 shrink-0 items-center justify-center rounded-lg ${dirtyKeys.has(key) ? "bg-amber-100 text-amber-700" : "bg-emerald-50 text-emerald-700"}`} title={dirtyKeys.has(key) ? "Unsaved change" : "Saved"}>{dirtyKeys.has(key) ? <Pencil className="h-3 w-3" /> : <Check className="h-3 w-3" />}</span> : null}</div>
@@ -397,7 +413,7 @@ export function MaterialCatalogWorkspace({
                   const draft = draftFor(item.id, supplier.id)
                   const saved = initialPriceMap.get(key)
                   return <td key={supplier.id} style={{ width: supplierColumnWidth(supplier), minWidth: supplierColumnWidth(supplier) }} className={`border-b border-r border-slate-200 p-1 align-top ${dirtyKeys.has(key) ? "bg-amber-50" : ""}`}>
-                    {isRetailCatalogSupplier(supplier) ? <a href={retailItemUrl(supplier, item)} target="_blank" rel="noreferrer" aria-label={`Find ${item.name} at ${supplier.name}`} title={`Find ${item.name} at ${supplier.name}`} className="mb-1 inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-1 text-[9px] font-bold text-[#0066cc]"><ExternalLink className="h-3 w-3 shrink-0" />Shop item</a> : null}
+                    {isRetailCatalogSupplier(supplier) ? draft.productUrl ? <a href={draft.productUrl} target="_blank" rel="noreferrer" aria-label={`Open exact ${item.name} at ${supplier.name}`} title={`Open exact ${item.name} at ${supplier.name}`} className="mb-1 inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-1 text-[9px] font-bold text-emerald-800"><ExternalLink className="h-3 w-3 shrink-0" />Exact item</a> : <button type="button" onClick={() => setExactProductLink(item, supplier)} title={`Add exact ${supplier.name} product link for ${item.name}`} className="mb-1 inline-flex h-7 w-full items-center justify-center rounded-md border border-amber-200 bg-amber-50 px-1 text-[9px] font-bold text-amber-800">Add exact link</button> : null}
                     <div className="relative"><span className="absolute left-2 top-1/2 -translate-y-1/2 font-semibold text-slate-400">$</span><input aria-label={`${supplier.name} unit price for ${item.name}`} inputMode="decimal" value={draft.unitPrice} onChange={(event) => updatePrice(item.id, supplier.id, { unitPrice: event.target.value.replace(/[^0-9.]/g, "") })} placeholder="Price" className="h-8 w-full rounded-md border border-slate-300 bg-white pl-5 pr-2 text-xs tabular-nums" /></div>
                     <div className="mt-1 flex gap-1">
                       <select aria-label={`${supplier.name} availability for ${item.name}`} value={draft.availability} onChange={(event) => updatePrice(item.id, supplier.id, { availability: event.target.value as PriceDraft["availability"] })} className={`h-7 min-w-0 flex-1 rounded-md border px-1 text-[10px] font-semibold ${draft.availability === "not_available" ? "border-rose-200 bg-rose-50 text-rose-700" : draft.availability === "available" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-600"}`}><option value="unknown">Unknown</option><option value="available">Available</option><option value="not_available">N/A</option></select>

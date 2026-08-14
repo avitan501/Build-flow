@@ -17,13 +17,14 @@ test("manager navigation groups secondary tools and keeps calls last", async () 
 })
 
 test("manager catalog is protected, seeded, editable, and supplier based", async () => {
-  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, parser] = await Promise.all([
+  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, parser] = await Promise.all([
     readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/catalog/actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260814033000_create_manager_material_catalog.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260814155841_add_catalog_measurements_and_common_items.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260814160945_add_retail_catalog_suppliers.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260814162242_add_verified_retail_product_links.sql"), "utf8"),
     readFile(path.join(root, "lib/material-catalog-pdf.ts"), "utf8"),
   ])
   expect(page).toContain("requireManagerPortalProfile")
@@ -42,11 +43,16 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(workspace).toContain("Save item")
   expect(workspace).toContain("Measurement / size")
   expect(workspace).toContain("Thickness / gauge")
-  expect(workspace).toContain("Find this item at")
-  expect(workspace).toContain("Shop item")
-  expect(workspace).toContain("https://www.lowes.com/search?searchTerm=")
-  expect(workspace).toContain("https://www.homedepot.com/s/")
+  expect(workspace).toContain("Open exact item at")
+  expect(workspace).toContain("Exact link needed")
+  expect(workspace).toContain("Add exact link")
+  expect(workspace).not.toContain("https://www.lowes.com/search?searchTerm=")
+  expect(workspace).not.toContain("https://www.homedepot.com/s/")
   expect(workspace).toContain("supplierColumnWidth")
+  expect(actions).toContain("Use an exact ${supplier.name} product page")
+  expect(actions).toContain('url.pathname.startsWith("/pd/")')
+  expect(actions).toContain('url.pathname.startsWith("/p/")')
+  expect(page).toContain("product_url")
   expect(workspace).not.toContain("Sample quantity")
   expect(workspace).toContain("price per {item.unit}")
   expect(actions).toContain("extractMaterialCatalogItemsFromPdf")
@@ -70,6 +76,8 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(retailSupplierMigration).toContain("home-depot-retail-catalog")
   expect(retailSupplierMigration).toContain("https://www.lowes.com/")
   expect(retailSupplierMigration).toContain("https://www.homedepot.com/")
+  expect(exactLinkMigration).toContain("add column if not exists product_url")
+  expect(exactLinkMigration).toContain("Search and category URLs are not allowed")
   expect(parser).toContain("parseMaterialComparisonText")
   expect(parser).toContain("No quantity, unit, and material rows were found")
 })

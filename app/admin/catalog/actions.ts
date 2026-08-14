@@ -38,6 +38,7 @@ type CatalogPriceInput = {
   unitPrice: number | null
   availability: "available" | "not_available" | "unknown"
   supplierSku?: string
+  productUrl?: string
   notes?: string
 }
 
@@ -50,6 +51,21 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 
 function clean(value: unknown, max: number) {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max)
+}
+
+function validRetailProductUrl(supplierId: string, value: string) {
+  if (!value) return true
+  try {
+    const url = new URL(value)
+    if (url.protocol !== "https:") return false
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, "")
+    const hasProductId = /\/\d+\/?$/.test(url.pathname)
+    if (supplierId === "lowes-retail-catalog") return hostname === "lowes.com" && url.pathname.startsWith("/pd/") && hasProductId
+    if (supplierId === "home-depot-retail-catalog") return hostname === "homedepot.com" && url.pathname.startsWith("/p/") && hasProductId
+    return false
+  } catch {
+    return false
+  }
 }
 
 async function validCategory(supabase: SupabaseClient, value: string) {
@@ -162,16 +178,21 @@ export async function saveMaterialCatalogPricesAction(inputs: CatalogPriceInput[
     const supplier = supplierMap.get(input.supplierId)
     const department = itemDepartmentMap.get(input.itemId)
     const price = input.unitPrice === null || input.unitPrice === undefined ? null : Number(input.unitPrice)
+    const productUrl = clean(input.productUrl, 1200)
     if (!UUID_PATTERN.test(input.itemId) || !supplier || !department) return { ok: false, error: "A catalog item or supplier is no longer available." }
     if (!hasRoutableSupplierTrust(supplier.trustLevel) || !supplierServesMaterialDepartment(supplier, department) || !supplierIsAddedToCatalogDepartment(supplier, department)) {
       return { ok: false, error: "This supplier is not added to that catalog department." }
     }
     if (price !== null && (!Number.isFinite(price) || price < 0 || price > 100_000_000)) return { ok: false, error: "Check the supplier prices before saving." }
+    if (productUrl && !validRetailProductUrl(supplier.id, productUrl)) {
+      return { ok: false, error: `Use an exact ${supplier.name} product page, not a search or category link.` }
+    }
     rows.push({
       item_id: input.itemId,
       supplier_id: supplier.id,
       supplier_name_snapshot: clean(supplier.name, 300),
       supplier_sku: clean(input.supplierSku, 120),
+      product_url: productUrl || null,
       unit_price: price === null ? null : Math.round(price * 10000) / 10000,
       availability: ["available", "not_available", "unknown"].includes(input.availability) ? input.availability : "unknown",
       notes: clean(input.notes, 1000),

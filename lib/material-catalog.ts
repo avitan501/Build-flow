@@ -38,6 +38,7 @@ export type MaterialCatalogSupplierPrice = {
   supplier_id: string
   supplier_name_snapshot: string
   supplier_sku: string
+  product_url: string | null
   unit_price: number | null
   availability: "available" | "not_available" | "unknown"
   notes: string
