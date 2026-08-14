@@ -28,9 +28,9 @@ export function DeleteManagerRecordButton({
   function confirmDeletion() {
     if (kind === "customer") {
       const related = `${projectCount} project${projectCount === 1 ? "" : "s"} and ${requestCount} request${requestCount === 1 ? "" : "s"}`
-      return window.prompt(
-        `Permanently delete ${label}, the login account, and ${related}? Type DELETE to confirm.`,
-      ) === "DELETE"
+      return window.confirm(
+        `Are you sure you want to delete ${label}? This will permanently delete the customer login, ${related}, and cannot be undone.`,
+      )
     }
 
     const details = kind === "project"

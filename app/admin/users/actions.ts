@@ -371,35 +371,40 @@ export async function deleteCustomerAction(customerId: string): Promise<DeleteMa
   const normalizedId = customerId.trim();
   if (!validUuid(normalizedId)) return { ok: false, error: "This customer could not be identified." };
 
-  const { error: prepareError } = await supabase.rpc("staff_prepare_customer_deletion", { p_customer_id: normalizedId });
+  const { data: preparation, error: prepareError } = await supabase.rpc("staff_prepare_customer_deletion", { p_customer_id: normalizedId });
   if (prepareError) return { ok: false, error: deletionError(prepareError.message, "customer") };
 
+  const queuedFileCount = Number((preparation as { queued_file_count?: number } | null)?.queued_file_count ?? 0);
   let cleanupFailed = false;
-  try {
-    await cleanupQueuedFiles("customer", normalizedId);
-  } catch (error) {
-    cleanupFailed = true;
-    console.error("Customer file cleanup failed before account deletion.", error);
+  if (queuedFileCount > 0) {
+    try {
+      await cleanupQueuedFiles("customer", normalizedId);
+    } catch (error) {
+      cleanupFailed = true;
+      console.error("Customer file cleanup failed before account deletion.", error);
+    }
   }
 
   const { error: deleteError } = await supabase.rpc("staff_delete_customer_account", { p_customer_id: normalizedId });
   if (deleteError) return { ok: false, error: deletionError(deleteError.message, "customer") };
 
-  const admin = createAdminClient();
   let warning: string | undefined;
   if (cleanupFailed) {
-    const { error: staleQueueError } = await admin
-      .from("manager_file_deletion_queue")
-      .delete()
-      .eq("target_type", "customer")
-      .eq("target_id", normalizedId);
-    if (staleQueueError) {
-      console.error("Customer was deleted, but stale file cleanup records remain.", staleQueueError);
+    try {
+      const admin = createAdminClient();
+      const { error: staleQueueError } = await admin
+        .from("manager_file_deletion_queue")
+        .delete()
+        .eq("target_type", "customer")
+        .eq("target_id", normalizedId);
+      if (staleQueueError) throw staleQueueError;
+    } catch (error) {
+      console.error("Customer was deleted, but stale file cleanup records remain.", error);
       warning = "The customer was deleted, but stale file-cleanup records remain for an administrator to review.";
     }
   }
 
-  const { data: remaining, error: verifyError } = await admin
+  const { data: remaining, error: verifyError } = await supabase
     .from("profiles")
     .select("id")
     .eq("id", normalizedId)
