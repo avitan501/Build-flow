@@ -4,6 +4,7 @@ import { Check, ChevronLeft, ChevronRight, FileUp, Pencil, Plus, Trash2, X, Zoom
 import { useMemo, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
+import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
 import {
   formatMaterialAnswer,
   hasCompleteMaterialAnswer,
@@ -67,6 +68,7 @@ function LumberItemList({ question, value, onChange, disabled }: {
   }
 
   return (
+    <ShopTranslationBoundary>
     <div className="grid gap-3">
       {items.map((item, index) => (
         <div key={index} className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -85,6 +87,7 @@ function LumberItemList({ question, value, onChange, disabled }: {
       ))}
       <button type="button" disabled={disabled} onClick={() => onChange({ items: [...items, emptyItem] })} className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:border-slate-500"><Plus className="h-4 w-4" />{`Add Another ${moldingMode ? "Molding" : cableMode ? "Cable" : "Item"}`}</button>
     </div>
+    </ShopTranslationBoundary>
   )
 }
 
@@ -109,6 +112,7 @@ function CardOptions({ question, value, onChange, disabled, compact = false }: {
     : question.options
 
   return (
+    <ShopTranslationBoundary>
     <div className={compact ? "flex flex-wrap gap-2" : "grid gap-3 sm:grid-cols-2"}>
       {options.map((option) => {
         const active = selectedValues.includes(option.value)
@@ -133,6 +137,7 @@ function CardOptions({ question, value, onChange, disabled, compact = false }: {
         </label>
       ) : null}
     </div>
+    </ShopTranslationBoundary>
   )
 }
 
@@ -146,6 +151,9 @@ function QuestionControl({ question, value, onChange, disabled, onUpload, compac
 }) {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [areaCalculatorOpen, setAreaCalculatorOpen] = useState(false)
+  const [areaLength, setAreaLength] = useState("")
+  const [areaWidth, setAreaWidth] = useState("")
   const controlId = `material-question-${question.id}`
 
   if (["single_select", "multi_select", "yes_no"].includes(question.question_type)) {
@@ -155,23 +163,35 @@ function QuestionControl({ question, value, onChange, disabled, onUpload, compac
     return <LumberItemList question={question} value={value} onChange={onChange} disabled={disabled} />
   }
   if (question.question_type === "dropdown") {
-    return <select id={controlId} name={question.question_key} aria-label={question.label} disabled={disabled} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} className="min-h-13 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"><option value="">Choose one</option>{question.options.map((option) => <option key={option.id} value={option.value}>{option.label}</option>)}</select>
+    return <ShopTranslationBoundary><select id={controlId} name={question.question_key} aria-label={question.label} disabled={disabled} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} className="min-h-13 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100"><option value="">Choose one</option>{question.options.map((option) => <option key={option.id} value={option.value}>{option.label}</option>)}</select></ShopTranslationBoundary>
   }
   if (question.question_type === "long_text") {
-    if (compact) return <input id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} value={typeof value === "string" ? value : ""} placeholder={question.placeholder || "Add optional notes"} onChange={(event) => onChange(event.target.value)} className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50" />
-    return <textarea id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} rows={5} value={typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(event.target.value)} className="w-full rounded-2xl border border-slate-300 px-4 py-2.5 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50" />
+    if (compact) return <ShopTranslationBoundary><input id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} value={typeof value === "string" ? value : ""} placeholder={question.placeholder || "Add optional notes"} onChange={(event) => onChange(event.target.value)} className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50" /></ShopTranslationBoundary>
+    return <ShopTranslationBoundary><textarea id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} rows={5} value={typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(event.target.value)} className="w-full rounded-2xl border border-slate-300 px-4 py-2.5 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50" /></ShopTranslationBoundary>
   }
   if (question.question_type === "quantity") {
     const current = typeof value === "object" && value && !Array.isArray(value) ? value : {}
-    return <div className="grid gap-3 sm:grid-cols-[1fr_1fr]"><input disabled={disabled} type="number" min="0" inputMode="decimal" value={current.value ?? ""} placeholder={question.placeholder || "Enter quantity"} onChange={(event) => onChange({ ...current, value: event.target.value === "" ? undefined : Math.max(0, Number(event.target.value)) })} className="min-h-13 rounded-2xl border border-slate-300 px-4 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /><select disabled={disabled} value={current.unit ?? ""} onChange={(event) => onChange({ ...current, unit: event.target.value })} className="min-h-13 rounded-2xl border border-slate-300 bg-white px-4 text-base"><option value="">Choose unit</option>{(question.configuration.units ?? []).map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select>{question.configuration.allowNotes ? <input disabled={disabled} value={current.notes ?? ""} placeholder="Packaging or quantity notes" onChange={(event) => onChange({ ...current, notes: event.target.value })} className="min-h-13 rounded-2xl border border-slate-300 px-4 text-base sm:col-span-2" /> : null}</div>
+    return <ShopTranslationBoundary><div className="grid gap-3 sm:grid-cols-[1fr_1fr]"><input disabled={disabled} type="number" min="0" inputMode="decimal" value={current.value ?? ""} placeholder={question.placeholder || "Enter quantity"} onChange={(event) => onChange({ ...current, value: event.target.value === "" ? undefined : Math.max(0, Number(event.target.value)) })} className="min-h-13 rounded-2xl border border-slate-300 px-4 text-base outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /><select disabled={disabled} value={current.unit ?? ""} onChange={(event) => onChange({ ...current, unit: event.target.value })} className="min-h-13 rounded-2xl border border-slate-300 bg-white px-4 text-base"><option value="">Choose unit</option>{(question.configuration.units ?? []).map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select>{question.configuration.allowNotes ? <input disabled={disabled} value={current.notes ?? ""} placeholder="Packaging or quantity notes" onChange={(event) => onChange({ ...current, notes: event.target.value })} className="min-h-13 rounded-2xl border border-slate-300 px-4 text-base sm:col-span-2" /> : null}</div></ShopTranslationBoundary>
   }
   if (question.question_type === "file_upload") {
     const current = typeof value === "object" && value && !Array.isArray(value) ? value : {}
-    return <div className="grid gap-2"><label className="flex min-h-24 cursor-pointer items-center justify-center gap-3 rounded-[18px] border-2 border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm font-semibold text-slate-700 hover:border-sky-400"><FileUp className="h-5 w-5" /><span>{uploading ? "Uploading..." : current.attachmentIds?.length ? `${current.attachmentIds.length} file${current.attachmentIds.length === 1 ? "" : "s"} attached` : "Choose plans or documents"}</span><input disabled={disabled || uploading || !onUpload} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.csv" className="sr-only" onChange={async (event) => { const files = Array.from(event.target.files ?? []); if (!files.length || !onUpload) return; setUploading(true); setUploadError(null); const result = await onUpload(question, files); setUploading(false); if (!result.ok) return setUploadError(result.error || "Upload failed."); onChange({ ...current, attachmentIds: [...(current.attachmentIds ?? []), ...(result.attachmentIds ?? [])] }) }} /></label>{uploadError ? <p className="text-sm text-rose-700">{uploadError}</p> : null}</div>
+    return <ShopTranslationBoundary><div className="grid gap-2"><label className="flex min-h-24 cursor-pointer items-center justify-center gap-3 rounded-[18px] border-2 border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm font-semibold text-slate-700 hover:border-sky-400"><FileUp className="h-5 w-5" /><span>{uploading ? "Uploading..." : current.attachmentIds?.length ? `${current.attachmentIds.length} file${current.attachmentIds.length === 1 ? "" : "s"} attached` : "Choose plans or documents"}</span><input disabled={disabled || uploading || !onUpload} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.csv" className="sr-only" onChange={async (event) => { const files = Array.from(event.target.files ?? []); if (!files.length || !onUpload) return; setUploading(true); setUploadError(null); const result = await onUpload(question, files); setUploading(false); if (!result.ok) return setUploadError(result.error || "Upload failed."); onChange({ ...current, attachmentIds: [...(current.attachmentIds ?? []), ...(result.attachmentIds ?? [])] }) }} /></label>{uploadError ? <p className="text-sm text-rose-700">{uploadError}</p> : null}</div></ShopTranslationBoundary>
   }
 
   const numeric = ["number", "square_feet", "linear_feet", "gallons"].includes(question.question_type)
-  return <div className={`relative ${compact ? "max-w-sm" : ""}`}><input id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} type={numeric ? "number" : "text"} min={numeric ? 0 : undefined} inputMode={numeric ? "decimal" : undefined} value={typeof value === "number" || typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(numeric ? event.target.value === "" ? "" : Math.max(0, Number(event.target.value)) : event.target.value)} className={`${compact ? "min-h-11 rounded-lg text-sm" : "min-h-13 rounded-2xl text-base"} w-full border border-slate-300 px-4 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50 ${question.unit ? "pr-24" : ""}`} />{question.unit ? <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-xs font-semibold text-slate-500">{question.unit}</span> : null}</div>
+  const area = Math.max(0, Number(areaLength)) * Math.max(0, Number(areaWidth))
+  return <ShopTranslationBoundary><div className={compact ? "max-w-sm" : ""}>
+    <div className="relative"><input id={controlId} name={question.question_key} aria-label={question.label} autoComplete="off" disabled={disabled} type={numeric ? "number" : "text"} min={numeric ? 0 : undefined} inputMode={numeric ? "decimal" : undefined} value={typeof value === "number" || typeof value === "string" ? value : ""} placeholder={question.placeholder} onChange={(event) => onChange(numeric ? event.target.value === "" ? "" : Math.max(0, Number(event.target.value)) : event.target.value)} className={`${compact ? "min-h-11 rounded-lg text-sm" : "min-h-13 rounded-2xl text-base"} w-full border border-slate-300 px-4 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-50 ${question.unit ? "pr-24" : ""}`} />{question.unit ? <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-xs font-semibold text-slate-500">{question.unit}</span> : null}</div>
+    {question.question_type === "square_feet" ? <div className="mt-2">
+      <button type="button" aria-expanded={areaCalculatorOpen} onClick={() => setAreaCalculatorOpen((open) => !open)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-[#0066cc]"><Plus className={`h-3.5 w-3.5 transition-transform ${areaCalculatorOpen ? "rotate-45" : ""}`} />Calculate from length × width</button>
+      {areaCalculatorOpen ? <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <label className="grid gap-1 text-xs font-semibold text-slate-600">Length (ft.)<input aria-label={`${question.label} length`} type="number" min="0" inputMode="decimal" value={areaLength} onChange={(event) => setAreaLength(event.target.value)} className="min-h-10 min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label>
+        <span className="pb-2 text-sm font-bold text-slate-400">×</span>
+        <label className="grid gap-1 text-xs font-semibold text-slate-600">Width (ft.)<input aria-label={`${question.label} width`} type="number" min="0" inputMode="decimal" value={areaWidth} onChange={(event) => setAreaWidth(event.target.value)} className="min-h-10 min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label>
+        <button type="button" disabled={!area} onClick={() => onChange(Math.ceil(area))} className="col-span-3 min-h-10 rounded-lg bg-slate-950 px-3 text-xs font-semibold text-white disabled:bg-slate-300">Use {area ? `${Math.ceil(area).toLocaleString()} sq. ft.` : "calculated area"}</button>
+      </div> : null}
+    </div> : null}
+  </div></ShopTranslationBoundary>
 }
 
 function configuratorGroupsFor(snapshot: MaterialQuestionnaireSnapshot) {
@@ -239,6 +259,12 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
   const showAllQuestions = displayMode === "all"
   const compact = density === "compact"
   const answeredQuestions = visibleQuestions.filter((question) => hasMaterialAnswer(answerForQuestion(question, answers)))
+  const hasStartedAnswer = visibleQuestions.some((question) => {
+    const value = answerForQuestion(question, answers)
+    if (hasMaterialAnswer(value)) return true
+    if (question.question_type !== "item_list" || typeof value !== "object" || !value || Array.isArray(value)) return false
+    return Boolean(value.items?.some((item) => item.size || item.code || item.length || Number(item.quantity) > 0))
+  })
   const requiredQuestions = visibleQuestions.filter((question) => question.is_required)
   const requiredProgress = requiredQuestions.reduce((totals, question) => {
     const progress = requiredFieldProgress(question, answerForQuestion(question, answers))
@@ -252,7 +278,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
     ...group,
     questions: visibleQuestions.filter((question) => configuratorGroupFor(question) === group.id),
   })).filter((group) => group.questions.length > 0)
-  const usesRightAlignedProductImages = configurator && ["Wood Floor", "Tile work"].includes(snapshot.category.department_key)
+  const usesRightAlignedProductImages = configurator
 
   function productImageButton(question: MaterialQuestion, compactImage = false) {
     if (!question.configuration.imageUrl) return null
@@ -265,6 +291,8 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
         aria-label="Enlarge product image"
       >
         <span
+          role="img"
+          aria-label="Product reference image"
           className="absolute inset-1 bg-contain bg-center bg-no-repeat"
           style={{
             backgroundImage: `url(${question.configuration.imageUrl})`,
@@ -336,6 +364,12 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
     setReviewing(false)
     setError(null)
     window.requestAnimationFrame(() => document.getElementById(`question-${question.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }))
+  }
+
+  function editSection(questions: MaterialQuestion[]) {
+    const firstQuestion = questions[0]
+    if (!firstQuestion) return
+    editQuestion(firstQuestion, visibleQuestions.findIndex((question) => question.id === firstQuestion.id))
   }
 
   function renderQuestion(question: MaterialQuestion, index: number) {
@@ -435,7 +469,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
             <div className="grid gap-5">
               {reviewQuestionGroups.map((group) => (
                 <section key={group.id}>
-                  <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{group.title}</h4>
+                  <div className="mb-2 flex items-center justify-between gap-3"><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{group.title}</h4><button type="button" onClick={() => editSection(group.questions)} className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-[#0066cc]"><Pencil className="h-3.5 w-3.5" />Edit section</button></div>
                   <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
                     {group.questions.map((question) => {
                       const index = visibleQuestions.findIndex((entry) => entry.id === question.id)
@@ -474,10 +508,10 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
               <button type="button" onClick={reviewAll} className="mt-3 inline-flex min-h-10 w-full touch-manipulation items-center justify-center gap-1 rounded-lg bg-slate-950 px-4 text-xs font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200">Review Request<ChevronRight className="h-3.5 w-3.5" aria-hidden="true" /></button>
             </aside>
 
-            <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+6.25rem)] z-40 mx-auto mt-3 flex min-h-12 w-[calc(100%-2.5rem)] max-w-[26rem] items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white/95 px-2 py-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.16)] backdrop-blur-lg lg:hidden" data-testid="flooring-mobile-summary">
+            {hasStartedAnswer ? <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+6.25rem)] z-40 mx-auto mt-3 flex min-h-12 w-[calc(100%-2.5rem)] max-w-[26rem] items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white/95 px-2 py-1.5 shadow-[0_10px_28px_rgba(15,23,42,0.16)] backdrop-blur-lg lg:hidden" data-testid="flooring-mobile-summary">
               <div className="min-w-0"><p className="truncate text-xs font-bold text-slate-950">{quantityLabel || `${answeredQuestions.length} selections`}</p><p className="text-[10px] font-semibold tabular-nums text-slate-500">{requiredProgress.complete}/{requiredProgress.total} required fields</p></div>
               <button type="button" onClick={reviewAll} className="inline-flex min-h-10 shrink-0 touch-manipulation items-center justify-center gap-1 rounded-lg bg-slate-950 px-3 text-xs font-semibold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200">Review<ChevronRight className="h-3.5 w-3.5" aria-hidden="true" /></button>
-            </div>
+            </div> : null}
           </div>
         ) : <div className={compact ? "grid gap-4" : "grid gap-7"}>{visibleQuestions.map(renderQuestion)}</div> : current ? <div><h3 className="text-[1.35rem] font-bold leading-tight text-slate-950 sm:text-2xl">{current.label}{current.is_required ? <span className="text-rose-500"> *</span> : null}</h3>{current.help_text ? <p className="mt-2 text-sm leading-6 text-slate-600">{current.help_text}</p> : null}<div className="mt-5"><QuestionControl question={current} value={answerForQuestion(current, answers)} onChange={(value, autoAdvance) => update(current.id, value, autoAdvance)} disabled={locked} onUpload={onUpload} /></div></div> : <p className="text-sm text-slate-600">No active questions are configured.</p>}
         {!configurator && error ? <div aria-live="polite" className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</div> : null}
@@ -504,7 +538,8 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
     </section>
   )
 
-  if (embedded) return content
+  const translatedContent = <ShopTranslationBoundary>{content}</ShopTranslationBoundary>
+  if (embedded) return translatedContent
   if (typeof document === "undefined") return null
-  return createPortal(<div className="fixed inset-0 z-[110] grid place-items-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6">{content}</div>, document.body)
+  return createPortal(<div className="fixed inset-0 z-[110] grid place-items-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6">{translatedContent}</div>, document.body)
 }

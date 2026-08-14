@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react"
 
 import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
 import { MaterialQuestionnaireWizard } from "@/components/buildflow/material-questionnaire-wizard"
+import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
 import { formatMaterialAnswer, hasMaterialAnswer, type MaterialAnswerValue, type MaterialQuestionnaireSnapshot } from "@/lib/material-questionnaires"
 
 const MATERIAL_DRAFT_KEY = "avantia-material-order-draft"
@@ -66,7 +67,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
 
   if (completedAnswers) {
     return (
-      <section className="overflow-hidden rounded-lg border border-emerald-200 bg-white shadow-sm">
+      <ShopTranslationBoundary><section className="overflow-hidden rounded-lg border border-emerald-200 bg-white shadow-sm">
         <div className="grid lg:grid-cols-[minmax(0,1fr)_21rem]">
           <div className="p-5 sm:p-6">
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><CheckCircle2 className="h-6 w-6" aria-hidden="true" /></span>
@@ -94,16 +95,16 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
             </dl>
           </div>
         </div>
-      </section>
+      </section></ShopTranslationBoundary>
     )
   }
 
   if (!hydrated) {
-    return <section className="min-h-72 animate-pulse rounded-lg border border-slate-200 bg-white" aria-label={`Loading ${displayCategory} order`} />
+    return <ShopTranslationBoundary><section className="min-h-72 animate-pulse rounded-lg border border-slate-200 bg-white" aria-label={`Loading ${displayCategory} order`} /></ShopTranslationBoundary>
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <ShopTranslationBoundary><section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <MaterialQuestionnaireWizard
         snapshot={snapshot}
         initialAnswers={draftAnswers}
@@ -126,6 +127,6 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
           {referenceFile ? <button type="button" onClick={() => setReferenceFile(null)} className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"><span className="max-w-48 truncate">{referenceFile.name}</span><X className="h-4 w-4" /></button> : <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white"><FileImage className="h-4 w-4" />Add Photo<input type="file" accept="image/png,image/jpeg,image/webp,.pdf" className="sr-only" onChange={(event) => setReferenceFile(event.target.files?.[0] ?? null)} /></label>}
         </div>
       </div> : null}
-    </section>
+    </section></ShopTranslationBoundary>
   )
 }

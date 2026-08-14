@@ -5,6 +5,7 @@ import { Mail, Phone } from "lucide-react"
 import { usePathname } from "next/navigation"
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
+import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
 import { WhatsAppIcon } from "@/components/buildflow/whatsapp-icon"
 
 const BUSINESS_WHATSAPP_URL = "https://wa.me/15169088319?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20with%20construction%20materials."
@@ -16,8 +17,9 @@ export function SiteFooter() {
   if (pathname && HIDDEN_PATHS.has(pathname)) return null
 
   return (
-    <footer className="border-t border-slate-200 bg-[#eef3f8] px-4 pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-6 sm:pt-6">
-      <div className="mx-auto grid max-w-[88rem] items-center gap-4 rounded-[18px] border border-slate-200 bg-white px-5 py-4 shadow-[0_10px_30px_rgba(7,17,38,0.05)] sm:grid-cols-[minmax(15rem,1fr)_auto] sm:px-6">
+    <ShopTranslationBoundary><footer className="border-t border-slate-200 bg-[#eef3f8] px-4 pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-6 sm:pt-6">
+      <div className="mx-auto max-w-[88rem] rounded-[18px] border border-slate-200 bg-white px-5 py-4 shadow-[0_10px_30px_rgba(7,17,38,0.05)] sm:px-6">
+        <div className="grid items-center gap-4 sm:grid-cols-[minmax(15rem,1fr)_auto]">
         <div className="flex min-w-0 items-center gap-4">
           <Link href="/" aria-label="Avantia home" className="inline-flex shrink-0">
             <AvantiaBuildLockup header />
@@ -31,8 +33,8 @@ export function SiteFooter() {
           <a href="mailto:office@build.avantiap.com" className="inline-flex min-h-10 min-w-0 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:px-3 sm:text-sm">
             <Mail className="h-4 w-4 shrink-0" aria-hidden="true" /> <span className="truncate">office@build.avantiap.com</span>
           </a>
-          <a href="tel:+15169088319" aria-label="(516) 908-8319" className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:w-auto sm:gap-2 sm:px-3">
-            <Phone className="h-4 w-4" aria-hidden="true" /><span className="hidden text-sm font-semibold sm:inline">(516) 908-8319</span>
+          <a href="tel:+15169088319" aria-label="Call or text (516) 908-8319" className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-[#0E2A4A] transition hover:bg-sky-50 hover:text-[#0066cc] sm:gap-2 sm:px-3">
+            <Phone className="h-4 w-4" aria-hidden="true" /><span className="whitespace-nowrap text-[11px] font-semibold sm:text-sm">(516) 908-8319</span>
           </a>
           <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="WhatsApp us" className="group relative inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#128c7e] text-white transition hover:bg-[#0f7a6e] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
             <WhatsAppIcon className="h-5 w-5" />
@@ -41,7 +43,16 @@ export function SiteFooter() {
             </span>
           </a>
         </nav>
+        </div>
+        <nav aria-label="Policies" className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-200 pt-3 text-xs font-semibold text-slate-500">
+          <Link href="/privacy" className="hover:text-[#0066cc]">Privacy</Link>
+          <Link href="/terms" className="hover:text-[#0066cc]">Terms</Link>
+          <Link href="/returns" className="hover:text-[#0066cc]">Returns</Link>
+          <Link href="/delivery-policy" className="hover:text-[#0066cc]">Delivery Policy</Link>
+          <Link href="/accessibility" className="hover:text-[#0066cc]">Accessibility</Link>
+          <Link href="/shop#shop-faq" className="ml-auto hover:text-[#0066cc]">Ordering FAQ</Link>
+        </nav>
       </div>
-    </footer>
+    </footer></ShopTranslationBoundary>
   )
 }

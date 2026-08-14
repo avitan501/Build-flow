@@ -4,6 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useMemo, useState, useSyncExternalStore, type FormEvent } from "react"
 
+import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
 import { clearSelectedGuestProject, createGuestProject, GUEST_PROJECTS_UPDATED_EVENT, readSelectedGuestProject } from "@/lib/guest-projects"
 import { MANAGER_ADD_ONS_UPDATED_EVENT, applyDepartmentAddOns, readManagerAddOns, type ManagerCatalogAddOns } from "@/lib/manager-add-ons"
 import type { ProjectRecord } from "@/lib/projects"
@@ -212,7 +213,7 @@ export function ShopProjectToolPicker({
   }
 
   return (
-    <div className="grid gap-4">
+    <ShopTranslationBoundary><div className="grid gap-4">
       <section className="max-w-3xl rounded-[18px] border border-black/[0.06] bg-white p-3 shadow-[0_8px_24px_rgba(0,0,0,0.045)] sm:p-3.5">
         <button
           type="button"
@@ -429,6 +430,6 @@ export function ShopProjectToolPicker({
           })}
         </div>
       </section>
-    </div>
+    </div></ShopTranslationBoundary>
   )
 }

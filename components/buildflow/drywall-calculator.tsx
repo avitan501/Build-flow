@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react"
 
+import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
+
 type DrywallMaterialRow = {
   label: string
   quantity: string
@@ -128,6 +130,7 @@ export function DrywallCalculator() {
   }
 
   return (
+    <ShopTranslationBoundary>
     <section className="grid gap-4 lg:grid-cols-[0.92fr_1.08fr]">
       <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_12px_28px_rgba(15,23,42,0.06)] sm:p-5">
         <div className="flex items-center gap-3">
@@ -224,5 +227,6 @@ export function DrywallCalculator() {
         {copyStatus ? <div className="mt-3 text-sm font-semibold text-sky-700">{copyStatus}</div> : null}
       </div>
     </section>
+    </ShopTranslationBoundary>
   )
 }

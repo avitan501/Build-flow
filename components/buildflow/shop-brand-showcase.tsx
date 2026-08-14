@@ -4,6 +4,8 @@ import Image from "next/image"
 import { Pause, Play } from "lucide-react"
 import { useState } from "react"
 
+import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
+
 const SHOP_BRANDS = [
   { name: "Andersen", logo: "/images/brands/andersen.svg", scale: "scale-95" },
   { name: "GAF", logo: "/images/brands/gaf.svg", scale: "scale-110" },
@@ -19,6 +21,7 @@ export function ShopBrandShowcase({ compact = false, transparent = false }: { co
   const [paused, setPaused] = useState(false)
 
   return (
+    <ShopTranslationBoundary>
     <section aria-labelledby="shop-brands-heading" className={`${compact ? "mx-auto max-w-[88rem] overflow-hidden" : "mt-8"} ${transparent ? "bg-transparent" : "bg-white"}`}>
       <div className={`mx-auto w-full max-w-7xl px-4 sm:px-8 lg:px-10 ${compact ? "py-2.5 sm:py-3" : "py-8 sm:py-10"}`}>
         <div className="flex items-center justify-center gap-2 text-center">
@@ -58,5 +61,6 @@ export function ShopBrandShowcase({ compact = false, transparent = false }: { co
         </div>
       </div>
     </section>
+    </ShopTranslationBoundary>
   )
 }

@@ -3,6 +3,42 @@ import path from "node:path"
 
 import { expect, test } from "@playwright/test"
 import { translateShopText } from "@/lib/shop-i18n"
+import { shopSearchMatches, shopSearchSuggestions } from "@/lib/shop-search"
+
+test("shop search tolerates common material misspellings", () => {
+  expect(shopSearchMatches("shetrock", ["Sheet rock", "Drywall board"])).toBe(true)
+  expect(shopSearchMatches("floring", ["Wood flooring"])).toBe(true)
+  expect(shopSearchMatches("frameing", ["Framing lumber"])).toBe(true)
+  expect(shopSearchSuggestions("shetrock", ["Framing", "Sheet rock", "Tile work"])).toEqual(["Sheet rock"])
+})
+
+test("shop search suggests the intended department for a typo", async ({ page }) => {
+  await page.goto("/shop")
+  await page.getByRole("button", { name: "Search materials" }).click()
+  await page.getByPlaceholder("Search materials").fill("shetrock")
+  await expect(page.getByRole("dialog").getByText("Sheet rock", { exact: true })).toBeVisible()
+})
+
+test("shop exposes ordering answers, contact options, and policy links", async ({ page }) => {
+  await page.goto("/shop")
+  await expect(page.getByRole("heading", { name: "Material ordering questions" })).toBeVisible()
+  await expect(page.locator("summary").filter({ hasText: "How does pricing work?" })).toBeVisible()
+  await expect(page.locator("summary").filter({ hasText: "When can materials be delivered?" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Call (516) 908-8319" })).toHaveAttribute("href", "tel:+15169088319")
+  await expect(page.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy")
+  await expect(page.getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/terms")
+  await expect(page.getByRole("link", { name: "Returns" })).toHaveAttribute("href", "/returns")
+  await expect(page.getByRole("link", { name: "Delivery Policy" })).toHaveAttribute("href", "/delivery-policy")
+})
+
+test("public routes declare their own canonical URL", async ({ page }) => {
+  for (const pathName of ["/", "/shop", "/shop/framing", "/privacy"]) {
+    await page.goto(pathName)
+    const canonical = new URL(await page.locator('link[rel="canonical"]').getAttribute("href") || "")
+    expect(canonical.origin).toBe("https://build.avantiap.com")
+    expect(canonical.pathname).toBe(pathName)
+  }
+})
 
 test("address selection closes and keeps one clear selected address", async ({ page }) => {
   const address = "123 Spruce Street, Cedarhurst, NY 11516"
@@ -390,6 +426,13 @@ test("sheetrock uses the compact on-page contractor configurator", async ({ page
 })
 
 test("shop language switch translates only the shop and persists the choice", async ({ page }) => {
+  const hydrationProblems: string[] = []
+  page.on("console", (message) => {
+    if (/hydration|did not match|server rendered html/i.test(message.text())) hydrationProblems.push(message.text())
+  })
+  page.on("pageerror", (error) => {
+    if (/hydration|did not match|server rendered html/i.test(error.message)) hydrationProblems.push(error.message)
+  })
   await page.goto("/shop")
 
   await page.getByRole("button", { name: "Ver tienda en español" }).click()
@@ -439,6 +482,33 @@ test("shop language switch translates only the shop and persists the choice", as
   await page.goto("/")
   await expect(page.locator("html")).toHaveAttribute("lang", "en")
   await expect(page.getByText("Estructura", { exact: true })).toHaveCount(0)
+  expect(hydrationProblems).toEqual([])
+})
+
+test("square-foot questions can calculate area from length and width", async ({ page }) => {
+  await page.goto("/shop/wood-floor")
+  await page.getByRole("button", { name: "Calculate from length × width" }).first().click()
+  await page.getByLabel("How much flooring do you need? length").fill("10")
+  await page.getByLabel("How much flooring do you need? width").fill("12")
+  await page.getByRole("button", { name: "Use 120 sq. ft." }).click()
+  await expect(page.getByRole("spinbutton", { name: "How much flooring do you need?", exact: true })).toHaveValue("120")
+})
+
+test("mobile review stays out of the way until an order starts and sections can be edited", async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 0) >= 1024, "Mobile sticky behavior")
+  await page.goto("/shop/wood-floor")
+  await expect(page.getByTestId("flooring-mobile-summary")).toHaveCount(0)
+  await page.getByRole("button", { name: "Red Oak" }).click()
+  await page.getByRole("button", { name: "5″" }).click()
+  await page.getByRole("spinbutton", { name: "How much flooring do you need?", exact: true }).fill("25")
+  await page.getByRole("button", { name: "Yes" }).nth(0).click()
+  const summary = page.getByTestId("flooring-mobile-summary")
+  await expect(summary).toBeVisible()
+  await summary.getByRole("button", { name: "Review" }).click()
+  await expect(page.getByRole("heading", { name: "Review Your Request" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Edit section" }).first()).toBeVisible()
+  await page.getByRole("button", { name: "Edit section" }).first().click()
+  await expect(page.getByRole("heading", { name: "Review Your Request" })).toHaveCount(0)
 })
 
 test("tile uses an on-page materials configurator", async ({ page }) => {
@@ -542,6 +612,7 @@ test("framing supports repeatable lumber order rows", async ({ page }) => {
 
 test("flooring review identifies the first required missing answer", async ({ page }) => {
   await page.goto("/shop/wood-floor")
+  await page.getByLabel("How much flooring do you need?").fill("1")
 
   const review = (page.viewportSize()?.width ?? 0) >= 1024
     ? page.getByTestId("flooring-order-summary").getByRole("button", { name: "Review Request" })

@@ -7,6 +7,14 @@ import { CoverageScrollSection } from "@/components/buildflow/coverage-scroll-se
 import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase";
 import { WhatsAppIcon } from "@/components/buildflow/whatsapp-icon";
 import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools";
+import { pageMetadata } from "@/lib/site-metadata";
+
+export const metadata = pageMetadata({
+  title: "Avantia Build | You Build. We Handle the Materials.",
+  description: "Send your plans or material list. We compare suppliers, organize the order, and arrange jobsite delivery.",
+  path: "/",
+  openGraphTitle: "Avantia Build | Materials Priced & Delivered",
+});
 
 const orderSteps = [
   {

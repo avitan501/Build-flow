@@ -45,6 +45,20 @@ const SPANISH_TEXT: Record<string, string> = {
   "Avantia home": "Inicio de Avantia",
   "Avantia contact": "Contacto de Avantia",
   "WhatsApp us": "Escríbanos por WhatsApp",
+  "Before you order": "Antes de pedir",
+  "Material ordering questions": "Preguntas sobre pedidos de materiales",
+  "Get a clear answer before pricing, approval, or delivery.": "Obtenga una respuesta clara antes del precio, la aprobación o la entrega.",
+  "How does pricing work?": "¿Cómo funciona el precio?",
+  "Send the material, size, quantity, and delivery details. Avantia reviews the request and confirms current supplier pricing before an order is approved.": "Envíe el material, tamaño, cantidad y detalles de entrega. Avantia revisa la solicitud y confirma el precio actual del proveedor antes de aprobar el pedido.",
+  "When can materials be delivered?": "¿Cuándo se pueden entregar los materiales?",
+  "Timing depends on stock, supplier cutoff times, and the jobsite address. We confirm the available delivery window before you approve the order.": "El plazo depende del inventario, los horarios límite del proveedor y la dirección de la obra. Confirmamos la ventana de entrega antes de que apruebe el pedido.",
+  "Can I return materials?": "¿Puedo devolver materiales?",
+  "Return eligibility depends on the supplier and the item. Custom, cut, tinted, opened, and special-order materials may not be returnable. Confirm the written quote before ordering.": "La devolución depende del proveedor y del artículo. Los materiales personalizados, cortados, teñidos, abiertos o de pedido especial pueden no ser retornables. Confirme la cotización escrita antes de pedir.",
+  "What happens if an item is unavailable?": "¿Qué sucede si un artículo no está disponible?",
+  "We contact you before substituting a product. You can approve the alternative, request another option, or remove the item.": "Nos comunicamos con usted antes de sustituir un producto. Puede aprobar la alternativa, solicitar otra opción o eliminar el artículo.",
+  "What if materials arrive damaged?": "¿Qué hago si los materiales llegan dañados?",
+  "Photograph the material and delivery ticket immediately, keep the packaging, and contact Avantia as soon as possible so we can review the supplier claim.": "Fotografíe inmediatamente el material y el recibo de entrega, conserve el empaque y contacte a Avantia cuanto antes para revisar el reclamo al proveedor.",
+  "Call (516) 908-8319": "Llame al (516) 908-8319",
   "Everything it takes to build": "Todo lo necesario para construir",
   "You build. We handle the materials.": "Usted construye. Nosotros nos encargamos de los materiales.",
   "Plans, pricing, ordering, and jobsite delivery.": "Planos, precios, pedidos y entrega en la obra.",
@@ -566,6 +580,11 @@ const SPANISH_TEXT: Record<string, string> = {
   "Could not reach the server. Please check your connection and try again.": "No se pudo conectar con el servidor. Revise su conexión e inténtelo de nuevo.",
 
   "Room takeoff": "Cálculo de la habitación",
+  "Calculate from length × width": "Calcular con largo × ancho",
+  "Length (ft.)": "Largo (pies)",
+  "Width (ft.)": "Ancho (pies)",
+  "Use calculated area": "Usar área calculada",
+  "Edit section": "Editar sección",
   "Enter room dimensions and adjust waste before ordering.": "Ingrese las dimensiones y ajuste el desperdicio antes de pedir.",
   "Material list": "Lista de materiales",
   "Use this as a planning estimate before final field verification.": "Use esta estimación para planificar antes de la verificación final en la obra.",
@@ -851,7 +870,10 @@ const SPANISH_TEXT: Record<string, string> = {
 }
 
 function translatePattern(value: string) {
-  let match = value.match(/^Need Help With a Custom (.+) Order\?$/)
+  let match = value.match(/^Use ([\d,.]+) sq\. ft\.$/)
+  if (match) return `Usar ${match[1]} pies²`
+
+  match = value.match(/^Need Help With a Custom (.+) Order\?$/)
   if (match) return `¿Necesita ayuda con un pedido personalizado de ${translateShopText(match[1], "es").toLowerCase()}?`
 
   match = value.match(/^Confirm This (.+) Request$/)

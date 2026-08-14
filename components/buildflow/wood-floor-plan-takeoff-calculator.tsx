@@ -12,6 +12,7 @@ import {
   type WoodFloorTakeoffActionState,
 } from "@/app/shop/wood-floor/flooring-calculator/actions";
 import type { WoodFloorRoom } from "@/lib/wood-floor-takeoff-extraction";
+import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider";
 import { calculateWoodFloorMaterials } from "@/lib/wood-floor-takeoff-materials";
 import { PROJECT_UPLOAD_STORAGE_BUCKET } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/client";
@@ -503,6 +504,7 @@ export function WoodFloorPlanTakeoffCalculator({
   }
 
   return (
+    <ShopTranslationBoundary>
     <section className="grid gap-4">
       <div className="rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -874,5 +876,6 @@ export function WoodFloorPlanTakeoffCalculator({
       </section>
       </div>
     </section>
+    </ShopTranslationBoundary>
   );
 }

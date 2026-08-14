@@ -8,9 +8,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { MobileMenuDrawer, type MobileMenuLink } from "@/components/buildflow/mobile-menu-drawer";
-import { useShopLanguage } from "@/components/buildflow/shop-language-provider";
+import { ShopTranslationBoundary, useShopLanguage } from "@/components/buildflow/shop-language-provider";
 import { placeholderImageMetadata } from "@/lib/shop-catalog";
 import { SHOP_CATEGORY_NAMES, SHOP_POPULAR_SEARCHES } from "@/lib/shop";
+import { shopSearchSuggestions } from "@/lib/shop-search";
 
 type MobileClientHeaderProps = {
   isSignedIn: boolean;
@@ -134,13 +135,11 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
 
   const normalizedQuery = draftQuery.trim().toLowerCase();
   const shopSuggestions = useMemo(() => {
-    if (!normalizedQuery) return [...SHOP_CATEGORY_NAMES];
-    return SHOP_CATEGORY_NAMES.filter((category) => category.toLowerCase().includes(normalizedQuery));
+    return shopSearchSuggestions(normalizedQuery, SHOP_CATEGORY_NAMES);
   }, [normalizedQuery]);
 
   const popularSearches = useMemo(() => {
-    if (!normalizedQuery) return [...SHOP_POPULAR_SEARCHES];
-    return SHOP_POPULAR_SEARCHES.filter((term) => term.toLowerCase().includes(normalizedQuery));
+    return shopSearchSuggestions(normalizedQuery, SHOP_POPULAR_SEARCHES);
   }, [normalizedQuery]);
 
   if (!pathname || !shouldShowHeader(pathname)) {
@@ -172,7 +171,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
   }
 
   return (
-    <>
+    <ShopTranslationBoundary>
       <div data-testid="site-header" className="sticky top-0 z-[60] border-b border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(148,163,184,0.1)]">
         <div className="mx-auto flex w-full max-w-7xl items-center gap-1.5 px-2 py-2.5 min-[360px]:gap-2 min-[360px]:px-3 sm:px-5">
           <button
@@ -423,6 +422,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
           </div>
         </div>
       ) : null}
-    </>
+    </ShopTranslationBoundary>
   );
 }

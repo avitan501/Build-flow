@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
+import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
 import { recordShopActivity } from "@/app/shop/actions"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import { getShopActivitySessionId, writeLocalShopActivity } from "@/lib/shop-activity"
@@ -96,6 +97,7 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
   }
 
   return (
+    <ShopTranslationBoundary>
     <main className="min-h-screen bg-[#f4f7fb] pb-28 text-slate-950">
       <section className="mx-auto max-w-6xl px-3 py-3 sm:px-6 sm:py-5 lg:px-8">
         <div className="overflow-hidden rounded-[24px] bg-white shadow-[0_16px_44px_rgba(15,23,42,0.08)] sm:rounded-[30px]">
@@ -300,5 +302,6 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
       </section>
 
     </main>
+    </ShopTranslationBoundary>
   )
 }

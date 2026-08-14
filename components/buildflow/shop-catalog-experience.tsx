@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 
 import { recordShopActivity } from "@/app/shop/actions"
 import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
+import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
 import {
   MANAGER_ADD_ONS_UPDATED_EVENT,
   departmentDisplayLabel,
@@ -26,6 +27,7 @@ import {
   readShopSavedIds,
 } from "@/lib/shop-cart"
 import { SHOP_CATEGORY_CHIPS } from "@/lib/shop"
+import { shopSearchMatches } from "@/lib/shop-search"
 
 type ShopCatalogExperienceProps = {
   products: ShopCatalogProduct[]
@@ -173,7 +175,6 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   const lastCategoryRef = useRef("")
 
   const query = (searchParams.get("q") ?? "").trim()
-  const normalizedQuery = query.toLowerCase()
   const activeCategory = searchParams.get("category")?.trim() || "All"
   const activeCategorySource = activeCategory === "All" ? "All" : resolveDepartmentSourceLabel(managerAddOns, activeCategory)
   const activeCategoryLabel = activeCategorySource === "All" ? "All" : departmentDisplayLabel(managerAddOns, activeCategorySource)
@@ -290,10 +291,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
         product.category === activeCategorySource ||
         product.imageCategory === activeCategoryLabel ||
         product.category === activeCategoryLabel
-      const haystack = [product.name, product.category, product.imageCategory, product.description, product.unit, product.specLine, product.supplierName || "", product.quoteNumber || "", product.popularUse]
-        .join(" ")
-        .toLowerCase()
-      const matchesQuery = !normalizedQuery || haystack.includes(normalizedQuery)
+      const matchesQuery = shopSearchMatches(query, [product.name, product.category, product.imageCategory, product.description, product.unit, product.specLine, product.supplierName, product.quoteNumber, product.popularUse])
       const matchesSaved = browseTab !== "saved" || savedIds.includes(product.id)
       return matchesCategory && matchesQuery && matchesSaved
     })
@@ -384,6 +382,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   }
 
   return (
+    <ShopTranslationBoundary>
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
         <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
@@ -615,5 +614,6 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
       </div>
 
     </main>
+    </ShopTranslationBoundary>
   )
 }

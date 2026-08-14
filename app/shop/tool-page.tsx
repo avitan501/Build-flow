@@ -5,6 +5,8 @@ import { getSessionWithProfile } from "@/lib/auth"
 import { applyDepartmentAddOns, createEmptyManagerAddOns, departmentExperienceFor, isDepartmentHidden } from "@/lib/manager-add-ons"
 import type { ProjectRecord } from "@/lib/projects"
 import { findShopToolCategory, type ShopToolSlug } from "@/lib/shop-tools"
+import { translateShopText } from "@/lib/shop-i18n"
+import { getRequestedShopLanguage } from "@/lib/shop-language-server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { applyStorefrontQuestionnaireDefaults, DOOR_MOLDING_QUESTIONNAIRE_PREVIEW, DRYWALL_QUESTIONNAIRE_PREVIEW, ELECTRICAL_QUESTIONNAIRE_PREVIEW, FLOORING_QUESTIONNAIRE_PREVIEW, FRAMING_QUESTIONNAIRE_PREVIEW, TILE_QUESTIONNAIRE_PREVIEW } from "@/lib/material-questionnaire-preview"
 import { buildMaterialQuestionnaireSnapshot } from "@/lib/material-questionnaires"
@@ -67,12 +69,14 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
   }
 
   const params = (await searchParams) ?? {}
+  const language = await getRequestedShopLanguage()
   // Keep the customer-facing "Flooring" label while using the legacy
   // department key that existing admin questionnaire records are stored under.
   const questionnaireDepartment = baseCategory.slug === "wood-floor" ? "Wood Floor" : baseCategory.label
   const projectSession = await loadCurrentUserProjects(questionnaireDepartment)
   if (isDepartmentHidden(projectSession.addOns, baseCategory.label)) notFound()
-  const category = applyDepartmentAddOns([baseCategory], projectSession.addOns)[0] ?? baseCategory
+  const configuredCategory = applyDepartmentAddOns([baseCategory], projectSession.addOns)[0] ?? baseCategory
+  const category = { ...configuredCategory, label: translateShopText(configuredCategory.label, language) }
   const experience = departmentExperienceFor(projectSession.addOns, baseCategory.label)
   const projects = projectSession.projects
   const selectedProjectId = projects.some((project) => project.id === params.project) ? params.project : ""

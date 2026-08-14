@@ -1,5 +1,6 @@
 import { ShopProjectToolPicker } from "@/components/buildflow/shop-project-tool-picker"
 import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase"
+import { ShopFaq } from "@/components/buildflow/shop-faq"
 import { getSessionWithProfile } from "@/lib/auth"
 import type { ProjectRecord } from "@/lib/projects"
 import { ShopCatalogExperience } from "@/components/buildflow/shop-catalog-experience"
@@ -7,6 +8,13 @@ import { buildShopProducts } from "@/lib/shop-catalog"
 import { loadShopActivityForCurrentUser } from "@/lib/shop-activity-server"
 import { loadShopItems } from "@/lib/shop-loader"
 import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools"
+import { pageMetadata } from "@/lib/site-metadata"
+
+export const metadata = pageMetadata({
+  title: "Order Construction Materials | Avantia Build",
+  description: "Choose a department, build a material list, upload plans, and request organized pricing and jobsite delivery.",
+  path: "/shop",
+})
 
 type ShopPageProps = {
   searchParams?: Promise<{ project?: string; address?: string; created?: string; error?: string; q?: string; category?: string }>
@@ -44,7 +52,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
     ])
     const products = buildShopProducts(itemsData, error)
 
-    return <ShopCatalogExperience products={products} recentActivity={recentActivity} />
+    return <><ShopCatalogExperience products={products} recentActivity={recentActivity} /><ShopFaq /></>
   }
 
   const { projects, user } = await loadCurrentUserProjects()
@@ -67,6 +75,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
       </section>
 
       <ShopBrandShowcase />
+      <ShopFaq />
     </main>
   )
 }

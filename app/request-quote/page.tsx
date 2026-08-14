@@ -2,6 +2,13 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
 import { QuoteRequestForm } from "@/components/buildflow/quote-request-form"
+import { pageMetadata } from "@/lib/site-metadata"
+
+export const metadata = pageMetadata({
+  title: "Request Material Pricing | Avantia Build",
+  description: "Send a material list or blueprint for organized supplier pricing and jobsite delivery.",
+  path: "/request-quote",
+})
 
 export default function RequestQuotePage() {
   return (

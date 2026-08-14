@@ -4,6 +4,7 @@ import { FileUp, X } from "lucide-react"
 import { useState } from "react"
 
 import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
+import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
 
 export function DepartmentRequestComposer({ category, displayCategory = category, requestId, questionnaireDepartment, allowUpload = false }: { category: string; displayCategory?: string; requestId: string; questionnaireDepartment?: string; allowUpload?: boolean }) {
   const [details, setDetails] = useState("")
@@ -12,7 +13,7 @@ export function DepartmentRequestComposer({ category, displayCategory = category
   const canSubmit = Boolean(trimmedDetails || file)
 
   return (
-    <section className="border-t border-slate-200 bg-white py-6 sm:py-8">
+    <ShopTranslationBoundary><section className="border-t border-slate-200 bg-white py-6 sm:py-8">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Order request</p>
         <h2 className="mt-1 text-xl font-semibold text-slate-950 sm:text-2xl">Place an order here</h2>
@@ -66,6 +67,6 @@ export function DepartmentRequestComposer({ category, displayCategory = category
         </div>
       </div>
 
-    </section>
+    </section></ShopTranslationBoundary>
   )
 }

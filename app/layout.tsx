@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Poppins } from "next/font/google";
 import { cookies } from "next/headers";
 import Script from "next/script";
+import { Fragment } from "react";
 
 import { AvantiaBuildClientShell } from "@/components/buildflow/buildflow-client-shell";
 import { MobileBottomDock } from "@/components/buildflow/mobile-bottom-dock";
@@ -39,9 +40,6 @@ export const metadata: Metadata = {
   title: "Avantia Build | You Build. We Handle the Materials.",
   description: "Send your plans or material list. We compare suppliers, organize the order, and arrange jobsite delivery.",
   manifest: "/manifest.webmanifest",
-  alternates: {
-    canonical: "/",
-  },
   appleWebApp: {
     capable: true,
     title: "Avantia Build",
@@ -107,12 +105,14 @@ export default async function RootLayout({
         ) : null}
         <ShopLanguageProvider initialLanguage={shopLanguage}>
           <AvantiaBuildClientShell>
-            <TrafficTracker disabled={isAdmin} />
-            <WorkflowSettingsHydrator state={publicStateRow?.state ?? null} />
-            <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isOwner={managerAccess.owner} managerHref={managerHref} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />
-            {children}
-            <SiteFooter />
-            <MobileBottomDock />
+            <Fragment>
+              <TrafficTracker disabled={isAdmin} />
+              <WorkflowSettingsHydrator state={publicStateRow?.state ?? null} />
+              <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isOwner={managerAccess.owner} managerHref={managerHref} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />
+              {children}
+              <SiteFooter />
+              <MobileBottomDock />
+            </Fragment>
           </AvantiaBuildClientShell>
         </ShopLanguageProvider>
       </body>
