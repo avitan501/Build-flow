@@ -1,13 +1,15 @@
 "use client"
 
-import { Mail, MessageSquareText, Paperclip, Phone, Route, Send } from "lucide-react"
+import { Download, FileText, Mail, MessageSquareText, Paperclip, Phone, Plus, Route, Send, Trash2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition } from "react"
+import { createPortal } from "react-dom"
 
-import { sendClientReplyAction } from "@/app/owner/materials/requests/actions"
+import { previewRequestClientQuoteAction, sendClientReplyAction, sendRequestClientQuoteAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 
 type PackageRoute = { id: string; department: string; supplier_id: string | null; status: string }
+type QuoteLine = { key: string; description: string; quantity: number; unit: string; unitPrice: number }
 
 const actionClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:border-sky-400 hover:bg-sky-50"
 
@@ -25,6 +27,8 @@ export function RequestManagementPanel({
   departments,
   suppliers,
   packages,
+  requestItems,
+  projectAddress,
 }: {
   requestId: string
   requestTitle: string
@@ -32,6 +36,8 @@ export function RequestManagementPanel({
   departments: string[]
   suppliers: SupplierRoutingOption[]
   packages: PackageRoute[]
+  requestItems: Array<{ id: string; name: string; quantity: number; unit: string | null }>
+  projectAddress: string
 }) {
   const router = useRouter()
   const [department, setDepartment] = useState("All departments")
@@ -43,6 +49,20 @@ export function RequestManagementPanel({
   const [deliveryMethod, setDeliveryMethod] = useState<"email" | "text">(client.email ? "email" : "text")
   const [feedback, setFeedback] = useState("")
   const [feedbackError, setFeedbackError] = useState(false)
+  const [quoteOpen, setQuoteOpen] = useState(false)
+  const [quoteNumber, setQuoteNumber] = useState(() => `AVA-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${requestId.slice(0, 4).toUpperCase()}`)
+  const [issueDate] = useState(() => new Date().toLocaleDateString("en-US"))
+  const [expiresOn, setExpiresOn] = useState(() => new Date(Date.now() + 30 * 86400000).toLocaleDateString("en-US"))
+  const [clientAddress, setClientAddress] = useState("")
+  const [shipTo, setShipTo] = useState(projectAddress)
+  const [quoteLines, setQuoteLines] = useState<QuoteLine[]>(() => requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
+  const [deliveryCharge, setDeliveryCharge] = useState(0)
+  const [salesTaxRate, setSalesTaxRate] = useState(8.875)
+  const [quoteTerms, setQuoteTerms] = useState("Prices may change until the order is approved and processed. This estimate expires after 30 days. All sales are final unless stated otherwise. Delivery, taxes, and freight are included only when shown above.")
+  const [quoteMessage, setQuoteMessage] = useState("Please review the attached Avantia Build estimate. Reply with any questions or approval.")
+  const [includeAch, setIncludeAch] = useState(false)
+  const [ach, setAch] = useState({ bankName: "", accountOwner: "", routingNumber: "", accountNumber: "" })
+  const [quoteFeedback, setQuoteFeedback] = useState("")
   const [pending, startTransition] = useTransition()
 
   const firstName = client.name.trim().split(/\s+/)[0] || "there"
@@ -86,6 +106,56 @@ export function RequestManagementPanel({
 
   function toggleReplyBlock(blockId: string) {
     setReplyBlocks((current) => current.includes(blockId) ? current.filter((id) => id !== blockId) : [...current, blockId])
+  }
+
+  const quoteSubtotal = quoteLines.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), 0)
+  const quoteTax = (quoteSubtotal + deliveryCharge) * salesTaxRate / 100
+  const quoteTotal = quoteSubtotal + deliveryCharge + quoteTax
+
+  function quoteInput(): RequestClientQuoteInput {
+    return {
+      requestId,
+      quoteNumber,
+      issueDate,
+      expiresOn,
+      clientAddress,
+      shipTo,
+      message: quoteMessage,
+      lines: quoteLines.map(({ description, quantity, unit, unitPrice }) => ({ description, quantity, unit, unitPrice })),
+      deliveryCharge,
+      salesTaxRate,
+      terms: quoteTerms,
+      ach: includeAch ? ach : undefined,
+    }
+  }
+
+  function updateQuoteLine(key: string, patch: Partial<QuoteLine>) {
+    setQuoteLines((current) => current.map((line) => line.key === key ? { ...line, ...patch } : line))
+  }
+
+  function downloadQuote() {
+    setQuoteFeedback("")
+    startTransition(async () => {
+      const result = await previewRequestClientQuoteAction(quoteInput())
+      if (!result.ok || !result.pdfBase64 || !result.fileName) return setQuoteFeedback(result.ok ? "The PDF could not be prepared." : result.error)
+      const bytes = Uint8Array.from(atob(result.pdfBase64), (character) => character.charCodeAt(0))
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }))
+      const link = document.createElement("a")
+      link.href = url
+      link.download = result.fileName
+      link.click()
+      URL.revokeObjectURL(url)
+      setQuoteFeedback("Estimate PDF downloaded for review.")
+    })
+  }
+
+  function sendQuote() {
+    setQuoteFeedback("")
+    startTransition(async () => {
+      const result = await sendRequestClientQuoteAction(quoteInput())
+      setQuoteFeedback(result.ok ? `Estimate emailed to ${client.email}.` : result.error)
+      if (result.ok) setFeedback(`Estimate ${quoteNumber} emailed to ${client.email}.`)
+    })
   }
 
   return (
@@ -142,11 +212,45 @@ export function RequestManagementPanel({
               {deliveryMethod === "email" ? <button type="button" onClick={sendClientEmail} disabled={pending || !client.email} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50"><Send className="h-4 w-4" />{pending ? "Sending..." : "Send email reply"}</button> : <button type="button" onClick={openClientText} disabled={!client.phone} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50"><MessageSquareText className="h-4 w-4" />Open text message</button>}
               {client.phone ? <a href={`tel:${client.phone}`} className={actionClass}><Phone className="h-4 w-4" />Call</a> : null}
             </div>
+            <button type="button" onClick={() => setQuoteOpen(true)} className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#0071e3] bg-sky-50 px-4 text-sm font-bold text-[#0066cc]"><FileText className="h-4 w-4" />Create and send estimate</button>
           </div>
 
         </div>
       </div>
       {feedback ? <p className={`mt-4 rounded-lg border px-4 py-3 text-sm font-semibold ${feedbackError ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`} role="status">{feedback}</p> : null}
+
+      {quoteOpen && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[150] grid place-items-center overflow-y-auto bg-slate-950/55 p-2 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="request-quote-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !pending) setQuoteOpen(false) }}>
+        <section className="flex max-h-[96dvh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+          <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#0066cc]">Avantia Build estimate</p><h2 id="request-quote-title" className="mt-0.5 text-xl font-bold">Create client quote</h2><p className="mt-0.5 text-xs text-slate-500">Review the PDF, then email it as an attachment.</p></div><button type="button" onClick={() => setQuoteOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200" aria-label="Close"><X className="h-4 w-4" /></button></header>
+          <div className="overflow-y-auto p-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="grid gap-1 text-xs font-bold">Estimate code<input value={quoteNumber} onChange={(event) => setQuoteNumber(event.target.value)} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
+              <label className="grid gap-1 text-xs font-bold">Date<input value={issueDate} disabled className="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-normal" /></label>
+              <label className="grid gap-1 text-xs font-bold">Valid through<input value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
+              <label className="grid gap-1 text-xs font-bold">Client<input value={client.name} disabled className="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-normal" /></label>
+              <label className="grid gap-1 text-xs font-bold sm:col-span-2">Customer address<textarea value={clientAddress} onChange={(event) => setClientAddress(event.target.value)} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
+              <label className="grid gap-1 text-xs font-bold sm:col-span-2">Ship to<textarea value={shipTo} onChange={(event) => setShipTo(event.target.value)} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
+            </div>
+
+            <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
+              <table className="w-full min-w-[48rem] text-left text-xs"><thead className="bg-slate-950 text-white"><tr><th className="px-3 py-2">Item</th><th className="px-3 py-2">Description</th><th className="px-3 py-2">Quantity</th><th className="px-3 py-2">Unit</th><th className="px-3 py-2">Unit price</th><th className="px-3 py-2 text-right">Total</th><th className="w-10" /></tr></thead><tbody>{quoteLines.map((line, index) => <tr key={line.key} className="border-b border-slate-200 last:border-b-0"><td className="px-3 py-2 font-bold">{index + 1}</td><td className="p-1.5"><input value={line.description} onChange={(event) => updateQuoteLine(line.key, { description: event.target.value })} className="h-9 w-full min-w-56 rounded-md border border-slate-300 px-2" /></td><td className="p-1.5"><input type="number" min="0.01" step="0.01" value={line.quantity} onChange={(event) => updateQuoteLine(line.key, { quantity: Number(event.target.value) })} className="h-9 w-24 rounded-md border border-slate-300 px-2" /></td><td className="p-1.5"><input value={line.unit} onChange={(event) => updateQuoteLine(line.key, { unit: event.target.value })} className="h-9 w-24 rounded-md border border-slate-300 px-2" /></td><td className="p-1.5"><input type="number" min="0" step="0.01" value={line.unitPrice} onChange={(event) => updateQuoteLine(line.key, { unitPrice: Number(event.target.value) })} className="h-9 w-28 rounded-md border border-slate-300 px-2" /></td><td className="px-3 py-2 text-right font-bold tabular-nums">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(line.quantity * line.unitPrice)}</td><td><button type="button" onClick={() => setQuoteLines((current) => current.filter((item) => item.key !== line.key))} className="inline-flex h-8 w-8 items-center justify-center text-slate-400 hover:text-rose-700" aria-label={`Remove item ${index + 1}`}><Trash2 className="h-3.5 w-3.5" /></button></td></tr>)}</tbody></table>
+            </div>
+            <button type="button" onClick={() => setQuoteLines((current) => [...current, { key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])} className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-xs font-bold"><Plus className="h-3.5 w-3.5" />Add item</button>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_20rem]">
+              <div className="grid gap-3">
+                <label className="grid gap-1 text-xs font-bold">Terms & conditions<textarea value={quoteTerms} onChange={(event) => setQuoteTerms(event.target.value)} rows={3} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
+                <label className="grid gap-1 text-xs font-bold">Email message<textarea value={quoteMessage} onChange={(event) => setQuoteMessage(event.target.value)} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
+                <label className="inline-flex min-h-10 items-center gap-2 text-sm font-bold"><input type="checkbox" checked={includeAch} onChange={(event) => setIncludeAch(event.target.checked)} className="h-4 w-4 accent-[#0071e3]" />Include ACH payment information in this PDF</label>
+                {includeAch ? <div className="grid gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:grid-cols-2"><label className="grid gap-1 text-xs font-bold">Bank name<input value={ach.bankName} onChange={(event) => setAch({ ...ach, bankName: event.target.value })} className="h-9 rounded-md border border-slate-300 bg-white px-2 font-normal" /></label><label className="grid gap-1 text-xs font-bold">Account owner<input value={ach.accountOwner} onChange={(event) => setAch({ ...ach, accountOwner: event.target.value })} className="h-9 rounded-md border border-slate-300 bg-white px-2 font-normal" /></label><label className="grid gap-1 text-xs font-bold">Routing number<input type="password" inputMode="numeric" value={ach.routingNumber} onChange={(event) => setAch({ ...ach, routingNumber: event.target.value })} className="h-9 rounded-md border border-slate-300 bg-white px-2 font-normal" /></label><label className="grid gap-1 text-xs font-bold">Account number<input type="password" value={ach.accountNumber} onChange={(event) => setAch({ ...ach, accountNumber: event.target.value })} className="h-9 rounded-md border border-slate-300 bg-white px-2 font-normal" /></label><p className="sm:col-span-2 text-[10px] font-semibold text-amber-800">These values are used only to create this PDF and are not saved in the customer request.</p></div> : null}
+              </div>
+              <aside className="rounded-lg border border-slate-200 bg-slate-50 p-4"><div className="flex justify-between text-sm"><span>Subtotal</span><strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quoteSubtotal)}</strong></div><label className="mt-3 flex items-center justify-between gap-3 text-sm"><span>Delivery</span><input type="number" min="0" step="0.01" value={deliveryCharge} onChange={(event) => setDeliveryCharge(Number(event.target.value))} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-right" /></label><label className="mt-2 flex items-center justify-between gap-3 text-sm"><span>Sales tax %</span><input type="number" min="0" max="20" step="0.001" value={salesTaxRate} onChange={(event) => setSalesTaxRate(Number(event.target.value))} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-right" /></label><div className="mt-3 flex justify-between border-t border-slate-300 pt-3 text-lg"><strong>Total</strong><strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quoteTotal)}</strong></div></aside>
+            </div>
+            {quoteFeedback ? <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold" role="status">{quoteFeedback}</p> : null}
+          </div>
+          <footer className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-4 py-3"><button type="button" onClick={downloadQuote} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Working..." : "Send estimate"}</button></footer>
+        </section>
+      </div>, document.body) : null}
     </section>
   )
 }

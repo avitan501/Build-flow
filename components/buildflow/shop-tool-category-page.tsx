@@ -7,6 +7,7 @@ import { EmbeddedMaterialQuickOrder } from "@/components/buildflow/embedded-mate
 import { EitanWhatsAppUploadForm } from "@/components/buildflow/eitan-whatsapp-upload-form"
 import { ManagerItemVisibility } from "@/components/buildflow/manager-item-visibility"
 import { PlanRequestUploadCard } from "@/components/buildflow/plan-request-upload-card"
+import { SheetRockProductConfigurator } from "@/components/buildflow/sheet-rock-product-configurator"
 import type { ProjectRecord } from "@/lib/projects"
 import { getDepartmentEssentials } from "@/lib/department-essentials"
 import type { ManagerDepartmentExperience } from "@/lib/manager-add-ons"
@@ -143,7 +144,8 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
       <section className="mx-auto flex max-w-7xl flex-col gap-4">
         <h1 className="text-[2rem] font-bold tracking-normal text-slate-950 sm:text-[2.4rem]">{category.label}</h1>
 
-        {experience.showQuickOrder && usesEmbeddedQuickOrder && questionnaireSnapshot ? <EmbeddedMaterialQuickOrder snapshot={questionnaireSnapshot} category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} /> : null}
+        {experience.showQuickOrder && category.slug === "sheet-rock" ? <SheetRockProductConfigurator /> : null}
+        {experience.showQuickOrder && usesEmbeddedQuickOrder && category.slug !== "sheet-rock" && questionnaireSnapshot ? <EmbeddedMaterialQuickOrder snapshot={questionnaireSnapshot} category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} /> : null}
         {experience.showQuickOrder && !customOrderOnly && (!usesEmbeddedQuickOrder || !questionnaireSnapshot) ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && usesStandardUpload && !composerHandlesUpload ? <CombinedUploadAction category={questionnaireDepartment} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}
