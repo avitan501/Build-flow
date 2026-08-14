@@ -49,6 +49,7 @@ export type CatalogSupplier = {
   name: string
   email?: string
   phone?: string
+  portalUrl?: string
   materials?: string | string[]
   trustLevel?: SupplierTrustLevel
   catalogDepartments?: string[]

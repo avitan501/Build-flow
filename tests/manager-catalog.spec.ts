@@ -17,12 +17,13 @@ test("manager navigation groups secondary tools and keeps calls last", async () 
 })
 
 test("manager catalog is protected, seeded, editable, and supplier based", async () => {
-  const [page, workspace, actions, migration, specificationMigration, parser] = await Promise.all([
+  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, parser] = await Promise.all([
     readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/catalog/actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260814033000_create_manager_material_catalog.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260814155841_add_catalog_measurements_and_common_items.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260814160945_add_retail_catalog_suppliers.sql"), "utf8"),
     readFile(path.join(root, "lib/material-catalog-pdf.ts"), "utf8"),
   ])
   expect(page).toContain("requireManagerPortalProfile")
@@ -41,6 +42,8 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(workspace).toContain("Save item")
   expect(workspace).toContain("Measurement / size")
   expect(workspace).toContain("Thickness / gauge")
+  expect(workspace).toContain("Open website")
+  expect(workspace).toContain("supplier.portalUrl")
   expect(workspace).not.toContain("Sample quantity")
   expect(workspace).toContain("price per {item.unit}")
   expect(actions).toContain("extractMaterialCatalogItemsFromPdf")
@@ -60,6 +63,10 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(specificationMigration).toContain("FRA-020")
   expect(specificationMigration).toContain("ELE-020")
   expect(specificationMigration).not.toContain("delete from public.material_catalog_items")
+  expect(retailSupplierMigration).toContain("lowes-retail-catalog")
+  expect(retailSupplierMigration).toContain("home-depot-retail-catalog")
+  expect(retailSupplierMigration).toContain("https://www.lowes.com/")
+  expect(retailSupplierMigration).toContain("https://www.homedepot.com/")
   expect(parser).toContain("parseMaterialComparisonText")
   expect(parser).toContain("No quantity, unit, and material rows were found")
 })

@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, ChevronLeft, ChevronRight, FileUp, ImageIcon, PackagePlus, Pencil, Plus, Save, Search, Store, Trash2, X } from "lucide-react"
+import { Check, ChevronLeft, ChevronRight, ExternalLink, FileUp, ImageIcon, PackagePlus, Pencil, Plus, Save, Search, Store, Trash2, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -326,7 +326,7 @@ export function MaterialCatalogWorkspace({
               <label className="min-w-0 flex-1"><span className="sr-only">Supplier price column</span><select value={mobileSupplier?.id ?? ""} onChange={(event) => setMobileSupplierId(event.target.value)} disabled={!mobileSupplier} className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold"><option value="">No eligible supplier</option>{visibleSuppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select></label>
               <button type="button" onClick={() => moveMobileSupplier(1)} disabled={visibleSuppliers.length < 2} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-35" aria-label="Next supplier"><ChevronRight className="h-4 w-4" /></button>
             </div>
-            <p className="mt-2 text-xs text-slate-500">{mobileSupplier ? `${mobileSupplier.email || mobileSupplier.phone || "Contact not set"} · ${visibleSuppliers.findIndex((supplier) => supplier.id === mobileSupplier.id) + 1} of ${visibleSuppliers.length}` : `No supplier added to ${selectedCategory}.`}</p>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500"><span>{mobileSupplier ? `${mobileSupplier.email || mobileSupplier.phone || "Online store"} · ${visibleSuppliers.findIndex((supplier) => supplier.id === mobileSupplier.id) + 1} of ${visibleSuppliers.length}` : `No supplier added to ${selectedCategory}.`}</span>{mobileSupplier?.portalUrl ? <a href={mobileSupplier.portalUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-[#0066cc]"><ExternalLink className="h-3.5 w-3.5" />Open website</a> : null}</div>
           </header>
           <div className="divide-y divide-slate-200">
             {categoryItems.map((item) => {
@@ -357,7 +357,7 @@ export function MaterialCatalogWorkspace({
             <thead className="sticky top-0 z-30 bg-slate-100">
               <tr>
                 <th className="sticky left-0 z-40 w-[320px] min-w-[320px] border-b border-r border-slate-300 bg-slate-100 px-3 py-2 font-bold">Item</th>
-                {visibleSuppliers.map((supplier) => <th key={supplier.id} className="w-[172px] min-w-[172px] border-b border-r border-slate-300 px-2 py-2 align-top"><span className="block truncate font-bold" title={supplier.name}>{supplier.name}</span><span className="mt-0.5 block truncate text-[10px] font-normal text-slate-500">{supplier.email || supplier.phone || "Contact not set"}</span></th>)}
+                {visibleSuppliers.map((supplier) => <th key={supplier.id} className="w-[172px] min-w-[172px] border-b border-r border-slate-300 px-2 py-2 align-top"><span className="block truncate font-bold" title={supplier.name}>{supplier.name}</span><span className="mt-0.5 block truncate text-[10px] font-normal text-slate-500">{supplier.email || supplier.phone || "Online store"}</span>{supplier.portalUrl ? <a href={supplier.portalUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-[#0066cc]"><ExternalLink className="h-3 w-3" />Open website</a> : null}</th>)}
               </tr>
             </thead>
             <tbody>
