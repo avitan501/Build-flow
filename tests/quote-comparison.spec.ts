@@ -131,3 +131,14 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
   expect(clientQuoteMigration).toContain("security invoker");
   expect(clientQuoteMigration).not.toMatch(/grant\s+.+\s+to\s+anon/i);
 });
+
+test("selecting a supplier saves the current price draft before awarding it", async () => {
+  const workspace = await readFile(path.join(process.cwd(), "components/buildflow/quote-comparison-workspace.tsx"), "utf8");
+  const saveCall = workspace.indexOf("const saveResult = await saveQuoteComparisonBidAction");
+  const awardCall = workspace.indexOf("const awardResult = await awardQuoteComparisonBidAction");
+
+  expect(saveCall).toBeGreaterThan(-1);
+  expect(awardCall).toBeGreaterThan(saveCall);
+  expect(workspace).toContain("Save prices & select supplier");
+  expect(workspace).toContain("prices saved and supplier selected");
+});

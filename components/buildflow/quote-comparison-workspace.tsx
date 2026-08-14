@@ -236,14 +236,39 @@ export function QuoteComparisonWorkspace({
       showClientQuote();
       return;
     }
-    run(
-      () => awardQuoteComparisonBidAction({ comparisonId: comparison.id, bidId }),
-      `${supplierName} selected.`,
-      () => {
-        setSelectedBidId(bidId);
-        showClientQuote();
-      },
-    );
+    const bid = liveBids.find((entry) => entry.id === bidId);
+    if (!bid) return;
+    setError("");
+    setMessage("");
+    startTransition(async () => {
+      const saveResult = await saveQuoteComparisonBidAction({
+        comparisonId: comparison.id,
+        bidId: bid.id,
+        deliveryCharge: bid.delivery_charge,
+        taxAmount: bid.tax_amount,
+        leadTimeDays: bid.lead_time_days,
+        notes: bid.notes,
+        prices: (bid.quote_comparison_prices ?? []).map((price) => ({
+          itemId: price.item_id,
+          unitPrice: price.unit_price,
+          isAvailable: price.is_available,
+        })),
+      });
+      if (!saveResult.ok) {
+        setError(saveResult.error);
+        return;
+      }
+
+      const awardResult = await awardQuoteComparisonBidAction({ comparisonId: comparison.id, bidId });
+      if (!awardResult.ok) {
+        setError(awardResult.error);
+        return;
+      }
+      setSelectedBidId(bidId);
+      setMessage(`${supplierName} prices saved and supplier selected.`);
+      showClientQuote();
+      router.refresh();
+    });
   }
 
   function deleteComparison() {
@@ -354,7 +379,7 @@ export function QuoteComparisonWorkspace({
             <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${analysis.blocked ? "bg-rose-500" : "bg-[#0071e3]"}`} style={{ width: `${analysis.score}%` }} /></div>
             <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-slate-100 py-4"><div><dt className="text-[10px] font-bold uppercase text-slate-400">Delivered total</dt><dd className="mt-1 text-lg font-bold tabular-nums">{formatComparisonMoney(analysis.landedTotal)}</dd></div><div><dt className="text-[10px] font-bold uppercase text-slate-400">Quoted items</dt><dd className="mt-1 text-lg font-bold tabular-nums">{analysis.pricedItemCount}/{analysis.itemCount}</dd></div><div><dt className="text-[10px] font-bold uppercase text-slate-400">Lead time</dt><dd className="mt-1 text-sm font-bold">{bid.lead_time_days === null ? "Not entered" : `${bid.lead_time_days} days`}</dd></div><div><dt className="text-[10px] font-bold uppercase text-slate-400">Completeness</dt><dd className="mt-1 text-sm font-bold">{Math.round(analysis.completeness * 100)}%</dd></div></dl>
             <div className="mt-4 flex flex-wrap gap-2">{analysis.isLowestCost ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800"><CircleDollarSign className="h-3.5 w-3.5" /> Lowest delivered</span> : null}{analysis.isFastest ? <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-800"><Clock3 className="h-3.5 w-3.5" /> Fastest</span> : null}{analysis.missingItemCount > 0 ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800"><AlertTriangle className="h-3.5 w-3.5" /> {analysis.missingItemCount} missing</span> : null}{analysis.blocked ? <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-800"><Ban className="h-3.5 w-3.5" /> Not eligible</span> : null}</div>
-            {!selected && !locked ? <button type="button" onClick={() => awardBid(bid.id, bid.supplier_name_snapshot)} disabled={pending || analysis.blocked || analysis.pricedItemCount === 0} className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300"><Award className="h-4 w-4" /> Select supplier</button> : null}
+            {!selected && !locked ? <button type="button" onClick={() => awardBid(bid.id, bid.supplier_name_snapshot)} disabled={pending || analysis.blocked || analysis.pricedItemCount === 0} className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300"><Award className="h-4 w-4" /> Save prices & select supplier</button> : null}
           </article>; })}</div> : <div className="mt-4 border border-dashed border-slate-300 bg-white px-5 py-10 text-center"><Truck className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm font-bold">Enter supplier prices to see the recommendation.</p></div>}
           {!recommended && analyses.some((analysis) => analysis.pricedItemCount > 0) ? <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-amber-800"><AlertTriangle className="h-4 w-4" /> No reliable winner yet. Complete more line prices before selecting a supplier.</p> : null}
         </section>
