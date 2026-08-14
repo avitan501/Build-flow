@@ -20,7 +20,7 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-[88rem] items-center gap-4 rounded-[18px] border border-slate-200 bg-white px-5 py-4 shadow-[0_10px_30px_rgba(7,17,38,0.05)] sm:grid-cols-[minmax(15rem,1fr)_auto] sm:px-6">
         <div className="flex min-w-0 items-center gap-4">
           <Link href="/" aria-label="Avantia home" className="inline-flex shrink-0">
-            <AvantiaBuildLockup header />
+            <AvantiaBuildLockup footer />
           </Link>
           <div className="min-w-0 border-l border-slate-200 pl-3 sm:pl-4">
             <p className="text-[11px] font-bold leading-4 text-[#071126] sm:text-sm">You build. We handle the materials.</p>

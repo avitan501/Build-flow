@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 180" role="img" aria-labelledby="title description">
+  <title id="title">Avantia Build</title>
+  <desc id="description">A painter paints the first three letters of Avantia, then returns.</desc>
+  <style>
+    .wordmark {
+      fill: #071126;
+      font-family: "Arial Rounded MT Bold", "Arial Black", Arial, sans-serif;
+      font-weight: 900;
+    }
+
+    .painted-ava {
+      animation: reveal-paint 6s ease-in-out infinite;
+      clip-path: inset(0 100% 0 0);
+      fill: #ff6400;
+    }
+
+    .painter {
+      animation: paint-ava 6s ease-in-out infinite;
+      transform-origin: 51px 101px;
+    }
+
+    .painter-bob {
+      animation: painter-bob 0.55s ease-in-out infinite alternate;
+    }
+
+    @keyframes paint-ava {
+      0%, 8% { transform: translateX(0); }
+      55%, 62% { transform: translateX(100px); }
+      94%, 100% { transform: translateX(0); }
+    }
+
+    @keyframes reveal-paint {
+      0%, 8% { clip-path: inset(0 100% 0 0); }
+      55%, 94% { clip-path: inset(0 0 0 0); }
+      100% { clip-path: inset(0 100% 0 0); }
+    }
+
+    @keyframes painter-bob {
+      from { transform: translateY(0); }
+      to { transform: translateY(-2px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .painted-ava {
+        animation: none;
+        clip-path: inset(0 0 0 0);
+      }
+
+      .painter {
+        animation: none;
+        transform: translateX(100px);
+      }
+
+      .painter-bob {
+        animation: none;
+      }
+    }
+  </style>
+
+  <text class="wordmark" x="12" y="128" font-size="112" letter-spacing="-8">avantia</text>
+  <text class="wordmark painted-ava" x="12" y="128" font-size="112" letter-spacing="-8">ava</text>
+  <text class="wordmark" x="442" y="128" font-size="62" letter-spacing="-3">build</text>
+
+  <g class="painter" aria-hidden="true">
+    <g class="painter-bob">
+      <path d="M108 49v17H91v31" fill="none" stroke="#5f6873" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
+      <rect x="80" y="38" width="34" height="12" rx="5" fill="#ff6400" stroke="#071126" stroke-width="3"/>
+      <path d="M38 72c1-13 8-21 20-21s19 8 20 21z" fill="#ff8a00" stroke="#071126" stroke-linejoin="round" stroke-width="3"/>
+      <path d="M34 72h48" fill="none" stroke="#071126" stroke-linecap="round" stroke-width="5"/>
+      <circle cx="58" cy="85" r="17" fill="#ffd2a6" stroke="#071126" stroke-width="3"/>
+      <circle cx="64" cy="82" r="3" fill="#071126"/>
+      <path d="M63 91c-4 4-8 4-12 0" fill="none" stroke="#071126" stroke-linecap="round" stroke-width="2.5"/>
+      <path d="M38 107c0-9 8-15 18-15h5c11 0 19 6 19 15v30H38z" fill="#1688d4" stroke="#071126" stroke-linejoin="round" stroke-width="3"/>
+      <path d="M43 108h32M48 108v29M70 108v29" fill="none" stroke="#d7efff" stroke-width="3"/>
+      <path d="M39 111 25 123M79 111l12-16" fill="none" stroke="#ffd2a6" stroke-linecap="round" stroke-width="8"/>
+      <path d="M47 137v16M70 137v16" fill="none" stroke="#071126" stroke-linecap="round" stroke-width="8"/>
+      <path d="M40 155h16M63 155h16" fill="none" stroke="#ff6400" stroke-linecap="round" stroke-width="7"/>
+      <path d="M92 119v19h-14" fill="none" stroke="#5f6873" stroke-linecap="round" stroke-width="4"/>
+      <path d="M76 135h21l-3 17H79z" fill="#ff6400" stroke="#071126" stroke-linejoin="round" stroke-width="3"/>
+    </g>
+  </g>
+
+  <g aria-hidden="true" transform="translate(574 54)">
+    <path d="M2 23c1-12 8-20 20-20s19 8 20 20z" fill="#ff6400"/>
+    <path d="M0 23h44" fill="none" stroke="#071126" stroke-linecap="round" stroke-width="4"/>
+  </g>
+</svg>

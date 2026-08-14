@@ -70,7 +70,7 @@ test("shop header keeps the animated Avantia logo beside material search", async
   const search = header.getByRole("button", { name: /Search materials/ })
 
   await expect(logo).toBeVisible()
-  await expect(logo).toHaveAttribute("src", /avantia-build-lockup-animated\.webp/)
+  await expect(logo).toHaveAttribute("src", /avantia-build-painter-ava\.svg/)
   await expect(search).toBeVisible()
   await expect(page.locator("main").getByTestId("avantia-build-lockup")).toHaveCount(0)
   expect(await search.getByText("Search materials").evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
