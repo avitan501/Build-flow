@@ -17,7 +17,7 @@ test("manager navigation groups secondary tools and keeps calls last", async () 
 })
 
 test("manager catalog is protected, seeded, editable, and supplier based", async () => {
-  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, allDepartmentRetailers, verifiedRetailProducts, curatedProducts, qualityMigration, qualityHelpers, parser] = await Promise.all([
+  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, allDepartmentRetailers, verifiedRetailProducts, curatedProducts, qualityMigration, coreCurationMigration, qualityHelpers, parser] = await Promise.all([
     readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/catalog/actions.ts"), "utf8"),
@@ -31,6 +31,7 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
     readFile(path.join(root, "supabase/migrations/20260816210019_seed_verified_retail_catalog_products.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260816223000_curate_common_catalog_products.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817001500_add_catalog_quality_and_price_history.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260817013000_curate_core_catalog_materials.sql"), "utf8"),
     readFile(path.join(root, "lib/material-catalog-quality.ts"), "utf8"),
     readFile(path.join(root, "lib/material-catalog-pdf.ts"), "utf8"),
   ])
@@ -64,6 +65,9 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(workspace).toContain("Missing price")
   expect(workspace).toContain("Needs review")
   expect(workspace).toContain("Catalog confidence")
+  expect(workspace).toContain("hideSupplier")
+  expect(workspace).toContain("Hide from {selectedCategory}")
+  expect(workspace).toContain("You can restore it with Add supplier")
   expect(workspace).toContain("Package quantity")
   expect(workspace).toContain("Manufacturer model")
   expect(workspace).toContain("Price details")
@@ -126,6 +130,11 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(qualityMigration).toContain("archive_material_catalog_price_trigger")
   expect(qualityMigration).toContain("GAF Timberline HDZ Charcoal")
   expect(qualityMigration).not.toContain("delete from public.material_catalog_items")
+  expect(coreCurationMigration).toContain("Lightweight joint compound - blue lid")
+  expect(coreCurationMigration).toContain("1/2 in. regular drywall, 4 x 8 ft.")
+  expect(coreCurationMigration).toContain("5/8 in. CDX plywood sheathing, 4 x 8 ft.")
+  expect(coreCurationMigration).toContain("flat flush hollow-core slab door")
+  expect(coreCurationMigration).not.toContain("delete from public.material_catalog_items")
   expect(qualityHelpers).toContain("catalogItemMatchesReview")
   expect(qualityHelpers).toContain("normalizedComparisonPrice")
   expect(parser).toContain("parseMaterialComparisonText")

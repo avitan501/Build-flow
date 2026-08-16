@@ -1,6 +1,6 @@
 "use client"
 
-import { AlertTriangle, Archive, Check, ChevronLeft, ChevronRight, ExternalLink, FileUp, ImageIcon, PackagePlus, Pencil, Plus, Save, Search, Store, X } from "lucide-react"
+import { AlertTriangle, Archive, Check, ChevronLeft, ChevronRight, ExternalLink, EyeOff, FileUp, ImageIcon, PackagePlus, Pencil, Plus, Save, Search, Store, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -192,7 +192,7 @@ export function MaterialCatalogWorkspace({
   const visibleSuppliers = useMemo(() => {
     const needle = supplierSearch.trim().toLowerCase()
     return eligibleCatalogSupplierPool.filter((supplier) => {
-      if (!isRetailCatalogSupplier(supplier) && !(catalogSupplierIds[selectedCategory] ?? []).includes(supplier.id)) return false
+      if (!(catalogSupplierIds[selectedCategory] ?? []).includes(supplier.id)) return false
       const materials = Array.isArray(supplier.materials) ? supplier.materials.join(" ") : supplier.materials ?? ""
       return !needle || `${supplier.name} ${supplier.email ?? ""} ${supplier.phone ?? ""} ${materials}`.toLowerCase().includes(needle)
     })
@@ -286,6 +286,24 @@ export function MaterialCatalogWorkspace({
       setMobileSupplierId("")
       setCatalogSupplierOpen(false)
       setNotice(result.message)
+      setError("")
+      router.refresh()
+    })
+  }
+
+  function hideSupplier(supplier: CatalogSupplier) {
+    if (dirtyKeys.size) {
+      setError("Save price changes before hiding a supplier column.")
+      return
+    }
+    if (!window.confirm(`Hide ${supplier.name} from ${selectedCategory}? You can restore it with Add supplier.`)) return
+    const supplierIds = (catalogSupplierIds[selectedCategory] ?? []).filter((id) => id !== supplier.id)
+    startTransition(async () => {
+      const result = await saveCatalogDepartmentSuppliersAction({ department: selectedCategory, supplierIds })
+      if (!result.ok) return setError(result.error)
+      setCatalogSupplierIds((current) => ({ ...current, [selectedCategory]: result.data.supplierIds }))
+      setMobileSupplierId("")
+      setNotice(`${supplier.name} hidden from ${selectedCategory}.`)
       setError("")
       router.refresh()
     })
@@ -470,6 +488,7 @@ export function MaterialCatalogWorkspace({
               <button type="button" onClick={() => moveMobileSupplier(1)} disabled={visibleSuppliers.length < 2} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-35" aria-label="Next supplier"><ChevronRight className="h-4 w-4" /></button>
             </div>
             {mobileSupplier && !isRetailCatalogSupplier(mobileSupplier) ? <p className="mt-2 text-xs text-slate-500">{mobileSupplier.email || mobileSupplier.phone || "Contact not set"} · {visibleSuppliers.findIndex((supplier) => supplier.id === mobileSupplier.id) + 1} of {visibleSuppliers.length}</p> : null}
+            {mobileSupplier ? <button type="button" onClick={() => hideSupplier(mobileSupplier)} disabled={pending} className="mt-2 inline-flex min-h-8 items-center gap-1.5 text-xs font-bold text-slate-600 disabled:opacity-40"><EyeOff className="h-3.5 w-3.5" />Hide from {selectedCategory}</button> : null}
           </header>
           <div className="divide-y divide-slate-200">
             {categoryItems.map((item) => {
@@ -506,7 +525,7 @@ export function MaterialCatalogWorkspace({
             <thead className="sticky top-0 z-30 bg-slate-100">
               <tr>
                 <th style={{ width: itemColumnWidth, minWidth: itemColumnWidth }} className="sticky left-0 z-40 border-b border-r border-slate-300 bg-slate-100 px-3 py-2 font-bold">Item</th>
-                {visibleSuppliers.map((supplier) => <th key={supplier.id} style={{ width: priceColumnWidth, minWidth: priceColumnWidth }} className="border-b border-r border-slate-300 px-1.5 py-2 align-top"><span className="block truncate font-bold" title={supplier.name}>{supplier.name}</span>{!isRetailCatalogSupplier(supplier) ? <span className="mt-0.5 block truncate text-[9px] font-normal text-slate-500">{supplier.email || supplier.phone || "Contact not set"}</span> : null}</th>)}
+                {visibleSuppliers.map((supplier) => <th key={supplier.id} style={{ width: priceColumnWidth, minWidth: priceColumnWidth }} className="border-b border-r border-slate-300 px-1.5 py-2 align-top"><div className="flex items-start gap-1"><span className="min-w-0 flex-1 truncate font-bold" title={supplier.name}>{supplier.name}</span><button type="button" onClick={() => hideSupplier(supplier)} disabled={pending} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-white hover:text-slate-800 disabled:opacity-30" title={`Hide ${supplier.name} from ${selectedCategory}`} aria-label={`Hide ${supplier.name} from ${selectedCategory}`}><EyeOff className="h-3 w-3" /></button></div>{!isRetailCatalogSupplier(supplier) ? <span className="mt-0.5 block truncate text-[9px] font-normal text-slate-500">{supplier.email || supplier.phone || "Contact not set"}</span> : null}</th>)}
               </tr>
             </thead>
             <tbody>
