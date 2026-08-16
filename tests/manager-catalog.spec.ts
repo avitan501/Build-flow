@@ -17,7 +17,7 @@ test("manager navigation groups secondary tools and keeps calls last", async () 
 })
 
 test("manager catalog is protected, seeded, editable, and supplier based", async () => {
-  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, allDepartmentRetailers, verifiedRetailProducts, parser] = await Promise.all([
+  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, allDepartmentRetailers, verifiedRetailProducts, curatedProducts, parser] = await Promise.all([
     readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/catalog/actions.ts"), "utf8"),
@@ -29,6 +29,7 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
     readFile(path.join(root, "supabase/migrations/20260816193227_seed_home_depot_framing_snapshot.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260816203816_ensure_retailers_in_every_catalog_department.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260816210019_seed_verified_retail_catalog_products.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260816223000_curate_common_catalog_products.sql"), "utf8"),
     readFile(path.join(root, "lib/material-catalog-pdf.ts"), "utf8"),
   ])
   expect(page).toContain("requireManagerPortalProfile")
@@ -51,8 +52,13 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(workspace).toContain("Add exact ${supplier.name} product link for ${item.name}")
   expect(workspace).not.toContain("https://www.lowes.com/search?searchTerm=")
   expect(workspace).not.toContain("https://www.homedepot.com/s/")
-  expect(workspace).toContain("supplierColumnWidth")
-  expect(workspace).toContain("isRetailCatalogSupplier(supplier) ? 88 : 132")
+  expect(workspace).toContain("itemColumnWidth")
+  expect(workspace).toContain("priceColumnWidth")
+  expect(workspace).toContain("Item column")
+  expect(workspace).toContain("Price column")
+  expect(workspace).toContain("avantia-catalog-item-column-width")
+  expect(workspace).toContain("avantia-catalog-price-column-width")
+  expect(workspace).toContain("Retail pricing location: ZIP 11516")
   expect(workspace).not.toContain("Valley Stream #1216")
   expect(workspace).not.toContain("snapshotLabel")
   expect(workspace).not.toContain('<option value="unknown">Unknown</option><option value="available">Available</option><option value="not_available">N/A</option></select>\n                      {draft.productUrl')
@@ -102,6 +108,10 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(verifiedRetailProducts).toContain("36 x 60 in. double-hung window")
   expect(verifiedRetailProducts).toContain("6-mil polyethylene vapor barrier, 10 x 100 ft.")
   expect(verifiedRetailProducts).not.toMatch(/\/(questions|reviews|sets)\//)
+  expect(curatedProducts).toContain("retailer prices verified on exact product pages")
+  expect(curatedProducts).toContain("'11516'")
+  expect(curatedProducts).toContain("7/16-in. x 4-ft. x 8-ft. OSB roof sheathing")
+  expect(curatedProducts).toContain("unit = 'bags'")
   expect(parser).toContain("parseMaterialComparisonText")
   expect(parser).toContain("No quantity, unit, and material rows were found")
 })

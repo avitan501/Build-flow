@@ -234,7 +234,7 @@ test("traffic endpoint accepts same-site events and blocks cross-site submission
 })
 
 test("traffic dashboard exposes live status to the owner only", async () => {
-  const [trafficPage, navigation, tracker, layout, trafficApi, filterStatus, trafficFunctionMigration, trafficRlsMigration] = await Promise.all([
+  const [trafficPage, navigation, tracker, layout, trafficApi, filterStatus, trafficFunctionMigration, trafficRlsMigration, geographyMigration, securityMigration] = await Promise.all([
     readFile(path.join(process.cwd(), "app/admin/traffic/page.tsx"), "utf8"),
     readFile(path.join(process.cwd(), "components/buildflow/admin-shell.tsx"), "utf8"),
     readFile(path.join(process.cwd(), "components/buildflow/traffic-tracker.tsx"), "utf8"),
@@ -243,6 +243,8 @@ test("traffic dashboard exposes live status to the owner only", async () => {
     readFile(path.join(process.cwd(), "components/buildflow/traffic-internal-filter-status.tsx"), "utf8"),
     readFile(path.join(process.cwd(), "supabase/migrations/20260814022000_add_owner_site_traffic_reader.sql"), "utf8"),
     readFile(path.join(process.cwd(), "supabase/migrations/20260814023000_use_owner_rls_for_site_traffic.sql"), "utf8"),
+    readFile(path.join(process.cwd(), "supabase/migrations/20260816214500_add_site_traffic_geography.sql"), "utf8"),
+    readFile(path.join(process.cwd(), "supabase/migrations/20260816224500_secure_site_traffic_recorder.sql"), "utf8"),
   ])
 
   expect(trafficPage).toContain("requireAdminProfile")
@@ -252,12 +254,18 @@ test("traffic dashboard exposes live status to the owner only", async () => {
   expect(trafficPage).toContain("Tracking active")
   expect(trafficPage).toContain("FILTERED_TRAFFIC_START")
   expect(trafficPage).toContain("Owner, employee, test, and automated visits are excluded")
+  expect(trafficPage).toContain("Visitor locations")
+  expect(trafficPage).toContain("city,region,country")
   expect(trafficPage).not.toContain("requireManagerPortalProfile")
   expect(navigation).not.toContain('link.href === "/admin/traffic" ||')
   expect(tracker).toContain("navigator.webdriver")
   expect(tracker).toContain("TRAFFIC_EXCLUSION_KEY")
   expect(layout).toContain("<TrafficTracker disabled={isAdmin} />")
   expect(trafficApi).toContain("playwright|headless|codex")
+  expect(trafficApi).toContain("PRODUCTION_HOSTS")
+  expect(trafficApi).toContain("x-vercel-ip-city")
+  expect(trafficApi).toContain("createAdminClient")
+  expect(trafficApi).not.toContain("x-forwarded-for")
   expect(filterStatus).toContain('localStorage.setItem(TRAFFIC_EXCLUSION_KEY, "1")')
   expect(trafficFunctionMigration).toContain("lower(trim(profile.email)) = 'avitanneto@gmail.com'")
   expect(trafficRlsMigration).toContain("drop function if exists public.owner_read_site_traffic")
@@ -265,6 +273,10 @@ test("traffic dashboard exposes live status to the owner only", async () => {
   expect(trafficRlsMigration).toContain("auth.jwt() ->> 'email'")
   expect(trafficRlsMigration).toContain("private.is_admin()")
   expect(trafficRlsMigration).toContain("grant select on public.site_page_views to authenticated")
+  expect(geographyMigration).toContain("add column if not exists city")
+  expect(geographyMigration).toContain("p_country text default null")
+  expect(securityMigration).toContain("grant execute on function public.record_site_page_view")
+  expect(securityMigration).toContain("to service_role")
 })
 
 test("home shows the compact manufacturer brand showcase", async ({ page }) => {

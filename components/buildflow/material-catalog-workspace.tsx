@@ -4,7 +4,7 @@ import { Check, ChevronLeft, ChevronRight, ExternalLink, FileUp, ImageIcon, Pack
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
 import {
@@ -56,10 +56,6 @@ const RETAIL_CATALOG_SUPPLIER_IDS = new Set(["lowes-retail-catalog", "home-depot
 
 function isRetailCatalogSupplier(supplier: CatalogSupplier) {
   return RETAIL_CATALOG_SUPPLIER_IDS.has(supplier.id)
-}
-
-function supplierColumnWidth(supplier: CatalogSupplier) {
-  return isRetailCatalogSupplier(supplier) ? 88 : 132
 }
 
 function emptyEditor(category: string): EditorDraft {
@@ -116,6 +112,8 @@ export function MaterialCatalogWorkspace({
   const [catalogSupplierDraftIds, setCatalogSupplierDraftIds] = useState<string[]>([])
   const [catalogSupplierIds, setCatalogSupplierIds] = useState<Record<string, string[]>>(() => initialCatalogSupplierIds(suppliers))
   const [showInactive, setShowInactive] = useState(false)
+  const [itemColumnWidth, setItemColumnWidth] = useState(280)
+  const [priceColumnWidth, setPriceColumnWidth] = useState(88)
   const [editor, setEditor] = useState<EditorDraft | null>(null)
   const [notice, setNotice] = useState("")
   const [error, setError] = useState("")
@@ -167,6 +165,34 @@ export function MaterialCatalogWorkspace({
     ?? visibleSuppliers.find((supplier) => supplier.id === "home-depot-retail-catalog")
     ?? visibleSuppliers[0]
     ?? null
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        const itemWidth = Number(window.localStorage.getItem("avantia-catalog-item-column-width"))
+        const priceWidth = Number(window.localStorage.getItem("avantia-catalog-price-column-width"))
+        if (itemWidth >= 220 && itemWidth <= 520) setItemColumnWidth(itemWidth)
+        if (priceWidth >= 76 && priceWidth <= 220) setPriceColumnWidth(priceWidth)
+      } catch {
+        // Browser storage is optional; the catalog still uses stable defaults.
+      }
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [])
+
+  function updateItemColumnWidth(width: number) {
+    setItemColumnWidth(width)
+    try { window.localStorage.setItem("avantia-catalog-item-column-width", String(width)) } catch {
+      // Browser storage is optional.
+    }
+  }
+
+  function updatePriceColumnWidth(width: number) {
+    setPriceColumnWidth(width)
+    try { window.localStorage.setItem("avantia-catalog-price-column-width", String(width)) } catch {
+      // Browser storage is optional.
+    }
+  }
 
   function moveMobileSupplier(direction: -1 | 1) {
     if (!mobileSupplier || visibleSuppliers.length < 2) return
@@ -351,7 +377,14 @@ export function MaterialCatalogWorkspace({
             <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 px-3 text-xs font-semibold"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} className="h-4 w-4 accent-[#0071e3]" />Show inactive</label>
             <button type="button" onClick={savePrices} disabled={pending || dirtyKeys.size === 0} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40"><Save className="h-4 w-4" />Save {dirtyKeys.size ? `${dirtyKeys.size} price${dirtyKeys.size === 1 ? "" : "s"}` : "prices"}</button>
           </div>
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500"><span>{categoryItems.length} item{categoryItems.length === 1 ? "" : "s"} · {visibleSuppliers.length} supplier column{visibleSuppliers.length === 1 ? "" : "s"}</span><span>Blank price = not entered · N/A = supplier does not carry it</span></div>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+            <span>{categoryItems.length} item{categoryItems.length === 1 ? "" : "s"} · {visibleSuppliers.length} supplier column{visibleSuppliers.length === 1 ? "" : "s"}</span>
+            <div className="hidden items-center gap-4 md:flex" aria-label="Catalog column sizes">
+              <label className="flex items-center gap-2 font-semibold text-slate-600">Item <input aria-label="Item column width" type="range" min="220" max="520" step="20" value={itemColumnWidth} onChange={(event) => updateItemColumnWidth(Number(event.target.value))} className="w-24 accent-[#0071e3]" /></label>
+              <label className="flex items-center gap-2 font-semibold text-slate-600">Price <input aria-label="Price column width" type="range" min="76" max="220" step="12" value={priceColumnWidth} onChange={(event) => updatePriceColumnWidth(Number(event.target.value))} className="w-24 accent-[#0071e3]" /></label>
+            </div>
+            <span>Retail pricing location: ZIP 11516</span>
+          </div>
         </section>
 
         {notice ? <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900" role="status">{notice}</p> : null}
@@ -396,16 +429,16 @@ export function MaterialCatalogWorkspace({
 
         <section className="mt-3 hidden max-w-full overflow-auto overscroll-x-contain rounded-lg border border-slate-300 bg-white shadow-sm md:block" aria-label={`${selectedCategory} supplier pricing matrix`}>
           {!visibleSuppliers.length ? <div className="flex min-h-14 items-center justify-between gap-3 border-b border-slate-200 bg-sky-50 px-3 py-2 text-sm"><span className="font-semibold text-slate-700">No supplier added to {selectedCategory}.</span><button type="button" onClick={openCatalogSuppliers} className="shrink-0 font-bold text-[#0066cc]">Add supplier</button></div> : null}
-          <table className="border-collapse text-left text-xs" style={{ minWidth: `${280 + visibleSuppliers.reduce((total, supplier) => total + supplierColumnWidth(supplier), 0)}px` }}>
+          <table className="border-collapse text-left text-xs" style={{ minWidth: `${itemColumnWidth + visibleSuppliers.length * priceColumnWidth}px` }}>
             <thead className="sticky top-0 z-30 bg-slate-100">
               <tr>
-                <th className="sticky left-0 z-40 w-[280px] min-w-[280px] border-b border-r border-slate-300 bg-slate-100 px-3 py-2 font-bold">Item</th>
-                {visibleSuppliers.map((supplier) => <th key={supplier.id} style={{ width: supplierColumnWidth(supplier), minWidth: supplierColumnWidth(supplier) }} className="border-b border-r border-slate-300 px-1.5 py-2 align-top"><span className="block truncate font-bold" title={supplier.name}>{supplier.name}</span>{!isRetailCatalogSupplier(supplier) ? <span className="mt-0.5 block truncate text-[9px] font-normal text-slate-500">{supplier.email || supplier.phone || "Contact not set"}</span> : null}</th>)}
+                <th style={{ width: itemColumnWidth, minWidth: itemColumnWidth }} className="sticky left-0 z-40 border-b border-r border-slate-300 bg-slate-100 px-3 py-2 font-bold">Item</th>
+                {visibleSuppliers.map((supplier) => <th key={supplier.id} style={{ width: priceColumnWidth, minWidth: priceColumnWidth }} className="border-b border-r border-slate-300 px-1.5 py-2 align-top"><span className="block truncate font-bold" title={supplier.name}>{supplier.name}</span>{!isRetailCatalogSupplier(supplier) ? <span className="mt-0.5 block truncate text-[9px] font-normal text-slate-500">{supplier.email || supplier.phone || "Contact not set"}</span> : null}</th>)}
               </tr>
             </thead>
             <tbody>
               {categoryItems.map((item) => <tr key={item.id} className="group even:bg-slate-50/60">
-                <td className="sticky left-0 z-20 border-b border-r border-slate-200 bg-white px-3 py-2 group-even:bg-[#fafafa]">
+                <td style={{ width: itemColumnWidth, minWidth: itemColumnWidth }} className="sticky left-0 z-20 border-b border-r border-slate-200 bg-white px-3 py-2 group-even:bg-[#fafafa]">
                   <div className="flex items-center gap-2">
                     {item.image_url ? <button type="button" onClick={() => setEditor(itemEditor(item))} className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white"><Image src={item.image_url} alt="" fill sizes="36px" className="object-contain" /></button> : <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-400"><ImageIcon className="h-4 w-4" /></span>}
                     <div className="min-w-0 flex-1"><p className="font-bold leading-4 text-slate-950">{item.name}</p>{item.measurement || item.thickness ? <p className="mt-0.5 text-[10px] font-semibold text-slate-600">{[item.measurement, item.thickness].filter(Boolean).join(" · ")}</p> : null}<p className="mt-0.5 text-[10px] text-slate-500">{item.item_code} · price per {item.unit}{item.status === "inactive" ? " · inactive" : ""}</p></div>
@@ -417,7 +450,7 @@ export function MaterialCatalogWorkspace({
                   const key = cellKey(item.id, supplier.id)
                   const draft = draftFor(item.id, supplier.id)
                   const saved = initialPriceMap.get(key)
-                  return <td key={supplier.id} style={{ width: supplierColumnWidth(supplier), minWidth: supplierColumnWidth(supplier) }} className={`border-b border-r border-slate-200 p-1 align-top ${dirtyKeys.has(key) ? "bg-amber-50" : ""}`}>
+                  return <td key={supplier.id} style={{ width: priceColumnWidth, minWidth: priceColumnWidth }} className={`border-b border-r border-slate-200 p-1 align-top ${dirtyKeys.has(key) ? "bg-amber-50" : ""}`}>
                     {isRetailCatalogSupplier(supplier) ? <div className="flex items-center gap-1">
                       <div className="relative min-w-0 flex-1"><span className="absolute left-1.5 top-1/2 -translate-y-1/2 font-semibold text-slate-400">$</span><input aria-label={`${supplier.name} unit price for ${item.name}`} inputMode="decimal" value={draft.unitPrice} onChange={(event) => updatePrice(item.id, supplier.id, { unitPrice: event.target.value.replace(/[^0-9.]/g, "") })} placeholder="Price" className="h-7 w-full rounded-md border border-slate-300 bg-white pl-4 pr-1 text-[11px] tabular-nums" /></div>
                       {draft.productUrl ? <a href={draft.productUrl} target="_blank" rel="noreferrer" aria-label={`Open exact ${item.name} at ${supplier.name}`} title={`Open exact ${item.name} at ${supplier.name}`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-[#0066cc]"><ExternalLink className="h-3 w-3" /></a> : <button type="button" onClick={() => setExactProductLink(item, supplier)} aria-label={`Add exact ${supplier.name} product link for ${item.name}`} title={`Add exact ${supplier.name} product link for ${item.name}`} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-amber-800"><ExternalLink className="h-3 w-3" /></button>}

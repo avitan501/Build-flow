@@ -1,10 +1,10 @@
-import { BarChart3, Eye, Monitor, Smartphone, Users } from "lucide-react"
+import { BarChart3, Eye, MapPin, Monitor, Smartphone, Users } from "lucide-react"
 
 import { TrafficInternalFilterStatus } from "@/components/buildflow/traffic-internal-filter-status"
 import { requireAdminProfile } from "@/lib/auth"
 import { FILTERED_TRAFFIC_START } from "@/lib/site-traffic"
 
-type TrafficRow = { path: string; referrer_host: string | null; session_hash: string; device_class: "mobile" | "desktop"; created_at: string }
+type TrafficRow = { path: string; referrer_host: string | null; session_hash: string; device_class: "mobile" | "desktop"; city: string | null; region: string | null; country: string | null; created_at: string }
 
 function countBy(values: string[]) {
   const counts = new Map<string, number>()
@@ -28,7 +28,7 @@ export default async function WebsiteTrafficPage() {
   try {
     const { data, error } = await supabase
       .from("site_page_views")
-      .select("path,referrer_host,session_hash,device_class,created_at")
+      .select("path,referrer_host,session_hash,device_class,city,region,country,created_at")
       .gte("created_at", start.toISOString())
       .order("created_at", { ascending: false })
       .limit(10000)
@@ -48,6 +48,7 @@ export default async function WebsiteTrafficPage() {
   const referrers = countBy(rows.map((row) => row.referrer_host && !row.referrer_host.endsWith("avantiap.com") ? row.referrer_host : "Direct / internal")).slice(0, 6)
   const mobileViews = rows.filter((row) => row.device_class === "mobile").length
   const desktopViews = rows.length - mobileViews
+  const locations = countBy(rows.map((row) => [row.city, row.region, row.country].filter(Boolean).join(", ") || "Location unavailable")).slice(0, 8)
   const daily = Array.from({ length: 14 }, (_, offset) => {
     const date = new Date(now)
     date.setUTCDate(date.getUTCDate() - (13 - offset))
@@ -80,9 +81,10 @@ export default async function WebsiteTrafficPage() {
           <div className="grid gap-5">
             <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-base font-bold text-slate-950">Devices</h2><div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-lg bg-slate-50 p-3"><Smartphone className="h-5 w-5 text-[#0066cc]" /><p className="mt-3 text-xl font-bold tabular-nums">{mobileViews}</p><p className="text-xs text-slate-500">Mobile views</p></div><div className="rounded-lg bg-slate-50 p-3"><Monitor className="h-5 w-5 text-[#0066cc]" /><p className="mt-3 text-xl font-bold tabular-nums">{desktopViews}</p><p className="text-xs text-slate-500">Desktop views</p></div></div></section>
             <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-base font-bold text-slate-950">Traffic sources</h2><div className="mt-3 divide-y divide-slate-100">{referrers.length ? referrers.map(([source, count]) => <div key={source} className="flex items-center justify-between gap-3 py-2.5 text-sm"><span className="truncate text-slate-600">{source}</span><span className="font-bold tabular-nums text-slate-950">{count}</span></div>) : <p className="py-3 text-sm text-slate-500">No source data yet.</p>}</div></section>
+            <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between gap-3"><h2 className="text-base font-bold text-slate-950">Visitor locations</h2><MapPin className="h-4 w-4 text-slate-400" /></div><div className="mt-3 divide-y divide-slate-100">{locations.length ? locations.map(([location, count]) => <div key={location} className="flex items-center justify-between gap-3 py-2.5 text-sm"><span className="truncate text-slate-600">{location}</span><span className="font-bold tabular-nums text-slate-950">{count}</span></div>) : <p className="py-3 text-sm text-slate-500">No location data yet.</p>}</div></section>
           </div>
         </div>
-        <p className="mt-5 text-xs leading-5 text-slate-500">Privacy: tracking stores page paths, device class, referrer host, and an anonymous session hash. It does not store customer names, emails, phone numbers, or IP addresses.</p>
+        <p className="mt-5 text-xs leading-5 text-slate-500">Privacy: tracking stores page paths, device class, referrer host, approximate city/region/country, and an anonymous session hash. It does not store customer names, emails, phone numbers, or IP addresses.</p>
       </div>
     </main>
   )

@@ -176,91 +176,32 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="product-demo" className="scroll-mt-24 px-3 py-4 sm:px-5 sm:py-6" aria-labelledby="product-demo-heading">
-        <div className="mx-auto max-w-[88rem]">
-        <div data-testid="homepage-demo" className="grid overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_20px_54px_rgba(7,17,38,0.09)] lg:grid-cols-[minmax(0,1.7fr)_minmax(18rem,0.7fr)]">
-          <div className="bg-[#071126] p-2.5 sm:p-4">
-            <video
-              className="aspect-video w-full rounded-[18px] bg-[#071126] object-cover shadow-[0_16px_42px_rgba(0,0,0,0.28)]"
-              controls
-              playsInline
-              preload="metadata"
-              poster="/videos/avantia-materials-demo-phone-poster.png"
-              aria-label="Avantia Build material request walkthrough on an iPhone"
-            >
-              <source src="/videos/avantia-materials-demo-phone.mp4" type="video/mp4" />
-              <source src="/videos/avantia-materials-demo-phone.webm" type="video/webm" />
-              <track src="/videos/avantia-materials-demo-phone.vtt" kind="captions" srcLang="en" label="English" />
-              Your browser does not support the video player. You can still <a href="/videos/avantia-materials-demo-phone.mp4">open the Avantia Build phone demo video</a>.
-            </video>
-          </div>
-          <div className="flex flex-col justify-center px-6 py-8 sm:px-9 sm:py-10 lg:px-8">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#0066cc]">Under 20 seconds</p>
-            <h2 id="product-demo-heading" className="mt-2 text-3xl font-semibold leading-tight tracking-[-0.035em] text-balance text-[#071126] sm:text-4xl">See how fast ordering can be.</h2>
-            <p className="mt-4 text-sm leading-6 text-slate-600 sm:text-base sm:leading-7">Choose the material, add the quantity and delivery notes, then review the complete request in one place.</p>
-            <ul className="mt-6 grid gap-3 text-sm font-semibold text-[#071126]">
-              {["Choose size and quantity", "Add delivery notes", "Review the complete order", "Confirm when everything looks right"].map((point) => (
-                <li key={point} className="flex items-center gap-3"><span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><Check className="h-3.5 w-3.5" aria-hidden="true" /></span>{point}</li>
-              ))}
-            </ul>
-            <Link href="/shop" className="mt-7 inline-flex min-h-12 items-center justify-between gap-4 rounded-lg bg-[#0071e3] px-4 py-3 text-sm font-bold text-white shadow-[0_12px_28px_rgba(0,113,227,0.22)] transition-colors hover:bg-[#0066cc] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200">
-              Start your request
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
-        <div data-testid="homepage-custom-demo" className="mt-4 grid overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_16px_42px_rgba(7,17,38,0.07)] lg:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
-          <div className="flex flex-col justify-center px-6 py-7 sm:px-9 lg:order-1">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#0066cc]">Can&apos;t find the item?</p>
-            <h3 className="mt-2 text-2xl font-semibold leading-tight text-balance text-[#071126] sm:text-3xl">Send a custom material request.</h3>
-            <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">Add a photo, link, or description. Our team will identify the item and help source it.</p>
-            <Link href="/request-quote" className="mt-5 inline-flex min-h-12 items-center justify-between gap-4 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-[#071126] transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200">
-              Request a custom item
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-          <div className="bg-[#071126] p-2.5 sm:p-4 lg:order-2">
-            <video
-              className="aspect-video w-full rounded-[16px] bg-[#071126] object-cover shadow-[0_14px_34px_rgba(0,0,0,0.24)]"
-              controls
-              playsInline
-              preload="metadata"
-              poster="/videos/avantia-custom-request-demo-poster.png"
-              aria-label="Avantia Build custom material request walkthrough"
-            >
-              <source src="/videos/avantia-custom-request-demo.mp4" type="video/mp4" />
-              <source src="/videos/avantia-custom-request-demo.webm" type="video/webm" />
-              <track src="/videos/avantia-custom-request-demo.vtt" kind="captions" srcLang="en" label="English" />
-              Your browser does not support the video player. You can still <a href="/videos/avantia-custom-request-demo.mp4">open the Avantia Build custom request demo video</a>.
-            </video>
-          </div>
-        </div>
-        <div data-testid="homepage-builder-story" className="mt-4 grid overflow-hidden rounded-[22px] border border-slate-200 bg-[#071126] text-white shadow-[0_16px_42px_rgba(7,17,38,0.1)] lg:grid-cols-[minmax(0,1.28fr)_minmax(0,0.72fr)]">
-          <div className="p-2.5 sm:p-4">
-            <video
-              className="aspect-video w-full rounded-[16px] bg-black object-cover shadow-[0_14px_34px_rgba(0,0,0,0.3)]"
-              controls
-              playsInline
-              preload="metadata"
-              poster="/videos/avantia-builder-story-poster.png"
-              aria-label="Avantia Build story about a contractor whose crew is waiting for missing materials"
-            >
-              <source src="/videos/avantia-builder-story.mp4" type="video/mp4" />
-              <source src="/videos/avantia-builder-story.webm" type="video/webm" />
-              <track src="/videos/avantia-builder-story.vtt" kind="captions" srcLang="en" label="English" />
-              Your browser does not support the video player. You can still <a className="underline" href="/videos/avantia-builder-story.mp4">open the Avantia Build builder story video</a>.
-            </video>
-          </div>
-          <div className="flex flex-col justify-center px-6 py-7 sm:px-9">
+      <section id="product-demo" data-testid="homepage-builder-story" className="relative isolate min-h-[28rem] overflow-hidden bg-[#071126] text-white sm:min-h-[34rem]" aria-labelledby="product-demo-heading">
+        <video
+          className="absolute inset-0 h-full w-full object-cover"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          poster="/videos/avantia-builder-story-poster.png"
+          aria-hidden="true"
+          tabIndex={-1}
+        >
+          <source src="/videos/avantia-builder-story.mp4" type="video/mp4" />
+          <source src="/videos/avantia-builder-story.webm" type="video/webm" />
+        </video>
+        <div className="absolute inset-0 bg-black/55" aria-hidden="true" />
+        <div className="relative mx-auto flex min-h-[28rem] max-w-[88rem] items-end px-5 py-10 sm:min-h-[34rem] sm:px-8 sm:py-14 lg:px-12">
+          <div className="max-w-2xl">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-sky-200">Keep the job moving</p>
-            <h3 className="mt-2 text-2xl font-semibold leading-tight text-balance sm:text-3xl">Your crew should be building, not waiting for materials.</h3>
-            <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">Send one request. We source, compare, and coordinate the materials your job needs.</p>
-            <Link href="/shop" className="mt-5 inline-flex min-h-12 items-center justify-between gap-4 rounded-lg bg-white px-4 py-3 text-sm font-bold text-[#071126] transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-300/40">
+            <h2 id="product-demo-heading" className="mt-3 text-3xl font-semibold leading-tight text-balance sm:text-5xl">Your crew should be building, not waiting for materials.</h2>
+            <p className="mt-4 max-w-xl text-sm leading-6 text-slate-100 sm:text-lg sm:leading-8">Send one request. We source, compare, and coordinate the materials your job needs.</p>
+            <Link href="/shop" className="mt-6 inline-flex min-h-12 items-center gap-4 rounded-lg bg-white px-5 py-3 text-sm font-bold text-[#071126] transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-300/40">
               Order materials now
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
-        </div>
         </div>
       </section>
 
