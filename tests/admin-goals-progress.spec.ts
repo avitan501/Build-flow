@@ -21,10 +21,29 @@ test("Goals & Progress protects the page and includes all five owner goals", asy
   expect(page).toContain("Build a client target list and collect feedback");
   expect(page).toContain("Call suppliers and find their cheapest items");
   expect(page).toContain("Launch “Beat Your Quote”");
-  expect(page).toContain("Set up supplier affiliate programs");
-  expect(page).toContain("Amazon Associates");
-  expect(page).toContain("https://affiliate-program.amazon.com/welcome/getstarted");
+  expect(page).toContain("<AffiliateProgramTracker");
+  expect(page).toContain('supabase.from("affiliate_programs")');
   expect(page).toContain("<AddTargetClient />");
+});
+
+test("affiliate tracker is persistent, owner-only, filterable, and setup-gated", async () => {
+  const component = await readFile(path.join(root, "components/buildflow/affiliate-program-tracker.tsx"), "utf8");
+  const actions = await readFile(path.join(root, "app/admin/goals-progress/affiliate-actions.ts"), "utf8");
+  const migration = await readFile(path.join(root, "supabase/migrations/20260816193932_create_affiliate_program_tracker.sql"), "utf8");
+
+  expect(component).toContain("Supplier Affiliate Program");
+  expect(component).toContain("Search supplier");
+  expect(component).toContain("Lowe’s Developer/API Onboarding");
+  expect(component).toContain("Start application opens the official program in a new tab");
+  expect(component).toContain("Setup checklist");
+  expect(actions).toContain("await requireAdminProfile()");
+  expect(actions).toContain("Complete every setup checklist item");
+  expect(migration).toContain("prevent_incomplete_affiliate_setup");
+  expect(migration).toContain("affiliate_confirmation_owner_insert");
+  expect((migration.match(/'Not Started'\)/g) ?? []).length).toBe(39);
+  expect((migration.match(/'In Progress'\)/g) ?? []).length).toBeGreaterThanOrEqual(1);
+  expect(migration).toContain("'Lowe''s Creator','A'");
+  expect(migration).toContain("'Developer/API Integration','In Progress'");
 });
 
 test("Beat Your Quote flyer is owner-only and has print and sharing controls", async () => {

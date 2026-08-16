@@ -1,0 +1,5 @@
+create index affiliate_integrations_program_idx on public.affiliate_integrations(program_id);
+create index affiliate_activities_created_by_idx on public.affiliate_program_activities(created_by);
+create index affiliate_attachments_program_idx on public.affiliate_program_attachments(program_id);
+create index affiliate_attachments_uploaded_by_idx on public.affiliate_program_attachments(uploaded_by);
+create index affiliate_checklist_completed_by_idx on public.affiliate_program_checklist(completed_by);

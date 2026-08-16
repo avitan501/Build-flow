@@ -1,7 +1,6 @@
 import {
   ArrowRight,
   ArrowUpRight,
-  BadgeDollarSign,
   Check,
   CircleDollarSign,
   Clock3,
@@ -12,6 +11,15 @@ import {
 import Link from "next/link";
 
 import { AddTargetClient } from "@/components/buildflow/add-target-client";
+import { AffiliateProgramTracker } from "@/components/buildflow/affiliate-program-tracker";
+import type {
+  AffiliateActivity,
+  AffiliateAttachment,
+  AffiliateChecklistItem,
+  AffiliateIntegration,
+  AffiliateProgram,
+  AffiliateTrackerSettings,
+} from "@/lib/affiliate-tracker";
 import { requireAdminProfile } from "@/lib/auth";
 
 const SHOP_PREVIEW_URL = "https://build-flow-wfl3-em41309w2-avitanneto-1804s-projects.vercel.app/shop";
@@ -50,6 +58,21 @@ export default async function GoalsProgressPage() {
     .limit(6)
     .returns<ClientTarget[]>();
   const clients = error ? [] : data ?? [];
+  const [programResult, checklistResult, activityResult, attachmentResult, integrationResult, settingsResult] = await Promise.all([
+    supabase.from("affiliate_programs").select("*").order("priority").order("supplier_name").returns<AffiliateProgram[]>(),
+    supabase.from("affiliate_program_checklist").select("*").order("sort_order").returns<AffiliateChecklistItem[]>(),
+    supabase.from("affiliate_program_activities").select("*").order("activity_date", { ascending: false }).limit(500).returns<AffiliateActivity[]>(),
+    supabase.from("affiliate_program_attachments").select("*").order("created_at", { ascending: false }).returns<AffiliateAttachment[]>(),
+    supabase.from("affiliate_integrations").select("*").order("created_at").returns<AffiliateIntegration[]>(),
+    supabase.from("affiliate_tracker_settings").select("*").eq("id", "global").maybeSingle<AffiliateTrackerSettings>(),
+  ]);
+  if (programResult.error || checklistResult.error || activityResult.error || attachmentResult.error || integrationResult.error || settingsResult.error || !settingsResult.data) {
+    throw new Error("The affiliate tracker could not load.");
+  }
+  const signedAttachments = await Promise.all((attachmentResult.data ?? []).map(async (attachment) => ({
+    ...attachment,
+    signed_url: (await supabase.storage.from("affiliate-confirmations").createSignedUrl(attachment.file_path, 1800)).data?.signedUrl ?? null,
+  })));
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-10">
@@ -107,36 +130,14 @@ export default async function GoalsProgressPage() {
             </section>
           </div>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="affiliate-goal-title">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex min-w-0 gap-3">
-                <GoalNumber>5</GoalNumber>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Affiliate revenue</p>
-                  <h2 id="affiliate-goal-title" className="mt-1 text-xl font-semibold">Set up supplier affiliate programs</h2>
-                  <p className="mt-1 max-w-2xl text-sm text-slate-600">Create tracked product links for useful jobsite purchases that Avantia does not directly quote or deliver.</p>
-                </div>
-              </div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-800"><BadgeDollarSign className="h-3.5 w-3.5" />Setup required</span>
-            </div>
-
-            <div className="mt-5 overflow-hidden rounded-md border border-slate-200">
-              <div className="grid gap-3 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase text-slate-500 sm:grid-cols-[10rem_minmax(0,1fr)_8rem_auto]"><span>Supplier</span><span>Best use</span><span>Status</span><span>Action</span></div>
-              <div className="grid items-center gap-3 border-t border-slate-100 px-4 py-4 sm:grid-cols-[10rem_minmax(0,1fr)_8rem_auto]">
-                <div><p className="font-semibold">Amazon</p><p className="text-xs text-slate-500">Associates Program</p></div>
-                <p className="text-sm text-slate-600">Tools, safety gear, consumables, and small jobsite items.</p>
-                <span className="w-fit rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">Not applied</span>
-                <a href="https://affiliate-program.amazon.com/welcome/getstarted" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 w-fit items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white">Apply<ArrowUpRight className="h-4 w-4" /></a>
-              </div>
-            </div>
-
-            <ol className="mt-5 grid gap-3 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
-              <li className="border-l-2 border-[#0071e3] pl-3"><strong className="block text-slate-950">1. Apply</strong>Register build.avantiap.com with Amazon Associates.</li>
-              <li className="border-l-2 border-slate-200 pl-3"><strong className="block text-slate-950">2. Get tracking ID</strong>Save the approved Associate tag in the website configuration.</li>
-              <li className="border-l-2 border-slate-200 pl-3"><strong className="block text-slate-950">3. Build a short list</strong>Select only useful construction products with exact tagged links.</li>
-              <li className="border-l-2 border-slate-200 pl-3"><strong className="block text-slate-950">4. Publish and measure</strong>Add the required disclosure, test every link, and review conversion reports.</li>
-            </ol>
-          </section>
+          <AffiliateProgramTracker
+            programs={programResult.data ?? []}
+            checklist={checklistResult.data ?? []}
+            activities={activityResult.data ?? []}
+            attachments={signedAttachments}
+            integrations={integrationResult.data ?? []}
+            settings={settingsResult.data}
+          />
         </div>
       </div>
     </main>
