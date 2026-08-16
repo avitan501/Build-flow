@@ -17,7 +17,7 @@ test("manager navigation groups secondary tools and keeps calls last", async () 
 })
 
 test("manager catalog is protected, seeded, editable, and supplier based", async () => {
-  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, parser] = await Promise.all([
+  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, parser] = await Promise.all([
     readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/catalog/actions.ts"), "utf8"),
@@ -26,6 +26,7 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
     readFile(path.join(root, "supabase/migrations/20260814160945_add_retail_catalog_suppliers.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260814162242_add_verified_retail_product_links.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260816190156_add_catalog_retail_snapshot_metadata.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260816193227_seed_home_depot_framing_snapshot.sql"), "utf8"),
     readFile(path.join(root, "lib/material-catalog-pdf.ts"), "utf8"),
   ])
   expect(page).toContain("requireManagerPortalProfile")
@@ -85,6 +86,9 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(exactLinkMigration).toContain("Search and category URLs are not allowed")
   expect(snapshotMigration).toContain("price_observed_at")
   expect(snapshotMigration).toContain("retail_store_id")
+  expect(homeDepotSnapshot).toContain("FRA-001")
+  expect(homeDepotSnapshot).toContain("https://www.homedepot.com/p/314732316")
+  expect(homeDepotSnapshot).toContain("Confirm local stock and checkout price")
   expect(parser).toContain("parseMaterialComparisonText")
   expect(parser).toContain("No quantity, unit, and material rows were found")
 })
