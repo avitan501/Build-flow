@@ -13,6 +13,7 @@ import {
   PhoneCall,
   PackageOpen,
   Store,
+  Target,
   Users,
   X,
 } from "lucide-react";
@@ -32,6 +33,7 @@ const primaryLinks = [
 ] as const;
 
 const moreLinks = [
+  { href: "/admin/goals-progress", label: "Goals & Progress", icon: Target },
   { href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 },
   { href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles },
   { href: "/admin/build-map", label: "Dashboard", icon: LayoutDashboard },
