@@ -171,7 +171,10 @@ export function MaterialCatalogWorkspace({
   const catalogSupplierSelectionChanged = useMemo(() => (
     [...catalogSupplierDraftIds].sort().join("|") !== [...savedCatalogSupplierIds].sort().join("|")
   ), [catalogSupplierDraftIds, savedCatalogSupplierIds])
-  const mobileSupplier = visibleSuppliers.find((supplier) => supplier.id === mobileSupplierId) ?? visibleSuppliers[0] ?? null
+  const mobileSupplier = visibleSuppliers.find((supplier) => supplier.id === mobileSupplierId)
+    ?? visibleSuppliers.find((supplier) => supplier.id === "home-depot-retail-catalog")
+    ?? visibleSuppliers[0]
+    ?? null
 
   function moveMobileSupplier(direction: -1 | 1) {
     if (!mobileSupplier || visibleSuppliers.length < 2) return

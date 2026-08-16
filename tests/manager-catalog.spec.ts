@@ -53,6 +53,7 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(workspace).toContain("supplierColumnWidth")
   expect(workspace).toContain("Valley Stream #1216")
   expect(workspace).toContain("snapshotLabel")
+  expect(workspace).toContain('supplier.id === "home-depot-retail-catalog"')
   expect(actions).toContain("Use an exact ${supplier.name} product page")
   expect(actions).toContain('url.pathname.startsWith("/pd/")')
   expect(actions).toContain('url.pathname.startsWith("/p/")')
