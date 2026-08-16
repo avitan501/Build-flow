@@ -53,6 +53,11 @@ const HOME_DEPOT_SNAPSHOT = {
   storeName: "Valley Stream",
   zipCode: "11516",
 } as const
+const LOWES_SNAPSHOT = {
+  storeId: null,
+  storeName: null,
+  zipCode: "11516",
+} as const
 
 function clean(value: unknown, max: number) {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max)
@@ -211,15 +216,17 @@ export async function saveMaterialCatalogPricesAction(inputs: CatalogPriceInput[
     if (productUrl && !validRetailProductUrl(supplier.id, productUrl)) {
       return { ok: false, error: `Use an exact ${supplier.name} product page, not a search or category link.` }
     }
-    if (supplier.id === "home-depot-retail-catalog" && price !== null && !productUrl) {
-      return { ok: false, error: "Add the exact Home Depot product page before saving its snapshot price." }
+    const retailSnapshot = supplier.id === "home-depot-retail-catalog"
+      ? HOME_DEPOT_SNAPSHOT
+      : supplier.id === "lowes-retail-catalog" ? LOWES_SNAPSHOT : null
+    if (retailSnapshot && price !== null && !productUrl) {
+      return { ok: false, error: `Add the exact ${supplier.name} product page before saving its snapshot price.` }
     }
-    const isHomeDepot = supplier.id === "home-depot-retail-catalog"
-    const isHomeDepotSnapshot = isHomeDepot && price !== null && Boolean(productUrl)
+    const isRetailSnapshot = Boolean(retailSnapshot && price !== null && productUrl)
     const existingPrice = existingPriceMap.get(`${input.itemId}:${supplier.id}`)
-    const snapshotChanged = isHomeDepotSnapshot
+    const snapshotChanged = isRetailSnapshot
       && (existingPrice?.product_url !== productUrl || Number(existingPrice?.unit_price) !== price)
-    const preservedSnapshot = isHomeDepot ? null : existingPrice
+    const preservedSnapshot = retailSnapshot ? null : existingPrice
     rows.push({
       item_id: input.itemId,
       supplier_id: supplier.id,
@@ -229,12 +236,12 @@ export async function saveMaterialCatalogPricesAction(inputs: CatalogPriceInput[
       unit_price: price === null ? null : Math.round(price * 10000) / 10000,
       availability: ["available", "not_available", "unknown"].includes(input.availability) ? input.availability : "unknown",
       notes: clean(input.notes, 1000),
-      retail_store_id: isHomeDepotSnapshot ? HOME_DEPOT_SNAPSHOT.storeId : preservedSnapshot?.retail_store_id ?? null,
-      retail_store_name: isHomeDepotSnapshot ? HOME_DEPOT_SNAPSHOT.storeName : preservedSnapshot?.retail_store_name ?? null,
-      retail_zip_code: isHomeDepotSnapshot ? HOME_DEPOT_SNAPSHOT.zipCode : preservedSnapshot?.retail_zip_code ?? null,
+      retail_store_id: isRetailSnapshot ? retailSnapshot?.storeId ?? null : preservedSnapshot?.retail_store_id ?? null,
+      retail_store_name: isRetailSnapshot ? retailSnapshot?.storeName ?? null : preservedSnapshot?.retail_store_name ?? null,
+      retail_zip_code: isRetailSnapshot ? retailSnapshot?.zipCode ?? null : preservedSnapshot?.retail_zip_code ?? null,
       price_observed_at: snapshotChanged
         ? new Date().toISOString()
-        : isHomeDepotSnapshot ? existingPrice?.price_observed_at ?? null : preservedSnapshot?.price_observed_at ?? null,
+        : isRetailSnapshot ? existingPrice?.price_observed_at ?? null : preservedSnapshot?.price_observed_at ?? null,
       updated_by: user.id,
       updated_at: new Date().toISOString(),
     })

@@ -17,7 +17,7 @@ test("manager navigation groups secondary tools and keeps calls last", async () 
 })
 
 test("manager catalog is protected, seeded, editable, and supplier based", async () => {
-  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, parser] = await Promise.all([
+  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, allDepartmentRetailers, verifiedRetailProducts, parser] = await Promise.all([
     readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/catalog/actions.ts"), "utf8"),
@@ -27,6 +27,8 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
     readFile(path.join(root, "supabase/migrations/20260814162242_add_verified_retail_product_links.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260816190156_add_catalog_retail_snapshot_metadata.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260816193227_seed_home_depot_framing_snapshot.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260816203816_ensure_retailers_in_every_catalog_department.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260816210019_seed_verified_retail_catalog_products.sql"), "utf8"),
     readFile(path.join(root, "lib/material-catalog-pdf.ts"), "utf8"),
   ])
   expect(page).toContain("requireManagerPortalProfile")
@@ -45,20 +47,23 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(workspace).toContain("Save item")
   expect(workspace).toContain("Measurement / size")
   expect(workspace).toContain("Thickness / gauge")
-  expect(workspace).toContain("Open exact item at")
-  expect(workspace).toContain("Exact link needed")
-  expect(workspace).toContain("Add exact link")
+  expect(workspace).toContain("Open exact ${item.name} at ${supplier.name}")
+  expect(workspace).toContain("Add exact ${supplier.name} product link for ${item.name}")
   expect(workspace).not.toContain("https://www.lowes.com/search?searchTerm=")
   expect(workspace).not.toContain("https://www.homedepot.com/s/")
   expect(workspace).toContain("supplierColumnWidth")
-  expect(workspace).toContain("Valley Stream #1216")
-  expect(workspace).toContain("snapshotLabel")
+  expect(workspace).toContain("isRetailCatalogSupplier(supplier) ? 88 : 132")
+  expect(workspace).not.toContain("Valley Stream #1216")
+  expect(workspace).not.toContain("snapshotLabel")
+  expect(workspace).not.toContain('<option value="unknown">Unknown</option><option value="available">Available</option><option value="not_available">N/A</option></select>\n                      {draft.productUrl')
   expect(workspace).toContain('supplier.id === "home-depot-retail-catalog"')
   expect(actions).toContain("Use an exact ${supplier.name} product page")
   expect(actions).toContain('url.pathname.startsWith("/pd/")')
   expect(actions).toContain('url.pathname.startsWith("/p/")')
   expect(actions).toContain('storeId: "1216"')
   expect(actions).toContain('zipCode: "11516"')
+  expect(actions).toContain("LOWES_SNAPSHOT")
+  expect(actions).toContain("isRetailSnapshot")
   expect(page).toContain("product_url")
   expect(workspace).not.toContain("Sample quantity")
   expect(workspace).toContain("price per {item.unit}")
@@ -90,6 +95,13 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(homeDepotSnapshot).toContain("FRA-001")
   expect(homeDepotSnapshot).toContain("https://www.homedepot.com/p/314732316")
   expect(homeDepotSnapshot).toContain("Confirm local stock and checkout price")
+  expect(allDepartmentRetailers).toContain("home-depot-retail-catalog")
+  expect(allDepartmentRetailers).toContain("lowes-retail-catalog")
+  expect(allDepartmentRetailers).toContain('"Others"')
+  expect(verifiedRetailProducts).toContain("/images/materials/catalog/win-004.jpg")
+  expect(verifiedRetailProducts).toContain("36 x 60 in. double-hung window")
+  expect(verifiedRetailProducts).toContain("6-mil polyethylene vapor barrier, 10 x 100 ft.")
+  expect(verifiedRetailProducts).not.toMatch(/\/(questions|reviews|sets)\//)
   expect(parser).toContain("parseMaterialComparisonText")
   expect(parser).toContain("No quantity, unit, and material rows were found")
 })
