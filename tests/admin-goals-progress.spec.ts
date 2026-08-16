@@ -12,7 +12,7 @@ test("owner manager navigation includes Goals & Progress", async () => {
   expect(shell).toContain("{access.owner ? (");
 });
 
-test("Goals & Progress protects the page and includes all four owner goals", async () => {
+test("Goals & Progress protects the page and includes all five owner goals", async () => {
   const page = await readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8");
 
   expect(page).toContain("await requireAdminProfile()");
@@ -21,6 +21,9 @@ test("Goals & Progress protects the page and includes all four owner goals", asy
   expect(page).toContain("Build a client target list and collect feedback");
   expect(page).toContain("Call suppliers and find their cheapest items");
   expect(page).toContain("Launch “Beat Your Quote”");
+  expect(page).toContain("Set up supplier affiliate programs");
+  expect(page).toContain("Amazon Associates");
+  expect(page).toContain("https://affiliate-program.amazon.com/welcome/getstarted");
   expect(page).toContain("<AddTargetClient />");
 });
 
