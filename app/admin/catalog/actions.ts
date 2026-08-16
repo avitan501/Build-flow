@@ -26,6 +26,15 @@ type CatalogItemInput = {
   description?: string
   measurement?: string
   thickness?: string
+  brand?: string
+  manufacturerModelNumber?: string
+  upc?: string
+  packageQuantity: number
+  packageUnit: string
+  comparisonQuantity: number
+  comparisonUnit: string
+  reviewStatus: "ready" | "needs_review" | "ambiguous" | "discontinued"
+  qualityNotes?: string
   defaultQuantity: number
   unit: string
   imageUrl?: string
@@ -40,6 +49,10 @@ type CatalogPriceInput = {
   supplierSku?: string
   productUrl?: string
   notes?: string
+  priceType?: "retail" | "supplier_quote" | "contractor" | "estimated"
+  verificationStatus?: "verified_today" | "recently_verified" | "supplier_quote" | "stale" | "unavailable" | "possible_match" | "unverified"
+  deliveryPrice?: number | null
+  minimumOrder?: number
 }
 
 type CatalogSupplierMembershipInput = {
@@ -103,10 +116,14 @@ export async function saveMaterialCatalogItemAction(input: CatalogItemInput): Pr
   const itemCode = clean(input.itemCode, 60).toUpperCase()
   const name = clean(input.name, 300)
   const quantity = Number(input.defaultQuantity)
+  const packageQuantity = Number(input.packageQuantity)
+  const comparisonQuantity = Number(input.comparisonQuantity)
   const unit = clean(input.unit, 40) || "each"
   if (!await validCategory(supabase, category)) return { ok: false, error: "Choose a catalog category." }
   if (!itemCode || !name) return { ok: false, error: "Item code and material name are required." }
   if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 100_000_000) return { ok: false, error: "Enter a valid default quantity." }
+  if (!Number.isFinite(packageQuantity) || packageQuantity <= 0 || packageQuantity > 100_000_000) return { ok: false, error: "Enter a valid package quantity." }
+  if (!Number.isFinite(comparisonQuantity) || comparisonQuantity <= 0 || comparisonQuantity > 100_000_000) return { ok: false, error: "Enter a valid comparison quantity." }
 
   const record = {
     category,
@@ -115,6 +132,15 @@ export async function saveMaterialCatalogItemAction(input: CatalogItemInput): Pr
     description: clean(input.description, 2000),
     measurement: clean(input.measurement, 160),
     thickness: clean(input.thickness, 160),
+    brand: clean(input.brand, 160),
+    manufacturer_model_number: clean(input.manufacturerModelNumber, 160),
+    upc: clean(input.upc, 80),
+    package_quantity: Math.round(packageQuantity * 10000) / 10000,
+    package_unit: clean(input.packageUnit, 40) || unit,
+    comparison_quantity: Math.round(comparisonQuantity * 10000) / 10000,
+    comparison_unit: clean(input.comparisonUnit, 40) || unit,
+    review_status: ["ready", "needs_review", "ambiguous", "discontinued"].includes(input.reviewStatus) ? input.reviewStatus : "needs_review",
+    quality_notes: clean(input.qualityNotes, 1000),
     default_quantity: Math.round(quantity * 100) / 100,
     unit,
     image_url: clean(input.imageUrl, 1000) || null,
@@ -153,15 +179,20 @@ export async function saveMaterialCatalogItemAction(input: CatalogItemInput): Pr
 }
 
 export async function deleteMaterialCatalogItemAction(itemId: string): Promise<ActionResult> {
-  const { supabase } = await managerContext()
+  const { supabase, user } = await managerContext()
   if (!UUID_PATTERN.test(itemId)) return { ok: false, error: "This catalog item could not be identified." }
   const { error, count } = await supabase
     .from("material_catalog_items")
-    .delete({ count: "exact" })
+    .update({
+      status: "inactive",
+      review_status: "discontinued",
+      updated_by: user.id,
+      updated_at: new Date().toISOString(),
+    }, { count: "exact" })
     .eq("id", itemId)
-  if (error || count !== 1) return { ok: false, error: "The item was not deleted. Refresh and try again." }
+  if (error || count !== 1) return { ok: false, error: "The item was not archived. Refresh and try again." }
   revalidatePath("/admin/catalog")
-  return { ok: true, message: "Catalog item deleted." }
+  return { ok: true, message: "Catalog item archived. Its pricing history was preserved." }
 }
 
 export async function saveMaterialCatalogPricesAction(inputs: CatalogPriceInput[]): Promise<ActionResult<{ saved: number }>> {
@@ -177,11 +208,12 @@ export async function saveMaterialCatalogPricesAction(inputs: CatalogPriceInput[
   if (itemIds.some((id) => !UUID_PATTERN.test(id))) return { ok: false, error: "A catalog item or supplier is no longer available." }
   const { data: itemData, error: itemError } = await supabase
     .from("material_catalog_items")
-    .select("id,category")
+    .select("id,category,package_quantity,comparison_quantity")
     .in("id", itemIds)
-    .returns<Array<{ id: string; category: string }>>()
+    .returns<Array<{ id: string; category: string; package_quantity: number; comparison_quantity: number }>>()
   if (itemError) return { ok: false, error: "The catalog items could not be verified." }
   const itemDepartmentMap = new Map((itemData ?? []).map((item) => [item.id, normalizeMaterialCatalogDepartment(item.category)]))
+  const itemMap = new Map((itemData ?? []).map((item) => [item.id, item]))
 
   const supplierIds = [...new Set(inputs.map((input) => input.supplierId))]
   const { data: existingPriceData, error: existingPriceError } = await supabase
@@ -208,11 +240,15 @@ export async function saveMaterialCatalogPricesAction(inputs: CatalogPriceInput[
     const department = itemDepartmentMap.get(input.itemId)
     const price = input.unitPrice === null || input.unitPrice === undefined ? null : Number(input.unitPrice)
     const productUrl = clean(input.productUrl, 1200)
+    const deliveryPrice = input.deliveryPrice === null || input.deliveryPrice === undefined ? null : Number(input.deliveryPrice)
+    const minimumOrder = Number(input.minimumOrder ?? 1)
     if (!UUID_PATTERN.test(input.itemId) || !supplier || !department) return { ok: false, error: "A catalog item or supplier is no longer available." }
     if (!hasRoutableSupplierTrust(supplier.trustLevel) || !supplierServesMaterialDepartment(supplier, department) || !supplierIsAddedToCatalogDepartment(supplier, department)) {
       return { ok: false, error: "This supplier is not added to that catalog department." }
     }
     if (price !== null && (!Number.isFinite(price) || price < 0 || price > 100_000_000)) return { ok: false, error: "Check the supplier prices before saving." }
+    if (deliveryPrice !== null && (!Number.isFinite(deliveryPrice) || deliveryPrice < 0 || deliveryPrice > 100_000_000)) return { ok: false, error: "Check the delivery prices before saving." }
+    if (!Number.isFinite(minimumOrder) || minimumOrder <= 0 || minimumOrder > 100_000_000) return { ok: false, error: "Check the minimum order before saving." }
     if (productUrl && !validRetailProductUrl(supplier.id, productUrl)) {
       return { ok: false, error: `Use an exact ${supplier.name} product page, not a search or category link.` }
     }
@@ -223,6 +259,21 @@ export async function saveMaterialCatalogPricesAction(inputs: CatalogPriceInput[
       return { ok: false, error: `Add the exact ${supplier.name} product page before saving its snapshot price.` }
     }
     const isRetailSnapshot = Boolean(retailSnapshot && price !== null && productUrl)
+    const item = itemMap.get(input.itemId)
+    if (!item) return { ok: false, error: "A catalog item is no longer available." }
+    const priceType = retailSnapshot
+      ? "retail"
+      : ["supplier_quote", "contractor", "estimated"].includes(input.priceType ?? "") ? input.priceType! : "supplier_quote"
+    const requestedVerificationStatus = ["recently_verified", "supplier_quote", "stale", "unavailable", "possible_match", "unverified"]
+      .includes(input.verificationStatus ?? "") ? input.verificationStatus! : "supplier_quote"
+    const verificationStatus = price === null
+      ? (input.availability === "not_available" ? "unavailable" : "unverified")
+      : isRetailSnapshot
+        ? "verified_today"
+        : requestedVerificationStatus
+    const comparisonPrice = price === null
+      ? null
+      : Math.round((((price + (deliveryPrice ?? 0)) / Number(item.package_quantity)) * Number(item.comparison_quantity)) * 10000) / 10000
     const existingPrice = existingPriceMap.get(`${input.itemId}:${supplier.id}`)
     const snapshotChanged = isRetailSnapshot
       && (existingPrice?.product_url !== productUrl || Number(existingPrice?.unit_price) !== price)
@@ -236,6 +287,13 @@ export async function saveMaterialCatalogPricesAction(inputs: CatalogPriceInput[
       unit_price: price === null ? null : Math.round(price * 10000) / 10000,
       availability: ["available", "not_available", "unknown"].includes(input.availability) ? input.availability : "unknown",
       notes: clean(input.notes, 1000),
+      price_type: priceType,
+      verification_status: verificationStatus,
+      delivery_price: deliveryPrice === null ? null : Math.round(deliveryPrice * 10000) / 10000,
+      minimum_order: Math.round(minimumOrder * 100) / 100,
+      verified_at: price === null ? null : new Date().toISOString(),
+      expires_at: priceType === "supplier_quote" ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : null,
+      comparison_price: comparisonPrice,
       retail_store_id: isRetailSnapshot ? retailSnapshot?.storeId ?? null : preservedSnapshot?.retail_store_id ?? null,
       retail_store_name: isRetailSnapshot ? retailSnapshot?.storeName ?? null : preservedSnapshot?.retail_store_name ?? null,
       retail_zip_code: isRetailSnapshot ? retailSnapshot?.zipCode ?? null : preservedSnapshot?.retail_zip_code ?? null,

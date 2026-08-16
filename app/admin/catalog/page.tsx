@@ -10,14 +10,14 @@ export default async function ManagerMaterialCatalogPage() {
   const [itemsResult, pricesResult, suppliersResult, settingsResult] = await Promise.all([
     supabase
       .from("material_catalog_items")
-      .select("id,category,item_code,name,description,measurement,thickness,default_quantity,unit,image_url,status,source,sort_order,created_at,updated_at")
+      .select("id,category,item_code,name,description,measurement,thickness,brand,manufacturer_model_number,upc,package_quantity,package_unit,comparison_quantity,comparison_unit,review_status,quality_notes,default_quantity,unit,image_url,status,source,sort_order,created_at,updated_at")
       .order("category")
       .order("sort_order")
       .order("name")
       .returns<MaterialCatalogItem[]>(),
     supabase
       .from("material_catalog_supplier_prices")
-      .select("item_id,supplier_id,supplier_name_snapshot,supplier_sku,product_url,unit_price,availability,notes,retail_store_id,retail_store_name,retail_zip_code,price_observed_at,updated_at")
+      .select("item_id,supplier_id,supplier_name_snapshot,supplier_sku,product_url,unit_price,availability,notes,price_type,verification_status,delivery_price,minimum_order,verified_at,expires_at,comparison_price,retail_store_id,retail_store_name,retail_zip_code,price_observed_at,updated_at")
       .returns<MaterialCatalogSupplierPrice[]>(),
     supabase.rpc("staff_load_catalog_suppliers"),
     supabase

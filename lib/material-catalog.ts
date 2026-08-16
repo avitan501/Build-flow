@@ -23,6 +23,15 @@ export type MaterialCatalogItem = {
   description: string
   measurement: string
   thickness: string
+  brand: string
+  manufacturer_model_number: string
+  upc: string
+  package_quantity: number
+  package_unit: string
+  comparison_quantity: number
+  comparison_unit: string
+  review_status: "ready" | "needs_review" | "ambiguous" | "discontinued"
+  quality_notes: string
   default_quantity: number
   unit: string
   image_url: string | null
@@ -42,6 +51,13 @@ export type MaterialCatalogSupplierPrice = {
   unit_price: number | null
   availability: "available" | "not_available" | "unknown"
   notes: string
+  price_type: "retail" | "supplier_quote" | "contractor" | "estimated"
+  verification_status: "verified_today" | "recently_verified" | "supplier_quote" | "stale" | "unavailable" | "possible_match" | "unverified"
+  delivery_price: number | null
+  minimum_order: number
+  verified_at: string | null
+  expires_at: string | null
+  comparison_price: number | null
   retail_store_id: string | null
   retail_store_name: string | null
   retail_zip_code: string | null

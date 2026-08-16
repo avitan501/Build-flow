@@ -17,7 +17,7 @@ test("manager navigation groups secondary tools and keeps calls last", async () 
 })
 
 test("manager catalog is protected, seeded, editable, and supplier based", async () => {
-  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, allDepartmentRetailers, verifiedRetailProducts, curatedProducts, parser] = await Promise.all([
+  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, allDepartmentRetailers, verifiedRetailProducts, curatedProducts, qualityMigration, qualityHelpers, parser] = await Promise.all([
     readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/catalog/actions.ts"), "utf8"),
@@ -30,6 +30,8 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
     readFile(path.join(root, "supabase/migrations/20260816203816_ensure_retailers_in_every_catalog_department.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260816210019_seed_verified_retail_catalog_products.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260816223000_curate_common_catalog_products.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260817001500_add_catalog_quality_and_price_history.sql"), "utf8"),
+    readFile(path.join(root, "lib/material-catalog-quality.ts"), "utf8"),
     readFile(path.join(root, "lib/material-catalog-pdf.ts"), "utf8"),
   ])
   expect(page).toContain("requireManagerPortalProfile")
@@ -59,6 +61,12 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(workspace).toContain("avantia-catalog-item-column-width")
   expect(workspace).toContain("avantia-catalog-price-column-width")
   expect(workspace).toContain("Retail pricing location: ZIP 11516")
+  expect(workspace).toContain("Missing price")
+  expect(workspace).toContain("Needs review")
+  expect(workspace).toContain("Catalog confidence")
+  expect(workspace).toContain("Package quantity")
+  expect(workspace).toContain("Manufacturer model")
+  expect(workspace).toContain("Price details")
   expect(workspace).not.toContain("Valley Stream #1216")
   expect(workspace).not.toContain("snapshotLabel")
   expect(workspace).not.toContain('<option value="unknown">Unknown</option><option value="available">Available</option><option value="not_available">N/A</option></select>\n                      {draft.productUrl')
@@ -75,6 +83,8 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(workspace).toContain("price per {item.unit}")
   expect(actions).toContain("extractMaterialCatalogItemsFromPdf")
   expect(actions).toContain("deleteMaterialCatalogItemAction")
+  expect(actions).toContain('review_status: "discontinued"')
+  expect(actions).not.toContain('.delete({ count: "exact" })')
   expect(actions).toContain("catalogEnabledDepartments")
   expect(actions).toContain("measurement: clean(input.measurement")
   expect(actions).toContain("thickness: clean(input.thickness")
@@ -112,6 +122,12 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(curatedProducts).toContain("'11516'")
   expect(curatedProducts).toContain("7/16-in. x 4-ft. x 8-ft. OSB roof sheathing")
   expect(curatedProducts).toContain("unit = 'bags'")
+  expect(qualityMigration).toContain("material_catalog_price_history")
+  expect(qualityMigration).toContain("archive_material_catalog_price_trigger")
+  expect(qualityMigration).toContain("GAF Timberline HDZ Charcoal")
+  expect(qualityMigration).not.toContain("delete from public.material_catalog_items")
+  expect(qualityHelpers).toContain("catalogItemMatchesReview")
+  expect(qualityHelpers).toContain("normalizedComparisonPrice")
   expect(parser).toContain("parseMaterialComparisonText")
   expect(parser).toContain("No quantity, unit, and material rows were found")
 })
