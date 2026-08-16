@@ -16,6 +16,9 @@ export type ManagerNewClientInput = { fullName: string; email: string; phone?: s
 export type CreateClientRequestResult =
   | { ok: true; requestId: string; customerId: string }
   | { ok: false; error: string };
+export type CreateTargetClientResult =
+  | { ok: true; customerId: string; existing: boolean }
+  | { ok: false; error: string };
 export type CustomerContactUpdateState = {
   status: "idle" | "success" | "error";
   message: string;
@@ -25,6 +28,49 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 
 function validUuid(value: string) {
   return UUID_PATTERN.test(value.trim());
+}
+
+export async function createTargetClientAction(input: ManagerNewClientInput): Promise<CreateTargetClientResult> {
+  const { supabase } = await requireAdminProfile();
+  const fullName = input.fullName.trim().replace(/\s+/g, " ").slice(0, 160);
+  const email = input.email.trim().toLowerCase().slice(0, 320);
+  const phone = input.phone?.trim().slice(0, 40) || null;
+  const companyName = input.companyName?.trim().slice(0, 180) || null;
+
+  if (fullName.length < 2) return { ok: false, error: "Enter the client's name." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid client email address." };
+
+  const { data: existingClient, error: existingClientError } = await supabase
+    .from("profiles")
+    .select("id,role,is_active")
+    .ilike("email", email)
+    .limit(1)
+    .maybeSingle<{ id: string; role: string; is_active: boolean }>();
+
+  if (existingClientError) return { ok: false, error: "Could not check the client directory." };
+  if (existingClient) {
+    if (existingClient.role !== "client") return { ok: false, error: "That email belongs to a staff account." };
+    if (!existingClient.is_active) return { ok: false, error: "That client account is inactive." };
+    return { ok: true, customerId: existingClient.id, existing: true };
+  }
+
+  const { data: createdClient, error: createClientError } = await supabase.functions.invoke<{
+    ok?: boolean;
+    customerId?: string;
+    error?: string;
+  }>("create-manager-client", {
+    body: { fullName, email, phone, companyName },
+  });
+
+  if (createClientError || !createdClient?.ok || !validUuid(createdClient.customerId || "")) {
+    if (createdClient?.error === "email_in_use_by_staff") return { ok: false, error: "That email belongs to a staff account." };
+    if (createdClient?.error === "client_inactive") return { ok: false, error: "That client account is inactive." };
+    return { ok: false, error: "Could not add the client. Please try again." };
+  }
+
+  revalidatePath("/admin/goals-progress");
+  revalidatePath("/admin/users");
+  return { ok: true, customerId: createdClient.customerId || "", existing: false };
 }
 
 async function cleanupQueuedFiles(targetType: DeletionTarget, targetId: string) {
