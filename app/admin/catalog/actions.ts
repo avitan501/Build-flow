@@ -48,6 +48,11 @@ type CatalogSupplierMembershipInput = {
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const HOME_DEPOT_SNAPSHOT = {
+  storeId: "1216",
+  storeName: "Valley Stream",
+  zipCode: "11516",
+} as const
 
 function clean(value: unknown, max: number) {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max)
@@ -173,6 +178,25 @@ export async function saveMaterialCatalogPricesAction(inputs: CatalogPriceInput[
   if (itemError) return { ok: false, error: "The catalog items could not be verified." }
   const itemDepartmentMap = new Map((itemData ?? []).map((item) => [item.id, normalizeMaterialCatalogDepartment(item.category)]))
 
+  const supplierIds = [...new Set(inputs.map((input) => input.supplierId))]
+  const { data: existingPriceData, error: existingPriceError } = await supabase
+    .from("material_catalog_supplier_prices")
+    .select("item_id,supplier_id,product_url,unit_price,retail_store_id,retail_store_name,retail_zip_code,price_observed_at")
+    .in("item_id", itemIds)
+    .in("supplier_id", supplierIds)
+    .returns<Array<{
+      item_id: string
+      supplier_id: string
+      product_url: string | null
+      unit_price: number | null
+      retail_store_id: string | null
+      retail_store_name: string | null
+      retail_zip_code: string | null
+      price_observed_at: string | null
+    }>>()
+  if (existingPriceError) return { ok: false, error: "The saved supplier prices could not be verified." }
+  const existingPriceMap = new Map((existingPriceData ?? []).map((row) => [`${row.item_id}:${row.supplier_id}`, row]))
+
   const rows = []
   for (const input of inputs) {
     const supplier = supplierMap.get(input.supplierId)
@@ -187,6 +211,15 @@ export async function saveMaterialCatalogPricesAction(inputs: CatalogPriceInput[
     if (productUrl && !validRetailProductUrl(supplier.id, productUrl)) {
       return { ok: false, error: `Use an exact ${supplier.name} product page, not a search or category link.` }
     }
+    if (supplier.id === "home-depot-retail-catalog" && price !== null && !productUrl) {
+      return { ok: false, error: "Add the exact Home Depot product page before saving its snapshot price." }
+    }
+    const isHomeDepot = supplier.id === "home-depot-retail-catalog"
+    const isHomeDepotSnapshot = isHomeDepot && price !== null && Boolean(productUrl)
+    const existingPrice = existingPriceMap.get(`${input.itemId}:${supplier.id}`)
+    const snapshotChanged = isHomeDepotSnapshot
+      && (existingPrice?.product_url !== productUrl || Number(existingPrice?.unit_price) !== price)
+    const preservedSnapshot = isHomeDepot ? null : existingPrice
     rows.push({
       item_id: input.itemId,
       supplier_id: supplier.id,
@@ -196,6 +229,12 @@ export async function saveMaterialCatalogPricesAction(inputs: CatalogPriceInput[
       unit_price: price === null ? null : Math.round(price * 10000) / 10000,
       availability: ["available", "not_available", "unknown"].includes(input.availability) ? input.availability : "unknown",
       notes: clean(input.notes, 1000),
+      retail_store_id: isHomeDepotSnapshot ? HOME_DEPOT_SNAPSHOT.storeId : preservedSnapshot?.retail_store_id ?? null,
+      retail_store_name: isHomeDepotSnapshot ? HOME_DEPOT_SNAPSHOT.storeName : preservedSnapshot?.retail_store_name ?? null,
+      retail_zip_code: isHomeDepotSnapshot ? HOME_DEPOT_SNAPSHOT.zipCode : preservedSnapshot?.retail_zip_code ?? null,
+      price_observed_at: snapshotChanged
+        ? new Date().toISOString()
+        : isHomeDepotSnapshot ? existingPrice?.price_observed_at ?? null : preservedSnapshot?.price_observed_at ?? null,
       updated_by: user.id,
       updated_at: new Date().toISOString(),
     })

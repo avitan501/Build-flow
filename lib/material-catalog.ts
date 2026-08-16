@@ -42,6 +42,10 @@ export type MaterialCatalogSupplierPrice = {
   unit_price: number | null
   availability: "available" | "not_available" | "unknown"
   notes: string
+  retail_store_id: string | null
+  retail_store_name: string | null
+  retail_zip_code: string | null
+  price_observed_at: string | null
   updated_at: string
 }
 

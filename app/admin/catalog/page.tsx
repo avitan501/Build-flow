@@ -17,7 +17,7 @@ export default async function ManagerMaterialCatalogPage() {
       .returns<MaterialCatalogItem[]>(),
     supabase
       .from("material_catalog_supplier_prices")
-      .select("item_id,supplier_id,supplier_name_snapshot,supplier_sku,product_url,unit_price,availability,notes,updated_at")
+      .select("item_id,supplier_id,supplier_name_snapshot,supplier_sku,product_url,unit_price,availability,notes,retail_store_id,retail_store_name,retail_zip_code,price_observed_at,updated_at")
       .returns<MaterialCatalogSupplierPrice[]>(),
     supabase.rpc("staff_load_catalog_suppliers"),
     supabase

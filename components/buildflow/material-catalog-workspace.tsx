@@ -59,7 +59,15 @@ function isRetailCatalogSupplier(supplier: CatalogSupplier) {
 }
 
 function supplierColumnWidth(supplier: CatalogSupplier) {
-  return isRetailCatalogSupplier(supplier) ? 108 : 132
+  return isRetailCatalogSupplier(supplier) ? 112 : 132
+}
+
+function snapshotLabel(price: MaterialCatalogSupplierPrice | null | undefined) {
+  if (!price?.price_observed_at) return ""
+  const date = new Date(price.price_observed_at)
+  if (Number.isNaN(date.getTime())) return ""
+  const location = price.retail_store_name || price.retail_store_id || price.retail_zip_code
+  return `${location ? `${location} · ` : ""}${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
 }
 
 function emptyEditor(category: string): EditorDraft {
@@ -361,7 +369,7 @@ export function MaterialCatalogWorkspace({
               <label className="min-w-0 flex-1"><span className="sr-only">Supplier price column</span><select value={mobileSupplier?.id ?? ""} onChange={(event) => setMobileSupplierId(event.target.value)} disabled={!mobileSupplier} className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold"><option value="">No eligible supplier</option>{visibleSuppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select></label>
               <button type="button" onClick={() => moveMobileSupplier(1)} disabled={visibleSuppliers.length < 2} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-35" aria-label="Next supplier"><ChevronRight className="h-4 w-4" /></button>
             </div>
-            <p className="mt-2 text-xs text-slate-500">{mobileSupplier ? `${mobileSupplier.email || mobileSupplier.phone || "Online store"} · ${visibleSuppliers.findIndex((supplier) => supplier.id === mobileSupplier.id) + 1} of ${visibleSuppliers.length}` : `No supplier added to ${selectedCategory}.`}</p>
+            <p className="mt-2 text-xs text-slate-500">{mobileSupplier ? `${mobileSupplier.id === "home-depot-retail-catalog" ? "Valley Stream #1216 · ZIP 11516" : mobileSupplier.email || mobileSupplier.phone || "Online store"} · ${visibleSuppliers.findIndex((supplier) => supplier.id === mobileSupplier.id) + 1} of ${visibleSuppliers.length}` : `No supplier added to ${selectedCategory}.`}</p>
           </header>
           <div className="divide-y divide-slate-200">
             {categoryItems.map((item) => {
@@ -382,6 +390,7 @@ export function MaterialCatalogWorkspace({
                   <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-slate-400">$</span><input aria-label={`${supplier.name} unit price for ${item.name}`} inputMode="decimal" value={draft.unitPrice} onChange={(event) => updatePrice(item.id, supplier.id, { unitPrice: event.target.value.replace(/[^0-9.]/g, "") })} placeholder="Unit price" className="h-10 w-full rounded-lg border border-slate-300 bg-white pl-6 pr-3 text-sm tabular-nums" /></div>
                   <div className="flex gap-1"><select aria-label={`${supplier.name} availability for ${item.name}`} value={draft.availability} onChange={(event) => updatePrice(item.id, supplier.id, { availability: event.target.value as PriceDraft["availability"] })} className={`h-10 min-w-0 flex-1 rounded-lg border px-2 text-xs font-semibold ${draft.availability === "not_available" ? "border-rose-200 bg-rose-50 text-rose-700" : draft.availability === "available" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-600"}`}><option value="unknown">Unknown</option><option value="available">Available</option><option value="not_available">N/A</option></select>{saved || dirtyKeys.has(key) ? <span className={`inline-flex h-10 w-8 shrink-0 items-center justify-center rounded-lg ${dirtyKeys.has(key) ? "bg-amber-100 text-amber-700" : "bg-emerald-50 text-emerald-700"}`} title={dirtyKeys.has(key) ? "Unsaved change" : "Saved"}>{dirtyKeys.has(key) ? <Pencil className="h-3 w-3" /> : <Check className="h-3 w-3" />}</span> : null}</div>
                   </div>
+                  {snapshotLabel(saved) ? <p className="mt-1 text-[10px] font-semibold text-slate-500">Snapshot: {snapshotLabel(saved)}</p> : null}
                 </div> : null}
               </article>
             })}
@@ -395,7 +404,7 @@ export function MaterialCatalogWorkspace({
             <thead className="sticky top-0 z-30 bg-slate-100">
               <tr>
                 <th className="sticky left-0 z-40 w-[280px] min-w-[280px] border-b border-r border-slate-300 bg-slate-100 px-3 py-2 font-bold">Item</th>
-                {visibleSuppliers.map((supplier) => <th key={supplier.id} style={{ width: supplierColumnWidth(supplier), minWidth: supplierColumnWidth(supplier) }} className="border-b border-r border-slate-300 px-1.5 py-2 align-top"><span className="block truncate font-bold" title={supplier.name}>{supplier.name}</span>{!isRetailCatalogSupplier(supplier) ? <span className="mt-0.5 block truncate text-[9px] font-normal text-slate-500">{supplier.email || supplier.phone || "Contact not set"}</span> : null}</th>)}
+                {visibleSuppliers.map((supplier) => <th key={supplier.id} style={{ width: supplierColumnWidth(supplier), minWidth: supplierColumnWidth(supplier) }} className="border-b border-r border-slate-300 px-1.5 py-2 align-top"><span className="block truncate font-bold" title={supplier.name}>{supplier.name}</span>{supplier.id === "home-depot-retail-catalog" ? <span className="mt-0.5 block truncate text-[9px] font-normal text-slate-500">#1216 · 11516</span> : !isRetailCatalogSupplier(supplier) ? <span className="mt-0.5 block truncate text-[9px] font-normal text-slate-500">{supplier.email || supplier.phone || "Contact not set"}</span> : null}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -419,6 +428,7 @@ export function MaterialCatalogWorkspace({
                       <select aria-label={`${supplier.name} availability for ${item.name}`} value={draft.availability} onChange={(event) => updatePrice(item.id, supplier.id, { availability: event.target.value as PriceDraft["availability"] })} className={`h-7 min-w-0 flex-1 rounded-md border px-1 text-[10px] font-semibold ${draft.availability === "not_available" ? "border-rose-200 bg-rose-50 text-rose-700" : draft.availability === "available" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-600"}`}><option value="unknown">Unknown</option><option value="available">Available</option><option value="not_available">N/A</option></select>
                       {saved || dirtyKeys.has(key) ? <span className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${dirtyKeys.has(key) ? "bg-amber-100 text-amber-700" : "bg-emerald-50 text-emerald-700"}`} title={dirtyKeys.has(key) ? "Unsaved change" : "Saved"}>{dirtyKeys.has(key) ? <Pencil className="h-3 w-3" /> : <Check className="h-3 w-3" />}</span> : null}
                     </div>
+                    {snapshotLabel(saved) ? <span className="mt-1 block truncate text-[9px] font-semibold text-slate-500" title={`Price snapshot: ${snapshotLabel(saved)}`}>{snapshotLabel(saved)}</span> : null}
                   </td>
                 })}
               </tr>)}
