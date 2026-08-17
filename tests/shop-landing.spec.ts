@@ -291,6 +291,13 @@ test("traffic dashboard exposes live status to the owner only", async () => {
   expect(publicIngestMigration).toContain("to anon, authenticated")
 })
 
+test("traffic recording keeps the established Supabase project when Vercel public variables are absent", async () => {
+  const supabaseEnv = await readFile(path.join(process.cwd(), "lib/supabase/env.ts"), "utf8")
+
+  expect(supabaseEnv).toContain("process.env.NEXT_PUBLIC_SUPABASE_URL || previewSupabaseUrl")
+  expect(supabaseEnv).toContain("process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || previewSupabasePublishableKey")
+})
+
 test("home shows the compact manufacturer brand showcase", async ({ page }) => {
   await page.goto("/")
 
