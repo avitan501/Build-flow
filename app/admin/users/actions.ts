@@ -31,7 +31,7 @@ function validUuid(value: string) {
 }
 
 export async function createTargetClientAction(input: ManagerNewClientInput): Promise<CreateTargetClientResult> {
-  const { supabase } = await requireAdminProfile();
+  const { supabase } = await requireStaffProfile("customers");
   const fullName = input.fullName.trim().replace(/\s+/g, " ").slice(0, 160);
   const email = input.email.trim().toLowerCase().slice(0, 320);
   const phone = input.phone?.trim().slice(0, 40) || null;

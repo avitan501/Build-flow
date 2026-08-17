@@ -21,15 +21,16 @@ test("Goals & Progress allows manager employees while owner controls stay protec
   expect(page).toContain("await requireManagerPortalProfile()");
   expect(page).toContain("async function OwnerAffiliateGoal()");
   expect(page).toContain("const { supabase } = await requireAdminProfile()");
-  expect(page).toContain("https://build-flow-wfl3-em41309w2-avitanneto-1804s-projects.vercel.app/shop");
-  expect(page).toContain("Publish website");
+  expect(page).toContain("Fix Website");
+  expect(page).toContain("<WebsiteFixNotes");
   expect(page).toContain("Client Target");
+  expect(page).toContain("<AddOutreachLead />");
+  expect(page).toContain("<OutreachLeadList");
+  expect(page).toContain("Clients in the system");
   expect(page).toContain("Call suppliers and find what they sell cheaper than anyone else");
   expect(page).toContain("Launch campaign: Beat Your Quote");
   expect(page).toContain('PersonHeader assignee="david"');
   expect(page).toContain('PersonHeader assignee="carlos"');
-  expect(page).toContain("Aharon Cohen");
-  expect(page).toContain("+1 (516) 507-6948");
   expect(page).toContain("<AffiliateProgramTracker");
   expect(page).toContain("access.owner ? <OwnerAffiliateGoal />");
   expect(page).toContain('supabase.from("affiliate_programs")');
@@ -37,6 +38,7 @@ test("Goals & Progress allows manager employees while owner controls stay protec
   expect(page).toContain('href="/admin/goals-progress/client-target"');
   expect(page).toContain('supabase.from("manager_goals")');
   expect(page).toContain("<AddManagerGoal");
+  expect(page.indexOf('PersonHeader assignee="carlos"')).toBeLessThan(page.indexOf('PersonHeader assignee="david"'));
 });
 
 test("manager goals are persistent and protected for manager users", async () => {
@@ -49,12 +51,35 @@ test("manager goals are persistent and protected for manager users", async () =>
   expect(component).toContain("Add a goal");
   expect(component).toContain("setManagerGoalCompletedAction");
   expect(component).toContain("deleteManagerGoalAction");
-  expect(actions.match(/requireManagerPortalProfile\(\)/g)?.length).toBe(3);
+  expect(actions.match(/requireManagerPortalProfile\(\)/g)?.length).toBe(4);
   expect(migration).toContain("create table if not exists public.manager_goals");
   expect(migration).toContain("alter table public.manager_goals enable row level security");
   expect(migration).toContain("role in ('admin', 'staff')");
   expect(migration).toContain("approval_status = 'approved'");
   expect(migration).toContain("created_by = (select auth.uid())");
+});
+
+test("outreach leads remain separate from clients and are protected for customer staff", async () => {
+  const [page, component, actions, userActions, migration, indexMigration] = await Promise.all([
+    readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/client-target-outreach.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/goals-progress/lead-actions.ts"), "utf8"),
+    readFile(path.join(root, "app/admin/users/actions.ts"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260817175631_manager_outreach_leads.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260817180209_index_manager_tracking_creators.sql"), "utf8"),
+  ]);
+
+  expect(page).toContain('supabase.from("manager_outreach_leads")');
+  expect(component).toContain("Add an outreach lead");
+  expect(component).toContain("A lead stays separate from active clients and orders.");
+  expect(actions.match(/requireStaffProfile\("customers"\)/g)?.length).toBe(3);
+  expect(userActions).toContain('createTargetClientAction(input: ManagerNewClientInput)');
+  expect(userActions).toContain('requireStaffProfile("customers")');
+  expect(migration).toContain("create table if not exists public.manager_outreach_leads");
+  expect(migration).toContain("alter table public.manager_outreach_leads enable row level security");
+  expect(migration).toContain("role in ('admin', 'staff')");
+  expect(migration).toContain("created_by = (select auth.uid())");
+  expect(indexMigration).toContain("manager_outreach_leads_created_by_idx");
 });
 
 test("Client Target conversation guide allows manager employees and is bilingual", async () => {

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireManagerPortalProfile } from "@/lib/auth";
 
 type GoalResult = { ok: true } | { ok: false; error: string };
+const WEBSITE_FIX_NOTE_PREFIX = "website_fix_note:";
 
 function validAssignee(value: string): value is "david" | "carlos" {
   return value === "david" || value === "carlos";
@@ -35,6 +36,26 @@ export async function createManagerGoalAction(input: {
     created_by: user.id,
   });
   if (error) return { ok: false, error: "The goal could not be added. Please try again." };
+
+  refreshGoals();
+  return { ok: true };
+}
+
+export async function createWebsiteFixNoteAction(input: { kind: string; note: string }): Promise<GoalResult> {
+  const { supabase, user } = await requireManagerPortalProfile();
+  const kind = ["Fix", "Add", "Change", "Remove"].find((value) => value.toLowerCase() === input.kind.trim().toLowerCase());
+  const note = input.note.trim().replace(/\s+/g, " ");
+
+  if (!kind) return { ok: false, error: "Choose Fix, Add, Change, or Remove." };
+  if (note.length < 2 || note.length > 120) return { ok: false, error: "Keep the website note between 2 and 120 characters." };
+
+  const { error } = await supabase.from("manager_goals").insert({
+    assignee: "david",
+    title: note,
+    details: `${WEBSITE_FIX_NOTE_PREFIX}${kind.toLowerCase()}`,
+    created_by: user.id,
+  });
+  if (error) return { ok: false, error: "The website note could not be added." };
 
   refreshGoals();
   return { ok: true };
