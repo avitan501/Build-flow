@@ -269,6 +269,8 @@ test("traffic dashboard exposes live status to the owner only", async () => {
   expect(trafficApi).toContain("PRODUCTION_HOSTS")
   expect(trafficApi).toContain("x-vercel-ip-city")
   expect(trafficApi).toContain("TRAFFIC_INGEST_SECRET")
+  expect(trafficApi).toContain("SUPABASE_SERVICE_ROLE_KEY")
+  expect(trafficApi).toContain("createAdminClient")
   expect(trafficApi).toContain("p_user_id: user?.id ?? null")
   expect(trafficApi).toContain("p_ingest_secret: ingestSecret")
   expect(trafficApi).not.toContain("x-forwarded-for")

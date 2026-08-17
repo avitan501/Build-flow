@@ -2,6 +2,7 @@ import { createHash } from "node:crypto"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { getSupabasePublicEnv, hasSupabasePublicEnv } from "@/lib/supabase/env"
 
@@ -45,7 +46,8 @@ export async function POST(request: Request) {
   if (!PRODUCTION_HOSTS.has(requestHost)) return new NextResponse(null, { status: 204 })
   if (/bot|crawler|spider|preview|playwright|headless|codex/i.test(request.headers.get("user-agent") || "")) return new NextResponse(null, { status: 204 })
   const ingestSecret = process.env.TRAFFIC_INGEST_SECRET
-  if (!hasSupabasePublicEnv() || !ingestSecret) return new NextResponse(null, { status: 204 })
+  const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+  if (!hasSupabasePublicEnv() || (!hasServiceRole && !ingestSecret)) return new NextResponse(null, { status: 204 })
 
   try {
     const payload = await request.json() as { path?: unknown; sessionId?: unknown; referrer?: unknown }
@@ -57,7 +59,9 @@ export async function POST(request: Request) {
     const serverClient = await createServerClient()
     const { data: { user } } = await serverClient.auth.getUser()
     const { url, anonKey } = getSupabasePublicEnv()
-    const recorder = createSupabaseClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    const recorder = hasServiceRole
+      ? createAdminClient()
+      : createSupabaseClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } })
     const { error } = await recorder.rpc("record_site_page_view", {
       p_path: path,
       p_referrer_host: safeReferrerHost(payload.referrer),
@@ -67,7 +71,7 @@ export async function POST(request: Request) {
       p_region: safeHeader(request.headers.get("x-vercel-ip-country-region"), 120),
       p_country: safeHeader(request.headers.get("x-vercel-ip-country"), 2)?.toUpperCase() ?? null,
       p_user_id: user?.id ?? null,
-      p_ingest_secret: ingestSecret,
+      p_ingest_secret: ingestSecret ?? null,
     })
     if (error) console.error("Site traffic recording failed.", { code: error.code })
   } catch (error) {
