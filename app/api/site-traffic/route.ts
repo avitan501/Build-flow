@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
-import { createAdminClient } from "@/lib/supabase/admin"
-import { hasSupabaseBuildEnv } from "@/lib/supabase/env"
+import { createClient as createServerClient } from "@/lib/supabase/server"
+import { getSupabasePublicEnv, hasSupabasePublicEnv } from "@/lib/supabase/env"
 
 const PRODUCTION_HOSTS = new Set(["build.avantiap.com", "www.build.avantiap.com"])
 
@@ -43,7 +44,8 @@ export async function POST(request: Request) {
   }
   if (!PRODUCTION_HOSTS.has(requestHost)) return new NextResponse(null, { status: 204 })
   if (/bot|crawler|spider|preview|playwright|headless|codex/i.test(request.headers.get("user-agent") || "")) return new NextResponse(null, { status: 204 })
-  if (!hasSupabaseBuildEnv()) return new NextResponse(null, { status: 204 })
+  const ingestSecret = process.env.TRAFFIC_INGEST_SECRET
+  if (!hasSupabasePublicEnv() || !ingestSecret) return new NextResponse(null, { status: 204 })
 
   try {
     const payload = await request.json() as { path?: unknown; sessionId?: unknown; referrer?: unknown }
@@ -52,7 +54,11 @@ export async function POST(request: Request) {
     if (!path.startsWith("/") || path.startsWith("/admin") || path.startsWith("/api") || sessionId.length < 12) return new NextResponse(null, { status: 204 })
     const userAgent = request.headers.get("user-agent") || ""
     const sessionHash = createHash("sha256").update(sessionId).digest("hex").slice(0, 32)
-    const { error } = await createAdminClient().rpc("record_site_page_view", {
+    const serverClient = await createServerClient()
+    const { data: { user } } = await serverClient.auth.getUser()
+    const { url, anonKey } = getSupabasePublicEnv()
+    const recorder = createSupabaseClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    const { error } = await recorder.rpc("record_site_page_view", {
       p_path: path,
       p_referrer_host: safeReferrerHost(payload.referrer),
       p_session_hash: sessionHash,
@@ -60,6 +66,8 @@ export async function POST(request: Request) {
       p_city: safeCity(request.headers.get("x-vercel-ip-city")),
       p_region: safeHeader(request.headers.get("x-vercel-ip-country-region"), 120),
       p_country: safeHeader(request.headers.get("x-vercel-ip-country"), 2)?.toUpperCase() ?? null,
+      p_user_id: user?.id ?? null,
+      p_ingest_secret: ingestSecret,
     })
     if (error) console.error("Site traffic recording failed.", { code: error.code })
   } catch (error) {
