@@ -32,6 +32,61 @@ function QuickOrderAction({ category, questionnaireDepartment }: { category: Sho
   return <section className="flex max-w-2xl flex-col items-start justify-between gap-4 rounded-[20px] border border-sky-200 bg-sky-50 p-5 sm:flex-row sm:items-center"><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">Choose materials</p><h2 className="mt-1 text-lg font-bold text-slate-950">Answer a few quick questions</h2><p className="mt-1 text-sm leading-6 text-slate-600">Select sizes, quantities, and accessories for this department.</p></div><AddToProjectButton product={{ id: `${category.slug}-quick-order`, name: `${category.label} Quick Order`, category: questionnaireDepartment, productType: "service", price: 0, unit: "Request" }} questionnaireDepartment={questionnaireDepartment} label="Start quick order" /></section>
 }
 
+const SINGLE_DOOR_PRICES = [
+  ["18 in.", "$131", "$180"],
+  ["20 in.", "$132", "$182"],
+  ["24 in.", "$133", "$184"],
+  ["28 in.", "$134", "$188"],
+  ["30 in.", "$135", "$190"],
+  ["32 in.", "$137", "$194"],
+  ["36 in.", "$141", "$196"],
+] as const
+
+const DOUBLE_DOOR_PRICES = [
+  ["36 in. (18 + 18)", "$372"],
+  ["40 in. (20 + 20)", "$373"],
+  ["48 in. (24 + 24)", "$374"],
+  ["56 in. (28 + 28)", "$395"],
+  ["60 in. (30 + 30)", "$398"],
+  ["72 in. (36 + 36)", "$435"],
+] as const
+
+function DoorPricingGuide() {
+  return (
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="door-price-guide-title">
+      <div className="grid md:grid-cols-[16rem_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-px bg-slate-200 md:grid-cols-1">
+          <div className="relative aspect-[4/3] bg-white md:aspect-auto md:min-h-44">
+            <Image src="/images/materials/catalog/flat-flush-door.png" alt="Flat flush interior door style" fill sizes="(min-width: 768px) 16rem, 50vw" className="object-contain p-3" priority />
+            <span className="absolute bottom-2 left-2 rounded bg-slate-950 px-2 py-1 text-[10px] font-bold text-white">Flat / flush</span>
+          </div>
+          <div className="relative aspect-[4/3] bg-white md:aspect-auto md:min-h-44">
+            <Image src="/images/materials/photos/doors.jpg" alt="Shaker and panel door styles" fill sizes="(min-width: 768px) 16rem, 50vw" className="object-cover" priority />
+            <span className="absolute bottom-2 left-2 rounded bg-slate-950 px-2 py-1 text-[10px] font-bold text-white">Shaker styles</span>
+          </div>
+        </div>
+        <div className="p-4 sm:p-5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-700">Door price guide</p>
+          <h2 id="door-price-guide-title" className="mt-1 text-lg font-bold text-slate-950">1-panel Shaker reference prices</h2>
+          <p className="mt-1 text-xs leading-5 text-slate-500">6 ft. 8 in. high, 1 3/8 in. thick. Prices are a starting reference and are confirmed with your quote.</p>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="border-l-2 border-orange-500 pl-2"><p className="text-[10px] font-semibold uppercase text-slate-500">Slab</p><p className="text-lg font-bold text-slate-950">From $131</p></div>
+            <div className="border-l-2 border-sky-500 pl-2"><p className="text-[10px] font-semibold uppercase text-slate-500">Prehung</p><p className="text-lg font-bold text-slate-950">From $180</p></div>
+            <div className="border-l-2 border-emerald-500 pl-2"><p className="text-[10px] font-semibold uppercase text-slate-500">Double</p><p className="text-lg font-bold text-slate-950">From $372</p></div>
+          </div>
+          <details className="group mt-4 border-t border-slate-200 pt-3">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between text-sm font-bold text-sky-700 marker:content-none">View prices by width<span aria-hidden="true" className="text-xl font-light transition-transform group-open:rotate-45">+</span></summary>
+            <div className="grid gap-4 pt-2 lg:grid-cols-2">
+              <table className="w-full text-left text-xs"><thead><tr className="border-b border-slate-200 text-slate-500"><th className="py-2">Width</th><th className="py-2 text-right">Slab</th><th className="py-2 text-right">Prehung</th></tr></thead><tbody>{SINGLE_DOOR_PRICES.map(([width, slab, prehung]) => <tr key={width} className="border-b border-slate-100"><td className="py-2 font-semibold">{width}</td><td className="py-2 text-right">{slab}</td><td className="py-2 text-right">{prehung}</td></tr>)}</tbody></table>
+              <table className="w-full text-left text-xs"><thead><tr className="border-b border-slate-200 text-slate-500"><th className="py-2">Double-door width</th><th className="py-2 text-right">Price</th></tr></thead><tbody>{DOUBLE_DOOR_PRICES.map(([width, price]) => <tr key={width} className="border-b border-slate-100"><td className="py-2 font-semibold">{width}</td><td className="py-2 text-right">{price}</td></tr>)}</tbody></table>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function KitchenActions() {
   const actions = [
     {
@@ -144,6 +199,8 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
     <main className="min-h-screen bg-[#f7f8fa] px-4 py-4 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <section className="mx-auto flex max-w-7xl flex-col gap-4">
         <h1 className="text-[2rem] font-bold tracking-normal text-slate-950 sm:text-[2.4rem]">{category.label}</h1>
+
+        {category.slug === "door-and-molding" ? <DoorPricingGuide /> : null}
 
         {experience.showQuickOrder && category.slug === "sheet-rock" ? <SheetRockProductConfigurator /> : null}
         {experience.showQuickOrder && usesEmbeddedQuickOrder && category.slug !== "sheet-rock" && questionnaireSnapshot ? <EmbeddedMaterialQuickOrder snapshot={questionnaireSnapshot} category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} /> : null}
