@@ -108,8 +108,6 @@ const REQUEST_DEPARTMENTS: Record<string, RequestDepartmentConfig> = {
   },
 }
 
-export const REQUEST_DEPARTMENT_LABELS = Object.values(REQUEST_DEPARTMENTS).map((department) => department.label)
-
 export function getRequestDepartmentConfig(request: string | null | undefined) {
   return request ? REQUEST_DEPARTMENTS[request] ?? null : null
 }

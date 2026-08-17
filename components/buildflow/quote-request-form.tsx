@@ -4,12 +4,11 @@ import { CheckCircle2, FileUp, LocateFixed, LoaderCircle, Send } from "lucide-re
 import { useActionState, useRef, useState, useTransition } from "react"
 
 import { submitQuoteRequestFormAction, type QuoteRequestFormState } from "@/app/request-quote/actions"
-import { REQUEST_DEPARTMENT_LABELS } from "@/lib/request-department-essentials"
 import { createClient } from "@/lib/supabase/client"
 import { getSupabasePublicEnv } from "@/lib/supabase/env"
 
 const initialState: QuoteRequestFormState = { status: "idle", message: "" }
-const departments = ["Framing", "Electrical", "Flooring", "Sheet rock", "Tile work", "Door and molding", "Siding", "Roofing", "Windows", ...REQUEST_DEPARTMENT_LABELS]
+const departments = ["Framing", "Electrical", "Flooring", "Sheet rock", "Tile work", "Door and molding", "Siding", "Roofing", "Windows", "Plumbing", "Lighting", "Insulation", "Concrete & Masonry", "Cabinets & Appliances", "Tool Rental"]
 const directAttachmentSize = 4 * 1024 * 1024
 const maxAttachmentSize = 25 * 1024 * 1024
 const inputClass = "min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3.5 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
