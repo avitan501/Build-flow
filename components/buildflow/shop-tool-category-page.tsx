@@ -209,7 +209,7 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
         {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}
         {experience.showPlanUpload && category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
 
-        {(!usesEmbeddedQuickOrder || category.slug === "electrical") ? <DepartmentEssentials data={essentials} /> : null}
+        <DepartmentEssentials data={essentials} />
 
         {(customOrderOnly || experience.showChatToOrder) && usesCompactCustomOrder ? (
           <details open={customOrderOnly} className="group rounded-lg border border-slate-200 bg-white shadow-sm">

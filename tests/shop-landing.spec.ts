@@ -357,6 +357,29 @@ test("electrical shows the Supabase-backed Kasa switch pack last without source 
   await expect(essentials.last().getByText(/\$/)).toHaveCount(0)
 })
 
+test("every active shop department shows common materials", async ({ page }) => {
+  const departments = [
+    "services",
+    "framing",
+    "electrical",
+    "tile-work",
+    "sheet-rock",
+    "kitchen",
+    "eitan",
+    "door-and-molding",
+    "wood-floor",
+    "siding",
+    "roofing",
+    "window",
+  ]
+
+  for (const department of departments) {
+    await page.goto(`/shop/${department}`)
+    await expect(page.getByRole("heading", { name: "Common materials" })).toBeVisible()
+    await expect(page.getByTestId("department-essentials").locator("article")).toHaveCount(8)
+  }
+})
+
 test("kitchen, tile, and drywall omit retired promotional and calculator cards", async ({ page }) => {
   await page.goto("/shop/kitchen")
   await expect(page.getByText("Premium cabinetry for builder-ready kitchens")).toHaveCount(0)

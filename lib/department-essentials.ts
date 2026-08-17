@@ -71,7 +71,7 @@ const ESSENTIALS: Partial<Record<ShopToolSlug, DepartmentEssentials>> = {
 }
 
 export function getDepartmentEssentials(slug: ShopToolSlug, catalogItems: CatalogEssentialItem[] = []): DepartmentEssentials {
-  if (slug === "electrical" && catalogItems.length > 0) {
+  if (catalogItems.length === 8) {
     return { spriteUrl: "", items: catalogItems }
   }
 

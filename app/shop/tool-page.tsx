@@ -21,6 +21,19 @@ type ToolPageSearchParams = {
   success?: string
 }
 
+const MATERIAL_CATALOG_DEPARTMENT: Partial<Record<ShopToolSlug, string>> = {
+  framing: "Framing",
+  electrical: "Electrical",
+  "tile-work": "Tile",
+  "sheet-rock": "Sheet Rock",
+  "door-and-molding": "Door & Molding",
+  "wood-floor": "Flooring",
+  siding: "Siding",
+  roofing: "Roofing",
+  window: "Windows",
+  eitan: "Windows",
+}
+
 async function loadCurrentUserProjects(questionnaireDepartment: string) {
   const { supabase, user } = await getSessionWithProfile()
   if (!supabase) {
@@ -120,8 +133,9 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
   const questionnaireSnapshot = storefrontDefaults
     ? applyStorefrontQuestionnaireDefaults(projectSession.questionnaireSnapshot, storefrontDefaults)
     : projectSession.questionnaireSnapshot
-  const catalogEssentials = baseCategory.slug === "electrical"
-    ? await loadCatalogEssentials(questionnaireDepartment)
+  const catalogDepartment = MATERIAL_CATALOG_DEPARTMENT[baseCategory.slug]
+  const catalogEssentials = catalogDepartment
+    ? await loadCatalogEssentials(catalogDepartment)
     : []
 
   return (
