@@ -358,23 +358,17 @@ test("electrical shows the Supabase-backed Kasa switch pack last without source 
 })
 
 test("every active shop department shows common materials", async ({ page }) => {
-  const departments = [
-    "services",
-    "framing",
-    "electrical",
-    "tile-work",
-    "sheet-rock",
-    "kitchen",
-    "eitan",
-    "door-and-molding",
-    "wood-floor",
-    "siding",
-    "roofing",
-    "window",
-  ]
+  await page.goto("/shop")
+  const departments = await page.getByTestId("department-grid").getByTestId("department-card").evaluateAll((links) =>
+    links
+      .map((link) => link.getAttribute("href"))
+      .filter((href): href is string => Boolean(href)),
+  )
+
+  expect(departments.length).toBeGreaterThan(0)
 
   for (const department of departments) {
-    await page.goto(`/shop/${department}`)
+    await page.goto(department)
     await expect(page.getByRole("heading", { name: "Common materials" })).toBeVisible()
     await expect(page.getByTestId("department-essentials").locator("article")).toHaveCount(8)
   }
