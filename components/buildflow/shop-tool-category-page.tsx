@@ -9,7 +9,7 @@ import { ManagerItemVisibility } from "@/components/buildflow/manager-item-visib
 import { PlanRequestUploadCard } from "@/components/buildflow/plan-request-upload-card"
 import { SheetRockProductConfigurator } from "@/components/buildflow/sheet-rock-product-configurator"
 import type { ProjectRecord } from "@/lib/projects"
-import { getDepartmentEssentials } from "@/lib/department-essentials"
+import { getDepartmentEssentials, type CatalogEssentialItem } from "@/lib/department-essentials"
 import type { ManagerDepartmentExperience } from "@/lib/manager-add-ons"
 import type { MaterialQuestionnaireSnapshot } from "@/lib/material-questionnaires"
 import type { ShopToolCategory } from "@/lib/shop-tools"
@@ -25,6 +25,7 @@ type ShopToolCategoryPageProps = {
   errorCode?: string | null
   successCode?: string | null
   questionnaireSnapshot?: MaterialQuestionnaireSnapshot | null
+  catalogEssentials?: CatalogEssentialItem[]
 }
 
 function QuickOrderAction({ category, questionnaireDepartment }: { category: ShopToolCategory; questionnaireDepartment: string }) {
@@ -131,8 +132,8 @@ function EitanActions({
   )
 }
 
-export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, questionnaireSnapshot }: ShopToolCategoryPageProps) {
-  const essentials = getDepartmentEssentials(category.slug)
+export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, questionnaireSnapshot, catalogEssentials = [] }: ShopToolCategoryPageProps) {
+  const essentials = getDepartmentEssentials(category.slug, catalogEssentials)
   const customOrderOnly = ["siding", "roofing", "window"].includes(category.slug)
   const usesStandardUpload = !["framing", "kitchen", "eitan", "window", "siding", "roofing"].includes(category.slug)
   const usesEmbeddedQuickOrder = ["wood-floor", "sheet-rock", "tile-work", "door-and-molding", "framing", "electrical"].includes(category.slug)
@@ -151,7 +152,7 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
         {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}
         {experience.showPlanUpload && category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
 
-        {!usesEmbeddedQuickOrder ? <DepartmentEssentials data={essentials} /> : null}
+        {(!usesEmbeddedQuickOrder || category.slug === "electrical") ? <DepartmentEssentials data={essentials} /> : null}
 
         {(customOrderOnly || experience.showChatToOrder) && usesCompactCustomOrder ? (
           <details open={customOrderOnly} className="group rounded-lg border border-slate-200 bg-white shadow-sm">

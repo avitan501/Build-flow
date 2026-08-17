@@ -346,6 +346,17 @@ test("siding and roofing are separate departments with a complete request flow",
   await expect(page.getByText("Attach blueprint or shopping list", { exact: true })).toBeVisible()
 })
 
+test("electrical shows the Supabase-backed Kasa switch pack last without source or price", async ({ page }) => {
+  await page.goto("/shop/electrical")
+
+  const essentials = page.getByTestId("department-essentials").locator("article")
+  await expect(essentials).toHaveCount(8)
+  await expect(essentials.last().getByRole("img", { name: "Kasa HS200 Smart Light Switches (3-Pack)" })).toBeVisible()
+  await expect(essentials.last()).toContainText("Kasa HS200 Smart Light Switches (3-Pack)")
+  await expect(essentials.last().getByText(/amazon/i)).toHaveCount(0)
+  await expect(essentials.last().getByText(/\$/)).toHaveCount(0)
+})
+
 test("kitchen, tile, and drywall omit retired promotional and calculator cards", async ({ page }) => {
   await page.goto("/shop/kitchen")
   await expect(page.getByText("Premium cabinetry for builder-ready kitchens")).toHaveCount(0)

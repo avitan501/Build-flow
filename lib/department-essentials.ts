@@ -1,8 +1,13 @@
 import type { ShopToolSlug } from "@/lib/shop-tools"
 
 export type DepartmentEssentials = {
-  items: string[]
+  items: Array<string | { name: string; imageUrl: string }>
   spriteUrl: string
+}
+
+export type CatalogEssentialItem = {
+  name: string
+  imageUrl: string
 }
 
 const ESSENTIALS: Partial<Record<ShopToolSlug, DepartmentEssentials>> = {
@@ -17,6 +22,19 @@ const ESSENTIALS: Partial<Record<ShopToolSlug, DepartmentEssentials>> = {
   roofing: {
     spriteUrl: "/images/department-essentials/roofing-grid.webp",
     items: ["Roof shingles", "Roof underlayment", "Ice and water shield", "Drip edge", "Roof flashing", "Ridge caps", "Roof vents", "Roofing nails"],
+  },
+  electrical: {
+    spriteUrl: "",
+    items: [
+      { name: "GFCI outlets", imageUrl: "/images/materials/catalog/ele-014.jpg" },
+      { name: "Light switches", imageUrl: "/images/materials/catalog/ele-015.jpg" },
+      { name: "6/3 NM-B electrical wire, 125 ft.", imageUrl: "/images/materials/catalog/ele-016.jpg" },
+      { name: "100-amp breaker subpanels", imageUrl: "/images/materials/catalog/ele-017.jpeg" },
+      { name: "30-amp double-pole breakers", imageUrl: "/images/materials/catalog/ele-018.jpg" },
+      { name: "Three-way light switches", imageUrl: "/images/materials/catalog/ele-019.jpg" },
+      { name: "Combination smoke and carbon-monoxide alarms", imageUrl: "/images/materials/catalog/ele-020.jpg" },
+      { name: "Kasa HS200 Smart Light Switches (3-Pack)", imageUrl: "/images/materials/catalog/ele-021-kasa-smart-switches.png" },
+    ],
   },
   "wood-floor": {
     spriteUrl: "/images/department-essentials/flooring-grid.webp",
@@ -52,6 +70,10 @@ const ESSENTIALS: Partial<Record<ShopToolSlug, DepartmentEssentials>> = {
   },
 }
 
-export function getDepartmentEssentials(slug: ShopToolSlug): DepartmentEssentials {
+export function getDepartmentEssentials(slug: ShopToolSlug, catalogItems: CatalogEssentialItem[] = []): DepartmentEssentials {
+  if (slug === "electrical" && catalogItems.length > 0) {
+    return { spriteUrl: "", items: catalogItems }
+  }
+
   return ESSENTIALS[slug] ?? ESSENTIALS.services!
 }

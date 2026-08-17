@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { ShopToolCategoryPage } from "@/components/buildflow/shop-tool-category-page"
 import { getSessionWithProfile } from "@/lib/auth"
 import { applyDepartmentAddOns, createEmptyManagerAddOns, departmentExperienceFor, isDepartmentHidden } from "@/lib/manager-add-ons"
+import type { CatalogEssentialItem } from "@/lib/department-essentials"
 import type { ProjectRecord } from "@/lib/projects"
 import { findShopToolCategory, type ShopToolSlug } from "@/lib/shop-tools"
 import { translateShopText } from "@/lib/shop-i18n"
@@ -61,6 +62,28 @@ async function loadCurrentUserProjects(questionnaireDepartment: string) {
   return { projects: data ?? [], isSignedIn: true, addOns: publicStateRow?.state?.addOns ?? createEmptyManagerAddOns(), questionnaireSnapshot }
 }
 
+async function loadCatalogEssentials(category: string): Promise<CatalogEssentialItem[]> {
+  try {
+    const { data, error } = await createAdminClient()
+      .from("material_catalog_items")
+      .select("name,image_url,sort_order")
+      .eq("category", category)
+      .eq("status", "active")
+      .order("sort_order", { ascending: false })
+      .limit(8)
+      .returns<Array<{ name: string; image_url: string | null; sort_order: number }>>()
+
+    if (error) return []
+
+    return (data ?? [])
+      .filter((item): item is { name: string; image_url: string; sort_order: number } => Boolean(item.image_url))
+      .reverse()
+      .map((item) => ({ name: item.name, imageUrl: item.image_url }))
+  } catch {
+    return []
+  }
+}
+
 export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Promise<ToolPageSearchParams>) {
   const baseCategory = findShopToolCategory(slug)
 
@@ -97,6 +120,9 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
   const questionnaireSnapshot = storefrontDefaults
     ? applyStorefrontQuestionnaireDefaults(projectSession.questionnaireSnapshot, storefrontDefaults)
     : projectSession.questionnaireSnapshot
+  const catalogEssentials = baseCategory.slug === "electrical"
+    ? await loadCatalogEssentials(questionnaireDepartment)
+    : []
 
   return (
     <ShopToolCategoryPage
@@ -110,6 +136,7 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
       errorCode={params.error?.trim() || null}
       successCode={params.success?.trim() || null}
       questionnaireSnapshot={questionnaireSnapshot}
+      catalogEssentials={catalogEssentials}
     />
   )
 }
