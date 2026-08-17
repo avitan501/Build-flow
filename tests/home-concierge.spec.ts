@@ -10,8 +10,10 @@ test("cinematic homepage presents Construction Concierge clearly", async ({ page
   await expect(page.getByRole("link", { name: "Start a Material Request" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Start a Material Request" })).toHaveAttribute("href", "/shop", { timeout: 4000 });
   await expect(page.getByRole("link", { name: "See How It Works" })).toHaveAttribute("href", "/how-it-works");
-  await expect(page.getByTestId("site-header").getByRole("button", { name: "Open navigation menu" })).toBeVisible();
-  await expect(page.getByTestId("site-header").getByRole("link", { name: "Log in" })).toHaveAttribute("href", "/login");
+  const homepageHeader = page.getByTestId("site-header");
+  await expect(homepageHeader.getByRole("button", { name: "Open navigation menu" })).toHaveText("Menu");
+  await expect(homepageHeader.getByRole("link", { name: "Avantia Build home" })).toHaveCount(0);
+  await expect(homepageHeader.getByRole("link", { name: "Log in" })).toHaveCount(0);
 
   const heroVideos = page.locator("main section").first().locator("video");
   const heroMobileVideo = heroVideos.first();
@@ -109,5 +111,5 @@ test("primary customer routes remain available in Menu", async ({ page }) => {
   await expect(navigation.getByRole("link", { name: "Order Materials", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Get Material Pricing", exact: true })).toHaveAttribute("href", "/request-quote");
   await expect(navigation.getByRole("link", { name: "Beat a Supplier Quote", exact: true })).toHaveAttribute("href", "/beat-a-quote");
-  await expect(drawer.getByRole("link", { name: "Log in", exact: true })).toHaveCount(0);
+  await expect(drawer.getByRole("link", { name: "Log in", exact: true })).toHaveAttribute("href", "/login");
 });

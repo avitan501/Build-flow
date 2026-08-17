@@ -172,26 +172,36 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
 
   return (
     <ShopTranslationBoundary>
-      <div data-testid="site-header" className="sticky top-0 z-[60] border-b border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(148,163,184,0.1)]">
-        <div className="mx-auto flex w-full max-w-7xl items-center gap-1.5 px-2 py-2.5 min-[360px]:gap-2 min-[360px]:px-3 sm:px-5">
+      <div data-testid="site-header" className={pathname === "/" ? "absolute inset-x-0 top-0 z-[60] bg-transparent" : "sticky top-0 z-[60] border-b border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(148,163,184,0.1)]"}>
+        <div className={`mx-auto flex w-full max-w-7xl items-center ${pathname === "/" ? "justify-end px-4 pb-2 pt-4 sm:px-7 sm:pt-5" : "gap-1.5 px-2 py-2.5 min-[360px]:gap-2 min-[360px]:px-3 sm:px-5"}`}>
           <button
             type="button"
             aria-label="Open navigation menu"
             aria-expanded={menuOpen}
             aria-controls="mobile-navigation-drawer"
             onClick={() => setMenuOpen(true)}
-            className="inline-flex rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
+            className={pathname === "/" ? "inline-flex min-h-10 items-center gap-2 rounded bg-black/20 px-3 text-sm font-semibold text-white backdrop-blur-md transition hover:bg-black/30 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" : "inline-flex rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"}
           >
-            <IconShell active={menuOpen}>
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M4 7h16" />
-                <path d="M4 12h16" />
-                <path d="M4 17h16" />
-              </svg>
-            </IconShell>
+            {pathname === "/" ? (
+              <>
+                <span>Menu</span>
+                <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                  <path d="M4 7h12" />
+                  <path d="M4 13h12" />
+                </svg>
+              </>
+            ) : (
+              <IconShell active={menuOpen}>
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 7h16" />
+                  <path d="M4 12h16" />
+                  <path d="M4 17h16" />
+                </svg>
+              </IconShell>
+            )}
           </button>
 
-          {isShopPage ? (
+          {pathname === "/" ? null : isShopPage ? (
             <>
               <Link
                 href="/"
@@ -227,7 +237,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
             </Link>
           )}
 
-          {!isShopPage ? (
+          {!isShopPage && pathname !== "/" ? (
             <nav className="hidden flex-1 items-center justify-center gap-1 md:flex" aria-label="Primary navigation">
               <Link href="/" className={`rounded-lg px-3 py-2 text-sm font-semibold ${pathname === "/" ? "bg-slate-100 text-slate-950" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}>Home</Link>
               <Link href="/shop" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Order Materials</Link>
@@ -242,7 +252,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
             </nav>
           ) : null}
 
-          {isShopPage ? (
+          {pathname !== "/" && isShopPage ? (
             <button
               type="button"
               onClick={() => setLanguage(language === "en" ? "es" : "en")}
@@ -256,7 +266,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
             </button>
           ) : null}
 
-          <Link
+          {pathname !== "/" ? <Link
             href={isSignedIn ? "/account" : "/login"}
             prefetch={false}
             aria-label={isSignedIn ? `Open account for ${accountLabel}` : "Log in"}
@@ -266,7 +276,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
               <AccountIcon signedIn={isSignedIn} />
             </span>
             <span className={`min-w-0 truncate ${isShopPage ? "hidden sm:inline" : pathname === "/" ? "hidden min-[390px]:inline" : ""}`}>{accountLabel}</span>
-          </Link>
+          </Link> : null}
 
         </div>
         {!isShopPage && pathname !== "/" ? (

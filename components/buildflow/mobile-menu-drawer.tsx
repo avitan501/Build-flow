@@ -132,6 +132,17 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
               );
             })}
           </nav>
+          <div className="mt-2 border-t border-slate-200 pt-2">
+            <Link
+              href={isSignedIn ? "/account" : "/login"}
+              prefetch={false}
+              onClick={onClose}
+              className="flex min-h-11 items-center justify-between rounded-2xl bg-[#0E2A4A] px-3 text-sm font-semibold text-white transition hover:bg-[#163a63] active:scale-[0.99]"
+            >
+              <span>{isSignedIn ? "Account" : "Log in"}</span>
+              <span aria-hidden="true">›</span>
+            </Link>
+          </div>
         </div>
 
         {requestLinks.length ? <div className="mt-3 rounded-[20px] border border-sky-100 bg-white/90 p-2.5 shadow-[0_12px_30px_rgba(148,163,184,0.12)]">
