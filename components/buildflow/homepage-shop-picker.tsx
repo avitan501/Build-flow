@@ -525,7 +525,7 @@ export function HomepageShopPicker({
                 data-testid="department-card"
                 className={`group min-w-0 touch-manipulation flex-col items-center bg-transparent text-center focus-visible:outline-none ${homepageCompact && index >= 6 && !showAllDepartments ? "hidden sm:flex" : "flex"}`}
               >
-                <span className="relative block aspect-square w-full max-w-[6.5rem] overflow-hidden bg-white transition duration-200 ease-out group-hover:-translate-y-1 group-hover:scale-[1.035] group-focus-visible:ring-2 group-focus-visible:ring-[#0071e3] sm:max-w-[8rem]">
+                <span className="relative block aspect-square w-full max-w-[6.5rem] overflow-hidden bg-transparent transition duration-200 ease-out group-hover:-translate-y-1 group-hover:scale-[1.035] group-focus-visible:ring-2 group-focus-visible:ring-[#0071e3] sm:max-w-[8rem]">
                   {cutout ? (
                     <span
                       role="img"
@@ -561,7 +561,7 @@ export function HomepageShopPicker({
                 data-testid="expanded-department-image"
                 role="img"
                 aria-label={`${department.label} materials`}
-                className="relative block aspect-square w-full max-w-[6.5rem] overflow-hidden bg-white bg-no-repeat mix-blend-multiply transition duration-200 ease-out group-hover:-translate-y-1 group-hover:scale-[1.035] group-focus-visible:ring-2 group-focus-visible:ring-[#0071e3] sm:max-w-[8rem]"
+                className="relative block aspect-square w-full max-w-[6.5rem] overflow-hidden bg-transparent bg-no-repeat mix-blend-multiply transition duration-200 ease-out group-hover:-translate-y-1 group-hover:scale-[1.035] group-focus-visible:ring-2 group-focus-visible:ring-[#0071e3] sm:max-w-[8rem]"
                 style={{
                   backgroundImage: "url(/images/department-essentials/expanded-materials-grid.webp)",
                   backgroundPosition: department.imagePosition,
