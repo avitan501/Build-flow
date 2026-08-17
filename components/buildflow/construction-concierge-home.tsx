@@ -113,7 +113,7 @@ export function ConstructionConciergeHome() {
 
   return (
     <main className="overflow-x-clip bg-[#f4f5f7] pb-20 text-[#071126] sm:pb-0">
-      <section className="relative isolate flex min-h-[min(88svh,56rem)] items-start justify-center overflow-hidden bg-[#071126] text-white">
+      <section data-homepage-hero className="relative isolate flex min-h-[min(88svh,56rem)] items-start justify-center overflow-hidden bg-[#071126] text-white sm:aspect-video sm:min-h-0 sm:items-center">
         <video ref={heroMobileVideoRef} className="absolute inset-0 -z-20 h-full w-full object-cover object-bottom sm:hidden" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v13-mobile-poster.png" onPlaying={() => setHeroPlaying(true)} onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
           <source src="/videos/avantia-hero-background-v13-mobile.webm" type="video/webm" />
           <source src="/videos/avantia-hero-background-v13-mobile.mp4" type="video/mp4" />
@@ -128,7 +128,7 @@ export function ConstructionConciergeHome() {
           {language === "en" ? "ES" : "EN"}
         </button>
 
-        <div className="mx-auto flex w-full max-w-4xl flex-col items-center px-5 pb-24 pt-32 text-center sm:px-8 sm:pt-28">
+        <div className="mx-auto flex w-full max-w-4xl flex-col items-center px-5 pb-24 pt-32 text-center sm:px-8 sm:py-10">
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/82 sm:text-xs">{text.heroEyebrow}</p>
           <h1 className="mt-2 max-w-2xl text-[1.4rem] font-semibold leading-tight text-balance sm:text-[2.6rem]">{text.headline}</h1>
           <p className="mt-2 max-w-xl text-xs font-medium leading-5 text-white/88 sm:text-base sm:leading-6">{text.subline}</p>

@@ -48,6 +48,23 @@ test("cinematic homepage presents Construction Concierge clearly", async ({ page
   expect(overflows).toBe(false);
 });
 
+test("desktop hero scales with the page instead of cropping at narrower widths", async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 900 });
+  await page.goto("/");
+
+  const hero = page.locator("[data-homepage-hero]");
+  const desktopVideo = hero.locator("video").nth(1);
+  const heroBox = await hero.boundingBox();
+  const desktopVideoBox = await desktopVideo.boundingBox();
+
+  expect(heroBox).not.toBeNull();
+  expect(desktopVideoBox).not.toBeNull();
+  expect(heroBox!.width / heroBox!.height).toBeCloseTo(16 / 9, 1);
+  expect(desktopVideoBox!.width).toBeCloseTo(heroBox!.width, 0);
+  expect(desktopVideoBox!.height).toBeCloseTo(heroBox!.height, 0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+});
+
 test("homepage switches all principal sales content to Spanish", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Ver página en español" }).click();
