@@ -76,7 +76,7 @@ const FAST_SERVICES = [
     imagePosition: "0% 0%",
   },
   {
-    label: "AI Takeoff",
+    label: "AI Takeoff with Human Verification",
     description: "Send plans for a material list",
     href: "/request-quote?request=ai-takeoff",
     imagePosition: "50% 0%",
@@ -86,12 +86,6 @@ const FAST_SERVICES = [
     description: "PDF, photo, or material list",
     href: "/request-quote?request=material-list",
     imagePosition: "100% 0%",
-  },
-  {
-    label: "Upload Plans",
-    description: "Blueprint pricing request",
-    href: "/request-quote?request=plans",
-    imagePosition: "0% 50%",
   },
   {
     label: "Find an Item",
@@ -472,7 +466,7 @@ export function HomepageShopPicker({
         ) : null}
       </section> : null}
 
-      <section data-testid="homepage-services-section" className={`${homepageCompact && homepageSection !== "services" ? "hidden sm:block" : "block"} mt-1 min-w-0 border-t border-slate-200/80 py-5 sm:py-7`}>
+      <section data-testid="homepage-services-section" className={`${homepageCompact && homepageSection !== "services" ? "hidden sm:block" : "block"} mt-1 min-w-0 border-t border-slate-200/80 py-4 sm:py-6`}>
         <div className="px-1">
           {!homepageCompact ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Project support</p> : null}
           <h2 className="text-[1.4rem] font-semibold leading-tight tracking-[0] text-[#171717] sm:text-[1.75rem]">Choose a service</h2>

@@ -88,8 +88,10 @@ test("homepage shop stays compact and expandable on phones", async ({ page }) =>
 
   await expect(page.getByRole("button", { name: "Services", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(4);
+  await expect(page.getByText("Upload Plans", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("AI Takeoff with Human Verification", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "View all services" }).click();
-  await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(10);
+  await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(9);
 
   await page.getByRole("button", { name: "Materials" }).click();
   await expect(page.getByRole("heading", { name: "Shop materials" })).toBeVisible();
@@ -118,7 +120,7 @@ test("Order Materials opens the full responsive service and department hub", asy
 
   if ((page.viewportSize()?.width ?? 1024) >= 640) {
     await expect(page.getByRole("heading", { name: "Shop materials" })).toBeVisible();
-    await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(10);
+    await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(9);
     await expect(page.locator('[data-testid="department-card"]:visible')).toHaveCount(16);
     const serviceGrid = await page.locator('[data-testid="fast-service-grid"]').boundingBox();
     expect(serviceGrid).not.toBeNull();
@@ -126,7 +128,7 @@ test("Order Materials opens the full responsive service and department hub", asy
   } else {
     await expect(page.getByRole("button", { name: "Services", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "View all services" }).click();
-    await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(10);
+    await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(9);
     await page.getByRole("button", { name: "Materials", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Shop materials" })).toBeVisible();
     await page.getByRole("button", { name: "View all materials" }).click();

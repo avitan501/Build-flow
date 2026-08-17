@@ -147,7 +147,7 @@ export function ConstructionConciergeHome() {
         </button>
       </section>
 
-      <section className="bg-[#f5f5f7] px-4 py-5 sm:px-8 sm:py-8 lg:px-10" aria-label="Avantia builder shop">
+      <section className="bg-white px-4 py-3 sm:px-8 sm:py-6 lg:px-10" aria-label="Avantia builder shop">
         <div className="mx-auto w-full max-w-7xl">
           <HomepageShopPicker projects={[]} categories={SHOP_TOOL_CATEGORIES} isSignedIn={false} homepageCompact />
         </div>
