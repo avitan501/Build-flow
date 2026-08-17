@@ -10,11 +10,13 @@ import {
   LayoutDashboard,
   Sparkles,
   Menu,
+  MessageCircle,
   PhoneCall,
   PackageOpen,
   Store,
   Target,
   Users,
+  Video,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -24,6 +26,14 @@ import { useState, type ReactNode } from "react";
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 
 const QUO_INBOX_URL = "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
+const GOOGLE_MEET_URL = "https://meet.google.com/";
+const WHATSAPP_CALL_URL = "https://web.whatsapp.com/";
+
+const communicationLinks = [
+  { href: QUO_INBOX_URL, label: "Calls & Messages", shortLabel: "Calls", icon: PhoneCall },
+  { href: GOOGLE_MEET_URL, label: "Open Google Meet", shortLabel: "Meet", icon: Video },
+  { href: WHATSAPP_CALL_URL, label: "Open WhatsApp to make a call", shortLabel: "WhatsApp", icon: MessageCircle },
+] as const;
 
 const primaryLinks = [
   { href: "/admin/users", label: "Customers", icon: Users },
@@ -129,11 +139,12 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
       </nav>
 
       <div className="border-t border-slate-200 p-3">
-        <Link href={QUO_INBOX_URL} onClick={onNavigate} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
-          <PhoneCall className="h-4 w-4" />
-          <span className="min-w-0 flex-1">Calls & Messages</span>
-          <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
-        </Link>
+        <div className="grid grid-cols-3 gap-1" aria-label="Communication shortcuts">
+          {communicationLinks.map((link) => {
+            const Icon = link.icon;
+            return <Link key={link.href} href={link.href} onClick={onNavigate} target="_blank" rel="noopener noreferrer" aria-label={link.label} title={link.label} className="flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-center text-[10px] font-semibold leading-3 text-slate-700 hover:bg-slate-100 hover:text-slate-950"><Icon className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="w-full truncate">{link.shortLabel}</span></Link>;
+          })}
+        </div>
         <Link href="/" onClick={onNavigate} className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
           <ChevronLeft className="h-4 w-4" />
           View customer website

@@ -121,10 +121,11 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
 
   expect(navigation).toContain('{ href: "/admin/quote-comparison", label: "Quote Comparison"');
   expect(navigation).toContain('link.href === "/admin/quote-comparison" && access.suppliers');
-  expect(navigation).toContain(">Calls & Messages</span>");
+  expect(navigation).toContain('label: "Calls & Messages"');
+  expect(navigation).toContain('label: "Open Google Meet"');
+  expect(navigation).toContain('label: "Open WhatsApp to make a call"');
   expect(navigation).toContain("https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602");
-  expect(navigation.indexOf(">Calls & Messages</span>")).toBeGreaterThan(navigation.indexOf('label: "Website Traffic"'));
-  expect(navigation).toContain("href={QUO_INBOX_URL}");
+  expect(navigation.indexOf("communicationLinks.map")).toBeGreaterThan(navigation.indexOf('label: "Website Traffic"'));
   expect(navigation).not.toContain('link.href === "/admin/traffic" ||');
   expect(navigation).toContain('target="_blank" rel="noopener noreferrer"');
   expect(migration).toContain("alter table public.quote_comparisons enable row level security");

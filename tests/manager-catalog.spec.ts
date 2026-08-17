@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test"
 
 const root = process.cwd()
 
-test("manager navigation groups secondary tools and keeps calls last", async () => {
+test("manager navigation groups secondary tools and keeps communication shortcuts at the bottom", async () => {
   const shell = await readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8")
   expect(shell).toContain('label: "Material Catalog"')
   expect(shell).toContain('href: "/admin/catalog"')
@@ -13,7 +13,12 @@ test("manager navigation groups secondary tools and keeps calls last", async () 
   expect(shell).toContain('label: "AI Tools"')
   expect(shell).toContain('label: "Dashboard"')
   expect(shell).toContain("More")
-  expect(shell.lastIndexOf("href={QUO_INBOX_URL}")).toBeGreaterThan(shell.indexOf("</nav>"))
+  expect(shell).toContain('shortLabel: "Calls"')
+  expect(shell).toContain('shortLabel: "Meet"')
+  expect(shell).toContain('shortLabel: "WhatsApp"')
+  expect(shell).toContain('const GOOGLE_MEET_URL = "https://meet.google.com/"')
+  expect(shell).toContain('const WHATSAPP_CALL_URL = "https://web.whatsapp.com/"')
+  expect(shell.lastIndexOf("communicationLinks.map")).toBeGreaterThan(shell.indexOf("</nav>"))
 })
 
 test("manager catalog is protected, seeded, editable, and supplier based", async () => {
