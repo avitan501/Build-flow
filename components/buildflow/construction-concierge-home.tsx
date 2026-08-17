@@ -114,13 +114,13 @@ export function ConstructionConciergeHome() {
   return (
     <main className="overflow-x-clip bg-[#f4f5f7] pb-20 text-[#071126] sm:pb-0">
       <section className="relative isolate flex min-h-[min(88svh,56rem)] items-start justify-center overflow-hidden bg-[#071126] text-white">
-        <video ref={heroMobileVideoRef} className="absolute inset-0 -z-20 h-full w-full object-cover object-bottom sm:hidden" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v12-mobile-poster.png" onPlaying={() => setHeroPlaying(true)} onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
-          <source src="/videos/avantia-hero-background-v12-mobile.webm" type="video/webm" />
-          <source src="/videos/avantia-hero-background-v12-mobile.mp4" type="video/mp4" />
+        <video ref={heroMobileVideoRef} className="absolute inset-0 -z-20 h-full w-full object-cover object-bottom sm:hidden" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v13-mobile-poster.png" onPlaying={() => setHeroPlaying(true)} onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
+          <source src="/videos/avantia-hero-background-v13-mobile.webm" type="video/webm" />
+          <source src="/videos/avantia-hero-background-v13-mobile.mp4" type="video/mp4" />
         </video>
-        <video ref={heroDesktopVideoRef} className="absolute inset-0 -z-20 hidden h-full w-full object-cover sm:block" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v12-desktop-poster.png" onPlaying={() => setHeroPlaying(true)} onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
-          <source src="/videos/avantia-hero-background-v12-desktop.webm" type="video/webm" />
-          <source src="/videos/avantia-hero-background-v12-desktop.mp4" type="video/mp4" />
+        <video ref={heroDesktopVideoRef} className="absolute inset-0 -z-20 hidden h-full w-full object-cover sm:block" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v13-desktop-poster.png" onPlaying={() => setHeroPlaying(true)} onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
+          <source src="/videos/avantia-hero-background-v13-desktop.webm" type="video/webm" />
+          <source src="/videos/avantia-hero-background-v13-desktop.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(7,17,38,.34)_0%,rgba(7,17,38,.04)_48%,rgba(7,17,38,.4)_100%)]" aria-hidden="true" />
 

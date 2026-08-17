@@ -19,11 +19,11 @@ test("cinematic homepage presents Construction Concierge clearly", async ({ page
   await expect(heroVideos).toHaveCount(2);
   await expect(heroMobileVideo).toHaveAttribute("autoplay", "");
   await expect(heroMobileVideo).toHaveAttribute("muted", "");
-  await expect(heroMobileVideo.locator('source[type="video/mp4"]')).toHaveAttribute("src", "/videos/avantia-hero-background-v12-mobile.mp4");
-  await expect(heroMobileVideo).toHaveAttribute("poster", "/videos/avantia-hero-background-v12-mobile-poster.png");
+  await expect(heroMobileVideo.locator('source[type="video/mp4"]')).toHaveAttribute("src", "/videos/avantia-hero-background-v13-mobile.mp4");
+  await expect(heroMobileVideo).toHaveAttribute("poster", "/videos/avantia-hero-background-v13-mobile-poster.png");
   await expect(heroMobileVideo).toHaveAttribute("data-loop-end", "12.25");
-  await expect(heroDesktopVideo.locator('source[type="video/mp4"]')).toHaveAttribute("src", "/videos/avantia-hero-background-v12-desktop.mp4");
-  await expect(heroDesktopVideo).toHaveAttribute("poster", "/videos/avantia-hero-background-v12-desktop-poster.png");
+  await expect(heroDesktopVideo.locator('source[type="video/mp4"]')).toHaveAttribute("src", "/videos/avantia-hero-background-v13-desktop.mp4");
+  await expect(heroDesktopVideo).toHaveAttribute("poster", "/videos/avantia-hero-background-v13-desktop-poster.png");
   await expect(heroDesktopVideo).toHaveAttribute("data-loop-end", "12.25");
   await expect(page.locator("main section").first().locator('img[alt="Avantia Build"]')).toHaveCount(0);
   await expect(page.locator("main section").first().locator("[aria-hidden=true] span.rounded-full")).toHaveCount(0);
