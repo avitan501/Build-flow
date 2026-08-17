@@ -482,7 +482,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
           </div>
         ) : showAllQuestions ? configurator ? (
           <div className="grid items-start lg:grid-cols-[minmax(0,1fr)_15rem]">
-            <div className="min-w-0 px-4 pb-24 sm:px-6 sm:pb-24 lg:pb-6 lg:pr-8">
+            <div className={`min-w-0 px-4 ${hasStartedAnswer ? "pb-24 sm:pb-24" : "pb-4 sm:pb-5"} sm:px-6 lg:pb-6 lg:pr-8`}>
               {questionGroups.map((group, groupIndex) => (
                 <section key={group.id} data-testid={`flooring-group-${group.id}`} className="border-b border-[#d2d2d7] py-4 last:border-b-0 sm:py-5">
                   <div className="mb-1 flex items-center gap-3">

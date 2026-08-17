@@ -33,56 +33,59 @@ function QuickOrderAction({ category, questionnaireDepartment }: { category: Sho
 }
 
 const SINGLE_DOOR_PRICES = [
-  ["18 in.", "$131", "$180"],
-  ["20 in.", "$132", "$182"],
-  ["24 in.", "$133", "$184"],
-  ["28 in.", "$134", "$188"],
-  ["30 in.", "$135", "$190"],
-  ["32 in.", "$137", "$194"],
-  ["36 in.", "$141", "$196"],
+  ["18 in.", 131, 180],
+  ["20 in.", 132, 182],
+  ["24 in.", 133, 184],
+  ["28 in.", 134, 188],
+  ["30 in.", 135, 190],
+  ["32 in.", 137, 194],
+  ["36 in.", 141, 196],
 ] as const
 
 const DOUBLE_DOOR_PRICES = [
-  ["36 in. (18 + 18)", "$372"],
-  ["40 in. (20 + 20)", "$373"],
-  ["48 in. (24 + 24)", "$374"],
-  ["56 in. (28 + 28)", "$395"],
-  ["60 in. (30 + 30)", "$398"],
-  ["72 in. (36 + 36)", "$435"],
+  ["36 in. (18 + 18)", 372],
+  ["40 in. (20 + 20)", 373],
+  ["48 in. (24 + 24)", 374],
+  ["56 in. (28 + 28)", 395],
+  ["60 in. (30 + 30)", 398],
+  ["72 in. (36 + 36)", 435],
 ] as const
+
+const DOOR_PRICE_FORMATTER = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
 
 function DoorPricingGuide() {
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="door-price-guide-title">
-      <div className="grid md:grid-cols-[16rem_minmax(0,1fr)]">
-        <div className="grid grid-cols-2 gap-px bg-slate-200 md:grid-cols-1">
-          <div className="relative aspect-[4/3] bg-white md:aspect-auto md:min-h-44">
-            <Image src="/images/materials/catalog/flat-flush-door.png" alt="Flat flush interior door style" fill sizes="(min-width: 768px) 16rem, 50vw" className="object-contain p-3" priority />
-            <span className="absolute bottom-2 left-2 rounded bg-slate-950 px-2 py-1 text-[10px] font-bold text-white">Flat / flush</span>
-          </div>
-          <div className="relative aspect-[4/3] bg-white md:aspect-auto md:min-h-44">
-            <Image src="/images/materials/photos/doors.jpg" alt="Shaker and panel door styles" fill sizes="(min-width: 768px) 16rem, 50vw" className="object-cover" priority />
-            <span className="absolute bottom-2 left-2 rounded bg-slate-950 px-2 py-1 text-[10px] font-bold text-white">Shaker styles</span>
-          </div>
+      <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-center gap-3 p-3 sm:grid-cols-[5.5rem_minmax(13rem,1fr)_minmax(20rem,1.2fr)] sm:gap-5 sm:p-4">
+        <div className="relative h-20 overflow-hidden rounded-md bg-[#f3f4f6] sm:h-24">
+          <Image src="/images/materials/catalog/one-panel-shaker-door.webp" alt="White primed 1-panel Shaker interior door" fill sizes="(min-width: 640px) 104px, 84px" className="object-contain p-1.5" priority />
         </div>
-        <div className="p-4 sm:p-5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-700">Door price guide</p>
-          <h2 id="door-price-guide-title" className="mt-1 text-lg font-bold text-slate-950">1-panel Shaker reference prices</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">6 ft. 8 in. high, 1 3/8 in. thick. Prices are a starting reference and are confirmed with your quote.</p>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <div className="border-l-2 border-orange-500 pl-2"><p className="text-[10px] font-semibold uppercase text-slate-500">Slab</p><p className="text-lg font-bold text-slate-950">From $131</p></div>
-            <div className="border-l-2 border-sky-500 pl-2"><p className="text-[10px] font-semibold uppercase text-slate-500">Prehung</p><p className="text-lg font-bold text-slate-950">From $180</p></div>
-            <div className="border-l-2 border-emerald-500 pl-2"><p className="text-[10px] font-semibold uppercase text-slate-500">Double</p><p className="text-lg font-bold text-slate-950">From $372</p></div>
-          </div>
-          <details className="group mt-4 border-t border-slate-200 pt-3">
-            <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between text-sm font-bold text-sky-700 marker:content-none">View prices by width<span aria-hidden="true" className="text-xl font-light transition-transform group-open:rotate-45">+</span></summary>
-            <div className="grid gap-4 pt-2 lg:grid-cols-2">
-              <table className="w-full text-left text-xs"><thead><tr className="border-b border-slate-200 text-slate-500"><th className="py-2">Width</th><th className="py-2 text-right">Slab</th><th className="py-2 text-right">Prehung</th></tr></thead><tbody>{SINGLE_DOOR_PRICES.map(([width, slab, prehung]) => <tr key={width} className="border-b border-slate-100"><td className="py-2 font-semibold">{width}</td><td className="py-2 text-right">{slab}</td><td className="py-2 text-right">{prehung}</td></tr>)}</tbody></table>
-              <table className="w-full text-left text-xs"><thead><tr className="border-b border-slate-200 text-slate-500"><th className="py-2">Double-door width</th><th className="py-2 text-right">Price</th></tr></thead><tbody>{DOUBLE_DOOR_PRICES.map(([width, price]) => <tr key={width} className="border-b border-slate-100"><td className="py-2 font-semibold">{width}</td><td className="py-2 text-right">{price}</td></tr>)}</tbody></table>
+
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-700">Featured Door</p>
+          <h2 id="door-price-guide-title" className="mt-0.5 text-pretty text-base font-bold leading-tight text-slate-950 sm:text-lg">1-Panel Shaker Interior Door</h2>
+          <p className="mt-1 text-xs font-medium text-slate-500">Primed white · 6 ft. 8 in. · 1 3/8 in.</p>
+        </div>
+
+        <div className="col-span-2 grid grid-cols-3 overflow-hidden rounded-md border border-slate-200 sm:col-span-1" data-testid="door-price-options">
+          {[["Slab", 131], ["Prehung", 180], ["Double", 372]].map(([label, price], index) => (
+            <div key={label} className={`${index ? "border-l border-slate-200" : ""} min-w-0 px-2 py-2 text-center sm:px-3`}>
+              <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500">{label}</p>
+              <p className="mt-0.5 truncate text-sm font-bold tabular-nums text-slate-950">{DOOR_PRICE_FORMATTER.format(Number(price))}</p>
             </div>
-          </details>
+          ))}
         </div>
+
       </div>
+
+      <details className="group border-t border-slate-200">
+        <summary className="flex min-h-11 cursor-pointer list-none touch-manipulation items-center justify-between px-4 text-xs font-bold text-sky-700 marker:content-none hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-sky-100">See All 13 Size Prices<span aria-hidden="true" className="text-lg font-light transition-transform motion-reduce:transition-none group-open:rotate-45">+</span></summary>
+        <div className="grid gap-4 border-t border-slate-100 bg-slate-50/70 p-4 lg:grid-cols-2">
+          <table className="w-full text-left text-xs"><thead><tr className="border-b border-slate-300 text-slate-500"><th className="py-2">Width</th><th className="py-2 text-right">Slab</th><th className="py-2 text-right">Prehung</th></tr></thead><tbody>{SINGLE_DOOR_PRICES.map(([width, slab, prehung]) => <tr key={width} className="border-b border-slate-200"><td className="py-2 font-semibold">{width}</td><td className="py-2 text-right tabular-nums">{DOOR_PRICE_FORMATTER.format(slab)}</td><td className="py-2 text-right tabular-nums">{DOOR_PRICE_FORMATTER.format(prehung)}</td></tr>)}</tbody></table>
+          <table className="w-full text-left text-xs"><thead><tr className="border-b border-slate-300 text-slate-500"><th className="py-2">Double-Door Width</th><th className="py-2 text-right">Price</th></tr></thead><tbody>{DOUBLE_DOOR_PRICES.map(([width, price]) => <tr key={width} className="border-b border-slate-200"><td className="py-2 font-semibold">{width}</td><td className="py-2 text-right tabular-nums">{DOOR_PRICE_FORMATTER.format(price)}</td></tr>)}</tbody></table>
+          <p className="text-[10px] leading-4 text-slate-500 lg:col-span-2">Reference pricing from the supplied price board. Final availability and pricing are confirmed with your quote.</p>
+        </div>
+      </details>
     </section>
   )
 }
@@ -198,12 +201,11 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
   return (
     <main className="min-h-screen bg-[#f7f8fa] px-4 py-4 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <section className="mx-auto flex max-w-7xl flex-col gap-4">
-        <h1 className="text-[2rem] font-bold tracking-normal text-slate-950 sm:text-[2.4rem]">{category.label}</h1>
-
-        {category.slug === "door-and-molding" ? <DoorPricingGuide /> : null}
+        <h1 className={`${category.slug === "door-and-molding" ? "text-[1.7rem] sm:text-[2rem]" : "text-[2rem] sm:text-[2.4rem]"} font-bold tracking-normal text-slate-950`}>{category.label}</h1>
 
         {experience.showQuickOrder && category.slug === "sheet-rock" ? <SheetRockProductConfigurator /> : null}
-        {experience.showQuickOrder && usesEmbeddedQuickOrder && category.slug !== "sheet-rock" && questionnaireSnapshot ? <EmbeddedMaterialQuickOrder snapshot={questionnaireSnapshot} category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} /> : null}
+        {experience.showQuickOrder && usesEmbeddedQuickOrder && category.slug !== "sheet-rock" && questionnaireSnapshot ? <div id={category.slug === "door-and-molding" ? "door-order-builder" : undefined} className="scroll-mt-24"><EmbeddedMaterialQuickOrder snapshot={questionnaireSnapshot} category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} /></div> : null}
+        {category.slug === "door-and-molding" ? <DoorPricingGuide /> : null}
         {experience.showQuickOrder && !customOrderOnly && (!usesEmbeddedQuickOrder || !questionnaireSnapshot) ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && usesStandardUpload && !composerHandlesUpload ? <CombinedUploadAction category={questionnaireDepartment} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}

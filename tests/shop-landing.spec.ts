@@ -603,7 +603,9 @@ test("door and molding reveals the matching order fields", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Door & Molding Quick Order" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "Choose Doors or Molding" })).toBeVisible()
-  await expect(page.getByText("1-panel Shaker reference prices")).toBeVisible()
+  await expect(page.getByRole("heading", { name: "1-Panel Shaker Interior Door" })).toBeVisible()
+  await expect(page.getByTestId("door-price-options")).toContainText("$131")
+  await expect(page.getByText("See All 13 Size Prices")).toBeVisible()
   await page.getByRole("button", { name: "Molding" }).click()
   await expect(page.getByRole("link", { name: "Molding Catalog" })).toHaveAttribute("href", "https://www.gardenstatelumber.com/products-programs/moulding/")
   await expect(page.getByLabel("Molding profile code")).toHaveCount(1)
