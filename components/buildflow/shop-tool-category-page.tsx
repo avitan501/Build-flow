@@ -211,8 +211,6 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
         {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}
         {experience.showPlanUpload && category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
 
-        <DepartmentEssentials data={essentials} />
-
         {(customOrderOnly || experience.showChatToOrder) && usesCompactCustomOrder ? (
           <details open={customOrderOnly} className="group rounded-lg border border-slate-200 bg-white shadow-sm">
             <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left marker:content-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-sky-100">
@@ -222,6 +220,8 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
             <div className="border-t border-slate-100 px-5 [&>section]:border-0"> <DepartmentRequestComposer category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} allowUpload={customOrderOnly || (composerHandlesUpload && experience.showPlanUpload)} /></div>
           </details>
         ) : experience.showChatToOrder ? <DepartmentRequestComposer category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} allowUpload={composerHandlesUpload && experience.showPlanUpload} /> : null}
+
+        <DepartmentEssentials data={essentials} />
       </section>
     </main>
   )

@@ -4,11 +4,12 @@ import { CheckCircle2, FileUp, LocateFixed, LoaderCircle, Send } from "lucide-re
 import { useActionState, useRef, useState, useTransition } from "react"
 
 import { submitQuoteRequestFormAction, type QuoteRequestFormState } from "@/app/request-quote/actions"
+import { REQUEST_DEPARTMENT_LABELS } from "@/lib/request-department-essentials"
 import { createClient } from "@/lib/supabase/client"
 import { getSupabasePublicEnv } from "@/lib/supabase/env"
 
 const initialState: QuoteRequestFormState = { status: "idle", message: "" }
-const departments = ["Framing", "Electrical", "Flooring", "Sheet rock", "Tile work", "Door and molding", "Siding", "Roofing", "Windows"]
+const departments = ["Framing", "Electrical", "Flooring", "Sheet rock", "Tile work", "Door and molding", "Siding", "Roofing", "Windows", ...REQUEST_DEPARTMENT_LABELS]
 const directAttachmentSize = 4 * 1024 * 1024
 const maxAttachmentSize = 25 * 1024 * 1024
 const inputClass = "min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3.5 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
@@ -23,7 +24,7 @@ function SubmitButton({ pending, beatQuote }: { pending: boolean; beatQuote: boo
   )
 }
 
-export function QuoteRequestForm({ mode = "request" }: { mode?: "request" | "beat" }) {
+export function QuoteRequestForm({ mode = "request", defaultDepartment }: { mode?: "request" | "beat"; defaultDepartment?: string }) {
   const beatQuote = mode === "beat"
   const [state, formAction, pending] = useActionState(submitQuoteRequestFormAction, initialState)
   const [uploadPending, startUploadTransition] = useTransition()
@@ -203,7 +204,7 @@ export function QuoteRequestForm({ mode = "request" }: { mode?: "request" | "bea
               <span aria-hidden="true" className="text-lg leading-none text-slate-400 transition group-open:rotate-45">+</span>
             </summary>
             <div className="grid grid-cols-2 gap-2 border-t border-slate-200 p-3 sm:grid-cols-4">
-              {departments.map((department) => <label key={department} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-900"><input type="checkbox" name="departments" value={department} className="h-4 w-4 accent-[#0071e3]" />{department === "Tile work" ? "Tile" : department}</label>)}
+              {departments.map((department) => <label key={department} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-900"><input type="checkbox" name="departments" value={department} defaultChecked={department === defaultDepartment} className="h-4 w-4 accent-[#0071e3]" />{department === "Tile work" ? "Tile" : department}</label>)}
             </div>
           </details>
         ) : null}

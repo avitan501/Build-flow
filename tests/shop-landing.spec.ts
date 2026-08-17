@@ -374,6 +374,24 @@ test("every active shop department shows common materials", async ({ page }) => 
   }
 })
 
+test("common materials sit below the order area and cover request-only departments", async ({ page }) => {
+  for (const department of ["roofing", "siding", "window"]) {
+    await page.goto(`/shop/${department}`)
+    const orderArea = page.getByText(new RegExp(`Need Help With a Custom .* Order\\?`), { exact: true })
+    const essentialsHeading = page.getByRole("heading", { name: "Common materials" })
+    await expect(orderArea).toBeVisible()
+    await expect(essentialsHeading).toBeVisible()
+    expect(await orderArea.evaluate((element) => element.compareDocumentPosition(document.querySelector("#department-essentials-heading")!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy()
+  }
+
+  for (const request of ["plumbing", "lighting", "insulation", "concrete", "cabinets", "tool-rental"]) {
+    await page.goto(`/request-quote?request=${request}`)
+    await expect(page.getByTestId("quote-request-form")).toBeVisible()
+    await expect(page.getByRole("heading", { name: "Common materials" })).toBeVisible()
+    await expect(page.getByTestId("department-essentials").locator("article")).toHaveCount(8)
+  }
+})
+
 test("kitchen, tile, and drywall omit retired promotional and calculator cards", async ({ page }) => {
   await page.goto("/shop/kitchen")
   await expect(page.getByText("Premium cabinetry for builder-ready kitchens")).toHaveCount(0)
