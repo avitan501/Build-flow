@@ -7,32 +7,44 @@ const conversationSteps = [
   {
     number: 1,
     label: "Introduction",
-    english: "Hi, this is Carlos. David Avitan asked me to call you.",
-    spanish: "Hola, soy Carlos. David Avitan me pidió que lo llamara.",
+    english: ["Hi, this is Carlos.", "David Avitan asked me to call you."],
+    spanish: ["Hola, soy Carlos.", "David Avitan me pidió que lo llamara."],
   },
   {
     number: 2,
     label: "Explain the service",
-    english:
-      "I hope all is well. I work with David. We have a service that helps beat construction material quotes. You can WhatsApp me any material list you need. I will shop around for you and give you the best price I find.",
-    spanish:
-      "Espero que esté bien. Trabajo con David. Tenemos un servicio que ayuda a mejorar cotizaciones de materiales de construcción. Puede enviarme por WhatsApp cualquier lista de materiales que necesite. Compararé precios por usted y le daré el mejor precio que encuentre.",
+    english: [
+      "I work with David.",
+      "We help contractors get better prices on construction materials.",
+      "Send me your list on WhatsApp, and I will compare prices for you.",
+    ],
+    spanish: [
+      "Trabajo con David.",
+      "Ayudamos a contratistas a conseguir mejores precios en materiales de construcción.",
+      "Envíeme su lista por WhatsApp y compararé los precios por usted.",
+    ],
   },
   {
     number: 3,
     label: "Ask what they need",
-    english:
-      "What project are you working on now? Which materials do you need today, tomorrow, or in the next few days?",
-    spanish:
-      "¿En qué proyecto está trabajando ahora? ¿Qué materiales necesita hoy, mañana o en los próximos días?",
+    english: ["What are you working on now?", "What materials do you need today, tomorrow, or this week?"],
+    spanish: ["¿En qué está trabajando ahora?", "¿Qué materiales necesita hoy, mañana o esta semana?"],
   },
   {
     number: 4,
     label: "Move to messaging",
-    english:
-      "I am sending you my WhatsApp now. Please reply with whatever you need. Do you prefer WhatsApp or text message? See you there.",
-    spanish:
-      "Le voy a enviar mi WhatsApp ahora. Por favor, respóndame con lo que necesite. ¿Prefiere WhatsApp o mensaje de texto? Nos vemos allí.",
+    english: [
+      "I will send you my WhatsApp now.",
+      "Please reply with the materials you need.",
+      "Do you prefer WhatsApp or regular text?",
+      "Great. I will see you there.",
+    ],
+    spanish: [
+      "Le enviaré mi WhatsApp ahora.",
+      "Por favor, respóndame con los materiales que necesita.",
+      "¿Prefiere WhatsApp o mensaje de texto?",
+      "Perfecto. Nos vemos allí.",
+    ],
   },
 ];
 
@@ -75,11 +87,15 @@ export default async function ClientTargetConversationPage() {
               <div className="grid md:grid-cols-2">
                 <div className="p-4 md:border-r md:border-slate-200">
                   <p className="mb-2 text-[11px] font-semibold uppercase text-[#0066cc] md:hidden">English</p>
-                  <p className="text-base font-medium leading-7 text-slate-900">{step.english}</p>
+                  <div className="grid gap-2">
+                    {step.english.map((line) => <p key={line} className="text-lg font-semibold leading-7 text-slate-900">{line}</p>)}
+                  </div>
                 </div>
                 <div className="border-t border-slate-200 p-4 md:border-t-0">
                   <p className="mb-2 text-[11px] font-semibold uppercase text-[#0066cc] md:hidden">Español</p>
-                  <p lang="es" className="text-base font-medium leading-7 text-slate-900">{step.spanish}</p>
+                  <div lang="es" className="grid gap-2">
+                    {step.spanish.map((line) => <p key={line} className="text-lg font-semibold leading-7 text-slate-900">{line}</p>)}
+                  </div>
                 </div>
               </div>
             </li>
