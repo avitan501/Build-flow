@@ -13,8 +13,8 @@ const BULK_BAGS = [
     description: "Clean construction sand for masonry, leveling, and general jobsite use.",
     imageUrl: "/images/materials/bulk-bags/one-yard-sand-bag.webp",
     imageAlt: "One cubic yard white bulk bag filled with construction sand",
-    price: 89,
-    details: "Sand material: $54. One-yard sack: $35. Delivery fee: $250 per delivery.",
+    price: 54,
+    details: "Sand material: $54. One-yard bag fee: $35. Delivery fee: $250.",
   },
   {
     id: "one-yard-crushed-stone-bag",
@@ -23,7 +23,7 @@ const BULK_BAGS = [
     imageUrl: "/images/materials/bulk-bags/one-yard-crushed-stone-bag.webp",
     imageAlt: "One cubic yard white bulk bag filled with crushed stone",
     price: 0,
-    details: "One cubic yard crushed stone bag. Final material price is confirmed before delivery.",
+    details: "One cubic yard crushed stone bag.",
   },
   {
     id: "one-yard-mulch-bag",
@@ -32,14 +32,8 @@ const BULK_BAGS = [
     imageUrl: "/images/materials/bulk-bags/one-yard-mulch-bag.webp",
     imageAlt: "One cubic yard white bulk bag filled with brown mulch",
     price: 0,
-    details: "One cubic yard mulch bag. Final material price is confirmed before delivery.",
+    details: "One cubic yard mulch bag.",
   },
-] as const
-
-const BAG_PRICE_DETAILS = [
-  ["Sand material", "$54"],
-  ["One-yard sack", "$35"],
-  ["Delivery fee", "$250"],
 ] as const
 
 const BAGGED_MATERIALS = [
@@ -48,7 +42,7 @@ const BAGGED_MATERIALS = [
     name: "Heidelberg Materials Lehigh Portland Cement Type I/II",
     detail: "94 lb. bag",
     price: 16.45,
-    imageUrl: "/images/materials/products-real/lehigh-portland-cement-type-i-ii.jpg",
+    imageUrl: "/images/materials/products-real/heidelberg-lehigh-portland-cement-type-i-ii-real.jpg",
     imageAlt: "Heidelberg Materials Lehigh Portland Cement Type I and II 94 pound bag",
   },
   {
@@ -56,7 +50,7 @@ const BAGGED_MATERIALS = [
     name: "MAPEI Keraflex Plus Gray Thinset",
     detail: "44 lb. bag",
     price: 18,
-    imageUrl: "/images/materials/products-real/mapei-ultraflex-thinset.jpg",
+    imageUrl: "/images/materials/products-real/mapei-keraflex-plus-gray-44lb-real.jpg",
     imageAlt: "MAPEI gray thinset mortar bag",
   },
 ] as const
@@ -72,7 +66,10 @@ function BulkBagCard({ bag }: { bag: (typeof BULK_BAGS)[number] }) {
       </div>
 
       <div className="p-4">
-        <h2 className="text-lg font-bold text-slate-950">{bag.name}</h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-lg font-bold text-slate-950">{bag.name}</h2>
+          {bag.price > 0 ? <p className="shrink-0 text-lg font-bold tabular-nums text-slate-950">${bag.price.toFixed(2)}</p> : null}
+        </div>
         <p className="mt-1 min-h-10 text-sm leading-5 text-slate-600">{bag.description}</p>
 
         <div className="mt-4 flex items-center gap-2">
@@ -97,24 +94,16 @@ function BulkBagCard({ bag }: { bag: (typeof BULK_BAGS)[number] }) {
 export function BulkBagStorefront() {
   return (
     <section aria-labelledby="bulk-bag-heading">
-      <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-4">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-orange-700">Jobsite bulk delivery</p>
           <h2 id="bulk-bag-heading" className="mt-1 text-xl font-bold text-slate-950 sm:text-2xl">Choose a one-yard bag</h2>
         </div>
-        <p className="text-sm text-slate-500">Crushed stone and mulch pricing is confirmed before delivery.</p>
-      </div>
-      <div className="mb-4 grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-label="Sand bag price breakdown">
-        {BAG_PRICE_DETAILS.map(([label, price], index) => (
-          <div key={label} className={`${index ? "border-l border-slate-200" : ""} px-3 py-3 text-center`}>
-            <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">{label}</p>
-            <p className="mt-0.5 text-base font-bold tabular-nums text-slate-950">{price}</p>
-          </div>
-        ))}
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {BULK_BAGS.map((bag) => <BulkBagCard key={bag.id} bag={bag} />)}
       </div>
+      <p className="mt-2 text-right text-[11px] text-slate-500">1-yard bag fee: $35 <span aria-hidden="true">·</span> Delivery fee: $250</p>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {BAGGED_MATERIALS.map((material) => (
