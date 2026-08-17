@@ -1,6 +1,6 @@
 "use client";
 
-import { Mail, PhoneCall, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { Mail, Pencil, PhoneCall, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 
@@ -8,6 +8,7 @@ import {
   createOutreachLeadAction,
   deleteOutreachLeadAction,
   updateClientLanguageAction,
+  updateOutreachLeadAction,
   updateOutreachLeadStatusAction,
 } from "@/app/admin/goals-progress/lead-actions";
 
@@ -73,6 +74,58 @@ export function AddOutreachLead() {
   </>;
 }
 
+function EditOutreachLead({ lead }: { lead: OutreachLeadRecord }) {
+  const initialValue = () => ({ fullName: lead.full_name, companyName: lead.company_name ?? "", email: lead.email ?? "", phone: lead.phone ?? "", notes: lead.notes ?? "", relationshipLevel: lead.relationship_level, preferredLanguage: lead.preferred_language });
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(initialValue);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function show() {
+    setForm(initialValue());
+    setError(null);
+    setOpen(true);
+  }
+
+  function close() {
+    if (!pending) setOpen(false);
+  }
+
+  function submit() {
+    setError(null);
+    startTransition(async () => {
+      const result = await updateOutreachLeadAction({ id: lead.id, ...form });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setOpen(false);
+      window.location.reload();
+    });
+  }
+
+  return <>
+    <button type="button" onClick={show} aria-label={`Edit ${lead.full_name}`} title="Edit lead" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"><Pencil className="h-4 w-4" /></button>
+    {open && typeof document !== "undefined" ? createPortal(
+      <div className="fixed inset-0 z-[165] grid place-items-center overflow-y-auto bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby={`edit-lead-${lead.id}`} onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
+        <section className="my-auto w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-2xl">
+          <header className="flex items-start justify-between border-b border-slate-200 p-5"><div><span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-sky-50 text-[#0066cc]"><Pencil className="h-4 w-4" /></span><h2 id={`edit-lead-${lead.id}`} className="mt-3 text-xl font-semibold">Edit outreach lead</h2><p className="mt-1 text-sm text-slate-500">Update this lead&apos;s contact and outreach details.</p></div><button type="button" onClick={close} aria-label="Close" className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-500"><X className="h-5 w-5" /></button></header>
+          <div className="grid max-h-[65vh] gap-4 overflow-y-auto p-5 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">Name<input autoFocus value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} className="min-h-11 rounded-md border border-slate-300 px-3 font-normal" /></label>
+            <label className="grid gap-1.5 text-sm font-semibold">Phone<input type="tel" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} className="min-h-11 rounded-md border border-slate-300 px-3 font-normal" /></label>
+            <label className="grid gap-1.5 text-sm font-semibold">Email<input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} className="min-h-11 rounded-md border border-slate-300 px-3 font-normal" /></label>
+            <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">Company <span className="font-normal text-slate-400">optional</span><input value={form.companyName} onChange={(event) => setForm((current) => ({ ...current, companyName: event.target.value }))} className="min-h-11 rounded-md border border-slate-300 px-3 font-normal" /></label>
+            <label className="grid gap-1.5 text-sm font-semibold">Relationship level<select value={form.relationshipLevel} onChange={(event) => setForm((current) => ({ ...current, relationshipLevel: Number(event.target.value) }))} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal">{[1, 2, 3, 4, 5].map((level) => <option key={level} value={level}>Level {level}</option>)}</select></label>
+            <label className="grid gap-1.5 text-sm font-semibold">Preferred language<select value={form.preferredLanguage} onChange={(event) => setForm((current) => ({ ...current, preferredLanguage: event.target.value as "en" | "es" }))} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal"><option value="en">English</option><option value="es">Spanish</option></select></label>
+            <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">Outreach notes <span className="font-normal text-slate-400">optional</span><textarea rows={3} maxLength={1000} value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} className="rounded-md border border-slate-300 p-3 font-normal" /></label>
+            {error ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700 sm:col-span-2">{error}</p> : null}
+          </div>
+          <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-4"><button type="button" onClick={close} disabled={pending} className="min-h-11 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold">Cancel</button><button type="button" onClick={submit} disabled={pending || form.fullName.trim().length < 2 || (!form.phone.trim() && !form.email.trim())} className="min-h-11 rounded-md bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-40">{pending ? "Saving..." : "Save lead"}</button></footer>
+        </section>
+      </div>, document.body) : null}
+  </>;
+}
+
 export function OutreachLeadList({ leads }: { leads: OutreachLeadRecord[] }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -95,7 +148,7 @@ export function OutreachLeadList({ leads }: { leads: OutreachLeadRecord[] }) {
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold">{lead.full_name}</p><span className="shrink-0 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-[#0066cc]">Level {lead.relationship_level}</span></div><p className="truncate text-xs text-slate-500">{lead.company_name || lead.email || lead.phone}</p>{lead.notes ? <p className="mt-1 text-xs leading-5 text-slate-600">{lead.notes}</p> : null}</div>
         <div className="flex flex-wrap gap-1"><select aria-label={`Language for ${lead.full_name}`} defaultValue={lead.preferred_language} disabled={pending} onChange={(event) => run(() => updateClientLanguageAction({ id: lead.id, target: "lead", language: event.target.value }))} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"><option value="en">English</option><option value="es">Spanish</option></select><select aria-label={`Status for ${lead.full_name}`} defaultValue={lead.status} disabled={pending} onChange={(event) => run(() => updateOutreachLeadStatusAction({ id: lead.id, status: event.target.value }))} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"><option value="new">New</option><option value="contacted">Contacted</option><option value="qualified">Qualified</option><option value="not_interested">Not interested</option></select></div>
-        <div className="flex gap-1">{lead.phone ? <a href={`tel:${lead.phone}`} aria-label={`Call ${lead.full_name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600"><PhoneCall className="h-4 w-4" /></a> : null}{lead.email ? <a href={`mailto:${lead.email}`} aria-label={`Email ${lead.full_name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600"><Mail className="h-4 w-4" /></a> : null}<button type="button" disabled={pending} onClick={() => window.confirm(`Remove ${lead.full_name} from leads?`) && run(() => deleteOutreachLeadAction(lead.id))} aria-label={`Remove ${lead.full_name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button></div>
+        <div className="flex gap-1"><EditOutreachLead lead={lead} />{lead.phone ? <a href={`tel:${lead.phone}`} aria-label={`Call ${lead.full_name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600"><PhoneCall className="h-4 w-4" /></a> : null}{lead.email ? <a href={`mailto:${lead.email}`} aria-label={`Email ${lead.full_name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600"><Mail className="h-4 w-4" /></a> : null}<button type="button" disabled={pending} onClick={() => window.confirm(`Remove ${lead.full_name} from leads?`) && run(() => deleteOutreachLeadAction(lead.id))} aria-label={`Remove ${lead.full_name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button></div>
       </div>
     </article>) : <p className="border-t border-slate-100 px-3 py-4 text-sm text-slate-500">No outreach leads yet. Add the first person Carlos should contact.</p>}
     {error ? <p className="m-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}

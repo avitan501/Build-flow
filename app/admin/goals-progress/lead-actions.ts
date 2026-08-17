@@ -62,6 +62,45 @@ export async function createOutreachLeadAction(input: {
   return { ok: true };
 }
 
+export async function updateOutreachLeadAction(input: {
+  id: string;
+  fullName: string;
+  companyName: string;
+  email: string;
+  phone: string;
+  notes: string;
+  relationshipLevel: number;
+  preferredLanguage: string;
+}): Promise<LeadResult> {
+  const { supabase } = await requireStaffProfile("customers");
+  const fullName = input.fullName.trim().replace(/\s+/g, " ").slice(0, 160);
+  const companyName = input.companyName.trim().replace(/\s+/g, " ").slice(0, 180);
+  const email = input.email.trim().toLowerCase().slice(0, 320);
+  const phone = input.phone.trim().slice(0, 40);
+  const notes = input.notes.trim().slice(0, 1000);
+  const relationshipLevel = Number.isInteger(input.relationshipLevel) && input.relationshipLevel >= 1 && input.relationshipLevel <= 5 ? input.relationshipLevel : 1;
+  const preferredLanguage = CLIENT_LANGUAGES.find((language) => language === input.preferredLanguage) ?? "en";
+
+  if (fullName.length < 2) return { ok: false, error: "Enter the lead's name." };
+  if (!email && !phone) return { ok: false, error: "Enter an email or phone number." };
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid email address." };
+  if (phone && (!/^[+()\d\s.-]+$/.test(phone) || phone.replace(/\D/g, "").length < 7)) return { ok: false, error: "Enter a valid phone number." };
+
+  const { data, error } = await supabase.from("manager_outreach_leads").update({
+    full_name: fullName,
+    company_name: companyName || null,
+    email: email || null,
+    phone: phone || null,
+    notes: notes || null,
+    relationship_level: relationshipLevel,
+    preferred_language: preferredLanguage,
+  }).eq("id", input.id).select("id").maybeSingle<{ id: string }>();
+  if (error || !data) return { ok: false, error: "The lead could not be updated. Please try again." };
+
+  refreshOutreach();
+  return { ok: true };
+}
+
 export async function updateClientLanguageAction(input: { id: string; target: "lead" | "client"; language: string }): Promise<LeadResult> {
   const { supabase } = await requireStaffProfile("customers");
   const language = CLIENT_LANGUAGES.find((value) => value === input.language);
