@@ -27,6 +27,7 @@ const QUO_INBOX_URL = "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78
 
 const primaryLinks = [
   { href: "/admin/users", label: "Customers", icon: Users },
+  { href: "/admin/goals-progress/client-target", label: "Client Target", icon: Target },
   { href: "/admin/vendors", label: "Suppliers", icon: Store },
   { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },
   { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
@@ -45,6 +46,7 @@ function linksForAccess(access: ManagerAccess) {
   if (access.owner) return primaryLinks;
   return primaryLinks.filter((link) =>
     (link.href === "/admin/users" && access.customers) ||
+    link.href === "/admin/goals-progress/client-target" ||
     (link.href === "/admin/vendors" && access.suppliers) ||
     (link.href === "/admin/quote-comparison" && access.suppliers) ||
     link.href === "/admin/catalog",

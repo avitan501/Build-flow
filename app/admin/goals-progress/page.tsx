@@ -6,6 +6,7 @@ import {
   Clock3,
   Megaphone,
   PhoneCall,
+  Languages,
   Target,
 } from "lucide-react";
 import Link from "next/link";
@@ -106,6 +107,13 @@ export default async function GoalsProgressPage() {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 gap-3"><GoalNumber>2</GoalNumber><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Outreach</p><h2 id="clients-goal-title" className="mt-1 text-xl font-semibold">Build a client target list and collect feedback</h2><p className="mt-1 text-sm text-slate-600">Start with contractors and builders who regularly purchase materials.</p></div></div>
               <AddTargetClient />
+            </div>
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-sky-200 bg-sky-50 p-3">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-[#0066cc]"><Languages className="h-4 w-4" /></span>
+                <div><p className="text-sm font-semibold text-slate-950">English and Spanish call guide</p><p className="text-xs text-slate-600">A step-by-step conversation Carlos can follow with each target client.</p></div>
+              </div>
+              <Link href="/admin/goals-progress/client-target" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white">Open conversation guide<ArrowRight className="h-4 w-4" /></Link>
             </div>
             <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
               <div className="overflow-hidden rounded-md border border-slate-200">

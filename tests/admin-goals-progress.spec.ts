@@ -5,10 +5,12 @@ import { expect, test } from "@playwright/test";
 
 const root = process.cwd();
 
-test("owner manager navigation includes Goals & Progress", async () => {
+test("manager navigation includes owner goals and employee Client Target access", async () => {
   const shell = await readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8");
 
   expect(shell).toContain('{ href: "/admin/goals-progress", label: "Goals & Progress", icon: Target }');
+  expect(shell).toContain('{ href: "/admin/goals-progress/client-target", label: "Client Target", icon: Target }');
+  expect(shell).toContain('link.href === "/admin/goals-progress/client-target"');
   expect(shell).toContain("{access.owner ? (");
 });
 
@@ -24,6 +26,19 @@ test("Goals & Progress protects the page and includes all five owner goals", asy
   expect(page).toContain("<AffiliateProgramTracker");
   expect(page).toContain('supabase.from("affiliate_programs")');
   expect(page).toContain("<AddTargetClient />");
+  expect(page).toContain('href="/admin/goals-progress/client-target"');
+});
+
+test("Client Target conversation guide allows manager employees and is bilingual", async () => {
+  const page = await readFile(path.join(root, "app/admin/goals-progress/client-target/page.tsx"), "utf8");
+
+  expect(page).toContain("await requireManagerPortalProfile()");
+  expect(page).toContain('access.owner ? "/admin/goals-progress" : "/admin/users"');
+  expect(page).toContain("Carlos&apos;s conversation guide");
+  expect(page).toContain("Hi, this is Carlos");
+  expect(page).toContain("Hola, soy Carlos");
+  expect(page).toContain("English");
+  expect(page).toContain("Español");
 });
 
 test("affiliate tracker is persistent, owner-only, filterable, and setup-gated", async () => {
