@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireStaffProfile } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 type LeadResult = { ok: true } | { ok: false; error: string };
 
@@ -19,7 +20,7 @@ export async function createOutreachLeadAction(input: {
   phone: string;
   notes: string;
 }): Promise<LeadResult> {
-  const { supabase, user } = await requireStaffProfile("customers");
+  const { user } = await requireStaffProfile("customers");
   const fullName = input.fullName.trim().replace(/\s+/g, " ").slice(0, 160);
   const companyName = input.companyName.trim().replace(/\s+/g, " ").slice(0, 180);
   const email = input.email.trim().toLowerCase().slice(0, 320);
@@ -29,8 +30,11 @@ export async function createOutreachLeadAction(input: {
   if (fullName.length < 2) return { ok: false, error: "Enter the lead's name." };
   if (!email && !phone) return { ok: false, error: "Enter an email or phone number." };
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid email address." };
+  if (phone && (!/^[+()\d\s.-]+$/.test(phone) || phone.replace(/\D/g, "").length < 7)) {
+    return { ok: false, error: "Enter a valid phone number." };
+  }
 
-  const { error } = await supabase.from("manager_outreach_leads").insert({
+  const { error } = await createAdminClient().from("manager_outreach_leads").insert({
     full_name: fullName,
     company_name: companyName || null,
     email: email || null,
@@ -53,11 +57,11 @@ export async function createOutreachLeadAction(input: {
 }
 
 export async function updateOutreachLeadStatusAction(input: { id: string; status: string }): Promise<LeadResult> {
-  const { supabase } = await requireStaffProfile("customers");
+  await requireStaffProfile("customers");
   const status = LEAD_STATUSES.find((value) => value === input.status);
   if (!status) return { ok: false, error: "Choose a valid lead status." };
 
-  const { error } = await supabase.from("manager_outreach_leads").update({ status }).eq("id", input.id);
+  const { error } = await createAdminClient().from("manager_outreach_leads").update({ status }).eq("id", input.id);
   if (error) return { ok: false, error: "The lead status could not be updated." };
 
   refreshOutreach();
@@ -65,8 +69,8 @@ export async function updateOutreachLeadStatusAction(input: { id: string; status
 }
 
 export async function deleteOutreachLeadAction(id: string): Promise<LeadResult> {
-  const { supabase } = await requireStaffProfile("customers");
-  const { error } = await supabase.from("manager_outreach_leads").delete().eq("id", id);
+  await requireStaffProfile("customers");
+  const { error } = await createAdminClient().from("manager_outreach_leads").delete().eq("id", id);
   if (error) return { ok: false, error: "The lead could not be removed." };
 
   refreshOutreach();
