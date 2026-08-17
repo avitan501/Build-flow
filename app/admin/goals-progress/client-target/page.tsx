@@ -49,16 +49,14 @@ const conversationSteps = [
 ];
 
 export default async function ClientTargetConversationPage() {
-  const { access } = await requireManagerPortalProfile();
-  const backHref = access.owner ? "/admin/goals-progress" : "/admin/users";
-  const backLabel = access.owner ? "Back to Goals & Progress" : "Back to Customers";
+  await requireManagerPortalProfile();
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-10">
       <div className="mx-auto max-w-6xl">
-        <Link href={backHref} className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-slate-700">
+        <Link href="/admin/goals-progress" className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-slate-700">
           <ArrowLeft className="h-4 w-4" />
-          {backLabel}
+          Back to Goals &amp; Progress
         </Link>
 
         <header className="mt-4 border-b border-slate-200 pb-6">

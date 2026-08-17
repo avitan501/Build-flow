@@ -27,14 +27,17 @@ const QUO_INBOX_URL = "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78
 
 const primaryLinks = [
   { href: "/admin/users", label: "Customers", icon: Users },
-  { href: "/admin/goals-progress/client-target", label: "Client Target", icon: Target },
   { href: "/admin/vendors", label: "Suppliers", icon: Store },
   { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },
   { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
 ] as const;
 
-const moreLinks = [
+const sharedMoreLinks = [
   { href: "/admin/goals-progress", label: "Goals & Progress", icon: Target },
+  { href: "/admin/goals-progress/client-target", label: "Client Target", icon: Target },
+] as const;
+
+const ownerMoreLinks = [
   { href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 },
   { href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles },
   { href: "/admin/build-map", label: "Dashboard", icon: LayoutDashboard },
@@ -46,7 +49,6 @@ function linksForAccess(access: ManagerAccess) {
   if (access.owner) return primaryLinks;
   return primaryLinks.filter((link) =>
     (link.href === "/admin/users" && access.customers) ||
-    link.href === "/admin/goals-progress/client-target" ||
     (link.href === "/admin/vendors" && access.suppliers) ||
     (link.href === "/admin/quote-comparison" && access.suppliers) ||
     link.href === "/admin/catalog",
@@ -64,11 +66,15 @@ function isActive(pathname: string, href: string) {
   if (href === "/admin/vendors") {
     return pathname.startsWith("/admin/vendors") || pathname.startsWith("/admin/supplier-approvals") || pathname.startsWith("/admin/supplier-requests");
   }
+  if (href === "/admin/goals-progress") {
+    return pathname === href || pathname.startsWith("/admin/goals-progress/beat-your-quote-flyer");
+  }
   return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
 }
 
 function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string; access: ManagerAccess; onNavigate?: () => void }) {
   const managerLinks = linksForAccess(access);
+  const moreLinks = access.owner ? [...sharedMoreLinks, ...ownerMoreLinks] : [...sharedMoreLinks];
   const moreIsActive = moreLinks.some((link) => isActive(pathname, link.href));
   const [moreOpen, setMoreOpen] = useState(moreIsActive);
   const homeHref = access.owner ? "/admin/build-map" : access.customers ? "/admin/users" : "/admin/vendors";
@@ -103,9 +109,8 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
             </Link>
           );
         })}
-        {access.owner ? (
-          <div className="pt-1">
-            <button
+        <div className="pt-1">
+          <button
               type="button"
               onClick={() => setMoreOpen((current) => !current)}
               aria-expanded={moreOpen}
@@ -115,13 +120,12 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
               <span className="min-w-0 flex-1 text-left">More</span>
               <ChevronDown className={`h-4 w-4 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
             </button>
-            {moreOpen ? <div className="ml-4 mt-1 space-y-1 border-l border-slate-200 pl-2">{moreLinks.map((link) => {
-              const Icon = link.icon;
-              const active = isActive(pathname, link.href);
-              return <Link key={link.href} href={link.href} onClick={onNavigate} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold ${active ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`}><Icon className="h-4 w-4 shrink-0" /><span>{link.label}</span></Link>;
-            })}</div> : null}
-          </div>
-        ) : null}
+          {moreOpen ? <div className="ml-4 mt-1 space-y-1 border-l border-slate-200 pl-2">{moreLinks.map((link) => {
+            const Icon = link.icon;
+            const active = isActive(pathname, link.href);
+            return <Link key={link.href} href={link.href} onClick={onNavigate} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold ${active ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`}><Icon className="h-4 w-4 shrink-0" /><span>{link.label}</span></Link>;
+          })}</div> : null}
+        </div>
       </nav>
 
       <div className="border-t border-slate-200 p-3">

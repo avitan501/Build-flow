@@ -21,7 +21,7 @@ import type {
   AffiliateProgram,
   AffiliateTrackerSettings,
 } from "@/lib/affiliate-tracker";
-import { requireAdminProfile } from "@/lib/auth";
+import { requireAdminProfile, requireManagerPortalProfile } from "@/lib/auth";
 
 const SHOP_PREVIEW_URL = "https://build-flow-wfl3-em41309w2-avitanneto-1804s-projects.vercel.app/shop";
 
@@ -48,17 +48,8 @@ function GoalNumber({ children }: { children: number | string }) {
   return <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">{children}</span>;
 }
 
-export default async function GoalsProgressPage() {
+async function OwnerAffiliateGoal() {
   const { supabase } = await requireAdminProfile();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id,full_name,company_name,email,phone")
-    .eq("role", "client")
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(6)
-    .returns<ClientTarget[]>();
-  const clients = error ? [] : data ?? [];
   const [programResult, checklistResult, activityResult, attachmentResult, integrationResult, settingsResult] = await Promise.all([
     supabase.from("affiliate_programs").select("*").order("priority").order("supplier_name").returns<AffiliateProgram[]>(),
     supabase.from("affiliate_program_checklist").select("*").order("sort_order").returns<AffiliateChecklistItem[]>(),
@@ -75,13 +66,35 @@ export default async function GoalsProgressPage() {
     signed_url: (await supabase.storage.from("affiliate-confirmations").createSignedUrl(attachment.file_path, 1800)).data?.signedUrl ?? null,
   })));
 
+  return <AffiliateProgramTracker
+    programs={programResult.data ?? []}
+    checklist={checklistResult.data ?? []}
+    activities={activityResult.data ?? []}
+    attachments={signedAttachments}
+    integrations={integrationResult.data ?? []}
+    settings={settingsResult.data}
+  />;
+}
+
+export default async function GoalsProgressPage() {
+  const { supabase, access } = await requireManagerPortalProfile();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,full_name,company_name,email,phone")
+    .eq("role", "client")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(6)
+    .returns<ClientTarget[]>();
+  const clients = error ? [] : data ?? [];
+
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-10">
       <div className="mx-auto max-w-6xl">
         <header className="border-b border-slate-200 pb-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager Portal</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-normal sm:text-4xl">Goals &amp; Progress</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Four owner priorities, with the people and tools needed to move each one forward.</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Five company priorities, with the people and tools needed to move each one forward.</p>
         </header>
 
         <div className="mt-6 grid gap-5">
@@ -106,7 +119,7 @@ export default async function GoalsProgressPage() {
           <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="clients-goal-title">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 gap-3"><GoalNumber>2</GoalNumber><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Outreach</p><h2 id="clients-goal-title" className="mt-1 text-xl font-semibold">Build a client target list and collect feedback</h2><p className="mt-1 text-sm text-slate-600">Start with contractors and builders who regularly purchase materials.</p></div></div>
-              <AddTargetClient />
+              {access.owner ? <AddTargetClient /> : null}
             </div>
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-sky-200 bg-sky-50 p-3">
               <div className="flex items-center gap-3">
@@ -134,18 +147,11 @@ export default async function GoalsProgressPage() {
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="campaign-goal-title">
               <div className="flex gap-3"><GoalNumber>4</GoalNumber><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Campaign</p><h2 id="campaign-goal-title" className="mt-1 text-xl font-semibold">Launch “Beat Your Quote”</h2></div></div>
               <div className="mt-5 flex gap-3 rounded-md bg-sky-50 p-4"><Megaphone className="h-5 w-5 shrink-0 text-[#0066cc]" /><p className="text-sm leading-6 text-slate-700">Send the flyer to contractors who already have a material quote. The flyer directs them to upload it for comparison.</p></div>
-              <div className="mt-5 flex flex-wrap gap-2"><Link href="/admin/goals-progress/beat-your-quote-flyer" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white">Open campaign flyer<ArrowRight className="h-4 w-4" /></Link><Link href="/beat-a-quote" target="_blank" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold">Test customer page<ArrowUpRight className="h-4 w-4" /></Link></div>
+              <div className="mt-5 flex flex-wrap gap-2">{access.owner ? <Link href="/admin/goals-progress/beat-your-quote-flyer" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white">Open campaign flyer<ArrowRight className="h-4 w-4" /></Link> : null}<Link href="/beat-a-quote" target="_blank" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold">Test customer page<ArrowUpRight className="h-4 w-4" /></Link></div>
             </section>
           </div>
 
-          <AffiliateProgramTracker
-            programs={programResult.data ?? []}
-            checklist={checklistResult.data ?? []}
-            activities={activityResult.data ?? []}
-            attachments={signedAttachments}
-            integrations={integrationResult.data ?? []}
-            settings={settingsResult.data}
-          />
+          {access.owner ? <OwnerAffiliateGoal /> : <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="affiliate-goal-title"><div className="flex gap-3"><GoalNumber>5</GoalNumber><div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Affiliate revenue</p><h2 id="affiliate-goal-title" className="mt-1 text-xl font-semibold">Set up supplier affiliate programs</h2><p className="mt-2 text-sm text-slate-600">The owner manages affiliate applications, approvals, and account details.</p></div></div></section>}
         </div>
       </div>
     </main>
