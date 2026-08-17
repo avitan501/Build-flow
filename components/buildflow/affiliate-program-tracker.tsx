@@ -94,7 +94,7 @@ export function AffiliateProgramTracker({ programs, checklist, activities, attac
 
   return <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="affiliate-goal-title">
     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 p-4 sm:p-5">
-      <div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Goal 5 · Affiliate revenue</p><h2 id="affiliate-goal-title" className="mt-1 text-xl font-semibold">Supplier Affiliate Program</h2><p className="mt-1 text-sm text-slate-600">Track applications, approvals, setup, and compliance in one owner-only workspace.</p></div>
+      <div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Carlos · Supplier program</p><h2 id="affiliate-goal-title" className="mt-1 text-xl font-semibold">Supplier Affiliate Program</h2><p className="mt-1 text-sm text-slate-600">Track applications, approvals, setup, and compliance in one owner-only workspace.</p></div>
       <div className="inline-flex rounded-md border border-slate-200 p-1 text-xs font-semibold"><button onClick={() => setPanel("programs")} className={`min-h-9 rounded px-3 ${panel === "programs" ? "bg-slate-950 text-white" : "text-slate-600"}`}>Programs</button><button onClick={() => setPanel("readiness")} className={`min-h-9 rounded px-3 ${panel === "readiness" ? "bg-slate-950 text-white" : "text-slate-600"}`}>Application readiness</button></div>
     </div>
 
