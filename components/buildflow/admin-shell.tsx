@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronDown,
   BarChart3,
+  CalendarDays,
   ClipboardList,
   Columns3,
   ExternalLink,
@@ -33,6 +34,7 @@ const communicationLinks = [
   { href: QUO_INBOX_URL, label: "Calls & Messages", shortLabel: "Calls", icon: PhoneCall },
   { href: GOOGLE_MEET_URL, label: "Open Google Meet", shortLabel: "Meet", icon: Video },
   { href: WHATSAPP_CALL_URL, label: "Open WhatsApp to make a call", shortLabel: "WhatsApp", icon: MessageCircle },
+  { href: "/admin/daily-summary", label: "Daily Work Summary", shortLabel: "Summary", icon: CalendarDays },
 ] as const;
 
 const primaryLinks = [
@@ -138,10 +140,15 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
       </nav>
 
       <div className="border-t border-slate-200 p-3">
-        <div className="grid grid-cols-3 gap-1" aria-label="Communication shortcuts">
+        <div className="grid grid-cols-4 gap-1" aria-label="Communication shortcuts">
           {communicationLinks.map((link) => {
             const Icon = link.icon;
-            return <Link key={link.href} href={link.href} onClick={onNavigate} target="_blank" rel="noopener noreferrer" aria-label={link.label} title={link.label} className="flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-center text-[10px] font-semibold leading-3 text-slate-700 hover:bg-slate-100 hover:text-slate-950"><Icon className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="w-full truncate">{link.shortLabel}</span></Link>;
+            const external = link.href.startsWith("https://");
+            const active = !external && isActive(pathname, link.href);
+            const className = `flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-center text-[10px] font-semibold leading-3 hover:bg-slate-100 hover:text-slate-950 ${active ? "bg-sky-50 text-[#0066cc]" : "text-slate-700"}`;
+            const content = <><Icon className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="w-full truncate">{link.shortLabel}</span></>;
+            if (external) return <Link key={link.href} href={link.href} onClick={onNavigate} target="_blank" rel="noopener noreferrer" aria-label={link.label} title={link.label} className={className}>{content}</Link>;
+            return <Link key={link.href} href={link.href} onClick={onNavigate} aria-label={link.label} title={link.label} className={className}>{content}</Link>;
           })}
         </div>
         <Link href="/" onClick={onNavigate} className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
