@@ -234,7 +234,7 @@ test("traffic endpoint accepts same-site events and blocks cross-site submission
 })
 
 test("traffic dashboard exposes live status to the owner only", async () => {
-  const [trafficPage, navigation, tracker, layout, trafficApi, filterStatus, trafficFunctionMigration, trafficRlsMigration, geographyMigration, securityMigration, identityMigration] = await Promise.all([
+  const [trafficPage, navigation, tracker, layout, trafficApi, filterStatus, trafficFunctionMigration, trafficRlsMigration, geographyMigration, securityMigration, identityMigration, publicIngestMigration] = await Promise.all([
     readFile(path.join(process.cwd(), "app/admin/traffic/page.tsx"), "utf8"),
     readFile(path.join(process.cwd(), "components/buildflow/admin-shell.tsx"), "utf8"),
     readFile(path.join(process.cwd(), "components/buildflow/traffic-tracker.tsx"), "utf8"),
@@ -246,6 +246,7 @@ test("traffic dashboard exposes live status to the owner only", async () => {
     readFile(path.join(process.cwd(), "supabase/migrations/20260816214500_add_site_traffic_geography.sql"), "utf8"),
     readFile(path.join(process.cwd(), "supabase/migrations/20260816224500_secure_site_traffic_recorder.sql"), "utf8"),
     readFile(path.join(process.cwd(), "supabase/migrations/20260817202212_secure_site_traffic_identity.sql"), "utf8"),
+    readFile(path.join(process.cwd(), "supabase/migrations/20260817203634_allow_constrained_public_traffic_ingest.sql"), "utf8"),
   ])
 
   expect(trafficPage).toContain("requireAdminProfile")
@@ -268,11 +269,7 @@ test("traffic dashboard exposes live status to the owner only", async () => {
   expect(trafficApi).toContain("playwright|headless|codex")
   expect(trafficApi).toContain("PRODUCTION_HOSTS")
   expect(trafficApi).toContain("x-vercel-ip-city")
-  expect(trafficApi).toContain("TRAFFIC_INGEST_SECRET")
-  expect(trafficApi).toContain("SUPABASE_SERVICE_ROLE_KEY")
-  expect(trafficApi).toContain("createAdminClient")
-  expect(trafficApi).toContain("p_user_id: user?.id ?? null")
-  expect(trafficApi).toContain("p_ingest_secret: ingestSecret")
+  expect(trafficApi).toContain("createServerClient")
   expect(trafficApi).not.toContain("x-forwarded-for")
   expect(filterStatus).toContain('localStorage.setItem(TRAFFIC_EXCLUSION_KEY, "1")')
   expect(trafficFunctionMigration).toContain("lower(trim(profile.email)) = 'avitanneto@gmail.com'")
@@ -289,6 +286,9 @@ test("traffic dashboard exposes live status to the owner only", async () => {
   expect(identityMigration).toContain("add column if not exists user_id")
   expect(identityMigration).toContain("invalid_traffic_ingest_secret")
   expect(identityMigration).toContain("to anon, authenticated")
+  expect(publicIngestMigration).toContain("auth.uid()")
+  expect(publicIngestMigration).toContain("interval '1 day'")
+  expect(publicIngestMigration).toContain("to anon, authenticated")
 })
 
 test("home shows the compact manufacturer brand showcase", async ({ page }) => {
