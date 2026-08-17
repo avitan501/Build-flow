@@ -38,7 +38,15 @@ export async function createOutreachLeadAction(input: {
     notes: notes || null,
     created_by: user.id,
   });
-  if (error) return { ok: false, error: "The lead could not be added. Please try again." };
+  if (error) {
+    console.error("[goals-progress] lead insert failed", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    return { ok: false, error: "The lead could not be added. Please try again." };
+  }
 
   refreshOutreach();
   return { ok: true };

@@ -60,13 +60,14 @@ test("manager goals are persistent and protected for manager users", async () =>
 });
 
 test("outreach leads remain separate from clients and are protected for customer staff", async () => {
-  const [page, component, actions, userActions, migration, indexMigration] = await Promise.all([
+  const [page, component, actions, userActions, migration, indexMigration, ownerPolicyMigration] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/client-target-outreach.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/goals-progress/lead-actions.ts"), "utf8"),
     readFile(path.join(root, "app/admin/users/actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817175631_manager_outreach_leads.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817180209_index_manager_tracking_creators.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260817183000_allow_owner_manage_outreach_leads.sql"), "utf8"),
   ]);
 
   expect(page).toContain('supabase.from("manager_outreach_leads")');
@@ -80,6 +81,8 @@ test("outreach leads remain separate from clients and are protected for customer
   expect(migration).toContain("role in ('admin', 'staff')");
   expect(migration).toContain("created_by = (select auth.uid())");
   expect(indexMigration).toContain("manager_outreach_leads_created_by_idx");
+  expect(ownerPolicyMigration).toContain("manager_outreach_leads_manager_insert");
+  expect(ownerPolicyMigration).toContain("avitanneto@gmail.com");
 });
 
 test("Client Target conversation guide allows manager employees and is bilingual", async () => {
