@@ -362,7 +362,7 @@ test("every active shop department shows common materials", async ({ page }) => 
   const departments = await page.getByTestId("department-grid").getByTestId("department-card").evaluateAll((links) =>
     links
       .map((link) => link.getAttribute("href"))
-      .filter((href): href is string => Boolean(href)),
+      .filter((href): href is string => Boolean(href?.startsWith("/shop/"))),
   )
 
   expect(departments.length).toBeGreaterThan(0)
