@@ -103,7 +103,10 @@ export function BulkBagStorefront() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {BULK_BAGS.map((bag) => <BulkBagCard key={bag.id} bag={bag} />)}
       </div>
-      <p className="mt-2 text-right text-[11px] text-slate-500">1-yard bag fee: $35 <span aria-hidden="true">·</span> Delivery fee: $250</p>
+      <div className="mt-3 flex flex-wrap justify-end gap-x-5 gap-y-1 border-t border-slate-200 pt-3 text-sm font-bold text-slate-800">
+        <p>1-yard bag fee: <span className="tabular-nums text-slate-950">$35</span></p>
+        <p>Delivery fee: <span className="tabular-nums text-slate-950">$250</span></p>
+      </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {BAGGED_MATERIALS.map((material) => (

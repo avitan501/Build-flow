@@ -67,14 +67,14 @@ const ESSENTIALS: Partial<Record<ShopToolSlug, DepartmentEssentials>> = {
   "concrete-masonry": {
     spriteUrl: "",
     items: [
-      { name: "Concrete mix", imageUrl: "/images/materials/concrete.svg" },
-      { name: "Mortar mix", imageUrl: "/images/materials/concrete.svg" },
-      { name: "Portland cement", imageUrl: "/images/materials/products-real/lehigh-portland-cement-type-i-ii.jpg" },
-      { name: "Concrete blocks", imageUrl: "/images/materials/concrete.svg" },
-      { name: "Rebar", imageUrl: "/images/materials/photos/concrete.jpg" },
-      { name: "Wire mesh", imageUrl: "/images/materials/photos/concrete.jpg" },
-      { name: "Forming supplies", imageUrl: "/images/materials/photos/concrete.jpg" },
-      { name: "Masonry tools", imageUrl: "/images/materials/photos/concrete.jpg" },
+      { name: "80 lb. concrete mix", imageUrl: "/images/materials/products-real/quikrete-80lb-concrete-mix-real.webp" },
+      { name: "80 lb. Type S mortar mix", imageUrl: "/images/materials/products-real/quikrete-type-s-mortar-mix-80lb-real.jpg" },
+      { name: "94 lb. Portland cement", imageUrl: "/images/materials/products-real/heidelberg-lehigh-portland-cement-type-i-ii-real.jpg" },
+      { name: "8 x 8 x 16 concrete block", imageUrl: "/images/materials/products-real/oldcastle-8x8x16-concrete-block-real.jpg" },
+      { name: "#4 steel rebar", imageUrl: "/images/materials/products-real/steel-rebar-half-inch-20ft-real.jpg" },
+      { name: "Concrete reinforcing mesh", imageUrl: "/images/materials/products-real/concrete-remesh-sheet-real.jpg" },
+      { name: "Concrete form plywood", imageUrl: "/images/materials/products-real/concrete-form-plywood-real.jpg" },
+      { name: "Masonry hand tools", imageUrl: "/images/materials/products-real/masonry-tool-set-real.jpg" },
     ],
   },
   services: {

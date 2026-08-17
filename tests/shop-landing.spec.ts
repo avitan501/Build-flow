@@ -63,7 +63,15 @@ test("concrete and masonry offers one-yard bags and supplied bagged-material pri
   await page.getByRole("button", { name: "Increase 1 Yard Sand Bag quantity" }).click()
   await expect(page.getByLabel("Quantity for 1 Yard Sand Bag")).toContainText("2")
   await expect(page.getByRole("heading", { name: "Common materials" })).toBeVisible()
-  await expect(page.getByTestId("department-essentials").locator("article")).toHaveCount(8)
+  const essentials = page.getByTestId("department-essentials")
+  await expect(essentials.locator("article")).toHaveCount(8)
+  await expect(essentials.getByRole("img")).toHaveCount(8)
+  const materialPhotos = await essentials.getByRole("img").evaluateAll((elements) =>
+    elements.map((element) => window.getComputedStyle(element).backgroundImage),
+  )
+  expect(materialPhotos.every((image) => image.includes("/images/materials/products-real/"))).toBe(true)
+  expect(materialPhotos.join(" ")).not.toContain("concrete.svg")
+  expect(materialPhotos.join(" ")).not.toContain("/photos/concrete.jpg")
 })
 
 test("address selection closes and keeps one clear selected address", async ({ page }) => {
