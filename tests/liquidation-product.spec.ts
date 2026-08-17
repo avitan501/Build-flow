@@ -17,10 +17,10 @@ test("Liquidation is a first-class shop category", async () => {
 });
 
 test("MDF liquidation product keeps the source, pricing, minimum, and five photos", async () => {
-  const migration = await readFile(
-    path.join(root, "supabase/migrations/20260817193000_add_liquidation_mdf_marketplace_item.sql"),
-    "utf8",
-  );
+  const [migration, catalog] = await Promise.all([
+    readFile(path.join(root, "supabase/migrations/20260817193000_add_liquidation_mdf_marketplace_item.sql"), "utf8"),
+    readFile(path.join(root, "lib/shop-catalog.ts"), "utf8"),
+  ]);
 
   expect(migration).toContain("liquidation-facebook-926145880521723");
   expect(migration).toContain("FBM-926145880521723");
@@ -28,4 +28,9 @@ test("MDF liquidation product keeps the source, pricing, minimum, and five photo
   expect(migration).toContain("10.00");
   expect(migration).toContain("https://www.facebook.com/marketplace/item/926145880521723/");
   expect(migration.match(/mdf-board-24x96-half-inch-[1-5]\.webp/g)).toHaveLength(5);
+  expect(catalog).toContain('id: "liquidation-facebook-926145880521723"');
+  expect(catalog).toContain('category: "Liquidation"');
+  expect(catalog).toContain('price: 10');
+  expect(catalog).toContain('availability: "Confirm availability"');
+  expect(catalog.match(/\["[1-5]",/g)).toHaveLength(5);
 });

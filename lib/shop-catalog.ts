@@ -1092,7 +1092,7 @@ const PRODUCT_SEED_INPUTS = [
   },
 ] satisfies Array<Omit<ProductSeed, "image" | "imageUrl" | "imageAlt" | "imageSource" | "imageLicense" | "imageCredit" | "imageCategory" | "gallery" | "availability">>
 
-export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = PRODUCT_SEED_INPUTS.map((product, index) => {
+const SEEDED_SHOP_PRODUCTS: ShopCatalogProduct[] = PRODUCT_SEED_INPUTS.map((product, index) => {
   const image = productSpecificImageMetadata({ slug: product.slug, name: product.name, category: product.category }) ?? placeholderImageMetadata(product.category, product.name)
 
   return {
@@ -1111,6 +1111,51 @@ export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = PRODUCT_SEED_INPUTS.ma
     detailBullets: product.detailBullets ?? [],
   }
 })
+
+const LIQUIDATION_MDF_PRODUCT: ShopCatalogProduct = {
+  id: "liquidation-facebook-926145880521723",
+  slug: "24-in-x-96-in-x-1-2-in-mdf-board-brand-new-liquid",
+  name: "24 in. x 96 in. x 1/2 in. MDF Board - Brand New",
+  description: "Brand-new MDF sheets for cabinetry, furniture, shelving, wall panels, DIY projects, and woodworking. Price is $10 per board with a 20-board minimum order. Large quantities were listed as available in Carteret, NJ. Availability and pickup or delivery must be confirmed before purchase.",
+  shortDescription: "Brand-new 1/2 in. MDF boards. $10 each with a 20-board minimum order.",
+  category: "Liquidation",
+  unit: "Per board - 20-board minimum",
+  price: 10,
+  supplierName: "Liquidation Marketplace Listing",
+  quoteNumber: "FBM-926145880521723",
+  image: "/images/liquidation/mdf-board-24x96-half-inch-1.webp",
+  imageUrl: "/images/liquidation/mdf-board-24x96-half-inch-1.webp",
+  imageAlt: "New MDF boards stacked in a warehouse",
+  imageSource: "https://www.facebook.com/marketplace/item/926145880521723/",
+  imageLicense: "Original Marketplace listing",
+  imageCredit: "Marketplace seller Adar",
+  imageCategory: "Liquidation",
+  gallery: [
+    ["1", "New MDF boards stacked in a warehouse"],
+    ["2", "Wrapped stacks of MDF boards in a warehouse"],
+    ["3", "MDF board shown upright to demonstrate its width and finish"],
+    ["4", "Full-length MDF board shown upright against a wall"],
+    ["5", "Large inventory of light-colored MDF boards in a warehouse"],
+  ].map(([number, imageAlt]) => ({
+    imageUrl: `/images/liquidation/mdf-board-24x96-half-inch-${number}.webp`,
+    imageAlt,
+    imageSource: "https://www.facebook.com/marketplace/item/926145880521723/",
+    imageLicense: "Original Marketplace listing",
+    imageCredit: "Marketplace seller Adar",
+    imageCategory: "Liquidation",
+  })),
+  specLine: "24 in. x 96 in. x 1/2 in. - brand-new MDF",
+  availability: "Confirm availability",
+  featuredLabel: "Liquidation",
+  popularUse: "Cabinetry, shelving, wall panels, and woodworking",
+  reviewLabel: "Marketplace listing snapshot",
+  rating: 5,
+  relatedCategories: ["Framing", "Carpentry"],
+  productType: "material",
+  detailBullets: ["Brand new", "20-board minimum", "Listed in Carteret, NJ"],
+}
+
+export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [LIQUIDATION_MDF_PRODUCT, ...SEEDED_SHOP_PRODUCTS]
 
 export function slugifyShopProduct(value: string) {
   return value
