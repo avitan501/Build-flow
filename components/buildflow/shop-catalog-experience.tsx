@@ -178,6 +178,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   const activeCategory = searchParams.get("category")?.trim() || "All"
   const activeCategorySource = activeCategory === "All" ? "All" : resolveDepartmentSourceLabel(managerAddOns, activeCategory)
   const activeCategoryLabel = activeCategorySource === "All" ? "All" : departmentDisplayLabel(managerAddOns, activeCategorySource)
+  const isLiquidationView = activeCategorySource === "Liquidation"
   const catalogProducts = useMemo(() => {
     const managerProducts = managerAddOnsToShopProducts(managerAddOns)
     return [...managerProducts, ...products].filter((product, index, all) => !isManagerItemHidden(managerAddOns, product.id) && all.findIndex((candidate) => candidate.id === product.id) === index)
@@ -385,7 +386,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
     <ShopTranslationBoundary>
     <main className="min-h-screen bg-[#f4f7fb] px-3 py-3 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
+        {!isLiquidationView ? <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
           <div className="flex flex-col gap-1">
             <div className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Tools</div>
             <h1 className="text-2xl font-bold tracking-normal text-slate-950 sm:text-3xl">Choose a work section</h1>
@@ -414,9 +415,9 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
               })}
             </div>
           </div>
-        </section>
+        </section> : null}
 
-        {isCategoryFiltered ? (
+        {isCategoryFiltered && !isLiquidationView ? (
           <section className="rounded-[30px] border-2 border-sky-200 bg-sky-50 p-4 shadow-[0_16px_40px_rgba(14,116,244,0.12)] sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>

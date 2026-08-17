@@ -16,7 +16,7 @@ test("Liquidation is a first-class shop category", async () => {
   expect(picker).toContain('href: "/shop?category=Liquidation"');
 });
 
-test("MDF liquidation product keeps the source, pricing, minimum, and five photos", async () => {
+test("MDF liquidation product keeps pricing, minimum, and five photos without public source wording", async () => {
   const [migration, catalog] = await Promise.all([
     readFile(path.join(root, "supabase/migrations/20260817193000_add_liquidation_mdf_marketplace_item.sql"), "utf8"),
     readFile(path.join(root, "lib/shop-catalog.ts"), "utf8"),
@@ -32,5 +32,22 @@ test("MDF liquidation product keeps the source, pricing, minimum, and five photo
   expect(catalog).toContain('category: "Liquidation"');
   expect(catalog).toContain('price: 10');
   expect(catalog).toContain('availability: "Confirm availability"');
+  expect(catalog).toContain('supplierName: "Avantia Build Liquidation"');
+  expect(catalog).toContain('quoteNumber: null');
   expect(catalog.match(/\["[1-5]",/g)).toHaveLength(5);
+});
+
+test("Order Materials opens the combined catalog and Liquidation skips the work-section panel", async () => {
+  const [shopPage, catalogExperience, detailExperience] = await Promise.all([
+    readFile(path.join(root, "app/shop/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/shop-catalog-experience.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/shop-product-detail-experience.tsx"), "utf8"),
+  ]);
+
+  expect(shopPage).toContain("<ShopCatalogExperience");
+  expect(shopPage).not.toContain("<ShopProjectToolPicker");
+  expect(shopPage).not.toContain("Project address");
+  expect(catalogExperience).toContain('const isLiquidationView = activeCategorySource === "Liquidation"');
+  expect(catalogExperience).toContain("{!isLiquidationView ? <section");
+  expect(detailExperience).toContain('product.category !== "Liquidation"');
 });

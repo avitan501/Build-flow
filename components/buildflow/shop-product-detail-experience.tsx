@@ -253,8 +253,8 @@ export function ShopProductDetailExperience({ product, relatedProducts }: ShopPr
                       <div><span className="font-medium text-slate-500">{isService ? "Service scope:" : "Product specs:"}</span> {product.specLine}</div>
                       <div><span className="font-medium text-slate-500">Unit:</span> {product.unit}</div>
                       <div><span className="font-medium text-slate-500">Best use:</span> {product.popularUse}</div>
-                      <div><span className="font-medium text-slate-500">Supplier:</span> {product.supplierName || "Avantia Build sample catalog"}</div>
-                      <div><span className="font-medium text-slate-500">Source:</span> {product.quoteNumber || "Catalog reference"}</div>
+                      {product.category !== "Liquidation" ? <div><span className="font-medium text-slate-500">Supplier:</span> {product.supplierName || "Avantia Build sample catalog"}</div> : null}
+                      {product.category !== "Liquidation" ? <div><span className="font-medium text-slate-500">Source:</span> {product.quoteNumber || "Catalog reference"}</div> : null}
                     </div>
                   </div>
                 </details>
