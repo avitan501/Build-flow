@@ -67,4 +67,5 @@ test("Order Materials includes a configurable High-End service", async () => {
   expect(qualification).toContain('id: "services-high-end"');
   expect(qualification).toContain('serviceLabel: "High-End"');
   expect(qualification).toContain('departmentLabel: "Services"');
+  expect(qualification).toContain('question("quality_level", "What quality level do you need?"');
 });

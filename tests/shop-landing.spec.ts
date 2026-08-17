@@ -596,6 +596,7 @@ test("door and molding reveals the matching order fields", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Flat / flush" })).toBeVisible()
   await expect(page.getByRole("button", { name: "1-panel Shaker" })).toBeVisible()
   await expect(page.getByRole("button", { name: "1 3/8 in." })).toBeVisible()
+  await expect(page.getByRole("button", { name: "High-End" })).toBeVisible()
   await expect(page.getByRole("button", { name: "Call me to arrange a jobsite measurement" })).toBeVisible()
   await page.getByRole("button", { name: "I have the measurements" }).click()
   await expect(page.getByLabel("Enter the door measurements")).toBeVisible()

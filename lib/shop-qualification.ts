@@ -133,6 +133,7 @@ const EITAN_WINDOW_QUESTIONS: QualifyingQuestion[] = [
 
 const DOOR_MOLDING_QUESTIONS: QualifyingQuestion[] = [
   question("door_scope", "What should be priced?", "select", true, ["Interior doors", "Exterior doors", "Molding/trim", "Complete door and trim package"]),
+  question("quality_level", "What quality level do you need?", "select", false, ["Standard", "High-End", "Custom / not sure"]),
   question("finish_type", "Paint grade or stain grade?", "select", false, ["Paint grade", "Stain grade", "Not sure"]),
   question("door_notes", "Any swing, size, jamb, casing, or hardware notes?", "textarea"),
 ]
