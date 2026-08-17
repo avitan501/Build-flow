@@ -87,9 +87,9 @@ test("homepage shop stays compact and expandable on phones", async ({ page }) =>
   await page.goto("/");
 
   await expect(page.getByRole("button", { name: "Services", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(4);
+  await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(3);
   await expect(page.getByText("Upload Plans", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("AI Takeoff with Human Verification", { exact: true })).toBeVisible();
+  await expect(page.getByText("AI Takeoff + Expert Review", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "View all services" }).click();
   await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(9);
 
@@ -106,6 +106,7 @@ test("Order Materials opens the full responsive service and department hub", asy
   await page.goto("/shop");
 
   await expect(page.getByRole("heading", { name: "Order materials" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Back to home" })).toHaveAttribute("href", "/");
   await expect(page.getByRole("heading", { name: "Choose a service" })).toBeVisible();
   const sectionBackgrounds = await page.evaluate(() => {
     const services = document.querySelector('[data-testid="homepage-services-section"]');

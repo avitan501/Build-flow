@@ -76,7 +76,7 @@ const FAST_SERVICES = [
     imagePosition: "0% 0%",
   },
   {
-    label: "AI Takeoff with Human Verification",
+    label: "AI Takeoff + Expert Review",
     description: "Send plans for a material list",
     href: "/request-quote?request=ai-takeoff",
     imagePosition: "50% 0%",
@@ -480,7 +480,7 @@ export function HomepageShopPicker({
                 key={service.label}
                 href={service.href}
                 prefetch={false}
-                className={`group min-w-0 touch-manipulation flex-col items-center text-center focus-visible:outline-none ${homepageCompact && index >= 4 && !showAllServices ? "hidden sm:flex" : "flex"}`}
+                className={`group min-w-0 touch-manipulation flex-col items-center text-center focus-visible:outline-none ${homepageCompact && index >= 3 && !showAllServices ? "hidden sm:flex" : "flex"}`}
               >
                 <span
                   data-testid="service-image"
