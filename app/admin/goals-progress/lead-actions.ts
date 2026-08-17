@@ -18,6 +18,7 @@ export async function createOutreachLeadAction(input: {
   email: string;
   phone: string;
   notes: string;
+  relationshipLevel: number;
 }): Promise<LeadResult> {
   const { supabase, user } = await requireStaffProfile("customers");
   const fullName = input.fullName.trim().replace(/\s+/g, " ").slice(0, 160);
@@ -25,6 +26,7 @@ export async function createOutreachLeadAction(input: {
   const email = input.email.trim().toLowerCase().slice(0, 320);
   const phone = input.phone.trim().slice(0, 40);
   const notes = input.notes.trim().slice(0, 1000);
+  const relationshipLevel = Number.isInteger(input.relationshipLevel) && input.relationshipLevel >= 1 && input.relationshipLevel <= 5 ? input.relationshipLevel : 1;
 
   if (fullName.length < 2) return { ok: false, error: "Enter the lead's name." };
   if (!email && !phone) return { ok: false, error: "Enter an email or phone number." };
@@ -39,6 +41,7 @@ export async function createOutreachLeadAction(input: {
     email: email || null,
     phone: phone || null,
     notes: notes || null,
+    relationship_level: relationshipLevel,
     created_by: user.id,
   });
   if (error) {

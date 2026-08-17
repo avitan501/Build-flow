@@ -2,16 +2,17 @@ import {
   ArrowRight,
   ArrowUpRight,
   CircleDollarSign,
-  Languages,
   Megaphone,
   PhoneCall,
   Target,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { AddTargetClient } from "@/components/buildflow/add-target-client";
 import { AffiliateProgramTracker } from "@/components/buildflow/affiliate-program-tracker";
+import { ClientTargetCallGuide } from "@/components/buildflow/client-target-call-guide";
 import { AddOutreachLead, OutreachLeadList, type OutreachLeadRecord } from "@/components/buildflow/client-target-outreach";
 import { AddManagerGoal, CustomManagerGoals, type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { WebsiteFixNotes } from "@/components/buildflow/website-fix-notes";
@@ -43,6 +44,17 @@ function GoalNumber({ children }: { children: number | string }) {
   return <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">{children}</span>;
 }
 
+function GoalDisclosure({ number, eyebrow, title, description, children }: { number: number; eyebrow: string; title: string; description?: string; children: ReactNode }) {
+  return <details className="group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <summary className="flex min-h-20 cursor-pointer list-none items-center gap-3 p-4 sm:p-5">
+      <GoalNumber>{number}</GoalNumber>
+      <div className="min-w-0 flex-1"><p className="text-[11px] font-semibold uppercase text-[#0066cc]">{eyebrow}</p><h3 className="mt-0.5 text-base font-semibold sm:text-lg">{title}</h3>{description ? <p className="mt-1 line-clamp-1 text-xs text-slate-500 sm:text-sm">{description}</p> : null}</div>
+      <span className="shrink-0 text-xs font-semibold text-[#0066cc] group-open:hidden">Open</span><span className="hidden shrink-0 text-xs font-semibold text-slate-500 group-open:inline">Close</span>
+    </summary>
+    <div className="border-t border-slate-200 p-4 sm:p-5">{children}</div>
+  </details>;
+}
+
 function PersonHeader({ assignee, description }: { assignee: "david" | "carlos"; description: string }) {
   const name = assignee === "david" ? "David" : "Carlos";
   return <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300 pb-3">
@@ -66,44 +78,36 @@ async function OwnerAffiliateGoal() {
     ...attachment,
     signed_url: (await supabase.storage.from("affiliate-confirmations").createSignedUrl(attachment.file_path, 1800)).data?.signedUrl ?? null,
   })));
-  return <AffiliateProgramTracker programs={programResult.data ?? []} checklist={checklistResult.data ?? []} activities={activityResult.data ?? []} attachments={signedAttachments} integrations={integrationResult.data ?? []} settings={settingsResult.data} />;
+  return <GoalDisclosure number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description={`${programResult.data?.length ?? 0} supplier programs · Open to manage applications and setup.`}><AffiliateProgramTracker programs={programResult.data ?? []} checklist={checklistResult.data ?? []} activities={activityResult.data ?? []} attachments={signedAttachments} integrations={integrationResult.data ?? []} settings={settingsResult.data} hideHeading /></GoalDisclosure>;
 }
 
 function FixWebsiteGoal({ notes }: { notes: ManagerGoalRecord[] }) {
-  return <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="fix-website-goal-title">
-    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 p-5">
-      <div className="flex min-w-0 gap-3"><GoalNumber>1</GoalNumber><div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Website</p><h3 id="fix-website-goal-title" className="mt-1 text-xl font-semibold">Fix Website</h3><p className="mt-1 text-sm text-slate-600">Keep a clear list of what should be fixed, added, changed, or removed before the next website publish.</p></div></div>
-      <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-[#0066cc]">{notes.filter((note) => note.status === "open").length} open notes</span>
-    </div>
-    <div className="p-5"><WebsiteFixNotes notes={notes} /></div>
-  </section>;
+  const openNotes = notes.filter((note) => note.status === "open").length;
+  return <GoalDisclosure number={1} eyebrow="Website" title="Fix Website" description={`${openNotes} open notes · Add, change, or remove items before publishing.`}><WebsiteFixNotes notes={notes} /></GoalDisclosure>;
 }
 
 function BeatQuoteGoal({ owner }: { owner: boolean }) {
-  return <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="campaign-goal-title">
-    <div className="flex gap-3"><GoalNumber>2</GoalNumber><div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Campaign</p><h3 id="campaign-goal-title" className="mt-1 text-xl font-semibold">Launch campaign: Beat Your Quote</h3></div></div>
-    <div className="mt-4 flex gap-3 rounded-md bg-sky-50 p-4"><Megaphone className="h-5 w-5 shrink-0 text-[#0066cc]" /><p className="text-sm leading-6 text-slate-700">Send the flyer to contractors who already have a material quote and invite them to upload it for comparison.</p></div>
+  return <GoalDisclosure number={2} eyebrow="Campaign" title="Launch campaign: Beat Your Quote" description="Send the flyer to contractors who already have a material quote.">
+    <div className="flex gap-3 rounded-md bg-sky-50 p-4"><Megaphone className="h-5 w-5 shrink-0 text-[#0066cc]" /><p className="text-sm leading-6 text-slate-700">Send the flyer to contractors who already have a material quote and invite them to upload it for comparison.</p></div>
     <div className="mt-4 flex flex-wrap gap-2">{owner ? <Link href="/admin/goals-progress/beat-your-quote-flyer" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white">Open campaign flyer<ArrowRight className="h-4 w-4" /></Link> : null}<Link href="/beat-a-quote" target="_blank" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold">Test customer page<ArrowUpRight className="h-4 w-4" /></Link></div>
-  </section>;
+  </GoalDisclosure>;
 }
 
 function ClientTargetGoal({ clients, leads, canManageClients }: { clients: ClientTarget[]; leads: OutreachLeadRecord[]; canManageClients: boolean }) {
-  return <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="clients-goal-title">
-    <div className="flex flex-wrap items-start justify-between gap-4"><div className="flex min-w-0 gap-3"><GoalNumber>1</GoalNumber><div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Outreach</p><h3 id="clients-goal-title" className="mt-1 text-xl font-semibold">Client Target</h3><p className="mt-1 text-sm text-slate-600">Leads are people Carlos is trying to reach. Clients are active customer accounts that can place orders.</p></div></div>{canManageClients ? <div className="flex flex-wrap gap-2"><AddOutreachLead /><AddTargetClient /></div> : null}</div>
-    <div className="mt-4 flex justify-end"><Link href="/admin/goals-progress/client-target" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white"><Languages className="h-4 w-4" />Open call guide<ArrowRight className="h-4 w-4" /></Link></div>
+  return <GoalDisclosure number={1} eyebrow="Outreach" title="Client Target" description="Leads to contact and active clients in one place.">
+    <div className="flex flex-wrap gap-2">{canManageClients ? <><AddOutreachLead /><AddTargetClient /></> : null}<ClientTargetCallGuide /></div>
     <div className="mt-4 grid gap-4 lg:grid-cols-2">
       <OutreachLeadList leads={leads} />
-      <div className="overflow-hidden rounded-md border border-slate-200"><div className="flex items-center justify-between bg-slate-50 px-3 py-2 text-xs font-semibold uppercase text-slate-500"><span>Clients in the system</span><Link href="/admin/users" className="text-[#0066cc]">Full directory</Link></div>{clients.length ? clients.map((client) => <div key={client.id} className="flex min-h-12 items-center justify-between gap-3 border-t border-slate-100 px-3 py-2"><div className="min-w-0"><p className="truncate text-sm font-semibold">{clientName(client)}</p><p className="truncate text-xs text-slate-500">{client.company_name || client.email || client.phone || "Contact details needed"}</p></div>{client.phone ? <a href={`tel:${client.phone}`} aria-label={`Call ${clientName(client)}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600"><PhoneCall className="h-4 w-4" /></a> : null}</div>) : <p className="border-t border-slate-100 px-3 py-4 text-sm text-slate-500">No clients added yet.</p>}</div>
+      <details className="overflow-hidden rounded-md border border-slate-200 bg-white"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between bg-slate-50 px-3 py-2 text-xs font-semibold uppercase text-slate-600"><span>Clients in the system</span><span className="text-slate-500">{clients.length} clients · Open</span></summary><div className="flex justify-end border-t border-slate-100 px-3 py-2"><Link href="/admin/users" className="text-xs font-semibold text-[#0066cc]">Full directory</Link></div>{clients.length ? clients.map((client) => <div key={client.id} className="flex min-h-12 items-center justify-between gap-3 border-t border-slate-100 px-3 py-2"><div className="min-w-0"><p className="truncate text-sm font-semibold">{clientName(client)}</p><p className="truncate text-xs text-slate-500">{client.company_name || client.email || client.phone || "Contact details needed"}</p></div>{client.phone ? <a href={`tel:${client.phone}`} aria-label={`Call ${clientName(client)}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600"><PhoneCall className="h-4 w-4" /></a> : null}</div>) : <p className="border-t border-slate-100 px-3 py-4 text-sm text-slate-500">No clients added yet.</p>}</details>
     </div>
-  </section>;
+  </GoalDisclosure>;
 }
 
 function SupplierPricingGoal() {
-  return <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="supplier-goal-title">
-    <div className="flex gap-3"><GoalNumber>2</GoalNumber><div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Purchasing</p><h3 id="supplier-goal-title" className="mt-1 text-xl font-semibold">Call suppliers and find what they sell cheaper than anyone else</h3></div></div>
-    <div className="mt-4 grid gap-3 text-sm text-slate-600"><p className="flex gap-2"><CircleDollarSign className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />Ask each supplier for their strongest-priced items, delivery minimum, lead time, and quote expiration.</p><p className="flex gap-2"><Target className="mt-0.5 h-4 w-4 shrink-0 text-[#0066cc]" />Enter the prices in the catalog and keep the best suppliers per department.</p></div>
+  return <GoalDisclosure number={2} eyebrow="Purchasing" title="Call suppliers and find what they sell cheaper than anyone else" description="Collect strongest-priced items, delivery minimums, and lead times.">
+    <div className="grid gap-3 text-sm text-slate-600"><p className="flex gap-2"><CircleDollarSign className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />Ask each supplier for their strongest-priced items, delivery minimum, lead time, and quote expiration.</p><p className="flex gap-2"><Target className="mt-0.5 h-4 w-4 shrink-0 text-[#0066cc]" />Enter the prices in the catalog and keep the best suppliers per department.</p></div>
     <div className="mt-4 flex flex-wrap gap-2"><Link href="/admin/vendors" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white">Supplier Directory<ArrowRight className="h-4 w-4" /></Link><Link href="/admin/catalog" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold">Enter catalog prices</Link></div>
-  </section>;
+  </GoalDisclosure>;
 }
 
 export default async function GoalsProgressPage() {
@@ -111,7 +115,7 @@ export default async function GoalsProgressPage() {
   const [clientResult, goalResult, leadResult] = await Promise.all([
     supabase.from("profiles").select("id,full_name,company_name,email,phone").eq("role", "client").eq("is_active", true).order("created_at", { ascending: false }).limit(5).returns<ClientTarget[]>(),
     supabase.from("manager_goals").select("id,assignee,title,details,status").order("status").order("created_at", { ascending: false }).returns<ManagerGoalRecord[]>(),
-    supabase.from("manager_outreach_leads").select("id,full_name,company_name,email,phone,notes,status").order("status").order("created_at", { ascending: false }).returns<OutreachLeadRecord[]>(),
+    supabase.from("manager_outreach_leads").select("id,full_name,company_name,email,phone,notes,status,relationship_level").order("status").order("created_at", { ascending: false }).returns<OutreachLeadRecord[]>(),
   ]);
   const clients = clientResult.error ? [] : clientResult.data ?? [];
   const goals = goalResult.error ? [] : goalResult.data ?? [];
@@ -123,7 +127,7 @@ export default async function GoalsProgressPage() {
     <header className="border-b border-slate-200 pb-6"><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Goals &amp; Progress</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Company priorities organized by owner. Add new goals under the person responsible for completing them.</p></header>
 
     <div className="mt-7 grid gap-9">
-      <section aria-labelledby="carlos-goals-title"><PersonHeader assignee="carlos" description="Clients, suppliers, and pricing outreach" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "carlos")} /><div className="mt-4 grid gap-4"><ClientTargetGoal clients={clients} leads={leads} canManageClients={access.customers} /><SupplierPricingGoal />{access.owner ? <OwnerAffiliateGoal /> : <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="affiliate-goal-title"><div className="flex gap-3"><GoalNumber>3</GoalNumber><div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Supplier program</p><h3 id="affiliate-goal-title" className="mt-1 text-xl font-semibold">Supplier Affiliate Program</h3><p className="mt-2 text-sm text-slate-600">Call suppliers, track opportunities, and report progress to David. The owner manages private account details.</p></div></div></section>}</div></section>
+      <section aria-labelledby="carlos-goals-title"><PersonHeader assignee="carlos" description="Clients, suppliers, and pricing outreach" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "carlos")} /><div className="mt-4 grid gap-4"><ClientTargetGoal clients={clients} leads={leads} canManageClients={access.customers} /><SupplierPricingGoal />{access.owner ? <OwnerAffiliateGoal /> : <GoalDisclosure number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="Track supplier opportunities and report progress to David."><p className="text-sm leading-6 text-slate-600">Call suppliers, track opportunities, and report progress to David. The owner manages private account details.</p></GoalDisclosure>}</div></section>
 
       <section aria-labelledby="david-goals-title"><PersonHeader assignee="david" description="Website and campaign launch" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "david")} /><div className="mt-4 grid gap-4"><FixWebsiteGoal notes={websiteNotes} /><BeatQuoteGoal owner={access.owner} /></div></section>
     </div>

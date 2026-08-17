@@ -5,14 +5,13 @@ import { expect, test } from "@playwright/test";
 
 const root = process.cwd();
 
-test("manager More menu includes Goals and Client Target for employees", async () => {
+test("manager More menu keeps Client Target inside Goals and Progress", async () => {
   const shell = await readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8");
 
   expect(shell).toContain('{ href: "/admin/goals-progress", label: "Goals & Progress", icon: Target }');
-  expect(shell).toContain('{ href: "/admin/goals-progress/client-target", label: "Client Target", icon: Target }');
+  expect(shell).not.toContain('{ href: "/admin/goals-progress/client-target", label: "Client Target", icon: Target }');
   expect(shell).toContain("const sharedMoreLinks");
   expect(shell).toContain("access.owner ? [...sharedMoreLinks, ...ownerMoreLinks] : [...sharedMoreLinks]");
-  expect(shell.indexOf('label: "Client Target"')).toBeGreaterThan(shell.indexOf("const sharedMoreLinks"));
 });
 
 test("Goals & Progress allows manager employees while owner controls stay protected", async () => {
@@ -35,7 +34,9 @@ test("Goals & Progress allows manager employees while owner controls stay protec
   expect(page).toContain("access.owner ? <OwnerAffiliateGoal />");
   expect(page).toContain('supabase.from("affiliate_programs")');
   expect(page).toContain("<AddTargetClient />");
-  expect(page).toContain('href="/admin/goals-progress/client-target"');
+  expect(page).toContain("<ClientTargetCallGuide />");
+  expect(page).toContain('title="Supplier Affiliate Program"');
+  expect(page).toContain("<GoalDisclosure number={3}");
   expect(page).toContain('supabase.from("manager_goals")');
   expect(page).toContain("<AddManagerGoal");
   expect(page.indexOf('PersonHeader assignee="carlos"')).toBeLessThan(page.indexOf('PersonHeader assignee="david"'));
@@ -59,13 +60,14 @@ test("manager goals are persistent and protected for manager users", async () =>
   expect(migration).toContain("created_by = (select auth.uid())");
 });
 
-test("outreach leads remain separate from clients and are protected for customer staff", async () => {
-  const [page, component, actions, userActions, migration, indexMigration, ownerPolicyMigration] = await Promise.all([
+test("outreach leads remain separate from clients and store relationship level", async () => {
+  const [page, component, actions, userActions, migration, levelMigration, indexMigration, ownerPolicyMigration] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/client-target-outreach.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/goals-progress/lead-actions.ts"), "utf8"),
     readFile(path.join(root, "app/admin/users/actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817175631_manager_outreach_leads.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260817214500_add_outreach_lead_relationship_level.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817180209_index_manager_tracking_creators.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817183000_allow_owner_manage_outreach_leads.sql"), "utf8"),
   ]);
@@ -73,10 +75,13 @@ test("outreach leads remain separate from clients and are protected for customer
   expect(page).toContain('supabase.from("manager_outreach_leads")');
   expect(component).toContain("Add an outreach lead");
   expect(component).toContain("A lead stays separate from active clients and orders.");
+  expect(component).toContain("Relationship level");
+  expect(component).toContain("Level {lead.relationship_level}");
   expect(actions.match(/requireStaffProfile\("customers"\)/g)?.length).toBe(3);
   expect(actions).not.toContain("createAdminClient");
   expect(actions.match(/supabase\.from\("manager_outreach_leads"\)/g)?.length).toBe(3);
   expect(actions).toContain('error: "Enter a valid phone number."');
+  expect(actions).toContain("relationship_level: relationshipLevel");
   expect(userActions).toContain('createTargetClientAction(input: ManagerNewClientInput)');
   expect(userActions).toContain('requireStaffProfile("customers")');
   expect(migration).toContain("create table if not exists public.manager_outreach_leads");
@@ -86,18 +91,37 @@ test("outreach leads remain separate from clients and are protected for customer
   expect(indexMigration).toContain("manager_outreach_leads_created_by_idx");
   expect(ownerPolicyMigration).toContain("manager_outreach_leads_manager_insert");
   expect(ownerPolicyMigration).toContain("avitanneto@gmail.com");
+  expect(levelMigration).toContain("relationship_level smallint not null default 1");
+  expect(levelMigration).toContain("relationship_level between 1 and 5");
 });
 
-test("Client Target conversation guide allows manager employees and is bilingual", async () => {
-  const page = await readFile(path.join(root, "app/admin/goals-progress/client-target/page.tsx"), "utf8");
+test("Client Target call guide opens in Goals and the old page redirects", async () => {
+  const [page, guide] = await Promise.all([
+    readFile(path.join(root, "app/admin/goals-progress/client-target/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/client-target-call-guide.tsx"), "utf8"),
+  ]);
 
-  expect(page).toContain("await requireManagerPortalProfile()");
-  expect(page).toContain('href="/admin/goals-progress"');
-  expect(page).toContain("Carlos&apos;s conversation guide");
-  expect(page).toContain("Hi, this is Carlos");
-  expect(page).toContain("Hola, soy Carlos");
-  expect(page).toContain("English");
-  expect(page).toContain("Español");
+  expect(page).toContain('redirect("/admin/goals-progress")');
+  expect(guide).toContain("Carlos&apos;s conversation guide");
+  expect(guide).toContain("Hi, this is Carlos");
+  expect(guide).toContain("Hola, soy Carlos");
+  expect(guide).toContain("English");
+  expect(guide).toContain("Español");
+  expect(guide).toContain('role="dialog"');
+});
+
+test("Goals and lists use collapsed disclosures to keep the page compact", async () => {
+  const [page, leads, goals] = await Promise.all([
+    readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/client-target-outreach.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/manager-goals.tsx"), "utf8"),
+  ]);
+
+  expect(page).toContain("function GoalDisclosure");
+  expect(page).toContain("<details");
+  expect(page).toContain("Clients in the system");
+  expect(leads).toContain('<details className="group');
+  expect(goals).toContain("goals.map((goal) => <details");
 });
 
 test("affiliate tracker is persistent, owner-only, filterable, and setup-gated", async () => {

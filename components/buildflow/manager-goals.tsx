@@ -81,11 +81,10 @@ export function CustomManagerGoals({ goals }: { goals: ManagerGoalRecord[] }) {
   }
 
   return <div className="mt-4 grid gap-2">
-    {goals.map((goal) => <article key={goal.id} className="flex items-start gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-      <button type="button" disabled={pending} onClick={() => run(() => setManagerGoalCompletedAction({ id: goal.id, completed: goal.status !== "completed" }))} aria-label={`${goal.status === "completed" ? "Reopen" : "Complete"} ${goal.title}`} className={`mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${goal.status === "completed" ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 text-transparent"}`}><Check className="h-4 w-4" /></button>
-      <div className="min-w-0 flex-1"><h3 className={`text-sm font-semibold ${goal.status === "completed" ? "text-slate-500 line-through" : "text-slate-950"}`}>{goal.title}</h3>{goal.details ? <p className="mt-1 text-xs leading-5 text-slate-500">{goal.details}</p> : null}</div>
-      <button type="button" disabled={pending} onClick={() => window.confirm(`Delete “${goal.title}”?`) && run(() => deleteManagerGoalAction(goal.id))} aria-label={`Delete ${goal.title}`} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
-    </article>)}
+    {goals.map((goal) => <details key={goal.id} className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-3 py-2"><span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${goal.status === "completed" ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 text-transparent"}`}><Check className="h-3.5 w-3.5" /></span><h3 className={`min-w-0 flex-1 truncate text-sm font-semibold ${goal.status === "completed" ? "text-slate-500 line-through" : "text-slate-950"}`}>{goal.title}</h3><span className="text-xs font-semibold text-[#0066cc]">Open</span></summary>
+      <div className="border-t border-slate-100 p-3"><p className="text-xs leading-5 text-slate-500">{goal.details || "No notes added."}</p><div className="mt-3 flex gap-2"><button type="button" disabled={pending} onClick={() => run(() => setManagerGoalCompletedAction({ id: goal.id, completed: goal.status !== "completed" }))} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-xs font-semibold"><Check className="h-4 w-4" />{goal.status === "completed" ? "Reopen" : "Complete"}</button><button type="button" disabled={pending} onClick={() => window.confirm(`Delete “${goal.title}”?`) && run(() => deleteManagerGoalAction(goal.id))} className="inline-flex min-h-9 items-center gap-2 rounded-md px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" />Delete</button></div></div>
+    </details>)}
     {error ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
   </div>;
 }

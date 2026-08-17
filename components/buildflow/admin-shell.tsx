@@ -44,7 +44,6 @@ const primaryLinks = [
 
 const sharedMoreLinks = [
   { href: "/admin/goals-progress", label: "Goals & Progress", icon: Target },
-  { href: "/admin/goals-progress/client-target", label: "Client Target", icon: Target },
 ] as const;
 
 const ownerMoreLinks = [

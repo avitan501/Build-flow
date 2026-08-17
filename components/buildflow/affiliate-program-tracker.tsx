@@ -34,6 +34,7 @@ type Props = {
   attachments: AffiliateAttachment[];
   integrations: AffiliateIntegration[];
   settings: AffiliateTrackerSettings;
+  hideHeading?: boolean;
 };
 
 const dateText = (value: string | null) => value ? new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString() : "—";
@@ -47,7 +48,7 @@ function SummaryCard({ label, value, accent = false }: { label: string; value: s
   return <div className={`min-w-0 border-l-2 px-3 py-1 ${accent ? "border-[#0071e3]" : "border-slate-200"}`}><p className="text-[10px] font-semibold uppercase text-slate-500">{label}</p><p className="mt-0.5 truncate text-xl font-semibold tabular-nums">{value}</p></div>;
 }
 
-export function AffiliateProgramTracker({ programs, checklist, activities, attachments, integrations, settings }: Props) {
+export function AffiliateProgramTracker({ programs, checklist, activities, attachments, integrations, settings, hideHeading = false }: Props) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All");
   const [priority, setPriority] = useState("All");
@@ -93,10 +94,10 @@ export function AffiliateProgramTracker({ programs, checklist, activities, attac
   };
 
   return <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="affiliate-goal-title">
-    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 p-4 sm:p-5">
+    {!hideHeading ? <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 p-4 sm:p-5">
       <div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Carlos · Supplier program</p><h2 id="affiliate-goal-title" className="mt-1 text-xl font-semibold">Supplier Affiliate Program</h2><p className="mt-1 text-sm text-slate-600">Track applications, approvals, setup, and compliance in one owner-only workspace.</p></div>
       <div className="inline-flex rounded-md border border-slate-200 p-1 text-xs font-semibold"><button onClick={() => setPanel("programs")} className={`min-h-9 rounded px-3 ${panel === "programs" ? "bg-slate-950 text-white" : "text-slate-600"}`}>Programs</button><button onClick={() => setPanel("readiness")} className={`min-h-9 rounded px-3 ${panel === "readiness" ? "bg-slate-950 text-white" : "text-slate-600"}`}>Application readiness</button></div>
-    </div>
+    </div> : <div className="flex justify-end border-b border-slate-200 p-3"><div className="inline-flex rounded-md border border-slate-200 p-1 text-xs font-semibold"><button onClick={() => setPanel("programs")} className={`min-h-9 rounded px-3 ${panel === "programs" ? "bg-slate-950 text-white" : "text-slate-600"}`}>Programs</button><button onClick={() => setPanel("readiness")} className={`min-h-9 rounded px-3 ${panel === "readiness" ? "bg-slate-950 text-white" : "text-slate-600"}`}>Application readiness</button></div></div>}
 
     {panel === "readiness" ? <ReadinessPanel settings={settings} run={run} pending={isPending} /> : <>
       <div className="grid grid-cols-2 gap-y-4 border-b border-slate-200 p-4 sm:grid-cols-5 lg:grid-cols-10">
