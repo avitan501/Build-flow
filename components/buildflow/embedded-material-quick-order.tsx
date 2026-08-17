@@ -22,6 +22,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
   displayCategory: string
   requestId: string
 }) {
+  const usesDenseFlooringLayout = requestId === "wood-floor"
   const [draftAnswers, setDraftAnswers] = useState<Record<string, MaterialAnswerValue>>({})
   const [completedAnswers, setCompletedAnswers] = useState<Record<string, MaterialAnswerValue> | null>(null)
   const [hydrated, setHydrated] = useState(false)
@@ -111,6 +112,7 @@ export function EmbeddedMaterialQuickOrder({ snapshot, category, displayCategory
         displayMode="all"
         density="compact"
         configurator
+        compactConfigurator={usesDenseFlooringLayout}
         embedded
         requireCompletion
         onAnswersChange={(answers) => storeDraft(answers, false)}

@@ -449,6 +449,16 @@ test("flooring uses a compact contractor configurator with a live summary", asyn
   await expect(page.getByText("What installation method will be used?", { exact: true })).toHaveCount(0)
   await expect(page.getByText("Wood floor calculator", { exact: true })).toHaveCount(0)
 
+  const flooringShell = await page.locator("main > section").first().boundingBox()
+  if ((page.viewportSize()?.width ?? 0) >= 1024) expect(flooringShell?.width ?? 9999).toBeLessThanOrEqual(1025)
+  const accessoryFields = page.getByTestId("flooring-group-extras").locator("fieldset")
+  await expect(accessoryFields.first()).toBeVisible()
+  if ((page.viewportSize()?.width ?? 0) >= 640) {
+    const firstAccessory = await accessoryFields.nth(0).boundingBox()
+    const secondAccessory = await accessoryFields.nth(1).boundingBox()
+    expect(secondAccessory?.x ?? 0).toBeGreaterThan(firstAccessory?.x ?? Number.MAX_SAFE_INTEGER)
+  }
+
   const redOak = page.getByRole("button", { name: "Red Oak" })
   await redOak.click()
   await expect(redOak).toHaveAttribute("aria-pressed", "true")

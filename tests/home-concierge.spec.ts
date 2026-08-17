@@ -89,13 +89,13 @@ test("homepage shop stays compact and expandable on phones", async ({ page }) =>
   await expect(page.getByRole("button", { name: "Services", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(4);
   await page.getByRole("button", { name: "View all services" }).click();
-  await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(9);
+  await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(10);
 
   await page.getByRole("button", { name: "Materials" }).click();
   await expect(page.getByRole("heading", { name: "Shop materials" })).toBeVisible();
   await expect(page.locator('[data-testid="department-card"]:visible')).toHaveCount(6);
   await page.getByRole("button", { name: "View all materials" }).click();
-  await expect(page.locator('[data-testid="department-card"]:visible')).toHaveCount(15);
+  await expect(page.locator('[data-testid="department-card"]:visible')).toHaveCount(16);
   await page.evaluate(() => window.scrollTo(0, window.innerHeight));
   await expect(page.getByRole("link", { name: "Start Order" })).toHaveAttribute("href", "/shop");
 });
@@ -105,22 +105,32 @@ test("Order Materials opens the full responsive service and department hub", asy
 
   await expect(page.getByRole("heading", { name: "Order materials" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Choose a service" })).toBeVisible();
+  const sectionBackgrounds = await page.evaluate(() => {
+    const services = document.querySelector('[data-testid="homepage-services-section"]');
+    const materials = document.querySelector('[data-testid="homepage-materials-section"]');
+    return {
+      services: services ? getComputedStyle(services).backgroundColor : null,
+      materials: materials ? getComputedStyle(materials).backgroundColor : null,
+    };
+  });
+  expect(sectionBackgrounds.services).toBe(sectionBackgrounds.materials);
+  expect(sectionBackgrounds.services).toBe("rgba(0, 0, 0, 0)");
 
   if ((page.viewportSize()?.width ?? 1024) >= 640) {
     await expect(page.getByRole("heading", { name: "Shop materials" })).toBeVisible();
-    await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(9);
-    await expect(page.locator('[data-testid="department-card"]:visible')).toHaveCount(15);
+    await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(10);
+    await expect(page.locator('[data-testid="department-card"]:visible')).toHaveCount(16);
     const serviceGrid = await page.locator('[data-testid="fast-service-grid"]').boundingBox();
     expect(serviceGrid).not.toBeNull();
     expect(serviceGrid!.width).toBeGreaterThan(700);
   } else {
     await expect(page.getByRole("button", { name: "Services", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "View all services" }).click();
-    await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(9);
+    await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(10);
     await page.getByRole("button", { name: "Materials", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Shop materials" })).toBeVisible();
     await page.getByRole("button", { name: "View all materials" }).click();
-    await expect(page.locator('[data-testid="department-card"]:visible')).toHaveCount(15);
+    await expect(page.locator('[data-testid="department-card"]:visible')).toHaveCount(16);
   }
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);

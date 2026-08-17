@@ -199,11 +199,12 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
   const composerHandlesUpload = usesEmbeddedQuickOrder
   const usesCompactCustomOrder = usesEmbeddedQuickOrder || customOrderOnly
   const isBulkBagDepartment = category.slug === "concrete-masonry"
+  const isFlooringDepartment = category.slug === "wood-floor"
 
   return (
-    <main className="min-h-screen bg-[#f7f8fa] px-4 py-4 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
-      <section className="mx-auto flex max-w-7xl flex-col gap-4">
-        <h1 className={`${category.slug === "door-and-molding" ? "text-[1.7rem] sm:text-[2rem]" : "text-[2rem] sm:text-[2.4rem]"} font-bold tracking-normal text-slate-950`}>{category.label}</h1>
+    <main className={`min-h-screen bg-[#f7f8fa] pb-28 text-slate-900 sm:pb-10 lg:px-8 ${isFlooringDepartment ? "px-3 py-3 sm:px-5 sm:py-4" : "px-4 py-4 sm:px-6 sm:py-5"}`}>
+      <section className={`mx-auto flex flex-col ${isFlooringDepartment ? "max-w-5xl gap-3" : "max-w-7xl gap-4"}`}>
+        <h1 className={`${category.slug === "door-and-molding" || isFlooringDepartment ? "text-[1.7rem] sm:text-[2rem]" : "text-[2rem] sm:text-[2.4rem]"} font-bold tracking-normal text-slate-950`}>{category.label}</h1>
 
         {isBulkBagDepartment ? <BulkBagStorefront /> : null}
         {category.slug === "door-and-molding" ? <DoorPricingGuide /> : null}

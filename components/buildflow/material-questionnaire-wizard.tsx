@@ -22,6 +22,7 @@ type MaterialQuestionnaireWizardProps = {
   displayMode?: "steps" | "all"
   density?: "comfortable" | "compact"
   configurator?: boolean
+  compactConfigurator?: boolean
   embedded?: boolean
   locked?: boolean
   requireCompletion?: boolean
@@ -91,7 +92,7 @@ function LumberItemList({ question, value, onChange, disabled }: {
   )
 }
 
-function CardOptions({ question, value, onChange, disabled, compact = false }: { question: MaterialQuestion; value: MaterialAnswerValue; onChange: (value: MaterialAnswerValue, autoAdvance?: boolean) => void; disabled: boolean; compact?: boolean }) {
+function CardOptions({ question, value, onChange, disabled, compact = false, dense = false }: { question: MaterialQuestion; value: MaterialAnswerValue; onChange: (value: MaterialAnswerValue, autoAdvance?: boolean) => void; disabled: boolean; compact?: boolean; dense?: boolean }) {
   const selected = selectableValue(value)
   const selectedValues = Array.isArray(selected) ? selected : typeof selected === "string" ? [selected] : []
   const isMulti = question.question_type === "multi_select"
@@ -113,7 +114,7 @@ function CardOptions({ question, value, onChange, disabled, compact = false }: {
 
   return (
     <ShopTranslationBoundary>
-    <div className={compact ? "flex flex-wrap gap-2" : "grid gap-3 sm:grid-cols-2"}>
+    <div className={dense ? "flex flex-nowrap gap-1" : compact ? "flex flex-wrap gap-2" : "grid gap-3 sm:grid-cols-2"}>
       {options.map((option) => {
         const active = selectedValues.includes(option.value)
         return (
@@ -123,10 +124,10 @@ function CardOptions({ question, value, onChange, disabled, compact = false }: {
             disabled={disabled}
             aria-pressed={active}
             onClick={() => toggle(option.value)}
-            className={`${compact ? "min-h-10 rounded-lg px-3 py-1.5 text-[13px]" : "min-h-16 rounded-[18px] px-4 py-3 text-[15px]"} relative flex touch-manipulation items-center justify-between gap-2 border text-left font-semibold transition-[border-color,background-color,box-shadow,color] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:cursor-default ${active ? compact ? "border-[#0071e3] bg-[#f5faff] text-[#1d1d1f] shadow-[inset_0_0_0_1px_#0071e3]" : "border-[#0071e3] bg-sky-50 text-slate-950 shadow-[0_8px_20px_rgba(0,113,227,0.12)]" : "border-[#d2d2d7] bg-white text-[#1d1d1f] hover:border-[#86868b] active:bg-[#f5f5f7]"}`}
+            className={`${dense ? "min-h-9 rounded-lg px-2.5 py-1 text-xs" : compact ? "min-h-10 rounded-lg px-3 py-1.5 text-[13px]" : "min-h-16 rounded-[18px] px-4 py-3 text-[15px]"} relative flex touch-manipulation items-center justify-between gap-2 border text-left font-semibold transition-[border-color,background-color,box-shadow,color] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100 disabled:cursor-default ${active ? compact ? "border-[#0071e3] bg-[#f5faff] text-[#1d1d1f] shadow-[inset_0_0_0_1px_#0071e3]" : "border-[#0071e3] bg-sky-50 text-slate-950 shadow-[0_8px_20px_rgba(0,113,227,0.12)]" : "border-[#d2d2d7] bg-white text-[#1d1d1f] hover:border-[#86868b] active:bg-[#f5f5f7]"}`}
           >
             <span>{option.label}</span>
-            <span className={`${compact ? "h-4 w-4" : "h-6 w-6"} inline-flex shrink-0 items-center justify-center rounded-full border ${active ? "border-[#0071e3] bg-[#0071e3] text-white" : compact ? "border-transparent text-transparent" : "border-slate-300 text-transparent"}`}><Check className={compact ? "h-3 w-3" : "h-4 w-4"} strokeWidth={3} /></span>
+            <span className={`${dense ? "hidden" : compact ? "h-4 w-4" : "h-6 w-6"} shrink-0 items-center justify-center rounded-full border ${dense ? "" : "inline-flex"} ${active ? "border-[#0071e3] bg-[#0071e3] text-white" : compact ? "border-transparent text-transparent" : "border-slate-300 text-transparent"}`}><Check className={compact ? "h-3 w-3" : "h-4 w-4"} strokeWidth={3} /></span>
           </button>
         )
       })}
@@ -141,13 +142,14 @@ function CardOptions({ question, value, onChange, disabled, compact = false }: {
   )
 }
 
-function QuestionControl({ question, value, onChange, disabled, onUpload, compact = false }: {
+function QuestionControl({ question, value, onChange, disabled, onUpload, compact = false, dense = false }: {
   question: MaterialQuestion
   value: MaterialAnswerValue
   onChange: (value: MaterialAnswerValue, autoAdvance?: boolean) => void
   disabled: boolean
   onUpload?: MaterialQuestionnaireWizardProps["onUpload"]
   compact?: boolean
+  dense?: boolean
 }) {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -157,7 +159,7 @@ function QuestionControl({ question, value, onChange, disabled, onUpload, compac
   const controlId = `material-question-${question.id}`
 
   if (["single_select", "multi_select", "yes_no"].includes(question.question_type)) {
-    return <CardOptions question={question} value={value} onChange={onChange} disabled={disabled} compact={compact} />
+    return <CardOptions question={question} value={value} onChange={onChange} disabled={disabled} compact={compact} dense={dense} />
   }
   if (question.question_type === "item_list") {
     return <LumberItemList question={question} value={value} onChange={onChange} disabled={disabled} />
@@ -245,7 +247,7 @@ function requiredFieldProgress(question: MaterialQuestion, value: MaterialAnswer
   return { complete, total: items.length * fields.length }
 }
 
-export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, displayMode = "steps", density = "comfortable", configurator = false, embedded = false, locked = false, requireCompletion = false, onAnswersChange, onClose, onSave, onUpload }: MaterialQuestionnaireWizardProps) {
+export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, displayMode = "steps", density = "comfortable", configurator = false, compactConfigurator = false, embedded = false, locked = false, requireCompletion = false, onAnswersChange, onClose, onSave, onUpload }: MaterialQuestionnaireWizardProps) {
   const [answers, setAnswers] = useState<Record<string, MaterialAnswerValue>>(() => initialQuestionnaireAnswers(snapshot, initialAnswers))
   const [step, setStep] = useState(0)
   const [reviewing, setReviewing] = useState(false)
@@ -280,14 +282,14 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
   })).filter((group) => group.questions.length > 0)
   const usesRightAlignedProductImages = configurator
 
-  function productImageButton(question: MaterialQuestion, compactImage = false) {
+  function productImageButton(question: MaterialQuestion, compactImage = false, denseImage = false) {
     if (!question.configuration.imageUrl) return null
     return (
       <button
         type="button"
         data-testid={`product-question-image-${question.question_key}`}
         onClick={() => setProductImagePreview(question)}
-        className={`${compactImage ? "h-12 w-12" : "h-16 w-16"} group relative shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-[border-color,box-shadow] hover:border-slate-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100`}
+        className={`${denseImage ? "h-10 w-10" : compactImage ? "h-12 w-12" : "h-16 w-16"} group relative shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-[border-color,box-shadow] hover:border-slate-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100`}
         aria-label="Enlarge product image"
       >
         <span
@@ -376,9 +378,10 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
     const hasError = errorQuestionId === question.id
     const singleSpecification = configurator && question.question_type === "single_select" && question.options.length === 1
     const compactAccessory = configurator && configuratorGroupFor(question) === "extras"
+    const denseAccessory = compactConfigurator && compactAccessory && question.question_type === "yes_no"
     const compactOptionalNote = (compact || compactAccessory) && question.question_type === "long_text" && !question.is_required
     const pairedConfiguratorQuestion = configurator && ["sheet_size", "thickness", "flooring_area", "waste_allowance"].includes(question.question_key)
-    const gridSpan = pairedConfiguratorQuestion ? "col-span-1" : "col-span-1 sm:col-span-2"
+    const gridSpan = pairedConfiguratorQuestion || (compactConfigurator && compactAccessory) ? "col-span-1" : "col-span-1 sm:col-span-2"
     const rightAlignedImage = usesRightAlignedProductImages && Boolean(question.configuration.imageUrl)
     if (singleSpecification) {
       if (!rightAlignedImage) {
@@ -404,7 +407,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
         key={question.id}
         id={`question-${question.id}`}
         data-question-key={question.question_key}
-        className={`${gridSpan} ${compactOptionalNote ? "scroll-mt-28 py-2" : compact || compactAccessory ? "scroll-mt-28 py-2.5 first:pt-0 last:pb-0" : "scroll-mt-24 pb-7"} min-w-0 border-b border-slate-100 last:border-b-0`}
+        className={`${gridSpan} ${denseAccessory ? "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2" : ""} ${compactOptionalNote ? "scroll-mt-28 py-2" : compact || compactAccessory ? "scroll-mt-28 py-2.5 first:pt-0 last:pb-0" : "scroll-mt-24 pb-7"} min-w-0 border-b border-slate-100 last:border-b-0`}
         aria-describedby={question.help_text && !compactOptionalNote ? `question-help-${question.id}` : undefined}
       >
         {!compact ? <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Question {index + 1}</p> : null}
@@ -418,9 +421,9 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
             </div>
             {question.help_text && !compactOptionalNote ? <p id={`question-help-${question.id}`} className={`${compact ? "mt-1 text-xs leading-5" : "mt-2 text-sm leading-6"} text-slate-600`}>{question.help_text}</p> : null}
           </div>
-          {rightAlignedImage ? productImageButton(question, compactAccessory) : null}
+          {rightAlignedImage ? productImageButton(question, compactAccessory, denseAccessory) : null}
         </div>
-        <div className={compact || compactAccessory ? "mt-2" : "mt-4"}>
+        <div className={denseAccessory ? "mt-0" : compact || compactAccessory ? "mt-2" : "mt-4"}>
           <QuestionControl
             question={question}
             value={answerForQuestion(question, answers)}
@@ -428,6 +431,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
             disabled={locked}
             onUpload={onUpload}
             compact={compact || compactAccessory}
+            dense={denseAccessory}
           />
         </div>
         {hasError ? <p role="alert" className="mt-2 text-xs font-semibold text-rose-700">This field is required.</p> : null}
@@ -445,11 +449,11 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
 
   const content = (
     <section className={`${embedded ? "w-full" : "max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-[24px] border border-white/70 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.32)]"}`} aria-label={`${snapshot.category.name} material questions`}>
-      <header className={`border-b border-slate-100 bg-white ${configurator ? "px-4 py-4 sm:px-6 sm:py-5" : compact ? "px-4 py-3 sm:px-5" : "px-5 py-4 sm:px-7"}`}>
+      <header className={`border-b border-slate-100 bg-white ${configurator ? compactConfigurator ? "px-4 py-3 sm:px-5 sm:py-4" : "px-4 py-4 sm:px-6 sm:py-5" : compact ? "px-4 py-3 sm:px-5" : "px-5 py-4 sm:px-7"}`}>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             {!configurator ? <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Material order details</p> : null}
-            <h2 className={`${configurator ? "" : "mt-1"} text-xl font-bold text-slate-950 sm:text-2xl`}>{snapshot.category.name}</h2>
+            <h2 className={`${configurator ? "" : "mt-1"} ${compactConfigurator ? "text-lg sm:text-xl" : "text-xl sm:text-2xl"} font-bold text-slate-950`}>{snapshot.category.name}</h2>
             {!configurator && requireCompletion ? <p className="mt-1 text-xs font-semibold text-slate-500">Required to complete this department request</p> : null}
           </div>
           {onClose && !requireCompletion ? <button type="button" onClick={onClose} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100" aria-label="Close questionnaire"><X className="h-5 w-5" /></button> : null}
@@ -481,15 +485,15 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
             </div>
           </div>
         ) : showAllQuestions ? configurator ? (
-          <div className="grid items-start lg:grid-cols-[minmax(0,1fr)_15rem]">
-            <div className={`min-w-0 px-4 ${hasStartedAnswer ? "pb-24 sm:pb-24" : "pb-4 sm:pb-5"} sm:px-6 lg:pb-6 lg:pr-8`}>
+          <div className={`grid items-start ${compactConfigurator ? "lg:grid-cols-[minmax(0,1fr)_13rem]" : "lg:grid-cols-[minmax(0,1fr)_15rem]"}`}>
+            <div className={`min-w-0 px-4 ${hasStartedAnswer ? "pb-24 sm:pb-24" : "pb-4 sm:pb-5"} ${compactConfigurator ? "sm:px-5 lg:pb-5 lg:pr-5" : "sm:px-6 lg:pb-6 lg:pr-8"}`}>
               {questionGroups.map((group, groupIndex) => (
-                <section key={group.id} data-testid={`flooring-group-${group.id}`} className="border-b border-[#d2d2d7] py-4 last:border-b-0 sm:py-5">
+                <section key={group.id} data-testid={`flooring-group-${group.id}`} className={`border-b border-[#d2d2d7] last:border-b-0 ${compactConfigurator ? "py-3 sm:py-4" : "py-4 sm:py-5"}`}>
                   <div className="mb-1 flex items-center gap-3">
                     <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-950 text-[11px] font-bold text-white">{groupIndex + 1}</span>
                     <div><h3 className="text-sm font-bold text-slate-950">{group.title}</h3>{group.description ? <p className="mt-0.5 text-[11px] leading-4 text-slate-500">{group.description}</p> : null}</div>
                   </div>
-                  <div className="ml-0 mt-2.5 grid grid-cols-1 gap-x-3 sm:ml-10 sm:grid-cols-2">{group.questions.map((question) => renderQuestion(question, visibleQuestions.findIndex((entry) => entry.id === question.id)))}</div>
+                  <div className={`${compactConfigurator ? "mt-1.5 gap-x-2 sm:ml-8" : "mt-2.5 gap-x-3 sm:ml-10"} ml-0 grid grid-cols-1 sm:grid-cols-2`}>{group.questions.map((question) => renderQuestion(question, visibleQuestions.findIndex((entry) => entry.id === question.id)))}</div>
                 </section>
               ))}
               {error ? <div aria-live="polite" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">{error}</div> : null}

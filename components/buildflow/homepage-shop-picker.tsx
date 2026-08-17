@@ -472,7 +472,7 @@ export function HomepageShopPicker({
         ) : null}
       </section> : null}
 
-      <section className={`${homepageCompact && homepageSection !== "services" ? "hidden sm:block" : "block"} mt-1 min-w-0 border-t border-slate-200/80 bg-white py-5 sm:py-7`}>
+      <section data-testid="homepage-services-section" className={`${homepageCompact && homepageSection !== "services" ? "hidden sm:block" : "block"} mt-1 min-w-0 border-t border-slate-200/80 py-5 sm:py-7`}>
         <div className="px-1">
           {!homepageCompact ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Project support</p> : null}
           <h2 className="text-[1.4rem] font-semibold leading-tight tracking-[0] text-[#171717] sm:text-[1.75rem]">Choose a service</h2>
@@ -508,7 +508,7 @@ export function HomepageShopPicker({
         {homepageCompact ? <button type="button" onClick={() => setShowAllServices((shown) => !shown)} className="mx-auto mt-4 flex min-h-10 items-center justify-center rounded border border-slate-300 bg-white px-5 text-sm font-semibold text-[#0066cc] sm:hidden">{showAllServices ? "Show less" : "View all services"}</button> : null}
       </section>
 
-      <section className={`${homepageCompact && homepageSection !== "materials" ? "hidden sm:block" : "block"} min-w-0 border-t border-slate-200/80 py-5 sm:py-7`}>
+      <section data-testid="homepage-materials-section" className={`${homepageCompact && homepageSection !== "materials" ? "hidden sm:block" : "block"} min-w-0 border-t border-slate-200/80 py-5 sm:py-7`}>
         <div className="px-1">
           {!homepageCompact ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Material departments</p> : null}
           <h2 className="text-[1.4rem] font-semibold leading-tight tracking-[0] text-[#171717] sm:text-[1.75rem]">Shop materials</h2>
