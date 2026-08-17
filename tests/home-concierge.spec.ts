@@ -77,7 +77,7 @@ test("homepage switches all principal sales content to Spanish", async ({ page }
   await expect(page.getByRole("heading", { name: "Servicio en 41 estados." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Marcas que conseguimos" })).toBeVisible();
   if ((page.viewportSize()?.width ?? 1024) < 640) {
-    await page.getByRole("button", { name: "Materials" }).click();
+    await page.getByRole("button", { name: "Materials", exact: true }).click();
   }
   await expect(page.getByRole("heading", { name: "Shop materials" })).toBeVisible();
 });
@@ -98,6 +98,32 @@ test("homepage shop stays compact and expandable on phones", async ({ page }) =>
   await expect(page.locator('[data-testid="department-card"]:visible')).toHaveCount(15);
   await page.evaluate(() => window.scrollTo(0, window.innerHeight));
   await expect(page.getByRole("link", { name: "Start Order" })).toHaveAttribute("href", "/shop");
+});
+
+test("Order Materials opens the full responsive service and department hub", async ({ page }) => {
+  await page.goto("/shop");
+
+  await expect(page.getByRole("heading", { name: "Order materials" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Choose a service" })).toBeVisible();
+
+  if ((page.viewportSize()?.width ?? 1024) >= 640) {
+    await expect(page.getByRole("heading", { name: "Shop materials" })).toBeVisible();
+    await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(9);
+    await expect(page.locator('[data-testid="department-card"]:visible')).toHaveCount(15);
+    const serviceGrid = await page.locator('[data-testid="fast-service-grid"]').boundingBox();
+    expect(serviceGrid).not.toBeNull();
+    expect(serviceGrid!.width).toBeGreaterThan(700);
+  } else {
+    await expect(page.getByRole("button", { name: "Services", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "View all services" }).click();
+    await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(9);
+    await page.getByRole("button", { name: "Materials", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Shop materials" })).toBeVisible();
+    await page.getByRole("button", { name: "View all materials" }).click();
+    await expect(page.locator('[data-testid="department-card"]:visible')).toHaveCount(15);
+  }
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
 
 test("Learn More provides seven distinct shareable service videos", async ({ page }) => {

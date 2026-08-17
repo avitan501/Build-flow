@@ -37,13 +37,16 @@ test("MDF liquidation product keeps pricing, minimum, and five photos without pu
   expect(catalog.match(/\["[1-5]",/g)).toHaveLength(5);
 });
 
-test("Order Materials opens the combined catalog and Liquidation skips the work-section panel", async () => {
+test("Order Materials opens the service hub while category links retain the catalog", async () => {
   const [shopPage, catalogExperience, detailExperience] = await Promise.all([
     readFile(path.join(root, "app/shop/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/shop-catalog-experience.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/shop-product-detail-experience.tsx"), "utf8"),
   ]);
 
+  expect(shopPage).toContain("<HomepageShopPicker");
+  expect(shopPage).toContain("const showCatalog = Boolean(category || search)");
+  expect(shopPage).toContain("Order materials");
   expect(shopPage).toContain("<ShopCatalogExperience");
   expect(shopPage).not.toContain("<ShopProjectToolPicker");
   expect(shopPage).not.toContain("Project address");

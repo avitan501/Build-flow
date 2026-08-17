@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type FormEvent } fr
 
 import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
 import { clearSelectedGuestProject, createGuestProject, GUEST_PROJECTS_UPDATED_EVENT, readSelectedGuestProject } from "@/lib/guest-projects"
-import { MANAGER_ADD_ONS_UPDATED_EVENT, applyDepartmentAddOns, readManagerAddOns, type ManagerCatalogAddOns } from "@/lib/manager-add-ons"
+import { MANAGER_ADD_ONS_UPDATED_EVENT, applyDepartmentAddOns, createEmptyManagerAddOns, readManagerAddOns, type ManagerCatalogAddOns } from "@/lib/manager-add-ons"
 import type { ProjectRecord } from "@/lib/projects"
 import type { ShopToolCategory } from "@/lib/shop-tools"
 
@@ -174,7 +174,7 @@ export function HomepageShopPicker({
   const [homepageSection, setHomepageSection] = useState<"services" | "materials">("services")
   const [showAllServices, setShowAllServices] = useState(false)
   const [showAllDepartments, setShowAllDepartments] = useState(false)
-  const [managerAddOns, setManagerAddOns] = useState<ManagerCatalogAddOns>(() => readManagerAddOns())
+  const [managerAddOns, setManagerAddOns] = useState<ManagerCatalogAddOns>(createEmptyManagerAddOns)
   const selectedProject = useMemo(() => projects.find((project) => project.id === projectId) ?? null, [projectId, projects])
   const selectedProjectIdForLinks = selectedProject?.id ?? ""
   const selectedAddressLabel = selectedProject?.address || selectedProject?.name || activeCustomAddress || "No selected address"
