@@ -17,7 +17,7 @@ const SHOP_BRANDS = [
   { name: "Trex", logo: "/images/brands/trex.svg", scale: "scale-75" },
 ]
 
-export function ShopBrandShowcase({ compact = false, transparent = false }: { compact?: boolean; transparent?: boolean }) {
+export function ShopBrandShowcase({ compact = false, transparent = false, title = "Shop Our Brands" }: { compact?: boolean; transparent?: boolean; title?: string }) {
   const [paused, setPaused] = useState(false)
 
   return (
@@ -25,7 +25,7 @@ export function ShopBrandShowcase({ compact = false, transparent = false }: { co
     <section aria-labelledby="shop-brands-heading" className={`${compact ? "mx-auto max-w-[88rem] overflow-hidden" : "mt-8"} ${transparent ? "bg-transparent" : "bg-white"}`}>
       <div className={`mx-auto w-full max-w-7xl px-4 sm:px-8 lg:px-10 ${compact ? "py-2.5 sm:py-3" : "py-8 sm:py-10"}`}>
         <div className="flex items-center justify-center gap-2 text-center">
-          <h2 id="shop-brands-heading" className={`${compact ? "text-sm sm:text-base font-medium text-slate-500" : "text-2xl sm:text-3xl font-semibold text-[#1d1d1f]"} tracking-normal`}>Shop Our Brands</h2>
+          <h2 id="shop-brands-heading" className={`${compact ? "text-sm sm:text-base font-medium text-slate-500" : "text-2xl sm:text-3xl font-semibold text-[#1d1d1f]"} tracking-normal`}>{title}</h2>
           <button
             type="button"
             aria-label={paused ? "Play brand logos" : "Pause brand logos"}

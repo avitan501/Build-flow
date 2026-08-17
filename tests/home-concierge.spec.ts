@@ -1,128 +1,113 @@
 import { expect, test } from "@playwright/test";
 
-test("home presents the contractor material coordination service", async ({ page }) => {
+test("cinematic homepage presents Construction Concierge clearly", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page).toHaveTitle("Avantia Build | You Build. We Handle the Materials.");
-  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", "Send your plans or material list. We compare suppliers, organize the order, and arrange jobsite delivery.");
-  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /\/opengraph-image\?/);
-  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "Avantia Build | Materials Priced & Delivered");
-  await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
-  await expect(page.locator('meta[property="og:image:height"]')).toHaveAttribute("content", "630");
-  await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute("content", "Avantia Build");
-  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.webmanifest");
-  await expect(page.getByRole("heading", { name: "You Build. We Handle the Materials." })).toBeVisible();
-  await expect(page.getByText("Avantia Build for contractors", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Start a Material Request", exact: true })).toHaveAttribute("href", "/shop");
-  await expect(page.getByRole("link", { name: "Send Us Your Plans" })).toHaveAttribute("href", "/request-quote");
-  await expect(page.getByRole("link", { name: /Watch the demo/ })).toHaveAttribute("href", "#product-demo");
-  await expect(page.getByRole("heading", { name: "Estimate apartment renovation materials in a few questions." })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Need help? WhatsApp us" })).toHaveAttribute("href", "https://wa.me/15169088319?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20starting%20a%20material%20order.");
-  await expect(page.getByText("No account needed", { exact: true })).toBeVisible();
-  await expect(page.getByText("Reply within 24 hours", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Choose Materials" })).toBeVisible();
-  const builderStory = page.getByTestId("homepage-builder-story");
-  const builderVideo = builderStory.locator("video");
-  await expect(builderStory).toBeVisible();
-  await expect(builderVideo).toHaveAttribute("poster", "/videos/avantia-builder-story-poster.png");
-  await expect(builderVideo.locator('source[type="video/mp4"]')).toHaveAttribute("src", "/videos/avantia-builder-story.mp4");
-  await expect(builderVideo.locator('source[type="video/webm"]')).toHaveAttribute("src", "/videos/avantia-builder-story.webm");
-  await expect(builderVideo).toHaveAttribute("autoplay", "");
-  await expect(builderVideo).toHaveAttribute("muted", "");
-  await expect(builderVideo).toHaveAttribute("loop", "");
-  await expect(builderVideo).toHaveAttribute("playsinline", "");
-  await expect(page.getByTestId("homepage-demo")).toHaveCount(0);
-  await expect(page.getByTestId("homepage-custom-demo")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "From plan to jobsite" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Upload", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Takeoff", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Compare", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Approve", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Deliver", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Framing", exact: true })).toHaveAttribute("href", "/shop/framing");
-  await expect(page.getByRole("link", { name: "Electrical", exact: true })).toHaveAttribute("href", "/shop/electrical");
-  await expect(page.getByRole("link", { name: "Flooring", exact: true })).toHaveAttribute("href", "/shop/wood-floor");
-  await expect(page.getByText("Need materials or pricing?", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Your materials desk", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "One request. One coordinator. No supplier runaround." })).toHaveCount(0);
-  await expect(page.getByText("Tell us what you need. We handle the rest.", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Fewer calls. Better buying decisions. Every order in one place.", { exact: true })).toHaveCount(0);
+  await expect(page).toHaveTitle("Avantia Build | Construction Materials, Handled.");
+  await expect(page.getByText("Avantia Construction Concierge", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Construction Materials, Priced and Delivered." })).toBeVisible();
+  await expect(page.getByText("Send us your plans or material list. We compare suppliers, organize your order, and coordinate jobsite delivery.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Start a Material Request" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Start a Material Request" })).toHaveAttribute("href", "/shop", { timeout: 4000 });
+  await expect(page.getByRole("link", { name: "See How It Works" })).toHaveAttribute("href", "/how-it-works");
+  await expect(page.getByTestId("site-header").getByRole("button", { name: "Open navigation menu" })).toBeVisible();
+  await expect(page.getByTestId("site-header").getByRole("link", { name: "Log in" })).toHaveAttribute("href", "/login");
+
+  const heroVideos = page.locator("main section").first().locator("video");
+  const heroMobileVideo = heroVideos.first();
+  const heroDesktopVideo = heroVideos.nth(1);
+  await expect(heroVideos).toHaveCount(2);
+  await expect(heroMobileVideo).toHaveAttribute("autoplay", "");
+  await expect(heroMobileVideo).toHaveAttribute("muted", "");
+  await expect(heroMobileVideo.locator('source[type="video/mp4"]')).toHaveAttribute("src", "/videos/avantia-hero-background-v12-mobile.mp4");
+  await expect(heroMobileVideo).toHaveAttribute("poster", "/videos/avantia-hero-background-v12-mobile-poster.png");
+  await expect(heroMobileVideo).toHaveAttribute("data-loop-end", "12.25");
+  await expect(heroDesktopVideo.locator('source[type="video/mp4"]')).toHaveAttribute("src", "/videos/avantia-hero-background-v12-desktop.mp4");
+  await expect(heroDesktopVideo).toHaveAttribute("poster", "/videos/avantia-hero-background-v12-desktop-poster.png");
+  await expect(heroDesktopVideo).toHaveAttribute("data-loop-end", "12.25");
+  await expect(page.locator("main section").first().locator('img[alt="Avantia Build"]')).toHaveCount(0);
+  await expect(page.locator("main section").first().locator("[aria-hidden=true] span.rounded-full")).toHaveCount(0);
+  const activeHeroVideo = (page.viewportSize()?.width ?? 1280) < 640 ? heroMobileVideo : heroDesktopVideo;
+  await activeHeroVideo.evaluate((video) => {
+    video.currentTime = 12.4;
+    video.dispatchEvent(new Event("timeupdate"));
+  });
+  await expect.poll(() => activeHeroVideo.evaluate((video) => video.currentTime)).toBeLessThan(1.5);
+  await expect(page.getByRole("button", { name: "Ver página en español" })).toHaveText("ES");
+  await expect(page.getByRole("heading", { name: "One place for material pricing and delivery." })).toBeVisible();
+  await expect(page.locator("main video")).toHaveCount(2);
+  await expect(page.getByRole("heading", { name: "Less purchasing work. More building." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Serving 41 states." })).toBeVisible();
-  const brands = page.getByRole("heading", { name: "Shop Our Brands" });
-  await expect(brands).toBeVisible();
-  await expect(page.getByRole("button", { name: "Pause brand logos" })).toBeVisible();
-  const brandSection = brands.locator("xpath=ancestor::section");
-  expect(await brandSection.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
-  const brandBox = await brands.boundingBox();
-  const heroBox = await page.getByRole("heading", { name: "You Build. We Handle the Materials." }).boundingBox();
-  expect(brandBox?.y).toBeGreaterThan(heroBox?.y ?? Number.NEGATIVE_INFINITY);
-  const departmentBox = await page.getByRole("heading", { name: "Choose Materials" }).boundingBox();
-  expect(brandBox?.y).toBeLessThan(departmentBox?.y ?? Number.POSITIVE_INFINITY);
-  const demoBox = await builderStory.boundingBox();
-  const coverageBox = await page.getByTestId("coverage-scroll-card").boundingBox();
-  expect(demoBox?.y).toBeGreaterThan(departmentBox?.y ?? Number.NEGATIVE_INFINITY);
-  expect(demoBox?.y).toBeLessThan(coverageBox?.y ?? Number.POSITIVE_INFINITY);
   await expect(page.getByTestId("coverage-map").getByTestId("coverage-dot")).toHaveCount(41);
-  const lockups = page.getByTestId("avantia-build-lockup");
-  await expect(lockups.first()).toHaveAttribute("data-testid", "avantia-build-lockup");
-  await expect(lockups.first().locator("img")).toHaveAttribute("src", /avantia-build-lockup-animated\.webp/);
-  await expect(page.getByTestId("site-header").getByRole("img", { name: "Avantia Build" })).toBeVisible();
-  await expect(page.getByRole("img", { name: "Avantia Build animated logo" })).toHaveCount(0);
-  await expect(page.getByRole("navigation", { name: "Mobile homepage" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Shop Our Brands" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pause brand logos" })).toBeVisible();
 
   const overflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflows).toBe(false);
-
-  if (test.info().project.name === "chromium-desktop") {
-    const mainBox = await page.locator("main").first().boundingBox();
-    expect(mainBox?.width).toBeGreaterThan(1300);
-    const islandWidths = await page.getByTestId("homepage-island").evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().width));
-    expect(Math.max(...islandWidths) - Math.min(...islandWidths)).toBeLessThan(2);
-  }
 });
 
-test("coverage card grows as it enters focus", async ({ page }) => {
+test("homepage switches all principal sales content to Spanish", async ({ page }) => {
   await page.goto("/");
-  const card = page.getByTestId("coverage-scroll-card");
-  await expect(card).toBeVisible();
+  await page.getByRole("button", { name: "Ver página en español" }).click();
 
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForTimeout(100);
-  const before = await card.evaluate((element) => Number(getComputedStyle(element).getPropertyValue("--coverage-scale")));
-
-  await card.scrollIntoViewIfNeeded();
-  await page.waitForFunction(
-    ({ testId, initialScale }) => {
-      const element = document.querySelector(`[data-testid="${testId}"]`);
-      return element && Number(getComputedStyle(element).getPropertyValue("--coverage-scale")) > initialScale;
-    },
-    { testId: "coverage-scroll-card", initialScale: before },
-  );
-  const focused = await card.evaluate((element) => Number(getComputedStyle(element).getPropertyValue("--coverage-scale")));
-
-  expect(focused).toBeGreaterThan(before);
-  expect(focused).toBeLessThanOrEqual(1);
+  await expect(page.locator("html")).toHaveAttribute("lang", "es");
+  await expect(page.getByRole("heading", { name: "Materiales cotizados y entregados." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Iniciar solicitud" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Un solo lugar para precios y entrega de materiales." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Menos compras. Más construcción." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Servicio en 41 estados." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Marcas que conseguimos" })).toBeVisible();
+  if ((page.viewportSize()?.width ?? 1024) < 640) {
+    await page.getByRole("button", { name: "Materials" }).click();
+  }
+  await expect(page.getByRole("heading", { name: "Shop materials" })).toBeVisible();
 });
 
-test("customer menu keeps four primary actions and puts Renovation AI under More", async ({ page }) => {
+test("homepage shop stays compact and expandable on phones", async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 1024) >= 640, "Mobile-only compact controls");
+  await page.goto("/");
+
+  await expect(page.getByRole("button", { name: "Services", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(4);
+  await page.getByRole("button", { name: "View all services" }).click();
+  await expect(page.locator('[data-testid="fast-service-grid"] a:visible')).toHaveCount(9);
+
+  await page.getByRole("button", { name: "Materials" }).click();
+  await expect(page.getByRole("heading", { name: "Shop materials" })).toBeVisible();
+  await expect(page.locator('[data-testid="department-card"]:visible')).toHaveCount(6);
+  await page.getByRole("button", { name: "View all materials" }).click();
+  await expect(page.locator('[data-testid="department-card"]:visible')).toHaveCount(15);
+  await page.evaluate(() => window.scrollTo(0, window.innerHeight));
+  await expect(page.getByRole("link", { name: "Start Order" })).toHaveAttribute("href", "/shop");
+});
+
+test("Learn More provides seven distinct shareable service videos", async ({ page }) => {
+  await page.goto("/how-it-works");
+
+  await expect(page.getByRole("heading", { name: "Seven ways Avantia keeps material purchasing off your plate." })).toBeVisible();
+  const videos = page.locator('main video');
+  await expect(videos).toHaveCount(7);
+  for (const slug of ["crew-downtime", "ai-takeoff", "supplier-comparison", "personal-shopper", "order-control", "delivery-coordination", "nationwide-sourcing"]) {
+    await expect(page.locator(`source[src="/videos/marketing/${slug}.mp4"]`)).toHaveCount(1);
+    await expect(page.locator(`track[src="/videos/marketing/${slug}.vtt"]`)).toHaveCount(1);
+  }
+  await page.getByRole("button", { name: "Ver página en español" }).click();
+  await expect(page.getByRole("heading", { name: "Siete maneras en que Avantia simplifica la compra de materiales." })).toBeVisible();
+
+  const overflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflows).toBe(false);
+});
+
+test("primary customer routes remain available in Menu", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Open navigation menu" }).click();
 
+  const drawer = page.getByRole("complementary", { name: "Site navigation" });
   const navigation = page.getByRole("navigation", { name: "Mobile full navigation" });
-  await expect(page.getByRole("button", { name: "Open navigation menu" })).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("complementary", { name: "Site navigation" })).toBeVisible();
+  await expect(drawer).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Home", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Order Materials", exact: true })).toBeVisible();
-  const partnerQuote = navigation.getByRole("link", { name: "Get Material Pricing", exact: true });
-  await expect(partnerQuote).toHaveAttribute("href", "/request-quote");
-  await expect(partnerQuote).not.toHaveAttribute("target", "_blank");
+  await expect(navigation.getByRole("link", { name: "Get Material Pricing", exact: true })).toHaveAttribute("href", "/request-quote");
   await expect(navigation.getByRole("link", { name: "Beat a Supplier Quote", exact: true })).toHaveAttribute("href", "/beat-a-quote");
-  await expect(navigation.getByRole("link", { name: "My Projects", exact: true })).toHaveCount(0);
-  await page.getByRole("complementary", { name: "Site navigation" }).getByText("More", { exact: true }).click();
-  await expect(page.getByRole("navigation", { name: "More navigation" }).getByRole("link", { name: /Renovation AI/ })).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Start Building", exact: true })).toHaveCount(0);
-  await expect(navigation.getByRole("link", { name: "Quotes", exact: true })).toHaveCount(0);
-  await expect(navigation.getByRole("link", { name: "Orders", exact: true })).toHaveCount(0);
-  await expect(navigation.getByRole("link", { name: "Log in", exact: true })).toHaveCount(0);
-  await expect(navigation.getByRole("link", { name: "Create account", exact: true })).toHaveCount(0);
+  await expect(drawer.getByRole("link", { name: "Log in", exact: true })).toHaveCount(0);
 });

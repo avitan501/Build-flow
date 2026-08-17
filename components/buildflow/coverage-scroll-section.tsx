@@ -10,7 +10,7 @@ const coverageDots = [
   [85, 40], [87, 35], [89, 30], [91, 23], [80, 29], [79, 38], [68, 34], [73, 36], [66, 44], [62, 31], [93, 17],
 ] as const
 
-export function CoverageScrollSection() {
+export function CoverageScrollSection({ language = "en" }: { language?: "en" | "es" }) {
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -53,12 +53,12 @@ export function CoverageScrollSection() {
         style={{ "--coverage-scale": 0.92, "--coverage-opacity": 0.78 } as React.CSSProperties}
       >
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Across the U.S.</p>
-          <h2 id="coverage-heading" className="mt-1.5 text-xl font-semibold leading-tight text-[#071126] sm:text-2xl">Serving 41 states.</h2>
-          <p className="mt-2 max-w-md text-sm leading-5 text-slate-600">Tell us the job location. We find options nearby.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">{language === "es" ? "En todo EE. UU." : "Across the U.S."}</p>
+          <h2 id="coverage-heading" className="mt-1.5 text-xl font-semibold leading-tight text-[#071126] sm:text-2xl">{language === "es" ? "Servicio en 41 estados." : "Serving 41 states."}</h2>
+          <p className="mt-2 max-w-md text-sm leading-5 text-slate-600">{language === "es" ? "Díganos dónde está el proyecto. Encontramos opciones cercanas." : "Tell us the job location. We find options nearby."}</p>
         </div>
         <div className="relative mx-auto aspect-[16/9] w-full max-w-xs overflow-hidden sm:max-w-sm" data-testid="coverage-map">
-          <Image src="/images/buildflow-retail/us-coverage-map.webp" alt="Map showing Avantia Build coverage across the United States" fill sizes="(min-width: 640px) 24rem, 100vw" className="object-contain" />
+          <Image src="/images/buildflow-retail/us-coverage-map.webp" alt={language === "es" ? "Mapa de cobertura de Avantia Build en Estados Unidos" : "Map showing Avantia Build coverage across the United States"} fill sizes="(min-width: 640px) 24rem, 100vw" className="object-contain" />
           {coverageDots.map(([left, top]) => (
             <span
               key={`${left}-${top}`}
