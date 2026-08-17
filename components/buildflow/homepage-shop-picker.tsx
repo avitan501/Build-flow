@@ -58,11 +58,11 @@ function buildCategoryFilterHref(category: string, projectId: string, address: s
   return `/shop?${params.toString()}`
 }
 
-const CATEGORY_CUTOUTS: Partial<Record<string, { imageUrl: string; imagePosition: string }>> = {
+const CATEGORY_CUTOUTS: Partial<Record<string, { imageUrl: string; imagePosition: string; imageSize?: string }>> = {
   framing: { imageUrl: "/images/department-essentials/lumber-grid.webp", imagePosition: "0% 0%" },
   "sheet-rock": { imageUrl: "/images/department-essentials/drywall-grid.webp", imagePosition: "0% 0%" },
-  "door-and-molding": { imageUrl: "/images/department-essentials/moldings-grid.webp", imagePosition: "0% 0%" },
-  "wood-floor": { imageUrl: "/images/department-essentials/flooring-grid.webp", imagePosition: "0% 0%" },
+  "door-and-molding": { imageUrl: "/images/department-essentials/door-molding-group.webp", imagePosition: "50% 50%", imageSize: "cover" },
+  "wood-floor": { imageUrl: "/images/department-essentials/flooring-group.webp", imagePosition: "50% 50%", imageSize: "cover" },
   siding: { imageUrl: "/images/department-essentials/siding-grid.webp", imagePosition: "0% 0%" },
   roofing: { imageUrl: "/images/department-essentials/roofing-grid.webp", imagePosition: "0% 0%" },
   window: { imageUrl: "/images/department-essentials/windows-grid.webp", imagePosition: "0% 0%" },
@@ -531,7 +531,7 @@ export function HomepageShopPicker({
                       role="img"
                       aria-label={category.imageAlt}
                       className="absolute inset-0 bg-transparent bg-no-repeat mix-blend-multiply"
-                      style={{ backgroundImage: `url(${cutout.imageUrl})`, backgroundPosition: cutout.imagePosition, backgroundSize: "400% 200%" }}
+                      style={{ backgroundImage: `url(${cutout.imageUrl})`, backgroundPosition: cutout.imagePosition, backgroundSize: cutout.imageSize ?? "400% 200%" }}
                     />
                   ) : (
                     <Image
