@@ -123,6 +123,12 @@ const FAST_SERVICES = [
     href: "/request-quote?request=rush-materials",
     imagePosition: "100% 100%",
   },
+  {
+    label: "High-End",
+    description: "Premium finishes and specialty materials",
+    href: "/request-quote?request=high-end",
+    imagePosition: "50% 50%",
+  },
 ] as const
 
 const EXTRA_DEPARTMENTS = [
@@ -473,7 +479,7 @@ export function HomepageShopPicker({
           {!homepageCompact ? <p className="mt-1 text-[13px] leading-5 text-slate-500 sm:text-sm">Send a quote, plan, list, or jobsite need. We will organize the next step.</p> : null}
         </div>
 
-        <div data-testid="fast-service-grid" className="mt-4 grid grid-cols-3 gap-x-2 gap-y-5 px-1 sm:grid-cols-5 sm:gap-x-4 lg:grid-cols-9">
+        <div data-testid="fast-service-grid" className="mt-4 grid grid-cols-3 gap-x-2 gap-y-5 px-1 sm:grid-cols-5 sm:gap-x-4 lg:grid-cols-10">
           {FAST_SERVICES.map((service, index) => {
             return (
               <Link

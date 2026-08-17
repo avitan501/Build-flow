@@ -255,6 +255,15 @@ export const SERVICE_ASSIGNMENT_TARGETS: ServiceAssignmentTarget[] = [
     defaultSupplierId: "window-supplier",
     defaultQuestions: EITAN_WINDOW_QUESTIONS,
   },
+  {
+    id: "services-high-end",
+    departmentSlug: "services",
+    departmentLabel: "Services",
+    serviceLabel: "High-End",
+    description: "Premium finishes, specialty materials, and high-end sourcing requests.",
+    defaultSupplierId: "materials-desk",
+    defaultQuestions: DEFAULT_SERVICE_QUESTIONS,
+  },
 ]
 
 function supplierForTarget(target: QualificationTarget) {

@@ -54,3 +54,17 @@ test("Order Materials opens the service hub while category links retain the cata
   expect(catalogExperience).toContain("{!isLiquidationView ? <section");
   expect(detailExperience).toContain('product.category !== "Liquidation"');
 });
+
+test("Order Materials includes a configurable High-End service", async () => {
+  const [picker, qualification] = await Promise.all([
+    readFile(path.join(root, "components/buildflow/homepage-shop-picker.tsx"), "utf8"),
+    readFile(path.join(root, "lib/shop-qualification.ts"), "utf8"),
+  ]);
+
+  expect(picker).toContain('label: "High-End"');
+  expect(picker).toContain('href: "/request-quote?request=high-end"');
+  expect(picker).toContain('description: "Premium finishes and specialty materials"');
+  expect(qualification).toContain('id: "services-high-end"');
+  expect(qualification).toContain('serviceLabel: "High-End"');
+  expect(qualification).toContain('departmentLabel: "Services"');
+});
