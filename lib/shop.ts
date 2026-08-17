@@ -1,6 +1,6 @@
 export const SHOP_SUPPLIER_ESTIMATE_STATUSES = ["draft", "reviewed", "archived"] as const;
 export const SHOP_ITEM_SOURCES = ["supplier_estimate", "manual"] as const;
-export const SHOP_CATEGORY_NAMES = ["Services", "Framing", "Tile work", "Sheet rock", "Kitchen", "Eitan", "Carpentry", "Exterior", "Miscellaneous"] as const;
+export const SHOP_CATEGORY_NAMES = ["Services", "Liquidation", "Framing", "Tile work", "Sheet rock", "Kitchen", "Eitan", "Carpentry", "Exterior", "Miscellaneous"] as const;
 export const SHOP_CATEGORY_CHIPS = SHOP_CATEGORY_NAMES;
 export const SHOP_POPULAR_SEARCHES = ["2x4 studs", "joist hangers", "subfloor adhesive", "pressure treated", "flashing roll", "final survey", "stakeout foundations"] as const;
 
@@ -11,6 +11,7 @@ export type ShopCategoryName = (typeof SHOP_CATEGORY_NAMES)[number];
 const SHOP_CATEGORY_SET = new Set<string>(SHOP_CATEGORY_NAMES);
 const SHOP_CATEGORY_KEYWORDS: Record<ShopCategoryName, RegExp> = {
   Services: /\b(survey|surveys|stakeout|final survey|under construction survey)\b/,
+  Liquidation: /\b(liquidation|surplus|closeout|overstock)\b/,
   Framing: /\b(2x4|2x6|2x8|2x10|2x12|lvl|joist|joists|hanger|hangers|tie|ties|nail|nails|strap|straps|bridging|treated lumber|plywood)\b/,
   "Tile work": /\b(tile|tiles|grout|thinset|thin set|mortar|schluter|cement board|backer board|backerboard|underlayment|tile paper|wire mesh|mesh|portland cement|fine sand)\b/,
   "Sheet rock": /\b(sheetrock|sheet rock|drywall|gypsum|compound|corner bead)\b/,
@@ -50,6 +51,7 @@ export function suggestShopCategory(input: {
   const haystack = buildCategoryHaystack(input);
 
   if (SHOP_CATEGORY_KEYWORDS.Services.test(haystack)) return "Services";
+  if (SHOP_CATEGORY_KEYWORDS.Liquidation.test(haystack)) return "Liquidation";
   if (SHOP_CATEGORY_KEYWORDS.Framing.test(haystack)) return "Framing";
   if (SHOP_CATEGORY_KEYWORDS["Tile work"].test(haystack)) return "Tile work";
   if (SHOP_CATEGORY_KEYWORDS["Sheet rock"].test(haystack)) return "Sheet rock";
@@ -75,6 +77,11 @@ export function mapExistingCategoryToShopCategory(
     case "services":
     case "service":
       return "Services";
+    case "liquidation":
+    case "surplus":
+    case "closeout":
+    case "overstock":
+      return "Liquidation";
     case "lumber":
     case "treated lumber":
     case "lvl beams":

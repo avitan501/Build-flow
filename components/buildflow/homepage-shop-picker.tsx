@@ -107,8 +107,8 @@ const FAST_SERVICES = [
   },
   {
     label: "Liquidation",
-    description: "Move or source surplus materials",
-    href: "/request-quote?request=liquidation",
+    description: "Shop surplus and closeout materials",
+    href: "/shop?category=Liquidation",
     imagePosition: "0% 100%",
   },
   {

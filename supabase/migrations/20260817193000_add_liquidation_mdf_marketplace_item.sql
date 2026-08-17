@@ -1,0 +1,101 @@
+insert into public.shop_items (
+  id,
+  supplier_estimate_id,
+  supplier_name,
+  quote_number,
+  pricing_date,
+  item_number,
+  name,
+  description,
+  category,
+  quantity,
+  unit,
+  unit_price,
+  extended_price,
+  source,
+  image_url,
+  image_alt,
+  image_source,
+  image_license,
+  image_credit,
+  image_category,
+  image_gallery
+)
+values (
+  'liquidation-facebook-926145880521723',
+  null,
+  'Liquidation Marketplace Listing',
+  'FBM-926145880521723',
+  date '2026-08-17',
+  'LIQ-MDF-2496-050',
+  '24 in. x 96 in. x 1/2 in. MDF Board - Brand New',
+  'Brand-new MDF sheets for cabinetry, furniture, shelving, wall panels, DIY projects, and woodworking. Price is $10 per board with a 20-board minimum order. Large quantities were listed as available in Carteret, NJ. Availability and pickup or delivery must be confirmed before purchase.',
+  'Liquidation',
+  20,
+  'Per board - 20-board minimum',
+  10.00,
+  200.00,
+  'manual',
+  '/images/liquidation/mdf-board-24x96-half-inch-1.webp',
+  'New MDF boards stacked in a warehouse',
+  'https://www.facebook.com/marketplace/item/926145880521723/',
+  'Original Marketplace listing',
+  'Marketplace seller Adar',
+  'Liquidation',
+  jsonb_build_array(
+    jsonb_build_object(
+      'imageUrl', '/images/liquidation/mdf-board-24x96-half-inch-2.webp',
+      'imageAlt', 'Wrapped stacks of MDF boards in a warehouse',
+      'imageSource', 'https://www.facebook.com/marketplace/item/926145880521723/',
+      'imageLicense', 'Original Marketplace listing',
+      'imageCredit', 'Marketplace seller Adar',
+      'imageCategory', 'Liquidation'
+    ),
+    jsonb_build_object(
+      'imageUrl', '/images/liquidation/mdf-board-24x96-half-inch-3.webp',
+      'imageAlt', 'MDF board shown upright to demonstrate its width and finish',
+      'imageSource', 'https://www.facebook.com/marketplace/item/926145880521723/',
+      'imageLicense', 'Original Marketplace listing',
+      'imageCredit', 'Marketplace seller Adar',
+      'imageCategory', 'Liquidation'
+    ),
+    jsonb_build_object(
+      'imageUrl', '/images/liquidation/mdf-board-24x96-half-inch-4.webp',
+      'imageAlt', 'Full-length MDF board shown upright against a wall',
+      'imageSource', 'https://www.facebook.com/marketplace/item/926145880521723/',
+      'imageLicense', 'Original Marketplace listing',
+      'imageCredit', 'Marketplace seller Adar',
+      'imageCategory', 'Liquidation'
+    ),
+    jsonb_build_object(
+      'imageUrl', '/images/liquidation/mdf-board-24x96-half-inch-5.webp',
+      'imageAlt', 'Large inventory of light-colored MDF boards in a warehouse',
+      'imageSource', 'https://www.facebook.com/marketplace/item/926145880521723/',
+      'imageLicense', 'Original Marketplace listing',
+      'imageCredit', 'Marketplace seller Adar',
+      'imageCategory', 'Liquidation'
+    )
+  )
+)
+on conflict (id) do update
+set
+  supplier_name = excluded.supplier_name,
+  quote_number = excluded.quote_number,
+  pricing_date = excluded.pricing_date,
+  item_number = excluded.item_number,
+  name = excluded.name,
+  description = excluded.description,
+  category = excluded.category,
+  quantity = excluded.quantity,
+  unit = excluded.unit,
+  unit_price = excluded.unit_price,
+  extended_price = excluded.extended_price,
+  source = excluded.source,
+  image_url = excluded.image_url,
+  image_alt = excluded.image_alt,
+  image_source = excluded.image_source,
+  image_license = excluded.image_license,
+  image_credit = excluded.image_credit,
+  image_category = excluded.image_category,
+  image_gallery = excluded.image_gallery,
+  updated_at = now();
