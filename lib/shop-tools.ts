@@ -15,6 +15,7 @@ export type ShopToolSlug =
   | "exterior"
   | "window"
   | "electrical"
+  | "concrete-masonry"
 
 export const DEPARTMENT_SYMBOL_KEYS = [
   "shopping-list",
@@ -133,6 +134,14 @@ export const SHOP_TOOL_CATEGORIES: ShopToolCategory[] = [
     imageAlt: "Wood, vinyl, replacement, and new-construction windows with installation materials",
     symbols: ["shopping-list", "blueprint", "site-visit"],
   },
+  {
+    slug: "concrete-masonry",
+    label: "Concrete & Masonry",
+    description: "One-yard bags of sand, crushed stone, mulch, and bulk jobsite materials.",
+    imageUrl: "/images/materials/bulk-bags/one-yard-sand-bag.webp",
+    imageAlt: "One cubic yard bulk bag filled with construction sand",
+    symbols: ["shopping-list", "delivery"],
+  },
 ]
 
 export function findShopToolCategory(slug: string) {
@@ -229,6 +238,10 @@ export function filterProductsForShopTool(products: ShopCatalogProduct[], slug: 
 
     if (slug === "roofing" || slug === "exterior") {
       return product.productType !== "service" && product.category === "Exterior" && !isWindowProduct(product) && (isRoofingProduct(product) || !isSidingProduct(product))
+    }
+
+    if (slug === "concrete-masonry") {
+      return product.productType !== "service" && product.category === "Concrete"
     }
 
     return product.productType !== "service" && isWindowProduct(product)

@@ -32,6 +32,7 @@ const MATERIAL_CATALOG_DEPARTMENT: Partial<Record<ShopToolSlug, string>> = {
   roofing: "Roofing",
   window: "Windows",
   eitan: "Windows",
+  "concrete-masonry": "Concrete",
 }
 
 async function loadCurrentUserProjects(questionnaireDepartment: string) {

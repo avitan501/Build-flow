@@ -1,6 +1,7 @@
 import Image from "next/image"
 
 import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
+import { BulkBagStorefront } from "@/components/buildflow/bulk-bag-storefront"
 import { DepartmentEssentials } from "@/components/buildflow/department-essentials"
 import { DepartmentRequestComposer } from "@/components/buildflow/department-request-composer"
 import { EmbeddedMaterialQuickOrder } from "@/components/buildflow/embedded-material-quick-order"
@@ -197,21 +198,23 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
   const usesEmbeddedQuickOrder = ["wood-floor", "sheet-rock", "tile-work", "door-and-molding", "framing", "electrical"].includes(category.slug)
   const composerHandlesUpload = usesEmbeddedQuickOrder
   const usesCompactCustomOrder = usesEmbeddedQuickOrder || customOrderOnly
+  const isBulkBagDepartment = category.slug === "concrete-masonry"
 
   return (
     <main className="min-h-screen bg-[#f7f8fa] px-4 py-4 pb-28 text-slate-900 sm:px-6 sm:py-5 sm:pb-10 lg:px-8">
       <section className="mx-auto flex max-w-7xl flex-col gap-4">
         <h1 className={`${category.slug === "door-and-molding" ? "text-[1.7rem] sm:text-[2rem]" : "text-[2rem] sm:text-[2.4rem]"} font-bold tracking-normal text-slate-950`}>{category.label}</h1>
 
+        {isBulkBagDepartment ? <BulkBagStorefront /> : null}
+        {category.slug === "door-and-molding" ? <DoorPricingGuide /> : null}
         {experience.showQuickOrder && category.slug === "sheet-rock" ? <SheetRockProductConfigurator /> : null}
         {experience.showQuickOrder && usesEmbeddedQuickOrder && category.slug !== "sheet-rock" && questionnaireSnapshot ? <div id={category.slug === "door-and-molding" ? "door-order-builder" : undefined} className="scroll-mt-24"><EmbeddedMaterialQuickOrder snapshot={questionnaireSnapshot} category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} /></div> : null}
-        {category.slug === "door-and-molding" ? <DoorPricingGuide /> : null}
-        {experience.showQuickOrder && !customOrderOnly && (!usesEmbeddedQuickOrder || !questionnaireSnapshot) ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
-        {experience.showPlanUpload && usesStandardUpload && !composerHandlesUpload ? <CombinedUploadAction category={questionnaireDepartment} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
+        {experience.showQuickOrder && !isBulkBagDepartment && !customOrderOnly && (!usesEmbeddedQuickOrder || !questionnaireSnapshot) ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
+        {experience.showPlanUpload && !isBulkBagDepartment && usesStandardUpload && !composerHandlesUpload ? <CombinedUploadAction category={questionnaireDepartment} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}
         {experience.showPlanUpload && category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
 
-        {(customOrderOnly || experience.showChatToOrder) && usesCompactCustomOrder ? (
+        {!isBulkBagDepartment && (customOrderOnly || experience.showChatToOrder) && usesCompactCustomOrder ? (
           <details open={customOrderOnly} className="group rounded-lg border border-slate-200 bg-white shadow-sm">
             <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left marker:content-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-sky-100">
               <span><span className="block text-base font-bold text-slate-950">{`Need Help With a Custom ${category.label} Order?`}</span><span className="mt-0.5 block text-sm text-slate-500">Describe the request or attach a blueprint or shopping list.</span></span>
@@ -219,7 +222,7 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
             </summary>
             <div className="border-t border-slate-100 px-5 [&>section]:border-0"> <DepartmentRequestComposer category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} allowUpload={customOrderOnly || (composerHandlesUpload && experience.showPlanUpload)} /></div>
           </details>
-        ) : experience.showChatToOrder ? <DepartmentRequestComposer category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} allowUpload={composerHandlesUpload && experience.showPlanUpload} /> : null}
+        ) : !isBulkBagDepartment && experience.showChatToOrder ? <DepartmentRequestComposer category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} allowUpload={composerHandlesUpload && experience.showPlanUpload} /> : null}
 
         <DepartmentEssentials data={essentials} />
       </section>

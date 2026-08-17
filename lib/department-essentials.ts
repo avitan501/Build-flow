@@ -64,6 +64,19 @@ const ESSENTIALS: Partial<Record<ShopToolSlug, DepartmentEssentials>> = {
     spriteUrl: "/images/department-essentials/drywall-grid.webp",
     items: ["Drywall sheets", "Moisture-resistant board", "Joint compound", "Drywall tape", "Corner bead", "Drywall screws", "Metal studs", "Insulation"],
   },
+  "concrete-masonry": {
+    spriteUrl: "",
+    items: [
+      { name: "Concrete mix", imageUrl: "/images/materials/concrete.svg" },
+      { name: "Mortar mix", imageUrl: "/images/materials/concrete.svg" },
+      { name: "Portland cement", imageUrl: "/images/materials/products-real/lehigh-portland-cement-type-i-ii.jpg" },
+      { name: "Concrete blocks", imageUrl: "/images/materials/concrete.svg" },
+      { name: "Rebar", imageUrl: "/images/materials/photos/concrete.jpg" },
+      { name: "Wire mesh", imageUrl: "/images/materials/photos/concrete.jpg" },
+      { name: "Forming supplies", imageUrl: "/images/materials/photos/concrete.jpg" },
+      { name: "Masonry tools", imageUrl: "/images/materials/photos/concrete.jpg" },
+    ],
+  },
   services: {
     spriteUrl: "/images/department-essentials/services-grid.webp",
     items: ["Site measurement", "Blueprint takeoff", "Material sourcing", "Quote comparison", "Delivery planning", "Product matching", "Closeout sourcing", "Project coordination"],

@@ -32,12 +32,35 @@ test("shop exposes ordering answers, contact options, and policy links", async (
 })
 
 test("public routes declare their own canonical URL", async ({ page }) => {
-  for (const pathName of ["/", "/shop", "/shop/framing", "/privacy"]) {
+  for (const pathName of ["/", "/shop", "/shop/framing", "/shop/concrete-masonry", "/privacy"]) {
     await page.goto(pathName)
     const canonical = new URL(await page.locator('link[rel="canonical"]').getAttribute("href") || "")
     expect(canonical.origin).toBe("https://build.avantiap.com")
     expect(canonical.pathname).toBe(pathName)
   }
+})
+
+test("concrete and masonry offers one-yard bags and supplied bagged-material pricing", async ({ page }) => {
+  await page.goto("/shop/concrete-masonry")
+
+  await expect(page.getByRole("heading", { name: "Concrete & Masonry" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Choose a one-yard bag" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "1 Yard Sand Bag" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "1 Yard Crushed Stone Bag" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "1 Yard Mulch Bag" })).toBeVisible()
+  await expect(page.getByRole("button", { name: /Send One Yard Bag/ })).toHaveCount(3)
+  await expect(page.getByLabel("Sand bag price breakdown")).toContainText("$54")
+  await expect(page.getByLabel("Sand bag price breakdown")).toContainText("$35")
+  await expect(page.getByLabel("Sand bag price breakdown")).toContainText("$250")
+  await expect(page.getByText("Heidelberg Materials Lehigh Portland Cement Type I/II", { exact: true })).toBeVisible()
+  await expect(page.getByText("$16.45", { exact: true })).toBeVisible()
+  await expect(page.getByText("MAPEI Keraflex Plus Gray Thinset", { exact: true })).toBeVisible()
+  await expect(page.getByText("$18.00", { exact: true })).toBeVisible()
+
+  await page.getByRole("button", { name: "Increase 1 Yard Sand Bag quantity" }).click()
+  await expect(page.getByLabel("Quantity for 1 Yard Sand Bag")).toContainText("2")
+  await expect(page.getByRole("heading", { name: "Common materials" })).toBeVisible()
+  await expect(page.getByTestId("department-essentials").locator("article")).toHaveCount(8)
 })
 
 test("address selection closes and keeps one clear selected address", async ({ page }) => {
@@ -624,6 +647,9 @@ test("door and molding reveals the matching order fields", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "1-Panel Shaker Interior Door" })).toBeVisible()
   await expect(page.getByTestId("door-price-options")).toContainText("$131")
   await expect(page.getByText("See All 13 Size Prices")).toBeVisible()
+  const featuredDoorTop = await page.getByRole("heading", { name: "1-Panel Shaker Interior Door" }).boundingBox()
+  const orderBuilderTop = await page.getByRole("heading", { name: "Door & Molding Quick Order" }).boundingBox()
+  expect(featuredDoorTop?.y ?? Number.MAX_SAFE_INTEGER).toBeLessThan(orderBuilderTop?.y ?? 0)
   await page.getByRole("button", { name: "Molding" }).click()
   await expect(page.getByRole("link", { name: "Molding Catalog" })).toHaveAttribute("href", "https://www.gardenstatelumber.com/products-programs/moulding/")
   await expect(page.getByLabel("Molding profile code")).toHaveCount(1)
