@@ -60,14 +60,16 @@ test("manager goals are persistent and protected for manager users", async () =>
   expect(migration).toContain("created_by = (select auth.uid())");
 });
 
-test("outreach leads remain separate from clients and store relationship level", async () => {
-  const [page, component, actions, userActions, migration, levelMigration, indexMigration, ownerPolicyMigration] = await Promise.all([
+test("outreach leads remain separate from clients and store relationship level and language", async () => {
+  const [page, component, addClient, actions, userActions, migration, levelMigration, languageMigration, indexMigration, ownerPolicyMigration] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/client-target-outreach.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/add-target-client.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/goals-progress/lead-actions.ts"), "utf8"),
     readFile(path.join(root, "app/admin/users/actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817175631_manager_outreach_leads.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817214500_add_outreach_lead_relationship_level.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260817223000_add_client_preferred_language.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817180209_index_manager_tracking_creators.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817183000_allow_owner_manage_outreach_leads.sql"), "utf8"),
   ]);
@@ -77,11 +79,16 @@ test("outreach leads remain separate from clients and store relationship level",
   expect(component).toContain("A lead stays separate from active clients and orders.");
   expect(component).toContain("Relationship level");
   expect(component).toContain("Level {lead.relationship_level}");
-  expect(actions.match(/requireStaffProfile\("customers"\)/g)?.length).toBe(3);
+  expect(component).toContain("Preferred language");
+  expect(component).toContain("updateClientLanguageAction");
+  expect(addClient).toContain("Preferred language");
+  expect(actions.match(/requireStaffProfile\("customers"\)/g)?.length).toBe(4);
   expect(actions).not.toContain("createAdminClient");
-  expect(actions.match(/supabase\.from\("manager_outreach_leads"\)/g)?.length).toBe(3);
+  expect(actions.match(/supabase\.from\("manager_outreach_leads"\)/g)?.length).toBe(4);
   expect(actions).toContain('error: "Enter a valid phone number."');
   expect(actions).toContain("relationship_level: relationshipLevel");
+  expect(actions).toContain("preferred_language: preferredLanguage");
+  expect(actions).toContain('target: "lead" | "client"');
   expect(userActions).toContain('createTargetClientAction(input: ManagerNewClientInput)');
   expect(userActions).toContain('requireStaffProfile("customers")');
   expect(migration).toContain("create table if not exists public.manager_outreach_leads");
@@ -93,6 +100,9 @@ test("outreach leads remain separate from clients and store relationship level",
   expect(ownerPolicyMigration).toContain("avitanneto@gmail.com");
   expect(levelMigration).toContain("relationship_level smallint not null default 1");
   expect(levelMigration).toContain("relationship_level between 1 and 5");
+  expect(languageMigration).toContain("manager_outreach_leads_preferred_language_check");
+  expect(languageMigration).toContain("profiles_preferred_language_check");
+  expect(languageMigration.match(/preferred_language in \('en', 'es'\)/g)?.length).toBe(2);
 });
 
 test("Client Target call guide opens in Goals and the old page redirects", async () => {

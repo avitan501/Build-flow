@@ -13,7 +13,7 @@ import type { ReactNode } from "react";
 import { AddTargetClient } from "@/components/buildflow/add-target-client";
 import { AffiliateProgramTracker } from "@/components/buildflow/affiliate-program-tracker";
 import { ClientTargetCallGuide } from "@/components/buildflow/client-target-call-guide";
-import { AddOutreachLead, OutreachLeadList, type OutreachLeadRecord } from "@/components/buildflow/client-target-outreach";
+import { AddOutreachLead, ClientLanguageSelect, OutreachLeadList, type OutreachLeadRecord } from "@/components/buildflow/client-target-outreach";
 import { AddManagerGoal, CustomManagerGoals, type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { WebsiteFixNotes } from "@/components/buildflow/website-fix-notes";
 import type {
@@ -34,6 +34,7 @@ type ClientTarget = {
   company_name: string | null;
   email: string | null;
   phone: string | null;
+  preferred_language: "en" | "es";
 };
 
 function clientName(client: ClientTarget) {
@@ -98,7 +99,7 @@ function ClientTargetGoal({ clients, leads, canManageClients }: { clients: Clien
     <div className="flex flex-wrap gap-2">{canManageClients ? <><AddOutreachLead /><AddTargetClient /></> : null}<ClientTargetCallGuide /></div>
     <div className="mt-4 grid gap-4 lg:grid-cols-2">
       <OutreachLeadList leads={leads} />
-      <details className="overflow-hidden rounded-md border border-slate-200 bg-white"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between bg-slate-50 px-3 py-2 text-xs font-semibold uppercase text-slate-600"><span>Clients in the system</span><span className="text-slate-500">{clients.length} clients · Open</span></summary><div className="flex justify-end border-t border-slate-100 px-3 py-2"><Link href="/admin/users" className="text-xs font-semibold text-[#0066cc]">Full directory</Link></div>{clients.length ? clients.map((client) => <div key={client.id} className="flex min-h-12 items-center justify-between gap-3 border-t border-slate-100 px-3 py-2"><div className="min-w-0"><p className="truncate text-sm font-semibold">{clientName(client)}</p><p className="truncate text-xs text-slate-500">{client.company_name || client.email || client.phone || "Contact details needed"}</p></div>{client.phone ? <a href={`tel:${client.phone}`} aria-label={`Call ${clientName(client)}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600"><PhoneCall className="h-4 w-4" /></a> : null}</div>) : <p className="border-t border-slate-100 px-3 py-4 text-sm text-slate-500">No clients added yet.</p>}</details>
+      <details className="overflow-hidden rounded-md border border-slate-200 bg-white"><summary className="flex min-h-12 cursor-pointer list-none items-center justify-between bg-slate-50 px-3 py-2 text-xs font-semibold uppercase text-slate-600"><span>Clients in the system</span><span className="text-slate-500">{clients.length} clients · Open</span></summary><div className="flex justify-end border-t border-slate-100 px-3 py-2"><Link href="/admin/users" className="text-xs font-semibold text-[#0066cc]">Full directory</Link></div>{clients.length ? clients.map((client) => <div key={client.id} className="flex min-h-12 items-center justify-between gap-3 border-t border-slate-100 px-3 py-2"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{clientName(client)}</p><p className="truncate text-xs text-slate-500">{client.company_name || client.email || client.phone || "Contact details needed"}</p></div><ClientLanguageSelect id={client.id} name={clientName(client)} language={client.preferred_language} />{client.phone ? <a href={`tel:${client.phone}`} aria-label={`Call ${clientName(client)}`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-600"><PhoneCall className="h-4 w-4" /></a> : null}</div>) : <p className="border-t border-slate-100 px-3 py-4 text-sm text-slate-500">No clients added yet.</p>}</details>
     </div>
   </GoalDisclosure>;
 }
@@ -113,9 +114,9 @@ function SupplierPricingGoal() {
 export default async function GoalsProgressPage() {
   const { supabase, access } = await requireManagerPortalProfile();
   const [clientResult, goalResult, leadResult] = await Promise.all([
-    supabase.from("profiles").select("id,full_name,company_name,email,phone").eq("role", "client").eq("is_active", true).order("created_at", { ascending: false }).limit(5).returns<ClientTarget[]>(),
+    supabase.from("profiles").select("id,full_name,company_name,email,phone,preferred_language").eq("role", "client").eq("is_active", true).order("created_at", { ascending: false }).limit(5).returns<ClientTarget[]>(),
     supabase.from("manager_goals").select("id,assignee,title,details,status").order("status").order("created_at", { ascending: false }).returns<ManagerGoalRecord[]>(),
-    supabase.from("manager_outreach_leads").select("id,full_name,company_name,email,phone,notes,status,relationship_level").order("status").order("created_at", { ascending: false }).returns<OutreachLeadRecord[]>(),
+    supabase.from("manager_outreach_leads").select("id,full_name,company_name,email,phone,notes,status,relationship_level,preferred_language").order("status").order("created_at", { ascending: false }).returns<OutreachLeadRecord[]>(),
   ]);
   const clients = clientResult.error ? [] : clientResult.data ?? [];
   const goals = goalResult.error ? [] : goalResult.data ?? [];

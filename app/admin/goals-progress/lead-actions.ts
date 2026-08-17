@@ -7,6 +7,7 @@ import { requireStaffProfile } from "@/lib/auth";
 type LeadResult = { ok: true } | { ok: false; error: string };
 
 const LEAD_STATUSES = ["new", "contacted", "qualified", "not_interested"] as const;
+const CLIENT_LANGUAGES = ["en", "es"] as const;
 
 function refreshOutreach() {
   revalidatePath("/admin/goals-progress");
@@ -19,6 +20,7 @@ export async function createOutreachLeadAction(input: {
   phone: string;
   notes: string;
   relationshipLevel: number;
+  preferredLanguage: string;
 }): Promise<LeadResult> {
   const { supabase, user } = await requireStaffProfile("customers");
   const fullName = input.fullName.trim().replace(/\s+/g, " ").slice(0, 160);
@@ -27,6 +29,7 @@ export async function createOutreachLeadAction(input: {
   const phone = input.phone.trim().slice(0, 40);
   const notes = input.notes.trim().slice(0, 1000);
   const relationshipLevel = Number.isInteger(input.relationshipLevel) && input.relationshipLevel >= 1 && input.relationshipLevel <= 5 ? input.relationshipLevel : 1;
+  const preferredLanguage = CLIENT_LANGUAGES.find((language) => language === input.preferredLanguage) ?? "en";
 
   if (fullName.length < 2) return { ok: false, error: "Enter the lead's name." };
   if (!email && !phone) return { ok: false, error: "Enter an email or phone number." };
@@ -42,6 +45,7 @@ export async function createOutreachLeadAction(input: {
     phone: phone || null,
     notes: notes || null,
     relationship_level: relationshipLevel,
+    preferred_language: preferredLanguage,
     created_by: user.id,
   });
   if (error) {
@@ -53,6 +57,20 @@ export async function createOutreachLeadAction(input: {
     });
     return { ok: false, error: "The lead could not be added. Please try again." };
   }
+
+  refreshOutreach();
+  return { ok: true };
+}
+
+export async function updateClientLanguageAction(input: { id: string; target: "lead" | "client"; language: string }): Promise<LeadResult> {
+  const { supabase } = await requireStaffProfile("customers");
+  const language = CLIENT_LANGUAGES.find((value) => value === input.language);
+  if (!language) return { ok: false, error: "Choose English or Spanish." };
+
+  const result = input.target === "client"
+    ? await supabase.from("profiles").update({ preferred_language: language }).eq("id", input.id).eq("role", "client")
+    : await supabase.from("manager_outreach_leads").update({ preferred_language: language }).eq("id", input.id);
+  if (result.error) return { ok: false, error: "The client language could not be updated." };
 
   refreshOutreach();
   return { ok: true };

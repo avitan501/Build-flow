@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import {
   createOutreachLeadAction,
   deleteOutreachLeadAction,
+  updateClientLanguageAction,
   updateOutreachLeadStatusAction,
 } from "@/app/admin/goals-progress/lead-actions";
 
@@ -19,9 +20,10 @@ export type OutreachLeadRecord = {
   notes: string | null;
   status: "new" | "contacted" | "qualified" | "not_interested";
   relationship_level: number;
+  preferred_language: "en" | "es";
 };
 
-const EMPTY_LEAD = { fullName: "", companyName: "", email: "", phone: "", notes: "", relationshipLevel: 1 };
+const EMPTY_LEAD = { fullName: "", companyName: "", email: "", phone: "", notes: "", relationshipLevel: 1, preferredLanguage: "en" };
 
 export function AddOutreachLead() {
   const [open, setOpen] = useState(false);
@@ -61,6 +63,7 @@ export function AddOutreachLead() {
             <label className="grid gap-1.5 text-sm font-semibold">Email<input type="email" value={lead.email} onChange={(event) => setLead((current) => ({ ...current, email: event.target.value }))} className="min-h-11 rounded-md border border-slate-300 px-3 font-normal" /></label>
             <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">Company <span className="font-normal text-slate-400">optional</span><input value={lead.companyName} onChange={(event) => setLead((current) => ({ ...current, companyName: event.target.value }))} className="min-h-11 rounded-md border border-slate-300 px-3 font-normal" /></label>
             <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">Relationship level <span className="font-normal text-slate-400">1 = new contact, 5 = know very well</span><select value={lead.relationshipLevel} onChange={(event) => setLead((current) => ({ ...current, relationshipLevel: Number(event.target.value) }))} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal">{[1, 2, 3, 4, 5].map((level) => <option key={level} value={level}>Level {level}</option>)}</select></label>
+            <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">Preferred language<select value={lead.preferredLanguage} onChange={(event) => setLead((current) => ({ ...current, preferredLanguage: event.target.value }))} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal"><option value="en">English</option><option value="es">Spanish</option></select></label>
             <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">Outreach notes <span className="font-normal text-slate-400">optional</span><textarea rows={3} maxLength={1000} value={lead.notes} onChange={(event) => setLead((current) => ({ ...current, notes: event.target.value }))} placeholder="What they buy, when to call, or the next step" className="rounded-md border border-slate-300 p-3 font-normal" /></label>
             {error ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700 sm:col-span-2">{error}</p> : null}
           </div>
@@ -91,10 +94,17 @@ export function OutreachLeadList({ leads }: { leads: OutreachLeadRecord[] }) {
     {leads.length ? leads.map((lead) => <article key={lead.id} className="border-t border-slate-100 px-3 py-3">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold">{lead.full_name}</p><span className="shrink-0 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-[#0066cc]">Level {lead.relationship_level}</span></div><p className="truncate text-xs text-slate-500">{lead.company_name || lead.email || lead.phone}</p>{lead.notes ? <p className="mt-1 text-xs leading-5 text-slate-600">{lead.notes}</p> : null}</div>
-        <select aria-label={`Status for ${lead.full_name}`} defaultValue={lead.status} disabled={pending} onChange={(event) => run(() => updateOutreachLeadStatusAction({ id: lead.id, status: event.target.value }))} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"><option value="new">New</option><option value="contacted">Contacted</option><option value="qualified">Qualified</option><option value="not_interested">Not interested</option></select>
+        <div className="flex flex-wrap gap-1"><select aria-label={`Language for ${lead.full_name}`} defaultValue={lead.preferred_language} disabled={pending} onChange={(event) => run(() => updateClientLanguageAction({ id: lead.id, target: "lead", language: event.target.value }))} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"><option value="en">English</option><option value="es">Spanish</option></select><select aria-label={`Status for ${lead.full_name}`} defaultValue={lead.status} disabled={pending} onChange={(event) => run(() => updateOutreachLeadStatusAction({ id: lead.id, status: event.target.value }))} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"><option value="new">New</option><option value="contacted">Contacted</option><option value="qualified">Qualified</option><option value="not_interested">Not interested</option></select></div>
         <div className="flex gap-1">{lead.phone ? <a href={`tel:${lead.phone}`} aria-label={`Call ${lead.full_name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600"><PhoneCall className="h-4 w-4" /></a> : null}{lead.email ? <a href={`mailto:${lead.email}`} aria-label={`Email ${lead.full_name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600"><Mail className="h-4 w-4" /></a> : null}<button type="button" disabled={pending} onClick={() => window.confirm(`Remove ${lead.full_name} from leads?`) && run(() => deleteOutreachLeadAction(lead.id))} aria-label={`Remove ${lead.full_name}`} className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button></div>
       </div>
     </article>) : <p className="border-t border-slate-100 px-3 py-4 text-sm text-slate-500">No outreach leads yet. Add the first person Carlos should contact.</p>}
     {error ? <p className="m-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
   </details>;
+}
+
+export function ClientLanguageSelect({ id, name, language }: { id: string; name: string; language: "en" | "es" }) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  return <div className="grid justify-items-end gap-1"><select aria-label={`Language for ${name}`} defaultValue={language} disabled={pending} onChange={(event) => startTransition(async () => { setError(null); const result = await updateClientLanguageAction({ id, target: "client", language: event.target.value }); if (!result.ok) setError(result.error); })} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"><option value="en">English</option><option value="es">Spanish</option></select>{error ? <span className="text-right text-[10px] font-semibold text-rose-600">{error}</span> : null}</div>;
 }

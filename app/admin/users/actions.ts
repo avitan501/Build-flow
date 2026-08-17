@@ -12,7 +12,7 @@ type DeleteManagerRecordResult =
   | { ok: true; warning?: string }
   | { ok: false; error: string };
 export type ManagerRequestLineInput = { name: string; quantity: number; unit: string };
-export type ManagerNewClientInput = { fullName: string; email: string; phone?: string; companyName?: string };
+export type ManagerNewClientInput = { fullName: string; email: string; phone?: string; companyName?: string; preferredLanguage?: "en" | "es" };
 export type CreateClientRequestResult =
   | { ok: true; requestId: string; customerId: string }
   | { ok: false; error: string };
@@ -36,6 +36,7 @@ export async function createTargetClientAction(input: ManagerNewClientInput): Pr
   const email = input.email.trim().toLowerCase().slice(0, 320);
   const phone = input.phone?.trim().slice(0, 40) || null;
   const companyName = input.companyName?.trim().slice(0, 180) || null;
+  const preferredLanguage = input.preferredLanguage === "es" ? "es" : "en";
 
   if (fullName.length < 2) return { ok: false, error: "Enter the client's name." };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid client email address." };
@@ -51,6 +52,9 @@ export async function createTargetClientAction(input: ManagerNewClientInput): Pr
   if (existingClient) {
     if (existingClient.role !== "client") return { ok: false, error: "That email belongs to a staff account." };
     if (!existingClient.is_active) return { ok: false, error: "That client account is inactive." };
+    const { error: languageError } = await supabase.from("profiles").update({ preferred_language: preferredLanguage }).eq("id", existingClient.id).eq("role", "client");
+    if (languageError) return { ok: false, error: "The client was found, but the language could not be saved." };
+    revalidatePath("/admin/goals-progress");
     return { ok: true, customerId: existingClient.id, existing: true };
   }
 
@@ -67,6 +71,9 @@ export async function createTargetClientAction(input: ManagerNewClientInput): Pr
     if (createdClient?.error === "client_inactive") return { ok: false, error: "That client account is inactive." };
     return { ok: false, error: "Could not add the client. Please try again." };
   }
+
+  const { error: languageError } = await supabase.from("profiles").update({ preferred_language: preferredLanguage }).eq("id", createdClient.customerId || "").eq("role", "client");
+  if (languageError) return { ok: false, error: "The client was added, but the language could not be saved. Please try again." };
 
   revalidatePath("/admin/goals-progress");
   revalidatePath("/admin/users");
