@@ -74,7 +74,8 @@ test("outreach leads remain separate from clients and are protected for customer
   expect(component).toContain("Add an outreach lead");
   expect(component).toContain("A lead stays separate from active clients and orders.");
   expect(actions.match(/requireStaffProfile\("customers"\)/g)?.length).toBe(3);
-  expect(actions.match(/createAdminClient\(\)/g)?.length).toBe(3);
+  expect(actions).not.toContain("createAdminClient");
+  expect(actions.match(/supabase\.from\("manager_outreach_leads"\)/g)?.length).toBe(3);
   expect(actions).toContain('error: "Enter a valid phone number."');
   expect(userActions).toContain('createTargetClientAction(input: ManagerNewClientInput)');
   expect(userActions).toContain('requireStaffProfile("customers")');
