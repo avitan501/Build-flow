@@ -51,6 +51,8 @@ test("Order Materials opens the service hub while category links retain the cata
   expect(shopPage).not.toContain("<ShopProjectToolPicker");
   expect(shopPage).not.toContain("Project address");
   expect(catalogExperience).toContain('const isLiquidationView = activeCategorySource === "Liquidation"');
+  expect(catalogExperience).toContain('isLiquidationView ? "Liquidation material"');
+  expect(catalogExperience).toContain("More items coming soon");
   expect(catalogExperience).toContain("{!isLiquidationView ? <section");
   expect(detailExperience).toContain('product.category !== "Liquidation"');
 });

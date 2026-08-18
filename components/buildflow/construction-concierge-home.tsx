@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, PackageCheck, Pause, Play, Search, Truck } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Check, PackageCheck, Search, Truck } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { CoverageScrollSection } from "@/components/buildflow/coverage-scroll-section";
 import { ScrollFocusIsland } from "@/components/buildflow/scroll-focus-island";
@@ -68,11 +68,8 @@ const HOMEPAGE_STORY_LOOP_END = 12.25;
 
 export function ConstructionConciergeHome() {
   const [language, setLanguage] = useState<Language>("en");
-  const [heroPlaying, setHeroPlaying] = useState(true);
   const [showHeroActions, setShowHeroActions] = useState(false);
   const [showStickyOrder, setShowStickyOrder] = useState(false);
-  const heroMobileVideoRef = useRef<HTMLVideoElement>(null);
-  const heroDesktopVideoRef = useRef<HTMLVideoElement>(null);
   const text = copy[language];
 
   useEffect(() => {
@@ -92,18 +89,6 @@ export function ConstructionConciergeHome() {
     return () => window.removeEventListener("scroll", updateStickyOrder);
   }, []);
 
-  function toggleHeroVideo() {
-    const video = window.matchMedia("(max-width: 639px)").matches ? heroMobileVideoRef.current : heroDesktopVideoRef.current;
-    if (!video) return;
-    if (video.paused) {
-      void video.play();
-      setHeroPlaying(true);
-    } else {
-      video.pause();
-      setHeroPlaying(false);
-    }
-  }
-
   function loopHomepageStory(event: React.SyntheticEvent<HTMLVideoElement>) {
     const video = event.currentTarget;
     if (video.currentTime < HOMEPAGE_STORY_LOOP_END) return;
@@ -114,11 +99,11 @@ export function ConstructionConciergeHome() {
   return (
     <main className="overflow-x-clip bg-[#f4f5f7] pb-20 text-[#071126] sm:pb-0">
       <section data-homepage-hero className="relative isolate flex min-h-[min(88svh,56rem)] items-start justify-center overflow-hidden bg-[#071126] text-white sm:aspect-video sm:min-h-0 sm:items-center">
-        <video ref={heroMobileVideoRef} className="absolute inset-0 -z-20 h-full w-full object-cover object-bottom sm:hidden" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v13-mobile-poster.png" onPlaying={() => setHeroPlaying(true)} onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
+        <video className="absolute inset-0 -z-20 h-full w-full object-cover object-bottom sm:hidden" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v13-mobile-poster.png" onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
           <source src="/videos/avantia-hero-background-v13-mobile.webm" type="video/webm" />
           <source src="/videos/avantia-hero-background-v13-mobile.mp4" type="video/mp4" />
         </video>
-        <video ref={heroDesktopVideoRef} className="absolute inset-0 -z-20 hidden h-full w-full object-cover sm:block" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v13-desktop-poster.png" onPlaying={() => setHeroPlaying(true)} onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
+        <video className="absolute inset-0 -z-20 hidden h-full w-full object-cover sm:block" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v13-desktop-poster.png" onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
           <source src="/videos/avantia-hero-background-v13-desktop.webm" type="video/webm" />
           <source src="/videos/avantia-hero-background-v13-desktop.mp4" type="video/mp4" />
         </video>
@@ -142,9 +127,6 @@ export function ConstructionConciergeHome() {
           </div>
         </div>
 
-        <button type="button" onClick={toggleHeroVideo} className="absolute bottom-4 right-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/36 text-white/90 backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:bottom-5 sm:right-5" aria-label={heroPlaying ? "Pause background video" : "Play background video"}>
-          {heroPlaying ? <Pause className="h-4 w-4" aria-hidden="true" /> : <Play className="h-4 w-4" aria-hidden="true" />}
-        </button>
       </section>
 
       <section className="bg-white px-4 py-3 sm:px-8 sm:py-6 lg:px-10" aria-label="Avantia builder shop">

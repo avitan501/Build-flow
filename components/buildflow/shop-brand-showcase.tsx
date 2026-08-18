@@ -1,8 +1,6 @@
 "use client"
 
 import Image from "next/image"
-import { Pause, Play } from "lucide-react"
-import { useState } from "react"
 
 import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
 
@@ -18,27 +16,16 @@ const SHOP_BRANDS = [
 ]
 
 export function ShopBrandShowcase({ compact = false, transparent = false, title = "Shop Our Brands" }: { compact?: boolean; transparent?: boolean; title?: string }) {
-  const [paused, setPaused] = useState(false)
-
   return (
     <ShopTranslationBoundary>
     <section aria-labelledby="shop-brands-heading" className={`${compact ? "mx-auto max-w-[88rem] overflow-hidden" : "mt-8"} ${transparent ? "bg-transparent" : "bg-white"}`}>
       <div className={`mx-auto w-full max-w-7xl px-4 sm:px-8 lg:px-10 ${compact ? "py-2.5 sm:py-3" : "py-8 sm:py-10"}`}>
-        <div className="flex items-center justify-center gap-2 text-center">
+        <div className="text-center">
           <h2 id="shop-brands-heading" className={`${compact ? "text-sm sm:text-base font-medium text-slate-500" : "text-2xl sm:text-3xl font-semibold text-[#1d1d1f]"} tracking-normal`}>{title}</h2>
-          <button
-            type="button"
-            aria-label={paused ? "Play brand logos" : "Pause brand logos"}
-            title={paused ? "Play brand logos" : "Pause brand logos"}
-            onClick={() => setPaused((current) => !current)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200/70 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]"
-          >
-            {paused ? <Play className="h-3.5 w-3.5" aria-hidden="true" /> : <Pause className="h-3.5 w-3.5" aria-hidden="true" />}
-          </button>
         </div>
 
         <div className={`${compact ? "mt-2" : "mt-6"} brand-marquee`} data-testid="shop-brand-grid">
-          <div className="brand-marquee-track" style={{ animationPlayState: paused ? "paused" : "running" }}>
+          <div className="brand-marquee-track">
             {[0, 1].map((groupIndex) => (
               <div key={groupIndex} className="brand-marquee-group" aria-hidden={groupIndex === 1}>
                 {SHOP_BRANDS.map((brand) => (

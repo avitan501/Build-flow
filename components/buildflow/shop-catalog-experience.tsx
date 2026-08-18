@@ -314,7 +314,7 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
   const categoryServiceProducts = filteredProducts.filter((product) => product.productType === "service")
 
   const isCategoryFiltered = activeCategorySource !== "All"
-  const resultLabel = query ? `Search results for "${query}"` : browseTab === "saved" ? "Saved tools" : isCategoryFiltered ? `${activeCategoryLabel} tools` : "All tools"
+  const resultLabel = query ? `Search results for "${query}"` : browseTab === "saved" ? "Saved tools" : isLiquidationView ? "Liquidation material" : isCategoryFiltered ? `${activeCategoryLabel} tools` : "All tools"
   const activeCategoryProducts = activeCategorySource === "Services" ? serviceProducts : isCategoryFiltered ? [...categoryServiceProducts, ...materialFilteredProducts] : materialFilteredProducts
 
   function applyFilters(next: { query?: string; category?: string; close?: boolean }) {
@@ -597,15 +597,18 @@ export function ShopCatalogExperience({ products, recentActivity = [] }: ShopCat
         </section>
 
         {activeCategoryProducts.length > 0 ? (
-          <section aria-label="Products" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
-            {activeCategoryProducts.map((product) => (
-              product.productType === "service" ? (
-                <ServiceListCard key={product.id} product={product} localOnly={isManagerAddOnProductId(product.id)} />
-              ) : (
-                <ShopProductCard key={product.id} product={product} localOnly={isManagerAddOnProductId(product.id)} />
-              )
-            ))}
-          </section>
+          <>
+            <section aria-label="Products" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 lg:gap-4">
+              {activeCategoryProducts.map((product) => (
+                product.productType === "service" ? (
+                  <ServiceListCard key={product.id} product={product} localOnly={isManagerAddOnProductId(product.id)} />
+                ) : (
+                  <ShopProductCard key={product.id} product={product} localOnly={isManagerAddOnProductId(product.id)} />
+                )
+              ))}
+            </section>
+            {isLiquidationView ? <p className="py-2 text-center text-sm font-semibold text-slate-500">More items coming soon</p> : null}
+          </>
         ) : (
           <section className="rounded-[28px] border border-dashed border-slate-300 bg-white px-5 py-12 text-center shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
             <h2 className="text-lg font-semibold text-slate-950">No products found</h2>

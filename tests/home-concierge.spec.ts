@@ -42,7 +42,8 @@ test("cinematic homepage presents Construction Concierge clearly", async ({ page
   await expect(page.getByRole("heading", { name: "Serving 41 states." })).toBeVisible();
   await expect(page.getByTestId("coverage-map").getByTestId("coverage-dot")).toHaveCount(41);
   await expect(page.getByRole("heading", { name: "Shop Our Brands" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Pause brand logos" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pause background video" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Pause brand logos" })).toHaveCount(0);
 
   const overflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflows).toBe(false);
