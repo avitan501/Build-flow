@@ -15,7 +15,9 @@ export type ImportedCatalogItem = {
 
 const CATEGORY_PREFIX: Record<MaterialCatalogCategory, string> = {
   Framing: "FRA", Electrical: "ELE", Tile: "TIL", "Sheet Rock": "SHR", "Door & Molding": "DOM",
-  Flooring: "FLO", Siding: "SID", Roofing: "ROO", Windows: "WIN", Others: "OTH",
+  Flooring: "FLO", Siding: "SID", Roofing: "ROO", Windows: "WIN", Plumbing: "PLU", Lighting: "LIG",
+  Insulation: "INS", "Concrete & Masonry": "CON", Cabinets: "CAB", Appliances: "APP", "Tool Rental": "TOL",
+  "Take Care of Yourself": "TCY", Liquidation: "LIQ", Others: "OTH",
 }
 
 function normalizeCategory(value: string): MaterialCatalogCategory | null {
