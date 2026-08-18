@@ -91,5 +91,6 @@ test("Order Materials includes the Take Care of Yourself service", async () => {
   expect(essentials).toContain("Automatic Shabbat mode with a calendar through 2054");
   expect(essentials).toContain("11.5 kW / 48 A");
   expect(essentials).toContain("Up to 5,000 sq. ft.");
+  expect(essentials.match(/imageUrls:/g)).toHaveLength(9);
   expect(essentials).toContain("requestHref:");
 });

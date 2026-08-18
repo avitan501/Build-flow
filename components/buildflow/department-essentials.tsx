@@ -21,6 +21,7 @@ const SPRITE_POSITIONS = [
 export function DepartmentEssentials({ data }: { data: DepartmentEssentialsData }) {
   const hasExtendedCatalog = data.items.length > 8
   const [selectedItem, setSelectedItem] = useState<CatalogEssentialItem | null>(null)
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (!selectedItem) return
@@ -73,7 +74,11 @@ export function DepartmentEssentials({ data }: { data: DepartmentEssentialsData 
               {hasDetails ? (
                 <button
                   type="button"
-                  onClick={() => setSelectedItem(item as CatalogEssentialItem)}
+                  onClick={() => {
+                    const product = item as CatalogEssentialItem
+                    setSelectedItem(product)
+                    setSelectedImageUrl(product.imageUrls?.[0] ?? product.imageUrl)
+                  }}
                   className="group w-full min-w-0 text-center"
                   aria-label={`View ${name}`}
                 >
@@ -114,8 +119,26 @@ export function DepartmentEssentials({ data }: { data: DepartmentEssentialsData 
             </div>
 
             <div className="grid sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-              <div className="relative min-h-72 border-b border-slate-200 bg-[#f7f8fa] sm:min-h-[520px] sm:border-b-0 sm:border-r">
-                <Image src={selectedItem.imageUrl} alt={selectedItem.name} fill sizes="(max-width: 640px) 100vw, 45vw" className="object-contain p-6 sm:p-9" />
+              <div className="border-b border-slate-200 bg-[#f7f8fa] sm:border-b-0 sm:border-r">
+                <div className="relative min-h-64 sm:min-h-[430px]">
+                  <Image src={selectedImageUrl ?? selectedItem.imageUrl} alt={selectedItem.name} fill sizes="(max-width: 640px) 100vw, 45vw" className="object-contain p-5 sm:p-8" />
+                </div>
+                {(selectedItem.imageUrls?.length ?? 0) > 1 ? (
+                  <div className="flex gap-2 overflow-x-auto border-t border-slate-200 bg-white p-3" aria-label={`${selectedItem.name} photos`}>
+                    {selectedItem.imageUrls?.map((imageUrl, index) => (
+                      <button
+                        key={imageUrl}
+                        type="button"
+                        onClick={() => setSelectedImageUrl(imageUrl)}
+                        aria-label={`View photo ${index + 1} of ${selectedItem.name}`}
+                        aria-pressed={(selectedImageUrl ?? selectedItem.imageUrl) === imageUrl}
+                        className="relative aspect-square w-16 shrink-0 overflow-hidden rounded-md border-2 border-slate-200 bg-[#f7f8fa] transition aria-pressed:border-sky-600 sm:w-[72px]"
+                      >
+                        <Image src={imageUrl} alt="" fill sizes="72px" className="object-contain p-1" />
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <div className="p-5 sm:p-8">

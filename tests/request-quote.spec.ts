@@ -48,6 +48,10 @@ test("take care products open detailed Avantia panels and prefill the request", 
   const dialog = page.getByTestId("essential-product-dialog")
   await expect(dialog).toBeVisible()
   await expect(dialog.getByRole("heading", { name: "Noam2 Shabbat Water Bar" })).toBeVisible()
+  const photos = dialog.getByRole("button", { name: /View photo .* Noam2 Shabbat Water Bar/ })
+  await expect(photos).toHaveCount(3)
+  await photos.nth(1).click()
+  await expect(photos.nth(1)).toHaveAttribute("aria-pressed", "true")
   await expect(dialog.getByText("Automatic Shabbat mode with a calendar through 2054")).toBeVisible()
   await expect(dialog.getByText("17.7 in. H x 12.5 in. W x 14 in. D")).toBeVisible()
 

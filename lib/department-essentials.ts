@@ -8,6 +8,7 @@ export type DepartmentEssentials = {
 export type CatalogEssentialItem = {
   name: string
   imageUrl: string
+  imageUrls?: string[]
   description?: string
   features?: string[]
   specifications?: Array<{ label: string; value: string }>
