@@ -3,6 +3,8 @@ import path from "node:path"
 
 import { expect, test } from "@playwright/test"
 
+import { calculateWorkedMinutes } from "../lib/daily-work-summary"
+
 const root = process.cwd()
 
 test("manager navigation provides a Daily Work Summary beside communication shortcuts", async () => {
@@ -26,7 +28,15 @@ test("daily summaries persist by date in protected manager data", async () => {
   expect(component).toContain("Still open")
   expect(component).toContain('type="date"')
   expect(component).toContain("Recent summaries")
+  expect(component).toContain("Check in")
+  expect(component).toContain("Check out")
+  expect(component).toContain("Hours")
+  expect(component).toContain("workedTime")
   expect(actions).toContain("await requireManagerPortalProfile()")
+  expect(actions).toContain("recordDailyAttendanceAction")
+  expect(actions).toContain('timeZone: "America/New_York"')
+  expect(actions).toContain("current?.checkInAt")
+  expect(actions).toContain("current?.checkOutAt")
   expect(actions).toContain("created_by: user.id")
   expect(actions).toContain('assignee: "carlos"')
   expect(actions).toContain("existing.data")
@@ -40,4 +50,10 @@ test("lead controls remain readable and independently scrollable on phones", asy
   expect(component).toContain("[scrollbar-width:none]")
   expect(component).toContain('w-[6.5rem] shrink-0')
   expect(component).toContain('w-[8.5rem] shrink-0')
+})
+
+test("attendance calculates Carlos's worked time from check in through check out", () => {
+  expect(calculateWorkedMinutes("2026-08-18T13:15:00.000Z", "2026-08-18T21:45:00.000Z")).toBe(510)
+  expect(calculateWorkedMinutes("2026-08-18T21:45:00.000Z", "2026-08-18T13:15:00.000Z")).toBeNull()
+  expect(calculateWorkedMinutes("2026-08-18T13:15:00.000Z", null)).toBeNull()
 })

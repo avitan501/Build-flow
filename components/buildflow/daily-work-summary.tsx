@@ -1,11 +1,11 @@
 "use client"
 
-import { CalendarDays, CheckCircle2, Clock3, Save } from "lucide-react"
+import { CalendarDays, CheckCircle2, Clock3, LogIn, LogOut, Save } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
-import { saveDailyWorkSummaryAction } from "@/app/admin/daily-summary/actions"
-import type { DailyWorkSummary } from "@/lib/daily-work-summary"
+import { recordDailyAttendanceAction, saveDailyWorkSummaryAction } from "@/app/admin/daily-summary/actions"
+import { calculateWorkedMinutes, type DailyWorkSummary } from "@/lib/daily-work-summary"
 
 function localToday() {
   const date = new Date()
@@ -17,6 +17,19 @@ function localToday() {
 
 function displayDate(value: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value}T12:00:00`))
+}
+
+function displayTime(value: string | null | undefined) {
+  if (!value) return "Not recorded"
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(value))
+}
+
+function workedTime(checkInAt: string | null | undefined, checkOutAt: string | null | undefined) {
+  const minutes = calculateWorkedMinutes(checkInAt, checkOutAt)
+  if (minutes === null) return null
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return `${hours} hr ${remainingMinutes} min`
 }
 
 export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummary[] }) {
@@ -54,6 +67,22 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
     })
   }
 
+  function recordAttendance(action: "check_in" | "check_out") {
+    setError(null)
+    setMessage(null)
+    startTransition(async () => {
+      const result = await recordDailyAttendanceAction({ date: selectedDate, action })
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      setMessage(action === "check_in" ? "Carlos checked in." : "Carlos checked out. Hours worked are calculated below.")
+      router.refresh()
+    })
+  }
+
+  const totalWorked = workedTime(selectedSummary?.checkInAt, selectedSummary?.checkOutAt)
+
   return <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
     <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
       <header className="flex items-center gap-3 border-b border-slate-200 p-4 sm:p-5">
@@ -63,6 +92,17 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
 
       <div className="grid gap-4 p-4 sm:p-5">
         <label className="grid max-w-xs gap-1.5 text-sm font-semibold">Work date<input type="date" value={selectedDate} onChange={(event) => selectDate(event.target.value)} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal" /></label>
+        <section className="rounded-md border border-slate-200 bg-slate-50 p-3" aria-label="Carlos attendance">
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div><p className="text-[10px] font-bold uppercase text-slate-500">Check in</p><p className="mt-1 text-sm font-semibold">{displayTime(selectedSummary?.checkInAt)}</p></div>
+            <div><p className="text-[10px] font-bold uppercase text-slate-500">Check out</p><p className="mt-1 text-sm font-semibold">{displayTime(selectedSummary?.checkOutAt)}</p></div>
+            <div><p className="text-[10px] font-bold uppercase text-slate-500">Hours</p><p className="mt-1 text-sm font-semibold text-[#0066cc]">{totalWorked ?? (selectedSummary?.checkInAt ? "In progress" : "—")}</p></div>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => recordAttendance("check_in")} disabled={pending || Boolean(selectedSummary?.checkInAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-emerald-300 bg-white px-3 text-sm font-semibold text-emerald-700 disabled:opacity-40"><LogIn className="h-4 w-4" />Check in</button>
+            <button type="button" onClick={() => recordAttendance("check_out")} disabled={pending || !selectedSummary?.checkInAt || Boolean(selectedSummary?.checkOutAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-amber-300 bg-white px-3 text-sm font-semibold text-amber-700 disabled:opacity-40"><LogOut className="h-4 w-4" />Check out</button>
+          </div>
+        </section>
         <label className="grid gap-1.5 text-sm font-semibold"><span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600" />Completed today</span><textarea value={completed} onChange={(event) => setCompleted(event.target.value)} maxLength={4000} rows={5} placeholder="Calls made, leads contacted, supplier pricing received, orders handled..." className="min-h-28 rounded-md border border-slate-300 p-3 font-normal leading-6 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
         <label className="grid gap-1.5 text-sm font-semibold"><span className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-amber-600" />Still open</span><textarea value={open} onChange={(event) => setOpen(event.target.value)} maxLength={4000} rows={4} placeholder="Follow-ups, unanswered calls, pricing still needed, and tomorrow's first steps..." className="min-h-24 rounded-md border border-slate-300 p-3 font-normal leading-6 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
         {error ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
