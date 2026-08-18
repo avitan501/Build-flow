@@ -55,16 +55,36 @@ test("Order Materials opens the service hub while category links retain the cata
   expect(detailExperience).toContain('product.category !== "Liquidation"');
 });
 
-test("Order Materials includes a configurable High-End service", async () => {
-  const [picker, qualification] = await Promise.all([
+test("Order Materials includes the Take Care of Yourself service", async () => {
+  const [picker, qualification, essentials] = await Promise.all([
     readFile(path.join(root, "components/buildflow/homepage-shop-picker.tsx"), "utf8"),
     readFile(path.join(root, "lib/shop-qualification.ts"), "utf8"),
+    readFile(path.join(root, "lib/request-department-essentials.ts"), "utf8"),
   ]);
 
-  expect(picker).toContain('label: "High-End"');
+  expect(picker).toContain('label: "Take Care of Yourself"');
   expect(picker).toContain('href: "/request-quote?request=high-end"');
-  expect(picker).toContain('description: "Premium finishes and specialty materials"');
+  expect(picker).toContain('description: "Comfort, wellness, and premium home upgrades"');
   expect(qualification).toContain('id: "services-high-end"');
-  expect(qualification).toContain('serviceLabel: "High-End"');
+  expect(qualification).toContain('serviceLabel: "Take Care of Yourself"');
   expect(qualification).toContain('departmentLabel: "Services"');
+  expect(essentials).toContain('"high-end": {');
+  expect(essentials).toContain('label: "Take Care of Yourself"');
+
+  const products = [
+    ["Noam2 Shabbat Water Bar", "noam2-water-bar.webp"],
+    ["AMNON18 Shabbat Hot Water System", "amnon18-hot-water-system.webp"],
+    ["Modern House Numbers - Numbers + Letters", "modern-house-numbers.webp"],
+    ["Warmboard-S Structural Radiant Panel", "warmboard-s-radiant-panel.webp"],
+    ["KOHLER Invigoration Linear Steam Head K-32309", "kohler-k32309-steam-head.webp"],
+    ["Tesla Wall Connector", "tesla-wall-connector.webp"],
+    ["Diode LED BLAZE Wet-Location Niche Lighting System", "diode-led-wet-location-niche-lighting.webp"],
+    ["Mustee DURABASE 3232M Fiberglass Shower Base", "mustee-3232m-shower-base.webp"],
+    ["EverScent Smart Home HVAC Fragrance Diffuser", "everscent-hvac-diffuser.webp"],
+  ] as const;
+
+  for (const [name, fileName] of products) {
+    expect(essentials).toContain(name);
+    await expect(readFile(path.join(root, "public/images/materials/take-care-of-yourself", fileName))).resolves.toBeTruthy();
+  }
 });

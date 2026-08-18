@@ -106,6 +106,23 @@ const REQUEST_DEPARTMENTS: Record<string, RequestDepartmentConfig> = {
       ],
     },
   },
+  "high-end": {
+    label: "Take Care of Yourself",
+    essentials: {
+      spriteUrl: "",
+      items: [
+        item("Noam2 Shabbat Water Bar", "/images/materials/take-care-of-yourself/noam2-water-bar.webp"),
+        item("AMNON18 Shabbat Hot Water System", "/images/materials/take-care-of-yourself/amnon18-hot-water-system.webp"),
+        item("Modern House Numbers - Numbers + Letters", "/images/materials/take-care-of-yourself/modern-house-numbers.webp"),
+        item("Warmboard-S Structural Radiant Panel", "/images/materials/take-care-of-yourself/warmboard-s-radiant-panel.webp"),
+        item("KOHLER Invigoration Linear Steam Head K-32309", "/images/materials/take-care-of-yourself/kohler-k32309-steam-head.webp"),
+        item("Tesla Wall Connector", "/images/materials/take-care-of-yourself/tesla-wall-connector.webp"),
+        item("Diode LED BLAZE Wet-Location Niche Lighting System", "/images/materials/take-care-of-yourself/diode-led-wet-location-niche-lighting.webp"),
+        item("Mustee DURABASE 3232M Fiberglass Shower Base", "/images/materials/take-care-of-yourself/mustee-3232m-shower-base.webp"),
+        item("EverScent Smart Home HVAC Fragrance Diffuser", "/images/materials/take-care-of-yourself/everscent-hvac-diffuser.webp"),
+      ],
+    },
+  },
 }
 
 export function getRequestDepartmentConfig(request: string | null | undefined) {

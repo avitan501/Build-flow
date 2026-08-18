@@ -118,8 +118,8 @@ const FAST_SERVICES = [
     imagePosition: "100% 100%",
   },
   {
-    label: "High-End",
-    description: "Premium finishes and specialty materials",
+    label: "Take Care of Yourself",
+    description: "Comfort, wellness, and premium home upgrades",
     href: "/request-quote?request=high-end",
     imagePosition: "50% 50%",
   },
