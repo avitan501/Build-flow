@@ -130,7 +130,8 @@ const EXTRA_DEPARTMENTS = [
   { label: "Lighting", imagePosition: "50% 0%", href: "/request-quote?request=lighting" },
   { label: "Insulation", imagePosition: "100% 0%", href: "/request-quote?request=insulation" },
   { label: "Concrete & Masonry", imagePosition: "0% 100%", href: "/shop/concrete-masonry" },
-  { label: "Cabinets & Appliances", imagePosition: "50% 100%", href: "/request-quote?request=cabinets" },
+  { label: "Cabinets", imagePosition: "50% 100%", href: "/request-quote?request=cabinets" },
+  { label: "Appliances", imagePosition: "50% 100%", href: "/shop/appliances" },
   { label: "Tool Rental", imagePosition: "100% 100%", href: "/request-quote?request=tool-rental" },
 ] as const
 
