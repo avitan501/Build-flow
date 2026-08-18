@@ -57,3 +57,16 @@ export function priceVerificationLabel(price: MaterialCatalogSupplierPrice) {
     unverified: "Unverified",
   }[price.verification_status]
 }
+
+export function priceCheckedDateLabel(price: MaterialCatalogSupplierPrice) {
+  const checkedAt = price.verified_at ?? price.price_observed_at
+  if (!checkedAt) return null
+  const date = new Date(checkedAt)
+  if (Number.isNaN(date.getTime())) return null
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/New_York",
+  }).format(date)
+}

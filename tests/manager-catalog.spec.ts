@@ -142,6 +142,8 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(coreCurationMigration).not.toContain("delete from public.material_catalog_items")
   expect(qualityHelpers).toContain("catalogItemMatchesReview")
   expect(qualityHelpers).toContain("normalizedComparisonPrice")
+  expect(qualityHelpers).toContain("priceCheckedDateLabel")
+  expect(workspace).toContain("priceCheckedDateLabel(saved)")
   expect(parser).toContain("parseMaterialComparisonText")
   expect(parser).toContain("No quantity, unit, and material rows were found")
 })
