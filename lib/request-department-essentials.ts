@@ -13,6 +13,7 @@ function item(
     features: string[]
     specifications?: Array<{ label: string; value: string }>
     imageUrls?: string[]
+    requestPrompt?: string
   },
 ) {
   return {
@@ -179,6 +180,13 @@ const REQUEST_DEPARTMENTS: Record<string, RequestDepartmentConfig> = {
           features: ["App-controlled schedules and intensity", "Connects to HVAC outflow ductwork", "One device can serve up to 5,000 sq. ft. per HVAC system", "No open flame, added water, or room-by-room plug-ins"],
           specifications: [{ label: "Connection", value: "3/8-in. delivery tube" }, { label: "Network", value: "2.4 / 5 GHz Wi-Fi" }, { label: "Coverage", value: "Up to 5,000 sq. ft." }, { label: "Control", value: "Mobile app" }],
         }),
+        item("Custom Glass", "/images/materials/take-care-of-yourself/custom-glass-shower.jpg", {
+          imageUrls: ["/images/materials/take-care-of-yourself/custom-glass-shower.jpg", "/images/materials/take-care-of-yourself/custom-glass-tempered.jpg", "/images/materials/take-care-of-yourself/custom-glass-painted.jpg"],
+          description: "Made-to-order architectural glass and mirror for showers, interiors, storefronts, railings, decorative features, and specialty applications.",
+          features: ["Tempered, laminated, insulated, low-iron, and anti-reflective glass", "Clear, tinted, acid-etched, back-painted, antique, and privacy options", "Custom mirrors, shower enclosures, marker boards, and walkable glass", "Fabrication can include polished edges, holes, notches, cutouts, and hardware preparation"],
+          specifications: [{ label: "Tell us the product", value: "Glass, mirror, shower enclosure, railing, marker board, or other" }, { label: "Measurements", value: "Width x height and thickness" }, { label: "Fabrication", value: "Edges, holes, notches, cutouts, and tempering" }, { label: "Project details", value: "Quantity, finish, location, and delivery date" }],
+          requestPrompt: "Please provide pricing and availability for: Custom Glass\n\nProduct type: \nWidth x height: \nThickness: \nQuantity: \nGlass or mirror finish/color: \nTempered or laminated: \nEdge finish: \nHoles, notches, cutouts, or hardware: \nProject location and delivery date: \nAdditional details:",
+        }),
       ],
     },
   },
@@ -186,4 +194,10 @@ const REQUEST_DEPARTMENTS: Record<string, RequestDepartmentConfig> = {
 
 export function getRequestDepartmentConfig(request: string | null | undefined) {
   return request ? REQUEST_DEPARTMENTS[request] ?? null : null
+}
+
+export function getRequestItemPrompt(request: string | null | undefined, requestedItem: string | null | undefined) {
+  const department = getRequestDepartmentConfig(request)
+  const item = department?.essentials.items.find((candidate) => typeof candidate !== "string" && candidate.name === requestedItem)
+  return typeof item === "string" ? undefined : item?.requestPrompt
 }

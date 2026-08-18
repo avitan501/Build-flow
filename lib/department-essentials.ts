@@ -13,6 +13,7 @@ export type CatalogEssentialItem = {
   features?: string[]
   specifications?: Array<{ label: string; value: string }>
   requestHref?: string
+  requestPrompt?: string
 }
 
 const ESSENTIALS: Partial<Record<ShopToolSlug, DepartmentEssentials>> = {
