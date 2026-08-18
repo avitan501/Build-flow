@@ -1,13 +1,17 @@
 import type { ShopToolSlug } from "@/lib/shop-tools"
 
 export type DepartmentEssentials = {
-  items: Array<string | { name: string; imageUrl: string }>
+  items: Array<string | CatalogEssentialItem>
   spriteUrl: string
 }
 
 export type CatalogEssentialItem = {
   name: string
   imageUrl: string
+  description?: string
+  features?: string[]
+  specifications?: Array<{ label: string; value: string }>
+  requestHref?: string
 }
 
 const ESSENTIALS: Partial<Record<ShopToolSlug, DepartmentEssentials>> = {

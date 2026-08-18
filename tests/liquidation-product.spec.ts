@@ -87,4 +87,9 @@ test("Order Materials includes the Take Care of Yourself service", async () => {
     expect(essentials).toContain(name);
     await expect(readFile(path.join(root, "public/images/materials/take-care-of-yourself", fileName))).resolves.toBeTruthy();
   }
+
+  expect(essentials).toContain("Automatic Shabbat mode with a calendar through 2054");
+  expect(essentials).toContain("11.5 kW / 48 A");
+  expect(essentials).toContain("Up to 5,000 sq. ft.");
+  expect(essentials).toContain("requestHref:");
 });

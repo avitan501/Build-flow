@@ -23,7 +23,7 @@ function SubmitButton({ pending, beatQuote }: { pending: boolean; beatQuote: boo
   )
 }
 
-export function QuoteRequestForm({ mode = "request", defaultDepartment }: { mode?: "request" | "beat"; defaultDepartment?: string }) {
+export function QuoteRequestForm({ mode = "request", defaultDepartment, defaultMaterialDetails }: { mode?: "request" | "beat"; defaultDepartment?: string; defaultMaterialDetails?: string }) {
   const beatQuote = mode === "beat"
   const [state, formAction, pending] = useActionState(submitQuoteRequestFormAction, initialState)
   const [uploadPending, startUploadTransition] = useTransition()
@@ -111,6 +111,7 @@ export function QuoteRequestForm({ mode = "request", defaultDepartment }: { mode
 
   return (
     <form
+      id="request-form"
       action={formAction}
       onSubmit={(event) => {
         const file = attachmentRef.current?.files?.[0]
@@ -189,7 +190,7 @@ export function QuoteRequestForm({ mode = "request", defaultDepartment }: { mode
 
       <fieldset className="grid gap-5 px-5 py-6 sm:px-8 sm:py-8">
         <legend className="w-full px-5 pt-6 text-xl font-semibold text-slate-950 sm:px-8 sm:pt-8">2. {beatQuote ? "Upload the supplier quote" : "What materials need pricing?"}</legend>
-        {!beatQuote ? <label className={labelClass}>Material details or list <span className="font-normal text-slate-500">Optional when attaching a file</span><textarea name="details" rows={5} maxLength={5000} placeholder="List the materials, quantities, brands, or specifications you need priced." className={`${inputClass} min-h-32 resize-y py-3`} /></label> : null}
+        {!beatQuote ? <label className={labelClass}>Material details or list <span className="font-normal text-slate-500">Optional when attaching a file</span><textarea name="details" rows={5} maxLength={5000} defaultValue={defaultMaterialDetails} placeholder="List the materials, quantities, brands, or specifications you need priced." className={`${inputClass} min-h-32 resize-y py-3`} /></label> : null}
         <label className="grid cursor-pointer gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-700 transition hover:border-sky-400 hover:bg-sky-50">
           <span className="inline-flex items-center gap-2 font-semibold text-slate-900"><FileUp className="h-5 w-5 text-[#0071e3]" />{beatQuote ? "Attach the supplier quote" : "Attach a plan or material list"} <span className="font-normal text-slate-500">{beatQuote ? "Required" : "Optional"}</span></span>
           <input ref={attachmentRef} type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => validateAttachment(event.currentTarget.files?.[0])} className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-slate-950 file:px-3 file:py-2 file:font-semibold file:text-white" />

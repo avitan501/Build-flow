@@ -12,8 +12,10 @@ export const metadata = pageMetadata({
   path: "/request-quote",
 })
 
-export default async function RequestQuotePage({ searchParams }: { searchParams?: Promise<{ request?: string }> }) {
-  const request = (await searchParams)?.request?.trim().toLowerCase()
+export default async function RequestQuotePage({ searchParams }: { searchParams?: Promise<{ request?: string; item?: string }> }) {
+  const resolvedSearchParams = await searchParams
+  const request = resolvedSearchParams?.request?.trim().toLowerCase()
+  const requestedItem = resolvedSearchParams?.item?.trim()
   const department = getRequestDepartmentConfig(request)
 
   return (
@@ -30,7 +32,7 @@ export default async function RequestQuotePage({ searchParams }: { searchParams?
         </div>
       </section>
       <div className="mx-auto max-w-5xl py-6 sm:px-6 sm:py-8">
-        <QuoteRequestForm defaultDepartment={department?.label} />
+        <QuoteRequestForm defaultDepartment={department?.label} defaultMaterialDetails={requestedItem ? `Please provide pricing and availability for: ${requestedItem}` : undefined} />
         <p className="px-5 py-5 text-center text-xs text-slate-500">Need help now? Call <a href="tel:+15169088319" className="font-semibold text-[#0066cc]">(516) 908-8319</a>.</p>
         {department ? <div className="px-5 sm:px-0"><DepartmentEssentials data={department.essentials} /></div> : null}
       </div>

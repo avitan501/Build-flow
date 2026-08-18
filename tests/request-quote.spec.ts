@@ -38,6 +38,24 @@ test("quote request is an Avantia-branded internal workflow", async ({ page }) =
   }
 })
 
+test("take care products open detailed Avantia panels and prefill the request", async ({ page }) => {
+  await page.goto("/request-quote?request=high-end")
+
+  await expect(page.getByRole("heading", { name: "Take Care of Yourself Materials" })).toBeVisible()
+  await expect(page.getByTestId("department-essentials").locator("article")).toHaveCount(9)
+
+  await page.getByRole("button", { name: "View Noam2 Shabbat Water Bar" }).click()
+  const dialog = page.getByTestId("essential-product-dialog")
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole("heading", { name: "Noam2 Shabbat Water Bar" })).toBeVisible()
+  await expect(dialog.getByText("Automatic Shabbat mode with a calendar through 2054")).toBeVisible()
+  await expect(dialog.getByText("17.7 in. H x 12.5 in. W x 14 in. D")).toBeVisible()
+
+  await dialog.getByRole("link", { name: "Request this item" }).click()
+  await expect(page).toHaveURL(/request=high-end&item=Noam2/)
+  await expect(page.getByLabel(/Material details or list/)).toHaveValue("Please provide pricing and availability for: Noam2 Shabbat Water Bar")
+})
+
 test("beat a quote is a dedicated upload request", async ({ page }) => {
   await page.goto("/beat-a-quote")
 
