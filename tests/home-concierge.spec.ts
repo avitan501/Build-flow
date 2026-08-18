@@ -164,9 +164,14 @@ test("primary customer routes remain available in Menu", async ({ page }) => {
   const drawer = page.getByRole("complementary", { name: "Site navigation" });
   const navigation = page.getByRole("navigation", { name: "Mobile full navigation" });
   await expect(drawer).toBeVisible();
+  const drawerBox = await drawer.boundingBox();
+  expect(drawerBox?.width).toBeCloseTo(page.viewportSize()?.width ?? 0, 0);
+  expect(drawerBox?.height).toBeCloseTo(page.viewportSize()?.height ?? 0, 0);
   await expect(navigation.getByRole("link", { name: "Home", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Order Materials", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Get Material Pricing", exact: true })).toHaveAttribute("href", "/request-quote");
   await expect(navigation.getByRole("link", { name: "Beat a Supplier Quote", exact: true })).toHaveAttribute("href", "/beat-a-quote");
   await expect(drawer.getByRole("link", { name: "Log in", exact: true })).toHaveAttribute("href", "/login");
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
 });

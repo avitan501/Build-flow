@@ -6,6 +6,7 @@ import {
   BarChart3,
   CalendarDays,
   ClipboardList,
+  ChevronRight,
   Columns3,
   ExternalLink,
   LayoutDashboard,
@@ -91,14 +92,14 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
   const homeHref = access.owner ? "/admin/build-map" : access.customers ? "/admin/users" : "/admin/vendors";
   return (
     <div className="flex h-full flex-col bg-white">
-      <div className="border-b border-slate-200 px-5 py-5">
+      <div className="border-b border-slate-100 px-6 pb-5 pt-7">
         <Link href={homeHref} onClick={onNavigate} aria-label="Avantia Build manager portal">
-          <AvantiaBuildLockup showSlogan />
+          <AvantiaBuildLockup />
         </Link>
-        <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager Portal</p>
+        <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#0066cc]">Manager Portal</p>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4" aria-label="Manager navigation">
+      <nav className="flex-1 overflow-y-auto px-5 py-5" aria-label="Manager navigation">
         {managerLinks.map((link) => {
           const Icon = link.icon;
           const external = link.href.startsWith("https://");
@@ -110,52 +111,52 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
               onClick={onNavigate}
               target={external ? "_blank" : undefined}
               rel={external ? "noopener noreferrer" : undefined}
-              className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
-                active ? "bg-slate-950 text-white" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"
+              className={`group flex min-h-14 items-center gap-3 border-b border-slate-100 px-1 text-[15px] font-semibold transition ${
+                active ? "text-[#0066cc]" : "text-slate-900 hover:text-[#0066cc]"
               }`}
             >
               <Icon className="h-4 w-4 shrink-0" />
               <span className="min-w-0 flex-1">{link.label}</span>
-              {external ? <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" /> : null}
+              {external ? <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" /> : <ChevronRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5" aria-hidden="true" />}
             </Link>
           );
         })}
-        <div className="pt-1">
+        <div className="border-b border-slate-100">
           <button
               type="button"
               onClick={() => setMoreOpen((current) => !current)}
               aria-expanded={moreOpen}
-              className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${moreIsActive ? "bg-slate-100 text-slate-950" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"}`}
+              className={`flex min-h-14 w-full items-center gap-3 px-1 text-[15px] font-semibold transition ${moreIsActive ? "text-[#0066cc]" : "text-slate-900 hover:text-[#0066cc]"}`}
             >
               <Menu className="h-4 w-4 shrink-0" />
               <span className="min-w-0 flex-1 text-left">More</span>
               <ChevronDown className={`h-4 w-4 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
             </button>
-          {moreOpen ? <div className="ml-4 mt-1 space-y-1 border-l border-slate-200 pl-2">{moreLinks.map((link) => {
+          {moreOpen ? <div className="mb-2 ml-7 border-l border-slate-200 pl-3">{moreLinks.map((link) => {
             const Icon = link.icon;
             const active = isActive(pathname, link.href);
-            return <Link key={link.href} href={link.href} onClick={onNavigate} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold ${active ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"}`}><Icon className="h-4 w-4 shrink-0" /><span>{link.label}</span></Link>;
+            return <Link key={link.href} href={link.href} onClick={onNavigate} className={`flex min-h-11 items-center gap-3 border-b border-slate-100 px-2 text-sm font-semibold ${active ? "text-[#0066cc]" : "text-slate-600 hover:text-[#0066cc]"}`}><Icon className="h-4 w-4 shrink-0" /><span>{link.label}</span></Link>;
           })}</div> : null}
         </div>
       </nav>
 
-      <div className="border-t border-slate-200 p-3">
+      <div className="border-t border-slate-100 px-5 pb-5 pt-3">
         <div className="grid grid-cols-4 gap-1" aria-label="Communication shortcuts">
           {communicationLinks.map((link) => {
             const Icon = link.icon;
             const external = link.href.startsWith("https://");
             const active = !external && isActive(pathname, link.href);
-            const className = `flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-center text-[10px] font-semibold leading-3 hover:bg-slate-100 hover:text-slate-950 ${active ? "bg-sky-50 text-[#0066cc]" : "text-slate-700"}`;
+            const className = `flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 px-1 py-2 text-center text-[10px] font-semibold leading-3 hover:text-[#0066cc] ${active ? "text-[#0066cc]" : "text-slate-700"}`;
             const content = <><Icon className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="w-full truncate">{link.shortLabel}</span></>;
             if (external) return <Link key={link.href} href={link.href} onClick={onNavigate} target="_blank" rel="noopener noreferrer" aria-label={link.label} title={link.label} className={className}>{content}</Link>;
             return <Link key={link.href} href={link.href} onClick={onNavigate} aria-label={link.label} title={link.label} className={className}>{content}</Link>;
           })}
         </div>
-        <Link href="/" onClick={onNavigate} className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+        <Link href="/" onClick={onNavigate} className="flex min-h-12 items-center gap-3 border-t border-slate-100 px-1 text-sm font-semibold text-slate-800 hover:text-[#0066cc]">
           <ChevronLeft className="h-4 w-4" />
           View customer website
         </Link>
-        <Link href="/account" onClick={onNavigate} className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+        <Link href="/account" onClick={onNavigate} className="flex min-h-12 items-center gap-3 border-t border-slate-100 px-1 text-sm font-semibold text-slate-800 hover:text-[#0066cc]">
           <ClipboardList className="h-4 w-4" />
           Account
         </Link>
@@ -191,15 +192,15 @@ export function AdminShell({ children, access }: { children: ReactNode; access: 
       </div>
 
       <div
-        className={`fixed inset-0 z-[80] bg-slate-950/40 transition lg:hidden ${menuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
+        className={`fixed inset-0 z-[80] bg-slate-950/20 transition lg:hidden ${menuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
         onClick={() => setMenuOpen(false)}
         aria-hidden="true"
       />
-      <aside className={`fixed inset-y-0 left-0 z-[81] w-[88vw] max-w-[20rem] border-r border-slate-200 bg-white shadow-2xl transition-transform lg:hidden ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`fixed inset-0 z-[81] bg-white transition-transform duration-300 lg:hidden ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <button
           type="button"
           onClick={() => setMenuOpen(false)}
-          className="absolute right-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700"
+          className="absolute right-5 top-[max(1.25rem,env(safe-area-inset-top))] z-10 inline-flex h-11 w-11 items-center justify-center bg-white text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]"
           aria-label="Close manager navigation"
         >
           <X className="h-5 w-5" />
