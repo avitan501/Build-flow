@@ -168,9 +168,9 @@ test("primary customer routes remain available in Menu", async ({ page }) => {
   expect(drawerBox?.width).toBeCloseTo(page.viewportSize()?.width ?? 0, 0);
   expect(drawerBox?.height).toBeCloseTo(page.viewportSize()?.height ?? 0, 0);
   await expect(navigation.getByRole("link", { name: "Home", exact: true })).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Order Materials", exact: true })).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Get Material Pricing", exact: true })).toHaveAttribute("href", "/request-quote");
-  await expect(navigation.getByRole("link", { name: "Beat a Supplier Quote", exact: true })).toHaveAttribute("href", "/beat-a-quote");
+  await expect(navigation.getByRole("link", { name: /Shop Materials/ })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: /Request Material Pricing/ })).toHaveAttribute("href", "/request-quote");
+  await expect(navigation.getByRole("link", { name: /Beat My Quote/ })).toHaveAttribute("href", "/beat-a-quote");
   await expect(drawer.getByRole("link", { name: "Log in", exact: true })).toHaveAttribute("href", "/login");
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();

@@ -9,6 +9,7 @@ import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 export type MobileMenuLink = {
   href: string;
   label: string;
+  description?: string;
   gated?: boolean;
   external?: boolean;
   badge?: string;
@@ -118,13 +119,16 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
                   onClick={onClose}
                   target={link.external ? "_blank" : undefined}
                   rel={link.external ? "noopener noreferrer" : undefined}
-                  className={`group flex min-h-16 items-center justify-between border-b border-slate-100 px-1 text-xl font-semibold tracking-normal transition active:translate-x-0.5 sm:min-h-[4.5rem] sm:text-2xl ${
+                  className={`group flex min-h-[4.75rem] items-center justify-between gap-4 border-b border-slate-100 px-1 py-3 tracking-normal transition active:translate-x-0.5 sm:min-h-[5.25rem] ${
                     active
                       ? "text-[#0066cc]"
                       : "text-slate-950 hover:text-[#0066cc]"
                   }`}
                 >
-                  <span>{link.label}</span>
+                  <span className="min-w-0">
+                    <span className="block text-xl font-semibold sm:text-2xl">{link.label}</span>
+                    {link.description ? <span className="mt-1 block text-sm font-normal leading-5 text-slate-500 sm:text-base">{link.description}</span> : null}
+                  </span>
                   {link.badge ? <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-sky-700">{link.badge}</span> : null}
                   {!link.badge && link.gated && !isSignedIn ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-slate-500">Login</span> : null}
                   {!link.badge && !(link.gated && !isSignedIn) ? <span className="text-2xl font-light text-slate-400 transition group-hover:translate-x-1 group-hover:text-[#0066cc]" aria-hidden="true">›</span> : null}

@@ -89,8 +89,8 @@ test("beat a quote is a dedicated upload request", async ({ page }) => {
   await expect(page.getByRole("navigation", { name: "Mobile homepage" })).toHaveCount((page.viewportSize()?.width ?? 0) < 1024 ? 1 : 0)
 
   await page.getByRole("button", { name: "Open navigation menu" }).click()
-  await expect(page.getByRole("navigation", { name: "Mobile full navigation" }).getByRole("link", { name: "Get Material Pricing" })).toBeVisible()
-  await expect(page.getByRole("navigation", { name: "Mobile full navigation" }).getByRole("link", { name: "Beat a Supplier Quote" })).toBeVisible()
+  await expect(page.getByRole("navigation", { name: "Mobile full navigation" }).getByRole("link", { name: /Request Material Pricing/ })).toBeVisible()
+  await expect(page.getByRole("navigation", { name: "Mobile full navigation" }).getByRole("link", { name: /Beat My Quote/ })).toBeVisible()
 })
 
 test("plan over the storage limit stays on the form and shows a useful error", async ({ page }) => {

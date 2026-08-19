@@ -107,9 +107,9 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
 
   const primaryLinks = useMemo<MobileMenuLink[]>(() => [
     { href: "/", label: "Home" },
-    { href: "/shop", label: "Order Materials" },
-    { href: "/request-quote", label: "Get Material Pricing" },
-    { href: "/beat-a-quote", label: "Beat a Supplier Quote" },
+    { href: "/shop", label: "Shop Materials", description: "Browse products and departments" },
+    { href: "/request-quote", label: "Request Material Pricing", description: "Send a list, photo, or plan" },
+    { href: "/beat-a-quote", label: "Beat My Quote", description: "Upload a supplier quote for a better price" },
   ], []);
 
   const moreLinks = useMemo<MobileMenuLink[]>(() => [
@@ -240,9 +240,9 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
           {!isShopPage && pathname !== "/" ? (
             <nav className="hidden flex-1 items-center justify-center gap-1 md:flex" aria-label="Primary navigation">
               <Link href="/" className={`rounded-lg px-3 py-2 text-sm font-semibold ${pathname === "/" ? "bg-slate-100 text-slate-950" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}>Home</Link>
-              <Link href="/shop" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Order Materials</Link>
-              <Link href="/request-quote" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Get Material Pricing</Link>
-              <Link href="/beat-a-quote" className="rounded-lg bg-[#0E2A4A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163a63]">Beat a Supplier Quote</Link>
+              <Link href="/shop" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Shop Materials</Link>
+              <Link href="/request-quote" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Request Material Pricing</Link>
+              <Link href="/beat-a-quote" className="rounded-lg bg-[#0E2A4A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163a63]">Beat My Quote</Link>
               <details className="group relative">
                 <summary className="cursor-pointer list-none rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950 marker:content-none">More</summary>
                 <div className="absolute right-0 top-[calc(100%+.5rem)] w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
@@ -283,7 +283,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
           <div className="border-t border-slate-200/70 px-3 py-2 md:hidden">
             <Link href="/request-quote" className="mx-auto flex min-h-9 max-w-md items-center justify-between rounded-full bg-[#0E2A4A] px-4 text-xs font-semibold text-white">
               <span>Need materials or pricing?</span>
-              <span>Get Material Pricing →</span>
+              <span>Request Pricing →</span>
             </Link>
           </div>
         ) : null}
