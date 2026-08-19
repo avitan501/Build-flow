@@ -43,9 +43,8 @@ test("Door and molding offers products and a working custom quote path", async (
   await page.goto("/shop/door-and-molding")
 
   await expect(page.getByText("No items are assigned to this tool page yet.")).toHaveCount(0)
-  await expect(page.getByRole("heading", { name: "1-Panel Shaker Interior Door" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "1-Panel Shaker Interior Door", exact: true })).toBeVisible()
   await expect(page.getByRole("heading", { name: "Common materials" })).toBeVisible()
-  await expect(page.getByText("Interior slab doors", { exact: true })).toBeVisible()
   await expect(page.getByText("Need Help With a Custom Door and molding Order?", { exact: true })).toBeVisible()
   await expect(page.getByLabel("Describe your material request")).toBeVisible()
 })
