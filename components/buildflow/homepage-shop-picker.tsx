@@ -288,9 +288,9 @@ export function HomepageShopPicker({
   return (
     <ShopTranslationBoundary><div className="grid gap-1">
       {!homepageCompact ? <header className="relative max-w-3xl border-l-2 border-[#0071e3] pb-4 pl-4 pr-1 pt-1 sm:pb-6 sm:pl-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Avantia builder shop</p>
-        <h1 className="mt-1.5 text-[1.85rem] font-semibold leading-[1.1] tracking-[0] text-[#111] sm:text-[2.45rem]">Everything a builder needs.</h1>
-        <p className="mt-2 max-w-xl text-[15px] leading-6 tracking-[0] text-[#60646c] sm:text-base">Materials, pricing, delivery, and jobsite support, organized in one place.</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0071e3]">Avantia builder shop</p>
+        <h1 className="mt-1.5 max-w-2xl text-[1.85rem] font-semibold leading-[1.02] tracking-[0] text-[#111] sm:text-[2.45rem]">Everything a builder needs.</h1>
+        <p className="mt-2 max-w-xl text-[15px] leading-[1.42] tracking-[0] text-[#60646c] sm:text-[0.98rem]">Materials, pricing, delivery, and jobsite support, organized in one place.</p>
       </header> : null}
 
       {homepageCompact ? (
@@ -468,10 +468,12 @@ export function HomepageShopPicker({
       </section> : null}
 
       <section data-testid="homepage-services-section" className={`${homepageCompact && homepageSection !== "services" ? "hidden sm:block" : "block"} mt-1 min-w-0 border-t border-slate-200/80 py-4 sm:py-6`}>
-        <div className="px-1">
-          {!homepageCompact ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Project support</p> : null}
-          <h2 className="text-[1.4rem] font-semibold leading-tight tracking-[0] text-[#171717] sm:text-[1.75rem]">Choose a service</h2>
-          {!homepageCompact ? <p className="mt-1 text-[13px] leading-5 text-slate-500 sm:text-sm">Send a quote, plan, list, or jobsite need. We will organize the next step.</p> : null}
+        <div className="px-1 sm:flex sm:items-end sm:justify-between sm:gap-6">
+          <div>
+            {!homepageCompact ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Project support</p> : null}
+            <h2 className="text-[1.4rem] font-semibold leading-tight tracking-[0] text-[#171717] sm:text-[1.75rem]">Choose a service</h2>
+          </div>
+          {!homepageCompact ? <p className="mt-1 max-w-[34ch] text-[13px] leading-5 text-slate-500 sm:mt-0 sm:text-sm">Send a quote, plan, list, or jobsite need. We will organize the next step.</p> : null}
         </div>
 
         <div data-testid="fast-service-grid" className="mt-4 grid grid-cols-3 gap-x-2 gap-y-5 px-1 sm:grid-cols-5 sm:gap-x-4 lg:grid-cols-10">
@@ -504,10 +506,12 @@ export function HomepageShopPicker({
       </section>
 
       <section data-testid="homepage-materials-section" className={`${homepageCompact && homepageSection !== "materials" ? "hidden sm:block" : "block"} min-w-0 border-t border-slate-200/80 py-5 sm:py-7`}>
-        <div className="px-1">
-          {!homepageCompact ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Material departments</p> : null}
-          <h2 className="text-[1.4rem] font-semibold leading-tight tracking-[0] text-[#171717] sm:text-[1.75rem]">Shop materials</h2>
-          {!homepageCompact ? <p className="mt-1 text-[13px] leading-5 text-slate-500 sm:text-sm">Choose a department to build a list, upload details, or request current pricing.</p> : null}
+        <div className="px-1 sm:flex sm:items-end sm:justify-between sm:gap-6">
+          <div>
+            {!homepageCompact ? <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">Material departments</p> : null}
+            <h2 className="text-[1.4rem] font-semibold leading-tight tracking-[0] text-[#171717] sm:text-[1.75rem]">Shop materials</h2>
+          </div>
+          {!homepageCompact ? <p className="mt-1 max-w-[34ch] text-[13px] leading-5 text-slate-500 sm:mt-0 sm:text-sm">Choose a department to build a list, upload details, or request current pricing.</p> : null}
         </div>
 
         <div data-testid="department-grid" className="mt-4 grid w-full min-w-0 grid-cols-3 gap-x-2 gap-y-5 px-1 pb-3 sm:grid-cols-4 sm:gap-x-4 sm:gap-y-6 lg:grid-cols-6">
