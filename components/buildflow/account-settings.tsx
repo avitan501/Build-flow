@@ -13,6 +13,7 @@ type AccountSettingsProps = {
   feedbackTone?: "success" | "error" | null;
   paymentStatus?: string | null;
   hasSavedPaymentProfile?: boolean;
+  showAbcPricing?: boolean;
 };
 
 const STRIPE_PAYMENT_LINK = "https://buy.stripe.com/5kQaEWb6q64N6FybJl97G00";
@@ -44,7 +45,7 @@ function SectionCard({ title, description, children }: { title: string; descript
   );
 }
 
-export function AccountSettings({ email, profile, alternateEmail, alternatePhone, feedbackCode, feedbackTone, paymentStatus, hasSavedPaymentProfile = false }: AccountSettingsProps) {
+export function AccountSettings({ email, profile, alternateEmail, alternatePhone, feedbackCode, feedbackTone, paymentStatus, hasSavedPaymentProfile = false, showAbcPricing = false }: AccountSettingsProps) {
   const feedbackText = feedbackCode
     ? feedbackTone === "error"
       ? errorMessages[feedbackCode] || "Account could not be updated."
@@ -74,6 +75,7 @@ export function AccountSettings({ email, profile, alternateEmail, alternatePhone
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <Link href="/projects" className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-white">My Projects</Link>
             <Link href="/shop" className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-white">Order Materials</Link>
+            {showAbcPricing ? <Link href="/account/abc" className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4 text-sm font-semibold text-[#0071e3] shadow-sm transition hover:bg-white sm:col-span-2">ABC Supply private pricing</Link> : null}
           </div>
         </header>
 
