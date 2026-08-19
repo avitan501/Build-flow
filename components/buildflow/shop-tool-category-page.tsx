@@ -1,4 +1,6 @@
 import Image from "next/image"
+import Link from "next/link"
+import { Calculator } from "lucide-react"
 
 import { AddToProjectButton } from "@/components/buildflow/add-to-project-button"
 import { BulkBagStorefront } from "@/components/buildflow/bulk-bag-storefront"
@@ -91,31 +93,84 @@ function DoorPricingGuide() {
   )
 }
 
-function KitchenActions() {
-  const actions = [
+function DepartmentUploadActions({
+  department,
+  questionnaireDepartment,
+  projects,
+  selectedProjectId,
+}: {
+  department: "Framing" | "Kitchen"
+  questionnaireDepartment: string
+  projects: ProjectRecord[]
+  selectedProjectId?: string
+}) {
+  const actions = department === "Framing" ? [
     {
-      label: "Upload blueprint or shopping list",
-      description: "Kitchen plan, design spec, list, PDF, image, CSV, or spreadsheet",
-      accept: ".csv,.xls,.xlsx,.pdf,image/*",
-      icon: (
-        <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M4 3h12l4 4v14H4z" />
-          <path d="M16 3v5h5" />
-          <path d="M8 13h8" />
-          <path d="M8 17h5" />
-        </svg>
-      ),
+      id: "framing-upload-framer-list",
+      label: "Upload framer list",
+      description: "PDF, photo, CSV, or spreadsheet with framing quantities",
+      accept: ".csv,.xls,.xlsx,.pdf,image/png,image/jpeg,image/webp",
+    },
+    {
+      id: "framing-upload-blue-print",
+      label: "Upload blueprint",
+      description: "Construction plan or framing blueprint for takeoff review",
+      accept: ".pdf,image/png,image/jpeg,image/webp",
+    },
+  ] : [
+    {
+      id: "kitchen-upload-kitchen-plan",
+      label: "Upload kitchen plan",
+      description: "Kitchen plan, cabinet layout, PDF, or image",
+      accept: ".pdf,image/png,image/jpeg,image/webp",
+    },
+    {
+      id: "kitchen-upload-design-spec",
+      label: "Upload design spec",
+      description: "Cabinet, finish, hardware, appliance, CSV, or spreadsheet specification",
+      accept: ".csv,.xls,.xlsx,.pdf,image/png,image/jpeg,image/webp",
     },
   ]
 
+  const icon = (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 3h12l4 4v14H4z" />
+      <path d="M16 3v5h5" />
+      <path d="M8 13h8" />
+      <path d="M8 17h5" />
+    </svg>
+  )
+
   return (
-    <section className="grid max-w-xl gap-3 sm:gap-4">
-        {actions.map((action) => (
-          <ManagerItemVisibility key={action.label} itemId={`kitchen-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
-            <PlanRequestUploadCard requestId={`kitchen-${action.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} category="Kitchen" label={action.label} description={action.description} accept={action.accept} icon={action.icon} />
-          </ManagerItemVisibility>
-        ))}
+    <section className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+      {actions.map((action) => (
+        <ManagerItemVisibility key={action.id} itemId={action.id}>
+          <PlanRequestUploadCard
+            requestId={action.id}
+            category={department}
+            questionnaireDepartment={questionnaireDepartment}
+            label={action.label}
+            description={action.description}
+            accept={action.accept}
+            icon={icon}
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+          />
+        </ManagerItemVisibility>
+      ))}
     </section>
+  )
+}
+
+function ThinsetCalculatorAction() {
+  return (
+    <Link href="/shop/tile-work/thinset-calculator" className="flex max-w-xl items-center justify-between gap-4 rounded-lg border border-sky-200 bg-sky-50 p-4 shadow-sm transition hover:border-sky-300 hover:bg-sky-100/70">
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[#0E2A4A] text-white"><Calculator className="h-5 w-5" aria-hidden="true" /></span>
+        <span><span className="block text-base font-bold text-slate-950">Thinset calculator</span><span className="mt-0.5 block text-xs leading-5 text-slate-600">Estimate bags from tile area, tile size, trowel, coverage, and waste.</span></span>
+      </span>
+      <span className="text-xl text-sky-700" aria-hidden="true">›</span>
+    </Link>
   )
 }
 
@@ -193,7 +248,7 @@ function EitanActions({
 
 export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, questionnaireSnapshot, catalogEssentials = [] }: ShopToolCategoryPageProps) {
   const essentials = getDepartmentEssentials(category.slug, catalogEssentials)
-  const customOrderOnly = ["siding", "roofing", "window"].includes(category.slug)
+  const customOrderOnly = ["siding", "roofing", "window", "door-and-molding", "exterior"].includes(category.slug)
   const usesStandardUpload = !["framing", "kitchen", "eitan", "window", "siding", "roofing"].includes(category.slug)
   const usesEmbeddedQuickOrder = ["wood-floor", "sheet-rock", "tile-work", "door-and-molding", "framing", "electrical"].includes(category.slug)
   const composerHandlesUpload = usesEmbeddedQuickOrder
@@ -208,11 +263,13 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
 
         {isBulkBagDepartment ? <BulkBagStorefront /> : null}
         {category.slug === "door-and-molding" ? <DoorPricingGuide /> : null}
+        {category.slug === "tile-work" ? <ThinsetCalculatorAction /> : null}
         {experience.showQuickOrder && category.slug === "sheet-rock" ? <SheetRockProductConfigurator /> : null}
         {experience.showQuickOrder && usesEmbeddedQuickOrder && category.slug !== "sheet-rock" && questionnaireSnapshot ? <div id={category.slug === "door-and-molding" ? "door-order-builder" : undefined} className="scroll-mt-24"><EmbeddedMaterialQuickOrder snapshot={questionnaireSnapshot} category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} /></div> : null}
         {experience.showQuickOrder && !isBulkBagDepartment && !customOrderOnly && (!usesEmbeddedQuickOrder || !questionnaireSnapshot) ? <QuickOrderAction category={category} questionnaireDepartment={questionnaireDepartment} /> : null}
         {experience.showPlanUpload && !isBulkBagDepartment && usesStandardUpload && !composerHandlesUpload ? <CombinedUploadAction category={questionnaireDepartment} requestId={category.slug} questionnaireDepartment={questionnaireDepartment} /> : null}
-        {experience.showPlanUpload && category.slug === "kitchen" ? <KitchenActions /> : null}
+        {experience.showPlanUpload && category.slug === "framing" ? <DepartmentUploadActions department="Framing" questionnaireDepartment={questionnaireDepartment} projects={projects} selectedProjectId={selectedProjectId} /> : null}
+        {experience.showPlanUpload && category.slug === "kitchen" ? <DepartmentUploadActions department="Kitchen" questionnaireDepartment={questionnaireDepartment} projects={projects} selectedProjectId={selectedProjectId} /> : null}
         {experience.showPlanUpload && category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
 
         {!isBulkBagDepartment && (customOrderOnly || experience.showChatToOrder) && usesCompactCustomOrder ? (

@@ -426,12 +426,12 @@ test("common materials sit below the order area and cover request-only departmen
   }
 })
 
-test("kitchen, tile, and drywall omit retired promotional and calculator cards", async ({ page }) => {
+test("kitchen and drywall omit retired cards while Tile exposes the working calculator", async ({ page }) => {
   await page.goto("/shop/kitchen")
   await expect(page.getByText("Premium cabinetry for builder-ready kitchens")).toHaveCount(0)
 
   await page.goto("/shop/tile-work")
-  await expect(page.getByText("Thinset calculator", { exact: true })).toHaveCount(0)
+  await expect(page.getByRole("link", { name: /Thinset calculator/ })).toHaveAttribute("href", "/shop/tile-work/thinset-calculator")
 
   await page.goto("/shop/sheet-rock")
   await expect(page.getByText("Drywall calculator", { exact: true })).toHaveCount(0)
@@ -592,7 +592,11 @@ test("shop language switch translates only the shop and persists the choice", as
 
   await page.goto("/shop/tile-work/thinset-calculator")
   await expect(page.getByText("Volver a azulejos", { exact: true })).toBeVisible()
-  await expect(page.getByText("La calculadora estará disponible aquí próximamente.", { exact: true })).toBeVisible()
+  await expect(page.getByTestId("thinset-calculator")).toBeVisible()
+  await page.getByLabel("Square footage").fill("1000")
+  await page.getByLabel("Tile size").selectOption("medium")
+  await page.getByLabel("Waste percentage").fill("10")
+  await expect(page.getByText("19", { exact: true })).toBeVisible()
 
   await page.goto("/shop/sheet-rock")
   await page.reload()

@@ -33,6 +33,7 @@ type AddToProjectButtonProps = {
   materialAnswers?: Record<string, MaterialAnswerValue>
   onAdded?: () => void
   autoOpen?: boolean
+  projectId?: string
 }
 
 type Options = {
@@ -47,7 +48,7 @@ function PlusIcon() {
   )
 }
 
-export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Request Item", file = null, questions: questionOverride, details, questionnaireDepartment, materialAnswers, onAdded, autoOpen = false }: AddToProjectButtonProps) {
+export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Request Item", file = null, questions: questionOverride, details, questionnaireDepartment, materialAnswers, onAdded, autoOpen = false, projectId }: AddToProjectButtonProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -108,6 +109,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
     setError(null)
     startTransition(async () => {
       const result = await addCatalogItemToProjectAction({
+        projectId,
         requestId: undefined,
         requestTitle: `${product.category} request`,
         product: {
@@ -287,7 +289,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
                 </div>
               ) : null}
 
-              {options && !created && isPending ? <div className="rounded-[20px] border border-sky-100 bg-sky-50 px-4 py-5 text-center text-sm font-semibold text-sky-900">Saving your request...</div> : null}
+              {options && !created && isPending ? <div className="rounded-[20px] border border-sky-100 bg-sky-50 px-4 py-5 text-center text-sm font-semibold text-sky-900">{file ? `Uploading ${file.name} and creating the project attachment...` : "Saving your request..."}</div> : null}
 
               {created && !created.materialResponse && !questionnaireCompleted ? (
                 <div className="grid gap-4">

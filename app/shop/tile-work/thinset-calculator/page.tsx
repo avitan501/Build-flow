@@ -1,5 +1,6 @@
 import Link from "next/link"
 
+import { ThinsetCalculator } from "@/components/buildflow/thinset-calculator"
 import { pageMetadata } from "@/lib/site-metadata"
 import { translateShopText } from "@/lib/shop-i18n"
 import { getRequestedShopLanguage } from "@/lib/shop-language-server"
@@ -20,9 +21,8 @@ export default async function ThinsetCalculatorPage() {
           {t("Back to Tile")}
         </Link>
         <h1 className="text-[2rem] font-bold tracking-normal text-slate-950 sm:text-[2.4rem]">{t("Thinset calculator")}</h1>
-        <section className="rounded-[20px] border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-sm font-medium text-slate-500 shadow-[0_14px_34px_rgba(148,163,184,0.08)]">
-          {t("Calculator flow will be added here.")}
-        </section>
+        <p className="max-w-2xl text-sm leading-6 text-slate-600">Estimate the number of thinset bags from the tile area, tile size, trowel, bag coverage, and waste.</p>
+        <ThinsetCalculator />
       </section>
     </main>
   )

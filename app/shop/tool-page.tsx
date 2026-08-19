@@ -35,6 +35,14 @@ const MATERIAL_CATALOG_DEPARTMENT: Partial<Record<ShopToolSlug, string>> = {
   "concrete-masonry": "Concrete",
 }
 
+const REQUIRED_PUBLIC_WORKFLOW_SLUGS = new Set<ShopToolSlug>([
+  "framing",
+  "kitchen",
+  "tile-work",
+  "door-and-molding",
+  "exterior",
+])
+
 async function loadCurrentUserProjects(questionnaireDepartment: string) {
   const { supabase, user } = await getSessionWithProfile()
   if (!supabase) {
@@ -111,7 +119,7 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
   // department key that existing admin questionnaire records are stored under.
   const questionnaireDepartment = baseCategory.slug === "wood-floor" ? "Wood Floor" : baseCategory.label
   const projectSession = await loadCurrentUserProjects(questionnaireDepartment)
-  if (isDepartmentHidden(projectSession.addOns, baseCategory.label)) notFound()
+  if (isDepartmentHidden(projectSession.addOns, baseCategory.label) && !REQUIRED_PUBLIC_WORKFLOW_SLUGS.has(slug)) notFound()
   const configuredCategory = applyDepartmentAddOns([baseCategory], projectSession.addOns)[0] ?? baseCategory
   const category = { ...configuredCategory, label: translateShopText(configuredCategory.label, language) }
   const experience = departmentExperienceFor(projectSession.addOns, baseCategory.label)

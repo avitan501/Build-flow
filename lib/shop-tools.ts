@@ -127,6 +127,14 @@ export const SHOP_TOOL_CATEGORIES: ShopToolCategory[] = [
     symbols: ["shopping-list", "blueprint", "site-visit"],
   },
   {
+    slug: "exterior",
+    label: "Exterior",
+    description: "Exterior envelope, flashing, weather barriers, trim, sealants, and fasteners.",
+    imageUrl: "/images/buildflow-retail/siding-department-v2.webp",
+    imageAlt: "Exterior weather barrier, flashing, trim, sealants, siding, and fasteners",
+    symbols: ["shopping-list", "blueprint", "site-visit"],
+  },
+  {
     slug: "window",
     label: "Window",
     description: "Window materials and window-related exterior items.",
@@ -147,10 +155,6 @@ export const SHOP_TOOL_CATEGORIES: ShopToolCategory[] = [
 export function findShopToolCategory(slug: string) {
   if (slug === "paper-work") {
     return SHOP_TOOL_CATEGORIES.find((category) => category.slug === "services") ?? null
-  }
-
-  if (slug === "exterior") {
-    return SHOP_TOOL_CATEGORIES.find((category) => category.slug === "roofing") ?? null
   }
 
   return SHOP_TOOL_CATEGORIES.find((category) => category.slug === slug) ?? null

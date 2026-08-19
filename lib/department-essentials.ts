@@ -64,7 +64,11 @@ const ESSENTIALS: Partial<Record<ShopToolSlug, DepartmentEssentials>> = {
   },
   "door-and-molding": {
     spriteUrl: "/images/department-essentials/moldings-grid.webp",
-    items: ["Baseboard molding", "Casing", "Crown molding", "Shoe molding", "Quarter round", "Chair rail", "Door jambs", "Window stools / sills"],
+    items: ["Interior slab doors", "Prehung interior doors", "Door jambs", "Door hardware", "Casing", "Baseboard molding", "Crown molding", "Shoe molding"],
+  },
+  exterior: {
+    spriteUrl: "/images/department-essentials/siding-grid.webp",
+    items: ["Metal flashing", "Siding", "Roofing materials", "House wrap", "Weather barriers", "Exterior trim", "Exterior sealants", "Exterior fasteners"],
   },
   "sheet-rock": {
     spriteUrl: "/images/department-essentials/drywall-grid.webp",
