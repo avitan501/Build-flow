@@ -4,8 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
-import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
-
 export type MobileMenuLink = {
   href: string;
   label: string;
@@ -94,13 +92,11 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
         aria-label="Site navigation"
         aria-hidden={!open}
         inert={!open}
-        className={`fixed inset-0 z-[71] overflow-y-auto bg-white px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] transition duration-300 sm:px-10 ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-0 z-[71] overflow-y-auto bg-white px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] transition duration-300 sm:px-8 ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col">
-          <div className="flex items-center justify-between gap-4">
-            <Link href="/" prefetch={false} onClick={onClose} aria-label="Avantia Build home" className="flex min-w-0 items-center">
-              <AvantiaBuildLockup />
-            </Link>
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <span className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">Menu</span>
             <button
               type="button"
               onClick={onClose}
@@ -125,19 +121,19 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
                   onClick={onClose}
                   target={link.external ? "_blank" : undefined}
                   rel={link.external ? "noopener noreferrer" : undefined}
-                  className={`group flex min-h-[4.75rem] items-center justify-between gap-4 border-b border-slate-100 px-1 py-3 tracking-normal transition active:translate-x-0.5 sm:min-h-[5.25rem] ${
+                  className={`group flex min-h-[4rem] items-center justify-between gap-4 border-b border-slate-100 px-1 py-3 tracking-normal transition active:translate-x-0.5 ${
                     active
                       ? "text-[#0066cc]"
                       : "text-slate-950 hover:text-[#0066cc]"
                   }`}
                 >
                   <span className="min-w-0">
-                    <span className="block text-xl font-semibold sm:text-2xl">{link.label}</span>
-                    {link.description ? <span className="mt-1 block text-sm font-normal leading-5 text-slate-500 sm:text-base">{link.description}</span> : null}
+                    <span className="block text-lg font-semibold sm:text-xl">{link.label}</span>
+                    {link.description ? <span className="mt-1 block text-xs font-normal leading-5 text-slate-500 sm:text-sm">{link.description}</span> : null}
                   </span>
                   {link.badge ? <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-sky-700">{link.badge}</span> : null}
                   {!link.badge && link.gated && !isSignedIn ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-slate-500">Login</span> : null}
-                  {!link.badge && !(link.gated && !isSignedIn) ? <span className="text-2xl font-light text-slate-400 transition group-hover:translate-x-1 group-hover:text-[#0066cc]" aria-hidden="true">›</span> : null}
+                  {!link.badge && !(link.gated && !isSignedIn) ? <span className="text-xl font-light text-slate-400 transition group-hover:translate-x-1 group-hover:text-[#0066cc]" aria-hidden="true">›</span> : null}
                 </Link>
               );
             })}

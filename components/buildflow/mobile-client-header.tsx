@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Languages } from "lucide-react";
+import { Languages, Menu } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { MobileMenuDrawer, type MobileMenuLink } from "@/components/buildflow/mobile-menu-drawer";
 import { ShopTranslationBoundary, useShopLanguage } from "@/components/buildflow/shop-language-provider";
 import { placeholderImageMetadata } from "@/lib/shop-catalog";
@@ -181,30 +180,23 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
             {isHome ? (
               <>
                 <span>Menu</span>
-                <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                  <path d="M4 7h12" />
-                  <path d="M4 13h12" />
-                </svg>
+                <Menu className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
               </>
             ) : (
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M4 7h16" />
-                  <path d="M4 12h16" />
-                  <path d="M4 17h16" />
-                </svg>
+              <Menu className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
             )}
           </button>
 
           {isHome ? null : isShopPage ? (
             <>
-              <Link
-                href="/"
-                prefetch={false}
-                aria-label="Avantia Build home"
-                className="flex min-h-10 shrink-0 items-center overflow-hidden transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
-              >
-                <AvantiaBuildLockup header />
-              </Link>
+            <Link
+              href="/"
+              prefetch={false}
+              aria-label="Avantia Build home"
+              className="flex min-h-10 shrink-0 items-center overflow-hidden transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
+            >
+              <span className="text-[13px] font-semibold tracking-tight text-[#1d1d1f]">Avantia</span>
+            </Link>
               <button
                 type="button"
                 onClick={() => {
@@ -224,10 +216,8 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
               </button>
             </>
           ) : (
-            <Link href="/" prefetch={false} aria-label="Avantia Build home" className="flex min-h-11 min-w-0 items-center px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 md:flex-none">
-              <span className="flex items-center transition active:scale-[0.99]">
-                <AvantiaBuildLockup compact homepageHeader={pathname === "/"} />
-              </span>
+            <Link href="/" prefetch={false} aria-label="Avantia Build home" className="flex min-h-11 min-w-0 items-center px-1 text-[13px] font-semibold tracking-tight text-[#1d1d1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 md:flex-none">
+              Avantia
             </Link>
           )}
 
@@ -309,7 +299,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
 
       {shopSearchOpen ? (
         <div id="shop-search-overlay" role="dialog" aria-modal="true" className="fixed inset-0 z-[80] bg-white/96 backdrop-blur-sm">
-          <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-4 pb-6 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6">
+            <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-4 pb-6 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6">
             <div className="mb-4 grid grid-cols-[48px_1fr_48px] items-center">
               <button
                 type="button"
@@ -322,7 +312,9 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
                 <CloseIcon />
               </button>
               <div className="flex justify-center">
-                <AvantiaBuildLockup compact />
+                <Link href="/" prefetch={false} className="text-sm font-semibold text-slate-700" aria-label="Avantia Build home">
+                  Avantia
+                </Link>
               </div>
               <div />
             </div>
