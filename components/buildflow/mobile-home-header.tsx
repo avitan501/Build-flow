@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 
 type MobileHomeHeaderProps = {
   uploadHref: string;
@@ -40,13 +41,7 @@ export function MobileHomeHeader({ uploadHref, aiHref }: MobileHomeHeaderProps) 
 
       <div className="relative flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(232,242,255,0.84))] text-base font-semibold tracking-tight text-slate-900 shadow-[0_10px_24px_rgba(148,163,184,0.14)]">
-            BF
-          </div>
-          <div>
-            <p className="text-[1.15rem] font-semibold tracking-tight text-slate-950">Build<span className="text-sky-600">Flow</span></p>
-            <p className="text-xs text-slate-500">Construction materials + project flow</p>
-          </div>
+          <AvantiaBuildLockup compact homepageHeader />
         </div>
 
         <div className="flex items-start gap-2.5">

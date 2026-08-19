@@ -36,22 +36,6 @@ function isActivePath(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`) || (href === "/search" && pathname === "/shop");
 }
 
-function IconShell({ active, premium = false, children }: { active: boolean; premium?: boolean; children: React.ReactNode }) {
-  return (
-    <span
-      className={`relative flex h-11 w-11 items-center justify-center rounded-2xl border transition active:scale-[0.98] ${
-        premium
-          ? "border-fuchsia-200/80 bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.28),transparent_34%),radial-gradient(circle_at_top_right,rgba(96,165,250,0.32),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(238,244,255,0.96))] text-slate-950 shadow-[0_12px_26px_rgba(96,165,250,0.14)]"
-          : active
-            ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))] text-slate-950 shadow-[0_10px_24px_rgba(148,163,184,0.14)]"
-            : "border-slate-200/90 bg-white/95 text-slate-700 shadow-sm"
-      }`}
-    >
-      {children}
-    </span>
-  );
-}
-
 function SearchIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -89,6 +73,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
   const [draftQuery, setDraftQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isShopPage = Boolean(pathname) && pathname.startsWith("/shop");
+  const isHome = pathname === "/";
   const shopQuery = isShopPage ? searchParams.get("q") ?? "" : "";
   const accountLabel = isSignedIn ? displayName?.split(/\s+/)[0] || "Account" : "Log in";
 
@@ -172,17 +157,28 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
 
   return (
     <ShopTranslationBoundary>
-      <div data-testid="site-header" className={pathname === "/" ? "absolute inset-x-0 top-0 z-[60] bg-transparent" : "sticky top-0 z-[60] border-b border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(148,163,184,0.1)]"}>
-        <div className={`mx-auto flex w-full max-w-7xl items-center ${pathname === "/" ? "justify-end px-4 pb-2 pt-4 sm:px-7 sm:pt-5" : "gap-1.5 px-2 py-2.5 min-[360px]:gap-2 min-[360px]:px-3 sm:px-5"}`}>
+      <div
+        data-testid="site-header"
+        className={
+          isHome
+            ? "sticky top-0 z-[60] border-b border-[#d2d2d7]/30 bg-white/8 px-3 py-2 backdrop-blur-xl sm:px-5"
+            : "sticky top-0 z-[60] border-b border-[#d2d2d7] bg-white/95 backdrop-blur-md"
+        }
+      >
+        <div className={`mx-auto flex w-full max-w-[92rem] items-center ${isHome ? "justify-end px-3 py-2 sm:px-5" : "gap-2 px-3 py-2 sm:px-5 lg:px-8"}`}>
           <button
             type="button"
             aria-label="Open navigation menu"
             aria-expanded={menuOpen}
             aria-controls="mobile-navigation-drawer"
             onClick={() => setMenuOpen(true)}
-            className={pathname === "/" ? "inline-flex min-h-10 items-center gap-2 rounded bg-black/20 px-3 text-sm font-semibold text-white backdrop-blur-md transition hover:bg-black/30 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" : "inline-flex rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"}
+            className={
+              isHome
+                ? "inline-flex min-h-10 items-center gap-2 rounded-full bg-[#1d1d1f]/60 px-3 text-sm font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] transition hover:bg-[#1d1d1f]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/75"
+                : "inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-900 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
+            }
           >
-            {pathname === "/" ? (
+            {isHome ? (
               <>
                 <span>Menu</span>
                 <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
@@ -191,23 +187,21 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
                 </svg>
               </>
             ) : (
-              <IconShell active={menuOpen}>
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M4 7h16" />
                   <path d="M4 12h16" />
                   <path d="M4 17h16" />
                 </svg>
-              </IconShell>
             )}
           </button>
 
-          {pathname === "/" ? null : isShopPage ? (
+          {isHome ? null : isShopPage ? (
             <>
               <Link
                 href="/"
                 prefetch={false}
                 aria-label="Avantia Build home"
-              className="flex min-h-11 shrink-0 items-center overflow-hidden rounded-lg bg-white transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
+                className="flex min-h-10 shrink-0 items-center overflow-hidden transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
               >
                 <AvantiaBuildLockup header />
               </Link>
@@ -217,7 +211,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
                   setDraftQuery(shopQuery);
                   setShopSearchOpen(true);
                 }}
-                className={`flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-2xl border px-2.5 py-2 text-left shadow-sm transition sm:px-3 ${shopSearchOpen || isActivePath(pathname, "/shop") ? "border-sky-100 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(235,244,255,0.92))]" : "border-slate-200/90 bg-white/95"}`}
+                className={`flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-full border border-[#d2d2d7] px-2.5 py-2 text-left shadow-sm transition sm:px-3 ${shopSearchOpen || isActivePath(pathname, "/shop") ? "bg-[#f5f5f7]" : "bg-white"}`}
                 aria-haspopup="dialog"
                 aria-expanded={shopSearchOpen}
                 aria-controls="shop-search-overlay"
@@ -230,22 +224,44 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
               </button>
             </>
           ) : (
-            <Link href="/" prefetch={false} aria-label="Avantia Build home" className="flex min-h-11 min-w-0 flex-1 items-center rounded-lg px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 md:flex-none">
+            <Link href="/" prefetch={false} aria-label="Avantia Build home" className="flex min-h-11 min-w-0 items-center px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 md:flex-none">
               <span className="flex items-center transition active:scale-[0.99]">
                 <AvantiaBuildLockup compact homepageHeader={pathname === "/"} />
               </span>
             </Link>
           )}
 
-          {!isShopPage && pathname !== "/" ? (
+          {!isShopPage && !isHome ? (
             <nav className="hidden flex-1 items-center justify-center gap-1 md:flex" aria-label="Primary navigation">
-              <Link href="/" className={`rounded-lg px-3 py-2 text-sm font-semibold ${pathname === "/" ? "bg-slate-100 text-slate-950" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}>Home</Link>
-              <Link href="/shop" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Shop Materials</Link>
-              <Link href="/request-quote" className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950">Request Material Pricing</Link>
-              <Link href="/beat-a-quote" className="rounded-lg bg-[#0E2A4A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163a63]">Beat My Quote</Link>
+              <Link
+                href="/"
+                className={`rounded-full px-3 py-2 text-[13px] leading-none font-medium transition ${pathname === "/" ? "bg-[#f2f5f7] text-[#1d1d1f]" : "text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"}`}
+              >
+                Home
+              </Link>
+              <Link
+                href="/shop"
+                className={`rounded-full px-3 py-2 text-[13px] leading-none font-medium transition ${pathname === "/shop" ? "bg-[#f2f5f7] text-[#1d1d1f]" : "text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"}`}
+              >
+                Shop Materials
+              </Link>
+              <Link
+                href="/request-quote"
+                className={`rounded-full px-3 py-2 text-[13px] leading-none font-medium transition ${pathname === "/request-quote" ? "bg-[#f2f5f7] text-[#1d1d1f]" : "text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"}`}
+              >
+                Request Pricing
+              </Link>
+              <Link
+                href="/beat-a-quote"
+                className={`rounded-full px-3 py-2 text-[13px] leading-none font-medium transition ${pathname === "/beat-a-quote" ? "bg-[#f2f5f7] text-[#1d1d1f]" : "text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"}`}
+              >
+                Beat My Quote
+              </Link>
               <details className="group relative">
-                <summary className="cursor-pointer list-none rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-950 marker:content-none">More</summary>
-                <div className="absolute right-0 top-[calc(100%+.5rem)] w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
+                <summary className="cursor-pointer list-none rounded-full px-3 py-2 text-[13px] leading-none font-medium text-[#6e6e73] marker:content-none transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]">
+                  More
+                </summary>
+                <div className="absolute right-0 top-[calc(100%+.5rem)] w-56 rounded-2xl border border-[#e7e7ea] bg-white p-2 shadow-[0_12px_48px_rgba(15,23,42,0.18)]">
                   <Link href="/ai/renovation-estimator" className={`flex min-h-11 items-center justify-between rounded-md px-3 text-sm font-semibold ${pathname.startsWith("/ai/renovation-estimator") ? "bg-sky-50 text-[#0066cc]" : "text-slate-700 hover:bg-slate-50"}`}><span>Renovation AI</span><span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] uppercase tracking-[.1em] text-sky-700">New</span></Link>
                 </div>
               </details>
@@ -256,7 +272,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
             <button
               type="button"
               onClick={() => setLanguage(language === "en" ? "es" : "en")}
-              className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-2xl border border-slate-200/90 bg-white/95 px-0 text-xs font-bold text-[#0E2A4A] shadow-sm transition hover:border-sky-200 hover:bg-sky-50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 min-[360px]:px-2"
+              className="inline-flex h-10 min-w-11 shrink-0 items-center justify-center gap-1 rounded-full border border-slate-200/90 px-0 text-xs font-bold text-[#0E2A4A] transition hover:border-sky-200 hover:bg-sky-50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 min-[360px]:px-2"
               aria-label={language === "en" ? "Ver tienda en español" : "View shop in English"}
               title={language === "en" ? "Ver tienda en español" : "View shop in English"}
               data-no-shop-translation
@@ -266,16 +282,16 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
             </button>
           ) : null}
 
-          {pathname !== "/" ? <Link
+          {!isHome ? <Link
             href={isSignedIn ? "/account" : "/login"}
             prefetch={false}
             aria-label={isSignedIn ? `Open account for ${accountLabel}` : "Log in"}
-            className={`flex min-h-11 max-w-[7.75rem] shrink-0 items-center gap-1.5 rounded-2xl border px-2 text-xs font-bold shadow-sm transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 min-[360px]:px-2.5 ${pathname === "/account" ? "border-sky-200 bg-sky-50 text-[#0E2A4A]" : "border-slate-200/90 bg-white/95 text-[#0E2A4A]"}`}
+            className={`hidden items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium leading-none transition active:scale-[0.98] md:inline-flex ${pathname === "/account" ? "bg-[#f2f5f7] text-[#0071e3]" : "text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"}`}
           >
-            <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isSignedIn ? "bg-[#0E2A4A] text-white" : "bg-slate-100 text-slate-700"}`}>
+            <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isSignedIn ? "bg-[#0071e3] text-white" : "bg-slate-100 text-slate-600"}`}>
               <AccountIcon signedIn={isSignedIn} />
             </span>
-            <span className={`min-w-0 truncate ${isShopPage ? "hidden sm:inline" : pathname === "/" ? "hidden min-[390px]:inline" : ""}`}>{accountLabel}</span>
+            <span className={`min-w-0 truncate ${isShopPage ? "hidden sm:inline" : ""}`}>{accountLabel}</span>
           </Link> : null}
 
         </div>

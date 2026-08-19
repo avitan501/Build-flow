@@ -35,7 +35,9 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
 
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const drawer = drawerRef.current;
@@ -74,6 +76,10 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
       previousFocusRef.current?.focus();
     };
   }, [onClose, open]);
+
+  if (!open) {
+    return null;
+  }
 
   return (
     <>
