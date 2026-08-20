@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useRef, useState, useTransition } from "react"
 
 import { uploadSupplierQuoteAction } from "@/app/admin/supplier-quotes/actions"
+import { extractDocumentTextInBrowser } from "@/lib/browser-document-extraction"
 import type { SupplierQuoteClient, SupplierQuoteSupplier } from "@/lib/supplier-quotes"
 
 export function SupplierQuoteUploadForm({ clients, suppliers, departments, enabled, aiEnabled }: {
@@ -36,21 +37,12 @@ export function SupplierQuoteUploadForm({ clients, suppliers, departments, enabl
     formData.set("supplierName", supplier?.name ?? "")
     startTransition(async () => {
       const file = formData.get("quoteFile")
-      if (!aiEnabled && file instanceof File && file.type.startsWith("image/")) {
+      if (!aiEnabled && file instanceof File && (file.type.startsWith("image/") || file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))) {
         setExtractionStatus("Reading the supplier and material lines on this device...")
         try {
-          const { createWorker } = await import("tesseract.js")
-          const worker = await createWorker("eng", 1, { logger: (message) => {
-            if (message.status === "recognizing text" && typeof message.progress === "number") setExtractionStatus(`Reading invoice · ${Math.round(message.progress * 100)}%`)
-          } })
-          try {
-            const result = await worker.recognize(file)
-            const text = result.data.text.trim()
-            if (text.length < 30) throw new Error("No readable invoice text was found.")
-            formData.set("browserOcrText", text)
-          } finally {
-            await worker.terminate()
-          }
+          const text = await extractDocumentTextInBrowser(file, setExtractionStatus)
+          if (text.length < 30) throw new Error("No readable invoice text was found.")
+          formData.set("browserOcrText", text)
         } catch (ocrError) {
           setExtractionStatus("")
           setError(ocrError instanceof Error ? ocrError.message : "This image could not be read. Try a clearer photo or PDF.")
