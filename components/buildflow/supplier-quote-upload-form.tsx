@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useRef, useState, useTransition } from "react"
 
 import { uploadSupplierQuoteAction } from "@/app/admin/supplier-quotes/actions"
-import { extractDocumentTextInBrowser } from "@/lib/browser-document-extraction"
+import { extractImageTextInBrowser } from "@/lib/browser-document-extraction"
 import type { SupplierQuoteClient, SupplierQuoteSupplier } from "@/lib/supplier-quotes"
 
 export function SupplierQuoteUploadForm({ clients, suppliers, departments, enabled, aiEnabled }: {
@@ -37,10 +37,10 @@ export function SupplierQuoteUploadForm({ clients, suppliers, departments, enabl
     formData.set("supplierName", supplier?.name ?? "")
     startTransition(async () => {
       const file = formData.get("quoteFile")
-      if (!aiEnabled && file instanceof File && (file.type.startsWith("image/") || file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))) {
+      if (!aiEnabled && file instanceof File && file.type.startsWith("image/")) {
         setExtractionStatus("Reading the supplier and material lines on this device...")
         try {
-          const text = await extractDocumentTextInBrowser(file, setExtractionStatus)
+          const text = await extractImageTextInBrowser(file, setExtractionStatus)
           if (text.length < 30) throw new Error("No readable invoice text was found.")
           formData.set("browserOcrText", text)
         } catch (ocrError) {

@@ -1,7 +1,5 @@
 import "server-only"
 
-import { Buffer } from "node:buffer"
-
 import { extractSupplierQuoteWithAi, type SupplierQuoteAiMetadata } from "@/lib/supplier-quote-ai"
 import { parseSupplierQuoteText } from "@/lib/supplier-quote-parser"
 
@@ -21,19 +19,13 @@ export async function extractSupplierQuoteFile(file: File, suppliedOcrText = "")
   const type = file.type.toLowerCase()
   let text = ""
   if (type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+    const { extractText, getDocumentProxy } = await import("unpdf")
+    const pdf = await getDocumentProxy(new Uint8Array(await file.arrayBuffer()))
     try {
-      await import("@napi-rs/canvas")
-      const { PDFParse } = await import("pdf-parse")
-      const parser = new PDFParse({ data: new Uint8Array(Buffer.from(await file.arrayBuffer())) })
-      try {
-        const result = await parser.getText()
-        text = (result.pages ?? []).map((page: { text?: string }) => page.text ?? "").join("\n")
-      } finally {
-        await parser.destroy()
-      }
-    } catch (error) {
-      if (!suppliedOcrText.trim()) throw error
-      console.warn("Server PDF text extraction failed; using browser-extracted text instead.")
+      const result = await extractText(pdf, { mergePages: true })
+      text = result.text
+    } finally {
+      await pdf.destroy()
     }
   } else if (type === "text/csv" || type === "text/plain" || /\.(csv|txt)$/i.test(file.name)) {
     text = await file.text()

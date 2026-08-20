@@ -26,6 +26,7 @@ export default defineConfig({
     {
       name: "mobile-safari",
       use: {
+        browserName: "webkit",
         ...devices["iPhone 13"],
       },
     },
