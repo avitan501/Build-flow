@@ -4,6 +4,7 @@ import path from "node:path"
 
 import { parseSupplierQuoteText } from "../lib/supplier-quote-parser"
 import { normalizeSupplierQuoteAiPayload } from "../lib/supplier-quote-ai"
+import { detectSupplierMatch, inferSupplierName } from "../lib/supplier-quote-supplier"
 
 const root = process.cwd()
 
@@ -33,6 +34,11 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(actions).toContain('client_name_snapshot: clientName')
   expect(uploadForm).toContain("Choose client")
   expect(uploadForm).toContain("+ Add new client")
+  expect(uploadForm).toContain("Detect from invoice")
+  expect(uploadForm).toContain('import("tesseract.js")')
+  expect(uploadForm).not.toContain("Scanned-image OCR is waiting for AI activation.")
+  expect(actions).toContain("detectSupplierMatch")
+  expect(actions).toContain("inferSupplierName")
   expect(uploadForm).toContain('name="clientSelection" required')
   expect(page).toContain("client_name_snapshot")
   expect(page).toContain('aria-label="Filter supplier quotes"')
@@ -55,7 +61,13 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(clientMigration).toContain("references public.profiles(id) on delete set null")
   expect(clientMigration).toContain("supplier_quotes_client_updated_idx")
   expect(page).toContain("Boolean(process.env.OPENAI_API_KEY)")
-  expect(await readFile(path.join(root, "components/buildflow/supplier-quote-upload-form.tsx"), "utf8")).toContain("Scanned-image OCR is waiting for AI activation.")
+})
+
+test("supplier detection matches the directory or keeps the name read from the invoice", async () => {
+  const text = "EE Elite Doors i Estimate\n960 Alabama Ave\nSOFT OPEN & CLOSE HARDWARE SET 362.00 724.00T"
+  expect(inferSupplierName(text)).toBe("Elite Doors")
+  expect(detectSupplierMatch([{ id: "elite", name: "Elite Doors" }], "", text)?.id).toBe("elite")
+  expect(detectSupplierMatch([{ id: "prince", name: "Prince Lumber" }], "", text)).toBeNull()
 })
 
 test("supplier quote AI payload is normalized before database insertion", async () => {
@@ -98,10 +110,12 @@ test("supplier quote parser recognizes common quantity and price rows", async ()
   const rows = parseSupplierQuoteText([
     "ABC-204 12 sheets 1/2 in drywall 4 x 8 $14.50 $174.00",
     "2 x 4 x 10 framing lumber 25 pcs 7.25 181.25",
+    "SOFT OPEN & CLOSE HARDWARE SET 362.00 724.00T",
     "Delivery $125.00",
   ].join("\n"))
 
-  expect(rows).toHaveLength(2)
+  expect(rows).toHaveLength(3)
   expect(rows[0]).toMatchObject({ itemCode: "ABC-204", quantity: 12, unit: "sheets", unitPrice: 14.5, lineTotal: 174 })
   expect(rows[1]).toMatchObject({ quantity: 25, unit: "each", unitPrice: 7.25, lineTotal: 181.25 })
+  expect(rows[2]).toMatchObject({ description: "SOFT OPEN & CLOSE HARDWARE SET", quantity: 2, unitPrice: 362, lineTotal: 724 })
 })

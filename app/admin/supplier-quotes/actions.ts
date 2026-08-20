@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { requireStaffProfile } from "@/lib/auth"
 import { normalizeMaterialCatalogDepartment, type CatalogSupplier } from "@/lib/material-catalog"
 import { extractSupplierQuoteFile } from "@/lib/supplier-quote-extraction"
+import { detectSupplierMatch, inferSupplierName } from "@/lib/supplier-quote-supplier"
 import { SUPPLIER_QUOTE_BUCKET, type SupplierQuoteItemRecord, type SupplierQuoteRecord } from "@/lib/supplier-quotes"
 
 type ActionResult<T = undefined> = T extends undefined
@@ -100,16 +101,18 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
   if (clientError || !client) return { ok: false, error: "The selected client is not available. Choose another client." }
   const clientName = clean(client.full_name || client.email || "Client", 200)
 
-  const supplierId = clean(formData.get("supplierId"), 160)
-  const supplierName = clean(formData.get("supplierName"), 200)
+  const supplierSelection = clean(formData.get("supplierId"), 160) || "auto"
+  let supplierId = supplierSelection === "auto" ? "" : supplierSelection
+  let supplierName = clean(formData.get("supplierName"), 200)
   const department = normalizeMaterialCatalogDepartment(clean(formData.get("department"), 120))
-  if (!supplierId || !supplierName) return { ok: false, error: "Choose the supplier that sent this quote." }
+  if (supplierSelection !== "auto" && (!UUID_PATTERN.test(supplierId) || !supplierName)) return { ok: false, error: "Choose a valid supplier or use automatic detection." }
 
   const quoteId = crypto.randomUUID()
   const filePath = `${user.id}/${quoteId}/${cleanFileName(file.name)}`
   let extraction
   try {
-    extraction = await extractSupplierQuoteFile(file)
+    const browserOcrText = String(formData.get("browserOcrText") ?? "").slice(0, 250000)
+    extraction = await extractSupplierQuoteFile(file, browserOcrText)
   } catch (error) {
     console.error("Supplier quote extraction failed", error)
     extraction = {
@@ -118,6 +121,15 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
       metadata: { supplierName: "", quoteNumber: "", quoteDate: "", expiresOn: "", department: "", deliveryCharge: 0, taxPercent: 0, subtotal: null, total: null },
       extractionNote: "The original document was saved, but automatic extraction failed. Add the items manually.",
     }
+  }
+
+
+  if (supplierSelection === "auto") {
+    const { data: supplierRows, error: supplierError } = await supabase.rpc("staff_load_catalog_suppliers")
+    if (supplierError) return { ok: false, error: "The invoice was read, but the Supplier Directory could not be checked." }
+    const match = detectSupplierMatch(Array.isArray(supplierRows) ? supplierRows as CatalogSupplier[] : [], extraction.metadata.supplierName, extraction.text)
+    supplierId = match?.id ?? ""
+    supplierName = match?.name || extraction.metadata.supplierName || inferSupplierName(extraction.text) || "Supplier needs review"
   }
 
   const { error: storageError } = await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).upload(filePath, file, {
@@ -135,7 +147,7 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
     id: quoteId,
     client_id: client.id,
     client_name_snapshot: clientName,
-    supplier_id: supplierId,
+    supplier_id: supplierId || null,
     supplier_name: supplierName,
     quote_number: quoteNumber,
     department,
@@ -149,7 +161,9 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
     extraction_note: extraction.extractionNote,
     delivery_charge: extraction.metadata.deliveryCharge,
     tax_percent: extraction.metadata.taxPercent,
-    notes: extraction.metadata.supplierName && extraction.metadata.supplierName.toLowerCase() !== supplierName.toLowerCase()
+    notes: supplierSelection === "auto" && !supplierId
+      ? "Supplier was read from the invoice but did not match the Supplier Directory. Confirm the supplier before routing."
+      : extraction.metadata.supplierName && extraction.metadata.supplierName.toLowerCase() !== supplierName.toLowerCase()
       ? `Document supplier detected as ${extraction.metadata.supplierName}. Confirm the selected Supplier Directory record.`
       : "",
     created_by: user.id,

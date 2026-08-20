@@ -19,8 +19,9 @@ export function SupplierQuoteUploadForm({ clients, suppliers, departments, enabl
   const [open, setOpen] = useState(false)
   const [fileName, setFileName] = useState("")
   const [clientSelection, setClientSelection] = useState(clients.length ? "" : "new")
-  const [supplierId, setSupplierId] = useState("")
+  const [supplierId, setSupplierId] = useState("auto")
   const [error, setError] = useState("")
+  const [extractionStatus, setExtractionStatus] = useState("")
   const [pending, startTransition] = useTransition()
   const supplier = suppliers.find((entry) => entry.id === supplierId)
   const addingClient = clientSelection === "new"
@@ -31,14 +32,35 @@ export function SupplierQuoteUploadForm({ clients, suppliers, departments, enabl
       setError("Choose a client or add a new one before uploading.")
       return
     }
-    if (!supplier) {
-      setError("Choose the supplier that sent this quote.")
-      return
-    }
-    formData.set("supplierName", supplier.name)
+    if (supplierId !== "auto" && !supplier) { setError("Choose a valid supplier."); return }
+    formData.set("supplierName", supplier?.name ?? "")
     startTransition(async () => {
+      const file = formData.get("quoteFile")
+      if (!aiEnabled && file instanceof File && file.type.startsWith("image/")) {
+        setExtractionStatus("Reading the supplier and material lines on this device...")
+        try {
+          const { createWorker } = await import("tesseract.js")
+          const worker = await createWorker("eng", 1, { logger: (message) => {
+            if (message.status === "recognizing text" && typeof message.progress === "number") setExtractionStatus(`Reading invoice · ${Math.round(message.progress * 100)}%`)
+          } })
+          try {
+            const result = await worker.recognize(file)
+            const text = result.data.text.trim()
+            if (text.length < 30) throw new Error("No readable invoice text was found.")
+            formData.set("browserOcrText", text)
+          } finally {
+            await worker.terminate()
+          }
+        } catch (ocrError) {
+          setExtractionStatus("")
+          setError(ocrError instanceof Error ? ocrError.message : "This image could not be read. Try a clearer photo or PDF.")
+          return
+        }
+      }
+      setExtractionStatus("Saving the original and preparing extracted items...")
       const result = await uploadSupplierQuoteAction(formData)
       if (!result.ok) {
+        setExtractionStatus("")
         setError(result.error)
         return
       }
@@ -68,7 +90,7 @@ export function SupplierQuoteUploadForm({ clients, suppliers, departments, enabl
           <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Company <span className="font-normal text-slate-400">Optional</span><input name="clientCompanyName" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm" autoComplete="organization" /></label>
         </div> : null}
         <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Supplier
-          <select name="supplierId" required value={supplierId} onChange={(event) => setSupplierId(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">Choose supplier</option>{suppliers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select>
+          <select name="supplierId" required value={supplierId} onChange={(event) => setSupplierId(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="auto">Detect from invoice</option>{suppliers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select>
         </label>
         <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Department
           <select name="department" defaultValue="Others" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm">{departments.map((department) => <option key={department}>{department}</option>)}</select>
@@ -80,8 +102,9 @@ export function SupplierQuoteUploadForm({ clients, suppliers, departments, enabl
           <input name="quoteFile" type="file" required accept=".pdf,.csv,.txt,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,text/plain,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")} />
         </label>
         {error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 sm:col-span-2">{error}</p> : null}
-        <p className={`text-xs font-medium sm:col-span-2 ${aiEnabled ? "text-emerald-700" : "text-amber-700"}`}>{aiEnabled ? "OCR + AI is active for scans, photos, quote details, and material rows." : "Text documents extract automatically. Scanned-image OCR is waiting for AI activation."}</p>
-        <div className="flex justify-end sm:col-span-2"><button type="submit" disabled={pending || !fileName || !supplierId || !clientSelection} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-bold text-white disabled:opacity-40">{pending ? <><LoaderCircle className="h-4 w-4 animate-spin" /> Reading document…</> : <>Upload and extract <FileUp className="h-4 w-4" /></>}</button></div>
+        <p className="text-xs font-medium text-slate-500 sm:col-span-2">Supplier, quote details, and material rows are read from the document. Review the results before routing.</p>
+        {extractionStatus ? <p role="status" className="text-xs font-semibold text-[#0071e3] sm:col-span-2">{extractionStatus}</p> : null}
+        <div className="flex justify-end sm:col-span-2"><button type="submit" disabled={pending || !fileName || !clientSelection} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-bold text-white disabled:opacity-40">{pending ? <><LoaderCircle className="h-4 w-4 animate-spin" /> Reading document…</> : <>Upload and extract <FileUp className="h-4 w-4" /></>}</button></div>
       </form>
     </section>
   )

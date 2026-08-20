@@ -17,7 +17,7 @@ const emptyMetadata: SupplierQuoteAiMetadata = {
   total: null,
 }
 
-export async function extractSupplierQuoteFile(file: File) {
+export async function extractSupplierQuoteFile(file: File, suppliedOcrText = "") {
   const type = file.type.toLowerCase()
   let text = ""
   if (type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
@@ -33,6 +33,7 @@ export async function extractSupplierQuoteFile(file: File) {
   } else if (type === "text/csv" || type === "text/plain" || /\.(csv|txt)$/i.test(file.name)) {
     text = await file.text()
   }
+  if (!text.trim() && suppliedOcrText.trim()) text = suppliedOcrText.slice(0, 250000)
 
   const parsedItems = parseSupplierQuoteText(text)
   let aiResult = null

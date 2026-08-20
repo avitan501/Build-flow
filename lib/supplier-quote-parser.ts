@@ -40,6 +40,7 @@ export function parseSupplierQuoteText(text: string): ExtractedSupplierQuoteItem
   const seen = new Set<string>()
   const leading = new RegExp(`^(?:([A-Z0-9][A-Z0-9._/-]{2,})\\s+)?([0-9][0-9,.]*)\\s+(${UNIT_PATTERN})\\s+(.+?)\\s+${MONEY_PATTERN}(?:\\s+${MONEY_PATTERN})?$`, "i")
   const trailing = new RegExp(`^(?:([A-Z0-9][A-Z0-9._/-]{2,})\\s+)?(.+?)\\s+([0-9][0-9,.]*)\\s+(${UNIT_PATTERN})?\\s+${MONEY_PATTERN}\\s+${MONEY_PATTERN}$`, "i")
+  const ocrPriceRow = /^(.+?)\s+\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)T?\s+\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)T?(?:\s*[|.]+)?$/i
 
   for (const originalLine of text.replace(/\r/g, "").split("\n").slice(0, 10000)) {
     const line = originalLine.replace(/\s+/g, " ").trim()
@@ -60,6 +61,16 @@ export function parseSupplierQuoteText(text: string): ExtractedSupplierQuoteItem
       const unitPrice = amount(second[5])
       const lineTotal = amount(second[6])
       if (rowQuantity && description) item = { itemCode: second[1] ?? "", description, specification: "", quantity: rowQuantity, unit: normalizeUnit(second[4]), unitPrice, lineTotal }
+    } else {
+      const scanned = line.match(ocrPriceRow)
+      const unitPrice = amount(scanned?.[2])
+      const lineTotal = amount(scanned?.[3])
+      const calculatedQuantity = unitPrice && lineTotal ? lineTotal / unitPrice : 0
+      const roundedQuantity = Math.round(calculatedQuantity)
+      const description = cleanDescription(scanned?.[1] ?? "")
+      if (description && unitPrice && lineTotal && roundedQuantity > 0 && roundedQuantity <= 500 && Math.abs(calculatedQuantity - roundedQuantity) < 0.01) {
+        item = { itemCode: "", description, specification: "", quantity: roundedQuantity, unit: "each", unitPrice, lineTotal }
+      }
     }
     if (!item || /^(description|item|quantity|qty|unit price)$/i.test(item.description)) continue
     const key = `${item.itemCode}|${item.description}|${item.quantity}|${item.unitPrice}`.toLowerCase()
