@@ -66,7 +66,12 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
     extraction = await extractSupplierQuoteFile(file)
   } catch (error) {
     console.error("Supplier quote extraction failed", error)
-    extraction = { text: "", items: [], extractionNote: "The original document was saved, but automatic extraction failed. Add the items manually." }
+    extraction = {
+      text: "",
+      items: [],
+      metadata: { supplierName: "", quoteNumber: "", quoteDate: "", expiresOn: "", department: "", deliveryCharge: 0, taxPercent: 0, subtotal: null, total: null },
+      extractionNote: "The original document was saved, but automatic extraction failed. Add the items manually.",
+    }
   }
 
   const { error: storageError } = await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).upload(filePath, file, {
@@ -78,20 +83,27 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
     return { ok: false, error: "The document could not be stored. Try again." }
   }
 
-  const quoteNumber = clean(formData.get("quoteNumber"), 100)
+  const quoteNumber = clean(formData.get("quoteNumber"), 100) || extraction.metadata.quoteNumber
+  const quoteDate = clean(formData.get("quoteDate"), 10) || extraction.metadata.quoteDate
   const { error: quoteError } = await supabase.from("supplier_quotes").insert({
     id: quoteId,
     supplier_id: supplierId,
     supplier_name: supplierName,
     quote_number: quoteNumber,
     department,
-    quote_date: clean(formData.get("quoteDate"), 10) || null,
+    quote_date: /^\d{4}-\d{2}-\d{2}$/.test(quoteDate) ? quoteDate : null,
+    expires_on: extraction.metadata.expiresOn || null,
     file_name: file.name.slice(0, 255),
     file_path: filePath,
     mime_type: file.type,
     file_size: file.size,
     raw_text: extraction.text,
     extraction_note: extraction.extractionNote,
+    delivery_charge: extraction.metadata.deliveryCharge,
+    tax_percent: extraction.metadata.taxPercent,
+    notes: extraction.metadata.supplierName && extraction.metadata.supplierName.toLowerCase() !== supplierName.toLowerCase()
+      ? `Document supplier detected as ${extraction.metadata.supplierName}. Confirm the selected Supplier Directory record.`
+      : "",
     created_by: user.id,
     updated_by: user.id,
   })

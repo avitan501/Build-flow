@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 
 import { parseSupplierQuoteText } from "../lib/supplier-quote-parser"
+import { normalizeSupplierQuoteAiPayload } from "../lib/supplier-quote-ai"
 
 const root = process.cwd()
 
@@ -20,6 +21,7 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(page).toContain('requireStaffProfile("suppliers")')
   expect(actions).toContain('requireStaffProfile("suppliers")')
   expect(actions).toContain("extractSupplierQuoteFile")
+  expect(actions).toContain("extraction.metadata.quoteNumber")
   expect(actions).toContain("addSupplierQuoteItemsToCatalogAction")
   expect(actions).toContain("sendSupplierQuoteToComparisonAction")
   expect(actions).toContain("createClientQuoteFromSupplierQuoteAction")
@@ -32,6 +34,38 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(migration).toContain("public = false")
   expect(migration).toContain("private.has_staff_capability('suppliers')")
   expect(migration).toContain("enable row level security")
+})
+
+test("supplier quote AI payload is normalized before database insertion", async () => {
+  const result = normalizeSupplierQuoteAiPayload({
+    metadata: {
+      supplierName: "  Nassau Lumber  ",
+      quoteNumber: " Q-1048 ",
+      quoteDate: "08/20/2026",
+      expiresOn: "2026-09-20",
+      department: "Framing",
+      deliveryCharge: "125.50",
+      taxPercent: 108,
+      subtotal: 400,
+      total: 525.5,
+    },
+    items: [{ itemCode: "PLY-1", description: "  1/2 in. plywood  ", specification: "4 x 8", quantity: "12", unit: "sheet", unitPrice: "22.50", lineTotal: null }],
+    notes: " Review scan ",
+  })
+
+  expect(result.metadata).toMatchObject({ supplierName: "Nassau Lumber", quoteNumber: "Q-1048", quoteDate: "", expiresOn: "2026-09-20", deliveryCharge: 125.5, taxPercent: 100 })
+  expect(result.items[0]).toMatchObject({ description: "1/2 in. plywood", quantity: 12, unitPrice: 22.5, lineTotal: 270 })
+  expect(result.notes).toBe("Review scan")
+})
+
+test("supplier quote AI extraction uses a cost-controlled model and does not retain responses", async () => {
+  const extraction = await readFile(path.join(root, "lib/supplier-quote-ai.ts"), "utf8")
+  expect(extraction).toContain('process.env.OPENAI_SUPPLIER_QUOTE_MODEL || "gpt-5-mini"')
+  expect(extraction).toContain("store: false")
+  expect(extraction).toContain('reasoning: { effort: "low" }')
+  expect(extraction).toContain('type: "json_schema"')
+  expect(extraction).toContain('detail: "high"')
+  expect(extraction).toContain("if (extractedText.trim())")
 })
 
 test("supplier quote parser recognizes common quantity and price rows", async () => {

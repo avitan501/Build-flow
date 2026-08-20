@@ -62,7 +62,8 @@ export function SupplierQuoteUploadForm({ suppliers, departments, enabled }: {
           <input name="quoteFile" type="file" required accept=".pdf,.csv,.txt,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,text/plain,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")} />
         </label>
         {error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 sm:col-span-2">{error}</p> : null}
-        <div className="flex justify-end sm:col-span-2"><button type="submit" disabled={pending || !fileName || !supplierId} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-bold text-white disabled:opacity-40">{pending ? <><LoaderCircle className="h-4 w-4 animate-spin" /> Extracting…</> : <>Upload and extract <FileUp className="h-4 w-4" /></>}</button></div>
+        <p className="text-xs font-medium text-slate-500 sm:col-span-2">OCR reads scans and photos. AI organizes the quote details and materials for your review.</p>
+        <div className="flex justify-end sm:col-span-2"><button type="submit" disabled={pending || !fileName || !supplierId} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-bold text-white disabled:opacity-40">{pending ? <><LoaderCircle className="h-4 w-4 animate-spin" /> Reading document…</> : <>Upload and extract <FileUp className="h-4 w-4" /></>}</button></div>
       </form>
     </section>
   )
