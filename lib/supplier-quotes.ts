@@ -65,6 +65,17 @@ export type SupplierQuoteClient = {
   email: string
 }
 
+export type SupplierQuoteRequestOption = {
+  id: string
+  clientId: string
+  title: string
+  caseNumber: string
+  projectName: string
+  projectAddress: string
+  status: string
+  createdAt: string
+}
+
 export function supplierQuoteStatusLabel(status: SupplierQuoteStatus) {
   return {
     needs_review: "Needs review",

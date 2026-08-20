@@ -48,6 +48,73 @@ async function loadQuote(quoteId: string) {
   return { supabase, user, quote: data ?? null }
 }
 
+type StaffSupabase = Awaited<ReturnType<typeof requireStaffProfile>>["supabase"]
+
+async function ensureClientRequestComparison(input: {
+  supabase: StaffSupabase
+  userId: string
+  requestId: string
+  clientId: string
+  clientName: string
+  clientEmail: string
+  fallbackDepartment: string
+}) {
+  const existing = await input.supabase
+    .from("quote_comparisons")
+    .select("id")
+    .eq("request_id", input.requestId)
+    .in("status", ["draft", "review"])
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string }>()
+  if (existing.error) throw existing.error
+  if (existing.data) return { comparisonId: existing.data.id, created: false }
+
+  const { data: request, error: requestError } = await input.supabase
+    .from("quote_requests")
+    .select("id,title,project_id,owner_id")
+    .eq("id", input.requestId)
+    .eq("owner_id", input.clientId)
+    .maybeSingle<{ id: string; title: string; project_id: string; owner_id: string }>()
+  if (requestError || !request) throw new Error("The selected client request is no longer available.")
+
+  const [{ data: project }, { data: requestItems, error: itemsError }] = await Promise.all([
+    input.supabase.from("projects").select("name,address").eq("id", request.project_id).maybeSingle<{ name: string; address: string | null }>(),
+    input.supabase.from("quote_request_items").select("name,quantity,unit,department").eq("request_id", request.id).order("created_at").returns<Array<{ name: string; quantity: number; unit: string | null; department: string }>>(),
+  ])
+  if (itemsError) throw itemsError
+  const department = normalizeMaterialCatalogDepartment(requestItems?.[0]?.department || input.fallbackDepartment)
+  const caseNumber = request.id.replaceAll("-", "").slice(0, 8).toUpperCase()
+  const { data: comparison, error: comparisonError } = await input.supabase.from("quote_comparisons").insert({
+    project_id: request.project_id,
+    request_id: request.id,
+    created_by: input.userId,
+    title: `Case #${caseNumber} · ${request.title}`.slice(0, 160),
+    department,
+    job_address: clean(project?.address || project?.name || "", 500),
+    client_id: input.clientId,
+    client_name_snapshot: input.clientName,
+    client_email_snapshot: input.clientEmail,
+  }).select("id").single<{ id: string }>()
+  if (comparisonError || !comparison) throw comparisonError || new Error("The comparison could not be created.")
+
+  if (requestItems?.length) {
+    const { error: seedError } = await input.supabase.from("quote_comparison_items").insert(requestItems.slice(0, 500).map((item, index) => ({
+      comparison_id: comparison.id,
+      description: clean(item.name, 500) || `Requested material ${index + 1}`,
+      specification: clean(item.department, 1000),
+      quantity: safeNumber(item.quantity, 1) || 1,
+      unit: clean(item.unit, 40) || "each",
+      sort_order: index,
+    })))
+    if (seedError) {
+      await input.supabase.from("quote_comparisons").delete().eq("id", comparison.id)
+      throw seedError
+    }
+  }
+  return { comparisonId: comparison.id, created: true }
+}
+
 export async function uploadSupplierQuoteAction(formData: FormData): Promise<ActionResult<{ quoteId: string }>> {
   const { supabase, user } = await requireStaffProfile("suppliers")
   const file = formData.get("quoteFile")
@@ -55,51 +122,26 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
   if (file.size > MAX_FILE_SIZE) return { ok: false, error: "The quote must be 25 MB or smaller." }
   if (!ALLOWED_TYPES.has(file.type)) return { ok: false, error: "Use a PDF, CSV, TXT, JPG, PNG, or WEBP file." }
 
+  const linkMode = clean(formData.get("linkMode"), 20) === "request" ? "request" : "unlinked"
   const clientSelection = clean(formData.get("clientSelection"), 160)
-  let clientId = clientSelection
-  if (clientSelection === "new") {
-    const fullName = clean(formData.get("clientFullName"), 160)
-    const email = clean(formData.get("clientEmail"), 320).toLowerCase()
-    const phone = clean(formData.get("clientPhone"), 40) || null
-    const companyName = clean(formData.get("clientCompanyName"), 180) || null
-    if (fullName.length < 2) return { ok: false, error: "Enter the new client's name." }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid client email address." }
-
-    const { data: existingClient, error: existingClientError } = await supabase
+  const requestId = clean(formData.get("requestId"), 160)
+  let client: { id: string; full_name: string | null; email: string | null } | null = null
+  let clientName = ""
+  if (linkMode === "request") {
+    if (!UUID_PATTERN.test(clientSelection) || !UUID_PATTERN.test(requestId)) return { ok: false, error: "Choose the client and one of their requests." }
+    const clientResult = await supabase
       .from("profiles")
-      .select("id,role,is_active")
-      .ilike("email", email)
-      .limit(1)
-      .maybeSingle<{ id: string; role: string; is_active: boolean }>()
-    if (existingClientError) return { ok: false, error: "Could not check the client directory." }
-    if (existingClient) {
-      if (existingClient.role !== "client") return { ok: false, error: "That email belongs to a staff account." }
-      if (!existingClient.is_active) return { ok: false, error: "That client account is inactive." }
-      clientId = existingClient.id
-    } else {
-      const { data: createdClient, error: createClientError } = await supabase.functions.invoke<{
-        ok?: boolean
-        customerId?: string
-        error?: string
-      }>("create-manager-client", { body: { fullName, email, phone, companyName } })
-      if (createClientError || !createdClient?.ok || !UUID_PATTERN.test(createdClient.customerId || "")) {
-        if (createdClient?.error === "email_in_use_by_staff") return { ok: false, error: "That email belongs to a staff account." }
-        if (createdClient?.error === "client_inactive") return { ok: false, error: "That client account is inactive." }
-        return { ok: false, error: "Could not add the client. Please try again." }
-      }
-      clientId = createdClient.customerId || ""
-    }
+      .select("id,full_name,email")
+      .eq("id", clientSelection)
+      .eq("role", "client")
+      .eq("is_active", true)
+      .maybeSingle<{ id: string; full_name: string | null; email: string | null }>()
+    if (clientResult.error || !clientResult.data) return { ok: false, error: "The selected client is not available. Choose another client." }
+    const { data: request } = await supabase.from("quote_requests").select("id").eq("id", requestId).eq("owner_id", clientResult.data.id).maybeSingle<{ id: string }>()
+    if (!request) return { ok: false, error: "That request does not belong to the selected client." }
+    client = clientResult.data
+    clientName = clean(client.full_name || client.email || "Client", 200)
   }
-  if (!UUID_PATTERN.test(clientId)) return { ok: false, error: "Choose a client or add a new one before uploading." }
-  const { data: client, error: clientError } = await supabase
-    .from("profiles")
-    .select("id,full_name,email")
-    .eq("id", clientId)
-    .eq("role", "client")
-    .eq("is_active", true)
-    .maybeSingle<{ id: string; full_name: string | null; email: string | null }>()
-  if (clientError || !client) return { ok: false, error: "The selected client is not available. Choose another client." }
-  const clientName = clean(client.full_name || client.email || "Client", 200)
 
   const supplierSelection = clean(formData.get("supplierId"), 160) || "auto"
   let supplierId = supplierSelection === "auto" ? "" : supplierSelection
@@ -141,12 +183,35 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
     return { ok: false, error: "The document could not be stored. Try again." }
   }
 
+  let comparisonId: string | null = null
+  let createdComparison = false
+  if (client) {
+    try {
+      const comparison = await ensureClientRequestComparison({
+        supabase,
+        userId: user.id,
+        requestId,
+        clientId: client.id,
+        clientName,
+        clientEmail: clean(client.email, 320),
+        fallbackDepartment: department,
+      })
+      comparisonId = comparison.comparisonId
+      createdComparison = comparison.created
+    } catch (error) {
+      await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).remove([filePath])
+      console.error("Client request comparison creation failed", error)
+      return { ok: false, error: "The quote was read, but it could not be attached to that client request." }
+    }
+  }
+
   const quoteNumber = clean(formData.get("quoteNumber"), 100) || extraction.metadata.quoteNumber
   const quoteDate = clean(formData.get("quoteDate"), 10) || extraction.metadata.quoteDate
   const { error: quoteError } = await supabase.from("supplier_quotes").insert({
     id: quoteId,
-    client_id: client.id,
+    client_id: client?.id ?? null,
     client_name_snapshot: clientName,
+    comparison_id: comparisonId,
     supplier_id: supplierId || null,
     supplier_name: supplierName,
     quote_number: quoteNumber,
@@ -171,6 +236,7 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
   })
   if (quoteError) {
     await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).remove([filePath])
+    if (createdComparison && comparisonId) await supabase.from("quote_comparisons").delete().eq("id", comparisonId)
     console.error("Supplier quote record creation failed", quoteError)
     return { ok: false, error: "The document uploaded, but its quote record could not be created." }
   }
@@ -438,6 +504,23 @@ export async function addSupplierQuoteItemsToCatalogAction(quoteId: string, item
   return { ok: true, data: { added, updated }, message: `${added} new catalog item${added === 1 ? "" : "s"} added; ${updated} existing price${updated === 1 ? "" : "s"} updated.` }
 }
 
+function comparisonWords(value: string) {
+  return new Set(value.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter((word) => word.length > 1))
+}
+
+function comparisonMatchScore(quoteItem: SupplierQuoteItemRecord, requestItem: { description: string; specification: string }) {
+  const quoteText = `${quoteItem.item_code} ${quoteItem.description} ${quoteItem.specification}`.trim()
+  const requestText = `${requestItem.description} ${requestItem.specification}`.trim()
+  const normalizedQuote = quoteText.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+  const normalizedRequest = requestText.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+  if (normalizedQuote === normalizedRequest) return 10
+  if (normalizedQuote.includes(normalizedRequest) || normalizedRequest.includes(normalizedQuote)) return 5
+  const quoteWords = comparisonWords(quoteText)
+  const requestWords = comparisonWords(requestText)
+  const overlap = [...quoteWords].filter((word) => requestWords.has(word)).length
+  return overlap / Math.max(quoteWords.size, requestWords.size, 1)
+}
+
 async function createComparisonFromQuote(quoteId: string, itemIds: string[], clientMode: boolean): Promise<ActionResult<{ comparisonId: string }>> {
   const { supabase, user, quote } = await loadQuote(quoteId)
   if (!quote) return { ok: false, error: "This supplier quote could not be found." }
@@ -447,51 +530,96 @@ async function createComparisonFromQuote(quoteId: string, itemIds: string[], cli
   const { data: items, error: itemsError } = await supabase.from("supplier_quote_items").select("*").eq("quote_id", quote.id).in("id", selectedIds).order("line_number").returns<SupplierQuoteItemRecord[]>()
   if (itemsError || !items?.length) return { ok: false, error: "The selected quote items could not be loaded." }
 
-  const { data: comparison, error: comparisonError } = await supabase.from("quote_comparisons").insert({
-    title: `${quote.supplier_name} · ${quote.quote_number || quote.file_name}`.slice(0, 160),
-    department: quote.department,
-    created_by: user.id,
-  }).select("id").single<{ id: string }>()
-  if (comparisonError || !comparison) return { ok: false, error: "The comparison workspace could not be created." }
+  let comparison: { id: string; request_id: string | null; status: string } | null = null
+  let createdComparison = false
+  if (quote.comparison_id) {
+    const current = await supabase.from("quote_comparisons").select("id,request_id,status").eq("id", quote.comparison_id).maybeSingle<{ id: string; request_id: string | null; status: string }>()
+    if (current.error) return { ok: false, error: "The linked client-request comparison could not be loaded." }
+    comparison = current.data
+  }
+  if (comparison && ["awarded", "archived"].includes(comparison.status)) return { ok: false, error: "This client-request comparison is already closed. Start a new comparison before adding another quote." }
+  if (!comparison) {
+    const created = await supabase.from("quote_comparisons").insert({
+      title: `${quote.supplier_name} · ${quote.quote_number || quote.file_name}`.slice(0, 160),
+      department: quote.department,
+      created_by: user.id,
+    }).select("id,request_id,status").single<{ id: string; request_id: string | null; status: string }>()
+    if (created.error || !created.data) return { ok: false, error: "The comparison workspace could not be created." }
+    comparison = created.data
+    createdComparison = true
+  }
 
   async function fail(message: string): Promise<ActionResult<{ comparisonId: string }>> {
-    await supabase.from("quote_comparisons").delete().eq("id", comparison!.id)
+    if (createdComparison) await supabase.from("quote_comparisons").delete().eq("id", comparison!.id)
     return { ok: false, error: message }
   }
 
-  const { data: comparisonItems, error: comparisonItemsError } = await supabase.from("quote_comparison_items").insert(items.map((item, index) => ({
-    comparison_id: comparison.id,
-    description: item.description,
-    specification: item.specification,
-    quantity: item.quantity,
-    unit: item.unit,
-    sort_order: index,
-  }))).select("id,description,sort_order").returns<Array<{ id: string; description: string; sort_order: number }>>()
-  if (comparisonItemsError || comparisonItems?.length !== items.length) return fail("The quote items could not be copied to the comparison.")
+  let comparisonItemsResult = await supabase.from("quote_comparison_items").select("id,description,specification,sort_order").eq("comparison_id", comparison.id).order("sort_order").returns<Array<{ id: string; description: string; specification: string; sort_order: number }>>()
+  if (comparisonItemsResult.error) return fail("The client request items could not be loaded.")
+  if (!comparisonItemsResult.data?.length) {
+    comparisonItemsResult = await supabase.from("quote_comparison_items").insert(items.map((item, index) => ({
+      comparison_id: comparison!.id,
+      description: item.description,
+      specification: item.specification,
+      quantity: item.quantity,
+      unit: item.unit,
+      sort_order: index,
+    }))).select("id,description,specification,sort_order").returns<Array<{ id: string; description: string; specification: string; sort_order: number }>>()
+    if (comparisonItemsResult.error || comparisonItemsResult.data?.length !== items.length) return fail("The quote items could not be copied to the comparison.")
+  }
+  const comparisonItems = comparisonItemsResult.data ?? []
 
   const { data: supplierData } = await supabase.rpc("staff_load_catalog_suppliers")
   const supplier = (Array.isArray(supplierData) ? supplierData as CatalogSupplier[] : []).find((entry) => entry.id === quote.supplier_id)
   if (!supplier) return fail("The supplier is no longer available in the Supplier Directory.")
-  const { data: bid, error: bidError } = await supabase.from("quote_comparison_bids").insert({
+  const bidSupplierId = comparison.request_id ? `${quote.supplier_id}:${quote.id}`.slice(0, 160) : quote.supplier_id
+  const bidName = comparison.request_id && quote.quote_number ? `${quote.supplier_name} · ${quote.quote_number}`.slice(0, 200) : quote.supplier_name
+  const existingBid = await supabase.from("quote_comparison_bids").select("id").eq("comparison_id", comparison.id).eq("supplier_id", bidSupplierId).maybeSingle<{ id: string }>()
+  if (existingBid.error) return fail("The supplier quote column could not be checked.")
+  const bidPayload = {
     comparison_id: comparison.id,
-    supplier_id: quote.supplier_id,
-    supplier_name_snapshot: quote.supplier_name,
+    supplier_id: bidSupplierId,
+    supplier_name_snapshot: bidName,
     trust_level_snapshot: supplier.trustLevel ?? "not-reviewed",
     delivery_charge: quote.delivery_charge,
     tax_percent: quote.tax_percent,
-    notes: quote.notes,
-  }).select("id").single<{ id: string }>()
+    notes: clean([quote.notes, `Source quote: ${quote.quote_number || quote.file_name}`].filter(Boolean).join("\n"), 4000),
+  }
+  const bidResult = existingBid.data
+    ? await supabase.from("quote_comparison_bids").update(bidPayload).eq("id", existingBid.data.id).select("id").single<{ id: string }>()
+    : await supabase.from("quote_comparison_bids").insert(bidPayload).select("id").single<{ id: string }>()
+  const { data: bid, error: bidError } = bidResult
   if (bidError || !bid) return fail("The supplier could not be added to the comparison.")
 
-  const comparisonByOrder = new Map((comparisonItems ?? []).map((item) => [item.sort_order, item.id]))
-  const priceRows = items.map((item, index) => ({
+  if (existingBid.data) await supabase.from("quote_comparison_prices").delete().eq("bid_id", bid.id)
+  const matches = items.map((item, index) => {
+    if (!comparison.request_id) return { item, comparisonItem: comparisonItems[index] }
+    const ranked = comparisonItems.map((candidate) => ({ candidate, score: comparisonMatchScore(item, candidate) })).sort((a, b) => b.score - a.score)
+    return { item, comparisonItem: ranked[0]?.score >= 0.3 ? ranked[0].candidate : null }
+  })
+  const bestByComparisonItem = new Map<string, (typeof matches)[number]>()
+  for (const match of matches) {
+    if (!match.comparisonItem) continue
+    const current = bestByComparisonItem.get(match.comparisonItem.id)
+    if (!current || (match.item.unit_price ?? Number.POSITIVE_INFINITY) < (current.item.unit_price ?? Number.POSITIVE_INFINITY)) bestByComparisonItem.set(match.comparisonItem.id, match)
+  }
+  const matched = [...bestByComparisonItem.values()]
+  if (!matched.length) {
+    await supabase.from("quote_comparison_bids").delete().eq("id", bid.id)
+    return fail("No supplier quote items matched this client request. Review the material names and try again.")
+  }
+  const priceRows = matched.map(({ item, comparisonItem }) => ({
     bid_id: bid.id,
-    item_id: comparisonByOrder.get(index),
+    item_id: comparisonItem!.id,
     unit_price: item.unit_price,
     is_available: item.unit_price !== null,
+    notes: clean(item.description, 1000),
   }))
   const { error: pricesError } = await supabase.from("quote_comparison_prices").insert(priceRows)
-  if (pricesError) return fail("The supplier pricing could not be copied to the comparison.")
+  if (pricesError) {
+    await supabase.from("quote_comparison_bids").delete().eq("id", bid.id)
+    return fail("The supplier pricing could not be copied to the comparison.")
+  }
 
   if (clientMode) {
     const { error: awardError } = await supabase.from("quote_comparisons").update({ status: "awarded", awarded_bid_id: bid.id }).eq("id", comparison.id)
@@ -501,13 +629,15 @@ async function createComparisonFromQuote(quoteId: string, itemIds: string[], cli
     await supabase.from("quote_comparisons").update({ status: "review" }).eq("id", comparison.id)
   }
 
-  for (let index = 0; index < items.length; index += 1) {
-    await supabase.from("supplier_quote_items").update({ comparison_item_id: comparisonByOrder.get(index) }).eq("id", items[index].id).eq("quote_id", quote.id)
+  for (const match of matched) {
+    await supabase.from("supplier_quote_items").update({ comparison_item_id: match.comparisonItem!.id }).eq("id", match.item.id).eq("quote_id", quote.id)
   }
   await supabase.from("supplier_quotes").update({ status: clientMode ? "client_quote" : "comparison", comparison_id: comparison.id, updated_by: user.id }).eq("id", quote.id)
   revalidatePath("/admin/quote-comparison")
   revalidatePath(`/admin/supplier-quotes/${quote.id}`)
-  return { ok: true, data: { comparisonId: comparison.id }, message: clientMode ? "Client quote workspace created." : "Comparison workspace created." }
+  const unmatched = items.length - matched.length
+  const matchMessage = unmatched ? ` ${matched.length} items matched the client request; ${unmatched} need manual matching.` : " All selected items matched the client request."
+  return { ok: true, data: { comparisonId: comparison.id }, message: `${clientMode ? "Client quote workspace created." : "Supplier quote added to the comparison."}${comparison.request_id ? matchMessage : ""}` }
 }
 
 export async function sendSupplierQuoteToComparisonAction(quoteId: string, itemIds: string[]) {

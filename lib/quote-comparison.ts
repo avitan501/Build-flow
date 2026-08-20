@@ -189,7 +189,8 @@ export function analyzeQuoteComparison(
     }
 
     const completeness = items.length === 0 ? 0 : pricedItemCount / items.length;
-    const landedTotal = comparisonSubtotal + positiveNumber(bid.delivery_charge) + calculateQuoteTax(comparisonSubtotal, bid.tax_percent);
+    const deliveryCharge = positiveNumber(bid.delivery_charge);
+    const landedTotal = comparisonSubtotal + deliveryCharge + calculateQuoteTax(comparisonSubtotal + deliveryCharge, bid.tax_percent);
     const blocked = bid.trust_level_snapshot === "do-not-use" || bid.status === "declined";
 
     return {
@@ -295,7 +296,8 @@ export function buildClientQuoteSummary(
     };
   });
   const supplierMaterialCost = lines.reduce((total, line) => total + line.supplierLineCost, 0);
-  const supplierDeliveryAndTax = positiveNumber(selectedBid?.delivery_charge) + calculateQuoteTax(supplierMaterialCost, selectedBid?.tax_percent);
+  const supplierDelivery = positiveNumber(selectedBid?.delivery_charge);
+  const supplierDeliveryAndTax = supplierDelivery + calculateQuoteTax(supplierMaterialCost + supplierDelivery, selectedBid?.tax_percent);
   const supplierLandedCost = supplierMaterialCost + supplierDeliveryAndTax;
   const clientMaterialSubtotal = lines.reduce((total, line) => total + line.clientLineTotal, 0);
   const safeClientDeliveryCharge = positiveNumber(clientDeliveryCharge);

@@ -96,16 +96,17 @@ test("client quote totals preserve private landed cost, profit, and margin", () 
   const summary = buildClientQuoteSummary(items, selected, 200);
 
   expect(summary.supplierMaterialCost).toBe(1100);
-  expect(summary.supplierLandedCost).toBe(1255);
+  expect(summary.supplierLandedCost).toBe(1260);
   expect(summary.clientMaterialSubtotal).toBe(1320);
   expect(summary.clientTotal).toBe(1520);
-  expect(summary.profit).toBe(265);
-  expect(summary.marginPercent).toBeCloseTo(17.434, 2);
+  expect(summary.profit).toBe(260);
+  expect(summary.marginPercent).toBeCloseTo(17.105, 2);
   expect(summary.complete).toBe(true);
 });
 
-test("supplier tax is calculated as a percentage of the material subtotal", () => {
+test("supplier tax is calculated from the taxable subtotal", () => {
   expect(calculateQuoteTax(1_000, 8.875)).toBe(88.75);
+  expect(calculateQuoteTax(2_446, 8.875)).toBe(217.08);
   expect(calculateQuoteTax(1_000, 150)).toBe(1_000);
   expect(calculateQuoteTax(1_000, -5)).toBe(0);
 });
