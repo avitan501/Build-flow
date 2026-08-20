@@ -25,7 +25,7 @@ export async function extractSupplierQuoteFile(file: File, suppliedOcrText = "")
       const result = await extractText(pdf, { mergePages: true })
       text = result.text
     } finally {
-      await pdf.destroy()
+      await pdf.loadingTask?.destroy()
     }
   } else if (type === "text/csv" || type === "text/plain" || /\.(csv|txt)$/i.test(file.name)) {
     text = await file.text()
