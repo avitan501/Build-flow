@@ -7,10 +7,11 @@ import { useRef, useState, useTransition } from "react"
 import { uploadSupplierQuoteAction } from "@/app/admin/supplier-quotes/actions"
 import type { SupplierQuoteSupplier } from "@/lib/supplier-quotes"
 
-export function SupplierQuoteUploadForm({ suppliers, departments, enabled }: {
+export function SupplierQuoteUploadForm({ suppliers, departments, enabled, aiEnabled }: {
   suppliers: SupplierQuoteSupplier[]
   departments: string[]
   enabled: boolean
+  aiEnabled: boolean
 }) {
   const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
@@ -62,7 +63,7 @@ export function SupplierQuoteUploadForm({ suppliers, departments, enabled }: {
           <input name="quoteFile" type="file" required accept=".pdf,.csv,.txt,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,text/plain,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")} />
         </label>
         {error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 sm:col-span-2">{error}</p> : null}
-        <p className="text-xs font-medium text-slate-500 sm:col-span-2">OCR reads scans and photos. AI organizes the quote details and materials for your review.</p>
+        <p className={`text-xs font-medium sm:col-span-2 ${aiEnabled ? "text-emerald-700" : "text-amber-700"}`}>{aiEnabled ? "OCR + AI is active for scans, photos, quote details, and material rows." : "Text documents extract automatically. Scanned-image OCR is waiting for AI activation."}</p>
         <div className="flex justify-end sm:col-span-2"><button type="submit" disabled={pending || !fileName || !supplierId} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-bold text-white disabled:opacity-40">{pending ? <><LoaderCircle className="h-4 w-4 animate-spin" /> Reading document…</> : <>Upload and extract <FileUp className="h-4 w-4" /></>}</button></div>
       </form>
     </section>

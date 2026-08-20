@@ -34,6 +34,8 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(migration).toContain("public = false")
   expect(migration).toContain("private.has_staff_capability('suppliers')")
   expect(migration).toContain("enable row level security")
+  expect(page).toContain("Boolean(process.env.OPENAI_API_KEY)")
+  expect(await readFile(path.join(root, "components/buildflow/supplier-quote-upload-form.tsx"), "utf8")).toContain("Scanned-image OCR is waiting for AI activation.")
 })
 
 test("supplier quote AI payload is normalized before database insertion", async () => {
