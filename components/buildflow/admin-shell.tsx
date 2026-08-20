@@ -5,6 +5,7 @@ import {
   ChevronDown,
   BarChart3,
   CalendarDays,
+  Archive,
   ClipboardList,
   ChevronRight,
   Columns3,
@@ -41,6 +42,7 @@ const communicationLinks = [
 const primaryLinks = [
   { href: "/admin/users", label: "Customers", icon: Users },
   { href: "/admin/vendors", label: "Suppliers", icon: Store },
+  { href: "/admin/supplier-quotes", label: "Supplier Quotes", icon: Archive },
   { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },
   { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
 ] as const;
@@ -62,6 +64,7 @@ function linksForAccess(access: ManagerAccess) {
   return primaryLinks.filter((link) =>
     (link.href === "/admin/users" && access.customers) ||
     (link.href === "/admin/vendors" && access.suppliers) ||
+    (link.href === "/admin/supplier-quotes" && access.suppliers) ||
     (link.href === "/admin/quote-comparison" && access.suppliers) ||
     link.href === "/admin/catalog",
   );
