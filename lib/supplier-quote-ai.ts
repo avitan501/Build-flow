@@ -27,6 +27,7 @@ type OpenAIResponse = {
 
 const AI_TIMEOUT_MS = 60_000
 const MAX_AI_ITEMS = 500
+const NON_MATERIAL_LINE_PATTERN = /^(?:delivery|shipping|freight)(?: charge| fee)?$|^(?:sales tax|tax|subtotal|grand total|total|discount)$/i
 
 function cleanText(value: unknown, max = 500) {
   return typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, max) : ""
@@ -88,7 +89,7 @@ export function normalizeSupplierQuoteAiPayload(value: unknown): SupplierQuoteAi
           lineTotal: statedTotal ?? (unitPrice === null ? null : Math.round(quantity * unitPrice * 100) / 100),
         }
       })
-      .filter((item) => item.description)
+      .filter((item) => item.description && !NON_MATERIAL_LINE_PATTERN.test(item.description))
       .slice(0, MAX_AI_ITEMS),
     notes: cleanText(payload.notes, 1000),
   }

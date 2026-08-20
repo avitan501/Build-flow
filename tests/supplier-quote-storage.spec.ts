@@ -71,12 +71,16 @@ test("supplier quote AI payload is normalized before database insertion", async 
       subtotal: 400,
       total: 525.5,
     },
-    items: [{ itemCode: "PLY-1", description: "  1/2 in. plywood  ", specification: "4 x 8", quantity: "12", unit: "sheet", unitPrice: "22.50", lineTotal: null }],
+    items: [
+      { itemCode: "PLY-1", description: "  1/2 in. plywood  ", specification: "4 x 8", quantity: "12", unit: "sheet", unitPrice: "22.50", lineTotal: null },
+      { itemCode: "", description: "Delivery", specification: "", quantity: 1, unit: "each", unitPrice: 55, lineTotal: 55 },
+    ],
     notes: " Review scan ",
   })
 
   expect(result.metadata).toMatchObject({ supplierName: "Nassau Lumber", quoteNumber: "Q-1048", quoteDate: "", expiresOn: "2026-09-20", deliveryCharge: 125.5, taxPercent: 100 })
   expect(result.items[0]).toMatchObject({ description: "1/2 in. plywood", quantity: 12, unitPrice: 22.5, lineTotal: 270 })
+  expect(result.items).toHaveLength(1)
   expect(result.notes).toBe("Review scan")
 })
 
