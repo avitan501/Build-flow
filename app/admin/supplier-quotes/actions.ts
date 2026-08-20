@@ -255,6 +255,85 @@ export async function deleteSupplierQuoteItemAction(quoteId: string, itemId: str
   return { ok: true, message: "Item removed." }
 }
 
+export async function retrySupplierQuoteExtractionAction(quoteId: string): Promise<ActionResult<{ items: SupplierQuoteItemRecord[] }>> {
+  const { supabase, user, quote } = await loadQuote(quoteId)
+  if (!quote) return { ok: false, error: "This supplier quote could not be found." }
+
+  const { count, error: countError } = await supabase
+    .from("supplier_quote_items")
+    .select("id", { count: "exact", head: true })
+    .eq("quote_id", quote.id)
+  if (countError) return { ok: false, error: "The current quote items could not be checked." }
+  if ((count ?? 0) > 0) return { ok: false, error: "This quote already has items. Review those lines before running extraction again." }
+
+  const { data: storedFile, error: downloadError } = await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).download(quote.file_path)
+  if (downloadError || !storedFile) return { ok: false, error: "The original invoice could not be opened for extraction." }
+
+  let extraction
+  try {
+    const file = new File([await storedFile.arrayBuffer()], quote.file_name, { type: quote.mime_type || storedFile.type })
+    extraction = await extractSupplierQuoteFile(file)
+  } catch (error) {
+    console.error("Supplier quote retry extraction failed", error)
+    return { ok: false, error: "The invoice could not be read. Confirm the image is clear and try again." }
+  }
+
+  if (!extraction.items.length) {
+    const error = quote.mime_type.startsWith("image/") && !process.env.OPENAI_API_KEY
+      ? "Image OCR is not active on this deployment yet. The original invoice is safe, but automatic extraction cannot run until OCR is connected."
+      : "No dependable material rows were found. Open the invoice to confirm it is clear, then try again or add a line manually."
+    await supabase.from("supplier_quotes").update({ extraction_note: error, updated_by: user.id }).eq("id", quote.id)
+    revalidatePath(`/admin/supplier-quotes/${quote.id}`)
+    return { ok: false, error }
+  }
+
+  const rows = extraction.items.map((item, index) => ({
+    quote_id: quote.id,
+    line_number: index + 1,
+    item_code: item.itemCode,
+    description: item.description,
+    specification: item.specification,
+    quantity: item.quantity,
+    unit: item.unit,
+    unit_price: item.unitPrice,
+    line_total: item.lineTotal,
+    selected: true,
+    review_status: "needs_review",
+  }))
+  const { data: inserted, error: insertError } = await supabase
+    .from("supplier_quote_items")
+    .insert(rows)
+    .select("*")
+    .order("line_number")
+    .returns<SupplierQuoteItemRecord[]>()
+  if (insertError || !inserted?.length) {
+    if (insertError?.code === "23505") return { ok: false, error: "Extraction already added items to this quote. Reload the page to review them." }
+    console.error("Supplier quote retry item creation failed", insertError)
+    return { ok: false, error: "The invoice was read, but the extracted items could not be saved." }
+  }
+
+  const metadata = extraction.metadata
+  const notes = metadata.supplierName && metadata.supplierName.toLowerCase() !== quote.supplier_name.toLowerCase()
+    ? [quote.notes, `Invoice supplier detected as ${metadata.supplierName}. Confirm the selected Supplier Directory record.`].filter(Boolean).join("\n")
+    : quote.notes
+  await supabase.from("supplier_quotes").update({
+    quote_number: quote.quote_number || metadata.quoteNumber,
+    quote_date: quote.quote_date || metadata.quoteDate || null,
+    expires_on: quote.expires_on || metadata.expiresOn || null,
+    delivery_charge: metadata.deliveryCharge,
+    tax_percent: metadata.taxPercent,
+    raw_text: extraction.text,
+    extraction_note: extraction.extractionNote,
+    notes,
+    status: "needs_review",
+    updated_by: user.id,
+  }).eq("id", quote.id)
+
+  revalidatePath(`/admin/supplier-quotes/${quote.id}`)
+  revalidatePath("/admin/supplier-quotes")
+  return { ok: true, data: { items: inserted }, message: extraction.extractionNote }
+}
+
 export async function addSupplierQuoteItemAction(quoteId: string): Promise<ActionResult<{ item: SupplierQuoteItemRecord }>> {
   const { supabase, quote } = await loadQuote(quoteId)
   if (!quote) return { ok: false, error: "This supplier quote could not be found." }
