@@ -15,7 +15,7 @@ async function recognizeImage(image: File | HTMLCanvasElement, onProgress: Progr
 }
 
 async function readPdf(file: File, onProgress: ProgressCallback) {
-  const pdfjs = await import("pdfjs-dist")
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
   pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"
   const document = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise
   const pages: string[] = []
