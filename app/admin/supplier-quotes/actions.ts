@@ -54,6 +54,52 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
   if (file.size > MAX_FILE_SIZE) return { ok: false, error: "The quote must be 25 MB or smaller." }
   if (!ALLOWED_TYPES.has(file.type)) return { ok: false, error: "Use a PDF, CSV, TXT, JPG, PNG, or WEBP file." }
 
+  const clientSelection = clean(formData.get("clientSelection"), 160)
+  let clientId = clientSelection
+  if (clientSelection === "new") {
+    const fullName = clean(formData.get("clientFullName"), 160)
+    const email = clean(formData.get("clientEmail"), 320).toLowerCase()
+    const phone = clean(formData.get("clientPhone"), 40) || null
+    const companyName = clean(formData.get("clientCompanyName"), 180) || null
+    if (fullName.length < 2) return { ok: false, error: "Enter the new client's name." }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid client email address." }
+
+    const { data: existingClient, error: existingClientError } = await supabase
+      .from("profiles")
+      .select("id,role,is_active")
+      .ilike("email", email)
+      .limit(1)
+      .maybeSingle<{ id: string; role: string; is_active: boolean }>()
+    if (existingClientError) return { ok: false, error: "Could not check the client directory." }
+    if (existingClient) {
+      if (existingClient.role !== "client") return { ok: false, error: "That email belongs to a staff account." }
+      if (!existingClient.is_active) return { ok: false, error: "That client account is inactive." }
+      clientId = existingClient.id
+    } else {
+      const { data: createdClient, error: createClientError } = await supabase.functions.invoke<{
+        ok?: boolean
+        customerId?: string
+        error?: string
+      }>("create-manager-client", { body: { fullName, email, phone, companyName } })
+      if (createClientError || !createdClient?.ok || !UUID_PATTERN.test(createdClient.customerId || "")) {
+        if (createdClient?.error === "email_in_use_by_staff") return { ok: false, error: "That email belongs to a staff account." }
+        if (createdClient?.error === "client_inactive") return { ok: false, error: "That client account is inactive." }
+        return { ok: false, error: "Could not add the client. Please try again." }
+      }
+      clientId = createdClient.customerId || ""
+    }
+  }
+  if (!UUID_PATTERN.test(clientId)) return { ok: false, error: "Choose a client or add a new one before uploading." }
+  const { data: client, error: clientError } = await supabase
+    .from("profiles")
+    .select("id,full_name,email")
+    .eq("id", clientId)
+    .eq("role", "client")
+    .eq("is_active", true)
+    .maybeSingle<{ id: string; full_name: string | null; email: string | null }>()
+  if (clientError || !client) return { ok: false, error: "The selected client is not available. Choose another client." }
+  const clientName = clean(client.full_name || client.email || "Client", 200)
+
   const supplierId = clean(formData.get("supplierId"), 160)
   const supplierName = clean(formData.get("supplierName"), 200)
   const department = normalizeMaterialCatalogDepartment(clean(formData.get("department"), 120))
@@ -87,6 +133,8 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
   const quoteDate = clean(formData.get("quoteDate"), 10) || extraction.metadata.quoteDate
   const { error: quoteError } = await supabase.from("supplier_quotes").insert({
     id: quoteId,
+    client_id: client.id,
+    client_name_snapshot: clientName,
     supplier_id: supplierId,
     supplier_name: supplierName,
     quote_number: quoteNumber,

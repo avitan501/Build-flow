@@ -10,6 +10,8 @@ export type SupplierQuoteStatus =
 
 export type SupplierQuoteRecord = {
   id: string
+  client_id: string | null
+  client_name_snapshot: string
   supplier_id: string | null
   supplier_name: string
   quote_number: string
@@ -55,6 +57,12 @@ export type SupplierQuoteSupplier = {
   id: string
   name: string
   catalogDepartments?: string[]
+}
+
+export type SupplierQuoteClient = {
+  id: string
+  name: string
+  email: string
 }
 
 export function supplierQuoteStatusLabel(status: SupplierQuoteStatus) {

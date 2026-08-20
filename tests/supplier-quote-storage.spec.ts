@@ -8,12 +8,14 @@ import { normalizeSupplierQuoteAiPayload } from "../lib/supplier-quote-ai"
 const root = process.cwd()
 
 test("manager supplier quote storage is private, durable, and routable", async () => {
-  const [navigation, page, workspace, actions, migration] = await Promise.all([
+  const [navigation, page, uploadForm, workspace, actions, migration, clientMigration] = await Promise.all([
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/supplier-quotes/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/supplier-quote-upload-form.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/supplier-quote-workspace.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/supplier-quotes/actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260820110800_create_supplier_quote_storage.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260820160124_link_supplier_quotes_to_clients.sql"), "utf8"),
   ])
 
   expect(navigation).toContain('href: "/admin/supplier-quotes"')
@@ -25,6 +27,13 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(actions).toContain("addSupplierQuoteItemsToCatalogAction")
   expect(actions).toContain("sendSupplierQuoteToComparisonAction")
   expect(actions).toContain("createClientQuoteFromSupplierQuoteAction")
+  expect(actions).toContain('client_id: client.id')
+  expect(actions).toContain('client_name_snapshot: clientName')
+  expect(uploadForm).toContain("Choose client")
+  expect(uploadForm).toContain("+ Add new client")
+  expect(uploadForm).toContain('name="clientSelection" required')
+  expect(page).toContain("client_name_snapshot")
+  expect(workspace).toContain("quote.client_name_snapshot")
   expect(workspace).toContain("Add to catalog")
   expect(workspace).toContain("Compare suppliers")
   expect(workspace).toContain("Prepare client quote")
@@ -34,6 +43,8 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(migration).toContain("public = false")
   expect(migration).toContain("private.has_staff_capability('suppliers')")
   expect(migration).toContain("enable row level security")
+  expect(clientMigration).toContain("references public.profiles(id) on delete set null")
+  expect(clientMigration).toContain("supplier_quotes_client_updated_idx")
   expect(page).toContain("Boolean(process.env.OPENAI_API_KEY)")
   expect(await readFile(path.join(root, "components/buildflow/supplier-quote-upload-form.tsx"), "utf8")).toContain("Scanned-image OCR is waiting for AI activation.")
 })
