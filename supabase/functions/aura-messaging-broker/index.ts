@@ -343,6 +343,21 @@ Deno.serve(async (req: Request) => {
         },
       });
     }
+    if (input.action === "website_traffic") {
+      const requestedSince = typeof input.since === "string" ? new Date(input.since) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const since = Number.isNaN(requestedSince.getTime()) ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) : requestedSince;
+      const rows = await sql`
+        select views.path, views.referrer_host, views.session_hash, views.device_class,
+          views.city, views.region, views.country, views.user_id, views.created_at,
+          profiles.full_name as profile_full_name, profiles.email as profile_email
+        from public.site_page_views as views
+        left join public.profiles as profiles on profiles.id = views.user_id
+        where views.created_at >= ${since.toISOString()}
+        order by views.created_at desc
+        limit 10000
+      `;
+      return json({ ok: true, rows });
+    }
     if (input.action === "configure_twilio") {
       if (!manager.isOwner) return json({ error: "Only the owner can change provider credentials." }, 403);
       const accountSid = typeof input.accountSid === "string" ? input.accountSid.trim() : "";

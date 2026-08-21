@@ -146,10 +146,10 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
 
   expect(navigation).toContain('{ href: "/admin/quote-comparison", label: "Quote Comparison"');
   expect(navigation).toContain('...(access.suppliers ? [');
-  expect(navigation).toContain('label: "Calls & Messages"');
+  expect(navigation).toContain('label: "Calls & Communications"');
   expect(navigation).toContain('label: "Open Google Meet"');
   expect(navigation).toContain('label: "Open WhatsApp to make a call"');
-  expect(navigation).toContain("https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602");
+  expect(navigation).toContain('href: "/admin/communications"');
   expect(navigation.indexOf("communicationLinks.map")).toBeGreaterThan(navigation.indexOf('label: "Website Traffic"'));
   expect(navigation).not.toContain('link.href === "/admin/traffic" ||');
   expect(navigation).toContain('target="_blank" rel="noopener noreferrer"');

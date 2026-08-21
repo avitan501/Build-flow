@@ -1,10 +1,10 @@
 import { BarChart3, Eye, MapPin, Monitor, Smartphone, Users } from "lucide-react"
 
 import { TrafficInternalFilterStatus } from "@/components/buildflow/traffic-internal-filter-status"
-import { requireAdminProfile } from "@/lib/auth"
+import { requireStaffProfile } from "@/lib/auth"
 import { FILTERED_TRAFFIC_START } from "@/lib/site-traffic"
 
-type TrafficRow = { path: string; referrer_host: string | null; session_hash: string; device_class: "mobile" | "desktop"; city: string | null; region: string | null; country: string | null; user_id: string | null; created_at: string }
+type TrafficRow = { path: string; referrer_host: string | null; session_hash: string; device_class: "mobile" | "desktop"; city: string | null; region: string | null; country: string | null; user_id: string | null; created_at: string; profile_full_name: string | null; profile_email: string | null }
 type TrafficProfile = { id: string; full_name: string | null; email: string }
 
 function countBy(values: string[]) {
@@ -33,29 +33,19 @@ function formatEasternDateTime(value: string) {
 }
 
 export default async function WebsiteTrafficPage() {
-  const { supabase } = await requireAdminProfile()
+  const { supabase } = await requireStaffProfile("traffic")
   const now = new Date()
   const thirtyDaysAgo = new Date(now)
   thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 30)
   const start = new Date(Math.max(thirtyDaysAgo.getTime(), new Date(FILTERED_TRAFFIC_START).getTime()))
   let rows: TrafficRow[] = []
-  let profiles: TrafficProfile[] = []
   let loadError = false
   try {
-    const { data, error } = await supabase
-      .from("site_page_views")
-      .select("path,referrer_host,session_hash,device_class,city,region,country,user_id,created_at")
-      .gte("created_at", start.toISOString())
-      .order("created_at", { ascending: false })
-      .limit(10000)
-      .returns<TrafficRow[]>()
-    loadError = Boolean(error)
-    rows = !error && Array.isArray(data) ? data as TrafficRow[] : []
-    const userIds = [...new Set(rows.map((row) => row.user_id).filter((value): value is string => Boolean(value)))]
-    if (!error && userIds.length) {
-      const { data: profileRows } = await supabase.from("profiles").select("id,full_name,email").in("id", userIds).returns<TrafficProfile[]>()
-      profiles = profileRows ?? []
-    }
+    const { data, error } = await supabase.functions.invoke<{ ok?: boolean; rows?: TrafficRow[] }>("aura-messaging-broker", {
+      body: { action: "website_traffic", since: start.toISOString() },
+    })
+    loadError = Boolean(error) || !data?.ok
+    rows = !loadError && Array.isArray(data?.rows) ? data.rows : []
   } catch {
     loadError = true
   }
@@ -76,7 +66,10 @@ export default async function WebsiteTrafficPage() {
     const key = easternDayKey(date)
     return { key, label: date.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" }), value: rows.filter((row) => easternDayKey(row.created_at) === key).length }
   })
-  const profileById = new Map(profiles.map((profile) => [profile.id, profile]))
+  const profileById = new Map<string, TrafficProfile>()
+  for (const row of rows) {
+    if (row.user_id && row.profile_email) profileById.set(row.user_id, { id: row.user_id, full_name: row.profile_full_name, email: row.profile_email })
+  }
   const dailyLocationMap = new Map<string, { day: string; location: string; views: number; sessions: Set<string>; signedIn: Set<string> }>()
   for (const row of rows) {
     const day = easternDayKey(row.created_at)

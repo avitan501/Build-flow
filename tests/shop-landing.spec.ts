@@ -267,7 +267,7 @@ test("traffic endpoint accepts same-site events and blocks cross-site submission
   expect(blocked.status()).toBe(403)
 })
 
-test("traffic dashboard exposes live status to the owner only", async () => {
+test("traffic dashboard exposes live status to approved operations managers", async () => {
   const [trafficPage, navigation, tracker, layout, trafficApi, filterStatus, trafficFunctionMigration, trafficRlsMigration, geographyMigration, securityMigration, identityMigration, publicIngestMigration] = await Promise.all([
     readFile(path.join(process.cwd(), "app/admin/traffic/page.tsx"), "utf8"),
     readFile(path.join(process.cwd(), "components/buildflow/admin-shell.tsx"), "utf8"),
@@ -283,19 +283,19 @@ test("traffic dashboard exposes live status to the owner only", async () => {
     readFile(path.join(process.cwd(), "supabase/migrations/20260817203634_allow_constrained_public_traffic_ingest.sql"), "utf8"),
   ])
 
-  expect(trafficPage).toContain("requireAdminProfile")
-  expect(trafficPage).toContain('.from("site_page_views")')
+  expect(trafficPage).toContain('requireStaffProfile("traffic")')
+  expect(trafficPage).toContain('action: "website_traffic"')
   expect(trafficPage).not.toContain("createAdminClient")
   expect(trafficPage).not.toContain("owner_read_site_traffic")
   expect(trafficPage).toContain("Tracking active")
   expect(trafficPage).toContain("FILTERED_TRAFFIC_START")
   expect(trafficPage).toContain("Owner, employee, test, and automated visits are excluded")
   expect(trafficPage).toContain("Visitor locations")
-  expect(trafficPage).toContain("city,region,country,user_id")
+  expect(trafficPage).toContain("city: string | null; region: string | null; country: string | null; user_id: string | null")
   expect(trafficPage).toContain("Traffic by day and place")
   expect(trafficPage).toContain("Recent visitors")
   expect(trafficPage).toContain("Signed-in customers are named. Guests remain anonymous.")
-  expect(trafficPage).not.toContain("requireManagerPortalProfile")
+  expect(trafficPage).not.toContain("requireAdminProfile")
   expect(navigation).not.toContain('link.href === "/admin/traffic" ||')
   expect(tracker).toContain("navigator.webdriver")
   expect(tracker).toContain("TRAFFIC_EXCLUSION_KEY")

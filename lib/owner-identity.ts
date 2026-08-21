@@ -4,7 +4,15 @@ export const STAFF_EMAILS = [
   "info@fivetownsbuilders.com",
 ] as const;
 
-export type StaffCapability = "customers" | "suppliers";
+export type StaffCapability =
+  | "customers"
+  | "communications"
+  | "tasks"
+  | "quotes"
+  | "suppliers"
+  | "aiTools"
+  | "traffic"
+  | "managerSettings";
 
 type ManagerIdentity = {
   email?: string | null;
@@ -33,8 +41,7 @@ export function isOwnerIdentity(params: { email?: string | null; phone?: string 
 export function isApprovedStaffIdentity(params: ManagerIdentity, capability?: StaffCapability) {
   const email = params.email?.trim().toLowerCase();
   const isStaffEmail = STAFF_EMAILS.some((staffEmail) => staffEmail === email);
-  const hasCapability = !capability ||
-    (isStaffEmail && ["customers", "suppliers"].includes(capability));
+  const hasCapability = !capability || isStaffEmail;
 
   return (
     isStaffEmail &&
@@ -47,9 +54,17 @@ export function isApprovedStaffIdentity(params: ManagerIdentity, capability?: St
 
 export function managerCapabilities(params: ManagerIdentity) {
   const owner = isApprovedManagerIdentity(params);
+  const operationsManager = isApprovedStaffIdentity(params);
   return {
     owner,
-    customers: owner || isApprovedStaffIdentity(params, "customers"),
-    suppliers: owner || isApprovedStaffIdentity(params, "suppliers"),
+    operationsManager,
+    customers: owner || operationsManager,
+    communications: owner || operationsManager,
+    tasks: owner || operationsManager,
+    quotes: owner || operationsManager,
+    suppliers: owner || operationsManager,
+    aiTools: owner || operationsManager,
+    traffic: owner || operationsManager,
+    managerSettings: owner || operationsManager,
   };
 }

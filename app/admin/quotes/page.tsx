@@ -1,7 +1,7 @@
 import { WireframePageByKey } from "@/components/buildflow/wireframe-page-loader";
-import { requireAdminProfile } from "@/lib/auth";
+import { requireStaffProfile } from "@/lib/auth";
 
 export default async function AdminQuotesPage() {
-  await requireAdminProfile();
+  await requireStaffProfile("quotes");
   return <WireframePageByKey pageKey="admin-quotes" />;
 }

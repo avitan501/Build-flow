@@ -93,6 +93,6 @@ export async function requireManagerPortalProfile() {
     isActive: session.profile?.is_active,
   });
 
-  if (!access.owner && !access.customers && !access.suppliers) redirect("/");
+  if (!access.owner && !access.operationsManager) redirect("/");
   return { ...session, access };
 }

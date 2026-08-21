@@ -1,6 +1,6 @@
 "use server"
 
-import { requireAdminProfile } from "@/lib/auth"
+import { requireStaffProfile } from "@/lib/auth"
 
 export type EstimateConverterState = {
   status: "idle" | "success" | "error"
@@ -74,7 +74,7 @@ function convertEstimate(input: {
 }
 
 export async function convertEstimateAction(_previous: EstimateConverterState, formData: FormData): Promise<EstimateConverterState> {
-  await requireAdminProfile()
+  await requireStaffProfile("aiTools")
   try {
     const pasted = field(formData, "sourceText", MAX_TEXT_LENGTH)
     const uploaded = formData.get("sourceFile")

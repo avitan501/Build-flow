@@ -194,12 +194,16 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
       ...(access.suppliers ? [{ href: "/admin/vendors", label: "Supplier Directory" }, { href: "/admin/supplier-quotes", label: "Supplier Quotes" }, { href: "/admin/catalog", label: "Material Catalog" }, { href: "/admin/quote-comparison", label: "Quote Comparison" }] : []),
       ...(access.owner ? [{ href: "/admin/abc", label: "ABC Supply Private Pricing" }] : []),
     ] },
-    ...(access.owner ? [
+    ...(access.aiTools ? [
       { title: "AI Tools", icon: Sparkles, links: [{ href: "/admin/ai-tools", label: "Open AI Tools" }] },
+    ] : []),
+    ...(access.traffic ? [
       { title: "Website Traffic", icon: BarChart3, links: [{ href: "/admin/traffic", label: "Open Website Traffic" }] },
+    ] : []),
+    ...(access.owner ? [
       { title: "Payments", icon: CreditCard, links: [{ href: "/admin/payments", label: "Payment Center" }] },
     ] : []),
-    { title: "Manager Settings", icon: Settings, links: [{ href: "/admin/goals-progress", label: "Goals & Progress" }, ...(access.owner ? [{ href: "/admin/settings", label: "Integrations & Settings" }] : [])] },
+    { title: "Manager Settings", icon: Settings, links: [{ href: "/admin/goals-progress", label: "Goals & Progress" }, ...(access.managerSettings ? [{ href: "/admin/settings", label: "Communication Status" }] : [])] },
   ].filter((section) => section.links.length > 0);
 
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9"><div className="mx-auto max-w-7xl">

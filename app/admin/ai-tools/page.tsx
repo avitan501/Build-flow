@@ -1,10 +1,10 @@
 import Link from "next/link"
 import { Activity, Calculator, FilePenLine, ListTree } from "lucide-react"
 
-import { requireAdminProfile } from "@/lib/auth"
+import { requireStaffProfile } from "@/lib/auth"
 
 export default async function AdminAiToolsPage() {
-  await requireAdminProfile()
+  await requireStaffProfile("aiTools")
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-8 lg:px-10">

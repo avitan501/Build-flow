@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers"
 
-import { requireAdminProfile } from "@/lib/auth"
+import { requireStaffProfile } from "@/lib/auth"
 import { createEmptyManagerAddOns, departmentExperienceFor, isDepartmentHidden } from "@/lib/manager-add-ons"
 import { findShopToolCategory } from "@/lib/shop-tools"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -19,7 +19,7 @@ export type OrderTestState = {
 const initialFailure = (message: string): OrderTestState => ({ status: "failed", message, checks: [] })
 
 export async function runOrderTestAction(_previous: OrderTestState, formData: FormData): Promise<OrderTestState> {
-  await requireAdminProfile()
+  await requireStaffProfile("aiTools")
   const slug = String(formData.get("department") || "").trim()
   const mode = String(formData.get("mode") || "") === "upload" ? "upload" : "quick"
   const category = findShopToolCategory(slug)

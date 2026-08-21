@@ -6,8 +6,10 @@ import {
   CalendarDays,
   Archive,
   ChevronRight,
+  ClipboardList,
   Columns3,
   CreditCard,
+  FileText,
   LayoutDashboard,
   Settings,
   Sparkles,
@@ -38,17 +40,45 @@ const communicationLinks = [
   { href: "/admin/daily-summary", label: "Daily Work Summary", shortLabel: "Summary", icon: CalendarDays },
 ] as const;
 
-type ManagerAccess = { owner: boolean; customers: boolean; suppliers: boolean };
+type ManagerAccess = {
+  owner: boolean;
+  operationsManager: boolean;
+  customers: boolean;
+  communications: boolean;
+  tasks: boolean;
+  quotes: boolean;
+  suppliers: boolean;
+  aiTools: boolean;
+  traffic: boolean;
+  managerSettings: boolean;
+};
 
 function navigationGroups(access: ManagerAccess) {
   return [
-    { label: "Customers", links: access.customers ? [{ href: "/admin/users", label: "Customer Directory", icon: Users }] : [] },
+    { label: "Customers", links: access.customers ? [
+      { href: "/admin/users", label: "Customer Directory", icon: Users },
+      { href: "/owner/materials/requests", label: "Customer Requests", icon: FileText },
+    ] : [] },
     {
-      label: "Calls & Communications",
+      label: "Communications",
       links: [
         ...(access.customers ? [{ href: "/admin/communications", label: "Communications", icon: PhoneCall }] : []),
         ...(access.owner ? [{ href: "/owner/aura", label: "Aura Communications", icon: MessageCircle }] : []),
       ],
+    },
+    {
+      label: "Tasks",
+      links: access.tasks ? [
+        { href: "/admin/daily-summary", label: "Tasks & Daily Summary", icon: ClipboardList },
+        { href: "/admin/goals-progress", label: "Goals & Progress", icon: Target },
+      ] : [],
+    },
+    {
+      label: "Quotes & Orders",
+      links: access.quotes ? [
+        { href: "/admin/quotes", label: "Quotes", icon: FileText },
+        { href: "/admin/orders", label: "Orders", icon: PackageOpen },
+      ] : [],
     },
     {
       label: "Suppliers",
@@ -63,14 +93,13 @@ function navigationGroups(access: ManagerAccess) {
       ],
     },
     {
-      label: "Manage",
+      label: "Tools",
       links: [
-        { href: "/admin/goals-progress", label: "Goals & Progress", icon: Target },
+        ...(access.aiTools ? [{ href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles }] : []),
+        ...(access.traffic ? [{ href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 }] : []),
+        ...(access.managerSettings ? [{ href: "/admin/settings", label: "Manager Settings", icon: Settings }] : []),
         ...(access.owner ? [
-          { href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles },
-          { href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 },
           { href: "/admin/payments", label: "Payments", icon: CreditCard },
-          { href: "/admin/settings", label: "Manager Settings", icon: Settings },
         ] : []),
       ],
     },
@@ -103,7 +132,7 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
         <Link href={homeHref} onClick={onNavigate} aria-label="Avantia Build manager portal">
           <AvantiaBuildLockup />
         </Link>
-        <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#0066cc]">Manager Portal</p>
+        <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#0066cc]">{access.owner ? "Owner Workspace" : "Operations Manager"}</p>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-5 py-5" aria-label="Manager navigation">
@@ -174,7 +203,7 @@ export function AdminShell({ children, access }: { children: ReactNode; access: 
             <Menu className="h-5 w-5" />
           </button>
           <div className="min-w-0"><AvantiaBuildLockup compact /></div>
-          <span className="inline-flex h-11 items-center rounded-lg bg-slate-950 px-3 text-xs font-bold uppercase tracking-[0.12em] text-white">Manager</span>
+          <span className="inline-flex h-11 items-center rounded-lg bg-slate-950 px-3 text-xs font-bold uppercase tracking-[0.12em] text-white">{access.owner ? "Owner" : "Manager"}</span>
         </header>
         {children}
       </div>

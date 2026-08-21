@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 
 import { requireAdminProfile } from "@/lib/auth";
+import { requireStaffProfile } from "@/lib/auth";
 import { sendCartSubmissionEmail } from "@/lib/cart-submission-email";
 
 export async function sendOrderNotificationTestAction() {
@@ -40,5 +41,21 @@ export async function sendOrderNotificationTestAction() {
       : "";
   const params = new URLSearchParams({ owner: result.owner.status, client: result.client.status });
   if (clientReason) params.set("clientReason", clientReason);
+  redirect(`/admin/settings?${params.toString()}`);
+}
+
+export async function checkCommunicationConnectionsAction() {
+  const { supabase } = await requireStaffProfile("managerSettings");
+  const result = await supabase.functions.invoke<{
+    ok?: boolean;
+    connections?: Record<"quo" | "whatsapp" | "email", { receive: boolean; send: boolean }>;
+  }>("aura-messaging-broker", { body: { action: "dashboard" } });
+  const params = new URLSearchParams();
+  for (const channel of ["quo", "whatsapp", "email"] as const) {
+    const connection = result.data?.connections?.[channel];
+    params.set(channel, connection?.send || connection?.receive ? "connected" : "not-connected");
+  }
+  if (result.error || !result.data?.ok) params.set("check", "failed");
+  else params.set("check", "complete");
   redirect(`/admin/settings?${params.toString()}`);
 }

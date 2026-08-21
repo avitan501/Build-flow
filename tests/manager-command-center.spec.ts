@@ -47,6 +47,37 @@ test("customer and lead records expose compact Q U O, email, and WhatsApp action
   expect(leads).toContain("<ContactActions")
 })
 
+test("approved staff use an Operations Manager workspace without owner-only controls", async () => {
+  const [identity, shell, settings, traffic, aiTools, payments, affiliate, broker] = await Promise.all([
+    readFile(path.join(root, "lib/owner-identity.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/settings/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/traffic/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/ai-tools/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/payments/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/goals-progress/affiliate-actions.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+  ])
+
+  for (const capability of ["communications", "tasks", "quotes", "aiTools", "traffic", "managerSettings"]) {
+    expect(identity).toContain(`| "${capability}"`)
+  }
+  expect(identity).toContain("operationsManager")
+  for (const section of ["Customers", "Communications", "Tasks", "Quotes & Orders", "Suppliers", "AI Tools", "Website Traffic", "Manager Settings"]) {
+    expect(shell).toContain(section)
+  }
+  expect(shell).toContain('access.owner ? "Owner Workspace" : "Operations Manager"')
+  expect(settings).toContain("Connection credentials and owner delivery tests remain restricted to David.")
+  expect(settings).toContain("checkCommunicationConnectionsAction")
+  expect(traffic).toContain('requireStaffProfile("traffic")')
+  expect(traffic).toContain('action: "website_traffic"')
+  expect(broker).toContain('input.action === "website_traffic"')
+  expect(broker).toContain("left join public.profiles")
+  expect(aiTools).toContain('requireStaffProfile("aiTools")')
+  expect(payments).toContain("requireAdminProfile")
+  expect(affiliate).toContain("requireAdminProfile")
+})
+
 test("communication records are linked to customers and visible in the customer directory", async () => {
   const [page, action, customerPage] = await Promise.all([
     readFile(path.join(root, "app/admin/communications/page.tsx"), "utf8"),
