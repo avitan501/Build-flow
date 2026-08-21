@@ -72,6 +72,20 @@ export async function storeAuraCommunication(input: CommunicationInput) {
   if (error) throw new Error(`Unable to save Aura communication: ${error.message}`);
 }
 
+export async function updateAuraCommunicationStatus(
+  provider: CommunicationInput["provider"],
+  externalActivityId: string,
+  status: string,
+) {
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("aura_communications")
+    .update({ status, last_event_at: new Date().toISOString() })
+    .eq("provider", provider)
+    .eq("external_activity_id", externalActivityId);
+  if (error) throw new Error(`Unable to update Aura communication: ${error.message}`);
+}
+
 function quoConfig() {
   const apiKey = process.env.AURA_QUO_API_KEY;
   const from = normalizeAuraPhone(process.env.AURA_QUO_FROM_NUMBER || "");

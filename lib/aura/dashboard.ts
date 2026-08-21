@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { canSendAuraEmail, canSendAuraQuoText } from "@/lib/aura/communications";
+import { canUseTwilioWhatsApp } from "@/lib/aura/twilio-whatsapp";
 import { canSendAuraWhatsApp } from "@/lib/aura/whatsapp";
 
 export type AuraIntakeRow = {
@@ -113,7 +114,9 @@ export async function loadAuraDashboard(supabase: SupabaseClient) {
         send: canSendAuraQuoText(),
       },
       whatsapp: {
-        receive: Boolean(process.env.AURA_WHATSAPP_APP_SECRET && process.env.AURA_WHATSAPP_VERIFY_TOKEN),
+        receive:
+          Boolean(process.env.AURA_WHATSAPP_APP_SECRET && process.env.AURA_WHATSAPP_VERIFY_TOKEN) ||
+          canUseTwilioWhatsApp(),
         send: canSendAuraWhatsApp(),
       },
       email: {

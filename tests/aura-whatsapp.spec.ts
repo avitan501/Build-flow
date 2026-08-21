@@ -23,6 +23,16 @@ test("Aura webhook rejects unverified requests", async ({ request }) => {
     },
   });
   expect(unsignedWebhook.status()).toBe(401);
+
+  const unsignedTwilioWebhook = await request.post("/api/aura/whatsapp/twilio", {
+    form: {
+      MessageSid: "SM-test",
+      From: "whatsapp:+13475675077",
+      To: "whatsapp:+15169088319",
+      Body: "Hello",
+    },
+  });
+  expect(unsignedTwilioWebhook.status()).toBe(401);
 });
 
 test("Aura Q U O webhook rejects unsigned requests", async ({ request }) => {

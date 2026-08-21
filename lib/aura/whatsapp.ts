@@ -3,6 +3,10 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { storeAuraCommunication } from "@/lib/aura/communications";
+import {
+  canUseTwilioWhatsApp,
+  sendTwilioWhatsAppText,
+} from "@/lib/aura/twilio-whatsapp";
 
 export type WhatsAppInboundMessage = {
   id: string;
@@ -103,10 +107,14 @@ function getMetaConfig() {
 }
 
 export function canSendAuraWhatsApp() {
-  return Boolean(getMetaConfig());
+  return Boolean(getMetaConfig()) || canUseTwilioWhatsApp();
 }
 
 export async function sendAuraWhatsAppText(to: string, body: string) {
+  const provider = process.env.AURA_WHATSAPP_PROVIDER?.trim().toLowerCase();
+  if (provider === "twilio" || (!getMetaConfig() && canUseTwilioWhatsApp())) {
+    return sendTwilioWhatsAppText(to, body);
+  }
   const config = getMetaConfig();
   if (!config) return { sent: false as const, reason: "not_configured" as const };
   const response = await fetch(
