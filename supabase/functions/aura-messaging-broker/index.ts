@@ -241,6 +241,35 @@ Deno.serve(async (req: Request) => {
     if (input.action === "status") {
       return json({ ok: true, whatsapp: Boolean(await twilioConfig()), sms: Boolean(await quoConfig()) });
     }
+    if (input.action === "dashboard") {
+      const [communications, contacts, whatsapp, sms] = await Promise.all([
+        sql`
+          select id, contact_id, provider, channel, direction, counterparty_phone, counterparty_email,
+            subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at
+          from public.aura_communications
+          order by occurred_at desc
+          limit 50
+        `,
+        sql`
+          select id, full_name, normalized_phone, email, company, notes, created_at
+          from public.aura_contacts
+          order by created_at desc
+          limit 20
+        `,
+        twilioConfig(),
+        quoConfig(),
+      ]);
+      return json({
+        ok: true,
+        communications,
+        contacts,
+        connections: {
+          quo: { receive: false, send: Boolean(sms) },
+          whatsapp: { receive: Boolean(whatsapp), send: Boolean(whatsapp) },
+          email: { receive: false, send: false },
+        },
+      });
+    }
     if (input.action === "configure_twilio") {
       if (!manager.isOwner) return json({ error: "Only the owner can change provider credentials." }, 403);
       const accountSid = typeof input.accountSid === "string" ? input.accountSid.trim() : "";
