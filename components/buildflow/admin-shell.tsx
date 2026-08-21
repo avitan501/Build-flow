@@ -40,6 +40,7 @@ const communicationLinks = [
 ] as const;
 
 const primaryLinks = [
+  { href: "/admin/build-map", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "Customers", icon: Users },
   { href: "/admin/vendors", label: "Suppliers", icon: Store },
   { href: "/admin/supplier-quotes", label: "Supplier Quotes", icon: Archive },
@@ -54,7 +55,6 @@ const sharedMoreLinks = [
 const ownerMoreLinks = [
   { href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 },
   { href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles },
-  { href: "/admin/build-map", label: "Dashboard", icon: LayoutDashboard },
 ] as const;
 
 type ManagerAccess = { owner: boolean; customers: boolean; suppliers: boolean };
@@ -66,6 +66,7 @@ function linksForAccess(access: ManagerAccess) {
     (link.href === "/admin/vendors" && access.suppliers) ||
     (link.href === "/admin/supplier-quotes" && access.suppliers) ||
     (link.href === "/admin/quote-comparison" && access.suppliers) ||
+    link.href === "/admin/build-map" ||
     link.href === "/admin/catalog",
   );
 }
@@ -92,7 +93,7 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
   const moreLinks = access.owner ? [...sharedMoreLinks, ...ownerMoreLinks] : [...sharedMoreLinks];
   const moreIsActive = moreLinks.some((link) => isActive(pathname, link.href));
   const [moreOpen, setMoreOpen] = useState(moreIsActive);
-  const homeHref = access.owner ? "/admin/build-map" : access.customers ? "/admin/users" : "/admin/vendors";
+  const homeHref = "/admin/build-map";
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="border-b border-slate-100 px-6 pb-5 pt-7">

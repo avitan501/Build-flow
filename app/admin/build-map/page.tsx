@@ -1,375 +1,196 @@
 import {
-  AlertCircle,
+  Archive,
   ArrowRight,
-  Building2,
-  Check,
+  CalendarDays,
   CheckCircle2,
-  CircleAlert,
-  ClipboardCheck,
   ClipboardList,
-  FileQuestion,
-  FolderKanban,
-  ListChecks,
-  MailCheck,
+  Clock3,
+  Columns3,
+  MessageCircle,
+  PackageCheck,
+  PackageOpen,
+  PhoneCall,
+  Send,
+  ShoppingCart,
   Store,
+  Target,
+  UserRound,
   Users,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 
-import { requireAdminProfile } from "@/lib/auth";
-import {
-  applyDepartmentAddOns,
-  createEmptyManagerAddOns,
-  type ManagerCatalogAddOns,
-} from "@/lib/manager-add-ons";
-import {
-  createEmptyQualificationSettings,
-  defaultQualificationSettingForServiceTarget,
-  SERVICE_ASSIGNMENT_TARGETS,
-  type ShopQualificationSettings,
-  type SupplierRoutingOption,
-} from "@/lib/shop-qualification";
-import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools";
+import { AddManagerGoal, CustomManagerGoals, type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
+import { DAILY_WORK_SUMMARY_PREFIX } from "@/lib/daily-work-summary";
+import { requireManagerPortalProfile } from "@/lib/auth";
+import { managerPipelineStage, type ManagerPipelineStage } from "@/lib/manager-dashboard";
+
+const QUO_INBOX_URL = "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
+const WHATSAPP_URL = "https://web.whatsapp.com/";
+const WEBSITE_FIX_NOTE_PREFIX = "website_fix_note:";
 
 type RequestRow = {
   id: string;
   owner_id: string;
   title: string;
   status: string;
-  created_at: string;
   updated_at: string;
-  projects: { name: string; address: string | null } | null;
-  material_questionnaire_responses: Array<{
-    id: string;
-    category_name_snapshot: string;
-    status: string;
-  }> | null;
 };
 
-type ProfileRow = { id: string; full_name: string | null; email: string | null };
-type RequestItemRow = { request_id: string; department: string };
-type AttachmentRow = { request_id: string };
-type SupplierPackageRow = {
+type ComparisonRow = {
   id: string;
-  request_id: string;
-  department: string;
-  supplier_id: string | null;
+  request_id: string | null;
   status: string;
+  client_quote_status: string;
   updated_at: string;
 };
-type QuestionnaireCategoryRow = {
+
+type SupplierPackageRow = {
+  request_id: string;
+  status: string;
+};
+
+type ClientRow = {
   id: string;
-  name: string;
-  department_key: string;
-  is_active: boolean;
-  material_questions: Array<{ id: string; is_active: boolean }>;
-};
-type ManagerState = {
-  qualificationSettings?: ShopQualificationSettings;
-  addOns?: ManagerCatalogAddOns;
+  full_name: string | null;
+  email: string | null;
 };
 
-const closedStatuses = new Set(["completed", "closed", "cancelled"]);
+type LeadRow = { id: string; status: string };
 
-const requestStatusLabels: Record<string, string> = {
-  draft: "Draft",
-  submitted: "Under review",
-  in_review: "Waiting for client",
-  under_review: "Under review",
-  waiting_for_client: "Waiting for client",
-  quoted: "Client approval",
-  approved: "Approved",
-  completed: "Completed",
-  closed: "Closed",
-  cancelled: "Cancelled",
-};
+const pipelineStages: Array<{
+  id: ManagerPipelineStage;
+  label: string;
+  description: string;
+  icon: typeof ClipboardList;
+  tone: string;
+  numberTone: string;
+}> = [
+  {
+    id: "received",
+    label: "Received / needs shopping",
+    description: "New client requests that still need supplier pricing.",
+    icon: ClipboardList,
+    tone: "border-amber-200 bg-amber-50",
+    numberTone: "text-amber-900",
+  },
+  {
+    id: "pricing",
+    label: "Priced / not sent",
+    description: "Supplier pricing received, but no client quote was sent.",
+    icon: ShoppingCart,
+    tone: "border-sky-200 bg-sky-50",
+    numberTone: "text-sky-900",
+  },
+  {
+    id: "approval",
+    label: "Waiting for client",
+    description: "Client quote sent and waiting for approval.",
+    icon: Clock3,
+    tone: "border-violet-200 bg-violet-50",
+    numberTone: "text-violet-900",
+  },
+  {
+    id: "delivery",
+    label: "Approved / delivery",
+    description: "Client approved; order or delivery still needs completion.",
+    icon: PackageCheck,
+    tone: "border-emerald-200 bg-emerald-50",
+    numberTone: "text-emerald-900",
+  },
+];
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
+const closedRequestStatuses = new Set(["completed", "closed", "cancelled"]);
+
+function formatUpdated(value: string) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
-function requestStatusClass(status: string) {
-  if (["completed", "closed", "approved"].includes(status)) return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (["waiting_for_client", "in_review", "quoted"].includes(status)) return "border-sky-200 bg-sky-50 text-sky-800";
-  if (["submitted", "under_review"].includes(status)) return "border-amber-200 bg-amber-50 text-amber-800";
-  if (status === "cancelled") return "border-rose-200 bg-rose-50 text-rose-700";
-  return "border-slate-200 bg-slate-50 text-slate-700";
+function FixedTarget({ title, detail, href, icon: Icon }: { title: string; detail: string; href: string; icon: typeof Target }) {
+  return <Link href={href} className="group flex min-h-16 items-center gap-3 border-b border-slate-100 px-1 py-3 last:border-b-0">
+    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-700"><Icon className="h-4 w-4" /></span>
+    <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-950">{title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{detail}</span></span>
+    <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" />
+  </Link>;
 }
 
-function supplierHasDeliveryContact(supplier: SupplierRoutingOption | undefined) {
-  if (!supplier?.preferredDeliveryMethod || supplier.preferredDeliveryMethod === "manual") return false;
-  if (supplier.preferredDeliveryMethod === "email") return Boolean(supplier.email?.trim());
-  if (supplier.preferredDeliveryMethod === "whatsapp") return Boolean(supplier.whatsapp?.trim());
-  if (["phone", "sms"].includes(supplier.preferredDeliveryMethod)) return Boolean(supplier.phone?.trim());
-  if (supplier.preferredDeliveryMethod === "portal") return Boolean(supplier.portalUrl?.trim());
-  return false;
+function PersonGoals({ assignee, goals, children }: { assignee: "carlos" | "david"; goals: ManagerGoalRecord[]; children: React.ReactNode }) {
+  const name = assignee === "carlos" ? "Carlos" : "David";
+  return <section className="border-t border-slate-200 pt-5 first:border-t-0 first:pt-0">
+    <header className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-3"><span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-slate-950 text-white"><UserRound className="h-5 w-5" /></span><div><h2 className="text-xl font-semibold">{name}</h2><p className="text-xs text-slate-500">{goals.filter((goal) => goal.status === "open").length} custom goals open</p></div></div>
+      <AddManagerGoal assignee={assignee} />
+    </header>
+    <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 shadow-sm">{children}</div>
+    <CustomManagerGoals goals={goals} />
+  </section>;
 }
 
-function nextAction(request: RequestRow, packages: SupplierPackageRow[]) {
-  const failed = packages.find((pkg) => pkg.status === "failed");
-  if (failed) return { label: "Fix supplier delivery", href: `/admin/supplier-approvals/${failed.id}`, tone: "rose" };
+export default async function AdminDashboardPage({ searchParams }: { searchParams: Promise<{ stage?: string }> }) {
+  const { stage = "" } = await searchParams;
+  const selectedStage = pipelineStages.some((item) => item.id === stage) ? stage as ManagerPipelineStage : null;
+  const { supabase, access } = await requireManagerPortalProfile();
 
-  const pending = packages.find((pkg) => pkg.status === "pending_approval");
-  if (pending) return { label: "Review supplier request", href: `/admin/supplier-approvals/${pending.id}`, tone: "amber" };
-
-  const approved = packages.find((pkg) => pkg.status === "approved");
-  if (approved) return { label: "Send to supplier", href: `/admin/supplier-approvals/${approved.id}`, tone: "emerald" };
-
-  if (["waiting_for_client", "in_review", "quoted"].includes(request.status)) {
-    return { label: "Follow up with client", href: `/owner/materials/requests/${request.id}`, tone: "sky" };
-  }
-
-  if (closedStatuses.has(request.status)) {
-    return { label: "View completed request", href: `/owner/materials/requests/${request.id}`, tone: "slate" };
-  }
-
-  const incompleteQuestionnaire = (request.material_questionnaire_responses ?? []).some((response) => response.status !== "complete");
-  return {
-    label: incompleteQuestionnaire ? "Review missing answers" : "Prepare supplier request",
-    href: `/owner/materials/requests/${request.id}`,
-    tone: incompleteQuestionnaire ? "amber" : "sky",
-  };
-}
-
-function actionClass(tone: string) {
-  if (tone === "rose") return "border-rose-200 bg-rose-50 text-rose-700";
-  if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-800";
-  if (tone === "emerald") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (tone === "sky") return "border-sky-200 bg-sky-50 text-sky-800";
-  return "border-slate-200 bg-slate-50 text-slate-700";
-}
-
-function CheckItem({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-700"}`}>
-      {ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
-      {label}
-    </span>
-  );
-}
-
-export default async function AdminBuildMapPage() {
-  const { supabase } = await requireAdminProfile();
-
-  const [requestsResult, projectsResult, customersResult, managerStateResult, packagesResult, questionnaireResult] = await Promise.all([
-    supabase
-      .from("quote_requests")
-      .select("id,owner_id,title,status,created_at,updated_at,projects(name,address),material_questionnaire_responses(id,category_name_snapshot,status)", { count: "exact" })
-      .order("updated_at", { ascending: false })
-      .limit(100)
-      .returns<RequestRow[]>(),
-    supabase.from("projects").select("id", { count: "exact", head: true }),
-    supabase.from("profiles").select("id", { count: "exact", head: true }),
-    supabase.from("workflow_manager_settings").select("state").eq("id", "singleton").maybeSingle<{ state: ManagerState }>(),
-    supabase
-      .from("supplier_packages")
-      .select("id,request_id,department,supplier_id,status,updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(200)
-      .returns<SupplierPackageRow[]>(),
-    supabase
-      .from("material_questionnaire_categories")
-      .select("id,name,department_key,is_active,material_questions(id,is_active)")
-      .order("sort_order")
-      .returns<QuestionnaireCategoryRow[]>(),
+  const [requestsResult, comparisonsResult, packagesResult, goalsResult, leadsResult, clientsResult] = await Promise.all([
+    supabase.from("quote_requests").select("id,owner_id,title,status,updated_at").order("updated_at", { ascending: false }).limit(250).returns<RequestRow[]>(),
+    supabase.from("quote_comparisons").select("id,request_id,status,client_quote_status,updated_at").order("updated_at", { ascending: false }).limit(500).returns<ComparisonRow[]>(),
+    supabase.from("supplier_packages").select("request_id,status").order("updated_at", { ascending: false }).limit(500).returns<SupplierPackageRow[]>(),
+    supabase.from("manager_goals").select("id,assignee,title,details,status").order("status").order("created_at", { ascending: false }).returns<ManagerGoalRecord[]>(),
+    supabase.from("manager_outreach_leads").select("id,status").returns<LeadRow[]>(),
+    supabase.from("profiles").select("id,full_name,email").eq("role", "client").eq("is_active", true).order("created_at", { ascending: false }).limit(500).returns<ClientRow[]>(),
   ]);
 
-  const requests = requestsResult.data ?? [];
-  const requestIds = requests.map((request) => request.id);
-  const ownerIds = [...new Set(requests.map((request) => request.owner_id))];
-
-  const [profilesResult, itemsResult, attachmentsResult] = await Promise.all([
-    ownerIds.length
-      ? supabase.from("profiles").select("id,full_name,email").in("id", ownerIds).returns<ProfileRow[]>()
-      : Promise.resolve({ data: [] as ProfileRow[] }),
-    requestIds.length
-      ? supabase.from("quote_request_items").select("request_id,department").in("request_id", requestIds).returns<RequestItemRow[]>()
-      : Promise.resolve({ data: [] as RequestItemRow[] }),
-    requestIds.length
-      ? supabase.from("quote_request_attachments").select("request_id").in("request_id", requestIds).returns<AttachmentRow[]>()
-      : Promise.resolve({ data: [] as AttachmentRow[] }),
-  ]);
-
-  const managerState = managerStateResult.data?.state;
-  const qualificationSettings = managerState?.qualificationSettings ?? createEmptyQualificationSettings();
-  const addOns = managerState?.addOns ?? createEmptyManagerAddOns();
-  const suppliers = qualificationSettings.suppliers;
-  const supplierMap = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
-  const profiles = new Map((profilesResult.data ?? []).map((profile) => [profile.id, profile]));
+  const requests = (requestsResult.data ?? []).filter((request) => request.status !== "draft" && !closedRequestStatuses.has(request.status));
+  const comparisons = comparisonsResult.data ?? [];
   const packages = packagesResult.data ?? [];
-  const questionnaires = questionnaireResult.data ?? [];
+  const clients = clientsResult.data ?? [];
+  const clientMap = new Map(clients.map((client) => [client.id, client]));
+  const stagedRequests = requests.map((request) => ({ request, stage: managerPipelineStage(request, comparisons, packages) }));
+  const stageCounts = new Map<ManagerPipelineStage, number>(pipelineStages.map((item) => [item.id, stagedRequests.filter((entry) => entry.stage === item.id).length]));
+  const visibleRequests = (selectedStage ? stagedRequests.filter((entry) => entry.stage === selectedStage) : stagedRequests).slice(0, 10);
+  const pipelineAvailable = !requestsResult.error && !comparisonsResult.error && !packagesResult.error;
 
-  const packagesByRequest = new Map<string, SupplierPackageRow[]>();
-  const departmentsByRequest = new Map<string, Set<string>>();
-  const itemCountByRequest = new Map<string, number>();
-  const fileCountByRequest = new Map<string, number>();
-  for (const pkg of packages) {
-    packagesByRequest.set(pkg.request_id, [...(packagesByRequest.get(pkg.request_id) ?? []), pkg]);
-    if (pkg.department) {
-      const departments = departmentsByRequest.get(pkg.request_id) ?? new Set<string>();
-      departments.add(pkg.department);
-      departmentsByRequest.set(pkg.request_id, departments);
-    }
-  }
-  for (const item of itemsResult.data ?? []) {
-    itemCountByRequest.set(item.request_id, (itemCountByRequest.get(item.request_id) ?? 0) + 1);
-    const departments = departmentsByRequest.get(item.request_id) ?? new Set<string>();
-    if (item.department) departments.add(item.department);
-    departmentsByRequest.set(item.request_id, departments);
-  }
-  for (const attachment of attachmentsResult.data ?? []) {
-    fileCountByRequest.set(attachment.request_id, (fileCountByRequest.get(attachment.request_id) ?? 0) + 1);
-  }
-  for (const request of requests) {
-    const departments = departmentsByRequest.get(request.id) ?? new Set<string>();
-    for (const response of request.material_questionnaire_responses ?? []) departments.add(response.category_name_snapshot);
-    departmentsByRequest.set(request.id, departments);
-  }
+  const goals = goalsResult.data ?? [];
+  const websiteNotes = goals.filter((goal) => goal.details?.startsWith(WEBSITE_FIX_NOTE_PREFIX));
+  const regularGoals = goals.filter((goal) => !goal.details?.startsWith(WEBSITE_FIX_NOTE_PREFIX) && !goal.details?.startsWith(DAILY_WORK_SUMMARY_PREFIX));
+  const openLeads = (leadsResult.data ?? []).filter((lead) => !["converted", "not_interested"].includes(lead.status)).length;
 
-  const visibleDepartments = applyDepartmentAddOns(SHOP_TOOL_CATEGORIES, addOns);
-  const readinessRows = visibleDepartments.map((department) => {
-    const sourceDepartment = SHOP_TOOL_CATEGORIES.find((category) => category.slug === department.slug)?.label ?? department.label;
-    const questionnaire = questionnaires.find((category) => category.department_key === sourceDepartment || category.department_key === department.label);
-    const activeQuestions = (questionnaire?.material_questions ?? []).filter((question) => question.is_active).length;
-    const builtInTargets = SERVICE_ASSIGNMENT_TARGETS.filter((target) => target.departmentLabel === sourceDepartment);
-    const managerTargets = addOns.services.filter((service) => service.category === sourceDepartment || service.category === department.label);
-    const supplierIds = [
-      ...builtInTargets.map((target) => qualificationSettings.products[target.id]?.supplierId || defaultQualificationSettingForServiceTarget(target).supplierId),
-      ...managerTargets.map((target) => qualificationSettings.products[target.id]?.supplierId || target.supplierId),
-    ].filter(Boolean);
-    const assignedSuppliers = supplierIds.map((id) => supplierMap.get(id)).filter((supplier): supplier is SupplierRoutingOption => Boolean(supplier));
-    const checks = {
-      photo: Boolean(department.imageUrl && !department.imageUrl.endsWith(".svg")),
-      quickOrder: Boolean(questionnaire?.is_active),
-      questions: activeQuestions > 0,
-      supplier: assignedSuppliers.length > 0,
-      delivery: assignedSuppliers.some(supplierHasDeliveryContact),
-    };
-    const ready = Object.values(checks).every(Boolean);
-    const missing = [
-      !checks.photo ? "photo" : null,
-      !checks.quickOrder ? "Quick Order" : null,
-      !checks.questions ? "questions" : null,
-      !checks.supplier ? "supplier" : null,
-      !checks.delivery ? "delivery method" : null,
-    ].filter(Boolean);
-    return { department, checks, ready, missing, activeQuestions, assignedSuppliers };
-  });
-
-  const openRequests = requests.filter((request) => !closedStatuses.has(request.status));
-  const pendingPackages = packages.filter((pkg) => pkg.status === "pending_approval").length;
-  const failedPackages = packages.filter((pkg) => pkg.status === "failed").length;
-  const readyDepartments = readinessRows.filter((row) => row.ready).length;
-
-  const metrics = [
-    { label: "Open requests", value: openRequests.length, detail: "Customer work requiring attention", icon: ClipboardList, href: "/admin/users?view=requests" },
-    { label: "Supplier review", value: pendingPackages, detail: "Packages waiting for approval", icon: ClipboardCheck, href: "/admin/supplier-approvals?view=pending" },
-    { label: "Delivery problems", value: failedPackages, detail: "Supplier messages that failed", icon: AlertCircle, href: "/admin/supplier-approvals?view=all" },
-    { label: "Ready departments", value: `${readyDepartments}/${readinessRows.length}`, detail: "Customer-ready department workflows", icon: CheckCircle2, href: "/admin/settings/material-order-questions" },
+  const dailyLinks = [
+    ...(access.customers ? [{ href: "/owner/materials/requests", label: "Client requests", detail: "Review and create requests", icon: ClipboardList }] : []),
+    ...(access.customers ? [{ href: "/admin/users", label: "Customers", detail: "Clients and contact details", icon: Users }] : []),
+    ...(access.suppliers ? [{ href: "/admin/vendors", label: "Suppliers", detail: "Directory and routing", icon: Store }] : []),
+    ...(access.suppliers ? [{ href: "/admin/supplier-quotes", label: "Supplier quotes", detail: "Upload and extract pricing", icon: Archive }] : []),
+    ...(access.suppliers ? [{ href: "/admin/quote-comparison", label: "Compare prices", detail: "Client list versus suppliers", icon: Columns3 }] : []),
+    { href: "/admin/catalog", label: "Material catalog", detail: "Items and supplier prices", icon: PackageOpen },
+    { href: "/admin/daily-summary", label: "Daily summary", detail: "Check in, check out, and report", icon: CalendarDays },
+    { href: QUO_INBOX_URL, label: "Calls & messages", detail: "Open the company inbox", icon: PhoneCall },
+    { href: WHATSAPP_URL, label: "WhatsApp", detail: "Open supplier and client chats", icon: MessageCircle },
   ];
 
-  return (
-    <main className="min-h-screen bg-[#f5f5f7] px-4 pb-16 pt-6 text-slate-950 sm:px-8 sm:pb-12">
-      <div className="mx-auto max-w-7xl">
-        <header className="border-b border-slate-200 pb-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager</p>
-          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Request Center</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">See what needs attention, move each request forward, and keep every department ready for customers.</p>
-        </header>
+  return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9"><div className="mx-auto max-w-7xl">
+    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5"><div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Dashboard</h1><p className="mt-2 text-sm text-slate-600">Today&apos;s requests, targets, and tools in one place.</p></div><Link href="/admin/daily-summary" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white"><CalendarDays className="h-4 w-4" />Daily summary</Link></header>
 
-        <section className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Manager overview">
-          {metrics.map((metric) => {
-            const Icon = metric.icon;
-            return (
-              <Link key={metric.label} href={metric.href} className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-sky-300 hover:shadow-md sm:p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0"><p className="text-xs font-semibold text-slate-600 sm:text-sm">{metric.label}</p><p className="mt-2 text-2xl font-bold sm:text-3xl">{metric.value}</p></div>
-                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-white"><Icon className="h-4 w-4" /></span>
-                </div>
-                <p className="mt-3 text-xs leading-5 text-slate-500">{metric.detail}</p>
-              </Link>
-            );
-          })}
-        </section>
+    {!pipelineAvailable ? <p role="alert" className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Some request counts could not load. Refresh before using the pipeline totals.</p> : null}
 
-        <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="request-center-heading">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
-            <div><h2 id="request-center-heading" className="text-lg font-bold">Requests needing attention</h2><p className="mt-1 text-xs text-slate-500">Customer, project, department, supplier, status, and next action.</p></div>
-            <Link href="/admin/users?view=requests" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-[#0066cc]">All requests <ArrowRight className="h-4 w-4" /></Link>
-          </div>
-          {openRequests.length ? (
-            <div className="divide-y divide-slate-100">
-              {openRequests.slice(0, 12).map((request) => {
-                const profile = profiles.get(request.owner_id);
-                const requestPackages = packagesByRequest.get(request.id) ?? [];
-                const action = nextAction(request, requestPackages);
-                const departments = [...(departmentsByRequest.get(request.id) ?? [])];
-                const assignedSupplierNames = [...new Set(requestPackages.map((pkg) => pkg.supplier_id ? supplierMap.get(pkg.supplier_id)?.name : null).filter(Boolean))];
-                return (
-                  <article key={request.id} className="grid gap-4 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(12rem,.7fr)_minmax(12rem,.7fr)] lg:items-center">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">{request.title}</h3><span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${requestStatusClass(request.status)}`}>{requestStatusLabels[request.status] ?? request.status.replaceAll("_", " ")}</span></div>
-                      <p className="mt-1 text-sm text-slate-600">{profile?.full_name?.trim() || profile?.email || "Customer"}</p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">{request.projects?.name || "Project"}{request.projects?.address ? ` · ${request.projects.address}` : ""} · Updated {formatDate(request.updated_at)}</p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">{departments.length ? departments.map((department) => <span key={department} className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">{department}</span>) : <span className="text-xs text-slate-400">Department not identified</span>}</div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-1">
-                      <div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Supplier</p><p className="mt-1 font-semibold text-slate-800">{assignedSupplierNames.join(", ") || "Not assigned"}</p></div>
-                      <div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Contents</p><p className="mt-1 font-semibold text-slate-800">{itemCountByRequest.get(request.id) ?? 0} items · {fileCountByRequest.get(request.id) ?? 0} files</p></div>
-                    </div>
-                    <Link href={action.href} className={`inline-flex min-h-11 items-center justify-between gap-3 rounded-lg border px-4 text-sm font-semibold ${actionClass(action.tone)}`}>{action.label}<ArrowRight className="h-4 w-4 shrink-0" /></Link>
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="px-5 py-12 text-center"><CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" /><p className="mt-3 font-semibold">No open customer requests.</p><p className="mt-1 text-sm text-slate-500">New submissions will appear here.</p></div>
-          )}
-        </section>
+    <section aria-labelledby="pipeline-heading" className="mt-6"><div className="flex items-center justify-between gap-3"><div><h2 id="pipeline-heading" className="text-xl font-semibold">Request pipeline</h2><p className="mt-1 text-xs text-slate-500">Open work only. Completed and cancelled requests are excluded.</p></div>{selectedStage ? <Link href="/admin/build-map#open-requests" className="text-xs font-semibold text-[#0066cc]">Show all</Link> : null}</div>
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">{pipelineStages.map((item) => { const Icon = item.icon; return <Link key={item.id} href={`/admin/build-map?stage=${item.id}#open-requests`} className={`flex min-h-36 flex-col justify-between rounded-lg border p-4 transition hover:-translate-y-0.5 hover:shadow-md ${item.tone}`}><div className="flex items-start justify-between gap-3"><Icon className="h-5 w-5 text-slate-700" /><span className={`text-4xl font-semibold tabular-nums sm:text-5xl ${item.numberTone}`}>{stageCounts.get(item.id) ?? 0}</span></div><div><h3 className="text-sm font-semibold leading-5">{item.label}</h3><p className="mt-1 hidden text-xs leading-5 text-slate-600 sm:block">{item.description}</p></div></Link>; })}</div>
+    </section>
 
-        <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="readiness-heading">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
-            <div><h2 id="readiness-heading" className="text-lg font-bold">Department readiness</h2><p className="mt-1 text-xs text-slate-500">Every customer-facing workflow checked in one place.</p></div>
-            <Link href="/admin/settings/material-order-questions" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-[#0066cc]">Manage departments <ArrowRight className="h-4 w-4" /></Link>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {readinessRows.map((row) => (
-              <article key={row.department.slug} className="grid gap-3 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(12rem,.7fr)_minmax(0,1.6fr)_auto] lg:items-center">
-                <div className="flex items-center gap-3">
-                  <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${row.ready ? "bg-emerald-600 text-white" : "bg-amber-100 text-amber-800"}`}>{row.ready ? <CheckCircle2 className="h-5 w-5" /> : <CircleAlert className="h-5 w-5" />}</span>
-                  <div><h3 className="font-bold">{row.department.label}</h3><p className={`mt-0.5 text-xs font-semibold ${row.ready ? "text-emerald-700" : "text-amber-800"}`}>{row.ready ? "Ready for customers" : `Missing: ${row.missing.join(", ")}`}</p></div>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <CheckItem ok={row.checks.photo} label="Photo" />
-                  <CheckItem ok={row.checks.quickOrder} label="Quick Order" />
-                  <CheckItem ok={row.checks.questions} label={`${row.activeQuestions} questions`} />
-                  <CheckItem ok={row.checks.supplier} label="Supplier" />
-                  <CheckItem ok={row.checks.delivery} label="Delivery" />
-                </div>
-                <div className="flex gap-2">
-                  <Link href="/admin/settings/material-order-questions" aria-label={`Manage ${row.department.label} questions`} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700" title="Questions"><FileQuestion className="h-4 w-4" /></Link>
-                  <Link href="/admin/vendors" aria-label={`Manage ${row.department.label} supplier`} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700" title="Supplier"><Store className="h-4 w-4" /></Link>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
+    <section id="open-requests" className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"><header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><h2 className="font-semibold">{selectedStage ? pipelineStages.find((item) => item.id === selectedStage)?.label : "Requests needing work"}</h2><p className="mt-0.5 text-xs text-slate-500">Most recently updated first</p></div><span className="text-sm font-semibold tabular-nums text-slate-500">{selectedStage ? stageCounts.get(selectedStage) : requests.length}</span></header>
+      {visibleRequests.length ? <div>{visibleRequests.map(({ request, stage: requestStage }) => { const client = clientMap.get(request.owner_id); const stageInfo = pipelineStages.find((item) => item.id === requestStage)!; return <Link key={request.id} href={`/owner/materials/requests/${request.id}`} className="group flex min-h-16 items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${requestStage === "received" ? "bg-amber-500" : requestStage === "pricing" ? "bg-sky-500" : requestStage === "approval" ? "bg-violet-500" : "bg-emerald-500"}`} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{request.title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{client?.full_name || client?.email || "Client"} · {stageInfo.label}</span></span><span className="hidden shrink-0 text-xs text-slate-400 sm:block">{formatUpdated(request.updated_at)}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" /></Link>; })}</div> : <p className="px-4 py-8 text-center text-sm text-slate-500">No open requests in this stage.</p>}
+    </section>
 
-        <section className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Manager directories">
-          <Link href="/admin/users?view=customers" className="flex min-h-20 items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><Users className="h-5 w-5 text-[#0066cc]" /><div><p className="font-bold">{customersResult.count ?? 0} customers</p><p className="text-xs text-slate-500">Customer directory</p></div></Link>
-          <Link href="/admin/projects" className="flex min-h-20 items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><FolderKanban className="h-5 w-5 text-[#0066cc]" /><div><p className="font-bold">{projectsResult.count ?? 0} projects</p><p className="text-xs text-slate-500">Project activity</p></div></Link>
-          <Link href="/admin/vendors" className="flex min-h-20 items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><Building2 className="h-5 w-5 text-[#0066cc]" /><div><p className="font-bold">{suppliers.length} suppliers</p><p className="text-xs text-slate-500">Supplier directory</p></div></Link>
-        </section>
+    <section aria-labelledby="targets-heading" className="mt-8"><div className="border-b border-slate-200 pb-3"><h2 id="targets-heading" className="text-xl font-semibold">Goals &amp; targets</h2><p className="mt-1 text-xs text-slate-500">Carlos first, then David. Open each custom goal to complete or remove it.</p></div><div className="mt-5 grid gap-7">
+      <PersonGoals assignee="carlos" goals={regularGoals.filter((goal) => goal.assignee === "carlos")}>
+        <FixedTarget title="Client Target" detail={`${openLeads} open leads · ${clients.length} active clients`} href="/admin/goals-progress" icon={Users} />
+        <FixedTarget title="Find suppliers' best-priced items" detail="Collect pricing and update the material catalog" href="/admin/catalog" icon={ShoppingCart} />
+        <FixedTarget title="Supplier Affiliate Program" detail="Track applications and supplier opportunities" href="/admin/goals-progress" icon={Store} />
+      </PersonGoals>
+      <PersonGoals assignee="david" goals={regularGoals.filter((goal) => goal.assignee === "david")}>
+        <FixedTarget title="Fix Website" detail={`${websiteNotes.filter((goal) => goal.status === "open").length} open website notes`} href="/admin/goals-progress" icon={CheckCircle2} />
+        <FixedTarget title="Launch Beat Your Quote" detail="Campaign, flyer, and customer upload flow" href="/admin/goals-progress" icon={Send} />
+      </PersonGoals>
+    </div></section>
 
-        {questionnaireResult.error ? <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><ListChecks className="mt-0.5 h-4 w-4 shrink-0" />Questionnaire readiness could not be loaded. Open Departments & Questions to check the database setup.</div> : null}
-        {requestsResult.error || packagesResult.error ? <div className="mt-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs leading-5 text-rose-800"><MailCheck className="mt-0.5 h-4 w-4 shrink-0" />Some request or supplier delivery data could not be loaded. Open the related directory for details.</div> : null}
-      </div>
-    </main>
-  );
+    <section aria-labelledby="daily-tools-heading" className="mt-8 border-t border-slate-200 pt-6"><div><h2 id="daily-tools-heading" className="text-xl font-semibold">Daily tools</h2><p className="mt-1 text-xs text-slate-500">The pages used to move requests, pricing, clients, and supplier work forward.</p></div><div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-3 lg:grid-cols-5">{dailyLinks.map((item) => { const Icon = item.icon; const external = item.href.startsWith("https://"); return <Link key={item.href} href={item.href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="group flex min-h-24 flex-col justify-between bg-white p-4 hover:bg-slate-50"><Icon className="h-5 w-5 text-[#0066cc]" /><span className="mt-3"><span className="block text-sm font-semibold">{item.label}</span><span className="mt-0.5 hidden text-xs leading-5 text-slate-500 sm:block">{item.detail}</span></span></Link>; })}</div></section>
+  </div></main>;
 }

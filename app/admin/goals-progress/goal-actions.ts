@@ -13,6 +13,7 @@ function validAssignee(value: string): value is "david" | "carlos" {
 
 function refreshGoals() {
   revalidatePath("/admin/goals-progress");
+  revalidatePath("/admin/build-map");
 }
 
 export async function createManagerGoalAction(input: {
