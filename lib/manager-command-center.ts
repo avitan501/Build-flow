@@ -1,6 +1,7 @@
 export const DASHBOARD_AI_HISTORY_PREFIX = "dashboard_ai_history_v1:"
 export const EMPLOYEE_ACTIVITY_PREFIX = "employee_activity_v1:"
 export const COMMUNICATION_LOG_PREFIX = "communication_log_v1:"
+export const TODAY_TASK_PREFIX = "today_task:"
 
 export type DashboardAiHistoryItem = {
   id: string

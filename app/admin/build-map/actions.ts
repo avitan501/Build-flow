@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { requireManagerPortalProfile } from "@/lib/auth"
 import {
   DASHBOARD_AI_HISTORY_PREFIX,
+  TODAY_TASK_PREFIX,
   parseDashboardAiHistory,
   serializeDashboardAiHistory,
   type DashboardAiHistoryItem,
@@ -13,6 +14,8 @@ import {
 type SearchResult =
   | { ok: true; answer: string; history: DashboardAiHistoryItem[] }
   | { ok: false; error: string }
+
+type TaskResult = { ok: true } | { ok: false; error: string }
 
 function clean(value: unknown, limit: number) {
   return String(value ?? "").trim().slice(0, limit)
@@ -26,6 +29,39 @@ function outputText(payload: Record<string, unknown>) {
     const content = Array.isArray((item as { content?: unknown[] }).content) ? (item as { content: unknown[] }).content : []
     return content.flatMap((entry) => entry && typeof entry === "object" && typeof (entry as { text?: unknown }).text === "string" ? [(entry as { text: string }).text] : [])
   }).join("\n").trim()
+}
+
+export async function createTodayTaskAction(titleInput: string): Promise<TaskResult> {
+  const { supabase, user } = await requireManagerPortalProfile()
+  const title = clean(titleInput, 120).replace(/\s+/g, " ")
+  if (title.length < 2) return { ok: false, error: "Enter a task." }
+
+  const { error } = await supabase.from("manager_goals").insert({
+    assignee: "carlos",
+    title,
+    details: TODAY_TASK_PREFIX,
+    status: "open",
+    created_by: user.id,
+  })
+  if (error) return { ok: false, error: "The task could not be added. Try again." }
+
+  revalidatePath("/admin/build-map")
+  return { ok: true }
+}
+
+export async function setTodayTaskCompletedAction(input: { id: string; completed: boolean }): Promise<TaskResult> {
+  const { supabase } = await requireManagerPortalProfile()
+  const { data, error } = await supabase
+    .from("manager_goals")
+    .update({ status: input.completed ? "completed" : "open" })
+    .eq("id", input.id)
+    .like("details", `${TODAY_TASK_PREFIX}%`)
+    .select("id")
+    .maybeSingle<{ id: string }>()
+
+  if (error || !data) return { ok: false, error: "The task status could not be updated." }
+  revalidatePath("/admin/build-map")
+  return { ok: true }
 }
 
 export async function searchManagerDashboardAction(queryInput: string): Promise<SearchResult> {

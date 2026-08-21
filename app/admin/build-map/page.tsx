@@ -21,12 +21,14 @@ import Link from "next/link";
 
 import { AddManagerGoal, CustomManagerGoals, type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { ManagerDashboardAiSearch } from "@/components/buildflow/manager-dashboard-ai-search";
+import { ManagerTodayTasks, type ManagerTodayTask } from "@/components/buildflow/manager-today-tasks";
 import { DAILY_WORK_SUMMARY_PREFIX } from "@/lib/daily-work-summary";
 import { requireManagerPortalProfile } from "@/lib/auth";
 import {
   COMMUNICATION_LOG_PREFIX,
   DASHBOARD_AI_HISTORY_PREFIX,
   EMPLOYEE_ACTIVITY_PREFIX,
+  TODAY_TASK_PREFIX,
   parseDashboardAiHistory,
   parseEmployeeActivity,
 } from "@/lib/manager-command-center";
@@ -64,6 +66,7 @@ type ClientRow = {
 };
 
 type LeadRow = { id: string; status: string };
+type DashboardGoalRecord = ManagerGoalRecord & { created_at: string };
 
 const pipelineStages: Array<{
   id: ManagerPipelineStage;
@@ -142,7 +145,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
     supabase.from("quote_requests").select("id,owner_id,title,status,updated_at").order("updated_at", { ascending: false }).limit(250).returns<RequestRow[]>(),
     supabase.from("quote_comparisons").select("id,request_id,status,client_quote_status,updated_at").order("updated_at", { ascending: false }).limit(500).returns<ComparisonRow[]>(),
     supabase.from("supplier_packages").select("request_id,status").order("updated_at", { ascending: false }).limit(500).returns<SupplierPackageRow[]>(),
-    supabase.from("manager_goals").select("id,assignee,title,details,status").order("status").order("created_at", { ascending: false }).returns<ManagerGoalRecord[]>(),
+    supabase.from("manager_goals").select("id,assignee,title,details,status,created_at").order("created_at", { ascending: false }).returns<DashboardGoalRecord[]>(),
     supabase.from("manager_outreach_leads").select("id,status").returns<LeadRow[]>(),
     supabase.from("profiles").select("id,full_name,email").eq("role", "client").eq("is_active", true).order("created_at", { ascending: false }).limit(500).returns<ClientRow[]>(),
   ]);
@@ -161,12 +164,20 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   const dashboardHistory = parseDashboardAiHistory(goals.find((goal) => goal.title === "Dashboard AI search" && goal.details?.startsWith(DASHBOARD_AI_HISTORY_PREFIX))?.details);
   const employeeActivity = parseEmployeeActivity(goals.find((goal) => goal.details?.startsWith(EMPLOYEE_ACTIVITY_PREFIX))?.details);
   const websiteNotes = goals.filter((goal) => goal.details?.startsWith(WEBSITE_FIX_NOTE_PREFIX));
+  const newYorkDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
+  const todayKey = newYorkDate.format(new Date());
+  const todayTasks: ManagerTodayTask[] = goals
+    .filter((goal) => goal.details?.startsWith(TODAY_TASK_PREFIX))
+    .filter((goal) => goal.status === "open" || newYorkDate.format(new Date(goal.created_at)) === todayKey)
+    .sort((a, b) => Number(a.status === "completed") - Number(b.status === "completed") || b.created_at.localeCompare(a.created_at))
+    .map(({ id, title, status, created_at }) => ({ id, title, status, created_at }));
   const regularGoals = goals.filter((goal) => ![
     WEBSITE_FIX_NOTE_PREFIX,
     DAILY_WORK_SUMMARY_PREFIX,
     DASHBOARD_AI_HISTORY_PREFIX,
     EMPLOYEE_ACTIVITY_PREFIX,
     COMMUNICATION_LOG_PREFIX,
+    TODAY_TASK_PREFIX,
   ].some((prefix) => goal.details?.startsWith(prefix)));
   const openLeads = (leadsResult.data ?? []).filter((lead) => !["converted", "not_interested"].includes(lead.status)).length;
 
@@ -184,6 +195,8 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
 
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9"><div className="mx-auto max-w-7xl">
     <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5"><div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Dashboard</h1><p className="mt-2 text-sm text-slate-600">Today&apos;s requests, targets, and tools in one place.</p></div><div className="flex flex-wrap items-center gap-2">{access.owner && employeeActivity ? <span className="inline-flex min-h-10 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800"><span className="h-2 w-2 rounded-full bg-emerald-500" />Carlos: {employeeActivity.pageLabel}</span> : null}<Link href="/admin/daily-summary" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white"><CalendarDays className="h-4 w-4" />Daily summary</Link></div></header>
+
+    <ManagerTodayTasks tasks={todayTasks} />
 
     <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled={Boolean(process.env.OPENAI_API_KEY)} />
 

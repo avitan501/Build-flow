@@ -8,10 +8,12 @@ import { managerPipelineStage } from "@/lib/manager-dashboard";
 const root = process.cwd();
 
 test("manager dashboard is the employee daily command center", async () => {
-  const [page, shell, goalActions] = await Promise.all([
+  const [page, shell, goalActions, dashboardActions, todayTasks] = await Promise.all([
     readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/goals-progress/goal-actions.ts"), "utf8"),
+    readFile(path.join(root, "app/admin/build-map/actions.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/manager-today-tasks.tsx"), "utf8"),
   ]);
 
   expect(page).toContain("requireManagerPortalProfile");
@@ -25,6 +27,8 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain('assignee="david"');
   expect(page.indexOf('assignee="carlos"')).toBeLessThan(page.indexOf('assignee="david"'));
   expect(page).toContain("Daily tools");
+  expect(page).toContain("ManagerTodayTasks");
+  expect(page).toContain("TODAY_TASK_PREFIX");
   expect(page).toContain("ManagerDashboardAiSearch");
   expect(page).toContain("Dashboard AI search");
   expect(page).toContain("employeeActivity");
@@ -35,6 +39,12 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(shell).toContain('{ href: "/admin/communications", label: "Communications"');
   expect(shell).toContain("EmployeeActivityReporter");
   expect(goalActions).toContain('revalidatePath("/admin/build-map")');
+  expect(dashboardActions).toContain("createTodayTaskAction");
+  expect(dashboardActions).toContain("setTodayTaskCompletedAction");
+  expect(dashboardActions).toContain('.like("details", `${TODAY_TASK_PREFIX}%`)');
+  expect(todayTasks).toContain("Today&apos;s tasks");
+  expect(todayTasks).toContain("America/New_York");
+  expect(todayTasks).toContain('role="checkbox"');
 });
 
 test("request pipeline moves work through pricing, approval, and delivery", () => {
