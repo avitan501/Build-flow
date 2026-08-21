@@ -82,6 +82,9 @@ test("manager supplier quote storage is private, durable, and routable", async (
 test("supplier detection matches the directory or keeps the name read from the invoice", async () => {
   const text = "EE Elite Doors i Estimate\n960 Alabama Ave\nSOFT OPEN & CLOSE HARDWARE SET 362.00 724.00T"
   expect(inferSupplierName(text)).toBe("Elite Doors")
+  const modernWindowsText = "MODERN WINDOWS\n1420 Commerce Ave., Bronx NY 10461\nQUOTATION #: 6080188"
+  expect(inferSupplierName(modernWindowsText)).toBe("MODERN WINDOWS")
+  expect(detectSupplierMatch([{ id: "modern", name: "Modern Window Manufacturing" }], "", modernWindowsText)?.id).toBe("modern")
   expect(detectSupplierMatch([{ id: "elite", name: "Elite Doors" }], "", text)?.id).toBe("elite")
   expect(detectSupplierMatch([{ id: "prince", name: "Prince Lumber" }], "", text)).toBeNull()
 })
