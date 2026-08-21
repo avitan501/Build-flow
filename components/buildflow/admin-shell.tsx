@@ -18,7 +18,6 @@ import {
   PhoneCall,
   PackageOpen,
   Store,
-  Target,
   UserRound,
   Users,
   Video,
@@ -61,16 +60,12 @@ function navigationGroups(access: ManagerAccess) {
     ] : [] },
     {
       label: "Communications",
-      links: [
-        ...(access.customers ? [{ href: "/admin/communications", label: "Communications", icon: PhoneCall }] : []),
-        ...(access.owner ? [{ href: "/owner/aura", label: "Aura Communications", icon: MessageCircle }] : []),
-      ],
+      links: access.communications ? [{ href: "/admin/communications", label: "Aura Communications", icon: PhoneCall }] : [],
     },
     {
       label: "Tasks",
       links: access.tasks ? [
         { href: "/admin/daily-summary", label: "Tasks & Daily Summary", icon: ClipboardList },
-        { href: "/admin/goals-progress", label: "Goals & Progress", icon: Target },
       ] : [],
     },
     {
@@ -89,13 +84,13 @@ function navigationGroups(access: ManagerAccess) {
           { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },
           { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
         ] : []),
-        ...(access.owner ? [{ href: "/admin/abc", label: "ABC Private Pricing", icon: Store }] : []),
       ],
     },
     {
-      label: "Tools",
+      label: "AI Tools",
       links: [
-        ...(access.aiTools ? [{ href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles }] : []),
+        ...(access.aiTools ? [{ href: "/admin/ai-tools", label: "AI Tools coming soon", icon: Sparkles }] : []),
+        ...(access.owner ? [{ href: "/admin/abc", label: "ABC Private Pricing", icon: Store }] : []),
         ...(access.traffic ? [{ href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 }] : []),
         ...(access.managerSettings ? [{ href: "/admin/settings", label: "Manager Settings", icon: Settings }] : []),
         ...(access.owner ? [

@@ -10,7 +10,7 @@ export default async function AdminAiToolsPage() {
     <main className="min-h-screen px-4 py-6 sm:px-8 lg:px-10">
       <div className="mx-auto max-w-6xl">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager Portal</p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-950">AI Tools</h1>
+        <h1 className="mt-2 text-3xl font-bold text-slate-950">AI Tools coming soon</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Internal utilities for preparing supplier requests, organizing material information, and checking customer order paths.</p>
         <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[

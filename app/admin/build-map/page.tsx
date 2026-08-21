@@ -184,18 +184,16 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   const managerSections = [
     { title: "Customers", icon: Users, links: access.customers ? [{ href: "/admin/users", label: "Customer Directory" }, { href: "/owner/materials/requests", label: "Client Requests" }] : [] },
     { title: "Calls & Communications", icon: PhoneCall, links: [
-      ...(access.customers ? [{ href: "/admin/communications", label: "Communication Center" }] : []),
-      ...(access.owner ? [{ href: "/owner/aura", label: "Aura Communications" }] : []),
+      ...(access.communications ? [{ href: "/admin/communications", label: "Aura Communications" }] : []),
       { href: QUO_INBOX_URL, label: "Calls & Messages" },
       { href: WHATSAPP_URL, label: "WhatsApp" },
       { href: "/admin/daily-summary", label: "Daily Work Summary" },
     ] },
     { title: "Suppliers", icon: Store, links: [
       ...(access.suppliers ? [{ href: "/admin/vendors", label: "Supplier Directory" }, { href: "/admin/supplier-quotes", label: "Supplier Quotes" }, { href: "/admin/catalog", label: "Material Catalog" }, { href: "/admin/quote-comparison", label: "Quote Comparison" }] : []),
-      ...(access.owner ? [{ href: "/admin/abc", label: "ABC Supply Private Pricing" }] : []),
     ] },
     ...(access.aiTools ? [
-      { title: "AI Tools", icon: Sparkles, links: [{ href: "/admin/ai-tools", label: "Open AI Tools" }] },
+      { title: "AI Tools", icon: Sparkles, links: [{ href: "/admin/ai-tools", label: "AI Tools coming soon" }, ...(access.owner ? [{ href: "/admin/abc", label: "ABC Private Pricing" }] : [])] },
     ] : []),
     ...(access.traffic ? [
       { title: "Website Traffic", icon: BarChart3, links: [{ href: "/admin/traffic", label: "Open Website Traffic" }] },

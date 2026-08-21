@@ -66,6 +66,10 @@ test("approved staff use an Operations Manager workspace without owner-only cont
   for (const section of ["Customers", "Communications", "Tasks", "Quotes & Orders", "Suppliers", "AI Tools", "Website Traffic", "Manager Settings"]) {
     expect(shell).toContain(section)
   }
+  expect(shell).toContain('label: "AI Tools coming soon"')
+  expect(shell).toContain('{ href: "/admin/abc", label: "ABC Private Pricing"')
+  expect(shell.indexOf('label: "ABC Private Pricing"')).toBeGreaterThan(shell.indexOf('label: "AI Tools coming soon"'))
+  expect(shell).not.toContain('{ href: "/owner/aura", label: "Aura Communications"')
   expect(shell).toContain('access.owner ? "Owner Workspace" : "Operations Manager"')
   expect(settings).toContain("Connection credentials and owner delivery tests remain restricted to David.")
   expect(settings).toContain("checkCommunicationConnectionsAction")
