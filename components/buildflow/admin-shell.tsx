@@ -31,10 +31,8 @@ import { EmployeeActivityReporter } from "@/components/buildflow/employee-activi
 
 const GOOGLE_MEET_URL = "https://meet.google.com/";
 const WHATSAPP_CALL_URL = "https://web.whatsapp.com/";
-const QUO_INBOX_URL = "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
-
 const communicationLinks = [
-  { href: QUO_INBOX_URL, label: "Calls & Messages", shortLabel: "Calls", icon: PhoneCall },
+  { href: "/admin/communications", label: "Calls & Communications", shortLabel: "Calls", icon: PhoneCall },
   { href: GOOGLE_MEET_URL, label: "Open Google Meet", shortLabel: "Meet", icon: Video },
   { href: WHATSAPP_CALL_URL, label: "Open WhatsApp to make a call", shortLabel: "WhatsApp", icon: MessageCircle },
   { href: "/admin/daily-summary", label: "Daily Work Summary", shortLabel: "Summary", icon: CalendarDays },
