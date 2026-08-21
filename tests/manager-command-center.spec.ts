@@ -30,7 +30,8 @@ test("dashboard AI uses authorized server data and keeps the API key private", a
   expect(broker).toContain('reasoning: { effort: "low" }')
   expect(action).not.toContain("NEXT_PUBLIC_OPENAI")
   expect(component).toContain("Recent searches")
-  expect(component).toContain("Ask Avantia AI")
+  expect(component).toContain("Ask AI")
+  expect(action).toContain("liveSearchFallback")
 })
 
 test("customer and lead records expose compact Q U O, email, and WhatsApp actions", async () => {

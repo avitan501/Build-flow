@@ -22,7 +22,7 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain("Waiting for client");
   expect(page).toContain("Payment received / delivery");
   expect(page).toContain("client_quote_status");
-  expect(page).toContain("Goals &amp; targets");
+  expect(page).toContain("Carlos targets");
   expect(page).toContain('assignee="carlos"');
   expect(page).toContain('assignee="david"');
   expect(page.indexOf('assignee="carlos"')).toBeLessThan(page.indexOf('assignee="david"'));
@@ -31,7 +31,9 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain("TODAY_TASK_PREFIX");
   expect(page).toContain("ManagerDashboardAiSearch");
   expect(page).toContain("Dashboard AI search");
-  expect(page).toContain("employeeActivity");
+  expect(page).toContain("EmployeeClockStatus");
+  expect(page.indexOf('id="pipeline-heading"')).toBeLessThan(page.indexOf("<ManagerTodayTasks tasks"));
+  expect(page).toContain("todaySummary?.checkInAt");
   expect(page).toContain("Supplier Quotes");
   expect(page).toContain("Quote Comparison");
   expect(shell).toContain('<span className="min-w-0 flex-1">Manager Dashboard</span>');
@@ -45,6 +47,7 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(dashboardActions).toContain("setTodayTaskCompletedAction");
   expect(dashboardActions).toContain('.like("details", `${TODAY_TASK_PREFIX}%`)');
   expect(todayTasks).toContain("Today&apos;s tasks");
+  expect(todayTasks).toContain('aria-label="Add a task"');
   expect(todayTasks).toContain("America/New_York");
   expect(todayTasks).toContain('role="checkbox"');
 });

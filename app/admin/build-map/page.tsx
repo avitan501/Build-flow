@@ -20,9 +20,10 @@ import {
 import Link from "next/link";
 
 import { AddManagerGoal, CustomManagerGoals, type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
+import { EmployeeClockStatus } from "@/components/buildflow/employee-clock-status";
 import { ManagerDashboardAiSearch } from "@/components/buildflow/manager-dashboard-ai-search";
 import { ManagerTodayTasks, type ManagerTodayTask } from "@/components/buildflow/manager-today-tasks";
-import { DAILY_WORK_SUMMARY_PREFIX } from "@/lib/daily-work-summary";
+import { DAILY_WORK_SUMMARY_PREFIX, parseDailyWorkSummary } from "@/lib/daily-work-summary";
 import { requireManagerPortalProfile } from "@/lib/auth";
 import {
   COMMUNICATION_LOG_PREFIX,
@@ -30,7 +31,6 @@ import {
   EMPLOYEE_ACTIVITY_PREFIX,
   TODAY_TASK_PREFIX,
   parseDashboardAiHistory,
-  parseEmployeeActivity,
 } from "@/lib/manager-command-center";
 import { managerPipelineStage, type ManagerPipelineStage } from "@/lib/manager-dashboard";
 
@@ -66,7 +66,7 @@ type ClientRow = {
 };
 
 type LeadRow = { id: string; status: string };
-type DashboardGoalRecord = ManagerGoalRecord & { created_at: string };
+type DashboardGoalRecord = ManagerGoalRecord & { created_at: string; updated_at: string };
 
 const pipelineStages: Array<{
   id: ManagerPipelineStage;
@@ -145,7 +145,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
     supabase.from("quote_requests").select("id,owner_id,title,status,updated_at").order("updated_at", { ascending: false }).limit(250).returns<RequestRow[]>(),
     supabase.from("quote_comparisons").select("id,request_id,status,client_quote_status,updated_at").order("updated_at", { ascending: false }).limit(500).returns<ComparisonRow[]>(),
     supabase.from("supplier_packages").select("request_id,status").order("updated_at", { ascending: false }).limit(500).returns<SupplierPackageRow[]>(),
-    supabase.from("manager_goals").select("id,assignee,title,details,status,created_at").order("created_at", { ascending: false }).returns<DashboardGoalRecord[]>(),
+    supabase.from("manager_goals").select("id,assignee,title,details,status,created_at,updated_at").order("created_at", { ascending: false }).returns<DashboardGoalRecord[]>(),
     supabase.from("manager_outreach_leads").select("id,status").returns<LeadRow[]>(),
     supabase.from("profiles").select("id,full_name,email").eq("role", "client").eq("is_active", true).order("created_at", { ascending: false }).limit(500).returns<ClientRow[]>(),
   ]);
@@ -162,10 +162,11 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
 
   const goals = goalsResult.data ?? [];
   const dashboardHistory = parseDashboardAiHistory(goals.find((goal) => goal.title === "Dashboard AI search" && goal.details?.startsWith(DASHBOARD_AI_HISTORY_PREFIX))?.details);
-  const employeeActivity = parseEmployeeActivity(goals.find((goal) => goal.details?.startsWith(EMPLOYEE_ACTIVITY_PREFIX))?.details);
   const websiteNotes = goals.filter((goal) => goal.details?.startsWith(WEBSITE_FIX_NOTE_PREFIX));
   const newYorkDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
   const todayKey = newYorkDate.format(new Date());
+  const todaySummaryRow = goals.find((goal) => goal.title === `Daily summary - ${todayKey}` && goal.details?.startsWith(DAILY_WORK_SUMMARY_PREFIX));
+  const todaySummary = todaySummaryRow ? parseDailyWorkSummary(todaySummaryRow) : null;
   const todayTasks: ManagerTodayTask[] = goals
     .filter((goal) => goal.details?.startsWith(TODAY_TASK_PREFIX))
     .filter((goal) => goal.status === "open" || newYorkDate.format(new Date(goal.created_at)) === todayKey)
@@ -205,33 +206,33 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   ].filter((section) => section.links.length > 0);
 
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9"><div className="mx-auto max-w-7xl">
-    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5"><div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Dashboard</h1><p className="mt-2 text-sm text-slate-600">Today&apos;s requests, targets, and tools in one place.</p></div><div className="flex flex-wrap items-center gap-2">{access.owner && employeeActivity ? <span className="inline-flex min-h-10 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800"><span className="h-2 w-2 rounded-full bg-emerald-500" />Carlos: {employeeActivity.pageLabel}</span> : null}<Link href="/admin/daily-summary" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white"><CalendarDays className="h-4 w-4" />Daily summary</Link></div></header>
+    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5"><div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Dashboard</h1><p className="mt-2 text-sm text-slate-600">Today&apos;s requests, targets, and tools in one place.</p></div><div className="flex flex-wrap items-center gap-2"><EmployeeClockStatus checkInAt={todaySummary?.checkInAt ?? null} checkOutAt={todaySummary?.checkOutAt ?? null} /><Link href="/admin/daily-summary" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white"><CalendarDays className="h-4 w-4" />Daily summary</Link></div></header>
+
+    {!pipelineAvailable ? <p role="alert" className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Some request counts could not load. Refresh before using the pipeline totals.</p> : null}
+
+    <section aria-labelledby="pipeline-heading" className="mt-5"><div className="flex items-center justify-between gap-3"><div><h2 id="pipeline-heading" className="text-xl font-semibold">Request pipeline</h2><p className="mt-1 text-xs text-slate-500">Open work only. Completed and cancelled requests are excluded.</p></div>{selectedStage ? <Link href="/admin/build-map#open-requests" className="text-xs font-semibold text-[#0066cc]">Show all</Link> : null}</div>
+      <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">{pipelineStages.map((item) => { const Icon = item.icon; return <Link key={item.id} href={`/admin/build-map?stage=${item.id}#open-requests`} className={`flex min-h-24 items-center gap-3 rounded-lg border p-3 transition hover:shadow-sm ${item.tone}`}><Icon className="h-4 w-4 shrink-0 text-slate-700" /><div className="min-w-0 flex-1"><span className={`text-2xl font-semibold tabular-nums ${item.numberTone}`}>{stageCounts.get(item.id) ?? 0}</span><h3 className="mt-0.5 text-xs font-semibold leading-4">{item.label}</h3></div></Link>; })}</div>
+    </section>
 
     <ManagerTodayTasks tasks={todayTasks} />
 
     <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled />
 
-    {!pipelineAvailable ? <p role="alert" className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Some request counts could not load. Refresh before using the pipeline totals.</p> : null}
-
-    <section aria-labelledby="pipeline-heading" className="mt-6"><div className="flex items-center justify-between gap-3"><div><h2 id="pipeline-heading" className="text-xl font-semibold">Request pipeline</h2><p className="mt-1 text-xs text-slate-500">Open work only. Completed and cancelled requests are excluded.</p></div>{selectedStage ? <Link href="/admin/build-map#open-requests" className="text-xs font-semibold text-[#0066cc]">Show all</Link> : null}</div>
-      <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">{pipelineStages.map((item) => { const Icon = item.icon; return <Link key={item.id} href={`/admin/build-map?stage=${item.id}#open-requests`} className={`flex min-h-24 items-center gap-3 rounded-lg border p-3 transition hover:shadow-sm ${item.tone}`}><Icon className="h-4 w-4 shrink-0 text-slate-700" /><div className="min-w-0 flex-1"><span className={`text-2xl font-semibold tabular-nums ${item.numberTone}`}>{stageCounts.get(item.id) ?? 0}</span><h3 className="mt-0.5 text-xs font-semibold leading-4">{item.label}</h3></div></Link>; })}</div>
-    </section>
-
     <section id="open-requests" className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"><header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><h2 className="font-semibold">{selectedStage ? pipelineStages.find((item) => item.id === selectedStage)?.label : "Requests needing work"}</h2><p className="mt-0.5 text-xs text-slate-500">Most recently updated first</p></div><span className="text-sm font-semibold tabular-nums text-slate-500">{selectedStage ? stageCounts.get(selectedStage) : requests.length}</span></header>
       {visibleRequests.length ? <div>{visibleRequests.map(({ request, stage: requestStage }) => { const client = clientMap.get(request.owner_id); const stageInfo = pipelineStages.find((item) => item.id === requestStage)!; return <Link key={request.id} href={`/owner/materials/requests/${request.id}`} className="group flex min-h-16 items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${requestStage === "received" ? "bg-amber-500" : requestStage === "pricing" ? "bg-sky-500" : requestStage === "approval" ? "bg-violet-500" : "bg-emerald-500"}`} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{request.title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{client?.full_name || client?.email || "Client"} · {stageInfo.label}</span></span><span className="hidden shrink-0 text-xs text-slate-400 sm:block">{formatUpdated(request.updated_at)}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" /></Link>; })}</div> : <p className="px-4 py-8 text-center text-sm text-slate-500">No open requests in this stage.</p>}
     </section>
 
-    <details className="group mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4"><span><strong id="targets-heading" className="text-base">Goals &amp; targets</strong><span className="ml-2 text-xs text-slate-500">Carlos and David</span></span><span className="text-xs font-semibold text-[#0066cc] group-open:hidden">Open</span></summary><div className="grid gap-7 border-t border-slate-200 p-4 sm:p-5">
+    <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="border-b border-slate-200 px-4 py-3"><h2 id="targets-heading" className="font-semibold">Carlos targets</h2><p className="mt-0.5 text-xs text-slate-500">Open goals and daily outreach priorities</p></header><div className="grid gap-7 p-4 sm:p-5">
       <PersonGoals assignee="carlos" goals={regularGoals.filter((goal) => goal.assignee === "carlos")}>
         <FixedTarget title="Client Target" detail={`${openLeads} open leads · ${clients.length} active clients`} href="/admin/goals-progress" icon={Users} />
         <FixedTarget title="Find suppliers' best-priced items" detail="Collect pricing and update the material catalog" href="/admin/catalog" icon={ShoppingCart} />
         <FixedTarget title="Supplier Affiliate Program" detail="Track applications and supplier opportunities" href="/admin/goals-progress" icon={Store} />
       </PersonGoals>
-      <PersonGoals assignee="david" goals={regularGoals.filter((goal) => goal.assignee === "david")}>
-        <FixedTarget title="Fix Website" detail={`${websiteNotes.filter((goal) => goal.status === "open").length} open website notes`} href="/admin/goals-progress" icon={CheckCircle2} />
-        <FixedTarget title="Launch Beat Your Quote" detail="Campaign, flyer, and customer upload flow" href="/admin/goals-progress" icon={Send} />
-      </PersonGoals>
-    </div></details>
+      <details className="group border-t border-slate-200 pt-4"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between"><span className="font-semibold">David goals</span><span className="text-xs font-semibold text-[#0066cc] group-open:hidden">Open</span></summary><div className="pt-4"><PersonGoals assignee="david" goals={regularGoals.filter((goal) => goal.assignee === "david")}>
+          <FixedTarget title="Fix Website" detail={`${websiteNotes.filter((goal) => goal.status === "open").length} open website notes`} href="/admin/goals-progress" icon={CheckCircle2} />
+          <FixedTarget title="Launch Beat Your Quote" detail="Campaign, flyer, and customer upload flow" href="/admin/goals-progress" icon={Send} />
+        </PersonGoals></div></details>
+    </div></section>
 
     <details className="group mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4"><span><strong id="manager-tools-heading" className="text-base">Manager tools</strong><span className="ml-2 text-xs text-slate-500">Directories, suppliers, and settings</span></span><span className="text-xs font-semibold text-[#0066cc] group-open:hidden">Open</span></summary><div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-3">{managerSections.map((section) => { const Icon = section.icon; return <section key={section.title} className="overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="flex items-center gap-3 border-b border-slate-100 px-3 py-2"><span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-[#0066cc]"><Icon className="h-4 w-4" /></span><h3 className="text-sm font-semibold">{section.title}</h3></header><div>{section.links.map((item) => { const external = item.href.startsWith("https://"); return <Link key={item.href} href={item.href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="group flex min-h-11 items-center justify-between gap-3 border-b border-slate-100 px-3 text-sm font-semibold text-slate-700 last:border-b-0 hover:bg-slate-50 hover:text-[#0066cc]"><span>{item.label}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5" /></Link>; })}</div></section>; })}</div></details>
   </div></main>;

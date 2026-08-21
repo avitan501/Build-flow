@@ -9,10 +9,9 @@ import { calculateWorkedMinutes, type DailyWorkSummary } from "@/lib/daily-work-
 
 function localToday() {
   const date = new Date()
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date)
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${value.year}-${value.month}-${value.day}`
 }
 
 function displayDate(value: string) {
@@ -41,6 +40,7 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
   const [completed, setCompleted] = useState(initialSummary?.completed ?? "")
   const [open, setOpen] = useState(initialSummary?.open ?? "")
   const [problems, setProblems] = useState(initialSummary?.problems ?? "")
+  const [problemPhoto, setProblemPhoto] = useState<File | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -51,6 +51,7 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
     setCompleted(summary?.completed ?? "")
     setOpen(summary?.open ?? "")
     setProblems(summary?.problems ?? "")
+    setProblemPhoto(null)
     setMessage(null)
     setError(null)
   }
@@ -69,17 +70,25 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
     })
   }
 
-  function uploadProblemPhoto(file: File | undefined) {
-    if (!file) return
+  function reportProblem() {
+    if (!problems.trim()) {
+      setError("Describe the website problem before reporting it.")
+      return
+    }
     setError(null)
     setMessage(null)
-    const formData = new FormData()
-    formData.set("date", selectedDate)
-    formData.set("photo", file)
     startTransition(async () => {
-      const result = await uploadDailyProblemPhotoAction(formData)
-      if (!result.ok) { setError(result.error); return }
-      setMessage("Problem image attached.")
+      const saved = await saveDailyWorkSummaryAction({ date: selectedDate, completed, open, problems })
+      if (!saved.ok) { setError(saved.error); return }
+      if (problemPhoto) {
+        const formData = new FormData()
+        formData.set("date", selectedDate)
+        formData.set("photo", problemPhoto)
+        const uploaded = await uploadDailyProblemPhotoAction(formData)
+        if (!uploaded.ok) { setError(`The problem was saved, but the screenshot failed: ${uploaded.error}`); return }
+      }
+      setProblemPhoto(null)
+      setMessage("Website problem reported.")
       router.refresh()
     })
   }
@@ -124,7 +133,7 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
         <label className="grid gap-1.5 text-sm font-semibold"><span className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-amber-600" />Still open</span><textarea value={open} onChange={(event) => setOpen(event.target.value)} maxLength={4000} rows={4} placeholder="Follow-ups, unanswered calls, pricing still needed, and tomorrow's first steps..." className="min-h-24 rounded-md border border-slate-300 p-3 font-normal leading-6 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
         <section className="rounded-md border border-rose-200 bg-rose-50/60 p-3">
           <label className="grid gap-1.5 text-sm font-semibold"><span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-rose-600" />Website problem</span><textarea value={problems} onChange={(event) => setProblems(event.target.value)} maxLength={4000} rows={3} placeholder="What happened, which page, and what were you trying to do?" className="min-h-20 rounded-md border border-rose-200 bg-white p-3 font-normal leading-6 outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-100" /></label>
-          <div className="mt-3 flex flex-wrap items-center gap-2"><label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700"><Upload className="h-4 w-4" />Attach screenshot<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={pending} onChange={(event) => { uploadProblemPhoto(event.target.files?.[0]); event.currentTarget.value = "" }} /></label>{pending ? <LoaderCircle className="h-4 w-4 animate-spin text-rose-600" /> : null}</div>
+          <div className="mt-3 flex flex-wrap items-center gap-2"><label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700"><Upload className="h-4 w-4" />{problemPhoto ? "Change screenshot" : "Attach screenshot"}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={pending} onChange={(event) => setProblemPhoto(event.target.files?.[0] ?? null)} /></label>{problemPhoto ? <span className="max-w-48 truncate text-xs font-medium text-slate-600">{problemPhoto.name}</span> : null}<button type="button" onClick={reportProblem} disabled={pending || !problems.trim()} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-rose-700 px-3 text-xs font-semibold text-white disabled:opacity-40"><AlertTriangle className="h-4 w-4" />Report problem</button>{pending ? <LoaderCircle className="h-4 w-4 animate-spin text-rose-600" /> : null}</div>
           {selectedSummary?.problemAttachments.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{selectedSummary.problemAttachments.map((attachment) => <a key={attachment.path} href={attachment.signedUrl || "#"} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-2 rounded-md border border-rose-100 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><FileImage className="h-4 w-4 shrink-0 text-rose-500" /><span className="truncate">{attachment.name}</span></a>)}</div> : null}
         </section>
         {error ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}

@@ -21,6 +21,21 @@ function clean(value: unknown, limit: number) {
   return String(value ?? "").trim().slice(0, limit)
 }
 
+function liveSearchFallback(query: string, collections: Array<{ label: string; rows: Array<Record<string, unknown>> }>) {
+  const ignored = new Set(["about", "from", "have", "show", "that", "the", "what", "when", "where", "which", "with"])
+  const terms = query.toLowerCase().split(/[^a-z0-9]+/).filter((term) => term.length > 2 && !ignored.has(term))
+  const matches = collections.flatMap(({ label, rows }) => rows.flatMap((row) => {
+    const searchable = Object.values(row).filter((value) => typeof value === "string").join(" ").toLowerCase()
+    if (terms.length && !terms.some((term) => searchable.includes(term))) return []
+    const name = clean(row.full_name || row.company_name || row.title || row.supplier_name || row.quote_number || "Record", 100)
+    const status = clean(row.status || row.approval_status || "", 40)
+    return [`${label}: ${name}${status ? ` (${status})` : ""}`]
+  })).slice(0, 12)
+  const totals = collections.map(({ label, rows }) => `${label}: ${rows.length}`).join(" · ")
+  if (!matches.length) return `Live search checked the current manager records and found no close match. ${totals}. Try a client name, request title, supplier, quote number, or goal.`
+  return `Live search results:\n${matches.map((match) => `• ${match}`).join("\n")}\n\nCurrent records: ${totals}.`
+}
+
 export async function createTodayTaskAction(titleInput: string): Promise<TaskResult> {
   const { supabase, user } = await requireManagerPortalProfile()
   const title = clean(titleInput, 120).replace(/\s+/g, " ")
@@ -65,6 +80,12 @@ export async function searchManagerDashboardAction(queryInput: string): Promise<
     access.suppliers ? supabase.from("supplier_quotes").select("id,supplier_name,client_name_snapshot,department,status,quote_number,updated_at").order("updated_at", { ascending: false }).limit(80) : Promise.resolve({ data: [] }),
   ])
   const goals = (goalsResult.data ?? []).filter((goal) => !String(goal.details || "").startsWith(DASHBOARD_AI_HISTORY_PREFIX))
+  const collections = [
+    { label: "Requests", rows: (requestsResult.data ?? []) as Array<Record<string, unknown>> },
+    { label: "Clients", rows: (clientsResult.data ?? []) as Array<Record<string, unknown>> },
+    { label: "Supplier quotes", rows: (quotesResult.data ?? []) as Array<Record<string, unknown>> },
+    { label: "Goals", rows: goals.map(({ title, status, updated_at }) => ({ title, status, updated_at })) as Array<Record<string, unknown>> },
+  ]
   const context = JSON.stringify({
     requests: requestsResult.data ?? [],
     clients: clientsResult.data ?? [],
@@ -72,25 +93,25 @@ export async function searchManagerDashboardAction(queryInput: string): Promise<
     goals: goals.map(({ title, status, updated_at }) => ({ title, status, updated_at })),
   })
 
+  let answer = ""
   try {
     const { data, error } = await supabase.functions.invoke<{ ok?: boolean; answer?: string; error?: string }>("aura-messaging-broker", {
       body: { action: "dashboard_ai", query, context },
     })
-    if (error || !data?.ok) return { ok: false, error: data?.error || "Avantia AI could not answer right now." }
-    const answer = clean(data.answer, 3000)
-    if (!answer) return { ok: false, error: "The AI search returned no answer. Try a more specific question." }
-
-    const title = "Dashboard AI search"
-    const existing = await supabase.from("manager_goals").select("id,details").eq("created_by", user.id).eq("title", title).limit(1).maybeSingle<{ id: string; details: string | null }>()
-    const history: DashboardAiHistoryItem[] = [{ id: crypto.randomUUID(), query, answer: answer.slice(0, 3000), createdAt: new Date().toISOString() }, ...parseDashboardAiHistory(existing.data?.details)].slice(0, 20)
-    const details = serializeDashboardAiHistory(history)
-    const assignee = access.owner ? "david" : "carlos"
-    if (existing.data) await supabase.from("manager_goals").update({ details, status: "completed" }).eq("id", existing.data.id)
-    else await supabase.from("manager_goals").insert({ assignee, title, details, status: "completed", created_by: user.id })
-
-    revalidatePath("/admin/build-map")
-    return { ok: true, answer, history }
+    answer = !error && data?.ok ? clean(data.answer, 3000) : ""
   } catch {
-    return { ok: false, error: "The AI search is temporarily unavailable. Try again in a moment." }
+    answer = ""
   }
+  if (!answer) answer = liveSearchFallback(query, collections)
+
+  const title = "Dashboard AI search"
+  const existing = await supabase.from("manager_goals").select("id,details").eq("created_by", user.id).eq("title", title).limit(1).maybeSingle<{ id: string; details: string | null }>()
+  const history: DashboardAiHistoryItem[] = [{ id: crypto.randomUUID(), query, answer: answer.slice(0, 3000), createdAt: new Date().toISOString() }, ...parseDashboardAiHistory(existing.data?.details)].slice(0, 20)
+  const details = serializeDashboardAiHistory(history)
+  const assignee = access.owner ? "david" : "carlos"
+  if (existing.data) await supabase.from("manager_goals").update({ details, status: "completed" }).eq("id", existing.data.id)
+  else await supabase.from("manager_goals").insert({ assignee, title, details, status: "completed", created_by: user.id })
+
+  revalidatePath("/admin/build-map")
+  return { ok: true, answer, history }
 }

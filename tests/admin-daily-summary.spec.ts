@@ -35,6 +35,8 @@ test("daily summaries persist by date in protected manager data", async () => {
   expect(component).toContain("Website problem")
   expect(component).toContain('accept="image/jpeg,image/png,image/webp"')
   expect(component).toContain("Attach screenshot")
+  expect(component).toContain("Report problem")
+  expect(component).toContain("Website problem reported.")
   expect(actions).toContain("await requireManagerPortalProfile()")
   expect(actions).toContain("recordDailyAttendanceAction")
   expect(actions).toContain('timeZone: "America/New_York"')
