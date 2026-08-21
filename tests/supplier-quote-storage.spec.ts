@@ -95,6 +95,7 @@ test("supplier quote AI payload is normalized before database insertion", async 
     },
     items: [
       { itemCode: "PLY-1", description: "  1/2 in. plywood  ", specification: "4 x 8", quantity: "12", unit: "sheet", unitPrice: "22.50", lineTotal: null },
+      { itemCode: "", description: "85", specification: "", quantity: 85, unit: "each", unitPrice: 11.45, lineTotal: 973.25 },
       { itemCode: "", description: "Delivery", specification: "", quantity: 1, unit: "each", unitPrice: 55, lineTotal: 55 },
     ],
     notes: " Review scan ",
@@ -104,6 +105,22 @@ test("supplier quote AI payload is normalized before database insertion", async 
   expect(result.items[0]).toMatchObject({ description: "1/2 in. plywood", quantity: 12, unitPrice: 22.5, lineTotal: 270 })
   expect(result.items).toHaveLength(1)
   expect(result.notes).toBe("Review scan")
+})
+
+test("catalog Exa search is manager-only and keeps results out of the catalog until approval", async () => {
+  const [route, search, catalog] = await Promise.all([
+    readFile(path.join(root, "app/api/admin/catalog/exa-search/route.ts"), "utf8"),
+    readFile(path.join(root, "lib/exa-catalog-search.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/exa-catalog-research.tsx"), "utf8"),
+  ])
+
+  expect(route).toContain("requireManagerPortalProfile")
+  expect(route).toContain("searchCatalogWithExa")
+  expect(search).toContain("process.env.EXA_API_KEY")
+  expect(search).toContain("https://api.exa.ai/search")
+  expect(catalog).toContain("Prepare catalog item")
+  expect(catalog).toContain("Nothing is saved until you approve it")
+  expect(catalog).toContain("/api/admin/catalog/exa-search")
 })
 
 test("supplier quote AI extraction uses a cost-controlled model and does not retain responses", async () => {

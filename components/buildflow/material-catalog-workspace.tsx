@@ -14,6 +14,7 @@ import {
   saveMaterialCatalogItemAction,
   saveMaterialCatalogPricesAction,
 } from "@/app/admin/catalog/actions"
+import { ExaCatalogResearch } from "@/components/buildflow/exa-catalog-research"
 import {
   MATERIAL_CATALOG_CATEGORIES,
   hasRoutableSupplierTrust,
@@ -427,6 +428,18 @@ export function MaterialCatalogWorkspace({
     })
   }
 
+  function prepareExaResult(result: import("@/lib/exa-catalog-search").ExaCatalogSearchResult) {
+    const draft = emptyEditor(selectedCategory)
+    setEditor({
+      ...draft,
+      name: result.title,
+      description: result.snippet,
+      imageUrl: result.imageUrl ?? "",
+      qualityNotes: `Found by Exa at ${result.url}. Verify the exact product, price, and availability before saving.`,
+    })
+    setNotice("Review the Exa result, then save it as a catalog item. Supplier pricing must be verified separately.")
+  }
+
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-3 pb-24 pt-4 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[100rem]">
@@ -444,6 +457,8 @@ export function MaterialCatalogWorkspace({
             <button type="button" onClick={() => setEditor(emptyEditor(selectedCategory))} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Add item</button>
           </div>
         </header>
+
+        <ExaCatalogResearch department={selectedCategory} onUseResult={prepareExaResult} />
 
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Catalog category">
           {categories.map((category) => {

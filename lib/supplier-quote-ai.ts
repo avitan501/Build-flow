@@ -33,6 +33,13 @@ function cleanText(value: unknown, max = 500) {
   return typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, max) : ""
 }
 
+function isUsableMaterialDescription(value: string) {
+  const description = value.trim()
+  if (!description || /^(?:description|item|quantity|qty|unit price)$/i.test(description)) return false
+  // A column-reading error can turn a quantity or price into the material name.
+  return !/^[\s$€£¥0-9,./:%+\-]+$/.test(description)
+}
+
 function nonNegativeNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null
   const parsed = Number(value)
@@ -89,7 +96,7 @@ export function normalizeSupplierQuoteAiPayload(value: unknown): SupplierQuoteAi
           lineTotal: statedTotal ?? (unitPrice === null ? null : Math.round(quantity * unitPrice * 100) / 100),
         }
       })
-      .filter((item) => item.description && !NON_MATERIAL_LINE_PATTERN.test(item.description))
+      .filter((item) => isUsableMaterialDescription(item.description) && !NON_MATERIAL_LINE_PATTERN.test(item.description))
       .slice(0, MAX_AI_ITEMS),
     notes: cleanText(payload.notes, 1000),
   }
@@ -138,24 +145,28 @@ const quoteSchema = {
   },
 } as const
 
-const EXTRACTION_PROMPT = `Read this supplier quote, estimate, invoice, receipt, or material price list. Use OCR when the document is scanned or photographed. Extract only actual purchasable material rows. Do not turn headings, addresses, subtotals, tax, delivery, discounts, payments, or grand totals into material items.
+const EXTRACTION_PROMPT = `Read this supplier quote, estimate, invoice, receipt, or material price list. Use the visual layout of the attached document as the source of truth when columns are misaligned in the text layer. Use OCR when the document is scanned or photographed. Extract only actual purchasable material rows. Do not turn headings, addresses, subtotals, tax, delivery, discounts, payments, or grand totals into material items.
 
-Preserve model numbers, SKUs, dimensions, thicknesses, colors, grades, pack sizes, and other product details. Put a concise product name in description and remaining details in specification. Use the quantity and unit shown. Never invent unreadable values. Use an empty string or null where the schema allows it. Dates must be YYYY-MM-DD. Calculate taxPercent only when the printed tax amount and taxable subtotal make it dependable. Use 0 when tax or delivery is absent or unclear. Every extracted value must be reviewed by a person before use.`
+Preserve model numbers, SKUs, dimensions, thicknesses, colors, grades, pack sizes, and other product details. Put a concise product name in description and remaining details in specification. Never use a quantity, price, line total, tax, or other numeric-only value as the description. Use the quantity and unit shown in the same material row. Never invent unreadable values. Use an empty string or null where the schema allows it. Dates must be YYYY-MM-DD. Calculate taxPercent only when the printed tax amount and taxable subtotal make it dependable. Use 0 when tax or delivery is absent or unclear. Every extracted value must be reviewed by a person before use.`
 
 export async function extractSupplierQuoteWithAi(file: File, extractedText = ""): Promise<SupplierQuoteAiResult | null> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return null
 
   const content: Array<Record<string, unknown>> = [{ type: "input_text", text: EXTRACTION_PROMPT }]
-  // Searchable documents use their extracted text to avoid the higher image/PDF token cost.
-  if (extractedText.trim()) {
-    content.push({ type: "input_text", text: `Source file: ${file.name}\n\n${extractedText.slice(0, 180_000)}` })
-  } else {
+  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+  const isImage = file.type.startsWith("image/")
+  if (isPdf || isImage) {
     const base64 = Buffer.from(await file.arrayBuffer()).toString("base64")
     const dataUrl = `data:${file.type};base64,${base64}`
-    content.push(file.type.startsWith("image/")
+    content.push(isImage
       ? { type: "input_image", image_url: dataUrl, detail: "high" }
       : { type: "input_file", filename: file.name, file_data: dataUrl })
+  }
+  if (extractedText.trim()) {
+    content.push({ type: "input_text", text: `OCR/text-layer reference for ${file.name}. Use it to confirm values, but prefer the document layout when columns are interleaved.\n\n${extractedText.slice(0, 180_000)}` })
+  } else if (!isPdf && !isImage) {
+    content.push({ type: "input_text", text: `Source file: ${file.name}` })
   }
 
   const controller = new AbortController()
