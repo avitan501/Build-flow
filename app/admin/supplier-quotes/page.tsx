@@ -21,12 +21,13 @@ export default async function SupplierQuotesPage({ searchParams }: {
   const clientFilter = filters.client?.trim() || ""
   const dateFilter = /^\d{4}-\d{2}-\d{2}$/.test(filters.date || "") ? filters.date || "" : ""
   const { supabase } = await requireStaffProfile("suppliers")
-  const [quotesResult, suppliersResult, clientsResult, requestsResult, projectsResult] = await Promise.all([
+  const [quotesResult, suppliersResult, clientsResult, requestsResult, projectsResult, ocrStatus] = await Promise.all([
     supabase.from("supplier_quotes").select("*").neq("status", "archived").order("updated_at", { ascending: false }).limit(200).returns<SupplierQuoteRecord[]>(),
     supabase.rpc("staff_load_catalog_suppliers"),
     supabase.from("profiles").select("id,full_name,email").eq("role", "client").eq("is_active", true).order("full_name").limit(500),
     supabase.from("quote_requests").select("id,title,status,project_id,owner_id,created_at").order("created_at", { ascending: false }).limit(1000).returns<RequestRow[]>(),
     supabase.from("projects").select("id,name,address").limit(1000).returns<RequestProjectRow[]>(),
+    supabase.functions.invoke<{ ok?: boolean; configured?: boolean }>("supplier-quote-ocr", { body: { action: "status" } }).catch(() => ({ data: null })),
   ])
   const quotes = quotesResult.data ?? []
   const suppliers = Array.isArray(suppliersResult.data) ? suppliersResult.data as CatalogSupplier[] : []
@@ -68,7 +69,7 @@ export default async function SupplierQuotesPage({ searchParams }: {
       <div className="mx-auto max-w-7xl">
         <header className="flex flex-col gap-5 border-b border-slate-200 pb-6 xl:flex-row xl:items-end xl:justify-between">
           <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0071e3]">Manager Portal</p><h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Supplier Quote Storage</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">One private place for supplier documents, extracted materials, current pricing, and the next action.</p></div>
-          <SupplierQuoteUploadForm clients={clients} requests={requests} suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name, catalogDepartments: supplier.catalogDepartments }))} departments={materialCatalogDepartmentOptions()} enabled={enabled} aiEnabled={Boolean(process.env.OPENAI_API_KEY)} />
+          <SupplierQuoteUploadForm clients={clients} requests={requests} suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name, catalogDepartments: supplier.catalogDepartments }))} departments={materialCatalogDepartmentOptions()} enabled={enabled} aiEnabled={Boolean(ocrStatus.data?.ok && ocrStatus.data.configured)} />
         </header>
 
         {!enabled ? <div className="mt-5 border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Supplier Quote Storage is waiting for its database update.</div> : null}

@@ -20,6 +20,14 @@ export type SupplierQuoteAiResult = {
   notes: string
 }
 
+export type SupplierQuoteAiInvoker = (input: {
+  action: "extract"
+  fileName: string
+  mimeType: string
+  fileBase64: string
+  extractedText: string
+}) => Promise<unknown>
+
 type OpenAIResponse = {
   output_text?: string
   output?: Array<{ content?: Array<{ type?: string; text?: string }> }>
@@ -149,7 +157,18 @@ const EXTRACTION_PROMPT = `Read this supplier quote, estimate, invoice, receipt,
 
 Preserve model numbers, SKUs, dimensions, thicknesses, colors, grades, pack sizes, and other product details. Put a concise product name in description and remaining details in specification. Never use a quantity, price, line total, tax, or other numeric-only value as the description. Use the quantity and unit shown in the same material row. Never invent unreadable values. Use an empty string or null where the schema allows it. Dates must be YYYY-MM-DD. Calculate taxPercent only when the printed tax amount and taxable subtotal make it dependable. Use 0 when tax or delivery is absent or unclear. Every extracted value must be reviewed by a person before use.`
 
-export async function extractSupplierQuoteWithAi(file: File, extractedText = ""): Promise<SupplierQuoteAiResult | null> {
+export async function extractSupplierQuoteWithAi(file: File, extractedText = "", invoke?: SupplierQuoteAiInvoker): Promise<SupplierQuoteAiResult | null> {
+  if (invoke) {
+    const response = await invoke({
+      action: "extract",
+      fileName: file.name,
+      mimeType: file.type || "application/octet-stream",
+      fileBase64: Buffer.from(await file.arrayBuffer()).toString("base64"),
+      extractedText: extractedText.slice(0, 180_000),
+    })
+    const payload = response && typeof response === "object" && "result" in response ? (response as { result: unknown }).result : null
+    return payload ? normalizeSupplierQuoteAiPayload(payload) : null
+  }
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return null
 

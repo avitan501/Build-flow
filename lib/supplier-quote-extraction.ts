@@ -1,6 +1,6 @@
 import "server-only"
 
-import { extractSupplierQuoteWithAi, type SupplierQuoteAiMetadata } from "@/lib/supplier-quote-ai"
+import { extractSupplierQuoteWithAi, type SupplierQuoteAiInvoker, type SupplierQuoteAiMetadata } from "@/lib/supplier-quote-ai"
 import { parseSupplierQuoteText } from "@/lib/supplier-quote-parser"
 
 const emptyMetadata: SupplierQuoteAiMetadata = {
@@ -15,7 +15,7 @@ const emptyMetadata: SupplierQuoteAiMetadata = {
   total: null,
 }
 
-export async function extractSupplierQuoteFile(file: File, suppliedOcrText = "") {
+export async function extractSupplierQuoteFile(file: File, suppliedOcrText = "", invoke?: SupplierQuoteAiInvoker) {
   const type = file.type.toLowerCase()
   let text = ""
   if (type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
@@ -35,7 +35,7 @@ export async function extractSupplierQuoteFile(file: File, suppliedOcrText = "")
   const parsedItems = parseSupplierQuoteText(text)
   let aiResult = null
   try {
-    aiResult = await extractSupplierQuoteWithAi(file, text)
+    aiResult = await extractSupplierQuoteWithAi(file, text, invoke)
   } catch (error) {
     console.error("Supplier quote AI extraction failed", error)
   }

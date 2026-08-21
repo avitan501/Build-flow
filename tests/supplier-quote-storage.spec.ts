@@ -75,7 +75,8 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(migration).toContain("enable row level security")
   expect(clientMigration).toContain("references public.profiles(id) on delete set null")
   expect(clientMigration).toContain("supplier_quotes_client_updated_idx")
-  expect(page).toContain("Boolean(process.env.OPENAI_API_KEY)")
+  expect(page).toContain('"supplier-quote-ocr"')
+  expect(actions).toContain("supplierQuoteAiInvoker")
 })
 
 test("supplier detection matches the directory or keeps the name read from the invoice", async () => {
@@ -129,13 +130,19 @@ test("catalog Exa search is manager-only and keeps results out of the catalog un
 })
 
 test("supplier quote AI extraction uses a cost-controlled model and does not retain responses", async () => {
-  const extraction = await readFile(path.join(root, "lib/supplier-quote-ai.ts"), "utf8")
-  expect(extraction).toContain('process.env.OPENAI_SUPPLIER_QUOTE_MODEL || "gpt-5-mini"')
+  const [extraction, edgeFunction] = await Promise.all([
+    readFile(path.join(root, "lib/supplier-quote-ai.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/supplier-quote-ocr/index.ts"), "utf8"),
+  ])
+  expect(extraction).toContain("SupplierQuoteAiInvoker")
+  expect(edgeFunction).toContain('model: "gpt-5-mini"')
+  expect(edgeFunction).toContain("openai_supplier_quote_api_key")
+  expect(edgeFunction).toContain("store: false")
+  expect(edgeFunction).toContain('reasoning: { effort: "low" }')
+  expect(edgeFunction).toContain('type: "json_schema"')
+  expect(edgeFunction).toContain('detail: "high"')
+  expect(edgeFunction).toContain("if (extractedText.trim())")
   expect(extraction).toContain("store: false")
-  expect(extraction).toContain('reasoning: { effort: "low" }')
-  expect(extraction).toContain('type: "json_schema"')
-  expect(extraction).toContain('detail: "high"')
-  expect(extraction).toContain("if (extractedText.trim())")
 })
 
 test("supplier quote parser recognizes common quantity and price rows", async () => {

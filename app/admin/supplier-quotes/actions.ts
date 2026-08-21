@@ -27,6 +27,14 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 const ALLOWED_TYPES = new Set(["application/pdf", "text/csv", "text/plain", "image/jpeg", "image/png", "image/webp"])
 const MAX_FILE_SIZE = 25 * 1024 * 1024
 
+function supplierQuoteAiInvoker(supabase: StaffSupabase) {
+  return async (input: Parameters<NonNullable<Parameters<typeof extractSupplierQuoteFile>[2]>>[0]) => {
+    const { data, error } = await supabase.functions.invoke("supplier-quote-ocr", { body: input })
+    if (error) throw error
+    return data
+  }
+}
+
 function clean(value: unknown, max: number) {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max)
 }
@@ -154,7 +162,7 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
   let extraction
   try {
     const browserOcrText = String(formData.get("browserOcrText") ?? "").slice(0, 250000)
-    extraction = await extractSupplierQuoteFile(file, browserOcrText)
+    extraction = await extractSupplierQuoteFile(file, browserOcrText, supplierQuoteAiInvoker(supabase))
   } catch (error) {
     console.error("Supplier quote extraction failed", error)
     extraction = {
@@ -352,16 +360,14 @@ export async function retrySupplierQuoteExtractionAction(quoteId: string, replac
   let extraction
   try {
     const file = new File([await storedFile.arrayBuffer()], quote.file_name, { type: quote.mime_type || storedFile.type })
-    extraction = await extractSupplierQuoteFile(file)
+    extraction = await extractSupplierQuoteFile(file, "", supplierQuoteAiInvoker(supabase))
   } catch (error) {
     console.error("Supplier quote retry extraction failed", error)
     return { ok: false, error: "The invoice could not be read. Confirm the image is clear and try again." }
   }
 
   if (!extraction.items.length) {
-    const error = quote.mime_type.startsWith("image/") && !process.env.OPENAI_API_KEY
-      ? "Image OCR is not active on this deployment yet. The original invoice is safe, but automatic extraction cannot run until OCR is connected."
-      : "No dependable material rows were found. Open the invoice to confirm it is clear, then try again or add a line manually."
+    const error = "No dependable material rows were found. Open the invoice to confirm it is clear, then try again or add a line manually."
     await supabase.from("supplier_quotes").update({ extraction_note: error, updated_by: user.id }).eq("id", quote.id)
     revalidatePath(`/admin/supplier-quotes/${quote.id}`)
     return { ok: false, error }
