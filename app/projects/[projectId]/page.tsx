@@ -37,7 +37,7 @@ function formatActivityDate(value: string) {
 function RequestProgress({ status }: { status: QuoteRequestRecord["status"] }) {
   const activeIndex = quoteRequestProgressIndex(status)
   return (
-    <ol className="mt-4 grid grid-cols-4 gap-1" aria-label={`Request progress: ${quoteRequestStatusLabel(status)}`}>
+    <ol className="mt-4 grid grid-cols-5 gap-1" aria-label={`Request progress: ${quoteRequestStatusLabel(status)}`}>
       {QUOTE_REQUEST_PROGRESS_STEPS.map((label, index) => {
         const complete = index <= activeIndex
         return (

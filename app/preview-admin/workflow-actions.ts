@@ -179,7 +179,7 @@ export async function updateRequestStatusAction(input: { requestId: string; stat
     draft: "Request created",
     submitted: "Request is under review",
     in_review: "Request is waiting for client approval",
-    quoted: "Request completed",
+    quoted: "Payment received; waiting for supplier delivery",
     closed: "Request completed",
   }
   await createProjectEvent({

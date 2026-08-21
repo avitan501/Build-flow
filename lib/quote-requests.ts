@@ -54,31 +54,33 @@ export type ProjectQuestionAnswerRecord = {
 }
 
 export function quoteRequestStatusLabel(status: QuoteRequestStatus) {
-  if (status === "draft") return "Draft"
-  if (status === "submitted") return "Request Received"
-  if (status === "in_review") return "Under Review"
-  if (status === "quoted") return "Ready for Your Approval"
+  if (status === "draft") return "Request Created"
+  if (status === "submitted") return "Under Review"
+  if (status === "in_review") return "Waiting for Client Approval"
+  if (status === "quoted") return "Payment Received · Waiting for Supplier Delivery"
   return "Completed"
 }
 
 export const QUOTE_REQUEST_PROGRESS_STEPS = [
-  "Request Received",
-  "Under Review",
-  "Ready for Approval",
+  "Created",
+  "Review",
+  "Approval",
+  "Supplier Delivery",
   "Completed",
 ] as const
 
 export function quoteRequestProgressIndex(status: QuoteRequestStatus) {
-  if (status === "draft" || status === "submitted") return 0
-  if (status === "in_review") return 1
-  if (status === "quoted") return 2
-  return 3
+  if (status === "draft") return 0
+  if (status === "submitted") return 1
+  if (status === "in_review") return 2
+  if (status === "quoted") return 3
+  return 4
 }
 
 export function quoteRequestStatusClass(status: QuoteRequestStatus) {
   if (status === "draft") return "border-slate-200 bg-slate-50 text-slate-700"
   if (status === "submitted") return "border-sky-200 bg-sky-50 text-sky-700"
   if (status === "in_review") return "border-amber-200 bg-amber-50 text-amber-800"
-  if (status === "quoted") return "border-emerald-200 bg-emerald-50 text-emerald-700"
-  return "border-violet-200 bg-violet-50 text-violet-700"
+  if (status === "quoted") return "border-violet-200 bg-violet-50 text-violet-700"
+  return "border-emerald-200 bg-emerald-50 text-emerald-700"
 }

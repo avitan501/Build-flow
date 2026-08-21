@@ -11,7 +11,8 @@ const stages: Array<{ status: QuoteRequestStatus; label: string }> = [
   { status: "draft", label: "Request Created" },
   { status: "submitted", label: "Under Review" },
   { status: "in_review", label: "Waiting for Client Approval" },
-  { status: "quoted", label: "Request Completed" },
+  { status: "quoted", label: "Payment Received · Waiting for Supplier Delivery" },
+  { status: "closed", label: "Request Completed" },
 ]
 
 export function CustomerRequestStatus({ requestId, status }: { requestId: string; status: QuoteRequestStatus }) {
@@ -38,9 +39,9 @@ export function CustomerRequestStatus({ requestId, status }: { requestId: string
         <h2 id="request-status-heading" className="mt-1 text-lg font-bold">Request status</h2>
         <p className="mt-1 text-sm text-slate-500">Choose the stage the customer should see in their project.</p>
       </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
         {stages.map((stage, index) => {
-          const active = stage.status === status || (status === "closed" && stage.status === "quoted")
+          const active = stage.status === status
           const complete = index < currentIndex
           return (
             <button

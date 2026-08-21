@@ -103,16 +103,17 @@ export function ProjectWorkflowManager({ questions, packages, projects, requests
       </article>
 
       <article className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
-        <div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Request Workflow</p><h2 className="mt-1 text-xl font-semibold text-slate-950">Project Requests</h2><p className="mt-1 text-sm text-slate-500">Move each customer request through the four visible project stages.</p></div>
+        <div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Request Workflow</p><h2 className="mt-1 text-xl font-semibold text-slate-950">Project Requests</h2><p className="mt-1 text-sm text-slate-500">Move each customer request through the five visible project stages.</p></div>
         <div className="mt-4 grid max-h-[30rem] gap-2 overflow-y-auto">
           {requests.length ? requests.map((request) => (
             <div key={request.id} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_15rem] sm:items-center">
               <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-950">{request.title}</p><p className="truncate text-xs text-slate-500">{request.projectName} · {quoteRequestStatusLabel(request.status)}</p></div>
-              <select value={request.status === "closed" ? "quoted" : request.status} disabled={isPending} onChange={(event) => updateRequestStatus(request.id, event.target.value as QuoteRequestStatus)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800">
+              <select value={request.status} disabled={isPending} onChange={(event) => updateRequestStatus(request.id, event.target.value as QuoteRequestStatus)} className="min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800">
                 <option value="draft">Request Created</option>
                 <option value="submitted">Under Review</option>
                 <option value="in_review">Waiting for Client Approval</option>
-                <option value="quoted">Request Completed</option>
+                <option value="quoted">Payment Received · Waiting for Supplier Delivery</option>
+                <option value="closed">Request Completed</option>
               </select>
             </div>
           )) : <p className="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">No project requests yet.</p>}

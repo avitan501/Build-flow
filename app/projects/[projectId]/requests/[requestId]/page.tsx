@@ -62,7 +62,7 @@ export default async function QuoteRequestDetailPage({ params }: { params: Promi
 
       <div className="mx-auto grid max-w-4xl gap-4 px-4 py-5 sm:px-8">
         <ProjectRequestActions projectId={projectId} requestId={requestId} status={request.status} showView={false} />
-        <ol className="grid grid-cols-4 gap-1 rounded-[18px] border border-slate-200 bg-white px-4 py-3 print:hidden" aria-label={`Request progress: ${quoteRequestStatusLabel(request.status)}`}>
+        <ol className="grid grid-cols-5 gap-1 rounded-[18px] border border-slate-200 bg-white px-4 py-3 print:hidden" aria-label={`Request progress: ${quoteRequestStatusLabel(request.status)}`}>
           {QUOTE_REQUEST_PROGRESS_STEPS.map((label, index) => <li key={label} className={`border-t-2 pt-2 text-[10px] font-semibold leading-4 sm:text-xs ${index <= activeProgressIndex ? "border-[#0071e3] text-slate-800" : "border-slate-200 text-slate-400"}`}>{label}</li>)}
         </ol>
         {locked ? <div className="rounded-[18px] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">This request is locked while it is being reviewed.</div> : null}

@@ -10,7 +10,7 @@ import { MATERIAL_DEPARTMENTS } from "@/lib/material-questionnaires"
 import { isApprovedManagerIdentity } from "@/lib/owner-identity"
 
 const roleOptions = ["admin", "staff", "client"] as const
-const deletableRequestStatuses = new Set(["draft", "submitted", "in_review", "quoted"])
+const deletableRequestStatuses = new Set(["draft", "submitted", "in_review"])
 
 type CustomerRecord = {
   id: string
