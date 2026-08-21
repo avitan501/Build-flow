@@ -17,6 +17,7 @@ const secretNames = {
   twilioFrom: "aura_twilio_whatsapp_from",
   quoKey: "aura_quo_api_key",
   quoFrom: "aura_quo_from_number",
+  openaiKey: "openai_supplier_quote_api_key",
 } as const;
 
 function json(body: unknown, status = 200) {
@@ -264,6 +265,41 @@ async function sendEmail(toValue: unknown, subjectValue: unknown, bodyValue: unk
   return result.id;
 }
 
+function openAiOutputText(payload: Record<string, unknown>) {
+  if (typeof payload.output_text === "string") return payload.output_text.trim();
+  const output = Array.isArray(payload.output) ? payload.output : [];
+  return output.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const content = Array.isArray((item as { content?: unknown[] }).content) ? (item as { content: unknown[] }).content : [];
+    return content.flatMap((entry) => entry && typeof entry === "object" && typeof (entry as { text?: unknown }).text === "string" ? [(entry as { text: string }).text] : []);
+  }).join("\n").trim();
+}
+
+async function dashboardAi(queryValue: unknown, contextValue: unknown) {
+  const apiKey = await secret(secretNames.openaiKey);
+  if (!apiKey) throw new Error("Avantia AI is not connected.");
+  const query = typeof queryValue === "string" ? queryValue.trim().slice(0, 500) : "";
+  const context = typeof contextValue === "string" ? contextValue.slice(0, 180_000) : "";
+  if (query.length < 2 || !context) throw new Error("Enter a question about the current business data.");
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-5-mini",
+      store: false,
+      reasoning: { effort: "low" },
+      max_output_tokens: 550,
+      instructions: "You are Avantia Build's internal operations assistant. Answer only from the supplied authorized business snapshot. Be concise, state when data is missing, and suggest the exact Avantia page to open when useful. Never invent prices, client details, or completion status.",
+      input: `Authorized business snapshot:\n${context}\n\nEmployee question: ${query}`,
+    }),
+  });
+  const payload = await response.json() as Record<string, unknown>;
+  if (!response.ok) throw new Error("Avantia AI could not answer right now.");
+  const answer = openAiOutputText(payload);
+  if (!answer) throw new Error("Avantia AI returned no answer. Try a more specific question.");
+  return answer;
+}
+
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   if (req.method === "POST" && url.searchParams.get("mode") === "twilio-webhook") {
@@ -344,6 +380,10 @@ Deno.serve(async (req: Request) => {
     if (input.action === "send_email") {
       const id = await sendEmail(input.to, input.subject, input.message);
       return json({ ok: true, id });
+    }
+    if (input.action === "dashboard_ai") {
+      const answer = await dashboardAi(input.query, input.context);
+      return json({ ok: true, answer });
     }
     return json({ error: "Unsupported action" }, 400);
   } catch (error) {

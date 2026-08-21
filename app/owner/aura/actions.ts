@@ -24,6 +24,7 @@ function requireUuid(value: FormDataEntryValue | null) {
 }
 
 export type SendAuraMessageResult = { ok: true } | { ok: false; error: string };
+export type PrepareQuoPhotoResult = { ok: true; deepLink: string } | { ok: false; error: string };
 
 type BrokerResult = { ok?: boolean; error?: string; id?: string };
 
@@ -93,6 +94,29 @@ export async function sendAuraMessageAction(input: {
 
   revalidatePath("/owner/aura");
   return { ok: true };
+}
+
+export async function prepareQuoPhotoMessageAction(formData: FormData): Promise<PrepareQuoPhotoResult> {
+  const { supabase, user, access } = await requireManagerPortalProfile();
+  if (!access.customers) return { ok: false, error: "Customer communication access is required." };
+  const phone = normalizeAuraPhone(String(formData.get("phone") || ""));
+  const message = String(formData.get("message") || "").trim().slice(0, 1600);
+  const photo = formData.get("photo");
+  if (!phone || !message) return { ok: false, error: "Enter a valid phone number and message." };
+  if (!(photo instanceof File) || photo.size === 0) return { ok: false, error: "Choose a photo." };
+  if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(photo.type)) return { ok: false, error: "Use a JPG, PNG, or WEBP photo." };
+  if (photo.size > 600 * 1024) return { ok: false, error: "Keep Q U O photos under 600 KB for reliable carrier delivery." };
+  const extension = photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg";
+  const path = `${user.id}/communications/${crypto.randomUUID()}.${extension}`;
+  const upload = await supabase.storage.from("project-uploads").upload(path, photo, { contentType: photo.type, upsert: false });
+  if (upload.error) return { ok: false, error: "The photo could not be prepared." };
+  const signed = await supabase.storage.from("project-uploads").createSignedUrl(path, 60 * 60);
+  if (signed.error || !signed.data?.signedUrl) {
+    await supabase.storage.from("project-uploads").remove([path]);
+    return { ok: false, error: "The photo link could not be prepared." };
+  }
+  const params = new URLSearchParams({ number: phone, from: "+15169088319", text: message, attachments: signed.data.signedUrl });
+  return { ok: true, deepLink: `openphone://message?${params.toString()}` };
 }
 
 export async function configureAuraProviderAction(formData: FormData): Promise<SendAuraMessageResult> {

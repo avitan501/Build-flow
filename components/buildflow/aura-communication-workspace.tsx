@@ -1,10 +1,10 @@
 "use client";
 
-import { Mail, MessageCircle, Phone, Search, Send, Smartphone } from "lucide-react";
+import { ImagePlus, Mail, MessageCircle, Phone, Search, Send, Smartphone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-import { sendAuraMessageAction } from "@/app/owner/aura/actions";
+import { prepareQuoPhotoMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions";
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard";
 
 type Connections = {
@@ -39,6 +39,13 @@ function contactName(contact: AuraContactRow | undefined, communication: AuraCom
   );
 }
 
+function quoCallHref(phone: string) {
+  if (typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+    return `openphone://dial?number=${encodeURIComponent(phone)}&from=${encodeURIComponent("+15169088319")}&action=call`;
+  }
+  return `tel:${phone}`;
+}
+
 export function AuraCommunicationWorkspace({
   communications,
   contacts,
@@ -55,6 +62,7 @@ export function AuraCommunicationWorkspace({
   const [recipient, setRecipient] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -89,6 +97,17 @@ export function AuraCommunicationWorkspace({
     const messageChannel = channel;
     setFeedback(null);
     startTransition(async () => {
+      if (messageChannel === "sms" && photo) {
+        const formData = new FormData();
+        formData.set("phone", recipient);
+        formData.set("message", message);
+        formData.set("photo", photo);
+        const prepared = await prepareQuoPhotoMessageAction(formData);
+        if (!prepared.ok) { setFeedback({ tone: "error", text: prepared.error }); return; }
+        window.location.href = prepared.deepLink;
+        setPhoto(null);
+        return;
+      }
       const result = await sendAuraMessageAction({ channel: messageChannel, recipient, subject, message });
       if (!result.ok) {
         setFeedback({ tone: "error", text: result.error });
@@ -129,13 +148,15 @@ export function AuraCommunicationWorkspace({
           </div>
           <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
             <label className="grid gap-1.5 text-xs font-semibold">{channel === "email" ? "Customer email" : "Customer phone"}<input value={recipient} onChange={(event) => setRecipient(event.target.value)} inputMode={channel === "email" ? "email" : "tel"} autoComplete={channel === "email" ? "email" : "tel"} placeholder={channel === "email" ? "customer@example.com" : "(516) 555-0123"} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label>
-            {channel === "call" ? <a href={normalizedPhone ? `tel:${normalizedPhone}` : undefined} aria-disabled={!normalizedPhone} className={`inline-flex min-h-11 self-end items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold ${normalizedPhone ? "bg-emerald-600 text-white" : "pointer-events-none bg-slate-200 text-slate-400"}`}><Phone className="h-4 w-4" />Start call</a> : null}
+            {channel === "call" ? <a href={normalizedPhone ? quoCallHref(normalizedPhone) : undefined} aria-disabled={!normalizedPhone} className={`inline-flex min-h-11 self-end items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold ${normalizedPhone ? "bg-emerald-600 text-white" : "pointer-events-none bg-slate-200 text-slate-400"}`}><Phone className="h-4 w-4" />Call with Q U O</a> : null}
             {channel === "email" ? <label className="grid gap-1.5 text-xs font-semibold md:col-span-2">Subject<input value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={200} placeholder="Message from Avantia Build" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label> : null}
             {channel !== "call" ? <label className="grid gap-1.5 text-xs font-semibold md:col-span-2">Message<textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1600} rows={4} placeholder="Write the message here" className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-6" /></label> : null}
+            {channel === "sms" ? <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold md:col-span-2"><ImagePlus className="h-4 w-4" />{photo ? photo.name : "Add photo"}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] || null)} /></label> : null}
+            {channel === "sms" && photo ? <p className="text-xs text-slate-500 md:col-span-2">Q U O opens with the photo attached. Review it and press Send.</p> : null}
           </div>
           {!selectedChannelReady ? <p className="mt-3 text-sm font-semibold text-amber-700">This channel needs its API credentials. Open Phone connections above and press Connect WhatsApp & Text.</p> : null}
           {feedback ? <p className={`mt-3 text-sm font-semibold ${feedback.tone === "success" ? "text-emerald-700" : "text-rose-700"}`} role="status">{feedback.text}</p> : null}
-          {channel !== "call" ? <div className="mt-4 flex justify-end"><button type="button" onClick={sendMessage} disabled={pending || !selectedChannelReady || !recipient.trim() || !message.trim()} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Sending..." : channel === "sms" ? "Send text" : channel === "whatsapp" ? "Send WhatsApp" : "Send email"}</button></div> : null}
+          {channel !== "call" ? <div className="mt-4 flex justify-end"><button type="button" onClick={sendMessage} disabled={pending || !selectedChannelReady || !recipient.trim() || !message.trim()} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Sending..." : channel === "sms" && photo ? "Open Q U O with photo" : channel === "sms" ? "Send text" : channel === "whatsapp" ? "Send WhatsApp" : "Send email"}</button></div> : null}
         </section>
 
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="aura-history-heading">
@@ -159,7 +180,7 @@ export function AuraCommunicationWorkspace({
 
       <aside className="h-fit overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <header className="border-b border-slate-200 p-4"><h2 className="font-semibold">Customer contacts</h2><p className="mt-1 text-xs text-slate-500">Call or start a message</p></header>
-        {contacts.length ? <div className="divide-y divide-slate-100">{contacts.map((contact) => <article key={contact.id} className="p-4"><h3 className="text-sm font-semibold">{contact.full_name || contact.company || "Unnamed contact"}</h3><p className="mt-1 truncate text-xs text-slate-500">{contact.normalized_phone || contact.email || "No contact method"}</p>{contact.normalized_phone ? <div className="mt-3 grid grid-cols-2 gap-2"><a href={`tel:${contact.normalized_phone}`} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 text-xs font-semibold"><Phone className="h-3.5 w-3.5" />Call</a><button type="button" onClick={() => chooseContact(contact)} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-slate-950 text-xs font-semibold text-white"><MessageCircle className="h-3.5 w-3.5" />Message</button></div> : contact.email ? <button type="button" onClick={() => { setChannel("email"); setRecipient(contact.email || ""); document.getElementById("aura-compose")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-md bg-slate-950 text-xs font-semibold text-white"><Mail className="h-3.5 w-3.5" />Email</button> : null}</article>)}</div> : <p className="p-5 text-sm text-slate-500">Contacts appear after an Aura intake is confirmed.</p>}
+        {contacts.length ? <div className="divide-y divide-slate-100">{contacts.map((contact) => <article key={contact.id} className="p-4"><h3 className="text-sm font-semibold">{contact.full_name || contact.company || "Unnamed contact"}</h3><p className="mt-1 truncate text-xs text-slate-500">{contact.normalized_phone || contact.email || "No contact method"}</p>{contact.normalized_phone ? <div className="mt-3 grid grid-cols-2 gap-2"><a href={quoCallHref(contact.normalized_phone)} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 text-xs font-semibold"><Phone className="h-3.5 w-3.5" />Q U O call</a><button type="button" onClick={() => chooseContact(contact)} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-slate-950 text-xs font-semibold text-white"><MessageCircle className="h-3.5 w-3.5" />Message</button></div> : contact.email ? <button type="button" onClick={() => { setChannel("email"); setRecipient(contact.email || ""); document.getElementById("aura-compose")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-md bg-slate-950 text-xs font-semibold text-white"><Mail className="h-3.5 w-3.5" />Email</button> : null}</article>)}</div> : <p className="p-5 text-sm text-slate-500">Contacts appear after an Aura intake is confirmed.</p>}
       </aside>
     </div>
   );

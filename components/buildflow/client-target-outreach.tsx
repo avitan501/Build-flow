@@ -1,6 +1,6 @@
 "use client";
 
-import { Mail, Pencil, PhoneCall, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 
@@ -11,6 +11,7 @@ import {
   updateOutreachLeadAction,
   updateOutreachLeadStatusAction,
 } from "@/app/admin/goals-progress/lead-actions";
+import { ContactActions } from "@/components/buildflow/contact-actions";
 
 export type OutreachLeadRecord = {
   id: string;
@@ -150,7 +151,7 @@ export function OutreachLeadList({ leads }: { leads: OutreachLeadRecord[] }) {
         <div className="flex max-w-full items-center gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <select aria-label={`Language for ${lead.full_name}`} defaultValue={lead.preferred_language} disabled={pending} onChange={(event) => run(() => updateClientLanguageAction({ id: lead.id, target: "lead", language: event.target.value }))} className="h-9 w-[6.5rem] shrink-0 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"><option value="en">English</option><option value="es">Spanish</option></select>
           <select aria-label={`Status for ${lead.full_name}`} defaultValue={lead.status} disabled={pending} onChange={(event) => run(() => updateOutreachLeadStatusAction({ id: lead.id, status: event.target.value }))} className="h-9 w-[8.5rem] shrink-0 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"><option value="new">New</option><option value="contacted">Contacted</option><option value="qualified">Qualified</option><option value="not_interested">Not interested</option></select>
-          <EditOutreachLead lead={lead} />{lead.phone ? <a href={`tel:${lead.phone}`} aria-label={`Call ${lead.full_name}`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-600"><PhoneCall className="h-4 w-4" /></a> : null}{lead.email ? <a href={`mailto:${lead.email}`} aria-label={`Email ${lead.full_name}`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-600"><Mail className="h-4 w-4" /></a> : null}<button type="button" disabled={pending} onClick={() => window.confirm(`Remove ${lead.full_name} from leads?`) && run(() => deleteOutreachLeadAction(lead.id))} aria-label={`Remove ${lead.full_name}`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
+          <EditOutreachLead lead={lead} /><ContactActions name={lead.full_name} phone={lead.phone} email={lead.email} /><button type="button" disabled={pending} onClick={() => window.confirm(`Remove ${lead.full_name} from leads?`) && run(() => deleteOutreachLeadAction(lead.id))} aria-label={`Remove ${lead.full_name}`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
         </div>
       </div>
     </article>) : <p className="border-t border-slate-100 px-3 py-4 text-sm text-slate-500">No outreach leads yet. Add the first person Carlos should contact.</p>}

@@ -3,6 +3,7 @@ import Link from "next/link"
 
 import { approvePendingUser, changeUserRole, rejectUser, suspendUser } from "@/app/admin/users/actions"
 import { CustomerContactForm } from "@/components/buildflow/customer-contact-form"
+import { ContactActions } from "@/components/buildflow/contact-actions"
 import { DeleteManagerRecordButton } from "@/components/buildflow/delete-manager-record-button"
 import { ManagerCreateClientRequest } from "@/components/buildflow/manager-create-client-request"
 import { requireStaffProfile } from "@/lib/auth"
@@ -199,6 +200,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                   <div className="flex flex-wrap justify-end gap-2"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(customer.role)}`}>{customer.role}</span>{isSelf ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">Your account</span> : null}</div>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-4 border-y border-slate-100 py-3 text-sm"><Link href={`/admin/users?view=projects&customer=${customer.id}`} className="font-semibold text-[#0066cc]"><strong>{projectCount.get(customer.id) ?? 0}</strong> projects</Link><Link href={`/admin/users?view=requests&customer=${customer.id}`} className="font-semibold text-[#0066cc]"><strong>{requestCount.get(customer.id) ?? 0}</strong> requests</Link><span className="text-slate-500">Joined {formatDate(customer.created_at)}</span></div>
+                <div className="mt-3 flex items-center justify-between gap-3"><span className="text-xs font-semibold text-slate-500">Contact</span><ContactActions name={customerName(customer)} phone={customer.phone} email={customer.email} /></div>
                 <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Edit customer contact</summary><CustomerContactForm customer={{ id: customer.id, fullName: customer.full_name || "", companyName: customer.company_name || "", phone: customer.phone || "" }} /></details>
                 {communicationLogs.length ? <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Communication log ({communicationLogs.length})</summary><div className="mt-2 divide-y divide-slate-100 rounded-md border border-slate-200 bg-slate-50">{communicationLogs.slice(0, 12).map((log) => <div key={log.id} className="px-3 py-2.5"><div className="flex flex-wrap items-center justify-between gap-2 text-xs"><strong className="capitalize">{log.channel} · {log.direction}</strong><time className="text-slate-500">{formatDate(log.createdAt)}</time></div><p className="mt-1 text-sm text-slate-700">{log.summary}</p>{log.outcome ? <p className="mt-1 text-xs font-semibold text-[#0066cc]">Next: {log.outcome}</p> : null}</div>)}</div></details> : null}
                 {isOwner ? <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Owner-only account controls</summary><div className="mt-3 flex flex-wrap items-end gap-3 rounded-lg bg-slate-50 p-3">

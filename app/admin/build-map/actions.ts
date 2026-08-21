@@ -21,16 +21,6 @@ function clean(value: unknown, limit: number) {
   return String(value ?? "").trim().slice(0, limit)
 }
 
-function outputText(payload: Record<string, unknown>) {
-  if (typeof payload.output_text === "string") return payload.output_text.trim()
-  const output = Array.isArray(payload.output) ? payload.output : []
-  return output.flatMap((item) => {
-    if (!item || typeof item !== "object") return []
-    const content = Array.isArray((item as { content?: unknown[] }).content) ? (item as { content: unknown[] }).content : []
-    return content.flatMap((entry) => entry && typeof entry === "object" && typeof (entry as { text?: unknown }).text === "string" ? [(entry as { text: string }).text] : [])
-  }).join("\n").trim()
-}
-
 export async function createTodayTaskAction(titleInput: string): Promise<TaskResult> {
   const { supabase, user } = await requireManagerPortalProfile()
   const title = clean(titleInput, 120).replace(/\s+/g, " ")
@@ -68,9 +58,6 @@ export async function searchManagerDashboardAction(queryInput: string): Promise<
   const { supabase, user, access } = await requireManagerPortalProfile()
   const query = clean(queryInput, 500)
   if (query.length < 2) return { ok: false, error: "Type a question about clients, requests, quotes, suppliers, or goals." }
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return { ok: false, error: "Dashboard AI is waiting for OPENAI_API_KEY in Vercel." }
-
   const [requestsResult, goalsResult, clientsResult, quotesResult] = await Promise.all([
     supabase.from("quote_requests").select("id,title,status,updated_at").order("updated_at", { ascending: false }).limit(80),
     supabase.from("manager_goals").select("title,details,status,updated_at").order("updated_at", { ascending: false }).limit(80),
@@ -86,25 +73,11 @@ export async function searchManagerDashboardAction(queryInput: string): Promise<
   })
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: process.env.OPENAI_DASHBOARD_MODEL || "gpt-5-mini",
-        store: false,
-        reasoning: { effort: "low" },
-        max_output_tokens: 550,
-        instructions: "You are Avantia Build's internal operations assistant. Answer only from the supplied authorized business snapshot. Be concise, state when data is missing, and suggest the exact Avantia page to open when useful. Never invent prices, client details, or completion status.",
-        input: `Authorized business snapshot:\n${context}\n\nEmployee question: ${query}`,
-      }),
-      cache: "no-store",
+    const { data, error } = await supabase.functions.invoke<{ ok?: boolean; answer?: string; error?: string }>("aura-messaging-broker", {
+      body: { action: "dashboard_ai", query, context },
     })
-    const payload = await response.json() as Record<string, unknown>
-    if (!response.ok) {
-      const errorMessage = payload.error && typeof payload.error === "object" ? clean((payload.error as { message?: unknown }).message, 300) : ""
-      return { ok: false, error: errorMessage || "The AI search could not run. Check the OpenAI project credit and key." }
-    }
-    const answer = outputText(payload)
+    if (error || !data?.ok) return { ok: false, error: data?.error || "Avantia AI could not answer right now." }
+    const answer = clean(data.answer, 3000)
     if (!answer) return { ok: false, error: "The AI search returned no answer. Try a more specific question." }
 
     const title = "Dashboard AI search"

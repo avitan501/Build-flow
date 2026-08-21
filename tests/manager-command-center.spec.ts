@@ -15,19 +15,36 @@ import {
 const root = process.cwd()
 
 test("dashboard AI uses authorized server data and keeps the API key private", async () => {
-  const [action, component] = await Promise.all([
+  const [action, component, broker] = await Promise.all([
     readFile(path.join(root, "app/admin/build-map/actions.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/manager-dashboard-ai-search.tsx"), "utf8"),
+    readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
   ])
 
   expect(action).toContain("requireManagerPortalProfile")
-  expect(action).toContain("process.env.OPENAI_API_KEY")
-  expect(action).toContain('process.env.OPENAI_DASHBOARD_MODEL || "gpt-5-mini"')
-  expect(action).toContain("store: false")
-  expect(action).toContain('reasoning: { effort: "low" }')
+  expect(action).toContain('action: "dashboard_ai"')
+  expect(action).not.toContain("process.env.OPENAI_API_KEY")
+  expect(broker).toContain('openaiKey: "openai_supplier_quote_api_key"')
+  expect(broker).toContain('model: "gpt-5-mini"')
+  expect(broker).toContain("store: false")
+  expect(broker).toContain('reasoning: { effort: "low" }')
   expect(action).not.toContain("NEXT_PUBLIC_OPENAI")
   expect(component).toContain("Recent searches")
-  expect(component).toContain("Waiting for the OpenAI key")
+  expect(component).toContain("Ask Avantia AI")
+})
+
+test("customer and lead records expose compact Q U O, email, and WhatsApp actions", async () => {
+  const [actions, customers, leads] = await Promise.all([
+    readFile(path.join(root, "components/buildflow/contact-actions.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/users/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/client-target-outreach.tsx"), "utf8"),
+  ])
+  expect(actions).toContain("Call with Q U O")
+  expect(actions).toContain("Text with Q U O")
+  expect(actions).toContain("Add photo")
+  expect(actions).toContain("prepareQuoPhotoMessageAction")
+  expect(customers).toContain("<ContactActions")
+  expect(leads).toContain("<ContactActions")
 })
 
 test("communication records are linked to customers and visible in the customer directory", async () => {

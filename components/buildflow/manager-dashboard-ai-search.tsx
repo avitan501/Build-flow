@@ -28,13 +28,14 @@ export function ManagerDashboardAiSearch({ initialHistory, enabled }: { initialH
     })
   }
 
-  return <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="dashboard-ai-title">
-    <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
+  return <details className="group mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3">
       <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-slate-950 text-white"><Sparkles className="h-4 w-4" /></span>
       <div className="min-w-0 flex-1"><h2 id="dashboard-ai-title" className="font-semibold">Ask Avantia AI</h2><p className="truncate text-xs text-slate-500">Search clients, requests, supplier quotes, and goals</p></div>
-      <button type="button" onClick={() => setHistoryOpen((open) => !open)} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-xs font-semibold"><History className="h-4 w-4" /><span className="hidden sm:inline">History</span></button>
-    </div>
-    <div className="p-3 sm:p-4">
+      <span className="text-xs font-semibold text-[#0066cc] group-open:hidden">Open</span>
+    </summary>
+    <div className="border-t border-slate-200 p-3 sm:p-4">
+      <div className="mb-3 flex justify-end"><button type="button" onClick={() => setHistoryOpen((open) => !open)} className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-xs font-semibold"><History className="h-4 w-4" />History</button></div>
       <form onSubmit={(event) => { event.preventDefault(); runSearch() }} className="flex gap-2">
         <label className="relative min-w-0 flex-1"><span className="sr-only">Ask Avantia AI</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} maxLength={500} placeholder="Example: Which requests still need supplier pricing?" className="min-h-12 w-full rounded-md border border-slate-300 pl-10 pr-3 text-sm outline-none focus:border-[#0071e3] focus:ring-4 focus:ring-sky-100" /></label>
         <button type="submit" disabled={pending || query.trim().length < 2 || !enabled} className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:bg-slate-300">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Ask"}</button>
@@ -44,5 +45,5 @@ export function ManagerDashboardAiSearch({ initialHistory, enabled }: { initialH
       {answer ? <div className="mt-3 rounded-md border border-sky-100 bg-sky-50 p-4"><p className="whitespace-pre-wrap text-sm leading-6 text-slate-800">{answer}</p></div> : null}
     </div>
     {historyOpen ? <div className="border-t border-slate-200 bg-slate-50 p-3 sm:p-4"><div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold">Recent searches</h3><button type="button" onClick={() => setHistoryOpen(false)} aria-label="Close history" className="inline-flex h-8 w-8 items-center justify-center"><X className="h-4 w-4" /></button></div>{history.length ? <div className="grid gap-2">{history.map((item) => <button key={item.id} type="button" onClick={() => { setQuery(item.query); setAnswer(item.answer); setHistoryOpen(false) }} className="rounded-md border border-slate-200 bg-white p-3 text-left"><span className="block truncate text-sm font-semibold">{item.query}</span><span className="mt-1 flex items-center gap-1 text-[11px] text-slate-500"><Clock3 className="h-3 w-3" />{formatTime(item.createdAt)}</span></button>)}</div> : <p className="text-sm text-slate-500">No searches yet.</p>}</div> : null}
-  </section>
+  </details>
 }
