@@ -15,6 +15,33 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "30mb",
     },
   },
+  async headers() {
+    const privateRoutes = [
+      "/account/:path*",
+      "/admin/:path*",
+      "/api/:path*",
+      "/cart",
+      "/dashboard",
+      "/login",
+      "/materials/:path*",
+      "/orders/:path*",
+      "/owner/:path*",
+      "/preview/:path*",
+      "/preview-admin/:path*",
+      "/projects/:path*",
+      "/quotes/:path*",
+      "/reset-password",
+      "/search",
+      "/signup",
+      "/takeoff-review",
+      "/upload",
+    ];
+
+    return privateRoutes.map((source) => ({
+      source,
+      headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+    }));
+  },
 };
 
 export default nextConfig;

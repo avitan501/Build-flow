@@ -34,11 +34,49 @@ const poppins = Poppins({
   weight: ["700", "800"],
 });
 
+const searchEngineIdentity = JSON.stringify({
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://build.avantiap.com/#organization",
+      name: "Avantia Build",
+      url: "https://build.avantiap.com",
+      logo: "https://build.avantiap.com/images/avantia/avantia-app-icon-512.png",
+      contactPoint: {
+        "@type": "ContactPoint",
+        telephone: "+1-516-908-8319",
+        contactType: "sales",
+        areaServed: "US",
+        availableLanguage: ["English", "Spanish"],
+      },
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://build.avantiap.com/#website",
+      name: "Avantia Build",
+      url: "https://build.avantiap.com",
+      publisher: { "@id": "https://build.avantiap.com/#organization" },
+    },
+  ],
+}).replace(/</g, "\\u003c");
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://build.avantiap.com"),
   applicationName: "Avantia Build",
   title: "Avantia Build | You Build. We Handle the Materials.",
   description: "Send your plans or material list. We compare suppliers, organize the order, and arrange jobsite delivery.",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -101,6 +139,7 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${poppins.variable} h-full antialiased`}
     >
       <body className="min-h-full">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: searchEngineIdentity }} />
         {serializedSupabaseConfig ? (
           <Script id="avantia-supabase-config" strategy="beforeInteractive">
             {`window.__AVANTIA_SUPABASE__=${serializedSupabaseConfig}`}
