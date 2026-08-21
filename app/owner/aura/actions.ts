@@ -24,13 +24,24 @@ function requireUuid(value: FormDataEntryValue | null) {
 
 export type SendAuraMessageResult = { ok: true } | { ok: false; error: string };
 
+type BrokerResult = { ok?: boolean; error?: string; id?: string };
+
+async function invokeMessagingBroker(
+  supabase: Awaited<ReturnType<typeof requireOwnerAccess>>["supabase"],
+  body: Record<string, unknown>,
+) {
+  const { data, error } = await supabase.functions.invoke<BrokerResult>("aura-messaging-broker", { body });
+  if (error || !data?.ok) throw new Error(data?.error || error?.message || "Messaging service is unavailable.");
+  return data;
+}
+
 export async function sendAuraMessageAction(input: {
   channel: AuraMessageChannel;
   recipient: string;
   subject?: string;
   message: string;
 }): Promise<SendAuraMessageResult> {
-  await requireOwnerAccess("/owner/aura");
+  const { supabase } = await requireOwnerAccess("/owner/aura");
   const channel = input.channel;
   const message = input.message.trim();
   const phone = input.channel === "email" ? null : normalizeAuraPhone(input.recipient);
@@ -43,19 +54,27 @@ export async function sendAuraMessageAction(input: {
 
   try {
     if (channel === "sms") {
-      await sendAuraQuoText(phone!, message);
+      try {
+        await invokeMessagingBroker(supabase, { action: "send_sms", to: phone, message });
+      } catch {
+        await sendAuraQuoText(phone!, message);
+      }
     } else if (channel === "whatsapp") {
-      const sent = await sendAuraWhatsAppText(phone!, message);
-      if (!sent.sent) return { ok: false, error: "WhatsApp sending is not configured." };
-      await storeAuraCommunication({
-        provider: "whatsapp",
-        channel: "whatsapp",
-        externalActivityId: sent.messageId || `whatsapp-out-${crypto.randomUUID()}`,
-        direction: "outgoing",
-        counterpartyPhone: phone,
-        body: message,
-        status: "sent",
-      });
+      try {
+        await invokeMessagingBroker(supabase, { action: "send_whatsapp", to: phone, message });
+      } catch {
+        const sent = await sendAuraWhatsAppText(phone!, message);
+        if (!sent.sent) return { ok: false, error: "WhatsApp sending is not configured." };
+        await storeAuraCommunication({
+          provider: "whatsapp",
+          channel: "whatsapp",
+          externalActivityId: sent.messageId || `whatsapp-out-${crypto.randomUUID()}`,
+          direction: "outgoing",
+          counterpartyPhone: phone,
+          body: message,
+          status: "sent",
+        });
+      }
     } else if (channel === "email") {
       await sendAuraEmail(email!, input.subject || "", message);
     } else {
@@ -66,6 +85,33 @@ export async function sendAuraMessageAction(input: {
     return { ok: false, error: `${channelName} could not send this message.` };
   }
 
+  revalidatePath("/owner/aura");
+  return { ok: true };
+}
+
+export async function configureAuraProviderAction(formData: FormData): Promise<SendAuraMessageResult> {
+  const { supabase } = await requireOwnerAccess("/owner/aura");
+  const provider = String(formData.get("provider") || "");
+  try {
+    if (provider === "twilio") {
+      await invokeMessagingBroker(supabase, {
+        action: "configure_twilio",
+        accountSid: String(formData.get("accountSid") || ""),
+        authToken: String(formData.get("authToken") || ""),
+        from: String(formData.get("from") || ""),
+      });
+    } else if (provider === "quo") {
+      await invokeMessagingBroker(supabase, {
+        action: "configure_quo",
+        apiKey: String(formData.get("apiKey") || ""),
+        from: String(formData.get("from") || ""),
+      });
+    } else {
+      return { ok: false, error: "Choose a supported connection." };
+    }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Connection could not be saved." };
+  }
   revalidatePath("/owner/aura");
   return { ok: true };
 }

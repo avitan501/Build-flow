@@ -68,7 +68,7 @@ export type AuraCommunicationRow = {
 };
 
 export async function loadAuraDashboard(supabase: SupabaseClient) {
-  const [intakesResult, contactsResult, leadsResult, tasksResult, communicationsResult] = await Promise.all([
+  const [intakesResult, contactsResult, leadsResult, tasksResult, communicationsResult, brokerResult] = await Promise.all([
     supabase
       .from("aura_intakes")
       .select("id, sender_phone, message_text, proposal, status, confirmation_code, created_at")
@@ -97,10 +97,14 @@ export async function loadAuraDashboard(supabase: SupabaseClient) {
       .select("id, contact_id, provider, channel, direction, counterparty_phone, counterparty_email, subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at")
       .order("occurred_at", { ascending: false })
       .limit(50),
+    supabase.functions.invoke<{ ok?: boolean; whatsapp?: boolean; sms?: boolean }>("aura-messaging-broker", {
+      body: { action: "status" },
+    }),
   ]);
 
   const firstError = intakesResult.error || contactsResult.error || leadsResult.error || tasksResult.error || communicationsResult.error;
   if (firstError) throw new Error(`Failed to load Aura dashboard: ${firstError.message}`);
+  const brokerStatus = brokerResult.data?.ok ? brokerResult.data : null;
 
   return {
     intakes: (intakesResult.data || []) as AuraIntakeRow[],
@@ -111,13 +115,13 @@ export async function loadAuraDashboard(supabase: SupabaseClient) {
     connections: {
       quo: {
         receive: Boolean(process.env.AURA_QUO_WEBHOOK_SIGNING_SECRET && process.env.AURA_QUO_PHONE_NUMBER_IDS),
-        send: canSendAuraQuoText(),
+        send: Boolean(brokerStatus?.sms) || canSendAuraQuoText(),
       },
       whatsapp: {
         receive:
           Boolean(process.env.AURA_WHATSAPP_APP_SECRET && process.env.AURA_WHATSAPP_VERIFY_TOKEN) ||
           canUseTwilioWhatsApp(),
-        send: canSendAuraWhatsApp(),
+        send: Boolean(brokerStatus?.whatsapp) || canSendAuraWhatsApp(),
       },
       email: {
         receive: Boolean(process.env.RESEND_API_KEY && process.env.AURA_RESEND_WEBHOOK_SECRET && process.env.AURA_RESEND_INBOUND_ADDRESS),

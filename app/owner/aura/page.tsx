@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AuraCommunicationWorkspace } from "@/components/buildflow/aura-communication-workspace";
+import { AuraConnectionSetup } from "@/components/buildflow/aura-connection-setup";
 import { loadAuraDashboard } from "@/lib/aura/dashboard";
 import { requireOwnerAccess } from "@/lib/owner-access";
 
@@ -82,6 +83,8 @@ export default async function AuraOwnerPage() {
             </div>
           ))}
         </section>
+
+        <AuraConnectionSetup whatsappReady={connections.whatsapp.send} smsReady={connections.quo.send} />
 
         <AuraCommunicationWorkspace communications={communications} contacts={contacts} connections={connections} />
 
