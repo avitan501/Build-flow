@@ -20,10 +20,10 @@ export function AuraConnectionSetup({ whatsappReady, smsReady }: { whatsappReady
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <section id="phone-connections" className="scroll-mt-6 rounded-lg border-2 border-[#0071e3] bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3"><KeyRound className="h-5 w-5 text-[#0066cc]" /><div><h2 className="font-semibold">Phone connections</h2><p className="text-xs text-slate-500">Credentials are encrypted in Supabase Vault.</p></div></div>
-        <button type="button" onClick={() => setOpen((value) => !value)} className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-semibold">{open ? "Close setup" : "Connect"}</button>
+        <button type="button" onClick={() => setOpen((value) => !value)} className="min-h-10 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white">{open ? "Close setup" : "Connect WhatsApp & Text"}</button>
       </div>
       <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
         <span className={`rounded-full px-2.5 py-1 ${whatsappReady ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}><MessageCircle className="mr-1 inline h-3.5 w-3.5" />WhatsApp {whatsappReady ? "connected" : "needs setup"}</span>
