@@ -12,6 +12,7 @@ import {
 } from "@/lib/aura/communications";
 import { sendAuraWhatsAppText } from "@/lib/aura/whatsapp";
 import { requireOwnerAccess } from "@/lib/owner-access";
+import { requireManagerPortalProfile } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function requireUuid(value: FormDataEntryValue | null) {
@@ -41,7 +42,8 @@ export async function sendAuraMessageAction(input: {
   subject?: string;
   message: string;
 }): Promise<SendAuraMessageResult> {
-  const { supabase } = await requireOwnerAccess("/owner/aura");
+  const { supabase, access } = await requireManagerPortalProfile();
+  if (!access.customers) return { ok: false, error: "Customer communication access is required." };
   const channel = input.channel;
   const message = input.message.trim();
   const phone = input.channel === "email" ? null : normalizeAuraPhone(input.recipient);

@@ -9,6 +9,7 @@ const secretKeys = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}") as R
 const serviceKey = secretKeys.default || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 const OWNER_EMAIL = "avitanneto@gmail.com";
+const STAFF_EMAILS = new Set(["buildavantiap@gmail.com", "info@fivetownsbuilders.com"]);
 
 const secretNames = {
   twilioSid: "aura_twilio_account_sid",
@@ -57,19 +58,22 @@ async function saveSecret(name: string, value: string, description: string) {
   }
 }
 
-async function requireOwner(req: Request) {
+async function requireManager(req: Request) {
   const authorization = req.headers.get("authorization") || "";
   const token = authorization.replace(/^Bearer\s+/i, "");
   if (!token) return null;
   const { data, error } = await admin.auth.getUser(token);
-  if (error || !data.user || data.user.email?.trim().toLowerCase() !== OWNER_EMAIL) return null;
+  if (error || !data.user) return null;
+  const email = data.user.email?.trim().toLowerCase() || "";
   const { data: profile } = await admin
     .from("profiles")
     .select("role, approval_status, is_active")
     .eq("id", data.user.id)
     .maybeSingle();
-  if (profile?.role !== "admin" || profile.approval_status !== "approved" || profile.is_active !== true) return null;
-  return data.user;
+  const isOwner = email === OWNER_EMAIL && profile?.role === "admin";
+  const isStaff = STAFF_EMAILS.has(email) && profile?.role === "staff";
+  if ((!isOwner && !isStaff) || profile?.approval_status !== "approved" || profile.is_active !== true) return null;
+  return { user: data.user, isOwner };
 }
 
 async function twilioConfig() {
@@ -229,8 +233,8 @@ Deno.serve(async (req: Request) => {
     try { return await handleTwilioWebhook(req); } catch { return twiml(500); }
   }
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
-  const owner = await requireOwner(req);
-  if (!owner) return json({ error: "Owner authorization required" }, 401);
+  const manager = await requireManager(req);
+  if (!manager) return json({ error: "Manager authorization required" }, 401);
   let input: Record<string, unknown>;
   try { input = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
   try {
@@ -238,6 +242,7 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, whatsapp: Boolean(await twilioConfig()), sms: Boolean(await quoConfig()) });
     }
     if (input.action === "configure_twilio") {
+      if (!manager.isOwner) return json({ error: "Only the owner can change provider credentials." }, 403);
       const accountSid = typeof input.accountSid === "string" ? input.accountSid.trim() : "";
       const authToken = typeof input.authToken === "string" ? input.authToken.trim() : "";
       const from = normalizePhone(input.from);
@@ -252,6 +257,7 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, whatsapp: true });
     }
     if (input.action === "configure_quo") {
+      if (!manager.isOwner) return json({ error: "Only the owner can change provider credentials." }, 403);
       const apiKey = typeof input.apiKey === "string" ? input.apiKey.trim() : "";
       const from = normalizePhone(input.from);
       if (apiKey.length < 20 || !from) return json({ error: "Enter a valid Q U O API key and business number." }, 400);

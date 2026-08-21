@@ -67,7 +67,7 @@ export type AuraCommunicationRow = {
   occurred_at: string;
 };
 
-export async function loadAuraDashboard(supabase: SupabaseClient) {
+export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: SupabaseClient = supabase) {
   const [intakesResult, contactsResult, leadsResult, tasksResult, communicationsResult, brokerResult] = await Promise.all([
     supabase
       .from("aura_intakes")
@@ -97,7 +97,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient) {
       .select("id, contact_id, provider, channel, direction, counterparty_phone, counterparty_email, subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at")
       .order("occurred_at", { ascending: false })
       .limit(50),
-    supabase.functions.invoke<{ ok?: boolean; whatsapp?: boolean; sms?: boolean }>("aura-messaging-broker", {
+    brokerClient.functions.invoke<{ ok?: boolean; whatsapp?: boolean; sms?: boolean }>("aura-messaging-broker", {
       body: { action: "status" },
     }),
   ]);
