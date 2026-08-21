@@ -59,6 +59,10 @@ test("ABC pricing and payments are owner-protected manager tools", async () => {
   expect(paymentsPage).toContain("requireAdminProfile");
   expect(stripeSetup).toContain("requireAdminProfile");
   expect(stripePortal).toContain("requireAdminProfile");
+  expect(stripeSetup.indexOf("await requireAdminProfile()"))
+    .toBeLessThan(stripeSetup.indexOf("hasStripeServerConfig()"));
+  expect(stripePortal.indexOf("await requireAdminProfile()"))
+    .toBeLessThan(stripePortal.indexOf("hasStripeServerConfig()"));
   expect(stripeSetup).toContain("/admin/payments?payment=saved");
   expect(stripePortal).toContain("/admin/payments");
 });

@@ -8,11 +8,11 @@ function paymentRedirect(request: NextRequest, payment: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const { user } = await requireAdminProfile();
+
   if (!hasStripeServerConfig()) {
     return paymentRedirect(request, "setup-unavailable");
   }
-
-  const { user } = await requireAdminProfile();
   const customerId = typeof user.app_metadata.stripe_customer_id === "string"
     ? user.app_metadata.stripe_customer_id
     : null;
