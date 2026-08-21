@@ -1,8 +1,8 @@
 import Link from "next/link"
 
 import { ManagerCreateClientRequest } from "@/components/buildflow/manager-create-client-request"
+import { requireStaffProfile } from "@/lib/auth"
 import { MATERIAL_DEPARTMENTS } from "@/lib/material-questionnaires"
-import { requireOwnerAccess } from "@/lib/owner-access"
 
 type InboxRequest = {
   id: string
@@ -21,7 +21,7 @@ export default async function MaterialRequestsInboxPage({
   searchParams: Promise<{ created?: string }>
 }) {
   const { created = "" } = await searchParams
-  const { supabase } = await requireOwnerAccess()
+  const { supabase } = await requireStaffProfile("customers")
   const [{ data, error }, { data: customerProfiles }, { data: categories }] = await Promise.all([
     supabase
       .from("quote_requests")
@@ -44,8 +44,8 @@ export default async function MaterialRequestsInboxPage({
         {created ? <div role="status" className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">Client request created successfully. The order is listed below.</div> : null}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <Link href="/owner/materials" className="text-sm font-semibold text-[#0066cc]">Back to Material Admin</Link>
-            <p className="mt-5 text-[11px] font-semibold uppercase tracking-[.16em] text-[#0066cc]">Owner inbox</p>
+            <Link href="/admin/users?view=requests" className="text-sm font-semibold text-[#0066cc]">Back to Customer Requests</Link>
+            <p className="mt-5 text-[11px] font-semibold uppercase tracking-[.16em] text-[#0066cc]">Manager inbox</p>
             <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Material requests</h1>
             <p className="mt-2 text-sm text-slate-600">Client questionnaire answers, project details, and uploaded plans.</p>
           </div>

@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation"
 
 import { SupplierRequestDraft } from "@/components/buildflow/supplier-request-draft"
+import { requireStaffProfile } from "@/lib/auth"
 import { normalizeMaterialCatalogDepartment, supplierCanReceiveDepartmentRequest } from "@/lib/material-catalog"
-import { requireOwnerAccess } from "@/lib/owner-access"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 
 type RequestRow = { id: string; title: string; projects: { address: string | null } | null }
@@ -33,7 +33,7 @@ export default async function SupplierRequestDraftPage({
   const supplierIds = [...new Set((Array.isArray(query.supplier) ? query.supplier : [query.supplier]).filter((value): value is string => Boolean(value)).map((value) => value.trim()).filter(Boolean))]
   if (!supplierIds.length) redirect(`/owner/materials/requests/${requestId}`)
 
-  const { supabase } = await requireOwnerAccess()
+  const { supabase } = await requireStaffProfile("suppliers")
   const [{ data: request }, { data: items }, { data: managerSettings }] = await Promise.all([
     supabase.from("quote_requests").select("id,title,projects(address)").eq("id", requestId).maybeSingle<RequestRow>(),
     supabase.from("quote_request_items").select("name,department,quantity,unit,answers,metadata").eq("request_id", requestId).order("created_at").returns<RequestItem[]>(),

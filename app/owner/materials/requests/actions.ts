@@ -1,7 +1,7 @@
 "use server"
 
 import { sendManagerClientReplyEmail } from "@/lib/cart-submission-email"
-import { requireOwnerAccess } from "@/lib/owner-access"
+import { requireStaffProfile } from "@/lib/auth"
 import { generateRequestClientQuotePdf, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
 
 type ReplyResult = { ok: true; providerId: string | null } | { ok: false; error: string }
@@ -42,7 +42,7 @@ export async function sendClientReplyAction(formData: FormData): Promise<ReplyRe
   if (attachment && attachment.size > 10 * 1024 * 1024) return { ok: false, error: "Keep the attachment under 10 MB." }
   if (attachment && !ALLOWED_ATTACHMENT_TYPES.has(attachment.type)) return { ok: false, error: "Attach a PDF, image, Word document, or Excel file." }
 
-  const { supabase } = await requireOwnerAccess()
+  const { supabase } = await requireStaffProfile("customers")
   const { data: request } = await supabase
     .from("quote_requests")
     .select("id,title,owner_id,project_id")
@@ -148,7 +148,7 @@ export async function sendClientReplyAction(formData: FormData): Promise<ReplyRe
 }
 
 async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
-  const { supabase } = await requireOwnerAccess()
+  const { supabase } = await requireStaffProfile("customers")
   const requestId = String(input.requestId || "").trim()
   const quoteNumber = String(input.quoteNumber || "").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 40)
   if (!requestId || quoteNumber.length < 3) return { ok: false as const, error: "Enter a valid estimate code." }

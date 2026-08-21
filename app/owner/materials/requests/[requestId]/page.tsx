@@ -3,9 +3,9 @@ import { notFound } from "next/navigation"
 
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status"
 import { RequestManagementPanel } from "@/components/buildflow/request-management-panel"
+import { requireStaffProfile } from "@/lib/auth"
 import { normalizeMaterialCatalogDepartment } from "@/lib/material-catalog"
 import type { MaterialQuestionnaireResponse, MaterialRequestAnswer } from "@/lib/material-questionnaires"
-import { requireOwnerAccess } from "@/lib/owner-access"
 import { quoteRequestStatusLabel, type QuoteRequestStatus } from "@/lib/quote-requests"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 
@@ -21,7 +21,7 @@ function legacyAnswers(value: unknown): LegacyAnswer[] {
 
 export default async function OwnerMaterialRequestPage({ params }: { params: Promise<{ requestId: string }> }) {
   const { requestId } = await params
-  const { supabase } = await requireOwnerAccess()
+  const { supabase } = await requireStaffProfile("customers")
   const [{ data: request, error: requestError }, { data: responses }, { data: attachments }, { data: items }, { data: managerSettings }, { data: packages }, { data: clientActionEvents }] = await Promise.all([
     supabase.from("quote_requests").select("id,project_id,owner_id,title,status,created_at,submitted_at,projects(name,address)").eq("id", requestId).maybeSingle<RequestDetails>(),
     supabase.from("material_questionnaire_responses").select("id, request_id, project_id, owner_id, category_id, category_name_snapshot, category_slug_snapshot, definition_version, definition_snapshot, status, completed_at, created_at, updated_at").eq("request_id", requestId).order("created_at").returns<MaterialQuestionnaireResponse[]>(),
@@ -52,7 +52,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 pb-28 pt-5 text-slate-950 sm:px-8">
       <div className="mx-auto max-w-4xl">
-        <Link href="/owner/materials/requests" className="text-sm font-semibold text-[#0066cc]">Back to Material Requests</Link>
+        <Link href="/admin/users?view=requests" className="text-sm font-semibold text-[#0066cc]">Back to Customer Requests</Link>
         <header className="mt-5 rounded-[20px] border border-slate-200 bg-white p-5">
           <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[11px] font-semibold uppercase tracking-[.14em] text-[#0066cc]">{quoteRequestStatusLabel(request.status)}</p><h1 className="mt-1 text-2xl font-bold">{request.title}</h1>{projectLabel ? <p className="mt-2 text-sm text-slate-600">{projectLabel}{request.projects?.name !== "Material Requests" && request.projects?.address ? ` · ${request.projects.address}` : ""}</p> : null}</div><div className="text-right text-sm text-slate-600"><p className="font-semibold text-slate-950">{profile?.full_name || "Client"}</p><p>{profile?.email}</p><p>{profile?.phone}</p></div></div>
         </header>

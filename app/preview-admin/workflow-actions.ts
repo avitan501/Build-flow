@@ -158,7 +158,7 @@ export async function returnRequestToDraftAction(requestId: string): Promise<Man
 }
 
 export async function updateRequestStatusAction(input: { requestId: string; status: QuoteRequestStatus }): Promise<ManagerResult> {
-  const { supabase } = await requireAdminProfile()
+  const { supabase } = await requireStaffProfile("customers")
   const allowed: QuoteRequestStatus[] = ["draft", "submitted", "in_review", "quoted", "closed"]
   if (!allowed.includes(input.status)) return { ok: false, error: "Choose a valid request status." }
 
