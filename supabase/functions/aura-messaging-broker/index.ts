@@ -116,34 +116,37 @@ async function validTwilioSignature(url: string, params: URLSearchParams, suppli
   return constantTimeEqual(await hmacSha1Base64(token, payload), supplied);
 }
 
-async function contactId(phone: string | null) {
-  if (!phone) return null;
-  const rows = await sql<{ id: string }[]>`
-    select id from public.aura_contacts where normalized_phone = ${phone} limit 1
-  `;
+async function contactId(phone: string | null, email: string | null = null) {
+  if (!phone && !email) return null;
+  const rows = phone
+    ? await sql<{ id: string }[]>`select id from public.aura_contacts where normalized_phone = ${phone} limit 1`
+    : await sql<{ id: string }[]>`select id from public.aura_contacts where lower(email) = lower(${email}) limit 1`;
   return rows[0]?.id || null;
 }
 
 async function storeCommunication(input: {
-  provider: "whatsapp" | "quo";
-  channel: "whatsapp" | "sms";
+  provider: "whatsapp" | "quo" | "manual";
+  channel: "whatsapp" | "sms" | "email";
   externalId: string;
   direction: "incoming" | "outgoing";
-  counterpartyPhone: string | null;
-  businessPhone: string | null;
+  counterpartyPhone?: string | null;
+  counterpartyEmail?: string | null;
+  businessPhone?: string | null;
+  subject?: string | null;
   body: string | null;
   status: string;
   media?: Array<{ url?: string; type?: string }>;
 }) {
   const now = new Date().toISOString();
-  const linkedContact = await contactId(input.counterpartyPhone);
+  const linkedContact = await contactId(input.counterpartyPhone || null, input.counterpartyEmail || null);
   await sql`
     insert into public.aura_communications (
       provider, channel, external_activity_id, contact_id, direction,
-      counterparty_phone, business_phone, body, status, media, occurred_at, last_event_at
+      counterparty_phone, counterparty_email, business_phone, subject, body, status, media, occurred_at, last_event_at
     ) values (
       ${input.provider}, ${input.channel}, ${input.externalId}, ${linkedContact}, ${input.direction},
-      ${input.counterpartyPhone}, ${input.businessPhone}, ${input.body}, ${input.status},
+      ${input.counterpartyPhone || null}, ${input.counterpartyEmail || null}, ${input.businessPhone || null},
+      ${input.subject || null}, ${input.body}, ${input.status},
       ${JSON.stringify(input.media || [])}::jsonb, ${now}, ${now}
     )
     on conflict (provider, external_activity_id) do update set
@@ -227,6 +230,40 @@ async function sendQuoSms(toValue: unknown, bodyValue: unknown) {
   return result.data.id;
 }
 
+function validEmail(value: unknown) {
+  const email = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character] || character);
+}
+
+async function sendEmail(toValue: unknown, subjectValue: unknown, bodyValue: unknown) {
+  const apiKey = Deno.env.get("RESEND_API_KEY");
+  if (!apiKey) throw new Error("Email is not connected.");
+  const to = validEmail(toValue);
+  const subject = typeof subjectValue === "string" ? subjectValue.trim().slice(0, 200) || "Message from Avantia Build" : "Message from Avantia Build";
+  const body = typeof bodyValue === "string" ? bodyValue.trim().slice(0, 10_000) : "";
+  if (!to || !body) throw new Error("Enter a valid email address and message.");
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: Deno.env.get("RESEND_FROM_EMAIL") || "Avantia Build <office@build.avantiap.com>",
+      to: [to],
+      reply_to: "buildavantiap@gmail.com",
+      subject,
+      text: body,
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#172033"><p>${escapeHtml(body).replaceAll("\n", "<br />")}</p><p style="margin-top:24px;color:#667085">Avantia Build · (516) 908-8319</p></div>`,
+    }),
+  });
+  const result = await response.json() as { id?: string; message?: string };
+  if (!response.ok || !result.id) throw new Error(result.message || `Email returned HTTP ${response.status}.`);
+  await storeCommunication({ provider: "manual", channel: "email", externalId: result.id, direction: "outgoing", counterpartyEmail: to, subject, body, status: "sent" });
+  return result.id;
+}
+
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   if (req.method === "POST" && url.searchParams.get("mode") === "twilio-webhook") {
@@ -239,7 +276,7 @@ Deno.serve(async (req: Request) => {
   try { input = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
   try {
     if (input.action === "status") {
-      return json({ ok: true, whatsapp: Boolean(await twilioConfig()), sms: Boolean(await quoConfig()) });
+      return json({ ok: true, whatsapp: Boolean(await twilioConfig()), sms: Boolean(await quoConfig()), email: Boolean(Deno.env.get("RESEND_API_KEY")) });
     }
     if (input.action === "dashboard") {
       const [communications, contacts, whatsapp, sms] = await Promise.all([
@@ -266,7 +303,7 @@ Deno.serve(async (req: Request) => {
         connections: {
           quo: { receive: false, send: Boolean(sms) },
           whatsapp: { receive: Boolean(whatsapp), send: Boolean(whatsapp) },
-          email: { receive: false, send: false },
+          email: { receive: false, send: Boolean(Deno.env.get("RESEND_API_KEY")) },
         },
       });
     }
@@ -302,6 +339,10 @@ Deno.serve(async (req: Request) => {
     }
     if (input.action === "send_sms") {
       const id = await sendQuoSms(input.to, input.message);
+      return json({ ok: true, id });
+    }
+    if (input.action === "send_email") {
+      const id = await sendEmail(input.to, input.subject, input.message);
       return json({ ok: true, id });
     }
     return json({ error: "Unsupported action" }, 400);

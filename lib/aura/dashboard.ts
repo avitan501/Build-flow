@@ -97,7 +97,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
       .select("id, contact_id, provider, channel, direction, counterparty_phone, counterparty_email, subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at")
       .order("occurred_at", { ascending: false })
       .limit(50),
-    brokerClient.functions.invoke<{ ok?: boolean; whatsapp?: boolean; sms?: boolean }>("aura-messaging-broker", {
+    brokerClient.functions.invoke<{ ok?: boolean; whatsapp?: boolean; sms?: boolean; email?: boolean }>("aura-messaging-broker", {
       body: { action: "status" },
     }),
   ]);
@@ -125,7 +125,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
       },
       email: {
         receive: Boolean(process.env.RESEND_API_KEY && process.env.AURA_RESEND_WEBHOOK_SECRET && process.env.AURA_RESEND_INBOUND_ADDRESS),
-        send: canSendAuraEmail(),
+        send: Boolean(brokerStatus?.email) || canSendAuraEmail(),
       },
     },
   };

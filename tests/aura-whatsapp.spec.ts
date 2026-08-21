@@ -1,9 +1,22 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 test("Aura dashboard is private", async ({ page }) => {
   await page.goto("/owner/aura");
 
   await expect(page).toHaveURL(/\/login\?next=%2Fowner%2Faura$/);
+});
+
+test("Aura broker routes email through Supabase with the business Gmail as reply-to", async () => {
+  const [broker, actions] = await Promise.all([
+    readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "app/owner/aura/actions.ts"), "utf8"),
+  ]);
+  expect(broker).toContain('input.action === "send_email"');
+  expect(broker).toContain('reply_to: "buildavantiap@gmail.com"');
+  expect(broker).toContain('Deno.env.get("RESEND_API_KEY")');
+  expect(actions).toContain('action: "send_email"');
 });
 
 test("Aura webhook rejects unverified requests", async ({ request }) => {

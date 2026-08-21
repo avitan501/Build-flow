@@ -78,7 +78,11 @@ export async function sendAuraMessageAction(input: {
         });
       }
     } else if (channel === "email") {
-      await sendAuraEmail(email!, input.subject || "", message);
+      try {
+        await invokeMessagingBroker(supabase, { action: "send_email", to: email, subject: input.subject || "", message });
+      } catch {
+        await sendAuraEmail(email!, input.subject || "", message);
+      }
     } else {
       return { ok: false, error: "Choose SMS, WhatsApp, or email." };
     }
