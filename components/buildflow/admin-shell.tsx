@@ -55,6 +55,7 @@ const sharedMoreLinks = [
 ] as const;
 
 const ownerMoreLinks = [
+  { href: "/owner/aura", label: "Aura Communications", icon: MessageCircle },
   { href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 },
   { href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles },
 ] as const;

@@ -12,6 +12,7 @@ const PROTECTED_PATH_PREFIXES = [
   "/materials",
   "/takeoff-review",
   "/admin",
+  "/owner",
 ];
 
 const CLIENT_HOME_REDIRECT_PATHS = new Set(["/dashboard"]);

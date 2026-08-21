@@ -18,16 +18,16 @@ export async function getOwnerAccessSession() {
           role: session.profile?.role,
           approvalStatus: session.profile?.approval_status,
           isActive: session.profile?.is_active,
-        }).customers,
+        }).owner,
     ),
   };
 }
 
-export async function requireOwnerAccess() {
+export async function requireOwnerAccess(nextPath = "/owner/materials") {
   const session = await getOwnerAccessSession();
 
   if (!session.user || !session.supabase) {
-    redirect("/login?next=/owner/materials");
+    redirect(`/login?next=${encodeURIComponent(nextPath)}`);
   }
 
   if (!session.isOwner) {

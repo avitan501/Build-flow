@@ -11,9 +11,11 @@
     "test:e2e:prod": "PLAYWRIGHT_BASE_URL=https://build-flow-wfl3.vercel.app playwright test"
   },
   "dependencies": {
+    "@ai-sdk/openai": "4.0.42",
     "@napi-rs/canvas": "^1.0.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.1",
+    "ai": "7.0.66",
     "lucide-react": "^0.468.0",
     "next": "^16.2.6",
     "pdf-lib": "^1.17.1",
@@ -22,7 +24,8 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tesseract.js": "7.0.0",
-    "unpdf": "^1.8.1"
+    "unpdf": "^1.8.1",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
