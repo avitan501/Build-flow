@@ -5,8 +5,8 @@ import { useState, useTransition } from "react";
 
 import { configureAuraProviderAction } from "@/app/owner/aura/actions";
 
-export function AuraConnectionSetup({ whatsappReady, smsReady }: { whatsappReady: boolean; smsReady: boolean }) {
-  const [open, setOpen] = useState(false);
+export function AuraConnectionSetup({ whatsappReady, smsReady, defaultOpen = false }: { whatsappReady: boolean; smsReady: boolean; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
