@@ -1,15 +1,11 @@
 "use client";
 
 import {
-  AlertTriangle,
   Archive,
   ArrowLeft,
   Award,
-  Ban,
   Check,
   ChevronDown,
-  CircleDollarSign,
-  Clock3,
   PackagePlus,
   Plus,
   RotateCcw,
@@ -28,6 +24,7 @@ import {
   addQuoteComparisonSupplierAction,
   archiveQuoteComparisonAction,
   awardQuoteComparisonBidAction,
+  confirmQuoteComparisonPriceMatchAction,
   deleteQuoteComparisonAction,
   deleteQuoteComparisonItemAction,
   removeQuoteComparisonSupplierAction,
@@ -42,7 +39,10 @@ import {
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import {
   analyzeQuoteComparison,
+  buildMixedSupplierAnalysis,
   formatComparisonMoney,
+  lowestSupplierPriceByItem,
+  quoteLineMatchStatus,
   quoteComparisonStatusLabel,
   type QuoteComparisonBidRecord,
   type QuoteComparisonItemRecord,
@@ -58,7 +58,7 @@ type BidDraft = {
   leadTimeDays: string;
   notes: string;
 };
-type PriceDraft = { unitPrice: string; isAvailable: boolean };
+type PriceDraft = { unitPrice: string; isAvailable: boolean; notes: string };
 
 const commonUnits = ["each", "piece", "sheet", "box", "bag", "bundle", "linear ft", "sq. ft.", "yard", "gallon"];
 
@@ -128,6 +128,7 @@ export function QuoteComparisonWorkspace({
         values[`${bid.id}:${item.id}`] = {
           unitPrice: price?.unit_price === null || price?.unit_price === undefined ? "" : String(price.unit_price),
           isAvailable: price?.is_available ?? true,
+          notes: price?.notes ?? "",
         };
       }
     }
@@ -150,15 +151,18 @@ export function QuoteComparisonWorkspace({
           item_id: item.id,
           unit_price: draftPrice?.unitPrice === "" || draftPrice?.unitPrice === undefined ? null : moneyInput(draftPrice.unitPrice),
           is_available: draftPrice?.isAvailable ?? true,
-          notes: "",
+          notes: draftPrice?.notes ?? "",
         } satisfies QuoteComparisonPriceRecord;
       }),
     };
   }), [bidDrafts, bids, items, priceDrafts]);
   const analyses = useMemo(() => analyzeQuoteComparison(items, liveBids), [items, liveBids]);
-  const recommended = analyses.find((analysis) => analysis.isRecommended);
+  const bestSingleSupplier = analyses.filter((analysis) => analysis.eligible && analysis.missingItemCount === 0).sort((a, b) => a.landedTotal - b.landedTotal)[0] ?? null;
+  const lowestPrices = useMemo(() => lowestSupplierPriceByItem(items, liveBids), [items, liveBids]);
+  const mixedAnalysis = useMemo(() => buildMixedSupplierAnalysis(items, liveBids), [items, liveBids]);
   const locked = !previewMode && (comparison.status === "awarded" || comparison.status === "archived");
   const canManageStructure = !previewMode && !locked;
+  const canManageRequestItems = canManageStructure && !comparison.request_id;
   const selectedBid = liveBids.find((bid) => bid.id === selectedBidId) ?? null;
 
   function run(action: () => Promise<{ ok: boolean; error?: string }>, successMessage: string, after?: () => void) {
@@ -195,6 +199,14 @@ export function QuoteComparisonWorkspace({
       setSupplierId("");
       setShowSupplierForm(false);
     });
+  }
+
+  function confirmMatch(key: string, bidId: string, itemId: string) {
+    run(
+      () => confirmQuoteComparisonPriceMatchAction({ comparisonId: comparison.id, bidId, itemId }),
+      "Supplier item match confirmed.",
+      () => setPriceDrafts((current) => ({ ...current, [key]: { ...current[key], notes: "" } })),
+    );
   }
 
   function saveAllQuotes() {
@@ -320,21 +332,12 @@ export function QuoteComparisonWorkspace({
         {previewMode ? <div className="mb-4 border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800">Interactive sample only. Changes stay in this browser and nothing is emailed.</div> : null}
         {locked ? <div className="mb-4 border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">The supplier comparison is locked. Client markup and quote details remain editable below.</div> : null}
 
-        <ClientQuoteBuilder
-          key={selectedBidId || "no-supplier"}
-          comparison={comparison}
-          items={items}
-          selectedBid={selectedBid}
-          clients={clients}
-          previewMode={previewMode}
-        />
-
         <section className="mt-5 border border-slate-200 bg-white shadow-sm" aria-labelledby="materials-heading">
           <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div><h2 id="materials-heading" className="text-lg font-bold">Material list</h2><p className="mt-1 text-xs text-slate-500">Every supplier is compared against the same quantities.</p></div>
-            {canManageStructure ? <button type="button" onClick={() => setShowItemForm((value) => !value)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold"><PackagePlus className="h-4 w-4" /> Add material</button> : null}
+            {canManageRequestItems ? <button type="button" onClick={() => setShowItemForm((value) => !value)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold"><PackagePlus className="h-4 w-4" /> Add material</button> : comparison.request_id ? <span className="text-xs font-semibold text-slate-500">Locked to client request</span> : null}
           </div>
-          {showItemForm && canManageStructure ? (
+          {showItemForm && canManageRequestItems ? (
             <div className="grid gap-3 border-b border-slate-200 bg-slate-50 p-4 sm:grid-cols-[minmax(12rem,1.4fr)_minmax(12rem,1fr)_8rem_9rem_auto] sm:items-end sm:px-6">
               <label className="grid gap-1 text-xs font-bold text-slate-600">Material<input value={itemDraft.description} onChange={(event) => setItemDraft((value) => ({ ...value, description: event.target.value }))} placeholder="2 x 4 x 10 ft. stud" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label>
               <label className="grid gap-1 text-xs font-bold text-slate-600">Specification <span className="sr-only">Optional</span><input value={itemDraft.specification} onChange={(event) => setItemDraft((value) => ({ ...value, specification: event.target.value }))} placeholder="Grade, brand, color…" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label>
@@ -343,7 +346,7 @@ export function QuoteComparisonWorkspace({
               <button type="button" onClick={addItem} disabled={pending || !itemDraft.description.trim() || !itemDraft.quantity} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-40"><Plus className="h-4 w-4" /> Add</button>
             </div>
           ) : null}
-          {items.length ? <div className="divide-y divide-slate-100">{items.map((item) => <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 px-5 py-3 sm:px-6"><div><p className="text-sm font-bold">{item.description}</p>{item.specification ? <p className="mt-0.5 text-xs text-slate-500">{item.specification}</p> : null}<p className="mt-1 text-xs font-semibold text-[#0071e3]">{item.quantity.toLocaleString()} {item.unit}</p></div>{canManageStructure ? <button type="button" onClick={() => window.confirm(`Remove ${item.description}?`) && run(() => deleteQuoteComparisonItemAction({ comparisonId: comparison.id, itemId: item.id }), "Material removed.")} className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label={`Remove ${item.description}`}><Trash2 className="h-4 w-4" /></button> : null}</div>)}</div> : <p className="px-5 py-8 text-center text-sm text-slate-500">Add at least one material to begin comparing prices.</p>}
+          {items.length ? <div className="divide-y divide-slate-100">{items.map((item) => <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 px-5 py-3 sm:px-6"><div><p className="text-sm font-bold">{item.description}</p>{item.specification ? <p className="mt-0.5 text-xs text-slate-500">{item.specification}</p> : null}<p className="mt-1 text-xs font-semibold text-[#0071e3]">{item.quantity.toLocaleString()} {item.unit}</p></div>{canManageRequestItems ? <button type="button" onClick={() => window.confirm(`Remove ${item.description}?`) && run(() => deleteQuoteComparisonItemAction({ comparisonId: comparison.id, itemId: item.id }), "Material removed.")} className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600" aria-label={`Remove ${item.description}`}><Trash2 className="h-4 w-4" /></button> : null}</div>)}</div> : <p className="px-5 py-8 text-center text-sm text-slate-500">Add at least one material to begin comparing prices.</p>}
         </section>
 
         <section className="mt-5 border border-slate-200 bg-white shadow-sm" aria-labelledby="quotes-heading">
@@ -362,7 +365,14 @@ export function QuoteComparisonWorkspace({
               <table className="w-full min-w-[860px] border-collapse text-left">
                 <thead><tr className="border-b border-slate-200 bg-slate-50"><th className="sticky left-0 z-10 min-w-64 bg-slate-50 px-5 py-3 text-xs font-bold uppercase tracking-[0.08em] text-slate-500">{comparison.request_id ? "Client request" : "Material"}</th>{bids.map((bid) => <th key={bid.id} className="min-w-56 border-l border-slate-200 px-4 py-3 align-top"><div className="flex items-start justify-between gap-2"><div><p className="text-sm font-bold normal-case tracking-normal text-slate-950">{bid.supplier_name_snapshot}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">{trustLabel(bid.trust_level_snapshot)}</p></div>{canManageStructure ? <button type="button" onClick={() => window.confirm(`Remove ${bid.supplier_name_snapshot} from this comparison?`) && run(() => removeQuoteComparisonSupplierAction({ comparisonId: comparison.id, bidId: bid.id }), "Supplier removed.")} className="text-slate-400 hover:text-rose-600" aria-label={`Remove ${bid.supplier_name_snapshot}`}><X className="h-4 w-4" /></button> : null}</div></th>)}</tr></thead>
                 <tbody>
-                  {items.map((item) => <tr key={item.id} className="border-b border-slate-100"><th className="sticky left-0 z-10 bg-white px-5 py-3"><p className="text-sm font-bold">{item.description}</p><p className="mt-1 text-xs font-medium text-slate-500">{item.quantity.toLocaleString()} {item.unit}{item.specification ? ` · ${item.specification}` : ""}</p></th>{bids.map((bid) => { const key = `${bid.id}:${item.id}`; const price = priceDrafts[key] ?? { unitPrice: "", isAvailable: true }; return <td key={bid.id} className="border-l border-slate-100 px-4 py-3 align-top"><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">$</span><input type="number" min="0" step="0.01" value={price.unitPrice} disabled={locked || !price.isAvailable} onChange={(event) => setPriceDrafts((current) => ({ ...current, [key]: { ...price, unitPrice: event.target.value } }))} placeholder="0.00" aria-label={`${bid.supplier_name_snapshot} unit price for ${item.description}`} className="min-h-10 w-full rounded-lg border border-slate-300 pl-7 pr-2 text-right text-sm font-bold tabular-nums disabled:bg-slate-100 disabled:text-slate-400" /></div><label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-slate-500"><input type="checkbox" checked={!price.isAvailable} disabled={locked} onChange={(event) => setPriceDrafts((current) => ({ ...current, [key]: { ...price, isAvailable: !event.target.checked, unitPrice: event.target.checked ? "" : price.unitPrice } }))} /> Not available</label></td>; })}</tr>)}
+                  {items.map((item) => <tr key={item.id} className="border-b border-slate-100"><th className="sticky left-0 z-10 bg-white px-5 py-3"><p className="text-sm font-bold">{item.description}</p><p className="mt-1 text-xs font-medium text-slate-500">{item.quantity.toLocaleString()} {item.unit}{item.specification ? ` · ${item.specification}` : ""}</p></th>{bids.map((bid) => {
+                    const key = `${bid.id}:${item.id}`;
+                    const price = priceDrafts[key] ?? { unitPrice: "", isAvailable: true, notes: "" };
+                    const lowest = lowestPrices.get(item.id);
+                    const isLowest = Boolean(price.isAvailable && price.unitPrice !== "" && lowest?.bidId === bid.id);
+                    const matchStatus = quoteLineMatchStatus(item, price.notes);
+                    return <td key={bid.id} className={`border-l border-slate-100 px-4 py-3 align-top ${isLowest ? "bg-emerald-50" : ""}`}><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">$</span><input type="number" min="0" step="0.01" value={price.unitPrice} disabled={locked || !price.isAvailable} onChange={(event) => setPriceDrafts((current) => ({ ...current, [key]: { ...price, unitPrice: event.target.value } }))} placeholder="0.00" aria-label={`${bid.supplier_name_snapshot} unit price for ${item.description}`} className={`min-h-10 w-full rounded-lg border pl-7 pr-2 text-right text-sm font-bold tabular-nums disabled:bg-slate-100 disabled:text-slate-400 ${isLowest ? "border-emerald-400 bg-white" : "border-slate-300"}`} /></div><div className="mt-2 flex flex-wrap items-center gap-2"><label className="flex items-center gap-2 text-[11px] font-semibold text-slate-500"><input type="checkbox" checked={!price.isAvailable} disabled={locked} onChange={(event) => setPriceDrafts((current) => ({ ...current, [key]: { ...price, isAvailable: !event.target.checked, unitPrice: event.target.checked ? "" : price.unitPrice } }))} /> Not available</label>{isLowest ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">Lowest</span> : null}{matchStatus !== "manual" ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${matchStatus === "exact" ? "bg-sky-100 text-sky-800" : matchStatus === "possible" ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"}`}>{matchStatus === "exact" ? "Exact match" : matchStatus === "possible" ? "Possible match" : "Needs review"}</span> : null}{!locked && ["possible", "review"].includes(matchStatus) ? <button type="button" onClick={() => confirmMatch(key, bid.id, item.id)} disabled={pending} className="text-[10px] font-bold text-[#0066cc] underline underline-offset-2">Confirm match</button> : null}</div></td>;
+                  })}</tr>)}
                   <tr className="border-b border-slate-200 bg-slate-50"><th className="sticky left-0 bg-slate-50 px-5 py-3 text-sm font-bold">Delivery charge</th>{bids.map((bid) => <td key={bid.id} className="border-l border-slate-200 px-4 py-3"><input type="number" min="0" step="0.01" value={bidDrafts[bid.id]?.deliveryCharge ?? ""} disabled={locked} onChange={(event) => setBidDrafts((current) => ({ ...current, [bid.id]: { ...current[bid.id], deliveryCharge: event.target.value } }))} className="min-h-10 w-full rounded-lg border border-slate-300 px-3 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /></td>)}</tr>
                   <tr className="border-b border-slate-200 bg-slate-50"><th className="sticky left-0 bg-slate-50 px-5 py-3 text-sm font-bold">Tax percentage</th>{bids.map((bid) => <td key={bid.id} className="border-l border-slate-200 px-4 py-3"><div className="relative"><input type="number" min="0" max="100" step="0.001" value={bidDrafts[bid.id]?.taxPercent ?? ""} disabled={locked} onChange={(event) => setBidDrafts((current) => ({ ...current, [bid.id]: { ...current[bid.id], taxPercent: event.target.value } }))} placeholder="8.875" className="min-h-10 w-full rounded-lg border border-slate-300 pl-3 pr-8 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">%</span></div></td>)}</tr>
                   <tr className="bg-slate-50"><th className="sticky left-0 bg-slate-50 px-5 py-3 text-sm font-bold">Lead time in days</th>{bids.map((bid) => <td key={bid.id} className="border-l border-slate-200 px-4 py-3"><input type="number" min="0" step="1" value={bidDrafts[bid.id]?.leadTimeDays ?? ""} disabled={locked} onChange={(event) => setBidDrafts((current) => ({ ...current, [bid.id]: { ...current[bid.id], leadTimeDays: event.target.value } }))} className="min-h-10 w-full rounded-lg border border-slate-300 px-3 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /></td>)}</tr>
@@ -373,16 +383,24 @@ export function QuoteComparisonWorkspace({
         </section>
 
         <section className="mt-5" aria-labelledby="analysis-heading">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0071e3]">Decision support</p><h2 id="analysis-heading" className="mt-1 text-2xl font-bold">Best supplier for this request</h2></div><p className="max-w-xl text-xs leading-5 text-slate-500">Score: delivered cost 60 points, completeness 20, lead time 10, trust 10. Missing prices are estimated from the highest entered price plus 10%.</p></div>
-          {analyses.length > 0 ? <div className="mt-4 grid gap-4 xl:grid-cols-3">{analyses.map((analysis) => { const bid = liveBids.find((entry) => entry.id === analysis.bidId)!; const selected = selectedBidId === bid.id; return <article key={bid.id} className={`relative border bg-white p-5 shadow-sm ${analysis.isRecommended ? "border-[#0071e3] ring-1 ring-[#0071e3]" : selected ? "border-emerald-300" : "border-slate-200"}`}>
-            <div className="flex items-start justify-between gap-3"><div>{analysis.isRecommended ? <span className="inline-flex items-center gap-1 rounded-full bg-[#e8f3ff] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#0066cc]"><Award className="h-3.5 w-3.5" /> Best overall</span> : selected ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase text-emerald-800"><Check className="h-3.5 w-3.5" /> Selected</span> : null}<h3 className="mt-2 text-lg font-bold">{analysis.supplierName}</h3><p className="mt-1 text-xs font-semibold text-slate-500">{trustLabel(bid.trust_level_snapshot)}</p></div><div className="text-right"><p className="text-3xl font-bold tabular-nums">{analysis.score}</p><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400">of 100</p></div></div>
-            <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${analysis.blocked ? "bg-rose-500" : "bg-[#0071e3]"}`} style={{ width: `${analysis.score}%` }} /></div>
-            <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-y border-slate-100 py-4"><div><dt className="text-[10px] font-bold uppercase text-slate-400">Delivered total</dt><dd className="mt-1 text-lg font-bold tabular-nums">{formatComparisonMoney(analysis.landedTotal)}</dd></div><div><dt className="text-[10px] font-bold uppercase text-slate-400">Quoted items</dt><dd className="mt-1 text-lg font-bold tabular-nums">{analysis.pricedItemCount}/{analysis.itemCount}</dd></div><div><dt className="text-[10px] font-bold uppercase text-slate-400">Lead time</dt><dd className="mt-1 text-sm font-bold">{bid.lead_time_days === null ? "Not entered" : `${bid.lead_time_days} days`}</dd></div><div><dt className="text-[10px] font-bold uppercase text-slate-400">Completeness</dt><dd className="mt-1 text-sm font-bold">{Math.round(analysis.completeness * 100)}%</dd></div></dl>
-            <div className="mt-4 flex flex-wrap gap-2">{analysis.isLowestCost ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800"><CircleDollarSign className="h-3.5 w-3.5" /> Lowest delivered</span> : null}{analysis.isFastest ? <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-800"><Clock3 className="h-3.5 w-3.5" /> Fastest</span> : null}{analysis.missingItemCount > 0 ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800"><AlertTriangle className="h-3.5 w-3.5" /> {analysis.missingItemCount} missing</span> : null}{analysis.blocked ? <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-800"><Ban className="h-3.5 w-3.5" /> Not eligible</span> : null}</div>
-            {!selected && !locked ? <button type="button" onClick={() => awardBid(bid.id, bid.supplier_name_snapshot)} disabled={pending || analysis.blocked || analysis.pricedItemCount === 0} className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300"><Award className="h-4 w-4" /> Save prices & select supplier</button> : null}
-          </article>; })}</div> : <div className="mt-4 border border-dashed border-slate-300 bg-white px-5 py-10 text-center"><Truck className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm font-bold">Enter supplier prices to see the recommendation.</p></div>}
-          {!recommended && analyses.some((analysis) => analysis.pricedItemCount > 0) ? <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-amber-800"><AlertTriangle className="h-4 w-4" /> No reliable winner yet. Complete more line prices before selecting a supplier.</p> : null}
+          <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0071e3]">Simple comparison</p><h2 id="analysis-heading" className="mt-1 text-2xl font-bold">Choose the buying method</h2><p className="mt-1 text-xs leading-5 text-slate-500">Totals include material, delivery, and supplier tax. A supplier must price every client-request item before selection.</p></div>
+          {analyses.length > 0 ? <>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <article className={`border bg-white p-5 shadow-sm ${bestSingleSupplier ? "border-[#0071e3]" : "border-amber-200"}`}><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#0066cc]">Best single supplier</p><h3 className="mt-1 text-lg font-bold">{bestSingleSupplier?.supplierName || "No complete supplier yet"}</h3></div><Award className="h-5 w-5 text-[#0071e3]" /></div>{bestSingleSupplier ? <><p className="mt-5 text-3xl font-bold tabular-nums">{formatComparisonMoney(bestSingleSupplier.landedTotal)}</p><p className="mt-1 text-xs text-slate-500">All {bestSingleSupplier.itemCount} items · one delivery</p>{selectedBidId === bestSingleSupplier.bidId ? <p className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-emerald-700"><Check className="h-4 w-4" /> Selected for client quote</p> : !locked ? <button type="button" onClick={() => awardBid(bestSingleSupplier.bidId, bestSingleSupplier.supplierName)} disabled={pending} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white"><Award className="h-4 w-4" /> Use this supplier</button> : null}</> : <p className="mt-4 text-sm font-semibold text-amber-800">Complete every item in at least one supplier column.</p>}</article>
+              <article className={`border bg-white p-5 shadow-sm ${mixedAnalysis.complete ? "border-emerald-200" : "border-slate-200"}`}><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.1em] text-emerald-700">Lowest per item</p><h3 className="mt-1 text-lg font-bold">Mixed supplier order</h3></div><Truck className="h-5 w-5 text-emerald-700" /></div>{mixedAnalysis.complete ? <><p className="mt-5 text-3xl font-bold tabular-nums">{formatComparisonMoney(mixedAnalysis.landedTotal)}</p><p className="mt-1 text-xs text-slate-500">{mixedAnalysis.supplierCount} supplier{mixedAnalysis.supplierCount === 1 ? "" : "s"} · all deliveries and tax included</p>{bestSingleSupplier && bestSingleSupplier.landedTotal > mixedAnalysis.landedTotal ? <p className="mt-4 text-sm font-bold text-emerald-700">Saves {formatComparisonMoney(bestSingleSupplier.landedTotal - mixedAnalysis.landedTotal)}</p> : <p className="mt-4 text-sm font-semibold text-slate-500">No saving after extra deliveries.</p>}<p className="mt-2 text-xs leading-5 text-slate-500">Comparison only for now. Select one complete supplier to prepare the client quote.</p></> : <p className="mt-4 text-sm font-semibold text-amber-800">{mixedAnalysis.missingItemCount} client item{mixedAnalysis.missingItemCount === 1 ? " is" : "s are"} still missing.</p>}</article>
+            </div>
+            <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"><div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold uppercase text-slate-500">All supplier totals</div>{analyses.map((analysis) => { const bid = liveBids.find((entry) => entry.id === analysis.bidId)!; const complete = analysis.missingItemCount === 0 && analysis.eligible && !analysis.blocked; return <div key={analysis.bidId} className="flex min-h-14 items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0"><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{analysis.supplierName}</p><p className={`mt-0.5 text-xs font-semibold ${complete ? "text-emerald-700" : "text-amber-700"}`}>{complete ? "Complete quote" : `${analysis.missingItemCount} missing · cannot select`}</p></div><p className="shrink-0 text-sm font-bold tabular-nums">{formatComparisonMoney(analysis.landedTotal)}</p>{!locked && selectedBidId !== bid.id ? <button type="button" onClick={() => awardBid(bid.id, bid.supplier_name_snapshot)} disabled={pending || !complete} className="min-h-9 rounded-md border border-slate-300 px-3 text-xs font-bold disabled:opacity-35">Select</button> : selectedBidId === bid.id ? <span className="text-xs font-bold text-emerald-700">Selected</span> : null}</div>; })}</div>
+          </> : <div className="mt-4 border border-dashed border-slate-300 bg-white px-5 py-10 text-center"><Truck className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 text-sm font-bold">Enter supplier prices to compare them.</p></div>}
         </section>
+
+        <ClientQuoteBuilder
+          key={selectedBidId || "no-supplier"}
+          comparison={comparison}
+          items={items}
+          selectedBid={selectedBid}
+          clients={clients}
+          previewMode={previewMode}
+        />
 
         {!previewMode ? <details className="mt-8 border-t border-slate-300 pt-4"><summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-slate-500"><ChevronDown className="h-4 w-4" /> Comparison controls</summary><div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={deleteComparison} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700"><Trash2 className="h-4 w-4" /> Delete comparison</button></div></details> : null}
       </div>

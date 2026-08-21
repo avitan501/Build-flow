@@ -89,6 +89,28 @@ export type QuoteComparisonAnalysis = {
   isFastest: boolean;
 };
 
+export type LowestSupplierLine = {
+  itemId: string;
+  bidId: string;
+  supplierName: string;
+  unitPrice: number;
+  lineTotal: number;
+};
+
+export type MixedSupplierAnalysis = {
+  complete: boolean;
+  pricedItemCount: number;
+  itemCount: number;
+  missingItemCount: number;
+  supplierCount: number;
+  supplierNames: string[];
+  materialSubtotal: number;
+  landedTotal: number;
+  lines: LowestSupplierLine[];
+};
+
+export type QuoteLineMatchStatus = "exact" | "possible" | "review" | "manual";
+
 export type ClientQuoteLine = {
   itemId: string;
   description: string;
@@ -260,6 +282,87 @@ export function analyzeQuoteComparison(
   if (recommendation) recommendation.isRecommended = true;
 
   return analyses.sort((a, b) => b.score - a.score || a.landedTotal - b.landedTotal);
+}
+
+export function lowestSupplierPriceByItem(
+  items: QuoteComparisonItemRecord[],
+  bids: QuoteComparisonBidRecord[],
+) {
+  const result = new Map<string, LowestSupplierLine>();
+  const eligibleBids = bids.filter((bid) => bid.trust_level_snapshot !== "do-not-use" && bid.status !== "declined");
+
+  for (const item of items) {
+    for (const bid of eligibleBids) {
+      const price = (bid.quote_comparison_prices ?? []).find((entry) => entry.item_id === item.id);
+      if (!price?.is_available || price.unit_price === null) continue;
+      const unitPrice = positiveNumber(price.unit_price);
+      const current = result.get(item.id);
+      if (!current || unitPrice < current.unitPrice) {
+        result.set(item.id, {
+          itemId: item.id,
+          bidId: bid.id,
+          supplierName: bid.supplier_name_snapshot,
+          unitPrice,
+          lineTotal: unitPrice * positiveNumber(item.quantity),
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+export function buildMixedSupplierAnalysis(
+  items: QuoteComparisonItemRecord[],
+  bids: QuoteComparisonBidRecord[],
+): MixedSupplierAnalysis {
+  const lowestLines = lowestSupplierPriceByItem(items, bids);
+  const lines = items.flatMap((item) => {
+    const line = lowestLines.get(item.id);
+    return line ? [line] : [];
+  });
+  const subtotals = new Map<string, number>();
+  for (const line of lines) subtotals.set(line.bidId, (subtotals.get(line.bidId) ?? 0) + line.lineTotal);
+
+  let landedTotal = 0;
+  for (const [bidId, subtotal] of subtotals) {
+    const bid = bids.find((entry) => entry.id === bidId);
+    if (!bid) continue;
+    const delivery = positiveNumber(bid.delivery_charge);
+    landedTotal += subtotal + delivery + calculateQuoteTax(subtotal + delivery, bid.tax_percent);
+  }
+
+  const supplierNames = [...new Set(lines.map((line) => line.supplierName))];
+  return {
+    complete: items.length > 0 && lines.length === items.length,
+    pricedItemCount: lines.length,
+    itemCount: items.length,
+    missingItemCount: Math.max(0, items.length - lines.length),
+    supplierCount: supplierNames.length,
+    supplierNames,
+    materialSubtotal: lines.reduce((total, line) => total + line.lineTotal, 0),
+    landedTotal,
+    lines,
+  };
+}
+
+function normalizedMatchText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+export function quoteLineMatchStatus(item: Pick<QuoteComparisonItemRecord, "description" | "specification">, supplierDescription: string): QuoteLineMatchStatus {
+  const source = normalizedMatchText(supplierDescription);
+  if (!source) return "manual";
+  const requestedDescription = normalizedMatchText(item.description);
+  const requestedFull = normalizedMatchText(`${item.description} ${item.specification}`);
+  if (source === requestedFull || source.includes(requestedFull) || (!item.specification.trim() && source === requestedDescription)) return "exact";
+  if (source === requestedDescription || requestedFull.includes(source)) return "possible";
+
+  const requestedWords = new Set(requestedFull.split(" ").filter((word) => word.length > 1));
+  const sourceWords = new Set(source.split(" ").filter((word) => word.length > 1));
+  const overlap = [...requestedWords].filter((word) => sourceWords.has(word)).length;
+  const confidence = overlap / Math.max(requestedWords.size, sourceWords.size, 1);
+  return confidence >= 0.5 ? "possible" : "review";
 }
 
 export function buildClientQuoteSummary(

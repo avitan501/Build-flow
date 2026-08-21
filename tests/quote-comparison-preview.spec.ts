@@ -6,8 +6,8 @@ test("staff can prepare a branded client quote without exposing private pricing"
   await expect(page.getByTestId("avantia-build-lockup").first()).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Select supplier" }).first().click();
-  await expect(page.getByText(/Pricing from Five Towns Building Supply/)).toBeVisible();
+  await page.getByRole("button", { name: "Use this supplier" }).click();
+  await expect(page.getByText(/Pricing from Metro Lumber/)).toBeVisible();
 
   await page.getByLabel("Markup for all").fill("22");
   await page.getByRole("button", { name: "Apply", exact: true }).click();

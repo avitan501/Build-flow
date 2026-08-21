@@ -5,8 +5,11 @@ import { expect, test } from "@playwright/test";
 
 import {
   analyzeQuoteComparison,
+  buildMixedSupplierAnalysis,
   buildClientQuoteSummary,
   calculateQuoteTax,
+  lowestSupplierPriceByItem,
+  quoteLineMatchStatus,
   type QuoteComparisonBidRecord,
   type QuoteComparisonItemRecord,
 } from "@/lib/quote-comparison";
@@ -111,6 +114,27 @@ test("supplier tax is calculated from the taxable subtotal", () => {
   expect(calculateQuoteTax(1_000, -5)).toBe(0);
 });
 
+test("lowest-per-item comparison includes every supplier delivery and tax", () => {
+  const supplierA = bid("supplier-a", { prices: [["studs", 4], ["plywood", 35]], delivery: 100 });
+  const supplierB = bid("supplier-b", { prices: [["studs", 6], ["plywood", 20]], delivery: 100 });
+  const lowest = lowestSupplierPriceByItem(items, [supplierA, supplierB]);
+  const mixed = buildMixedSupplierAnalysis(items, [supplierA, supplierB]);
+
+  expect(lowest.get("studs")?.bidId).toBe("supplier-a");
+  expect(lowest.get("plywood")?.bidId).toBe("supplier-b");
+  expect(mixed.complete).toBe(true);
+  expect(mixed.supplierCount).toBe(2);
+  expect(mixed.materialSubtotal).toBe(800);
+  expect(mixed.landedTotal).toBe(1000);
+});
+
+test("supplier line matching distinguishes exact, possible, review, and manual prices", () => {
+  expect(quoteLineMatchStatus(items[0], "2 x 4 studs 10 ft")).toBe("exact");
+  expect(quoteLineMatchStatus(items[0], "2 x 4 studs")).toBe("possible");
+  expect(quoteLineMatchStatus(items[0], "SPF framing lumber")).toBe("review");
+  expect(quoteLineMatchStatus(items[0], "")).toBe("manual");
+});
+
 test("manager navigation and migration enforce supplier-scoped access", async () => {
   const root = process.cwd();
   const [navigation, migration, clientQuoteMigration, taxMigration] = await Promise.all([
@@ -150,14 +174,23 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
 });
 
 test("selecting a supplier saves the current price draft before awarding it", async () => {
-  const workspace = await readFile(path.join(process.cwd(), "components/buildflow/quote-comparison-workspace.tsx"), "utf8");
+  const [workspace, actions] = await Promise.all([
+    readFile(path.join(process.cwd(), "components/buildflow/quote-comparison-workspace.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "app/admin/quote-comparison/actions.ts"), "utf8"),
+  ]);
   const saveCall = workspace.indexOf("const saveResult = await saveQuoteComparisonBidAction");
   const awardCall = workspace.indexOf("const awardResult = await awardQuoteComparisonBidAction");
 
   expect(saveCall).toBeGreaterThan(-1);
   expect(awardCall).toBeGreaterThan(saveCall);
-  expect(workspace).toContain("Save prices & select supplier");
+  expect(workspace).toContain("Use this supplier");
   expect(workspace).toContain("prices saved and supplier selected");
+  expect(workspace).toContain("Best single supplier");
+  expect(workspace).toContain("Lowest per item");
+  expect(workspace).toContain("Confirm match");
+  expect(workspace).toContain("Locked to client request");
+  expect(actions).toContain("analysis.missingItemCount > 0");
+  expect(actions).toContain("confirmQuoteComparisonPriceMatchAction");
 });
 
 test("supplier quote workspace captures tax as a percentage", async () => {

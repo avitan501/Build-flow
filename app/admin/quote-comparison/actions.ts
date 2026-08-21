@@ -9,6 +9,7 @@ import { generateClientQuotePdf } from "@/lib/client-quote-pdf";
 import {
   analyzeQuoteComparison,
   buildClientQuoteSummary,
+  quoteLineMatchStatus,
   type QuoteComparisonBidRecord,
   type QuoteComparisonItemRecord,
   type QuoteComparisonRecord,
@@ -64,6 +65,19 @@ async function ensureComparisonEditable(supabase: SupabaseClient, comparisonId: 
 
   if (error || !data) return "The comparison could not be found.";
   if (!['draft', 'review'].includes(data.status)) return "Reopen this comparison before changing it.";
+  return null;
+}
+
+async function ensureComparisonItemsEditable(supabase: SupabaseClient, comparisonId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("quote_comparisons")
+    .select("status,request_id")
+    .eq("id", comparisonId)
+    .maybeSingle<{ status: string; request_id: string | null }>();
+
+  if (error || !data) return "The comparison could not be found.";
+  if (!["draft", "review"].includes(data.status)) return "Reopen this comparison before changing it.";
+  if (data.request_id) return "Client-request items are locked for apples-to-apples comparison.";
   return null;
 }
 
@@ -140,7 +154,7 @@ export async function addQuoteComparisonItemAction(input: {
   const description = cleanText(input.description, 500);
   const quantity = cleanQuantity(input.quantity);
   if (!description || quantity === null) return { ok: false, error: "Enter a material and a quantity greater than zero." };
-  const lockedError = await ensureComparisonEditable(supabase, input.comparisonId);
+  const lockedError = await ensureComparisonItemsEditable(supabase, input.comparisonId);
   if (lockedError) return { ok: false, error: lockedError };
 
   const { data: lastItem } = await supabase
@@ -174,7 +188,7 @@ export async function deleteQuoteComparisonItemAction(input: {
   itemId: string;
 }): Promise<ActionResult> {
   const { supabase } = await requireStaffProfile("suppliers");
-  const lockedError = await ensureComparisonEditable(supabase, input.comparisonId);
+  const lockedError = await ensureComparisonItemsEditable(supabase, input.comparisonId);
   if (lockedError) return { ok: false, error: lockedError };
   const { error } = await supabase
     .from("quote_comparison_items")
@@ -224,6 +238,13 @@ export async function removeQuoteComparisonSupplierAction(input: {
   const { supabase } = await requireStaffProfile("suppliers");
   const lockedError = await ensureComparisonEditable(supabase, input.comparisonId);
   if (lockedError) return { ok: false, error: lockedError };
+  const { data: bid, error: bidError } = await supabase
+    .from("quote_comparison_bids")
+    .select("id")
+    .eq("id", input.bidId)
+    .eq("comparison_id", input.comparisonId)
+    .maybeSingle<{ id: string }>();
+  if (bidError || !bid) return { ok: false, error: "The supplier quote could not be found in this comparison." };
   const { error } = await supabase
     .from("quote_comparison_bids")
     .delete()
@@ -267,6 +288,31 @@ export async function saveQuoteComparisonBidAction(input: {
   return { ok: true };
 }
 
+export async function confirmQuoteComparisonPriceMatchAction(input: {
+  comparisonId: string;
+  bidId: string;
+  itemId: string;
+}): Promise<ActionResult> {
+  const { supabase } = await requireStaffProfile("suppliers");
+  const lockedError = await ensureComparisonEditable(supabase, input.comparisonId);
+  if (lockedError) return { ok: false, error: lockedError };
+  const { data: bid, error: bidError } = await supabase
+    .from("quote_comparison_bids")
+    .select("id")
+    .eq("id", input.bidId)
+    .eq("comparison_id", input.comparisonId)
+    .maybeSingle<{ id: string }>();
+  if (bidError || !bid) return { ok: false, error: "The supplier quote could not be found in this comparison." };
+  const { error } = await supabase
+    .from("quote_comparison_prices")
+    .update({ notes: "" })
+    .eq("bid_id", input.bidId)
+    .eq("item_id", input.itemId);
+  if (error) return { ok: false, error: "The supplier item match could not be confirmed." };
+  revalidatePath(comparisonPath(input.comparisonId));
+  return { ok: true };
+}
+
 export async function awardQuoteComparisonBidAction(input: {
   comparisonId: string;
   bidId: string;
@@ -282,9 +328,17 @@ export async function awardQuoteComparisonBidAction(input: {
   ]);
   if (itemsResult.error || bidsResult.error) return { ok: false, error: "Could not verify the comparison." };
   const analysis = analyzeQuoteComparison(itemsResult.data ?? [], bidsResult.data ?? []).find((entry) => entry.bidId === input.bidId);
-  if (!analysis || analysis.blocked || analysis.pricedItemCount === 0) {
-    return { ok: false, error: "This supplier cannot be selected until it has valid pricing and an allowed trust level." };
+  if (!analysis || analysis.blocked || !analysis.eligible || analysis.missingItemCount > 0) {
+    return { ok: false, error: "This supplier cannot be selected until every client-request item has valid pricing." };
   }
+  const selectedBid = (bidsResult.data ?? []).find((bid) => bid.id === input.bidId);
+  const prices = new Map((selectedBid?.quote_comparison_prices ?? []).map((price) => [price.item_id, price]));
+  const weakMatch = (itemsResult.data ?? []).find((item) => {
+    const sourceDescription = prices.get(item.id)?.notes ?? "";
+    const matchStatus = quoteLineMatchStatus(item, sourceDescription);
+    return sourceDescription && matchStatus !== "exact" && matchStatus !== "manual";
+  });
+  if (weakMatch) return { ok: false, error: `Review the supplier match for ${weakMatch.description} before selecting this supplier.` };
 
   const { error } = await supabase.rpc("staff_award_quote_comparison_bid", {
     p_comparison_id: input.comparisonId,
