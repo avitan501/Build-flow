@@ -63,6 +63,9 @@ export const metadata: Metadata = {
     title: "Avantia Build | Materials Priced & Delivered",
     description: "Send plans or a material list. WhatsApp: (516) 908-8319.",
   },
+  other: {
+    "impact-site-verification": "08c0dd51-7fec-49c5-b32b-c32ee98fcbcc",
+  },
 };
 
 export default async function RootLayout({
