@@ -1,6 +1,7 @@
 import { DailyWorkSummaryForm } from "@/components/buildflow/daily-work-summary"
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { DAILY_WORK_SUMMARY_PREFIX, parseDailyWorkSummary } from "@/lib/daily-work-summary"
+import { SUPPLIER_QUOTE_BUCKET } from "@/lib/supplier-quotes"
 
 type SummaryRow = {
   id: string
@@ -19,7 +20,14 @@ export default async function DailySummaryPage() {
     .order("title", { ascending: false })
     .limit(90)
     .returns<SummaryRow[]>()
-  const summaries = result.error ? [] : (result.data ?? []).map(parseDailyWorkSummary).filter((entry) => entry !== null)
+  const parsed = result.error ? [] : (result.data ?? []).map(parseDailyWorkSummary).filter((entry) => entry !== null)
+  const summaries = await Promise.all(parsed.map(async (summary) => ({
+    ...summary,
+    problemAttachments: await Promise.all(summary.problemAttachments.map(async (attachment) => ({
+      ...attachment,
+      signedUrl: (await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).createSignedUrl(attachment.path, 1800)).data?.signedUrl ?? null,
+    }))),
+  })))
 
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-10">
     <div className="mx-auto max-w-5xl">

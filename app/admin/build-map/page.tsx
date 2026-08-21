@@ -20,8 +20,16 @@ import {
 import Link from "next/link";
 
 import { AddManagerGoal, CustomManagerGoals, type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
+import { ManagerDashboardAiSearch } from "@/components/buildflow/manager-dashboard-ai-search";
 import { DAILY_WORK_SUMMARY_PREFIX } from "@/lib/daily-work-summary";
 import { requireManagerPortalProfile } from "@/lib/auth";
+import {
+  COMMUNICATION_LOG_PREFIX,
+  DASHBOARD_AI_HISTORY_PREFIX,
+  EMPLOYEE_ACTIVITY_PREFIX,
+  parseDashboardAiHistory,
+  parseEmployeeActivity,
+} from "@/lib/manager-command-center";
 import { managerPipelineStage, type ManagerPipelineStage } from "@/lib/manager-dashboard";
 
 const QUO_INBOX_URL = "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
@@ -150,8 +158,16 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   const pipelineAvailable = !requestsResult.error && !comparisonsResult.error && !packagesResult.error;
 
   const goals = goalsResult.data ?? [];
+  const dashboardHistory = parseDashboardAiHistory(goals.find((goal) => goal.title === "Dashboard AI search" && goal.details?.startsWith(DASHBOARD_AI_HISTORY_PREFIX))?.details);
+  const employeeActivity = parseEmployeeActivity(goals.find((goal) => goal.details?.startsWith(EMPLOYEE_ACTIVITY_PREFIX))?.details);
   const websiteNotes = goals.filter((goal) => goal.details?.startsWith(WEBSITE_FIX_NOTE_PREFIX));
-  const regularGoals = goals.filter((goal) => !goal.details?.startsWith(WEBSITE_FIX_NOTE_PREFIX) && !goal.details?.startsWith(DAILY_WORK_SUMMARY_PREFIX));
+  const regularGoals = goals.filter((goal) => ![
+    WEBSITE_FIX_NOTE_PREFIX,
+    DAILY_WORK_SUMMARY_PREFIX,
+    DASHBOARD_AI_HISTORY_PREFIX,
+    EMPLOYEE_ACTIVITY_PREFIX,
+    COMMUNICATION_LOG_PREFIX,
+  ].some((prefix) => goal.details?.startsWith(prefix)));
   const openLeads = (leadsResult.data ?? []).filter((lead) => !["converted", "not_interested"].includes(lead.status)).length;
 
   const dailyLinks = [
@@ -167,7 +183,9 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   ];
 
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9"><div className="mx-auto max-w-7xl">
-    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5"><div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Dashboard</h1><p className="mt-2 text-sm text-slate-600">Today&apos;s requests, targets, and tools in one place.</p></div><Link href="/admin/daily-summary" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white"><CalendarDays className="h-4 w-4" />Daily summary</Link></header>
+    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5"><div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Dashboard</h1><p className="mt-2 text-sm text-slate-600">Today&apos;s requests, targets, and tools in one place.</p></div><div className="flex flex-wrap items-center gap-2">{access.owner && employeeActivity ? <span className="inline-flex min-h-10 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800"><span className="h-2 w-2 rounded-full bg-emerald-500" />Carlos: {employeeActivity.pageLabel}</span> : null}<Link href="/admin/daily-summary" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white"><CalendarDays className="h-4 w-4" />Daily summary</Link></div></header>
+
+    <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled={Boolean(process.env.OPENAI_API_KEY)} />
 
     {!pipelineAvailable ? <p role="alert" className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Some request counts could not load. Refresh before using the pipeline totals.</p> : null}
 

@@ -1,10 +1,10 @@
 "use client"
 
-import { CalendarDays, CheckCircle2, Clock3, LogIn, LogOut, Save } from "lucide-react"
+import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, FileImage, LoaderCircle, LogIn, LogOut, Save, Upload } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
-import { recordDailyAttendanceAction, saveDailyWorkSummaryAction } from "@/app/admin/daily-summary/actions"
+import { recordDailyAttendanceAction, saveDailyWorkSummaryAction, uploadDailyProblemPhotoAction } from "@/app/admin/daily-summary/actions"
 import { calculateWorkedMinutes, type DailyWorkSummary } from "@/lib/daily-work-summary"
 
 function localToday() {
@@ -40,6 +40,7 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
   const selectedSummary = summaries.find((summary) => summary.date === selectedDate)
   const [completed, setCompleted] = useState(initialSummary?.completed ?? "")
   const [open, setOpen] = useState(initialSummary?.open ?? "")
+  const [problems, setProblems] = useState(initialSummary?.problems ?? "")
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -49,6 +50,7 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
     setSelectedDate(date)
     setCompleted(summary?.completed ?? "")
     setOpen(summary?.open ?? "")
+    setProblems(summary?.problems ?? "")
     setMessage(null)
     setError(null)
   }
@@ -57,12 +59,27 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
     setError(null)
     setMessage(null)
     startTransition(async () => {
-      const result = await saveDailyWorkSummaryAction({ date: selectedDate, completed, open })
+      const result = await saveDailyWorkSummaryAction({ date: selectedDate, completed, open, problems })
       if (!result.ok) {
         setError(result.error)
         return
       }
       setMessage("Daily summary saved.")
+      router.refresh()
+    })
+  }
+
+  function uploadProblemPhoto(file: File | undefined) {
+    if (!file) return
+    setError(null)
+    setMessage(null)
+    const formData = new FormData()
+    formData.set("date", selectedDate)
+    formData.set("photo", file)
+    startTransition(async () => {
+      const result = await uploadDailyProblemPhotoAction(formData)
+      if (!result.ok) { setError(result.error); return }
+      setMessage("Problem image attached.")
       router.refresh()
     })
   }
@@ -105,9 +122,14 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
         </section>
         <label className="grid gap-1.5 text-sm font-semibold"><span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600" />Completed today</span><textarea value={completed} onChange={(event) => setCompleted(event.target.value)} maxLength={4000} rows={5} placeholder="Calls made, leads contacted, supplier pricing received, orders handled..." className="min-h-28 rounded-md border border-slate-300 p-3 font-normal leading-6 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
         <label className="grid gap-1.5 text-sm font-semibold"><span className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-amber-600" />Still open</span><textarea value={open} onChange={(event) => setOpen(event.target.value)} maxLength={4000} rows={4} placeholder="Follow-ups, unanswered calls, pricing still needed, and tomorrow's first steps..." className="min-h-24 rounded-md border border-slate-300 p-3 font-normal leading-6 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
+        <section className="rounded-md border border-rose-200 bg-rose-50/60 p-3">
+          <label className="grid gap-1.5 text-sm font-semibold"><span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-rose-600" />Website problem</span><textarea value={problems} onChange={(event) => setProblems(event.target.value)} maxLength={4000} rows={3} placeholder="What happened, which page, and what were you trying to do?" className="min-h-20 rounded-md border border-rose-200 bg-white p-3 font-normal leading-6 outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-100" /></label>
+          <div className="mt-3 flex flex-wrap items-center gap-2"><label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700"><Upload className="h-4 w-4" />Attach screenshot<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={pending} onChange={(event) => { uploadProblemPhoto(event.target.files?.[0]); event.currentTarget.value = "" }} /></label>{pending ? <LoaderCircle className="h-4 w-4 animate-spin text-rose-600" /> : null}</div>
+          {selectedSummary?.problemAttachments.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{selectedSummary.problemAttachments.map((attachment) => <a key={attachment.path} href={attachment.signedUrl || "#"} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-2 rounded-md border border-rose-100 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><FileImage className="h-4 w-4 shrink-0 text-rose-500" /><span className="truncate">{attachment.name}</span></a>)}</div> : null}
+        </section>
         {error ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
         {message ? <p className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{message}</p> : null}
-        <button type="button" onClick={save} disabled={pending || (!completed.trim() && !open.trim())} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-40 sm:w-auto sm:justify-self-start"><Save className="h-4 w-4" />{pending ? "Saving..." : selectedSummary ? "Update daily summary" : "Save daily summary"}</button>
+        <button type="button" onClick={save} disabled={pending || (!completed.trim() && !open.trim() && !problems.trim())} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[#0071e3] px-5 text-sm font-semibold text-white disabled:opacity-40 sm:w-auto sm:justify-self-start"><Save className="h-4 w-4" />{pending ? "Saving..." : selectedSummary ? "Update daily summary" : "Save daily summary"}</button>
       </div>
     </section>
 

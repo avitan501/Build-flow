@@ -6,6 +6,8 @@ export type DailyWorkSummary = {
   date: string
   completed: string
   open: string
+  problems: string
+  problemAttachments: Array<{ name: string; path: string; type: string; size: number; signedUrl?: string | null }>
   checkInAt: string | null
   checkOutAt: string | null
   updatedAt: string
@@ -35,6 +37,15 @@ export function parseDailyWorkSummary(row: DailyWorkSummaryRow): DailyWorkSummar
       date,
       completed: typeof value.completed === "string" ? value.completed : "",
       open: typeof value.open === "string" ? value.open : "",
+      problems: typeof value.problems === "string" ? value.problems : "",
+      problemAttachments: Array.isArray(value.problemAttachments) ? value.problemAttachments.filter((entry): entry is DailyWorkSummary["problemAttachments"][number] => Boolean(
+        entry
+        && typeof entry === "object"
+        && typeof entry.name === "string"
+        && typeof entry.path === "string"
+        && typeof entry.type === "string"
+        && typeof entry.size === "number",
+      )) : [],
       checkInAt: typeof value.checkInAt === "string" ? value.checkInAt : null,
       checkOutAt: typeof value.checkOutAt === "string" ? value.checkOutAt : null,
       updatedAt: row.updated_at,
@@ -48,6 +59,8 @@ export function serializeDailyWorkSummary(input: {
   date: string
   completed: string
   open: string
+  problems?: string
+  problemAttachments?: DailyWorkSummary["problemAttachments"]
   checkInAt?: string | null
   checkOutAt?: string | null
 }) {

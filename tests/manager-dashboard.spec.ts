@@ -25,10 +25,15 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain('assignee="david"');
   expect(page.indexOf('assignee="carlos"')).toBeLessThan(page.indexOf('assignee="david"'));
   expect(page).toContain("Daily tools");
+  expect(page).toContain("ManagerDashboardAiSearch");
+  expect(page).toContain("Dashboard AI search");
+  expect(page).toContain("employeeActivity");
   expect(page).toContain("Supplier quotes");
   expect(page).toContain("Compare prices");
   expect(shell.indexOf('{ href: "/admin/build-map", label: "Dashboard"')).toBeLessThan(shell.indexOf('{ href: "/admin/users", label: "Customers"'));
   expect(shell).toContain('const homeHref = "/admin/build-map"');
+  expect(shell).toContain('{ href: "/admin/communications", label: "Communications"');
+  expect(shell).toContain("EmployeeActivityReporter");
   expect(goalActions).toContain('revalidatePath("/admin/build-map")');
 });
 

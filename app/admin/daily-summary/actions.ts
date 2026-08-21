@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { DAILY_WORK_SUMMARY_PREFIX, DAILY_WORK_SUMMARY_TITLE_PREFIX, parseDailyWorkSummary, serializeDailyWorkSummary } from "@/lib/daily-work-summary"
+import { SUPPLIER_QUOTE_BUCKET } from "@/lib/supplier-quotes"
 
 type SaveDailySummaryResult = { ok: true } | { ok: false; error: string }
 type ExistingSummaryRow = { id: string; title: string; details: string | null; updated_at: string }
@@ -44,14 +45,16 @@ export async function saveDailyWorkSummaryAction(input: {
   date: string
   completed: string
   open: string
+  problems: string
 }): Promise<SaveDailySummaryResult> {
   const { supabase, user } = await requireManagerPortalProfile()
   const date = input.date.trim()
   const completed = input.completed.trim().slice(0, 4000)
   const open = input.open.trim().slice(0, 4000)
+  const problems = input.problems.trim().slice(0, 4000)
 
   if (!validDate(date)) return { ok: false, error: "Choose a valid work date." }
-  if (!completed && !open) return { ok: false, error: "Add what was completed or what is still open." }
+  if (!completed && !open && !problems) return { ok: false, error: "Add completed work, open work, or a website problem." }
 
   const title = `${DAILY_WORK_SUMMARY_TITLE_PREFIX}${date}`
   const existing = await findDailySummary(supabase, date)
@@ -62,6 +65,8 @@ export async function saveDailyWorkSummaryAction(input: {
     date,
     completed,
     open,
+    problems,
+    problemAttachments: current?.problemAttachments ?? [],
     checkInAt: current?.checkInAt,
     checkOutAt: current?.checkOutAt,
   })
@@ -99,7 +104,8 @@ export async function recordDailyAttendanceAction(input: {
   const checkOutAt = input.action === "check_out" ? now.toISOString() : current?.checkOutAt ?? null
   const completed = current?.completed ?? ""
   const open = current?.open ?? ""
-  const details = serializeDailyWorkSummary({ date, completed, open, checkInAt, checkOutAt })
+  const problems = current?.problems ?? ""
+  const details = serializeDailyWorkSummary({ date, completed, open, problems, problemAttachments: current?.problemAttachments ?? [], checkInAt, checkOutAt })
   const status = open || (checkInAt && !checkOutAt) ? "open" : "completed"
   const title = `${DAILY_WORK_SUMMARY_TITLE_PREFIX}${date}`
   const result = existing.data
@@ -108,6 +114,46 @@ export async function recordDailyAttendanceAction(input: {
 
   if (result.error) return { ok: false, error: "Attendance could not be saved. Please try again." }
 
+  revalidateDailySummary()
+  return { ok: true }
+}
+
+export async function uploadDailyProblemPhotoAction(formData: FormData): Promise<SaveDailySummaryResult> {
+  const { supabase, user } = await requireManagerPortalProfile()
+  const date = String(formData.get("date") || "").trim()
+  const file = formData.get("photo")
+  if (!validDate(date)) return { ok: false, error: "Choose a valid work date." }
+  if (!(file instanceof File) || !file.size) return { ok: false, error: "Choose a problem screenshot or photo." }
+  if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(file.type)) return { ok: false, error: "Use a JPG, PNG, or WebP image." }
+  if (file.size > 10 * 1024 * 1024) return { ok: false, error: "The image must be 10 MB or smaller." }
+
+  const existing = await findDailySummary(supabase, date)
+  if (existing.error) return { ok: false, error: "The daily summary could not be checked." }
+  const current = existing.data ? parseDailyWorkSummary(existing.data) : null
+  if ((current?.problemAttachments.length ?? 0) >= 8) return { ok: false, error: "A daily summary can contain up to 8 problem images." }
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-100) || "problem-image"
+  const path = `${user.id}/daily-issues/${date}/${crypto.randomUUID()}-${safeName}`
+  const upload = await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).upload(path, file, { contentType: file.type, upsert: false })
+  if (upload.error) return { ok: false, error: "The problem image could not be uploaded." }
+
+  const problemAttachments = [...(current?.problemAttachments ?? []), { name: file.name.slice(0, 160), path, type: file.type, size: file.size }]
+  const details = serializeDailyWorkSummary({
+    date,
+    completed: current?.completed ?? "",
+    open: current?.open ?? "",
+    problems: current?.problems ?? "",
+    problemAttachments,
+    checkInAt: current?.checkInAt,
+    checkOutAt: current?.checkOutAt,
+  })
+  const title = `${DAILY_WORK_SUMMARY_TITLE_PREFIX}${date}`
+  const result = existing.data
+    ? await supabase.from("manager_goals").update({ details, status: "open" }).eq("id", existing.data.id)
+    : await supabase.from("manager_goals").insert({ assignee: "carlos", title, details, status: "open", created_by: user.id })
+  if (result.error) {
+    await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).remove([path])
+    return { ok: false, error: "The problem image was uploaded but could not be linked to the summary." }
+  }
   revalidateDailySummary()
   return { ok: true }
 }

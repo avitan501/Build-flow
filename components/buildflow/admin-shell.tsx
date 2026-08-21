@@ -27,10 +27,11 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
+import { EmployeeActivityReporter } from "@/components/buildflow/employee-activity-reporter";
 
-const QUO_INBOX_URL = "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
 const GOOGLE_MEET_URL = "https://meet.google.com/";
 const WHATSAPP_CALL_URL = "https://web.whatsapp.com/";
+const QUO_INBOX_URL = "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
 
 const communicationLinks = [
   { href: QUO_INBOX_URL, label: "Calls & Messages", shortLabel: "Calls", icon: PhoneCall },
@@ -46,6 +47,7 @@ const primaryLinks = [
   { href: "/admin/supplier-quotes", label: "Supplier Quotes", icon: Archive },
   { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },
   { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
+  { href: "/admin/communications", label: "Communications", icon: PhoneCall },
 ] as const;
 
 const sharedMoreLinks = [
@@ -66,6 +68,7 @@ function linksForAccess(access: ManagerAccess) {
     (link.href === "/admin/vendors" && access.suppliers) ||
     (link.href === "/admin/supplier-quotes" && access.suppliers) ||
     (link.href === "/admin/quote-comparison" && access.suppliers) ||
+    (link.href === "/admin/communications" && access.customers) ||
     link.href === "/admin/build-map" ||
     link.href === "/admin/catalog",
   );
@@ -164,6 +167,7 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
           <ClipboardList className="h-4 w-4" />
           Account
         </Link>
+        <EmployeeActivityReporter owner={access.owner} />
       </div>
     </div>
   );

@@ -7,10 +7,11 @@ import { DeleteManagerRecordButton } from "@/components/buildflow/delete-manager
 import { ManagerCreateClientRequest } from "@/components/buildflow/manager-create-client-request"
 import { requireStaffProfile } from "@/lib/auth"
 import { MATERIAL_DEPARTMENTS } from "@/lib/material-questionnaires"
+import { COMMUNICATION_LOG_PREFIX, parseCommunicationLog, type CommunicationLog } from "@/lib/manager-command-center"
 import { isApprovedManagerIdentity } from "@/lib/owner-identity"
 
 const roleOptions = ["admin", "staff", "client"] as const
-const deletableRequestStatuses = new Set(["draft", "submitted", "in_review"])
+const deletableRequestStatuses = new Set(["draft", "submitted", "in_review", "quoted"])
 
 type CustomerRecord = {
   id: string
@@ -76,7 +77,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const search = params.q?.trim().toLowerCase() || ""
   const status = params.status?.trim() || "all"
 
-  const [customersResult, requestsResult, projectsResult, auditResult, categoriesResult] = await Promise.all([
+  const [customersResult, requestsResult, projectsResult, auditResult, categoriesResult, communicationResult] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, email, full_name, company_name, phone, role, approval_status, is_active, created_at")
@@ -100,6 +101,13 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
       .eq("is_active", true)
       .order("sort_order")
       .returns<Array<{ department_key: string }>>(),
+    supabase
+      .from("manager_goals")
+      .select("details")
+      .like("details", `${COMMUNICATION_LOG_PREFIX}%`)
+      .order("updated_at", { ascending: false })
+      .limit(500)
+      .returns<Array<{ details: string | null }>>(),
   ])
 
   if (customersResult.error) throw new Error("Failed to load customer accounts.")
@@ -117,11 +125,17 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const requestCount = new Map<string, number>()
   const projectRequestCount = new Map<string, number>()
   const projectCount = new Map<string, number>()
+  const communicationByClient = new Map<string, CommunicationLog[]>()
   for (const request of requests) {
     requestCount.set(request.owner_id, (requestCount.get(request.owner_id) ?? 0) + 1)
     projectRequestCount.set(request.project_id, (projectRequestCount.get(request.project_id) ?? 0) + 1)
   }
   for (const project of projects) projectCount.set(project.owner_id, (projectCount.get(project.owner_id) ?? 0) + 1)
+  for (const row of communicationResult.data ?? []) {
+    const log = parseCommunicationLog(row.details)
+    if (!log) continue
+    communicationByClient.set(log.clientId, [...(communicationByClient.get(log.clientId) ?? []), log])
+  }
 
   const filteredCustomers = clientCustomers.filter((customer) => {
     if (!search) return true
@@ -178,6 +192,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           <section className="mt-4 grid gap-3" aria-label="Customer accounts">
             {filteredCustomers.map((customer) => {
               const isSelf = customer.id === profile?.id
+              const communicationLogs = communicationByClient.get(customer.id) ?? []
               return <article key={customer.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0"><h2 className="text-lg font-bold">{customerName(customer)}</h2><p className="mt-1 break-all text-sm text-slate-600">{customer.email || "No email"}</p><p className="mt-1 text-sm text-slate-500">{customer.company_name || "No company"}{customer.phone ? ` · ${customer.phone}` : " · No phone"}</p></div>
@@ -185,6 +200,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-4 border-y border-slate-100 py-3 text-sm"><Link href={`/admin/users?view=projects&customer=${customer.id}`} className="font-semibold text-[#0066cc]"><strong>{projectCount.get(customer.id) ?? 0}</strong> projects</Link><Link href={`/admin/users?view=requests&customer=${customer.id}`} className="font-semibold text-[#0066cc]"><strong>{requestCount.get(customer.id) ?? 0}</strong> requests</Link><span className="text-slate-500">Joined {formatDate(customer.created_at)}</span></div>
                 <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Edit customer contact</summary><CustomerContactForm customer={{ id: customer.id, fullName: customer.full_name || "", companyName: customer.company_name || "", phone: customer.phone || "" }} /></details>
+                {communicationLogs.length ? <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Communication log ({communicationLogs.length})</summary><div className="mt-2 divide-y divide-slate-100 rounded-md border border-slate-200 bg-slate-50">{communicationLogs.slice(0, 12).map((log) => <div key={log.id} className="px-3 py-2.5"><div className="flex flex-wrap items-center justify-between gap-2 text-xs"><strong className="capitalize">{log.channel} · {log.direction}</strong><time className="text-slate-500">{formatDate(log.createdAt)}</time></div><p className="mt-1 text-sm text-slate-700">{log.summary}</p>{log.outcome ? <p className="mt-1 text-xs font-semibold text-[#0066cc]">Next: {log.outcome}</p> : null}</div>)}</div></details> : null}
                 {isOwner ? <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Owner-only account controls</summary><div className="mt-3 flex flex-wrap items-end gap-3 rounded-lg bg-slate-50 p-3">
                   <div className="flex flex-wrap gap-2"><form action={approvePendingUser}><input type="hidden" name="userId" value={customer.id} /><button type="submit" disabled={isSelf || customer.approval_status === "approved"} className="min-h-10 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white disabled:opacity-35">Approve</button></form><form action={suspendUser}><input type="hidden" name="userId" value={customer.id} /><button type="submit" disabled={isSelf || customer.approval_status === "suspended"} className="min-h-10 rounded-lg border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-800 disabled:opacity-35">Suspend</button></form><form action={rejectUser}><input type="hidden" name="userId" value={customer.id} /><button type="submit" disabled={isSelf || customer.approval_status === "rejected"} className="min-h-10 rounded-lg border border-rose-200 bg-white px-4 text-sm font-semibold text-rose-700 disabled:opacity-35">Reject</button></form></div>
                   <form action={changeUserRole} className="flex flex-wrap items-center gap-2"><input type="hidden" name="userId" value={customer.id} /><label className="text-xs font-semibold text-slate-600">Role <select name="role" defaultValue={customer.role} disabled={isSelf} className="ml-1 min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm">{roleOptions.map((role) => <option key={role}>{role}</option>)}</select></label><button type="submit" disabled={isSelf} className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-35">Save role</button></form>
