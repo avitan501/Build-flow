@@ -1,17 +1,17 @@
 import {
-  Archive,
   ArrowRight,
+  BarChart3,
   CalendarDays,
   CheckCircle2,
   ClipboardList,
   Clock3,
-  Columns3,
-  MessageCircle,
+  CreditCard,
   PackageCheck,
-  PackageOpen,
   PhoneCall,
   Send,
+  Settings,
   ShoppingCart,
+  Sparkles,
   Store,
   Target,
   UserRound,
@@ -181,17 +181,26 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   ].some((prefix) => goal.details?.startsWith(prefix)));
   const openLeads = (leadsResult.data ?? []).filter((lead) => !["converted", "not_interested"].includes(lead.status)).length;
 
-  const dailyLinks = [
-    ...(access.customers ? [{ href: "/owner/materials/requests", label: "Client requests", detail: "Review and create requests", icon: ClipboardList }] : []),
-    ...(access.customers ? [{ href: "/admin/users", label: "Customers", detail: "Clients and contact details", icon: Users }] : []),
-    ...(access.suppliers ? [{ href: "/admin/vendors", label: "Suppliers", detail: "Directory and routing", icon: Store }] : []),
-    ...(access.suppliers ? [{ href: "/admin/supplier-quotes", label: "Supplier quotes", detail: "Upload and extract pricing", icon: Archive }] : []),
-    ...(access.suppliers ? [{ href: "/admin/quote-comparison", label: "Compare prices", detail: "Client list versus suppliers", icon: Columns3 }] : []),
-    { href: "/admin/catalog", label: "Material catalog", detail: "Items and supplier prices", icon: PackageOpen },
-    { href: "/admin/daily-summary", label: "Daily summary", detail: "Check in, check out, and report", icon: CalendarDays },
-    { href: QUO_INBOX_URL, label: "Calls & messages", detail: "Open the company inbox", icon: PhoneCall },
-    { href: WHATSAPP_URL, label: "WhatsApp", detail: "Open supplier and client chats", icon: MessageCircle },
-  ];
+  const managerSections = [
+    { title: "Customers", icon: Users, links: access.customers ? [{ href: "/admin/users", label: "Customer Directory" }, { href: "/owner/materials/requests", label: "Client Requests" }] : [] },
+    { title: "Calls & Communications", icon: PhoneCall, links: [
+      ...(access.customers ? [{ href: "/admin/communications", label: "Communication Center" }] : []),
+      ...(access.owner ? [{ href: "/owner/aura", label: "Aura Communications" }] : []),
+      { href: QUO_INBOX_URL, label: "Calls & Messages" },
+      { href: WHATSAPP_URL, label: "WhatsApp" },
+      { href: "/admin/daily-summary", label: "Daily Work Summary" },
+    ] },
+    { title: "Suppliers", icon: Store, links: [
+      ...(access.suppliers ? [{ href: "/admin/vendors", label: "Supplier Directory" }, { href: "/admin/supplier-quotes", label: "Supplier Quotes" }, { href: "/admin/catalog", label: "Material Catalog" }, { href: "/admin/quote-comparison", label: "Quote Comparison" }] : []),
+      ...(access.owner ? [{ href: "/admin/abc", label: "ABC Supply Private Pricing" }] : []),
+    ] },
+    ...(access.owner ? [
+      { title: "AI Tools", icon: Sparkles, links: [{ href: "/admin/ai-tools", label: "Open AI Tools" }] },
+      { title: "Website Traffic", icon: BarChart3, links: [{ href: "/admin/traffic", label: "Open Website Traffic" }] },
+      { title: "Payments", icon: CreditCard, links: [{ href: "/admin/payments", label: "Payment Center" }] },
+    ] : []),
+    { title: "Manager Settings", icon: Settings, links: [{ href: "/admin/goals-progress", label: "Goals & Progress" }, ...(access.owner ? [{ href: "/admin/settings", label: "Integrations & Settings" }] : [])] },
+  ].filter((section) => section.links.length > 0);
 
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9"><div className="mx-auto max-w-7xl">
     <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5"><div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Dashboard</h1><p className="mt-2 text-sm text-slate-600">Today&apos;s requests, targets, and tools in one place.</p></div><div className="flex flex-wrap items-center gap-2">{access.owner && employeeActivity ? <span className="inline-flex min-h-10 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800"><span className="h-2 w-2 rounded-full bg-emerald-500" />Carlos: {employeeActivity.pageLabel}</span> : null}<Link href="/admin/daily-summary" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white"><CalendarDays className="h-4 w-4" />Daily summary</Link></div></header>
@@ -222,6 +231,6 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
       </PersonGoals>
     </div></section>
 
-    <section aria-labelledby="daily-tools-heading" className="mt-8 border-t border-slate-200 pt-6"><div><h2 id="daily-tools-heading" className="text-xl font-semibold">Daily tools</h2><p className="mt-1 text-xs text-slate-500">The pages used to move requests, pricing, clients, and supplier work forward.</p></div><div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-3 lg:grid-cols-5">{dailyLinks.map((item) => { const Icon = item.icon; const external = item.href.startsWith("https://"); return <Link key={item.href} href={item.href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="group flex min-h-24 flex-col justify-between bg-white p-4 hover:bg-slate-50"><Icon className="h-5 w-5 text-[#0066cc]" /><span className="mt-3"><span className="block text-sm font-semibold">{item.label}</span><span className="mt-0.5 hidden text-xs leading-5 text-slate-500 sm:block">{item.detail}</span></span></Link>; })}</div></section>
+    <section aria-labelledby="manager-tools-heading" className="mt-8 border-t border-slate-200 pt-6"><div><h2 id="manager-tools-heading" className="text-xl font-semibold">Manager tools</h2><p className="mt-1 text-xs text-slate-500">Business tools organized by responsibility.</p></div><div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{managerSections.map((section) => { const Icon = section.icon; return <section key={section.title} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"><header className="flex items-center gap-3 border-b border-slate-100 px-4 py-3"><span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-slate-100 text-[#0066cc]"><Icon className="h-4 w-4" /></span><h3 className="font-semibold">{section.title}</h3></header><div>{section.links.map((item) => { const external = item.href.startsWith("https://"); return <Link key={item.href} href={item.href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="group flex min-h-12 items-center justify-between gap-3 border-b border-slate-100 px-4 text-sm font-semibold text-slate-700 last:border-b-0 hover:bg-slate-50 hover:text-[#0066cc]"><span>{item.label}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5" /></Link>; })}</div></section>; })}</div></section>
   </div></main>;
 }

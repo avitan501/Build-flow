@@ -11,6 +11,7 @@ export type MobileMenuLink = {
   gated?: boolean;
   external?: boolean;
   badge?: string;
+  prominent?: boolean;
 };
 
 type MobileMenuDrawerProps = {
@@ -153,9 +154,8 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
           </details> : null}
 
           {adminLinks.length > 0 ? (
-            <div className="mt-8 pt-5">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0066cc]">Manager</p>
-              <nav className="mt-2 grid" aria-label="Admin navigation">
+            <div className="mt-10">
+              <nav className="grid" aria-label="Manager navigation">
               {adminLinks.map((link) => {
                 const active = Boolean(pathname) && isActivePath(pathname, link.href);
                 return (
@@ -164,9 +164,11 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
                     href={link.href}
                     prefetch={false}
                     onClick={onClose}
-                    className={`flex min-h-14 items-center justify-between px-1 text-base font-semibold transition ${active ? "text-[#0066cc]" : "text-slate-800 hover:text-[#0066cc]"}`}
+                    className={link.prominent
+                      ? `group flex min-h-24 items-center justify-between gap-4 rounded-lg px-5 py-4 text-white shadow-[0_12px_30px_rgba(15,23,42,0.16)] transition active:scale-[0.99] ${active ? "bg-[#0071e3]" : "bg-slate-950 hover:bg-slate-900"}`
+                      : `flex min-h-14 items-center justify-between px-1 text-base font-semibold transition ${active ? "text-[#0066cc]" : "text-slate-800 hover:text-[#0066cc]"}`}
                   >
-                    <span>{link.label}</span><span className="text-xl font-light text-slate-400" aria-hidden="true">›</span>
+                    <span className="min-w-0"><span className={link.prominent ? "block text-xl font-semibold" : "block"}>{link.label}</span>{link.description ? <span className={`mt-1 block text-xs font-normal leading-5 ${link.prominent ? "text-slate-300" : "text-slate-500"}`}>{link.description}</span> : null}</span><span className={`text-2xl font-light ${link.prominent ? "text-white/70" : "text-slate-400"}`} aria-hidden="true">›</span>
                   </Link>
                 );
               })}
@@ -181,7 +183,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
               onClick={onClose}
               className="flex min-h-16 items-center justify-between px-1 text-lg font-semibold text-slate-950 transition hover:text-[#0066cc]"
             >
-              <span>{isSignedIn ? "Account" : "Log in"}</span>
+              <span>{isSignedIn ? "My Account" : "Log in"}</span>
               <span className="text-2xl font-light text-slate-400" aria-hidden="true">›</span>
             </Link>
           </div>

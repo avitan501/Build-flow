@@ -145,7 +145,7 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
   ]);
 
   expect(navigation).toContain('{ href: "/admin/quote-comparison", label: "Quote Comparison"');
-  expect(navigation).toContain('link.href === "/admin/quote-comparison" && access.suppliers');
+  expect(navigation).toContain('...(access.suppliers ? [');
   expect(navigation).toContain('label: "Calls & Messages"');
   expect(navigation).toContain('label: "Open Google Meet"');
   expect(navigation).toContain('label: "Open WhatsApp to make a call"');

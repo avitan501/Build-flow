@@ -62,7 +62,7 @@ function AccountIcon({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, managerHref = "/admin/build-map", isPreviewAdminEnabled = false, displayName = null }: MobileClientHeaderProps) {
+export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/build-map", isPreviewAdminEnabled = false, displayName = null }: MobileClientHeaderProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -74,7 +74,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
   const isShopPage = Boolean(pathname) && pathname.startsWith("/shop");
   const isHome = pathname === "/";
   const shopQuery = isShopPage ? searchParams.get("q") ?? "" : "";
-  const accountLabel = isSignedIn ? displayName?.split(/\s+/)[0] || "Account" : "Log in";
+  const accountLabel = isSignedIn ? displayName?.split(/\s+/)[0] || "My Account" : "Log in";
 
   useEffect(() => {
     if (shopSearchOpen) {
@@ -101,17 +101,10 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
       return [];
     }
 
-    return [
-      ...(isAdmin
-        ? [
-            { href: managerHref, label: "Manager" },
-            { href: "/admin/users", label: "Customers" },
-            { href: "/admin/vendors", label: "Suppliers" },
-            ...(isOwner ? [{ href: "/admin/ai-tools", label: "AI Tools" }, { href: "/admin/traffic", label: "Website Traffic" }] : []),
-          ]
-        : []),
-    ];
-  }, [isAdmin, isOwner, isPreviewAdminEnabled, managerHref]);
+    return isAdmin
+      ? [{ href: managerHref, label: "Manager", description: "Customers, suppliers, communications, and business tools", prominent: true }]
+      : [];
+  }, [isAdmin, isPreviewAdminEnabled, managerHref]);
 
   const normalizedQuery = draftQuery.trim().toLowerCase();
   const shopSuggestions = useMemo(() => {

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { requireAdminProfile } from "@/lib/auth";
 import { callAbcBridge } from "@/lib/abc-supply/bridge";
 
 export const runtime = "nodejs";
 export const preferredRegion = "iad1";
 
 export async function GET() {
+  await requireAdminProfile();
   try {
     const payload = await callAbcBridge({ action: "accounts" });
     return NextResponse.json(payload, { headers: { "Cache-Control": "no-store, max-age=0" } });

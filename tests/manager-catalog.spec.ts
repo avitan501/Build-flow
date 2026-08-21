@@ -5,14 +5,19 @@ import { expect, test } from "@playwright/test"
 
 const root = process.cwd()
 
-test("manager navigation groups secondary tools and keeps communication shortcuts at the bottom", async () => {
+test("manager navigation groups business tools and keeps communication shortcuts at the bottom", async () => {
   const shell = await readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8")
   expect(shell).toContain('label: "Material Catalog"')
   expect(shell).toContain('href: "/admin/catalog"')
   expect(shell).toContain('label: "Website Traffic"')
   expect(shell).toContain('label: "AI Tools"')
-  expect(shell).toContain('label: "Dashboard"')
-  expect(shell).toContain("More")
+  expect(shell).toContain("Manager Dashboard")
+  expect(shell).toContain('label: "Calls & Communications"')
+  expect(shell).toContain('label: "Suppliers"')
+  expect(shell).toContain('href: "/admin/abc"')
+  expect(shell).toContain('href: "/admin/payments"')
+  expect(shell).toContain('label: "Manager Settings"')
+  expect(shell).not.toContain('<span className="min-w-0 flex-1 text-left">More</span>')
   expect(shell).toContain('shortLabel: "Calls"')
   expect(shell).toContain('shortLabel: "Meet"')
   expect(shell).toContain('shortLabel: "WhatsApp"')

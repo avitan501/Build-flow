@@ -1,24 +1,16 @@
 import { AccountSettings } from "@/components/buildflow/account-settings";
 import { requireSignedInProfile } from "@/lib/auth";
-import { isApprovedManagerIdentity } from "@/lib/owner-identity";
 
 type AccountPageProps = {
   searchParams?: Promise<{
     error?: string;
     updated?: string;
-    payment?: string;
   }>;
 };
 
 export default async function AccountPage({ searchParams }: AccountPageProps) {
   const params = (await searchParams) ?? {};
   const { user, profile } = await requireSignedInProfile();
-  const showAbcPricing = isApprovedManagerIdentity({
-    email: user.email || profile?.email,
-    role: profile?.role,
-    approvalStatus: profile?.approval_status,
-    isActive: profile?.is_active,
-  });
 
   return (
     <AccountSettings
@@ -28,9 +20,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
       alternatePhone={typeof user.user_metadata.alternate_phone === "string" ? user.user_metadata.alternate_phone : null}
       feedbackCode={params.error || params.updated || null}
       feedbackTone={params.error ? "error" : params.updated ? "success" : null}
-      paymentStatus={params.payment || null}
-      hasSavedPaymentProfile={typeof user.app_metadata.stripe_customer_id === "string"}
-      showAbcPricing={showAbcPricing}
+      notificationEmail={user.user_metadata.notification_email !== false}
+      notificationSms={user.user_metadata.notification_sms === true}
     />
   );
 }

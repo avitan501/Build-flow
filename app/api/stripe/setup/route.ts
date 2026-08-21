@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireSignedInProfile } from "@/lib/auth";
+import { requireAdminProfile } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createStripeObject, hasStripeServerConfig } from "@/lib/stripe";
 
-function accountRedirect(request: NextRequest, payment: string) {
-  return NextResponse.redirect(new URL(`/account?payment=${payment}`, request.url), 303);
+function paymentRedirect(request: NextRequest, payment: string) {
+  return NextResponse.redirect(new URL(`/admin/payments?payment=${payment}`, request.url), 303);
 }
 
 export async function POST(request: NextRequest) {
   if (!hasStripeServerConfig()) {
-    return accountRedirect(request, "setup-unavailable");
+    return paymentRedirect(request, "setup-unavailable");
   }
 
-  const { user, profile } = await requireSignedInProfile();
+  const { user, profile } = await requireAdminProfile();
 
   try {
     let customerId = typeof user.app_metadata.stripe_customer_id === "string"
@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
       customer: customerId,
       "payment_method_types[0]": "card",
       "payment_method_types[1]": "us_bank_account",
-      success_url: `${origin}/account?payment=saved`,
-      cancel_url: `${origin}/account?payment=canceled`,
+      success_url: `${origin}/admin/payments?payment=saved`,
+      cancel_url: `${origin}/admin/payments?payment=canceled`,
     });
 
     if (!session.url) {
@@ -58,6 +58,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.redirect(session.url, 303);
   } catch {
-    return accountRedirect(request, "setup-error");
+    return paymentRedirect(request, "setup-error");
   }
 }

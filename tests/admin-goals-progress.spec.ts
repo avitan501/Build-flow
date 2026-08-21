@@ -5,13 +5,13 @@ import { expect, test } from "@playwright/test";
 
 const root = process.cwd();
 
-test("manager More menu keeps Client Target inside Goals and Progress", async () => {
+test("manager navigation keeps Client Target inside grouped Goals and Progress", async () => {
   const shell = await readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8");
 
   expect(shell).toContain('{ href: "/admin/goals-progress", label: "Goals & Progress", icon: Target }');
   expect(shell).not.toContain('{ href: "/admin/goals-progress/client-target", label: "Client Target", icon: Target }');
-  expect(shell).toContain("const sharedMoreLinks");
-  expect(shell).toContain("access.owner ? [...sharedMoreLinks, ...ownerMoreLinks] : [...sharedMoreLinks]");
+  expect(shell).toContain("function navigationGroups(access: ManagerAccess)");
+  expect(shell).not.toContain("sharedMoreLinks");
 });
 
 test("Goals & Progress allows manager employees while owner controls stay protected", async () => {

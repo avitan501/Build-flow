@@ -74,3 +74,17 @@ export async function updateAlternateContacts(formData: FormData) {
   revalidatePath("/account");
   redirect("/account?updated=contacts");
 }
+
+export async function updateNotificationPreferences(formData: FormData) {
+  const { supabase } = await requireSignedInProfile();
+  const { error } = await supabase.auth.updateUser({
+    data: {
+      notification_email: formData.get("notificationEmail") === "on",
+      notification_sms: formData.get("notificationSms") === "on",
+    },
+  });
+
+  if (error) redirect("/account?error=notifications");
+  revalidatePath("/account");
+  redirect("/account?updated=notifications");
+}

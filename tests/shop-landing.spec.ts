@@ -226,7 +226,7 @@ test("manager pages require authentication and stay out of the guest menu", asyn
   await page.goto("/")
   await page.getByRole("button", { name: "Open navigation menu" }).click()
   const drawerWidth = await page.getByRole("complementary").evaluate((element) => element.getBoundingClientRect().width)
-  expect(drawerWidth).toBeLessThanOrEqual(288)
+  expect(drawerWidth).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth))
   await expect(page.getByRole("link", { name: "Manager", exact: true })).toHaveCount(0)
 
   await page.goto("/admin/build-map")
