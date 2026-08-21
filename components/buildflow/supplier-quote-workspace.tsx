@@ -105,11 +105,12 @@ export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, depar
     })
   }
 
-  function retryExtraction() {
+  function retryExtraction(replaceExisting = false) {
+    if (replaceExisting && !window.confirm("Re-read the original invoice with AI and replace the current extracted rows? The original invoice will remain saved.")) return
     startTransition(async () => {
       setTone("info")
       setMessage("Reading the original invoice and extracting its material lines...")
-      const result = await retrySupplierQuoteExtractionAction(quote.id)
+      const result = await retrySupplierQuoteExtractionAction(quote.id, replaceExisting)
       if (!result.ok) { setTone("error"); setMessage(result.error); return }
       setItems(result.data.items.map(editableItem))
       setTone("success")
@@ -156,7 +157,7 @@ export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, depar
         </section>
 
         <section className="mt-4 border border-slate-200 bg-white shadow-sm" aria-labelledby="quote-items-heading">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><h2 id="quote-items-heading" className="font-bold">Extracted items</h2><p className="mt-0.5 text-xs text-slate-500">Review every selected row before routing</p></div><button type="button" onClick={addLine} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-bold"><Plus className="h-4 w-4" /> Add line</button></div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><h2 id="quote-items-heading" className="font-bold">Extracted items</h2><p className="mt-0.5 text-xs text-slate-500">Review every selected row before routing</p></div><div className="flex flex-wrap gap-2">{items.length ? <button type="button" onClick={() => retryExtraction(true)} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 px-3 text-sm font-bold text-sky-800"><RotateCw className="h-4 w-4" /> Re-read with AI</button> : null}<button type="button" onClick={addLine} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-bold"><Plus className="h-4 w-4" /> Add line</button></div></div>
           <div className="divide-y divide-slate-200">
             {items.map((item, index) => <article key={item.id} className={`grid gap-3 p-4 lg:grid-cols-[2.5rem_minmax(13rem,2fr)_minmax(8rem,1fr)_6rem_6rem_7rem_7rem_2.5rem] lg:items-end ${item.selected ? "bg-white" : "bg-slate-50 opacity-65"}`}>
               <label className="flex items-center gap-2 text-xs font-bold text-slate-500 lg:grid lg:justify-items-center"><span className="lg:hidden">Use item</span><input type="checkbox" checked={item.selected} onChange={(event) => updateItem(item.id, { selected: event.target.checked })} className="h-5 w-5 accent-[#0071e3]" aria-label={`Use item ${index + 1}`} /><span className="tabular-nums">{index + 1}</span></label>
@@ -168,7 +169,7 @@ export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, depar
               <div><p className="text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500">Line total</p><p className="flex min-h-10 items-center text-sm font-bold tabular-nums">{money(item.quantity * (item.unitPrice ?? 0))}</p></div>
               <button type="button" onClick={() => removeLine(item)} disabled={pending} aria-label={`Remove ${item.description}`} className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
             </article>)}
-            {!items.length ? <div className="px-5 py-10 text-center"><FileSearch className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 font-bold">No items extracted yet</p><p className="mx-auto mt-1 max-w-md text-sm text-slate-500">Read the saved invoice again to extract material names, model numbers, quantities, units, prices, and totals.</p><div className="mt-4 flex flex-wrap justify-center gap-2"><button type="button" onClick={retryExtraction} disabled={pending} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-50">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />} Extract invoice</button><button type="button" onClick={addLine} disabled={pending} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold"><Plus className="h-4 w-4" /> Add manually</button></div></div> : null}
+            {!items.length ? <div className="px-5 py-10 text-center"><FileSearch className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 font-bold">No items extracted yet</p><p className="mx-auto mt-1 max-w-md text-sm text-slate-500">Read the saved invoice again to extract material names, model numbers, quantities, units, prices, and totals.</p><div className="mt-4 flex flex-wrap justify-center gap-2"><button type="button" onClick={() => retryExtraction()} disabled={pending} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-50">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />} Extract invoice</button><button type="button" onClick={addLine} disabled={pending} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold"><Plus className="h-4 w-4" /> Add manually</button></div></div> : null}
           </div>
         </section>
 

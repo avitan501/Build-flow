@@ -335,7 +335,7 @@ export async function deleteSupplierQuoteItemAction(quoteId: string, itemId: str
   return { ok: true, message: "Item removed." }
 }
 
-export async function retrySupplierQuoteExtractionAction(quoteId: string): Promise<ActionResult<{ items: SupplierQuoteItemRecord[] }>> {
+export async function retrySupplierQuoteExtractionAction(quoteId: string, replaceExisting = false): Promise<ActionResult<{ items: SupplierQuoteItemRecord[] }>> {
   const { supabase, user, quote } = await loadQuote(quoteId)
   if (!quote) return { ok: false, error: "This supplier quote could not be found." }
 
@@ -344,7 +344,7 @@ export async function retrySupplierQuoteExtractionAction(quoteId: string): Promi
     .select("id", { count: "exact", head: true })
     .eq("quote_id", quote.id)
   if (countError) return { ok: false, error: "The current quote items could not be checked." }
-  if ((count ?? 0) > 0) return { ok: false, error: "This quote already has items. Review those lines before running extraction again." }
+  if ((count ?? 0) > 0 && !replaceExisting) return { ok: false, error: "This quote already has items. Review those lines before running extraction again." }
 
   const { data: storedFile, error: downloadError } = await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).download(quote.file_path)
   if (downloadError || !storedFile) return { ok: false, error: "The original invoice could not be opened for extraction." }
@@ -380,6 +380,10 @@ export async function retrySupplierQuoteExtractionAction(quoteId: string): Promi
     selected: true,
     review_status: "needs_review",
   }))
+  if (replaceExisting && (count ?? 0) > 0) {
+    const { error: removeError } = await supabase.from("supplier_quote_items").delete().eq("quote_id", quote.id)
+    if (removeError) return { ok: false, error: "The old extracted rows could not be replaced. No changes were made." }
+  }
   const { data: inserted, error: insertError } = await supabase
     .from("supplier_quote_items")
     .insert(rows)
