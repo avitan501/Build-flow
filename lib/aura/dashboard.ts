@@ -1,8 +1,9 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { canSendAuraEmail, canSendAuraQuoText } from "@/lib/aura/communications";
 import { canSendAuraWhatsApp } from "@/lib/aura/whatsapp";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 export type AuraIntakeRow = {
   id: string;
@@ -65,8 +66,7 @@ export type AuraCommunicationRow = {
   occurred_at: string;
 };
 
-export async function loadAuraDashboard() {
-  const supabase = createAdminClient();
+export async function loadAuraDashboard(supabase: SupabaseClient) {
   const [intakesResult, contactsResult, leadsResult, tasksResult, communicationsResult] = await Promise.all([
     supabase
       .from("aura_intakes")

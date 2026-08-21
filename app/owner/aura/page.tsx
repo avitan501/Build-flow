@@ -24,8 +24,8 @@ function emptyState(label: string) {
 }
 
 export default async function AuraOwnerPage() {
-  await requireOwnerAccess("/owner/aura");
-  const { intakes, contacts, leads, tasks, communications, connections } = await loadAuraDashboard();
+  const { supabase } = await requireOwnerAccess("/owner/aura");
+  const { intakes, contacts, leads, tasks, communications, connections } = await loadAuraDashboard(supabase);
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-950 sm:px-8 sm:py-10">
