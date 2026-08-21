@@ -15,11 +15,13 @@ const accessories: ReadonlyArray<{ id: string; name: string; unit: string; image
 ] as const
 
 export function SheetRockProductConfigurator() {
+  const boardUnitPrice = 1
   const [drywallType, setDrywallType] = useState("Regular")
   const [size, setSize] = useState("4 ft. x 12 ft.")
   const [thickness, setThickness] = useState("1/2 in.")
   const [quantity, setQuantity] = useState(1)
-  const [selectedAccessories, setSelectedAccessories] = useState<Record<string, number>>({ compound: 1, tape: 1 })
+  const [selectedAccessories, setSelectedAccessories] = useState<Record<string, number>>({})
+  const [compoundColor, setCompoundColor] = useState("Green")
   const [imageOpen, setImageOpen] = useState(false)
 
   const productName = `${drywallType} drywall board`
@@ -28,9 +30,9 @@ export function SheetRockProductConfigurator() {
   const details = useMemo(() => {
     const lines = [`Product: ${drywallType} drywall board`, `Size: ${size}`, `Thickness: ${thickness}`, `Quantity: ${quantity} sheets`]
     const selected = accessories.filter((item) => (selectedAccessories[item.id] ?? 0) > 0)
-    if (selected.length) lines.push("Accessories:", ...selected.map((item) => `- ${selectedAccessories[item.id]} ${item.unit} ${item.name}`))
+    if (selected.length) lines.push("Accessories:", ...selected.map((item) => `- ${selectedAccessories[item.id]} ${item.unit} ${item.name}${item.id === "compound" ? ` (${compoundColor} lid)` : ""}`))
     return lines.join("\n")
-  }, [drywallType, quantity, selectedAccessories, size, thickness])
+  }, [compoundColor, drywallType, quantity, selectedAccessories, size, thickness])
 
   function updateAccessory(id: string, next: number) {
     setSelectedAccessories((current) => {
@@ -45,7 +47,7 @@ export function SheetRockProductConfigurator() {
     <ShopTranslationBoundary><section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="sheet-rock-configurator-heading">
       <div className="min-w-0 p-4 sm:p-5">
           <div className="grid grid-cols-[minmax(0,1fr)_4rem] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_5rem] sm:gap-5">
-            <div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0066cc]">Configure exact material</p><h2 id="sheet-rock-configurator-heading" className="mt-1 text-xl font-bold">{productName}</h2><p className="mt-1 text-sm text-slate-500">Choose the board, size, thickness, quantity, and accessories before requesting supplier pricing.</p><span className="mt-2 inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">Price by quote</span></div>
+            <div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0066cc]">Configure exact material</p><h2 id="sheet-rock-configurator-heading" className="mt-1 text-xl font-bold">{productName}</h2><p className="mt-1 text-sm text-slate-500">Choose the board, size, thickness, quantity, and accessories before requesting supplier pricing.</p><span className="mt-2 inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">$1.00 per sheet</span></div>
           <button type="button" onClick={() => setImageOpen(true)} className="group relative block h-16 w-16 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:h-20 sm:w-20" aria-label="Enlarge product image">
             <span className="absolute inset-0 bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${productImage})`, backgroundPosition: imagePosition, backgroundSize: "400% 200%" }} />
             <span className="absolute bottom-1 right-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-950/85 text-white shadow"><ZoomIn className="h-3.5 w-3.5" /></span>
@@ -65,10 +67,13 @@ export function SheetRockProductConfigurator() {
               <div className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200">
                 {accessories.map((item) => {
                   const count = selectedAccessories[item.id] ?? 0
-                  return <div key={item.id} className={`grid grid-cols-[minmax(0,1fr)_2.75rem_auto] items-center gap-2 px-2 py-2 ${count ? "bg-orange-50/60" : ""}`}>
-                    <button type="button" onClick={() => updateAccessory(item.id, count ? 0 : 1)} className="min-w-0 text-left"><span className="block text-sm font-bold leading-tight">{item.name}</span><span className="block text-[10px] text-slate-500">{count ? "Selected" : "Tap to add"}</span></button>
-                    <span className="h-10 w-10 rounded-md border border-slate-200 bg-white bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${item.image})`, backgroundPosition: item.position, backgroundSize: item.position ? "400% 200%" : undefined }} />
-                    <QuantityStepper value={count} onChange={(value) => updateAccessory(item.id, value)} compact ariaLabel={`${item.name} quantity`} />
+                  return <div key={item.id} className={count ? "bg-orange-50/60" : ""}>
+                    <div className="grid grid-cols-[minmax(0,1fr)_2.75rem_auto] items-center gap-2 px-2 py-2">
+                      <button type="button" onClick={() => updateAccessory(item.id, count ? 0 : 1)} className="min-w-0 text-left"><span className="block text-sm font-bold leading-tight">{item.name}</span><span className="block text-[10px] text-slate-500">{count ? "Selected" : "Tap to add"}</span></button>
+                      <span className="h-10 w-10 rounded-md border border-slate-200 bg-white bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${item.image})`, backgroundPosition: item.position, backgroundSize: item.position ? "400% 200%" : undefined }} />
+                      <QuantityStepper value={count} onChange={(value) => updateAccessory(item.id, value)} compact ariaLabel={`${item.name} quantity`} />
+                    </div>
+                    {item.id === "compound" && count > 0 ? <div className="border-t border-orange-100 px-2 pb-2 pt-2"><OptionGroup label="Compound color" value={compoundColor} options={["Green", "Blue"]} onChange={setCompoundColor} /></div> : null}
                   </div>
                 })}
               </div>
@@ -76,7 +81,7 @@ export function SheetRockProductConfigurator() {
           </div>
 
           <div className="mt-5 flex justify-end border-t border-slate-200 pt-4">
-            <AddToProjectButton product={{ id: "sheet-rock-drywall", name: productName, category: "Sheet rock", productType: "material", price: 0, unit: "sheets" }} quantity={quantity} details={details} label="Add configured item" className="rounded-lg" />
+            <AddToProjectButton product={{ id: "sheet-rock-drywall", name: productName, category: "Sheet rock", productType: "material", price: boardUnitPrice, unit: "sheets" }} quantity={quantity} details={details} label="Add configured item" className="rounded-lg" />
           </div>
       </div>
 
@@ -86,7 +91,7 @@ export function SheetRockProductConfigurator() {
 }
 
 function OptionGroup({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
-  return <ShopTranslationBoundary><fieldset><legend className="text-xs font-bold text-slate-700">{label}</legend><div className="mt-1.5 flex flex-wrap gap-2">{options.map((option) => <button key={option} type="button" onClick={() => onChange(option)} className={`inline-flex min-h-9 items-center gap-1 rounded-md border px-3 text-xs font-semibold ${value === option ? "border-orange-500 bg-orange-50 text-slate-950" : "border-slate-300 bg-white text-slate-700"}`}>{value === option ? <Check className="h-3 w-3 text-orange-600" /> : null}{option}</button>)}</div></fieldset></ShopTranslationBoundary>
+  return <ShopTranslationBoundary><fieldset><legend className="text-xs font-bold text-slate-700">{label}</legend><div className="mt-1.5 flex flex-wrap gap-2">{options.map((option) => <button key={option} type="button" aria-pressed={value === option} onClick={() => onChange(option)} className={`inline-flex min-h-9 items-center gap-1 rounded-md border px-3 text-xs font-semibold ${value === option ? "border-orange-500 bg-orange-50 text-slate-950" : "border-slate-300 bg-white text-slate-700"}`}>{value === option ? <Check className="h-3 w-3 text-orange-600" /> : null}{option}</button>)}</div></fieldset></ShopTranslationBoundary>
 }
 
 function QuantityStepper({ value, onChange, compact = false, ariaLabel }: { value: number; onChange: (value: number) => void; compact?: boolean; ariaLabel: string }) {
