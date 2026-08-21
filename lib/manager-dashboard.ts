@@ -21,11 +21,8 @@ export function managerPipelineStage(
   supplierPackages: ManagerPipelineSupplierPackage[],
 ): ManagerPipelineStage {
   const requestComparisons = comparisons.filter((comparison) => comparison.request_id === request.id);
-  const accepted = requestComparisons.some((comparison) => comparison.client_quote_status === "accepted" || comparison.status === "awarded");
-  if (["approved", "quoted"].includes(request.status) || accepted) return "delivery";
-
-  const sent = requestComparisons.some((comparison) => comparison.client_quote_status === "sent");
-  if (request.status === "waiting_for_client" || sent) return "approval";
+  if (["approved", "quoted"].includes(request.status)) return "delivery";
+  if (["in_review", "waiting_for_client"].includes(request.status)) return "approval";
 
   if (requestComparisons.length > 0 || supplierPackages.some((supplierPackage) => supplierPackage.request_id === request.id)) return "pricing";
   return "received";

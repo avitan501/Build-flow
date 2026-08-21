@@ -31,3 +31,10 @@ test("manager status controls keep paid delivery and completion separate", async
   expect(workflowManager).toContain('<option value="closed">Request Completed</option>')
   expect(workflowActions).toContain('quoted: "Payment received; waiting for supplier delivery"')
 })
+
+test("customer directory does not expose the unrelated pending approval label", async () => {
+  const page = await readFile(path.join(process.cwd(), "app/admin/users/page.tsx"), "utf8")
+
+  expect(page).not.toContain("pendingCustomers")
+  expect(page).not.toContain("{customer.approval_status}</span>")
+})

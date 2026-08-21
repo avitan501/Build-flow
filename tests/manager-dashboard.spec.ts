@@ -18,7 +18,7 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain("Received / needs shopping");
   expect(page).toContain("Priced / not sent");
   expect(page).toContain("Waiting for client");
-  expect(page).toContain("Approved / delivery");
+  expect(page).toContain("Payment received / delivery");
   expect(page).toContain("client_quote_status");
   expect(page).toContain("Goals &amp; targets");
   expect(page).toContain('assignee="carlos"');
@@ -37,7 +37,7 @@ test("request pipeline moves work through pricing, approval, and delivery", () =
 
   expect(managerPipelineStage(request, [], [])).toBe("received");
   expect(managerPipelineStage(request, [], [{ request_id: request.id }])).toBe("pricing");
-  expect(managerPipelineStage(request, [{ request_id: request.id, status: "review", client_quote_status: "sent" }], [])).toBe("approval");
+  expect(managerPipelineStage(request, [{ request_id: request.id, status: "review", client_quote_status: "sent" }], [])).toBe("pricing");
+  expect(managerPipelineStage({ ...request, status: "in_review" }, [{ request_id: request.id, status: "awarded", client_quote_status: "accepted" }], [])).toBe("approval");
   expect(managerPipelineStage({ ...request, status: "quoted" }, [], [])).toBe("delivery");
-  expect(managerPipelineStage(request, [{ request_id: request.id, status: "awarded", client_quote_status: "accepted" }], [])).toBe("delivery");
 });

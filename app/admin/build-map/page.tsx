@@ -91,8 +91,8 @@ const pipelineStages: Array<{
   },
   {
     id: "delivery",
-    label: "Approved / delivery",
-    description: "Client approved; order or delivery still needs completion.",
+    label: "Payment received / delivery",
+    description: "Payment received; supplier delivery still needs completion.",
     icon: PackageCheck,
     tone: "border-emerald-200 bg-emerald-50",
     numberTone: "text-emerald-900",

@@ -143,12 +143,11 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   })
 
   const openRequests = requests.filter((request) => deletableRequestStatuses.has(request.status)).length
-  const pendingCustomers = clientCustomers.filter((customer) => customer.approval_status === "pending").length
   const statuses = Array.from(new Set(requests.map((request) => request.status))).sort()
   const projectStatuses = Array.from(new Set(projects.map((project) => project.status))).sort()
   const pageTitle = view === "customers" ? "Customer Directory" : view === "projects" ? "Customer Projects" : "Customer Requests"
   const pageDescription = view === "customers"
-    ? "Customer accounts, contact details, projects, and access status."
+    ? "Customer accounts, contact details, projects, and requests."
     : view === "projects"
       ? "Every customer project, its related requests, and permanent project controls."
       : "Every material and service request submitted by your customers."
@@ -162,7 +161,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
         </header>
 
         <nav className="mt-6 grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-white p-1" aria-label="Customers, projects, and requests views">
-          <Link href="/admin/users?view=customers" className={`flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold ${view === "customers" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Users className="h-4 w-4 shrink-0" /><span className="truncate">Customers</span><span className={`rounded-full px-2 py-0.5 text-xs ${view === "customers" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}>{clientCustomers.length}</span>{pendingCustomers ? <span className="hidden text-xs text-amber-600 lg:inline">{pendingCustomers} pending</span> : null}</Link>
+          <Link href="/admin/users?view=customers" className={`flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold ${view === "customers" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Users className="h-4 w-4 shrink-0" /><span className="truncate">Customers</span><span className={`rounded-full px-2 py-0.5 text-xs ${view === "customers" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}>{clientCustomers.length}</span></Link>
           <Link href="/admin/users?view=projects" className={`flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold ${view === "projects" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><FolderKanban className="h-4 w-4 shrink-0" /><span className="truncate">Projects</span><span className={`rounded-full px-2 py-0.5 text-xs ${view === "projects" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}>{projects.length}</span></Link>
           <Link href="/admin/users?view=requests" className={`flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold ${view === "requests" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><ClipboardList className="h-4 w-4 shrink-0" /><span className="truncate">Requests</span><span className={`rounded-full px-2 py-0.5 text-xs ${view === "requests" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}>{openRequests}</span></Link>
         </nav>
@@ -182,7 +181,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
               return <article key={customer.id} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0"><h2 className="text-lg font-bold">{customerName(customer)}</h2><p className="mt-1 break-all text-sm text-slate-600">{customer.email || "No email"}</p><p className="mt-1 text-sm text-slate-500">{customer.company_name || "No company"}{customer.phone ? ` · ${customer.phone}` : " · No phone"}</p></div>
-                  <div className="flex flex-wrap justify-end gap-2"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(customer.role)}`}>{customer.role}</span><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(customer.approval_status)}`}>{customer.approval_status}</span>{isSelf ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">Your account</span> : null}</div>
+                  <div className="flex flex-wrap justify-end gap-2"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(customer.role)}`}>{customer.role}</span>{isSelf ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">Your account</span> : null}</div>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-4 border-y border-slate-100 py-3 text-sm"><Link href={`/admin/users?view=projects&customer=${customer.id}`} className="font-semibold text-[#0066cc]"><strong>{projectCount.get(customer.id) ?? 0}</strong> projects</Link><Link href={`/admin/users?view=requests&customer=${customer.id}`} className="font-semibold text-[#0066cc]"><strong>{requestCount.get(customer.id) ?? 0}</strong> requests</Link><span className="text-slate-500">Joined {formatDate(customer.created_at)}</span></div>
                 <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Edit customer contact</summary><CustomerContactForm customer={{ id: customer.id, fullName: customer.full_name || "", companyName: customer.company_name || "", phone: customer.phone || "" }} /></details>
