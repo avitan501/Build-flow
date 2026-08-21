@@ -55,6 +55,31 @@ const DOUBLE_DOOR_PRICES = [
 ] as const
 
 const DOOR_PRICE_FORMATTER = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
+const SHEET_ROCK_PRICE_FORMATTER = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 })
+
+const SHEET_ROCK_FEATURED_PRICES = [
+  {
+    name: "5/8 in. Type X Firecode Drywall",
+    detail: "4 ft. x 8 ft. sheet",
+    image: "/images/department-essentials/drywall-grid.webp",
+    regularPrice: 12.5,
+    contractorPrice: 11.25,
+  },
+  {
+    name: "5/8 in. Mold Tough Type X Drywall",
+    detail: "4 ft. x 8 ft. sheet",
+    image: "/images/buildflow-retail/drywall.jpg",
+    regularPrice: 16.25,
+    contractorPrice: 15.5,
+  },
+  {
+    name: "Blue / Green Joint Compound",
+    detail: "4.5 gal. pail",
+    image: "/images/materials/catalog/shr-011-blue-joint-compound.png",
+    regularPrice: 19.25,
+    contractorPrice: 18.25,
+  },
+] as const
 
 function DoorPricingGuide() {
   return (
@@ -89,6 +114,47 @@ function DoorPricingGuide() {
           <p className="text-[10px] leading-4 text-slate-500 lg:col-span-2">Reference pricing from the supplied price board. Final availability and pricing are confirmed with your quote.</p>
         </div>
       </details>
+    </section>
+  )
+}
+
+function SheetRockPricingGuide() {
+  return (
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="sheet-rock-price-guide-title" data-testid="sheet-rock-price-guide">
+      <div className="flex items-end justify-between gap-4 border-b border-slate-200 px-4 py-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-700">Featured contractor pricing</p>
+          <h2 id="sheet-rock-price-guide-title" className="mt-0.5 text-base font-bold text-slate-950 sm:text-lg">Sheet Rock and Compound</h2>
+        </div>
+        <p className="hidden text-right text-[10px] leading-4 text-slate-500 sm:block">Jack&apos;s Building Materials<br />Quote #2331 · Aug 19, 2026</p>
+      </div>
+
+      <div className="divide-y divide-slate-200 sm:grid sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        {SHEET_ROCK_FEATURED_PRICES.map((item, index) => (
+          <article key={item.name} className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 p-3 sm:grid-cols-1 sm:p-4">
+            <div className="relative h-[4.5rem] overflow-hidden rounded-md bg-slate-50 sm:h-24">
+              <Image src={item.image} alt={item.name} fill sizes="(min-width: 640px) 30vw, 72px" className="object-contain p-1.5" loading={index === 0 ? "eager" : "lazy"} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold leading-5 text-slate-950">{item.name}</h3>
+              <p className="mt-0.5 text-xs text-slate-500">{item.detail}</p>
+              <div className="mt-2 grid grid-cols-2 overflow-hidden rounded-md border border-slate-200">
+                <div className="px-2 py-1.5">
+                  <p className="text-[9px] font-bold uppercase text-slate-500">Regular</p>
+                  <p className="text-sm font-bold tabular-nums text-slate-950">{SHEET_ROCK_PRICE_FORMATTER.format(item.regularPrice)}</p>
+                </div>
+                <div className="border-l border-slate-200 bg-sky-50 px-2 py-1.5">
+                  <p className="text-[9px] font-bold uppercase text-sky-700">Contractor price</p>
+                  <p className="text-sm font-bold tabular-nums text-slate-950">{SHEET_ROCK_PRICE_FORMATTER.format(item.contractorPrice)}</p>
+                </div>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <p className="border-t border-slate-200 px-4 py-2 text-[10px] leading-4 text-slate-500 sm:hidden">Jack&apos;s Building Materials · Quote #2331 · Aug 19, 2026</p>
+      <p className="border-t border-slate-200 px-4 py-2 text-[10px] leading-4 text-slate-500">Final availability and contractor-tier eligibility are confirmed with the order.</p>
     </section>
   )
 }
@@ -263,6 +329,7 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
 
         {isBulkBagDepartment ? <BulkBagStorefront /> : null}
         {category.slug === "door-and-molding" ? <DoorPricingGuide /> : null}
+        {category.slug === "sheet-rock" ? <SheetRockPricingGuide /> : null}
         {category.slug === "tile-work" ? <ThinsetCalculatorAction /> : null}
         {experience.showQuickOrder && category.slug === "sheet-rock" ? <SheetRockProductConfigurator /> : null}
         {experience.showQuickOrder && usesEmbeddedQuickOrder && category.slug !== "sheet-rock" && questionnaireSnapshot ? <div id={category.slug === "door-and-molding" ? "door-order-builder" : undefined} className="scroll-mt-24"><EmbeddedMaterialQuickOrder snapshot={questionnaireSnapshot} category={questionnaireDepartment} displayCategory={category.label} requestId={category.slug} /></div> : null}
