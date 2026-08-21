@@ -63,21 +63,21 @@ const SHEET_ROCK_FEATURED_PRICES = [
     detail: "4 ft. x 8 ft. sheet",
     image: "/images/department-essentials/drywall-grid.webp",
     regularPrice: 12.5,
-    contractorPrice: 11.25,
+    bulkPrice: 11.25,
   },
   {
     name: "5/8 in. Mold Tough Type X Drywall",
     detail: "4 ft. x 8 ft. sheet",
     image: "/images/buildflow-retail/drywall.jpg",
     regularPrice: 16.25,
-    contractorPrice: 15.5,
+    bulkPrice: 15.5,
   },
   {
     name: "Blue / Green Joint Compound",
     detail: "4.5 gal. pail",
     image: "/images/materials/catalog/shr-011-blue-joint-compound.png",
     regularPrice: 19.25,
-    contractorPrice: 18.25,
+    bulkPrice: 18.25,
   },
 ] as const
 
@@ -121,12 +121,11 @@ function DoorPricingGuide() {
 function SheetRockPricingGuide() {
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="sheet-rock-price-guide-title" data-testid="sheet-rock-price-guide">
-      <div className="flex items-end justify-between gap-4 border-b border-slate-200 px-4 py-3">
+      <div className="border-b border-slate-200 px-4 py-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-700">Featured contractor pricing</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-700">Featured bulk pricing</p>
           <h2 id="sheet-rock-price-guide-title" className="mt-0.5 text-base font-bold text-slate-950 sm:text-lg">Sheet Rock and Compound</h2>
         </div>
-        <p className="hidden text-right text-[10px] leading-4 text-slate-500 sm:block">Jack&apos;s Building Materials<br />Quote #2331 · Aug 19, 2026</p>
       </div>
 
       <div className="divide-y divide-slate-200 sm:grid sm:grid-cols-3 sm:divide-x sm:divide-y-0">
@@ -144,8 +143,8 @@ function SheetRockPricingGuide() {
                   <p className="text-sm font-bold tabular-nums text-slate-950">{SHEET_ROCK_PRICE_FORMATTER.format(item.regularPrice)}</p>
                 </div>
                 <div className="border-l border-slate-200 bg-sky-50 px-2 py-1.5">
-                  <p className="text-[9px] font-bold uppercase text-sky-700">Contractor price</p>
-                  <p className="text-sm font-bold tabular-nums text-slate-950">{SHEET_ROCK_PRICE_FORMATTER.format(item.contractorPrice)}</p>
+                  <p className="text-[9px] font-bold uppercase text-sky-700">Bulk</p>
+                  <p className="text-sm font-bold tabular-nums text-slate-950">{SHEET_ROCK_PRICE_FORMATTER.format(item.bulkPrice)}</p>
                 </div>
               </div>
             </div>
@@ -153,8 +152,7 @@ function SheetRockPricingGuide() {
         ))}
       </div>
 
-      <p className="border-t border-slate-200 px-4 py-2 text-[10px] leading-4 text-slate-500 sm:hidden">Jack&apos;s Building Materials · Quote #2331 · Aug 19, 2026</p>
-      <p className="border-t border-slate-200 px-4 py-2 text-[10px] leading-4 text-slate-500">Final availability and contractor-tier eligibility are confirmed with the order.</p>
+      <p className="border-t border-slate-200 px-4 py-2 text-[10px] leading-4 text-slate-500">Final availability and bulk pricing are confirmed with the order.</p>
     </section>
   )
 }
