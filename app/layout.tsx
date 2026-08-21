@@ -47,7 +47,10 @@ const searchEngineIdentity = JSON.stringify({
         "@type": "ContactPoint",
         telephone: "+1-516-908-8319",
         contactType: "sales",
-        areaServed: "US",
+        areaServed: {
+          "@type": "State",
+          name: "New York",
+        },
         availableLanguage: ["English", "Spanish"],
       },
     },

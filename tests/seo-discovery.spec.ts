@@ -33,6 +33,7 @@ test("identifies Avantia Build to search engines", async ({ page }) => {
   const schema = await page.locator('script[type="application/ld+json"]').textContent()
   expect(schema).toContain('"name":"Avantia Build"')
   expect(schema).toContain('"telephone":"+1-516-908-8319"')
+  expect(schema).toContain('"name":"New York"')
 })
 
 test("marks manager pages as unavailable for indexing", async ({ request }) => {

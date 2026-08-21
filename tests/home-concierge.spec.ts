@@ -49,6 +49,27 @@ test("cinematic homepage presents Construction Concierge clearly", async ({ page
   expect(overflows).toBe(false);
 });
 
+test("homepage video reaches the top and does not reserve a hidden bottom dock", async ({ page }) => {
+  await page.goto("/");
+
+  const layout = await page.evaluate(() => {
+    const header = document.querySelector<HTMLElement>('[data-testid="site-header"]');
+    const hero = document.querySelector<HTMLElement>("[data-homepage-hero]");
+    const main = document.querySelector<HTMLElement>("main");
+
+    return {
+      headerPosition: header ? getComputedStyle(header).position : null,
+      heroTop: hero?.getBoundingClientRect().top ?? null,
+      mainPaddingBottom: main ? getComputedStyle(main).paddingBottom : null,
+    };
+  });
+
+  expect(layout.headerPosition).toBe("fixed");
+  expect(layout.heroTop).not.toBeNull();
+  expect(Math.abs(layout.heroTop ?? 0)).toBeLessThanOrEqual(16);
+  expect(layout.mainPaddingBottom).toBe("0px");
+});
+
 test("desktop hero scales with the page instead of cropping at narrower widths", async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 900 });
   await page.goto("/");

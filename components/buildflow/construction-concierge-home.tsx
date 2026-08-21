@@ -97,7 +97,7 @@ export function ConstructionConciergeHome() {
   }
 
   return (
-    <main className="overflow-x-clip bg-[#f4f5f7] pb-20 text-[#071126] sm:pb-0">
+    <main className="overflow-x-clip bg-[#f4f5f7] text-[#071126]">
       <section data-homepage-hero className="relative isolate flex min-h-[min(88svh,56rem)] items-start justify-center overflow-hidden bg-[#071126] text-white sm:aspect-video sm:min-h-0 sm:items-center">
         <video className="absolute inset-0 -z-20 h-full w-full object-cover object-bottom sm:hidden" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v13-mobile-poster.png" onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
           <source src="/videos/avantia-hero-background-v13-mobile.webm" type="video/webm" />

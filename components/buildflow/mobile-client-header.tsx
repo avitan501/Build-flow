@@ -149,7 +149,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
         data-testid="site-header"
         className={
           isHome
-            ? "sticky top-0 z-[60] border-b border-[#d2d2d7]/30 bg-white/8 px-3 py-2 backdrop-blur-xl sm:px-5"
+            ? "fixed inset-x-0 top-0 z-[60] bg-transparent px-3 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-5 sm:pt-3"
             : "sticky top-0 z-[60] border-b border-[#d2d2d7] bg-white/95 backdrop-blur-md"
         }
       >
