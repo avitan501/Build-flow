@@ -96,10 +96,6 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
     { href: "/beat-a-quote", label: "Beat My Quote", description: "Upload a supplier quote for a better price" },
   ], []);
 
-  const moreLinks = useMemo<MobileMenuLink[]>(() => [
-    { href: "/ai/renovation-estimator", label: "Renovation AI", badge: "New" },
-  ], []);
-
   const adminLinks = useMemo<MobileMenuLink[]>(() => {
     if (!isAdmin && !isPreviewAdminEnabled) {
       return [];
@@ -295,7 +291,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, isOwner = false, manag
         ) : null}
       </div>
 
-      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} primaryLinks={primaryLinks} moreLinks={moreLinks} adminLinks={adminLinks} isSignedIn={isSignedIn} />
+      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} primaryLinks={primaryLinks} adminLinks={adminLinks} isSignedIn={isSignedIn} />
 
       {shopSearchOpen ? (
         <div id="shop-search-overlay" role="dialog" aria-modal="true" className="fixed inset-0 z-[80] bg-white/96 backdrop-blur-sm">

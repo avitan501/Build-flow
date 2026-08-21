@@ -95,8 +95,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
         className={`fixed inset-0 z-[71] overflow-y-auto bg-white px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] transition duration-300 sm:px-8 ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col">
-          <div className="flex items-center justify-between gap-3 pb-3">
-            <span className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">Menu</span>
+          <div className="flex items-center justify-end pb-3">
             <button
               type="button"
               onClick={onClose}
