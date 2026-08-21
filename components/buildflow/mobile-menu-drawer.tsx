@@ -95,7 +95,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
         className={`fixed inset-0 z-[71] overflow-y-auto bg-white px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] transition duration-300 sm:px-8 ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col">
-          <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center justify-between gap-3 pb-3">
             <span className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">Menu</span>
             <button
               type="button"
@@ -110,7 +110,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
             </button>
           </div>
 
-          <nav className="mt-12 grid sm:mt-16" aria-label="Mobile full navigation">
+          <nav className="mt-12 grid gap-1 sm:mt-16" aria-label="Mobile full navigation">
             {primaryLinks.map((link) => {
               const active = !link.external && Boolean(pathname) && isActivePath(pathname, link.href);
               return (
@@ -121,7 +121,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
                   onClick={onClose}
                   target={link.external ? "_blank" : undefined}
                   rel={link.external ? "noopener noreferrer" : undefined}
-                  className={`group flex min-h-[4rem] items-center justify-between gap-4 border-b border-slate-100 px-1 py-3 tracking-normal transition active:translate-x-0.5 ${
+                  className={`group flex min-h-[4rem] items-center justify-between gap-4 px-1 py-3 tracking-normal transition active:translate-x-0.5 ${
                     active
                       ? "text-[#0066cc]"
                       : "text-slate-950 hover:text-[#0066cc]"
@@ -139,22 +139,22 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
             })}
           </nav>
 
-          {requestLinks.length ? <div className="mt-8 border-t border-slate-200 pt-5">
+          {requestLinks.length ? <div className="mt-8 pt-5">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Requests</p>
             <nav className="mt-2 grid" aria-label="Request navigation">
-              {requestLinks.map((link) => <Link key={`${link.label}-${link.href}`} href={link.href} prefetch={false} onClick={onClose} className={`flex min-h-14 items-center justify-between border-b border-slate-100 px-1 text-base font-semibold ${Boolean(pathname) && isActivePath(pathname, link.href) ? "text-[#0066cc]" : "text-slate-800 hover:text-[#0066cc]"}`}><span>{link.label}</span><span className="text-xl font-light text-slate-400" aria-hidden="true">›</span></Link>)}
+              {requestLinks.map((link) => <Link key={`${link.label}-${link.href}`} href={link.href} prefetch={false} onClick={onClose} className={`flex min-h-14 items-center justify-between px-1 text-base font-semibold ${Boolean(pathname) && isActivePath(pathname, link.href) ? "text-[#0066cc]" : "text-slate-800 hover:text-[#0066cc]"}`}><span>{link.label}</span><span className="text-xl font-light text-slate-400" aria-hidden="true">›</span></Link>)}
             </nav>
           </div> : null}
 
-          {moreLinks.length ? <details className="group mt-8 border-t border-slate-200 pt-4">
+          {moreLinks.length ? <details className="group mt-8 pt-4">
             <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-1 text-base font-semibold text-slate-900 marker:content-none"><span>More</span><span className="text-xl font-light text-slate-400 transition group-open:rotate-90" aria-hidden="true">›</span></summary>
-            <nav className="grid border-t border-slate-100" aria-label="More navigation">
-              {moreLinks.map((link) => <Link key={`${link.label}-${link.href}`} href={link.href} prefetch={false} onClick={onClose} className={`flex min-h-14 items-center justify-between border-b border-slate-100 px-1 text-base font-semibold ${Boolean(pathname) && isActivePath(pathname, link.href) ? "text-[#0066cc]" : "text-slate-700 hover:text-[#0066cc]"}`}><span>{link.label}</span>{link.badge ? <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] uppercase tracking-[.1em] text-sky-700">{link.badge}</span> : <span className="text-xl font-light text-slate-400" aria-hidden="true">›</span>}</Link>)}
+            <nav className="grid" aria-label="More navigation">
+              {moreLinks.map((link) => <Link key={`${link.label}-${link.href}`} href={link.href} prefetch={false} onClick={onClose} className={`flex min-h-14 items-center justify-between px-1 text-base font-semibold ${Boolean(pathname) && isActivePath(pathname, link.href) ? "text-[#0066cc]" : "text-slate-700 hover:text-[#0066cc]"}`}><span>{link.label}</span>{link.badge ? <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] uppercase tracking-[.1em] text-sky-700">{link.badge}</span> : <span className="text-xl font-light text-slate-400" aria-hidden="true">›</span>}</Link>)}
             </nav>
           </details> : null}
 
           {adminLinks.length > 0 ? (
-            <div className="mt-8 border-t border-slate-200 pt-5">
+            <div className="mt-8 pt-5">
               <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0066cc]">Manager</p>
               <nav className="mt-2 grid" aria-label="Admin navigation">
               {adminLinks.map((link) => {
@@ -165,7 +165,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
                     href={link.href}
                     prefetch={false}
                     onClick={onClose}
-                    className={`flex min-h-14 items-center justify-between border-b border-slate-100 px-1 text-base font-semibold transition ${active ? "text-[#0066cc]" : "text-slate-800 hover:text-[#0066cc]"}`}
+                    className={`flex min-h-14 items-center justify-between px-1 text-base font-semibold transition ${active ? "text-[#0066cc]" : "text-slate-800 hover:text-[#0066cc]"}`}
                   >
                     <span>{link.label}</span><span className="text-xl font-light text-slate-400" aria-hidden="true">›</span>
                   </Link>
@@ -180,7 +180,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
               href={isSignedIn ? "/account" : "/login"}
               prefetch={false}
               onClick={onClose}
-              className="flex min-h-16 items-center justify-between border-t border-slate-200 px-1 text-lg font-semibold text-slate-950 transition hover:text-[#0066cc]"
+              className="flex min-h-16 items-center justify-between px-1 text-lg font-semibold text-slate-950 transition hover:text-[#0066cc]"
             >
               <span>{isSignedIn ? "Account" : "Log in"}</span>
               <span className="text-2xl font-light text-slate-400" aria-hidden="true">›</span>
