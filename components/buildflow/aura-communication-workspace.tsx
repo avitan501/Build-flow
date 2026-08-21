@@ -51,7 +51,7 @@ export function AuraCommunicationWorkspace({
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [channelFilter, setChannelFilter] = useState("all");
-  const [channel, setChannel] = useState<"sms" | "whatsapp" | "email">(connections.quo.send ? "sms" : connections.whatsapp.send ? "whatsapp" : "email");
+  const [channel, setChannel] = useState<"call" | "sms" | "whatsapp" | "email">("call");
   const [recipient, setRecipient] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -85,21 +85,24 @@ export function AuraCommunicationWorkspace({
   }
 
   function sendMessage() {
+    if (channel === "call") return;
+    const messageChannel = channel;
     setFeedback(null);
     startTransition(async () => {
-      const result = await sendAuraMessageAction({ channel, recipient, subject, message });
+      const result = await sendAuraMessageAction({ channel: messageChannel, recipient, subject, message });
       if (!result.ok) {
         setFeedback({ tone: "error", text: result.error });
         return;
       }
       setMessage("");
-      const channelName = channel === "sms" ? "SMS" : channel === "whatsapp" ? "WhatsApp" : "Email";
+      const channelName = messageChannel === "sms" ? "SMS" : messageChannel === "whatsapp" ? "WhatsApp" : "Email";
       setFeedback({ tone: "success", text: `${channelName} sent and saved to the timeline.` });
       router.refresh();
     });
   }
 
-  const selectedChannelReady = channel === "sms" ? connections.quo.send : channel === "whatsapp" ? connections.whatsapp.send : connections.email.send;
+  const selectedChannelReady = channel === "call" || (channel === "sms" ? connections.quo.send : channel === "whatsapp" ? connections.whatsapp.send : connections.email.send);
+  const normalizedPhone = recipient.replace(/[^0-9+]/g, "");
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
@@ -112,15 +115,27 @@ export function AuraCommunicationWorkspace({
             </div>
             {channel !== "email" && recipient ? <a href={`tel:${recipient}`} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold"><Phone className="h-4 w-4" />Call</a> : null}
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)]">
-            <label className="grid gap-1.5 text-xs font-semibold">Channel<select value={channel} onChange={(event) => { setChannel(event.target.value as "sms" | "whatsapp" | "email"); setRecipient(""); }} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal"><option value="sms" disabled={!connections.quo.send}>Q U O SMS</option><option value="whatsapp" disabled={!connections.whatsapp.send}>WhatsApp</option><option value="email" disabled={!connections.email.send}>Email</option></select></label>
-            <label className="grid gap-1.5 text-xs font-semibold">{channel === "email" ? "Customer email" : "Customer phone"}<input value={recipient} onChange={(event) => setRecipient(event.target.value)} inputMode={channel === "email" ? "email" : "tel"} autoComplete={channel === "email" ? "email" : "tel"} placeholder={channel === "email" ? "customer@example.com" : "(516) 555-0123"} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label>
-            {channel === "email" ? <label className="grid gap-1.5 text-xs font-semibold md:col-span-2">Subject<input value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={200} placeholder="Message from Avantia Build" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label> : null}
-            <label className="grid gap-1.5 text-xs font-semibold md:col-span-2">Message<textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1600} rows={4} placeholder="Write the message here" className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-6" /></label>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Communication method">
+            {([
+              ["call", "Call", Phone],
+              ["sms", "Text", Smartphone],
+              ["whatsapp", "WhatsApp", MessageCircle],
+              ["email", "Email", Mail],
+            ] as const).map(([value, label, Icon]) => (
+              <button key={value} type="button" onClick={() => { setChannel(value); setFeedback(null); }} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold ${channel === value ? "border-[#0071e3] bg-[#0071e3] text-white" : "border-slate-300 bg-white text-slate-800"}`}>
+                <Icon className="h-4 w-4" />{label}
+              </button>
+            ))}
           </div>
-          {!selectedChannelReady ? <p className="mt-3 text-sm font-semibold text-amber-700">This channel needs its API credentials before messages can be sent.</p> : null}
+          <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+            <label className="grid gap-1.5 text-xs font-semibold">{channel === "email" ? "Customer email" : "Customer phone"}<input value={recipient} onChange={(event) => setRecipient(event.target.value)} inputMode={channel === "email" ? "email" : "tel"} autoComplete={channel === "email" ? "email" : "tel"} placeholder={channel === "email" ? "customer@example.com" : "(516) 555-0123"} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label>
+            {channel === "call" ? <a href={normalizedPhone ? `tel:${normalizedPhone}` : undefined} aria-disabled={!normalizedPhone} className={`inline-flex min-h-11 self-end items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold ${normalizedPhone ? "bg-emerald-600 text-white" : "pointer-events-none bg-slate-200 text-slate-400"}`}><Phone className="h-4 w-4" />Start call</a> : null}
+            {channel === "email" ? <label className="grid gap-1.5 text-xs font-semibold md:col-span-2">Subject<input value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={200} placeholder="Message from Avantia Build" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label> : null}
+            {channel !== "call" ? <label className="grid gap-1.5 text-xs font-semibold md:col-span-2">Message<textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1600} rows={4} placeholder="Write the message here" className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-6" /></label> : null}
+          </div>
+          {!selectedChannelReady ? <p className="mt-3 text-sm font-semibold text-amber-700">This channel needs its API credentials. Open Phone connections above and press Connect WhatsApp & Text.</p> : null}
           {feedback ? <p className={`mt-3 text-sm font-semibold ${feedback.tone === "success" ? "text-emerald-700" : "text-rose-700"}`} role="status">{feedback.text}</p> : null}
-          <div className="mt-4 flex justify-end"><button type="button" onClick={sendMessage} disabled={pending || !selectedChannelReady || !recipient.trim() || !message.trim()} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Sending..." : "Send message"}</button></div>
+          {channel !== "call" ? <div className="mt-4 flex justify-end"><button type="button" onClick={sendMessage} disabled={pending || !selectedChannelReady || !recipient.trim() || !message.trim()} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Sending..." : channel === "sms" ? "Send text" : channel === "whatsapp" ? "Send WhatsApp" : "Send email"}</button></div> : null}
         </section>
 
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="aura-history-heading">
