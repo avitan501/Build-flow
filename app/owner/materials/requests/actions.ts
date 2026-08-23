@@ -47,6 +47,47 @@ export async function organizeClientMaterialRequestAction(formData: FormData) {
   return { ok: true as const, status: data.status || "organized", itemCount: data.itemCount || 0, reviewCount: data.reviewCount || 0 }
 }
 
+export async function updateOrganizedMaterialItemAction(formData: FormData) {
+  const requestId = String(formData.get("requestId") || "").trim()
+  const itemId = String(formData.get("itemId") || "").trim()
+  const name = String(formData.get("name") || "").trim().replace(/\s+/g, " ").slice(0, 300)
+  const quantity = Number(formData.get("quantity"))
+  const unit = String(formData.get("unit") || "").trim().replace(/\s+/g, " ").slice(0, 60)
+  const dimensions = String(formData.get("dimensions") || "").trim().replace(/\s+/g, " ").slice(0, 300)
+  const thickness = String(formData.get("thickness") || "").trim().replace(/\s+/g, " ").slice(0, 160)
+  const details = String(formData.get("details") || "").trim().replace(/\s+/g, " ").slice(0, 1200)
+  const markReady = formData.get("markReady") === "true"
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !/^[0-9a-f-]{36}$/i.test(itemId)) return { ok: false as const, error: "This item could not be identified." }
+  if (!name || !Number.isFinite(quantity) || quantity <= 0 || !unit) return { ok: false as const, error: "Enter the item, quantity, and unit." }
+
+  const { supabase, user } = await requireStaffProfile("customers")
+  const { data: item } = await supabase
+    .from("quote_request_items")
+    .select("id,metadata")
+    .eq("id", itemId)
+    .eq("request_id", requestId)
+    .maybeSingle<{ id: string; metadata: Record<string, unknown> | null }>()
+  if (!item || item.metadata?.ai_organized !== true) return { ok: false as const, error: "Only the organized material copy can be changed here." }
+
+  const metadata = {
+    ...(item.metadata ?? {}),
+    dimensions,
+    thickness,
+    request_details: details,
+    manually_reviewed_at: new Date().toISOString(),
+    manually_reviewed_by: user.id,
+    ...(markReady ? { review_status: "ready", review_reasons: [], needs_review: false } : {}),
+  }
+  const { error } = await supabase
+    .from("quote_request_items")
+    .update({ name, quantity, unit, metadata, qualification_status: markReady ? "not_required" : "pending" })
+    .eq("id", itemId)
+    .eq("request_id", requestId)
+  if (error) return { ok: false as const, error: "The item could not be saved. Please try again." }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const }
+}
+
 export async function sendClientReplyAction(formData: FormData): Promise<ReplyResult> {
   const requestId = String(formData.get("requestId") || "").trim()
   const message = String(formData.get("message") || "").trim()
