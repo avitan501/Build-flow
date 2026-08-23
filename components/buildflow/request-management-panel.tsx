@@ -18,7 +18,7 @@ const REPLY_BLOCKS = [
   { id: "received", label: "Order received", text: "We received your order and are reviewing it now." },
   { id: "question", label: "I have a question", text: "I have a question about your request before we continue." },
   { id: "pricing", label: "Pricing is ready", text: "Your pricing is ready. Please review the attached quote." },
-  { id: "missing", label: "Need more information", text: "Please reply with the missing information so we can complete your request." },
+  { id: "missing", label: "Ask for missing details", text: "Please reply with the missing information so we can complete your request." },
 ] as const
 
 export function RequestManagementPanel({
@@ -37,14 +37,14 @@ export function RequestManagementPanel({
   departments: string[]
   suppliers: SupplierRoutingOption[]
   packages: PackageRoute[]
-  requestItems: Array<{ id: string; name: string; quantity: number; unit: string | null }>
+  requestItems: Array<{ id: string; name: string; quantity: number; unit: string | null; reviewReasons: string[] }>
   projectAddress: string
 }) {
   const router = useRouter()
   const [department, setDepartment] = useState(() => departments.length === 1 ? departments[0] : "")
   const [supplierIds, setSupplierIds] = useState<string[]>([])
   const [greeting, setGreeting] = useState<"hi" | "hello" | "morning" | "afternoon">("hi")
-  const [replyBlocks, setReplyBlocks] = useState<string[]>(["received"])
+  const [replyBlocks, setReplyBlocks] = useState<string[]>(() => requestItems.some((item) => item.reviewReasons.length) ? ["missing"] : ["received"])
   const [replyNote, setReplyNote] = useState("")
   const [attachment, setAttachment] = useState<File | null>(null)
   const [deliveryMethod, setDeliveryMethod] = useState<"email" | "text">(client.email ? "email" : "text")
@@ -71,11 +71,14 @@ export function RequestManagementPanel({
   )
 
   const firstName = client.name.trim().split(/\s+/)[0] || "there"
+  const missingQuestions = useMemo(() => requestItems.flatMap((item) => item.reviewReasons.map((reason) => `${item.name}: ${reason}`)), [requestItems])
   const clientMessage = useMemo(() => {
     const greetingText = greeting === "hello" ? `Hello ${client.name || "there"},` : greeting === "morning" ? `Good morning ${firstName},` : greeting === "afternoon" ? `Good afternoon ${firstName},` : `Hi ${firstName},`
-    const selectedText = REPLY_BLOCKS.filter((block) => replyBlocks.includes(block.id)).map((block) => block.text)
+    const selectedText = REPLY_BLOCKS.filter((block) => replyBlocks.includes(block.id)).flatMap((block) => block.id === "missing" && missingQuestions.length
+      ? ["To finish pricing, please confirm:", ...missingQuestions.map((question) => `- ${question}`)]
+      : [block.text])
     return [greetingText, "", ...selectedText, ...(replyNote.trim() ? [replyNote.trim()] : []), "", `Request: ${requestTitle}`, "", "Thank you,", "Avantia Build"].join("\n")
-  }, [client.name, firstName, greeting, replyBlocks, replyNote, requestTitle])
+  }, [client.name, firstName, greeting, missingQuestions, replyBlocks, replyNote, requestTitle])
 
   function toggleSupplier(supplierId: string) {
     setSupplierIds((current) => current.includes(supplierId) ? current.filter((id) => id !== supplierId) : [...current, supplierId])
@@ -169,7 +172,7 @@ export function RequestManagementPanel({
       <div className="flex items-center gap-2"><Route className="h-5 w-5 text-[#0066cc]" /><h2 id="request-management-heading" className="text-xl font-bold">Manage request</h2></div>
       <p className="mt-1 text-sm text-slate-600">Reply to the client or prepare one pricing request for several suppliers.</p>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
+      <div className="mt-5 grid gap-5">
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <h3 className="font-bold text-slate-950">Create supplier request</h3>
           <div className="mt-3 grid gap-3">
@@ -189,18 +192,19 @@ export function RequestManagementPanel({
           <div className="rounded-lg border border-slate-200 p-4">
             <div className="flex items-center gap-2"><MessageSquareText className="h-5 w-5 text-[#0066cc]" /><h3 className="font-bold text-slate-950">Reply to client</h3></div>
             <p className="mt-1 text-sm text-slate-500">Choose the message parts. The reply updates instantly.</p>
+            {missingQuestions.length ? <p className="mt-2 text-xs font-semibold text-amber-700">AI found {missingQuestions.length} details to confirm. Select Ask for missing details to include them automatically.</p> : null}
 
             <fieldset className="mt-4">
               <legend className="text-xs font-bold uppercase tracking-[.12em] text-slate-500">Greeting</legend>
               <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {([['hi', `Hi ${firstName}`], ['hello', 'Hello'], ['morning', 'Good morning'], ['afternoon', 'Good afternoon']] as const).map(([value, label]) => <label key={value} className={`flex min-h-10 cursor-pointer items-center justify-center rounded-lg border px-2 text-center text-xs font-semibold ${greeting === value ? "border-sky-400 bg-sky-50 text-[#0066cc]" : "border-slate-200 bg-white text-slate-600"}`}><input type="radio" name={`greeting-${requestId}`} value={value} checked={greeting === value} onChange={() => setGreeting(value)} className="sr-only" />{label}</label>)}
+                {([['hi', `Hi ${firstName}`], ['hello', 'Hello'], ['morning', 'Good morning'], ['afternoon', 'Good afternoon']] as const).map(([value, label]) => <label key={value} className={`flex min-h-9 cursor-pointer items-center justify-center rounded-full border px-3 text-center text-xs font-semibold ${greeting === value ? "border-sky-400 bg-sky-50 text-[#0066cc]" : "border-slate-200 bg-white text-slate-600"}`}><input type="radio" name={`greeting-${requestId}`} value={value} checked={greeting === value} onChange={() => setGreeting(value)} className="sr-only" />{label}</label>)}
               </div>
             </fieldset>
 
             <fieldset className="mt-4">
               <legend className="text-xs font-bold uppercase tracking-[.12em] text-slate-500">What to say</legend>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {REPLY_BLOCKS.map((block) => <label key={block.id} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-semibold ${replyBlocks.includes(block.id) ? "border-sky-300 bg-sky-50 text-slate-950" : "border-slate-200 bg-white text-slate-600"}`}><input type="checkbox" checked={replyBlocks.includes(block.id)} onChange={() => toggleReplyBlock(block.id)} className="h-4 w-4 rounded border-slate-300 accent-[#0071e3]" />{block.label}</label>)}
+              <div className="mt-2 flex flex-wrap gap-2">
+                {REPLY_BLOCKS.map((block) => <label key={block.id} className={`inline-flex min-h-9 cursor-pointer items-center rounded-full border px-3 text-xs font-semibold ${replyBlocks.includes(block.id) ? "border-sky-300 bg-sky-50 text-[#0066cc]" : "border-slate-200 bg-white text-slate-600"}`}><input type="checkbox" checked={replyBlocks.includes(block.id)} onChange={() => toggleReplyBlock(block.id)} className="sr-only" />{block.label}</label>)}
               </div>
             </fieldset>
 
