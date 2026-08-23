@@ -3,6 +3,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js"
 
+import { detectExplicitQuantityUnit, removeResolvedQuantityUnitReasons } from "./material-list-normalization.ts"
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { max: 1, prepare: false })
@@ -84,6 +86,12 @@ const prompt = `Organize a customer's construction shopping or material list int
 For each actual requested material, return one row with a concise construction item name, quantity, sales unit, dimensions, thickness, department, and remaining details. Keep model numbers, brands, colors, grades, lengths, widths, heights, pack sizes, and other specifications. Separate quantity from dimensions. Never use a price as a quantity. Do not include headings, addresses, totals, delivery, tax, labor, or explanatory text as material rows.
 
 Do not invent missing information. Copy the shortest exact text fragment supporting each row into sourceText. Combine obvious wrapped lines that describe the same item, but do not combine different products. Use common concise English construction names while preserving printed brands, models, and specifications.
+
+Never ask for or mark a quantity or sales unit missing when it is already printed in the supporting source text. Recognize quantity-first, item-first, abbreviated, bulleted, and table formats. These all mean the same thing: "14 squares siding", "Siding: 14 squares", "14 sq siding", "| 14 | squares | siding |", and "| siding | 14 | squares |". Likewise, recognize singular and plural construction units such as box/boxes, roll/rolls, sheet/sheets, pail/pails, and case/cases.
+
+Treat department labels such as "Siding list", "Framing materials", "Electrical takeoff", or a standalone department heading as headings, never as material rows.
+
+For siding, a panel-area quantity such as "40 squares siding" is not a complete siding order. Unless the source explicitly requests panels only, mark the row missing when any required ordering detail is absent: material/manufacturer, profile, color, waste allowance, starter-strip linear feet, outside-corner count/height/post size, inside-corner count/height/post size, J-channel/opening-trim linear feet/profile, or the inclusion/exclusion of house wrap, soffit, fascia, insulation, and fasteners. Never calculate perimeter, corners, or opening trim from siding squares alone.
 
 Assign reviewStatus precisely:
 - ready: the product identity, quantity, sales unit, and every ordering specification explicitly present in the source are clear. Do not require a dimension or thickness when that field does not apply to the product.
@@ -219,12 +227,20 @@ Deno.serve(async (request: Request) => {
 
     const organizedAt = new Date().toISOString()
     const rows = items.map((item) => {
-      const missingQuantity = !Number.isFinite(item.quantity) || Number(item.quantity) <= 0
+      const sourceText = clean(item.sourceText, 1200)
+      const detected = detectExplicitQuantityUnit(sourceText)
+      const quantity = Number.isFinite(item.quantity) && Number(item.quantity) > 0 ? Number(item.quantity) : detected?.quantity
+      const normalizedUnit = clean(item.unit, 60) || detected?.unit || ""
+      const missingQuantity = !Number.isFinite(quantity) || Number(quantity) <= 0
+      const missingUnit = !normalizedUnit
       const dimensions = clean(item.dimensions, 300)
       const thickness = clean(item.thickness, 160)
       const details = clean(item.details, 1200)
-      const reviewReasons = item.reviewReasons.map((reason) => clean(reason, 240)).filter(Boolean).slice(0, 5)
-      const reviewStatus = missingQuantity ? "missing" : item.reviewStatus === "ready" && item.needsReview ? "check" : item.reviewStatus
+      const originalReviewReasons = item.reviewReasons.map((reason) => clean(reason, 240)).filter(Boolean).slice(0, 5)
+      const reviewReasons = removeResolvedQuantityUnitReasons(originalReviewReasons, detected)
+      const onlyResolvedQuantityUnit = Boolean(detected && originalReviewReasons.length && reviewReasons.length === 0)
+      const aiReviewStatus = onlyResolvedQuantityUnit && item.reviewStatus === "missing" ? "ready" : item.reviewStatus
+      const reviewStatus = missingQuantity || missingUnit ? "missing" : aiReviewStatus === "ready" && item.needsReview && !onlyResolvedQuantityUnit ? "check" : aiReviewStatus
       return {
         request_id: source.request_id,
         project_id: source.project_id,
@@ -232,10 +248,10 @@ Deno.serve(async (request: Request) => {
         name: clean(item.name, 300) || "Material requiring review",
         department: clean(item.department, 120) || source.department || "Others",
         item_type: "material",
-        quantity: missingQuantity ? 1 : Number(item.quantity),
-        unit: clean(item.unit, 60) || "each",
+        quantity: missingQuantity ? 1 : Number(quantity),
+        unit: normalizedUnit || (missingQuantity ? "quantity required" : "unspecified"),
         unit_price: 0,
-        qualification_status: "answered",
+        qualification_status: reviewStatus === "ready" ? "not_required" : "pending",
         answers: [],
         metadata: {
           ai_organized: true,
@@ -245,9 +261,13 @@ Deno.serve(async (request: Request) => {
           dimensions,
           thickness,
           request_details: [details, missingQuantity && "Quantity was not provided."].filter(Boolean).join(" · "),
-          source_text: clean(item.sourceText, 1200),
+          source_text: sourceText,
           review_status: reviewStatus,
-          review_reasons: [...reviewReasons, ...(missingQuantity && !reviewReasons.some((reason) => /quantity/i.test(reason)) ? ["Quantity is missing"] : [])],
+          review_reasons: [
+            ...reviewReasons,
+            ...(missingQuantity && !reviewReasons.some((reason) => /quantity/i.test(reason)) ? ["Quantity is missing"] : []),
+            ...(missingUnit && !reviewReasons.some((reason) => /unit/i.test(reason)) ? ["Sales unit is missing"] : []),
+          ].slice(0, 5),
           needs_review: reviewStatus !== "ready",
         },
       }
