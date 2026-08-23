@@ -1,5 +1,7 @@
 import "server-only"
 
+import { unstable_cache } from "next/cache"
+
 export type ExaCatalogSearchInput = {
   query: string
   department?: string
@@ -16,6 +18,8 @@ export type ExaCatalogSearchResult = {
   priceText: string | null
   publishedDate: string | null
 }
+
+export type ProductSearchLink = { label: string; url: string }
 
 type ExaResponse = {
   results?: Array<{
@@ -46,14 +50,18 @@ function findPrice(value: string) {
   return match?.[0] ?? null
 }
 
-export async function searchCatalogWithExa(input: ExaCatalogSearchInput) {
-  const apiKey = process.env.EXA_API_KEY
-  if (!apiKey) return { ok: false as const, code: "not_configured" as const, error: "Exa is not connected yet. Add EXA_API_KEY to the Avantia Vercel project." }
+export function productSearchLinks(queryValue: string): ProductSearchLink[] {
+  const query = clean(queryValue, 240)
+  const encoded = encodeURIComponent(query)
+  return [
+    { label: "Google Shopping", url: `https://www.google.com/search?tbm=shop&q=${encoded}` },
+    { label: "Home Depot", url: `https://www.homedepot.com/s/${encoded}` },
+    { label: "Lowe's", url: `https://www.lowes.com/search?searchTerm=${encoded}` },
+  ]
+}
 
-  const query = clean(input.query, 240)
-  if (!query) return { ok: false as const, code: "invalid" as const, error: "Enter a product or material to search for." }
-  const department = clean(input.department, 100)
-  const zipCode = clean(input.zipCode, 12)
+async function runExaSearch(query: string, department: string, zipCode: string, domains: string[]) {
+  const apiKey = process.env.EXA_API_KEY!
   const location = zipCode ? ` near ZIP code ${zipCode}` : ""
   const category = department ? ` for the ${department} construction department` : ""
   const response = await fetch("https://api.exa.ai/search", {
@@ -62,15 +70,14 @@ export async function searchCatalogWithExa(input: ExaCatalogSearchInput) {
     body: JSON.stringify({
       query: `${query}${category}${location}. Find exact product pages, not search or category pages.`,
       type: "auto",
-      numResults: 8,
+      numResults: 5,
       contents: { highlights: { maxCharacters: 1200 } },
-      ...(input.domains?.length ? { includeDomains: input.domains.slice(0, 5) } : {}),
+      ...(domains.length ? { includeDomains: domains } : {}),
     }),
-    cache: "no-store",
   })
   if (!response.ok) {
     console.error("Exa catalog search failed", { status: response.status })
-    return { ok: false as const, code: "provider_error" as const, error: "Exa could not complete the search. Try again later." }
+    throw new Error(`exa_${response.status}`)
   }
 
   const payload = await response.json() as ExaResponse
@@ -91,5 +98,23 @@ export async function searchCatalogWithExa(input: ExaCatalogSearchInput) {
       publishedDate: clean(result.publishedDate, 40) || null,
     }]
   })
-  return { ok: true as const, results }
+  return { ok: true as const, results, checkedAt: new Date().toISOString() }
+}
+
+const cachedExaSearch = unstable_cache(runExaSearch, ["exa-catalog-search-v2"], { revalidate: 86_400 })
+
+export async function searchCatalogWithExa(input: ExaCatalogSearchInput) {
+  const query = clean(input.query, 240)
+  const fallbackLinks = productSearchLinks(query)
+  if (!query) return { ok: false as const, code: "invalid" as const, error: "Enter a product or material to search for.", fallbackLinks }
+  if (!process.env.EXA_API_KEY) return { ok: false as const, code: "not_configured" as const, error: "Live price search is not connected. Use the retailer links below.", fallbackLinks }
+
+  const department = clean(input.department, 100)
+  const zipCode = clean(input.zipCode, 12)
+  const domains = (input.domains ?? []).map((domain) => clean(domain, 120)).filter(Boolean).slice(0, 5)
+  try {
+    return { ...await cachedExaSearch(query, department, zipCode, domains), fallbackLinks }
+  } catch {
+    return { ok: false as const, code: "provider_error" as const, error: "Live price search could not be completed. Use the retailer links below.", fallbackLinks }
+  }
 }

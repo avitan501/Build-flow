@@ -6,6 +6,7 @@ import { parseSupplierQuoteText } from "../lib/supplier-quote-parser"
 import { normalizeSupplierQuoteAiPayload } from "../lib/supplier-quote-ai"
 import { detectSupplierMatch, inferSupplierName } from "../lib/supplier-quote-supplier"
 import { preferredRequestMaterialSources, requestMaterialChartCsv, toRequestMaterialChartRow } from "../lib/request-material-chart"
+import { materialReviewReasons, materialReviewStatus, materialReviewSummary } from "../lib/client-material-review"
 
 const root = process.cwd()
 
@@ -127,13 +128,15 @@ test("client request chart keeps quantity, item, and details in stable columns",
 })
 
 test("client material lists are organized securely in the background", async () => {
-  const [requestAction, publicIntake, aiFunction, ownerPage, ownerActions, organizerButton, supplierDraft] = await Promise.all([
+  const [requestAction, publicIntake, aiFunction, ownerPage, ownerActions, organizerButton, organizedList, priceCheck, supplierDraft] = await Promise.all([
     readFile(path.join(root, "app/request-quote/actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/public-quote-intake/index.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/client-material-list-ai/index.ts"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/[requestId]/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/organize-material-list-button.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/organized-material-list.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/material-price-check.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/[requestId]/supplier-request/page.tsx"), "utf8"),
   ])
 
@@ -149,16 +152,34 @@ test("client material lists are organized securely in the background", async () 
   expect(aiFunction).toContain("source.name")
   expect(aiFunction).toContain("typedSource")
   expect(aiFunction).toContain("ai_organized: true")
+  expect(aiFunction).toContain('reviewStatus: { type: "string", enum: ["ready", "check", "missing"] }')
+  expect(aiFunction).toContain("review_reasons: [...reviewReasons")
+  expect(aiFunction).toContain("Only check and missing rows require employee review")
   expect(ownerPage).toContain("AI organized")
-  expect(ownerPage).toContain("Size and details")
+  expect(ownerPage).toContain("OrganizedMaterialList")
   expect(ownerPage).toContain("Organize with AI")
-  expect(ownerPage).toContain('className="mt-4 grid gap-2 sm:hidden"')
-  expect(ownerPage).toContain('className="mt-4 hidden overflow-hidden rounded-lg border border-slate-200 sm:block"')
+  expect(organizedList).toContain('className="mt-3 grid gap-2 sm:hidden"')
+  expect(organizedList).toContain("Only yellow and red items need attention")
+  expect(organizedList).toContain("materialReviewSummary")
+  expect(organizedList).toContain("MaterialPriceCheck")
+  expect(priceCheck).toContain("Current price check")
+  expect(priceCheck).toContain("fallbackLinks")
   expect(ownerActions).toContain("organizeClientMaterialRequestAction")
   expect(organizerButton).toContain("Organizing...")
   expect(organizerButton).toContain("router.refresh()")
   expect(organizerButton).toContain("disabled={isPending}")
   expect(supplierDraft).toContain("preferredRequestMaterialSources")
+})
+
+test("material review status clearly separates ready, check, and missing rows", () => {
+  const base = { id: "item-1", name: "2x4x8 stud", department: "Framing", quantity: 20, unit: "pieces", metadata: {} }
+  const ready = { ...base, metadata: { review_status: "ready" } }
+  const check = { ...base, id: "item-2", metadata: { review_status: "check", review_reasons: ["Confirm lumber grade"] } }
+  const missing = { ...base, id: "item-3", metadata: { review_status: "missing", review_reasons: ["Length is missing"] } }
+  expect(materialReviewStatus(ready)).toBe("ready")
+  expect(materialReviewReasons(check)).toEqual(["Confirm lumber grade"])
+  expect(materialReviewStatus(missing)).toBe("missing")
+  expect(materialReviewSummary([ready, check, missing])).toEqual({ ready: 1, check: 1, missing: 1 })
 })
 
 test("supplier detection matches the directory or keeps the name read from the invoice", async () => {
@@ -198,17 +219,20 @@ test("supplier quote AI payload is normalized before database insertion", async 
   expect(result.notes).toBe("Review scan")
 })
 
-test("catalog Exa search is manager-only and keeps results out of the catalog until approval", async () => {
+test("catalog Exa search is staff-only, cached, and keeps results out of the catalog until approval", async () => {
   const [route, search, catalog] = await Promise.all([
     readFile(path.join(root, "app/api/admin/catalog/exa-search/route.ts"), "utf8"),
     readFile(path.join(root, "lib/exa-catalog-search.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/exa-catalog-research.tsx"), "utf8"),
   ])
 
-  expect(route).toContain("requireManagerPortalProfile")
+  expect(route).toContain('requireStaffProfile("quotes")')
   expect(route).toContain("searchCatalogWithExa")
   expect(search).toContain("process.env.EXA_API_KEY")
   expect(search).toContain("https://api.exa.ai/search")
+  expect(search).toContain("unstable_cache")
+  expect(search).toContain("revalidate: 86_400")
+  expect(search).toContain("Google Shopping")
   expect(catalog).toContain("Prepare catalog item")
   expect(catalog).toContain("Nothing is saved until you approve it")
   expect(catalog).toContain("/api/admin/catalog/exa-search")

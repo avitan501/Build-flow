@@ -36,6 +36,9 @@ type AiItem = {
   thickness: string
   details: string
   needsReview: boolean
+  reviewStatus: "ready" | "check" | "missing"
+  reviewReasons: string[]
+  sourceText: string
 }
 
 type AiResult = {
@@ -57,7 +60,7 @@ const schema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["name", "department", "quantity", "unit", "dimensions", "thickness", "details", "needsReview"],
+        required: ["name", "department", "quantity", "unit", "dimensions", "thickness", "details", "needsReview", "reviewStatus", "reviewReasons", "sourceText"],
         properties: {
           name: { type: "string" },
           department: { type: "string" },
@@ -67,6 +70,9 @@ const schema = {
           thickness: { type: "string" },
           details: { type: "string" },
           needsReview: { type: "boolean" },
+          reviewStatus: { type: "string", enum: ["ready", "check", "missing"] },
+          reviewReasons: { type: "array", maxItems: 5, items: { type: "string" } },
+          sourceText: { type: "string" },
         },
       },
     },
@@ -77,9 +83,16 @@ const prompt = `Organize a customer's construction shopping or material list int
 
 For each actual requested material, return one row with a concise construction item name, quantity, sales unit, dimensions, thickness, department, and remaining details. Keep model numbers, brands, colors, grades, lengths, widths, heights, pack sizes, and other specifications. Separate quantity from dimensions. Never use a price as a quantity. Do not include headings, addresses, totals, delivery, tax, labor, or explanatory text as material rows.
 
-Do not invent missing information. When quantity is absent, return null and set needsReview true. When size, thickness, unit, or product identity is unclear, leave that field empty and set needsReview true. Combine obvious wrapped lines that describe the same item, but do not combine different products. Use common concise English construction names while preserving printed brands, models, and specifications.
+Do not invent missing information. Copy the shortest exact text fragment supporting each row into sourceText. Combine obvious wrapped lines that describe the same item, but do not combine different products. Use common concise English construction names while preserving printed brands, models, and specifications.
 
-If the document is a blueprint, floor plan, architectural plan, or other document that requires a takeoff rather than an explicit shopping list, set documentType to plan and return no items. If it is not a usable material list, set documentType to other and return no items. Every extracted row requires human review before ordering.`
+Assign reviewStatus precisely:
+- ready: the product identity, quantity, sales unit, and every ordering specification explicitly present in the source are clear. Do not require a dimension or thickness when that field does not apply to the product.
+- check: the requested product is identifiable and orderable, but one printed detail is ambiguous or should be confirmed. State the specific issue in reviewReasons.
+- missing: an essential value such as product identity, quantity, sales unit, model, required size, or required thickness is absent. Leave it empty and state exactly what is missing in reviewReasons.
+
+Set needsReview false only for ready. Set it true for check or missing. Never add a generic review reason. Review reasons must name the missing or ambiguous field, for example "Confirm whether unit means box or piece" or "Drywall thickness is missing".
+
+If the document is a blueprint, floor plan, architectural plan, or other document that requires a takeoff rather than an explicit shopping list, set documentType to plan and return no items. If it is not a usable material list, set documentType to other and return no items. Only check and missing rows require employee review before supplier pricing.`
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -210,6 +223,8 @@ Deno.serve(async (request: Request) => {
       const dimensions = clean(item.dimensions, 300)
       const thickness = clean(item.thickness, 160)
       const details = clean(item.details, 1200)
+      const reviewReasons = item.reviewReasons.map((reason) => clean(reason, 240)).filter(Boolean).slice(0, 5)
+      const reviewStatus = missingQuantity ? "missing" : item.reviewStatus === "ready" && item.needsReview ? "check" : item.reviewStatus
       return {
         request_id: source.request_id,
         project_id: source.project_id,
@@ -230,7 +245,10 @@ Deno.serve(async (request: Request) => {
           dimensions,
           thickness,
           request_details: [details, missingQuantity && "Quantity was not provided."].filter(Boolean).join(" · "),
-          needs_review: Boolean(item.needsReview || missingQuantity),
+          source_text: clean(item.sourceText, 1200),
+          review_status: reviewStatus,
+          review_reasons: [...reviewReasons, ...(missingQuantity && !reviewReasons.some((reason) => /quantity/i.test(reason)) ? ["Quantity is missing"] : [])],
+          needs_review: reviewStatus !== "ready",
         },
       }
     })
