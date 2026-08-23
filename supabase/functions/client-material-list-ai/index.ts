@@ -154,9 +154,10 @@ Deno.serve(async (request: Request) => {
   const apiKey = await openAiKey()
   if (!apiKey) return json({ error: "AI is not configured" }, 503)
 
-  let body: { requestId?: unknown }
+  let body: { requestId?: unknown; force?: unknown }
   try { body = await request.json() } catch { return json({ error: "Invalid JSON" }, 400) }
   const requestId = clean(body.requestId, 80)
+  const force = body.force === true
   if (!/^[0-9a-f-]{36}$/i.test(requestId)) return json({ error: "Invalid request" }, 400)
 
   const [{ data: requestRecord }, { data: sourceItems }, { data: attachments }] = await Promise.all([
@@ -166,9 +167,9 @@ Deno.serve(async (request: Request) => {
   ])
   if (!requestRecord || !sourceItems?.length) return json({ error: "Request not found" }, 404)
 
-  const source = sourceItems[0]
+  const source = sourceItems.find((item) => item.metadata?.ai_organized !== true) ?? sourceItems[0]
   const existing = sourceItems.filter((item) => item.metadata?.ai_organized === true)
-  if (existing.length) {
+  if (existing.length && !force) {
     await updateSource(source, { ai_organization_status: "organized", ai_organization_item_count: existing.length })
     return json({ ok: true, status: "already_organized", itemCount: existing.length })
   }
@@ -272,8 +273,17 @@ Deno.serve(async (request: Request) => {
         },
       }
     })
-    const { error: insertError } = await admin.from("quote_request_items").insert(rows)
+    const { data: insertedRows, error: insertError } = await admin.from("quote_request_items").insert(rows).select("id")
     if (insertError) throw new Error("organized_items_insert_failed")
+
+    if (existing.length) {
+      const { error: deleteError } = await admin.from("quote_request_items").delete().in("id", existing.map((item) => item.id))
+      if (deleteError) {
+        const insertedIds = (insertedRows ?? []).map((row) => row.id)
+        if (insertedIds.length) await admin.from("quote_request_items").delete().in("id", insertedIds)
+        throw new Error("previous_organized_items_replace_failed")
+      }
+    }
 
     await updateSource(source, {
       ai_organization_status: "organized",
