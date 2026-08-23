@@ -127,12 +127,13 @@ test("client request chart keeps quantity, item, and details in stable columns",
 })
 
 test("client material lists are organized securely in the background", async () => {
-  const [requestAction, publicIntake, aiFunction, ownerPage, ownerActions, supplierDraft] = await Promise.all([
+  const [requestAction, publicIntake, aiFunction, ownerPage, ownerActions, organizerButton, supplierDraft] = await Promise.all([
     readFile(path.join(root, "app/request-quote/actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/public-quote-intake/index.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/client-material-list-ai/index.ts"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/[requestId]/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/organize-material-list-button.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/[requestId]/supplier-request/page.tsx"), "utf8"),
   ])
 
@@ -151,7 +152,12 @@ test("client material lists are organized securely in the background", async () 
   expect(ownerPage).toContain("AI organized")
   expect(ownerPage).toContain("Size and details")
   expect(ownerPage).toContain("Organize with AI")
+  expect(ownerPage).toContain('className="mt-4 grid gap-2 sm:hidden"')
+  expect(ownerPage).toContain('className="mt-4 hidden overflow-hidden rounded-lg border border-slate-200 sm:block"')
   expect(ownerActions).toContain("organizeClientMaterialRequestAction")
+  expect(organizerButton).toContain("Organizing...")
+  expect(organizerButton).toContain("router.refresh()")
+  expect(organizerButton).toContain("disabled={isPending}")
   expect(supplierDraft).toContain("preferredRequestMaterialSources")
 })
 

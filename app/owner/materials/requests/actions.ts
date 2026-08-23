@@ -35,13 +35,15 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
 
 export async function organizeClientMaterialRequestAction(formData: FormData) {
   const requestId = String(formData.get("requestId") || "").trim()
-  if (!/^[0-9a-f-]{36}$/i.test(requestId)) return
+  if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false as const, error: "This request could not be identified." }
   const { supabase } = await requireStaffProfile("customers")
   const { data: request } = await supabase.from("quote_requests").select("id").eq("id", requestId).maybeSingle<{ id: string }>()
-  if (!request) return
-  await supabase.functions.invoke("client-material-list-ai", { body: { requestId } })
+  if (!request) return { ok: false as const, error: "This request was not found." }
+  const { data, error } = await supabase.functions.invoke<{ ok?: boolean; status?: string; itemCount?: number; error?: string }>("client-material-list-ai", { body: { requestId } })
+  if (error || !data?.ok) return { ok: false as const, error: "The list could not be organized. Please try again." }
   revalidatePath(`/owner/materials/requests/${requestId}`)
   revalidatePath("/admin/supplier-quotes")
+  return { ok: true as const, status: data.status || "organized", itemCount: data.itemCount || 0 }
 }
 
 export async function sendClientReplyAction(formData: FormData): Promise<ReplyResult> {
