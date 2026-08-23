@@ -1,18 +1,10 @@
 "use client"
 
 import { Phone } from "lucide-react"
-
-function dialablePhone(phone: string) {
-  const trimmed = phone.trim()
-  const digits = trimmed.replace(/\D/g, "")
-  if (!digits) return ""
-  if (trimmed.startsWith("+")) return `+${digits}`
-  if (digits.length === 10) return `+1${digits}`
-  return `+${digits}`
-}
+import { normalizeAuraPhone } from "@/lib/aura/identity"
 
 export function QuoCallButton({ phone, supplierName }: { phone: string | null; supplierName: string }) {
-  const number = dialablePhone(phone || "")
+  const number = normalizeAuraPhone(phone) || ""
   const enabled = Boolean(number)
 
   function callSupplier() {

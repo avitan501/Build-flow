@@ -26,7 +26,7 @@ function emptyState(label: string) {
 
 export default async function AuraOwnerPage() {
   const { supabase } = await requireOwnerAccess("/owner/aura");
-  const { intakes, contacts, leads, tasks, communications, connections } = await loadAuraDashboard(supabase);
+  const { intakes, contacts, leads, tasks, communications, customers, connections } = await loadAuraDashboard(supabase);
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-950 sm:px-8 sm:py-10">
@@ -86,7 +86,7 @@ export default async function AuraOwnerPage() {
           ))}
         </section>
 
-        <AuraCommunicationWorkspace communications={communications} contacts={contacts} connections={connections} />
+        <AuraCommunicationWorkspace communications={communications} contacts={contacts} customers={customers} connections={connections} />
 
         <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-4">

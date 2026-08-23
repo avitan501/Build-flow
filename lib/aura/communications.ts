@@ -1,6 +1,9 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { normalizeAuraEmail, normalizeAuraPhone } from "@/lib/aura/identity";
+
+export { normalizeAuraEmail, normalizeAuraPhone } from "@/lib/aura/identity";
 
 export type AuraMessageChannel = "sms" | "whatsapp" | "email";
 
@@ -18,21 +21,6 @@ type CommunicationInput = {
   media?: Array<{ url?: string; type?: string; duration?: number }>;
   occurredAt?: string;
 };
-
-export function normalizeAuraPhone(value: string) {
-  const trimmed = value.trim();
-  const digits = trimmed.replace(/[^0-9]/g, "");
-  if (!digits) return null;
-  if (trimmed.startsWith("+")) return `+${digits}`;
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  return `+${digits}`;
-}
-
-export function normalizeAuraEmail(value: string) {
-  const email = value.trim().toLowerCase();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
-}
 
 async function contactForIdentity(phone: string | null, email: string | null) {
   if (!phone && !email) return null;

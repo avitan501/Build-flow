@@ -5,16 +5,9 @@ import { useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
 import { prepareQuoPhotoMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
+import { normalizeAuraPhone } from "@/lib/aura/identity"
 
 type Channel = "sms" | "whatsapp" | "email"
-
-function phoneNumber(value: string | null) {
-  const raw = value?.trim() || ""
-  const digits = raw.replace(/\D/g, "")
-  if (!digits) return ""
-  if (raw.startsWith("+")) return `+${digits}`
-  return digits.length === 10 ? `+1${digits}` : `+${digits}`
-}
 
 function callHref(phone: string) {
   if (!phone) return "#"
@@ -25,7 +18,7 @@ function callHref(phone: string) {
 }
 
 export function ContactActions({ name, phone, email }: { name: string; phone: string | null; email: string | null }) {
-  const normalizedPhone = phoneNumber(phone)
+  const normalizedPhone = normalizeAuraPhone(phone) || ""
   const [channel, setChannel] = useState<Channel | null>(null)
   const [message, setMessage] = useState("")
   const [subject, setSubject] = useState("")

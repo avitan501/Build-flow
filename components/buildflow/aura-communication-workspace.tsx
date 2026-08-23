@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import { prepareQuoPhotoMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions";
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard";
+import { customersForIdentity, normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identity";
 
 type Connections = {
   quo: { receive: boolean; send: boolean };
@@ -39,6 +40,10 @@ function contactName(contact: AuraContactRow | undefined, communication: AuraCom
   );
 }
 
+function customerLabel(customer: AuraCustomerIdentity) {
+  return customer.full_name || customer.company_name || customer.email || customer.phone || "Unnamed customer";
+}
+
 function quoCallHref(phone: string) {
   if (typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
     return `openphone://dial?number=${encodeURIComponent(phone)}&from=${encodeURIComponent("+15169088319")}&action=call`;
@@ -49,10 +54,12 @@ function quoCallHref(phone: string) {
 export function AuraCommunicationWorkspace({
   communications,
   contacts,
+  customers,
   connections,
 }: {
   communications: AuraCommunicationRow[];
   contacts: AuraContactRow[];
+  customers: AuraCustomerIdentity[];
   connections: Connections;
 }) {
   const router = useRouter();
@@ -60,6 +67,8 @@ export function AuraCommunicationWorkspace({
   const [channelFilter, setChannelFilter] = useState("all");
   const [channel, setChannel] = useState<"call" | "sms" | "whatsapp" | "email">("call");
   const [recipient, setRecipient] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [manualDestination, setManualDestination] = useState(false);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
@@ -92,6 +101,13 @@ export function AuraCommunicationWorkspace({
     document.getElementById("aura-compose")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  function chooseCustomer(id: string) {
+    setSelectedCustomerId(id);
+    setManualDestination(false);
+    const customer = customers.find((item) => item.id === id);
+    setRecipient(channel === "email" ? customer?.email || "" : customer?.phone || "");
+  }
+
   function sendMessage() {
     if (channel === "call") return;
     const messageChannel = channel;
@@ -121,7 +137,7 @@ export function AuraCommunicationWorkspace({
   }
 
   const selectedChannelReady = channel === "call" || (channel === "sms" ? connections.quo.send : channel === "whatsapp" ? connections.whatsapp.send : connections.email.send);
-  const normalizedPhone = recipient.replace(/[^0-9+]/g, "");
+  const normalizedPhone = normalizeAuraPhone(recipient);
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
@@ -141,18 +157,28 @@ export function AuraCommunicationWorkspace({
               ["whatsapp", "WhatsApp", MessageCircle],
               ["email", "Email", Mail],
             ] as const).map(([value, label, Icon]) => (
-              <button key={value} type="button" onClick={() => { setChannel(value); setFeedback(null); }} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold ${channel === value ? "border-[#0071e3] bg-[#0071e3] text-white" : "border-slate-300 bg-white text-slate-800"}`}>
+              <button key={value} type="button" onClick={() => { setChannel(value); setFeedback(null); const customer = customers.find((item) => item.id === selectedCustomerId); if (customer && !manualDestination) setRecipient(value === "email" ? customer.email || "" : customer.phone || ""); }} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold ${channel === value ? "border-[#0071e3] bg-[#0071e3] text-white" : "border-slate-300 bg-white text-slate-800"}`}>
                 <Icon className="h-4 w-4" />{label}
               </button>
             ))}
           </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <label className="grid gap-1.5 text-xs font-semibold">Customer
+              <select value={selectedCustomerId} onChange={(event) => chooseCustomer(event.target.value)} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal">
+                <option value="">Choose a customer</option>
+                {customers.map((customer) => <option key={customer.id} value={customer.id}>{customerLabel(customer)}{customer.company_name && customer.company_name !== customerLabel(customer) ? ` · ${customer.company_name}` : ""}</option>)}
+              </select>
+            </label>
+            <button type="button" onClick={() => { setManualDestination((value) => !value); setSelectedCustomerId(""); setRecipient(""); }} className="min-h-11 self-end rounded-md border border-slate-300 px-3 text-sm font-semibold">{manualDestination ? "Use customer list" : "Enter manually"}</button>
+          </div>
           <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-            <label className="grid gap-1.5 text-xs font-semibold">{channel === "email" ? "Customer email" : "Customer phone"}<input value={recipient} onChange={(event) => setRecipient(event.target.value)} inputMode={channel === "email" ? "email" : "tel"} autoComplete={channel === "email" ? "email" : "tel"} placeholder={channel === "email" ? "customer@example.com" : "(516) 555-0123"} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label>
+            <label className="grid gap-1.5 text-xs font-semibold">{channel === "email" ? "Customer email" : "Customer phone"}<input value={recipient} onChange={(event) => setRecipient(event.target.value)} readOnly={!manualDestination && Boolean(selectedCustomerId)} inputMode={channel === "email" ? "email" : "tel"} autoComplete={channel === "email" ? "email" : "tel"} placeholder={channel === "email" ? "customer@example.com" : "(516) 555-0123"} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal read-only:bg-slate-50" /></label>
             {channel === "call" ? <a href={normalizedPhone ? quoCallHref(normalizedPhone) : undefined} aria-disabled={!normalizedPhone} className={`inline-flex min-h-11 self-end items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold ${normalizedPhone ? "bg-emerald-600 text-white" : "pointer-events-none bg-slate-200 text-slate-400"}`}><Phone className="h-4 w-4" />Call with Q U O</a> : null}
             {channel === "email" ? <label className="grid gap-1.5 text-xs font-semibold md:col-span-2">Subject<input value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={200} placeholder="Message from Avantia Build" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label> : null}
             {channel !== "call" ? <label className="grid gap-1.5 text-xs font-semibold md:col-span-2">Message<textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1600} rows={4} placeholder="Write the message here" className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-6" /></label> : null}
             {channel === "sms" ? <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold md:col-span-2"><ImagePlus className="h-4 w-4" />{photo ? photo.name : "Add photo"}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] || null)} /></label> : null}
             {channel === "sms" && photo ? <p className="text-xs text-slate-500 md:col-span-2">Q U O opens with the photo attached. Review it and press Send.</p> : null}
+            {channel !== "email" && recipient ? <p className={`text-xs font-semibold md:col-span-2 ${normalizedPhone ? "text-emerald-700" : "text-rose-700"}`}>{normalizedPhone ? `Sending to ${normalizedPhone}` : "Enter a complete US number or an explicit international number."}</p> : null}
           </div>
           {!selectedChannelReady ? <p className="mt-3 text-sm font-semibold text-amber-700">This channel needs its API credentials. Open Phone connections above and press Connect WhatsApp & Text.</p> : null}
           {feedback ? <p className={`mt-3 text-sm font-semibold ${feedback.tone === "success" ? "text-emerald-700" : "text-rose-700"}`} role="status">{feedback.text}</p> : null}
@@ -170,10 +196,13 @@ export function AuraCommunicationWorkspace({
           </header>
           {filteredCommunications.length ? <div className="divide-y divide-slate-100">{filteredCommunications.map((communication) => {
             const contact = communication.contact_id ? contactById.get(communication.contact_id) : undefined;
+            const matches = customersForIdentity(customers, communication.counterparty_phone, communication.counterparty_email);
+            const matchedCustomer = matches.length === 1 ? matches[0] : undefined;
             const detail = communication.summary || communication.body || communication.transcript;
             const duration = durationLabel(communication.duration_seconds);
             const Icon = communication.channel === "call" ? Phone : communication.channel === "whatsapp" ? MessageCircle : communication.channel === "email" ? Mail : Smartphone;
-            return <article key={communication.id} className="flex gap-3 p-4 sm:p-5"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-sky-50 text-[#0066cc]"><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{contactName(contact, communication)}</h3><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">{communication.channel} · {communication.direction || "unknown"}</span></div><p className="mt-1 text-xs text-slate-500">{communication.counterparty_phone || communication.counterparty_email}</p></div><time className="text-xs text-slate-500">{formatDate(communication.occurred_at)}</time></div>{detail ? <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{detail}</p> : null}{duration ? <p className="mt-2 text-xs font-semibold text-slate-500">Duration {duration}</p> : null}{communication.next_steps.length ? <p className="mt-2 text-xs font-semibold text-[#0066cc]">Next: {communication.next_steps.join(" · ")}</p> : null}</div></article>;
+            const statusTone = ["failed", "undelivered"].includes(communication.status || "") ? "bg-rose-100 text-rose-700" : ["delivered", "read"].includes(communication.status || "") ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600";
+            return <article key={communication.id} className="flex gap-3 p-4 sm:p-5"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-sky-50 text-[#0066cc]"><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{matchedCustomer ? customerLabel(matchedCustomer) : contactName(contact, communication)}</h3><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">{communication.channel} · {communication.direction || "unknown"}</span>{communication.status ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${statusTone}`}>{communication.status}</span> : null}{matches.length === 0 ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">Unmatched</span> : matches.length > 1 ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">Match conflict</span> : null}</div><p className="mt-1 text-xs text-slate-500">{communication.counterparty_phone || communication.counterparty_email}</p></div><time className="text-xs text-slate-500">{formatDate(communication.occurred_at)}</time></div>{detail ? <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{detail}</p> : null}{duration ? <p className="mt-2 text-xs font-semibold text-slate-500">Duration {duration}</p> : null}{communication.next_steps.length ? <p className="mt-2 text-xs font-semibold text-[#0066cc]">Next: {communication.next_steps.join(" · ")}</p> : null}</div></article>;
           })}</div> : <p className="p-8 text-center text-sm text-slate-500">No communications match this filter.</p>}
         </section>
       </div>

@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { canSendAuraEmail, canSendAuraQuoText } from "@/lib/aura/communications";
 import { canUseTwilioWhatsApp } from "@/lib/aura/twilio-whatsapp";
 import { canSendAuraWhatsApp } from "@/lib/aura/whatsapp";
+import type { AuraCustomerIdentity } from "@/lib/aura/identity";
 
 export type AuraIntakeRow = {
   id: string;
@@ -68,7 +69,7 @@ export type AuraCommunicationRow = {
 };
 
 export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: SupabaseClient = supabase) {
-  const [intakesResult, contactsResult, leadsResult, tasksResult, communicationsResult, brokerResult] = await Promise.all([
+  const [intakesResult, contactsResult, leadsResult, tasksResult, communicationsResult, customersResult, brokerResult] = await Promise.all([
     supabase
       .from("aura_intakes")
       .select("id, sender_phone, message_text, proposal, status, confirmation_code, created_at")
@@ -97,12 +98,18 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
       .select("id, contact_id, provider, channel, direction, counterparty_phone, counterparty_email, subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at")
       .order("occurred_at", { ascending: false })
       .limit(50),
+    supabase
+      .from("profiles")
+      .select("id, full_name, company_name, phone, email")
+      .eq("role", "client")
+      .eq("is_active", true)
+      .limit(500),
     brokerClient.functions.invoke<{ ok?: boolean; whatsapp?: boolean; sms?: boolean; email?: boolean }>("aura-messaging-broker", {
       body: { action: "status" },
     }),
   ]);
 
-  const firstError = intakesResult.error || contactsResult.error || leadsResult.error || tasksResult.error || communicationsResult.error;
+  const firstError = intakesResult.error || contactsResult.error || leadsResult.error || tasksResult.error || communicationsResult.error || customersResult.error;
   if (firstError) throw new Error(`Failed to load Aura dashboard: ${firstError.message}`);
   const brokerStatus = brokerResult.data?.ok ? brokerResult.data : null;
 
@@ -112,6 +119,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
     leads: (leadsResult.data || []) as AuraLeadRow[],
     tasks: (tasksResult.data || []) as AuraTaskRow[],
     communications: (communicationsResult.data || []) as AuraCommunicationRow[],
+    customers: (customersResult.data || []) as AuraCustomerIdentity[],
     connections: {
       quo: {
         receive: Boolean(process.env.AURA_QUO_WEBHOOK_SIGNING_SECRET && process.env.AURA_QUO_PHONE_NUMBER_IDS),

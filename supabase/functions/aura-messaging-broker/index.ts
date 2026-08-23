@@ -38,9 +38,13 @@ function normalizePhone(value: unknown) {
   const input = typeof value === "string" ? value.trim() : "";
   const digits = input.replace(/[^0-9]/g, "");
   if (!digits) return null;
+  if (input.startsWith("+")) {
+    if (digits.length === 10 && digits.startsWith("347")) return `+1${digits}`;
+    return digits.length >= 8 && digits.length <= 15 ? `+${digits}` : null;
+  }
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  return `+${digits}`;
+  return null;
 }
 
 async function secret(name: string) {

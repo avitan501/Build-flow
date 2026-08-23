@@ -5,6 +5,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { normalizeAuraPhone } from "@/lib/aura/identity";
 
 const quoMediaSchema = z.object({
   url: z.string().url().max(4000),
@@ -66,11 +67,6 @@ const quoEventSchema = z.object({
 
 export type QuoWebhookEvent = z.infer<typeof quoEventSchema>;
 
-function normalizePhone(value: string | undefined) {
-  if (!value) return null;
-  const digits = value.replace(/[^0-9]/g, "");
-  return digits ? `+${digits}` : null;
-}
 function safeDate(value: string | null | undefined, fallback: string) {
   const date = new Date(value || fallback);
   return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
@@ -139,8 +135,8 @@ function communicationFields(event: QuoWebhookEvent) {
 
   const direction = object.direction || null;
   const to = stringTo(object.to);
-  const counterpartyPhone = normalizePhone(direction === "outgoing" ? to : object.from);
-  const businessPhone = normalizePhone(direction === "outgoing" ? object.from : to);
+  const counterpartyPhone = normalizeAuraPhone(direction === "outgoing" ? to : object.from);
+  const businessPhone = normalizeAuraPhone(direction === "outgoing" ? object.from : to);
   const transcript = object.dialogue
     ?.map((line) => `${line.identifier ? `${line.identifier}: ` : ""}${line.content}`)
     .join("\n");
