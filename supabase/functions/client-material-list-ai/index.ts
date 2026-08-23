@@ -10,6 +10,7 @@ const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { max: 1, prepare: false })
 const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 const MAX_FILE_BYTES = 25 * 1024 * 1024
+const AI_MODEL = "gpt-5.6-terra"
 
 type SourceItem = {
   id: string
@@ -205,7 +206,7 @@ Deno.serve(async (request: Request) => {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-5-mini",
+        model: AI_MODEL,
         store: false,
         reasoning: { effort: "low" },
         max_output_tokens: 8_000,
@@ -259,7 +260,7 @@ Deno.serve(async (request: Request) => {
         answers: [],
         metadata: {
           ai_organized: true,
-          ai_model: "gpt-5-mini",
+          ai_model: AI_MODEL,
           ai_organized_at: organizedAt,
           source_item_id: source.id,
           dimensions,

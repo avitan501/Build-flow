@@ -128,7 +128,7 @@ test("client request chart keeps quantity, item, and details in stable columns",
 })
 
 test("client material lists are organized securely in the background", async () => {
-  const [requestAction, publicIntake, aiFunction, ownerPage, ownerActions, organizerButton, organizedList, priceCheck, supplierDraft] = await Promise.all([
+  const [requestAction, publicIntake, aiFunction, ownerPage, ownerActions, organizerButton, organizedList, reviewEditor, priceCheck, supplierDraft] = await Promise.all([
     readFile(path.join(root, "app/request-quote/actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/public-quote-intake/index.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/client-material-list-ai/index.ts"), "utf8"),
@@ -136,6 +136,7 @@ test("client material lists are organized securely in the background", async () 
     readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/organize-material-list-button.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/organized-material-list.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/material-review-editor.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-price-check.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/[requestId]/supplier-request/page.tsx"), "utf8"),
   ])
@@ -144,7 +145,8 @@ test("client material lists are organized securely in the background", async () 
   expect(requestAction).toContain('functions.invoke("client-material-list-ai"')
   expect(publicIntake).toContain("EdgeRuntime.waitUntil")
   expect(aiFunction).toContain("openai_supplier_quote_api_key")
-  expect(aiFunction).toContain('model: "gpt-5-mini"')
+  expect(aiFunction).toContain('const AI_MODEL = "gpt-5.6-terra"')
+  expect(aiFunction).toContain("model: AI_MODEL")
   expect(aiFunction).toContain("store: false")
   expect(aiFunction).toContain('reasoning: { effort: "low" }')
   expect(aiFunction).toContain('documentType: { type: "string", enum: ["material_list", "plan", "other"] }')
@@ -180,6 +182,10 @@ test("client material lists are organized securely in the background", async () 
   expect(organizedList).toContain("MaterialPriceCheck")
   expect(organizedList).toContain("MaterialReviewEditor")
   expect(organizedList).toContain("requestId={requestId}")
+  expect(reviewEditor).toContain("recommendation.choices.map")
+  expect(reviewEditor).toContain("<select")
+  expect(reviewEditor).not.toContain("<textarea")
+  expect(reviewEditor).not.toContain('type="number"')
   expect(priceCheck).toContain("Current price check")
   expect(priceCheck).toContain("fallbackLinks")
   expect(ownerActions).toContain("organizeClientMaterialRequestAction")
