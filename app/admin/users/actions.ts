@@ -304,6 +304,7 @@ export async function createRequestForClientAction(input: {
   department: string;
   title?: string;
   lines: ManagerRequestLineInput[];
+  freeText?: string;
   notes?: string;
 }): Promise<CreateClientRequestResult> {
   const { supabase } = await requireStaffProfile("customers");
@@ -350,6 +351,7 @@ export async function createRequestForClientAction(input: {
   const department = input.department.trim().slice(0, 100);
   const storedDepartment = department || "Unassigned";
 
+  const freeText = input.freeText?.trim().slice(0, 4000) || "";
   const lines = input.lines
     .map((line) => ({
       name: line.name.trim().slice(0, 300),
@@ -357,20 +359,22 @@ export async function createRequestForClientAction(input: {
       unit: line.unit.trim().slice(0, 40) || "each",
     }))
     .filter((line) => line.name);
-  if (!lines.length) return { ok: false, error: "Add at least one material item." };
+  if (!lines.length && !freeText) return { ok: false, error: "Paste the client's list or add at least one material item." };
   if (lines.length > 50) return { ok: false, error: "Keep each request to 50 material lines or fewer." };
   if (lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0 || line.quantity > 1_000_000)) {
     return { ok: false, error: "Every item needs a valid quantity greater than zero." };
   }
 
   const notes = input.notes?.trim().slice(0, 4000) || "";
+  const requestDetails = [freeText, notes ? `Additional notes:\n${notes}` : ""].filter(Boolean).join("\n\n").slice(0, 4000);
+  const storedLines = freeText ? [{ name: "Free-text material list", quantity: 1, unit: "request" }] : lines;
   const requestTitle = input.title?.trim().slice(0, 180) || (department ? `${department} request` : "Material request");
   const { data: requestId, error: requestError } = await supabase.rpc("staff_create_client_request", {
     p_customer_id: customerId,
     p_department: storedDepartment,
     p_title: requestTitle,
-    p_lines: lines,
-    p_notes: notes,
+    p_lines: storedLines,
+    p_notes: requestDetails,
   });
   if (requestError || !validUuid(String(requestId || ""))) {
     const message = requestError?.message || "";
@@ -378,6 +382,10 @@ export async function createRequestForClientAction(input: {
     if (message.includes("client_not_available")) return { ok: false, error: "This customer account is not available." };
     if (message.includes("invalid_material")) return { ok: false, error: "Check every material name, quantity, and unit." };
     return { ok: false, error: "The request could not be saved. No order was submitted." };
+  }
+
+  if (freeText) {
+    await supabase.functions.invoke("client-material-list-ai", { body: { requestId: String(requestId) } });
   }
 
   revalidatePath("/admin/users");

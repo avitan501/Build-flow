@@ -159,8 +159,12 @@ Deno.serve(async (request: Request) => {
 
   try {
     const requestDetails = clean(source.metadata?.request_details, 20_000)
+    const sourceName = clean(source.name, 4_000)
+    const typedSource = [requestDetails, sourceName && sourceName !== "Free-text material list" ? sourceName : ""]
+      .filter(Boolean)
+      .join("\n\n")
     const content: Array<Record<string, unknown>> = [{ type: "input_text", text: prompt }]
-    if (requestDetails) content.push({ type: "input_text", text: `Customer's typed material notes:\n\n${requestDetails}` })
+    if (typedSource) content.push({ type: "input_text", text: `Customer's typed material notes:\n\n${typedSource}` })
 
     const attachment = (attachments ?? []).find((file) => file.file_type === "application/pdf" || file.file_type?.startsWith("image/"))
     if (attachment && (attachment.file_size ?? 0) <= MAX_FILE_BYTES) {
