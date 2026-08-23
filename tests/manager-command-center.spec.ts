@@ -51,14 +51,15 @@ test("customer and lead records expose compact Q U O, email, and WhatsApp action
     readFile(path.join(root, "components/buildflow/client-target-outreach.tsx"), "utf8"),
   ])
   expect(actions).toContain("Call with Q U O")
-  expect(actions).toContain("Text with Q U O")
+  expect(actions).toContain("Q U O text")
+  expect(actions).toContain("Send message")
   expect(actions).toContain("Add photo")
   expect(actions).toContain("prepareQuoPhotoMessageAction")
   expect(customers).toContain("<ContactActions")
   expect(leads).toContain("<ContactActions")
 })
 
-test("approved staff use an Operations Manager workspace without owner-only controls", async () => {
+test("approved staff use a compact manager workspace without owner-only controls", async () => {
   const [identity, shell, settings, traffic, aiTools, payments, affiliate, broker] = await Promise.all([
     readFile(path.join(root, "lib/owner-identity.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
@@ -74,22 +75,24 @@ test("approved staff use an Operations Manager workspace without owner-only cont
     expect(identity).toContain(`| "${capability}"`)
   }
   expect(identity).toContain("operationsManager")
-  for (const section of ["Directories & Catalog", "Communications", "Supplier Pricing", "AI Tools", "Website Traffic", "Manager Settings"]) {
-    expect(shell).toContain(section)
-  }
+  for (const removedHeading of ["Directories & Catalog", "Supplier Pricing"]) expect(shell).not.toContain(removedHeading)
   for (const removedSection of ['label: "Tasks"', 'label: "Quotes & Orders"']) expect(shell).not.toContain(removedSection)
-  expect(shell).toContain('label: "AI Tools coming soon"')
-  expect(shell).toContain('{ href: "/admin/abc", label: "ABC Private Pricing"')
-  expect(shell.indexOf('label: "ABC Private Pricing"')).toBeGreaterThan(shell.indexOf('label: "AI Tools coming soon"'))
+  expect(shell).toContain('label: "AI Tools — Coming Soon"')
+  expect(shell).not.toContain('href: "/admin/abc"')
+  expect(shell).not.toContain('href: "/admin/traffic"')
+  expect(aiTools).toContain('href: "/admin/abc"')
+  expect(aiTools).toContain('href: "/admin/traffic"')
   expect(shell).not.toContain('{ href: "/owner/aura", label: "Aura Communications"')
-  expect(shell).toContain('access.owner ? "Owner Workspace" : "Operations Manager"')
+  expect(shell).toContain("Go to Customer Website")
+  expect(shell).toContain("Quick Access")
   expect(settings).toContain("Connection credentials and owner delivery tests remain restricted to David.")
   expect(settings).toContain("checkCommunicationConnectionsAction")
   expect(traffic).toContain('requireStaffProfile("traffic")')
   expect(traffic).toContain('action: "website_traffic"')
   expect(broker).toContain('input.action === "website_traffic"')
   expect(broker).toContain("left join public.profiles")
-  expect(aiTools).toContain('requireStaffProfile("aiTools")')
+  expect(aiTools).toContain("requireManagerPortalProfile")
+  expect(aiTools).toContain('if (!access.aiTools) redirect("/")')
   expect(payments).toContain("requireAdminProfile")
   expect(affiliate).toContain("requireAdminProfile")
 })
@@ -106,7 +109,8 @@ test("communication records are linked to customers and visible in the customer 
   expect(action).toContain('eq("id", clientId)')
   expect(action).toContain("serializeCommunicationLog")
   expect(customerPage).toContain("communicationByClient")
-  expect(customerPage).toContain("Communication log")
+  expect(customerPage).toContain("ContactConversation")
+  expect(customerPage).toContain('body: { action: "dashboard" }')
 })
 
 test("employee activity reports only the current Avantia page with a visible notice", async () => {

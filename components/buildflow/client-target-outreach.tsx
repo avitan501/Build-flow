@@ -12,6 +12,7 @@ import {
   updateOutreachLeadStatusAction,
 } from "@/app/admin/goals-progress/lead-actions";
 import { ContactActions } from "@/components/buildflow/contact-actions";
+import { ContactConversation, type DirectoryConversationEntry } from "@/components/buildflow/contact-conversation";
 
 export type OutreachLeadRecord = {
   id: string;
@@ -75,7 +76,7 @@ export function AddOutreachLead() {
   </>;
 }
 
-function EditOutreachLead({ lead }: { lead: OutreachLeadRecord }) {
+export function EditOutreachLead({ lead }: { lead: OutreachLeadRecord }) {
   const initialValue = () => ({ fullName: lead.full_name, companyName: lead.company_name ?? "", email: lead.email ?? "", phone: lead.phone ?? "", notes: lead.notes ?? "", relationshipLevel: lead.relationship_level, preferredLanguage: lead.preferred_language });
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(initialValue);
@@ -125,6 +126,44 @@ function EditOutreachLead({ lead }: { lead: OutreachLeadRecord }) {
         </section>
       </div>, document.body) : null}
   </>;
+}
+
+export function OutreachLeadDirectory({ leads, conversations, senderName }: { leads: OutreachLeadRecord[]; conversations: Record<string, DirectoryConversationEntry[]>; senderName: string }) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function run(action: () => Promise<{ ok: true } | { ok: false; error: string }>) {
+    setError(null);
+    startTransition(async () => {
+      const result = await action();
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      window.location.reload();
+    });
+  }
+
+  if (!leads.length) return <p className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">No leads match this search.</p>;
+
+  return <section className="grid gap-3" aria-label="Leads">
+    {leads.map((lead) => <article key={lead.id} className="grid min-w-0 gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.85fr)]">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="text-base font-bold">{lead.full_name}</h2><span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-[#0066cc]">Level {lead.relationship_level}</span></div><p className="mt-1 truncate text-sm text-slate-600">{lead.company_name || "No company"}</p><p className="mt-1 break-all text-xs text-slate-500">{[lead.phone, lead.email].filter(Boolean).join(" · ") || "Contact details needed"}</p></div>
+          <div className="flex items-center gap-1"><EditOutreachLead lead={lead} /><button type="button" disabled={pending} onClick={() => window.confirm(`Remove ${lead.full_name} from leads?`) && run(() => deleteOutreachLeadAction(lead.id))} aria-label={`Remove ${lead.full_name}`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button></div>
+        </div>
+        {lead.notes ? <p className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">{lead.notes}</p> : null}
+        <div className="mt-3 flex max-w-full flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+          <select aria-label={`Language for ${lead.full_name}`} defaultValue={lead.preferred_language} disabled={pending} onChange={(event) => run(() => updateClientLanguageAction({ id: lead.id, target: "lead", language: event.target.value }))} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"><option value="en">English</option><option value="es">Spanish</option></select>
+          <select aria-label={`Status for ${lead.full_name}`} defaultValue={lead.status} disabled={pending} onChange={(event) => run(() => updateOutreachLeadStatusAction({ id: lead.id, status: event.target.value }))} className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"><option value="new">New</option><option value="contacted">Contacted</option><option value="qualified">Qualified</option><option value="not_interested">Not interested</option></select>
+          <div className="ml-auto"><ContactActions name={lead.full_name} phone={lead.phone} email={lead.email} senderName={senderName} /></div>
+        </div>
+      </div>
+      <ContactConversation entries={conversations[lead.id] ?? []} />
+    </article>)}
+    {error ? <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
+  </section>;
 }
 
 export function OutreachLeadList({ leads }: { leads: OutreachLeadRecord[] }) {

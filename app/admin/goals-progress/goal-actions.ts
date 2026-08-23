@@ -21,12 +21,13 @@ export async function createManagerGoalAction(input: {
   title: string;
   details: string;
 }): Promise<GoalResult> {
-  const { supabase, user } = await requireManagerPortalProfile();
+  const { supabase, user, access } = await requireManagerPortalProfile();
   const assignee = input.assignee.trim().toLowerCase();
   const title = input.title.trim();
   const details = input.details.trim();
 
   if (!validAssignee(assignee)) return { ok: false, error: "Choose David or Carlos." };
+  if (!access.owner && assignee !== "carlos") return { ok: false, error: "Only the owner can manage David's goals." };
   if (title.length < 2 || title.length > 120) return { ok: false, error: "Enter a goal between 2 and 120 characters." };
   if (details.length > 500) return { ok: false, error: "Keep the notes under 500 characters." };
 
@@ -43,7 +44,8 @@ export async function createManagerGoalAction(input: {
 }
 
 export async function createWebsiteFixNoteAction(input: { kind: string; note: string }): Promise<GoalResult> {
-  const { supabase, user } = await requireManagerPortalProfile();
+  const { supabase, user, access } = await requireManagerPortalProfile();
+  if (!access.owner) return { ok: false, error: "Only the owner can manage website goals." };
   const kind = ["Fix", "Add", "Change", "Remove"].find((value) => value.toLowerCase() === input.kind.trim().toLowerCase());
   const note = input.note.trim().replace(/\s+/g, " ");
 
@@ -63,11 +65,13 @@ export async function createWebsiteFixNoteAction(input: { kind: string; note: st
 }
 
 export async function setManagerGoalCompletedAction(input: { id: string; completed: boolean }): Promise<GoalResult> {
-  const { supabase } = await requireManagerPortalProfile();
-  const { error } = await supabase
+  const { supabase, access } = await requireManagerPortalProfile();
+  let update = supabase
     .from("manager_goals")
     .update({ status: input.completed ? "completed" : "open" })
     .eq("id", input.id);
+  if (!access.owner) update = update.eq("assignee", "carlos");
+  const { error } = await update;
   if (error) return { ok: false, error: "The goal status could not be updated." };
 
   refreshGoals();
@@ -75,8 +79,10 @@ export async function setManagerGoalCompletedAction(input: { id: string; complet
 }
 
 export async function deleteManagerGoalAction(id: string): Promise<GoalResult> {
-  const { supabase } = await requireManagerPortalProfile();
-  const { error } = await supabase.from("manager_goals").delete().eq("id", id);
+  const { supabase, access } = await requireManagerPortalProfile();
+  let deletion = supabase.from("manager_goals").delete().eq("id", id);
+  if (!access.owner) deletion = deletion.eq("assignee", "carlos");
+  const { error } = await deletion;
   if (error) return { ok: false, error: "The goal could not be deleted." };
 
   refreshGoals();

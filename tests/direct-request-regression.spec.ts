@@ -19,7 +19,7 @@ test("direct checkout removes project selection and preserves manager request de
   expect(actions).toContain("ensureDirectRequestProject")
   expect(actions).toContain('DIRECT_REQUEST_PROJECT_NAME = "Material Requests"')
   expect(ownerDetail).toContain('answers,metadata')
-  expect(ownerDetail).toContain("Request breakdown")
+  expect(ownerDetail).toContain("Original customer request")
   expect(ownerDetail).toContain("request_details")
   expect(ownerDetail).toContain("answer_display_snapshot")
   expect(ownerDetail).toContain('const { supabase } = await requireStaffProfile("customers")')

@@ -150,7 +150,7 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
   expect(navigation).toContain('label: "Open Google Meet"');
   expect(navigation).toContain('label: "Open WhatsApp to make a call"');
   expect(navigation).toContain('href: "/admin/communications"');
-  expect(navigation.indexOf("communicationLinks.map")).toBeGreaterThan(navigation.indexOf('label: "Website Traffic"'));
+  expect(navigation.indexOf("communicationLinks.map")).toBeGreaterThan(navigation.indexOf("</nav>"));
   expect(navigation).not.toContain('link.href === "/admin/traffic" ||');
   expect(navigation).toContain('target="_blank" rel="noopener noreferrer"');
   expect(migration).toContain("alter table public.quote_comparisons enable row level security");

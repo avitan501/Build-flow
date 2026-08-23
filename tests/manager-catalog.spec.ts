@@ -5,19 +5,26 @@ import { expect, test } from "@playwright/test"
 
 const root = process.cwd()
 
-test("manager navigation groups business tools and keeps communication shortcuts at the bottom", async () => {
-  const shell = await readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8")
+test("manager navigation is compact and keeps communication shortcuts at the bottom", async () => {
+  const [shell, aiTools] = await Promise.all([
+    readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/ai-tools/page.tsx"), "utf8"),
+  ])
   expect(shell).toContain('label: "Material Catalog"')
   expect(shell).toContain('href: "/admin/catalog"')
-  expect(shell).toContain('label: "Website Traffic"')
-  expect(shell).toContain('label: "AI Tools"')
+  expect(shell).not.toContain('label: "Website Traffic"')
+  expect(shell).toContain('label: "AI Tools — Coming Soon"')
   expect(shell).toContain("Manager Dashboard")
   expect(shell).toContain('label: "Calls & Communications"')
-  expect(shell).toContain('label: "Directories & Catalog"')
-  expect(shell).toContain('label: "Supplier Pricing"')
-  expect(shell).toContain('href: "/admin/abc"')
+  expect(shell).not.toContain('label: "Directories & Catalog"')
+  expect(shell).not.toContain('label: "Supplier Pricing"')
+  expect(shell).not.toContain('href: "/admin/abc"')
+  expect(aiTools).toContain('href: "/admin/abc"')
+  expect(aiTools).toContain('href: "/admin/traffic"')
   expect(shell).toContain('href: "/admin/payments"')
   expect(shell).toContain('label: "Manager Settings"')
+  expect(shell).toContain("Go to Customer Website")
+  expect(shell).toContain("Quick Access")
   expect(shell).not.toContain('<span className="min-w-0 flex-1 text-left">More</span>')
   expect(shell).toContain('shortLabel: "Calls"')
   expect(shell).toContain('shortLabel: "Meet"')

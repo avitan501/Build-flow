@@ -114,9 +114,11 @@ function SupplierPricingGoal() {
 
 export default async function GoalsProgressPage() {
   const { supabase, access } = await requireManagerPortalProfile();
+  let goalsQuery = supabase.from("manager_goals").select("id,assignee,title,details,status").order("status").order("created_at", { ascending: false });
+  if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos");
   const [clientResult, goalResult, leadResult] = await Promise.all([
     supabase.from("profiles").select("id,full_name,company_name,email,phone,preferred_language").eq("role", "client").eq("is_active", true).order("created_at", { ascending: false }).limit(5).returns<ClientTarget[]>(),
-    supabase.from("manager_goals").select("id,assignee,title,details,status").order("status").order("created_at", { ascending: false }).returns<ManagerGoalRecord[]>(),
+    goalsQuery.returns<ManagerGoalRecord[]>(),
     supabase.from("manager_outreach_leads").select("id,full_name,company_name,email,phone,notes,status,relationship_level,preferred_language").order("status").order("created_at", { ascending: false }).returns<OutreachLeadRecord[]>(),
   ]);
   const clients = clientResult.error ? [] : clientResult.data ?? [];
@@ -131,7 +133,7 @@ export default async function GoalsProgressPage() {
     <div className="mt-7 grid gap-9">
       <section aria-labelledby="carlos-goals-title"><PersonHeader assignee="carlos" description="Clients, suppliers, and pricing outreach" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "carlos")} /><div className="mt-4 grid gap-4"><ClientTargetGoal clients={clients} leads={leads} canManageClients={access.customers} /><SupplierPricingGoal />{access.owner ? <OwnerAffiliateGoal /> : <GoalDisclosure number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="Track supplier opportunities and report progress to David."><p className="text-sm leading-6 text-slate-600">Call suppliers, track opportunities, and report progress to David. The owner manages private account details.</p></GoalDisclosure>}</div></section>
 
-      <section aria-labelledby="david-goals-title"><PersonHeader assignee="david" description="Website and campaign launch" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "david")} /><div className="mt-4 grid gap-4"><FixWebsiteGoal notes={websiteNotes} /><BeatQuoteGoal owner={access.owner} /></div></section>
+      {access.owner ? <section aria-labelledby="david-goals-title"><PersonHeader assignee="david" description="Website and campaign launch" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "david")} /><div className="mt-4 grid gap-4"><FixWebsiteGoal notes={websiteNotes} /><BeatQuoteGoal owner /></div></section> : null}
     </div>
   </div></main>;
 }

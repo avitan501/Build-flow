@@ -2,7 +2,6 @@
 
 import {
   ChevronLeft,
-  BarChart3,
   Archive,
   ChevronRight,
   Columns3,
@@ -48,46 +47,22 @@ type ManagerAccess = {
   managerSettings: boolean;
 };
 
-function navigationGroups(access: ManagerAccess) {
+function navigationLinks(access: ManagerAccess) {
   return [
-    {
-      label: "Directories & Catalog",
-      links: [
-        ...(access.customers ? [
-      { href: "/admin/users", label: "Customer Directory", icon: Users },
-        ] : []),
-        ...(access.suppliers ? [
-          { href: "/admin/vendors", label: "Supplier Directory", icon: Store },
-          { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },
-        ] : []),
-      ],
-    },
-    {
-      label: "Communications",
-      links: access.communications ? [{ href: "/admin/communications", label: "Aura Communications", icon: PhoneCall }] : [],
-    },
-    {
-      label: "Supplier Pricing",
-      links: [
-        ...(access.suppliers ? [
-          { href: "/admin/supplier-quotes", label: "Supplier Quote Storage", icon: Archive },
-          { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
-        ] : []),
-      ],
-    },
-    {
-      label: "AI Tools",
-      links: [
-        ...(access.aiTools ? [{ href: "/admin/ai-tools", label: "AI Tools coming soon", icon: Sparkles }] : []),
-        ...(access.owner ? [{ href: "/admin/abc", label: "ABC Private Pricing", icon: Store }] : []),
-        ...(access.traffic ? [{ href: "/admin/traffic", label: "Website Traffic", icon: BarChart3 }] : []),
-        ...(access.managerSettings ? [{ href: "/admin/settings", label: "Manager Settings", icon: Settings }] : []),
-        ...(access.owner ? [
-          { href: "/admin/payments", label: "Payments", icon: CreditCard },
-        ] : []),
-      ],
-    },
-  ].filter((group) => group.links.length > 0);
+    ...(access.customers ? [{ href: "/admin/users", label: "Customer Directory", icon: Users }] : []),
+    ...(access.suppliers ? [
+      { href: "/admin/vendors", label: "Supplier Directory", icon: Store },
+      { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },
+    ] : []),
+    ...(access.communications ? [{ href: "/admin/communications", label: "Aura Communications", icon: PhoneCall }] : []),
+    ...(access.suppliers ? [
+      { href: "/admin/supplier-quotes", label: "Supplier Quote Storage", icon: Archive },
+      { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
+    ] : []),
+    ...(access.aiTools ? [{ href: "/admin/ai-tools", label: "AI Tools — Coming Soon", icon: Sparkles }] : []),
+    ...(access.managerSettings ? [{ href: "/admin/settings", label: "Manager Settings", icon: Settings }] : []),
+    ...(access.owner ? [{ href: "/admin/payments", label: "Payments", icon: CreditCard }] : []),
+  ];
 }
 
 function isActive(pathname: string, href: string) {
@@ -108,7 +83,7 @@ function isActive(pathname: string, href: string) {
 }
 
 function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string; access: ManagerAccess; onNavigate?: () => void }) {
-  const groups = navigationGroups(access);
+  const links = navigationLinks(access);
   const homeHref = "/admin/build-map";
   return (
     <div className="flex h-full flex-col bg-white">
@@ -116,31 +91,29 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
         <Link href={homeHref} onClick={onNavigate} aria-label="Avantia Build manager portal">
           <AvantiaBuildLockup />
         </Link>
-        <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#0066cc]">{access.owner ? "Owner Workspace" : "Operations Manager"}</p>
+        <Link href="/" onClick={onNavigate} className="mt-4 flex min-h-10 items-center gap-2 text-sm font-semibold text-[#0066cc] hover:text-[#004f9e]">
+          <ChevronLeft className="h-4 w-4" />
+          Go to Customer Website
+        </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-5 py-5" aria-label="Manager navigation">
-        <Link href={homeHref} onClick={onNavigate} className={`group flex min-h-16 items-center gap-3 rounded-lg px-4 text-[15px] font-semibold transition ${isActive(pathname, homeHref) ? "bg-[#0071e3] text-white shadow-sm" : "bg-slate-950 text-white hover:bg-slate-900"}`}>
+      <nav className="flex-1 overflow-y-auto px-5 py-3" aria-label="Manager navigation">
+        <Link href={homeHref} onClick={onNavigate} className={`group flex min-h-11 items-center gap-3 rounded-md px-2 text-sm font-semibold transition ${isActive(pathname, homeHref) ? "bg-sky-50 text-[#0066cc]" : "text-slate-800 hover:bg-slate-50"}`}>
           <LayoutDashboard className="h-5 w-5 shrink-0" />
           <span className="min-w-0 flex-1">Manager Dashboard</span>
-          <ChevronRight className="h-4 w-4 text-white/60 transition group-hover:translate-x-0.5" aria-hidden="true" />
+          <ChevronRight className="h-3.5 w-3.5 text-slate-300 transition group-hover:translate-x-0.5" aria-hidden="true" />
         </Link>
-        <div className="mt-5 grid gap-5">
-          {groups.map((group) => {
-            const headingId = `manager-nav-${group.label.replaceAll(" ", "-").replaceAll("&", "and").toLowerCase()}`;
-            return <section key={group.label} aria-labelledby={headingId}>
-              <h2 id={headingId} className="px-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">{group.label}</h2>
-              <div className="mt-1">{group.links.map((link) => {
-                const Icon = link.icon;
-                const active = isActive(pathname, link.href);
-                return <Link key={link.href} href={link.href} onClick={onNavigate} className={`group flex min-h-11 items-center gap-3 rounded-md px-2 text-sm font-semibold transition ${active ? "bg-sky-50 text-[#0066cc]" : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"}`}><Icon className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1">{link.label}</span><ChevronRight className="h-3.5 w-3.5 text-slate-300 transition group-hover:translate-x-0.5" aria-hidden="true" /></Link>;
-              })}</div>
-            </section>;
+        <div className="mt-1">
+          {links.map((link) => {
+            const Icon = link.icon;
+            const active = isActive(pathname, link.href);
+            return <Link key={link.href} href={link.href} onClick={onNavigate} className={`group flex min-h-11 items-center gap-3 rounded-md px-2 text-sm font-semibold transition ${active ? "bg-sky-50 text-[#0066cc]" : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"}`}><Icon className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1">{link.label}</span><ChevronRight className="h-3.5 w-3.5 text-slate-300 transition group-hover:translate-x-0.5" aria-hidden="true" /></Link>;
           })}
         </div>
       </nav>
 
       <div className="border-t border-slate-100 px-5 pb-5 pt-3">
+        <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Quick Access</p>
         <div className="grid grid-cols-3 gap-1" aria-label="Communication shortcuts">
           {communicationLinks.map((link) => {
             const Icon = link.icon;
@@ -152,10 +125,6 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
             return <Link key={link.href} href={link.href} onClick={onNavigate} aria-label={link.label} title={link.label} className={className}>{content}</Link>;
           })}
         </div>
-        <Link href="/" onClick={onNavigate} className="flex min-h-12 items-center gap-3 border-t border-slate-100 px-1 text-sm font-semibold text-slate-800 hover:text-[#0066cc]">
-          <ChevronLeft className="h-4 w-4" />
-          View customer website
-        </Link>
         <Link href="/account" onClick={onNavigate} className="flex min-h-12 items-center gap-3 border-t border-slate-100 px-1 text-sm font-semibold text-slate-800 hover:text-[#0066cc]">
           <UserRound className="h-4 w-4" />
           My Account

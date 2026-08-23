@@ -10,17 +10,23 @@ test("Goals and Client Target stay in the dashboard instead of manager navigatio
 
   expect(shell).not.toContain('{ href: "/admin/goals-progress", label: "Goals & Progress"');
   expect(shell).not.toContain('{ href: "/admin/goals-progress/client-target", label: "Client Target", icon: Target }');
-  expect(shell).toContain("function navigationGroups(access: ManagerAccess)");
+  expect(shell).toContain("function navigationLinks(access: ManagerAccess)");
   expect(shell).not.toContain("sharedMoreLinks");
-  expect(shell).toContain('label: "Directories & Catalog"');
-  expect(shell).toContain('label: "Supplier Pricing"');
+  expect(shell).not.toContain('label: "Directories & Catalog"');
+  expect(shell).not.toContain('label: "Supplier Pricing"');
+  expect(shell).toContain("Go to Customer Website");
+  expect(shell).toContain("Quick Access");
   expect(shell).not.toContain('label: "Tasks"');
   expect(shell).not.toContain('label: "Quotes & Orders"');
   expect(shell).not.toContain('label: "Tasks & Daily Summary"');
 });
 
 test("Goals & Progress allows manager employees while owner controls stay protected", async () => {
-  const page = await readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8");
+  const [page, actions, dashboard] = await Promise.all([
+    readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/goals-progress/goal-actions.ts"), "utf8"),
+    readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
+  ]);
 
   expect(page).toContain("await requireManagerPortalProfile()");
   expect(page).toContain("async function OwnerAffiliateGoal()");
@@ -45,6 +51,12 @@ test("Goals & Progress allows manager employees while owner controls stay protec
   expect(page).toContain('supabase.from("manager_goals")');
   expect(page).toContain("<AddManagerGoal");
   expect(page.indexOf('PersonHeader assignee="carlos"')).toBeLessThan(page.indexOf('PersonHeader assignee="david"'));
+  expect(page).toContain('if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos")');
+  expect(page).toContain('access.owner ? <section aria-labelledby="david-goals-title"');
+  expect(dashboard).toContain('if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos")');
+  expect(dashboard).toContain('access.owner ? <details className="group border-t border-slate-200 pt-4"');
+  expect(actions).toContain('if (!access.owner && assignee !== "carlos")');
+  expect(actions.match(/if \(!access\.owner\).*\.eq\("assignee", "carlos"\)/g)?.length).toBe(2);
 });
 
 test("manager goals are persistent and protected for manager users", async () => {

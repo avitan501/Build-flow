@@ -27,18 +27,19 @@ test("manager deletion functions target one record and protect privileged accoun
   expect(sql).not.toMatch(/delete from auth\.users\s*;/i)
 })
 
-test("customer manager exposes separate customer project and request deletion controls", async () => {
+test("customer manager hides project UI while retaining protected project deletion support", async () => {
   const [page, actions, button] = await Promise.all([
     readFile(path.join(root, "app/admin/users/page.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/users/actions.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/delete-manager-record-button.tsx"), "utf8"),
   ])
 
-  expect(page).toContain('/admin/users?view=projects')
+  expect(page).not.toContain('/admin/users?view=projects')
+  expect(page).toContain('/admin/users?view=leads')
   expect(page).toContain('new Set(["draft", "submitted", "in_review", "quoted"])')
   expect(page).toContain('if (projectsResult.error) throw new Error("Failed to load customer projects.")')
   expect(page).toContain('kind="customer"')
-  expect(page).toContain('kind="project"')
+  expect(page).not.toContain('kind="project"')
   expect(page).toContain('kind="request"')
   expect(actions).toContain('supabase.rpc("staff_delete_customer_quote_request"')
   expect(actions).toContain('supabase.rpc("staff_delete_customer_project"')

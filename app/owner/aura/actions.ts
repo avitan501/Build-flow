@@ -93,6 +93,8 @@ export async function sendAuraMessageAction(input: {
   }
 
   revalidatePath("/owner/aura");
+  revalidatePath("/admin/communications");
+  revalidatePath("/admin/users");
   return { ok: true };
 }
 

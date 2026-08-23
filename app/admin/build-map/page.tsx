@@ -140,12 +140,14 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   const { stage = "" } = await searchParams;
   const selectedStage = pipelineStages.some((item) => item.id === stage) ? stage as ManagerPipelineStage : null;
   const { supabase, access } = await requireManagerPortalProfile();
+  let goalsQuery = supabase.from("manager_goals").select("id,assignee,title,details,status,created_at,updated_at").order("created_at", { ascending: false });
+  if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos");
 
   const [requestsResult, comparisonsResult, packagesResult, goalsResult, leadsResult, clientsResult] = await Promise.all([
     supabase.from("quote_requests").select("id,owner_id,title,status,updated_at").order("updated_at", { ascending: false }).limit(250).returns<RequestRow[]>(),
     supabase.from("quote_comparisons").select("id,request_id,status,client_quote_status,updated_at").order("updated_at", { ascending: false }).limit(500).returns<ComparisonRow[]>(),
     supabase.from("supplier_packages").select("request_id,status").order("updated_at", { ascending: false }).limit(500).returns<SupplierPackageRow[]>(),
-    supabase.from("manager_goals").select("id,assignee,title,details,status,created_at,updated_at").order("created_at", { ascending: false }).returns<DashboardGoalRecord[]>(),
+    goalsQuery.returns<DashboardGoalRecord[]>(),
     supabase.from("manager_outreach_leads").select("id,status").returns<LeadRow[]>(),
     supabase.from("profiles").select("id,full_name,email").eq("role", "client").eq("is_active", true).order("created_at", { ascending: false }).limit(500).returns<ClientRow[]>(),
   ]);
@@ -228,10 +230,10 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
         <FixedTarget title="Find suppliers' best-priced items" detail="Collect pricing and update the material catalog" href="/admin/catalog" icon={ShoppingCart} />
         <FixedTarget title="Supplier Affiliate Program" detail="Track applications and supplier opportunities" href="/admin/goals-progress" icon={Store} />
       </PersonGoals>
-      <details className="group border-t border-slate-200 pt-4"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between"><span className="font-semibold">David goals</span><span className="text-xs font-semibold text-[#0066cc] group-open:hidden">Open</span></summary><div className="pt-4"><PersonGoals assignee="david" goals={regularGoals.filter((goal) => goal.assignee === "david")}>
+      {access.owner ? <details className="group border-t border-slate-200 pt-4"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between"><span className="font-semibold">David goals</span><span className="text-xs font-semibold text-[#0066cc] group-open:hidden">Open</span></summary><div className="pt-4"><PersonGoals assignee="david" goals={regularGoals.filter((goal) => goal.assignee === "david")}>
           <FixedTarget title="Fix Website" detail={`${websiteNotes.filter((goal) => goal.status === "open").length} open website notes`} href="/admin/goals-progress" icon={CheckCircle2} />
           <FixedTarget title="Launch Beat Your Quote" detail="Campaign, flyer, and customer upload flow" href="/admin/goals-progress" icon={Send} />
-        </PersonGoals></div></details>
+        </PersonGoals></div></details> : null}
     </div></section>
 
     <details className="group mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4"><span><strong id="manager-tools-heading" className="text-base">Manager tools</strong><span className="ml-2 text-xs text-slate-500">Directories, suppliers, and settings</span></span><span className="text-xs font-semibold text-[#0066cc] group-open:hidden">Open</span></summary><div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-3">{managerSections.map((section) => { const Icon = section.icon; return <section key={section.title} className="overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="flex items-center gap-3 border-b border-slate-100 px-3 py-2"><span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-[#0066cc]"><Icon className="h-4 w-4" /></span><h3 className="text-sm font-semibold">{section.title}</h3></header><div>{section.links.map((item) => { const external = item.href.startsWith("https://"); return <Link key={item.href} href={item.href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="group flex min-h-11 items-center justify-between gap-3 border-b border-slate-100 px-3 text-sm font-semibold text-slate-700 last:border-b-0 hover:bg-slate-50 hover:text-[#0066cc]"><span>{item.label}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5" /></Link>; })}</div></section>; })}</div></details>
