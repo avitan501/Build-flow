@@ -12,6 +12,11 @@ test("Goals and Client Target stay in the dashboard instead of manager navigatio
   expect(shell).not.toContain('{ href: "/admin/goals-progress/client-target", label: "Client Target", icon: Target }');
   expect(shell).toContain("function navigationGroups(access: ManagerAccess)");
   expect(shell).not.toContain("sharedMoreLinks");
+  expect(shell).toContain('label: "Directories & Catalog"');
+  expect(shell).toContain('label: "Supplier Pricing"');
+  expect(shell).not.toContain('label: "Tasks"');
+  expect(shell).not.toContain('label: "Quotes & Orders"');
+  expect(shell).not.toContain('label: "Tasks & Daily Summary"');
 });
 
 test("Goals & Progress allows manager employees while owner controls stay protected", async () => {

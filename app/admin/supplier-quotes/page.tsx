@@ -1,4 +1,4 @@
-import { ArrowRight, FileCheck2, FileClock, Filter, FolderArchive, ReceiptText, X } from "lucide-react"
+import { ArrowRight, ClipboardList, Columns3, FileCheck2, FileClock, Filter, FolderArchive, ReceiptText, Upload, X } from "lucide-react"
 import Link from "next/link"
 
 import { SupplierQuoteUploadForm } from "@/components/buildflow/supplier-quote-upload-form"
@@ -8,25 +8,27 @@ import { supplierQuoteStatusLabel, type SupplierQuoteClient, type SupplierQuoteR
 
 type RequestRow = { id: string; title: string; status: string; project_id: string; owner_id: string; created_at: string }
 type RequestProjectRow = { id: string; name: string; address: string | null }
+type RequestComparisonRow = { id: string; request_id: string | null; status: string }
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value))
 }
 
 export default async function SupplierQuotesPage({ searchParams }: {
-  searchParams: Promise<{ supplier?: string; client?: string; date?: string }>
+  searchParams: Promise<{ supplier?: string; client?: string; date?: string; request?: string }>
 }) {
   const filters = await searchParams
   const supplierFilter = filters.supplier?.trim() || ""
   const clientFilter = filters.client?.trim() || ""
   const dateFilter = /^\d{4}-\d{2}-\d{2}$/.test(filters.date || "") ? filters.date || "" : ""
   const { supabase } = await requireStaffProfile("suppliers")
-  const [quotesResult, suppliersResult, clientsResult, requestsResult, projectsResult, ocrStatus] = await Promise.all([
+  const [quotesResult, suppliersResult, clientsResult, requestsResult, projectsResult, comparisonsResult, ocrStatus] = await Promise.all([
     supabase.from("supplier_quotes").select("*").neq("status", "archived").order("updated_at", { ascending: false }).limit(200).returns<SupplierQuoteRecord[]>(),
     supabase.rpc("staff_load_catalog_suppliers"),
     supabase.from("profiles").select("id,full_name,email").eq("role", "client").eq("is_active", true).order("full_name").limit(500),
     supabase.from("quote_requests").select("id,title,status,project_id,owner_id,created_at").order("created_at", { ascending: false }).limit(1000).returns<RequestRow[]>(),
     supabase.from("projects").select("id,name,address").limit(1000).returns<RequestProjectRow[]>(),
+    supabase.from("quote_comparisons").select("id,request_id,status").order("updated_at", { ascending: false }).limit(1000).returns<RequestComparisonRow[]>(),
     supabase.functions.invoke<{ ok?: boolean; configured?: boolean }>("supplier-quote-ocr", { body: { action: "status" } }).catch(() => ({ data: null })),
   ])
   const quotes = quotesResult.data ?? []
@@ -50,7 +52,19 @@ export default async function SupplierQuotesPage({ searchParams }: {
       createdAt: request.created_at,
     }
   })
-  const enabled = !quotesResult.error && !suppliersResult.error && !clientsResult.error && !requestsResult.error && !projectsResult.error
+  const openRequests = requests.filter((request) => !["draft", "closed"].includes(request.status))
+  const requestedRequestId = filters.request?.trim() || ""
+  const initialRequestId = openRequests.some((request) => request.id === requestedRequestId) ? requestedRequestId : ""
+  const clientById = new Map(clients.map((client) => [client.id, client]))
+  const comparisonByRequestId = new Map<string, RequestComparisonRow>()
+  for (const comparison of comparisonsResult.data ?? []) {
+    if (comparison.request_id && !comparisonByRequestId.has(comparison.request_id) && !["awarded", "archived"].includes(comparison.status)) comparisonByRequestId.set(comparison.request_id, comparison)
+  }
+  const quoteCountByComparisonId = new Map<string, number>()
+  for (const quote of quotes) {
+    if (quote.comparison_id) quoteCountByComparisonId.set(quote.comparison_id, (quoteCountByComparisonId.get(quote.comparison_id) ?? 0) + 1)
+  }
+  const enabled = !quotesResult.error && !suppliersResult.error && !clientsResult.error && !requestsResult.error && !projectsResult.error && !comparisonsResult.error
   const reviewCount = quotes.filter((quote) => quote.status === "needs_review").length
   const routedCount = quotes.filter((quote) => ["cataloged", "comparison", "client_quote"].includes(quote.status)).length
   const supplierOptions = [...new Set(quotes.map((quote) => quote.supplier_name).filter(Boolean))].sort((a, b) => a.localeCompare(b))
@@ -69,13 +83,29 @@ export default async function SupplierQuotesPage({ searchParams }: {
       <div className="mx-auto max-w-7xl">
         <header className="flex flex-col gap-5 border-b border-slate-200 pb-6 xl:flex-row xl:items-end xl:justify-between">
           <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0071e3]">Manager Portal</p><h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Supplier Quote Storage</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">One private place for supplier documents, extracted materials, current pricing, and the next action.</p></div>
-          <SupplierQuoteUploadForm clients={clients} requests={requests} suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name, catalogDepartments: supplier.catalogDepartments }))} departments={materialCatalogDepartmentOptions()} enabled={enabled} aiEnabled={Boolean(ocrStatus.data?.ok && ocrStatus.data.configured)} />
+          <SupplierQuoteUploadForm key={initialRequestId || "new-quote"} clients={clients} requests={openRequests} suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name, catalogDepartments: supplier.catalogDepartments }))} departments={materialCatalogDepartmentOptions()} enabled={enabled} aiEnabled={Boolean(ocrStatus.data?.ok && ocrStatus.data.configured)} initialRequestId={initialRequestId} />
         </header>
 
         {!enabled ? <div className="mt-5 border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Supplier Quote Storage is waiting for its database update.</div> : null}
 
         <section className="mt-5 grid grid-cols-3 gap-3" aria-label="Supplier quote summary">
           {[{ label: "Stored", value: quotes.length, icon: FolderArchive }, { label: "Needs review", value: reviewCount, icon: FileClock }, { label: "Routed", value: routedCount, icon: FileCheck2 }].map((metric) => <div key={metric.label} className="border border-slate-200 bg-white p-3 shadow-sm sm:p-4"><metric.icon className="h-4 w-4 text-[#0071e3]" /><p className="mt-3 text-2xl font-bold tabular-nums">{metric.value}</p><p className="mt-1 text-[11px] font-semibold text-slate-500 sm:text-xs">{metric.label}</p></div>)}
+        </section>
+
+        <section className="mt-5 border border-slate-200 bg-white shadow-sm" aria-labelledby="client-requests-heading">
+          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6">
+            <div><h2 id="client-requests-heading" className="text-lg font-bold">Open client requests</h2><p className="mt-1 text-xs text-slate-500">Start with the client list, then add each supplier response to the same comparison.</p></div>
+            <ClipboardList className="h-5 w-5 text-[#0071e3]" />
+          </div>
+          {openRequests.length ? <div className="divide-y divide-slate-200">{openRequests.map((request) => {
+            const client = clientById.get(request.clientId)
+            const comparison = comparisonByRequestId.get(request.id)
+            const quoteCount = comparison ? quoteCountByComparisonId.get(comparison.id) ?? 0 : 0
+            return <article key={request.id} className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6">
+              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate font-bold">{request.title}</h3><span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">{request.status.replaceAll("_", " ")}</span></div><p className="mt-1 truncate text-sm text-slate-600">{client?.name || "Client"}{request.projectName ? ` · ${request.projectName}` : ""}</p><div className="mt-2 flex flex-wrap gap-x-3 text-xs font-medium text-slate-500"><span>{request.caseNumber}</span><span>{quoteCount} supplier {quoteCount === 1 ? "quote" : "quotes"}</span><span>{formatDate(request.createdAt)}</span></div></div>
+              <div className="flex flex-wrap gap-2"><Link href={`/owner/materials/requests/${request.id}`} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800"><ClipboardList className="h-4 w-4 text-[#0071e3]" /> View client list</Link><Link href={`/admin/supplier-quotes?request=${request.id}#supplier-quote-upload`} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-3 text-sm font-bold text-white"><Upload className="h-4 w-4" /> Add supplier quote</Link>{comparison ? <Link href={`/admin/quote-comparison/${comparison.id}`} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800"><Columns3 className="h-4 w-4 text-[#0071e3]" /> Compare</Link> : null}</div>
+            </article>
+          })}</div> : <div className="px-5 py-10 text-center"><ClipboardList className="mx-auto h-8 w-8 text-slate-300" /><h3 className="mt-3 font-bold">No open client requests</h3><p className="mt-1 text-sm text-slate-500">New submitted requests will appear here automatically.</p></div>}
         </section>
 
         <section className="mt-5 border border-slate-200 bg-white shadow-sm" aria-labelledby="stored-quotes-heading">

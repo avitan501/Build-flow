@@ -7,10 +7,10 @@ import { calculateWorkedMinutes } from "../lib/daily-work-summary"
 
 const root = process.cwd()
 
-test("manager navigation provides a Daily Work Summary beside communication shortcuts", async () => {
+test("daily work summary stays in the dashboard instead of manager navigation", async () => {
   const shell = await readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8")
-  expect(shell).toContain('{ href: "/admin/daily-summary", label: "Daily Work Summary", shortLabel: "Summary", icon: CalendarDays }')
-  expect(shell).toContain('className="grid grid-cols-4 gap-1"')
+  expect(shell).not.toContain('{ href: "/admin/daily-summary"')
+  expect(shell).toContain('className="grid grid-cols-3 gap-1"')
 })
 
 test("daily summaries persist by date in protected manager data", async () => {

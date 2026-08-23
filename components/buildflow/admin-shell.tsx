@@ -3,13 +3,10 @@
 import {
   ChevronLeft,
   BarChart3,
-  CalendarDays,
   Archive,
   ChevronRight,
-  ClipboardList,
   Columns3,
   CreditCard,
-  FileText,
   LayoutDashboard,
   Settings,
   Sparkles,
@@ -36,7 +33,6 @@ const communicationLinks = [
   { href: "/admin/communications", label: "Calls & Communications", shortLabel: "Calls", icon: PhoneCall },
   { href: GOOGLE_MEET_URL, label: "Open Google Meet", shortLabel: "Meet", icon: Video },
   { href: WHATSAPP_CALL_URL, label: "Open WhatsApp to make a call", shortLabel: "WhatsApp", icon: MessageCircle },
-  { href: "/admin/daily-summary", label: "Daily Work Summary", shortLabel: "Summary", icon: CalendarDays },
 ] as const;
 
 type ManagerAccess = {
@@ -54,34 +50,27 @@ type ManagerAccess = {
 
 function navigationGroups(access: ManagerAccess) {
   return [
-    { label: "Customers", links: access.customers ? [
+    {
+      label: "Directories & Catalog",
+      links: [
+        ...(access.customers ? [
       { href: "/admin/users", label: "Customer Directory", icon: Users },
-      { href: "/owner/materials/requests", label: "Customer Requests", icon: FileText },
-    ] : [] },
+        ] : []),
+        ...(access.suppliers ? [
+          { href: "/admin/vendors", label: "Supplier Directory", icon: Store },
+          { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },
+        ] : []),
+      ],
+    },
     {
       label: "Communications",
       links: access.communications ? [{ href: "/admin/communications", label: "Aura Communications", icon: PhoneCall }] : [],
     },
     {
-      label: "Tasks",
-      links: access.tasks ? [
-        { href: "/admin/daily-summary", label: "Tasks & Daily Summary", icon: ClipboardList },
-      ] : [],
-    },
-    {
-      label: "Quotes & Orders",
-      links: access.quotes ? [
-        { href: "/admin/quotes", label: "Quotes", icon: FileText },
-        { href: "/admin/orders", label: "Orders", icon: PackageOpen },
-      ] : [],
-    },
-    {
-      label: "Suppliers",
+      label: "Supplier Pricing",
       links: [
         ...(access.suppliers ? [
-          { href: "/admin/vendors", label: "Supplier Directory", icon: Store },
-          { href: "/admin/supplier-quotes", label: "Supplier Quotes", icon: Archive },
-          { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },
+          { href: "/admin/supplier-quotes", label: "Supplier Quote Storage", icon: Archive },
           { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
         ] : []),
       ],
@@ -152,7 +141,7 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
       </nav>
 
       <div className="border-t border-slate-100 px-5 pb-5 pt-3">
-        <div className="grid grid-cols-4 gap-1" aria-label="Communication shortcuts">
+        <div className="grid grid-cols-3 gap-1" aria-label="Communication shortcuts">
           {communicationLinks.map((link) => {
             const Icon = link.icon;
             const external = link.href.startsWith("https://");

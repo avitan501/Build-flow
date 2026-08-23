@@ -8,21 +8,23 @@ import { uploadSupplierQuoteAction } from "@/app/admin/supplier-quotes/actions"
 import { extractImageTextInBrowser } from "@/lib/browser-document-extraction"
 import type { SupplierQuoteClient, SupplierQuoteRequestOption, SupplierQuoteSupplier } from "@/lib/supplier-quotes"
 
-export function SupplierQuoteUploadForm({ clients, requests, suppliers, departments, enabled, aiEnabled }: {
+export function SupplierQuoteUploadForm({ clients, requests, suppliers, departments, enabled, aiEnabled, initialRequestId = "" }: {
   clients: SupplierQuoteClient[]
   requests: SupplierQuoteRequestOption[]
   suppliers: SupplierQuoteSupplier[]
   departments: string[]
   enabled: boolean
   aiEnabled: boolean
+  initialRequestId?: string
 }) {
+  const initialRequest = requests.find((request) => request.id === initialRequestId)
   const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(Boolean(initialRequest))
   const [fileName, setFileName] = useState("")
-  const [linkMode, setLinkMode] = useState<"unlinked" | "request">("unlinked")
-  const [clientSelection, setClientSelection] = useState("")
-  const [requestId, setRequestId] = useState("")
+  const [linkMode, setLinkMode] = useState<"unlinked" | "request">(initialRequest ? "request" : "unlinked")
+  const [clientSelection, setClientSelection] = useState(initialRequest?.clientId ?? "")
+  const [requestId, setRequestId] = useState(initialRequest?.id ?? "")
   const [supplierId, setSupplierId] = useState("auto")
   const [error, setError] = useState("")
   const [extractionStatus, setExtractionStatus] = useState("")
@@ -68,7 +70,7 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
   }
 
   return (
-    <section className="w-full border border-slate-200 bg-white shadow-sm sm:max-w-2xl" aria-labelledby="supplier-quote-upload-title">
+    <section id="supplier-quote-upload" className="w-full scroll-mt-6 border border-slate-200 bg-white shadow-sm sm:max-w-2xl" aria-labelledby="supplier-quote-upload-title">
       <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-4 sm:px-5">
         <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0071e3]">New quote</p><h2 id="supplier-quote-upload-title" className="mt-1 text-lg font-bold">Upload and extract</h2></div>
         <button type="button" onClick={() => setOpen(false)} aria-label="Close upload form" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600"><X className="h-4 w-4" /></button>

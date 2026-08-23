@@ -64,9 +64,10 @@ test("approved staff use an Operations Manager workspace without owner-only cont
     expect(identity).toContain(`| "${capability}"`)
   }
   expect(identity).toContain("operationsManager")
-  for (const section of ["Customers", "Communications", "Tasks", "Quotes & Orders", "Suppliers", "AI Tools", "Website Traffic", "Manager Settings"]) {
+  for (const section of ["Directories & Catalog", "Communications", "Supplier Pricing", "AI Tools", "Website Traffic", "Manager Settings"]) {
     expect(shell).toContain(section)
   }
+  for (const removedSection of ['label: "Tasks"', 'label: "Quotes & Orders"']) expect(shell).not.toContain(removedSection)
   expect(shell).toContain('label: "AI Tools coming soon"')
   expect(shell).toContain('{ href: "/admin/abc", label: "ABC Private Pricing"')
   expect(shell.indexOf('label: "ABC Private Pricing"')).toBeGreaterThan(shell.indexOf('label: "AI Tools coming soon"'))
