@@ -3,7 +3,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js"
 
-import { detectExplicitQuantityUnit, removeResolvedQuantityUnitReasons } from "./material-list-normalization.ts"
+import { detectExplicitQuantityUnit, materialRequiresThickness, removeResolvedQuantityUnitReasons, verifiedThickness } from "./material-list-normalization.ts"
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -236,13 +236,15 @@ Deno.serve(async (request: Request) => {
       const missingQuantity = !Number.isFinite(quantity) || Number(quantity) <= 0
       const missingUnit = !normalizedUnit
       const dimensions = clean(item.dimensions, 300)
-      const thickness = clean(item.thickness, 160)
+      const proposedThickness = clean(item.thickness, 160)
+      const thickness = verifiedThickness(proposedThickness, typedSource || sourceText)
       const details = clean(item.details, 1200)
       const originalReviewReasons = item.reviewReasons.map((reason) => clean(reason, 240)).filter(Boolean).slice(0, 5)
       const reviewReasons = removeResolvedQuantityUnitReasons(originalReviewReasons, detected)
+      const missingThickness = materialRequiresThickness(item.name) && !thickness
       const onlyResolvedQuantityUnit = Boolean(detected && originalReviewReasons.length && reviewReasons.length === 0)
       const aiReviewStatus = onlyResolvedQuantityUnit && item.reviewStatus === "missing" ? "ready" : item.reviewStatus
-      const reviewStatus = missingQuantity || missingUnit ? "missing" : aiReviewStatus === "ready" && item.needsReview && !onlyResolvedQuantityUnit ? "check" : aiReviewStatus
+      const reviewStatus = missingQuantity || missingUnit || missingThickness ? "missing" : aiReviewStatus === "ready" && item.needsReview && !onlyResolvedQuantityUnit ? "check" : aiReviewStatus
       return {
         request_id: source.request_id,
         project_id: source.project_id,
@@ -269,6 +271,7 @@ Deno.serve(async (request: Request) => {
             ...reviewReasons,
             ...(missingQuantity && !reviewReasons.some((reason) => /quantity/i.test(reason)) ? ["Quantity is missing"] : []),
             ...(missingUnit && !reviewReasons.some((reason) => /unit/i.test(reason)) ? ["Sales unit is missing"] : []),
+            ...(missingThickness && !reviewReasons.some((reason) => /thickness/i.test(reason)) ? ["Thickness is missing"] : []),
           ].slice(0, 5),
           needs_review: reviewStatus !== "ready",
         },

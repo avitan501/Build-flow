@@ -44,7 +44,7 @@ export function RequestManagementPanel({
   const [department, setDepartment] = useState(() => departments.length === 1 ? departments[0] : "")
   const [supplierIds, setSupplierIds] = useState<string[]>([])
   const [greeting, setGreeting] = useState<"hi" | "hello" | "morning" | "afternoon">("hi")
-  const [replyBlocks, setReplyBlocks] = useState<string[]>(() => requestItems.some((item) => item.reviewReasons.length) ? ["missing"] : ["received"])
+  const [replyBlock, setReplyBlock] = useState<string>(() => requestItems.some((item) => item.reviewReasons.length) ? "missing" : "received")
   const [replyNote, setReplyNote] = useState("")
   const [attachment, setAttachment] = useState<File | null>(null)
   const [deliveryMethod, setDeliveryMethod] = useState<"email" | "text">(client.email ? "email" : "text")
@@ -74,11 +74,11 @@ export function RequestManagementPanel({
   const missingQuestions = useMemo(() => requestItems.flatMap((item) => item.reviewReasons.map((reason) => `${item.name}: ${reason}`)), [requestItems])
   const clientMessage = useMemo(() => {
     const greetingText = greeting === "hello" ? `Hello ${client.name || "there"},` : greeting === "morning" ? `Good morning ${firstName},` : greeting === "afternoon" ? `Good afternoon ${firstName},` : `Hi ${firstName},`
-    const selectedText = REPLY_BLOCKS.filter((block) => replyBlocks.includes(block.id)).flatMap((block) => block.id === "missing" && missingQuestions.length
+    const selectedText = REPLY_BLOCKS.filter((block) => block.id === replyBlock).flatMap((block) => block.id === "missing" && missingQuestions.length
       ? ["To finish pricing, please confirm:", ...missingQuestions.map((question) => `- ${question}`)]
       : [block.text])
     return [greetingText, "", ...selectedText, ...(replyNote.trim() ? [replyNote.trim()] : []), "", `Request: ${requestTitle}`, "", "Thank you,", "Avantia Build"].join("\n")
-  }, [client.name, firstName, greeting, missingQuestions, replyBlocks, replyNote, requestTitle])
+  }, [client.name, firstName, greeting, missingQuestions, replyBlock, replyNote, requestTitle])
 
   function toggleSupplier(supplierId: string) {
     setSupplierIds((current) => current.includes(supplierId) ? current.filter((id) => id !== supplierId) : [...current, supplierId])
@@ -111,10 +111,6 @@ export function RequestManagementPanel({
     window.location.href = `sms:${phone}${separator}body=${encodeURIComponent(clientMessage)}`
     setFeedbackError(false)
     setFeedback("The text message is ready in your messaging app. Review it and tap Send.")
-  }
-
-  function toggleReplyBlock(blockId: string) {
-    setReplyBlocks((current) => current.includes(blockId) ? current.filter((id) => id !== blockId) : [...current, blockId])
   }
 
   const quoteSubtotal = quoteLines.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), 0)
@@ -188,28 +184,18 @@ export function RequestManagementPanel({
           {packages.length ? <div className="mt-4 border-t border-slate-200 pt-3"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Current routes</p><div className="mt-2 grid gap-2">{packages.map((pkg) => <div key={pkg.id} className="flex items-center justify-between gap-3 text-sm"><span className="font-semibold">{pkg.department}</span><span className="text-right text-slate-600">{suppliers.find((entry) => entry.id === pkg.supplier_id)?.name || "Not assigned"} · {pkg.status.replaceAll("_", " ")}</span></div>)}</div></div> : null}
         </div>
 
-        <div>
-          <div className="rounded-lg border border-slate-200 p-4">
+        <div className="border-t border-slate-200 pt-4">
+          <div>
             <div className="flex items-center gap-2"><MessageSquareText className="h-5 w-5 text-[#0066cc]" /><h3 className="font-bold text-slate-950">Reply to client</h3></div>
-            <p className="mt-1 text-sm text-slate-500">Choose the message parts. The reply updates instantly.</p>
-            {missingQuestions.length ? <p className="mt-2 text-xs font-semibold text-amber-700">AI found {missingQuestions.length} details to confirm. Select Ask for missing details to include them automatically.</p> : null}
+            {missingQuestions.length ? <p className="mt-1 text-xs font-semibold text-amber-700">{missingQuestions.length} missing details can be added to the reply automatically.</p> : null}
 
-            <fieldset className="mt-4">
-              <legend className="text-xs font-bold uppercase tracking-[.12em] text-slate-500">Greeting</legend>
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {([['hi', `Hi ${firstName}`], ['hello', 'Hello'], ['morning', 'Good morning'], ['afternoon', 'Good afternoon']] as const).map(([value, label]) => <label key={value} className={`flex min-h-9 cursor-pointer items-center justify-center rounded-full border px-3 text-center text-xs font-semibold ${greeting === value ? "border-sky-400 bg-sky-50 text-[#0066cc]" : "border-slate-200 bg-white text-slate-600"}`}><input type="radio" name={`greeting-${requestId}`} value={value} checked={greeting === value} onChange={() => setGreeting(value)} className="sr-only" />{label}</label>)}
-              </div>
-            </fieldset>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <label className="grid gap-1 text-xs font-bold text-slate-600">Greeting<select value={greeting} onChange={(event) => setGreeting(event.target.value as typeof greeting)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-950"><option value="hi">Hi {firstName}</option><option value="hello">Hello</option><option value="morning">Good morning</option><option value="afternoon">Good afternoon</option></select></label>
+              <label className="grid gap-1 text-xs font-bold text-slate-600">Follow-up<select value={replyBlock} onChange={(event) => setReplyBlock(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-950">{REPLY_BLOCKS.map((block) => <option key={block.id} value={block.id}>{block.label}</option>)}</select></label>
+            </div>
 
-            <fieldset className="mt-4">
-              <legend className="text-xs font-bold uppercase tracking-[.12em] text-slate-500">What to say</legend>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {REPLY_BLOCKS.map((block) => <label key={block.id} className={`inline-flex min-h-9 cursor-pointer items-center rounded-full border px-3 text-xs font-semibold ${replyBlocks.includes(block.id) ? "border-sky-300 bg-sky-50 text-[#0066cc]" : "border-slate-200 bg-white text-slate-600"}`}><input type="checkbox" checked={replyBlocks.includes(block.id)} onChange={() => toggleReplyBlock(block.id)} className="sr-only" />{block.label}</label>)}
-              </div>
-            </fieldset>
-
-            <label className="mt-4 grid gap-1.5 text-sm font-semibold text-slate-700">Additional note <span className="font-normal text-slate-400">(optional)</span><textarea value={replyNote} onChange={(event) => setReplyNote(event.target.value)} rows={2} placeholder="Add a short custom note" className="resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm" /></label>
-            <div className="mt-4 whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-700" aria-label="Reply preview">{clientMessage}</div>
+            <label className="mt-3 grid gap-1 text-xs font-bold text-slate-600">Add a note <span className="font-normal text-slate-400">(optional)</span><textarea value={replyNote} onChange={(event) => setReplyNote(event.target.value)} rows={2} placeholder="Write a short note" className="resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
+            <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50"><summary className="cursor-pointer px-3 py-2 text-xs font-bold text-[#0066cc]">Preview message</summary><div className="whitespace-pre-wrap border-t border-slate-200 px-3 py-3 text-sm leading-6 text-slate-700" aria-label="Reply preview">{clientMessage}</div></details>
 
             <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
               <button type="button" onClick={() => setDeliveryMethod("email")} disabled={!client.email} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold ${deliveryMethod === "email" ? "bg-white text-slate-950 shadow-sm" : "text-slate-600"} disabled:opacity-40`}><Mail className="h-4 w-4" />Email</button>

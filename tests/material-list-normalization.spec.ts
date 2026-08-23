@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { detectExplicitQuantityUnit, removeResolvedQuantityUnitReasons } from "../supabase/functions/client-material-list-ai/material-list-normalization"
+import { detectExplicitQuantityUnit, materialRequiresThickness, removeResolvedQuantityUnitReasons, verifiedThickness } from "../supabase/functions/client-material-list-ai/material-list-normalization"
 
 const sidingFormats = [
   "14 squares of siding",
@@ -36,4 +36,17 @@ test("removes only redundant quantity and unit review reasons", () => {
 test("does not infer invalid or absent quantities", () => {
   expect(detectExplicitQuantityUnit("-5 squares siding")).toBeNull()
   expect(detectExplicitQuantityUnit("siding without quantity")).toBeNull()
+})
+
+test("accepts thickness only when the same explicit measurement exists in the source", () => {
+  expect(verifiedThickness('1/2 in.', '220 sheets of 1/2" drywall')).toBe('1/2 in.')
+  expect(verifiedThickness("12 mm", "Tile backer, 12 mm, 20 sheets")).toBe("12 mm")
+  expect(verifiedThickness("16 gauge", "16 ga steel studs, 40 pieces")).toBe("16 gauge")
+})
+
+test("rejects quantities and unsupported values presented as thickness", () => {
+  expect(verifiedThickness("12", "12 sheets of drywall")).toBe("")
+  expect(verifiedThickness("1/2 in.", "12 sheets of drywall")).toBe("")
+  expect(materialRequiresThickness("Sheetrock drywall")).toBe(true)
+  expect(materialRequiresThickness("Sheetrock screws")).toBe(false)
 })

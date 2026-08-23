@@ -43,3 +43,31 @@ export function removeResolvedQuantityUnitReasons(reasons: string[], detected: D
   if (!detected) return reasons
   return reasons.filter((reason) => !/\b(?:quantity|sales?\s+unit|selling\s+unit|unit\s+(?:is\s+)?missing)\b/i.test(reason))
 }
+
+function thicknessMeasurements(value: string) {
+  const normalized = value
+    .toLowerCase()
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/\s+/g, " ")
+  const matches = normalized.matchAll(/(\d+\s*\/\s*\d+|\d+(?:\.\d+)?)\s*("|in(?:\.|ch(?:es)?)?|mm|cm|mil|gauge|ga)(?=\s|$|[,;:)])/gi)
+  return [...matches].map((match) => ({
+    amount: match[1].replace(/\s+/g, ""),
+    unit: /^(?:"|in)/i.test(match[2]) ? "in" : /^(?:ga|gauge)$/i.test(match[2]) ? "gauge" : match[2].toLowerCase(),
+  }))
+}
+
+export function verifiedThickness(value: string, sourceText: string) {
+  const candidate = value.trim().replace(/\s+/g, " ")
+  if (!candidate) return ""
+  const candidateMeasurements = thicknessMeasurements(candidate)
+  if (!candidateMeasurements.length) return ""
+  const sourceMeasurements = thicknessMeasurements(sourceText)
+  return candidateMeasurements.some((candidateMeasurement) => sourceMeasurements.some((sourceMeasurement) =>
+    candidateMeasurement.amount === sourceMeasurement.amount && candidateMeasurement.unit === sourceMeasurement.unit
+  )) ? candidate : ""
+}
+
+export function materialRequiresThickness(name: string) {
+  if (/\b(?:screws?|nails?|fasteners?|anchors?)\b/i.test(name)) return false
+  return /\b(?:drywall|sheetrock|gypsum|greenboard|blueboard|cement\s+board|wonderboard|plywood|osb)\b/i.test(name)
+}
