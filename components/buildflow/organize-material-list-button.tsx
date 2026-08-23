@@ -9,9 +9,11 @@ export function OrganizeMaterialListButton({ requestId, refresh = false }: { req
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState("")
 
   function organize() {
     setError("")
+    setNotice("")
     startTransition(async () => {
       const formData = new FormData()
       formData.set("requestId", requestId)
@@ -20,6 +22,14 @@ export function OrganizeMaterialListButton({ requestId, refresh = false }: { req
       if (!result.ok) {
         setError(result.error)
         return
+      }
+      if (!result.itemCount) {
+        setNotice(result.status === "plan" ? "This file needs a plan takeoff before materials can be listed." : "AI did not find material rows. Review the original request or attachment.")
+      } else {
+        const remaining = result.reviewCount
+          ? `${result.reviewCount} still need details.`
+          : "All items are ready for supplier pricing."
+        setNotice(`${refresh ? "AI rechecked" : "AI organized"} ${result.itemCount} items. ${remaining}`)
       }
       router.refresh()
     })
@@ -31,6 +41,7 @@ export function OrganizeMaterialListButton({ requestId, refresh = false }: { req
         {isPending ? "Organizing..." : refresh ? "Recheck with AI" : "Organize with AI"}
       </button>
       {error ? <p role="alert" className="max-w-sm text-xs font-semibold text-rose-700">{error}</p> : null}
+      {notice ? <p role="status" className="max-w-sm text-xs font-semibold text-emerald-700">{notice}</p> : null}
     </div>
   )
 }

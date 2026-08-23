@@ -50,6 +50,10 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
   const organizedItems = (items ?? []).filter((item) => item.metadata?.ai_organized === true)
   const originalItems = (items ?? []).filter((item) => item.metadata?.ai_organized !== true)
   const organizationStatus = typeof originalItems[0]?.metadata?.ai_organization_status === "string" ? originalItems[0].metadata.ai_organization_status : ""
+  const organizationCompletedAt = typeof originalItems[0]?.metadata?.ai_organization_completed_at === "string" ? originalItems[0].metadata.ai_organization_completed_at : ""
+  const organizationCompletedLabel = organizationCompletedAt && Number.isFinite(Date.parse(organizationCompletedAt))
+    ? new Date(organizationCompletedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })
+    : ""
   const departmentItems = organizedItems.length ? organizedItems : items ?? []
   const departments = Array.from(new Set(departmentItems.map((item) => normalizeMaterialCatalogDepartment(item.department))))
   if (!departments.length) departments.push("Others")
@@ -64,7 +68,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
         </header>
         <div className="mt-4 grid gap-4">
           <section className="rounded-lg border border-slate-200 bg-white p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[.12em] text-[#0071e3]">AI organized</p><h2 className="mt-1 text-xl font-bold">Material list</h2><p className="mt-1 text-sm text-slate-500">Review quantities and specifications before requesting supplier pricing.</p></div>{organizationStatus !== "processing" ? <OrganizeMaterialListButton requestId={request.id} refresh={organizedItems.length > 0} /> : null}</div>
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[.12em] text-[#0071e3]">AI organized</p><h2 className="mt-1 text-xl font-bold">Material list</h2><p className="mt-1 text-sm text-slate-500">Review quantities and specifications before requesting supplier pricing.</p>{organizationCompletedLabel ? <p className="mt-1 text-xs font-semibold text-slate-400">Last AI review: {organizationCompletedLabel} ET</p> : null}</div>{organizationStatus !== "processing" ? <OrganizeMaterialListButton requestId={request.id} refresh={organizedItems.length > 0} /> : null}</div>
             {organizedItems.length ? <OrganizedMaterialList items={organizedItems} /> : <div className={`mt-4 rounded-lg px-4 py-3 text-sm font-semibold ${organizationStatus === "failed" ? "bg-rose-50 text-rose-800" : organizationStatus === "plan_requires_takeoff" ? "bg-amber-50 text-amber-800" : "bg-sky-50 text-sky-800"}`}>{organizationStatus === "processing" ? "AI is organizing this material list." : organizationStatus === "failed" ? "Automatic organization needs another attempt." : organizationStatus === "plan_requires_takeoff" ? "This appears to be a plan and requires a takeoff before materials can be listed." : "The original request is saved. Select Organize with AI to create the material chart."}</div>}
           </section>
           <section className="rounded-lg border border-slate-200 bg-white p-5">

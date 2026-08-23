@@ -171,7 +171,8 @@ Deno.serve(async (request: Request) => {
   const existing = sourceItems.filter((item) => item.metadata?.ai_organized === true)
   if (existing.length && !force) {
     await updateSource(source, { ai_organization_status: "organized", ai_organization_item_count: existing.length })
-    return json({ ok: true, status: "already_organized", itemCount: existing.length })
+    const reviewCount = existing.filter((item) => item.metadata?.review_status !== "ready").length
+    return json({ ok: true, status: "already_organized", itemCount: existing.length, reviewCount })
   }
   const startedAt = Date.parse(clean(source.metadata?.ai_organization_started_at, 80))
   if (source.metadata?.ai_organization_status === "processing" && Number.isFinite(startedAt) && Date.now() - startedAt < 10 * 60 * 1000) {
@@ -291,7 +292,8 @@ Deno.serve(async (request: Request) => {
       ai_organization_item_count: rows.length,
       ai_organization_completed_at: organizedAt,
     })
-    return json({ ok: true, status: "organized", itemCount: rows.length })
+    const reviewCount = rows.filter((row) => row.metadata.review_status !== "ready").length
+    return json({ ok: true, status: "organized", itemCount: rows.length, reviewCount })
   } catch (cause) {
     const code = cause instanceof Error ? cause.message.slice(0, 120) : "unknown_error"
     await updateSource(source, { ai_organization_status: "failed", ai_organization_error: code, ai_organization_completed_at: new Date().toISOString() })
