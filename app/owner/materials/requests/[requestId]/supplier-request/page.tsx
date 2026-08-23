@@ -3,10 +3,11 @@ import { notFound, redirect } from "next/navigation"
 import { SupplierRequestDraft } from "@/components/buildflow/supplier-request-draft"
 import { requireStaffProfile } from "@/lib/auth"
 import { normalizeMaterialCatalogDepartment, supplierCanReceiveDepartmentRequest } from "@/lib/material-catalog"
+import { preferredRequestMaterialSources, type RequestMaterialChartSource } from "@/lib/request-material-chart"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 
 type RequestRow = { id: string; title: string; projects: { address: string | null } | null }
-type RequestItem = { name: string; department: string; quantity: number; unit: string | null; answers: unknown; metadata: Record<string, unknown> | null }
+type RequestItem = RequestMaterialChartSource
 
 function itemDetails(item: RequestItem) {
   const answers = Array.isArray(item.answers)
@@ -36,16 +37,17 @@ export default async function SupplierRequestDraftPage({
   const { supabase } = await requireStaffProfile("suppliers")
   const [{ data: request }, { data: items }, { data: managerSettings }] = await Promise.all([
     supabase.from("quote_requests").select("id,title,projects(address)").eq("id", requestId).maybeSingle<RequestRow>(),
-    supabase.from("quote_request_items").select("name,department,quantity,unit,answers,metadata").eq("request_id", requestId).order("created_at").returns<RequestItem[]>(),
+    supabase.from("quote_request_items").select("request_id,name,department,item_type,quantity,unit,answers,metadata").eq("request_id", requestId).order("created_at").returns<RequestItem[]>(),
     supabase.from("workflow_manager_settings").select("state").eq("id", "singleton").maybeSingle<{ state: { qualificationSettings?: { suppliers?: SupplierRoutingOption[] } } }>(),
   ])
   if (!request) notFound()
 
+  const preferredItems = preferredRequestMaterialSources(items ?? [])
   const departmentValue = Array.isArray(query.department) ? query.department[0] : query.department
   const department = normalizeMaterialCatalogDepartment(departmentValue)
-  const requestDepartments = new Set((items ?? []).map((item) => normalizeMaterialCatalogDepartment(item.department)))
+  const requestDepartments = new Set(preferredItems.map((item) => normalizeMaterialCatalogDepartment(item.department)))
   if (!departmentValue?.trim() || !requestDepartments.has(department)) redirect(`/owner/materials/requests/${requestId}`)
-  const matchingItems = (items ?? []).filter((item) => normalizeMaterialCatalogDepartment(item.department) === department)
+  const matchingItems = preferredItems.filter((item) => normalizeMaterialCatalogDepartment(item.department) === department)
   const selectedSuppliers = (managerSettings?.state?.qualificationSettings?.suppliers ?? [])
     .filter((supplier) => supplierIds.includes(supplier.id) && supplierCanReceiveDepartmentRequest(supplier, department))
     .map((supplier) => ({ id: supplier.id, name: supplier.name, email: supplier.email!.trim() }))

@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 
 type QuotePayload = {
+  requestKind?: "quote_request" | "beat_quote"
   referenceId: string
   firstName: string
   lastName: string
@@ -172,6 +173,19 @@ function hasServiceRoleKey(request: Request) {
 
 function hasBearerToken(request: Request) {
   return Boolean(request.headers.get("authorization")?.replace(/^Bearer\s+/i, ""))
+}
+
+async function organizeClientMaterialList(supabaseUrl: string, serviceRoleKey: string, requestId: string) {
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/client-material-list-ai`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${serviceRoleKey}`, "content-type": "application/json" },
+      body: JSON.stringify({ requestId }),
+    })
+    if (!response.ok) console.error("client_material_list_ai_failed", { requestId, status: response.status })
+  } catch (cause) {
+    console.error("client_material_list_ai_failed", { requestId, reason: cause instanceof Error ? cause.message : "unknown" })
+  }
 }
 
 Deno.serve(async (request) => {
@@ -528,6 +542,10 @@ Deno.serve(async (request) => {
         },
       },
     }).eq("request_id", requestId)
+
+    if (payload.requestKind !== "beat_quote") {
+      EdgeRuntime.waitUntil(organizeClientMaterialList(supabaseUrl, serviceRoleKey, requestId))
+    }
 
     return json({ ok: true, clientId, projectId, requestId, referenceId: payload.referenceId, email: { owner: ownerEmail, client: clientEmail } })
   } catch (cause) {

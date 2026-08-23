@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status"
 import { RequestManagementPanel } from "@/components/buildflow/request-management-panel"
+import { organizeClientMaterialRequestAction } from "@/app/owner/materials/requests/actions"
 import { requireStaffProfile } from "@/lib/auth"
 import { normalizeMaterialCatalogDepartment } from "@/lib/material-catalog"
 import type { MaterialQuestionnaireResponse, MaterialRequestAnswer } from "@/lib/material-questionnaires"
@@ -45,7 +46,11 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
   const signedFiles = await Promise.all((attachments ?? []).map(async (file) => ({ ...file, url: (await supabase.storage.from("project-uploads").createSignedUrl(file.file_path, 1800)).data?.signedUrl ?? null })))
   const generalFiles = signedFiles.filter((file) => !file.material_response_id)
   const suppliers = managerSettings?.state?.qualificationSettings?.suppliers ?? []
-  const departments = Array.from(new Set((items ?? []).map((item) => normalizeMaterialCatalogDepartment(item.department))))
+  const organizedItems = (items ?? []).filter((item) => item.metadata?.ai_organized === true)
+  const originalItems = (items ?? []).filter((item) => item.metadata?.ai_organized !== true)
+  const organizationStatus = typeof originalItems[0]?.metadata?.ai_organization_status === "string" ? originalItems[0].metadata.ai_organization_status : ""
+  const departmentItems = organizedItems.length ? organizedItems : items ?? []
+  const departments = Array.from(new Set(departmentItems.map((item) => normalizeMaterialCatalogDepartment(item.department))))
   if (!departments.length) departments.push("Others")
   const projectLabel = request.projects?.name === "Material Requests" ? request.projects.address : request.projects?.name
 
@@ -58,10 +63,14 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
         </header>
         <div className="mt-4 grid gap-4">
           <section className="rounded-lg border border-slate-200 bg-white p-5">
-            <h2 className="text-xl font-bold">Request breakdown</h2>
-            <p className="mt-1 text-sm text-slate-500">Every quantity, selection, note, and uploaded file saved with this request.</p>
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[.12em] text-[#0071e3]">AI organized</p><h2 className="mt-1 text-xl font-bold">Material list</h2><p className="mt-1 text-sm text-slate-500">Review quantities and specifications before requesting supplier pricing.</p></div>{!organizedItems.length && organizationStatus !== "processing" ? <form action={organizeClientMaterialRequestAction}><input type="hidden" name="requestId" value={request.id} /><button type="submit" className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white">Organize with AI</button></form> : null}</div>
+            {organizedItems.length ? <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200"><table className="w-full min-w-[42rem] border-collapse text-left text-sm"><thead className="bg-slate-950 text-white"><tr><th className="w-28 px-3 py-2.5">Quantity</th><th className="w-1/3 px-3 py-2.5">Item</th><th className="px-3 py-2.5">Size and details</th></tr></thead><tbody className="divide-y divide-slate-200">{organizedItems.map((item) => { const dimensions = typeof item.metadata?.dimensions === "string" ? item.metadata.dimensions : ""; const thickness = typeof item.metadata?.thickness === "string" ? item.metadata.thickness : ""; const details = typeof item.metadata?.request_details === "string" ? item.metadata.request_details : ""; return <tr key={item.id} className="align-top"><td className="bg-slate-50 px-3 py-3 font-bold tabular-nums">{item.quantity} {item.unit || "each"}</td><td className="px-3 py-3 font-semibold">{item.name}{item.metadata?.needs_review === true ? <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">Review</span> : null}</td><td className="px-3 py-3 leading-5 text-slate-600">{[dimensions && `Size: ${dimensions}`, thickness && `Thickness: ${thickness}`, details].filter(Boolean).join(" · ") || "No additional details"}</td></tr> })}</tbody></table></div> : <div className={`mt-4 rounded-lg px-4 py-3 text-sm font-semibold ${organizationStatus === "failed" ? "bg-rose-50 text-rose-800" : organizationStatus === "plan_requires_takeoff" ? "bg-amber-50 text-amber-800" : "bg-sky-50 text-sky-800"}`}>{organizationStatus === "processing" ? "AI is organizing this material list." : organizationStatus === "failed" ? "Automatic organization needs another attempt." : organizationStatus === "plan_requires_takeoff" ? "This appears to be a plan and requires a takeoff before materials can be listed." : "The original request is saved. Select Organize with AI to create the material chart."}</div>}
+          </section>
+          <section className="rounded-lg border border-slate-200 bg-white p-5">
+            <h2 className="text-xl font-bold">{organizedItems.length ? "Original request" : "Request breakdown"}</h2>
+            <p className="mt-1 text-sm text-slate-500">The customer’s original notes, selections, and uploaded files remain unchanged.</p>
             <div className="mt-4 divide-y divide-slate-100">
-              {(items ?? []).length ? items!.map((item) => {
+              {originalItems.length ? originalItems.map((item) => {
                 const itemAnswers = legacyAnswers(item.answers)
                 const requestDetails = typeof item.metadata?.request_details === "string" ? item.metadata.request_details.trim() : ""
                 return <article key={item.id} className="py-4 first:pt-0 last:pb-0"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-bold">{item.name}</h3><p className="mt-1 text-sm text-slate-500">{item.department} · {item.item_type.replaceAll("_", " ")}</p></div><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold">{item.quantity} {item.unit || "each"}</span></div>{requestDetails ? <div className="mt-3 whitespace-pre-wrap rounded-lg bg-sky-50 px-4 py-3 text-sm leading-6 text-slate-800">{requestDetails}</div> : null}{itemAnswers.length ? <dl className="mt-3 grid gap-2">{itemAnswers.filter((answer) => Boolean(answer.value || answer.answer)).map((answer, index) => <div key={`${answer.questionId || answer.question || index}`} className="grid gap-1 rounded-lg bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(12rem,.8fr)_1.2fr]"><dt className="text-sm font-semibold text-slate-600">{answer.label || answer.question || "Question"}</dt><dd className="text-sm font-semibold text-slate-950">{answer.value || answer.answer}</dd></div>)}</dl> : null}</article>
@@ -76,7 +85,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
           </section>
         </div>
         <CustomerRequestStatus requestId={request.id} status={request.status} />
-        <RequestManagementPanel requestId={request.id} requestTitle={request.title} client={{ name: profile?.full_name || "Client", email: profile?.email || "", phone: profile?.phone || "" }} departments={departments} suppliers={suppliers} packages={packages ?? []} requestItems={(items ?? []).map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, unit: item.unit }))} projectAddress={request.projects?.address || ""} />
+        <RequestManagementPanel requestId={request.id} requestTitle={request.title} client={{ name: profile?.full_name || "Client", email: profile?.email || "", phone: profile?.phone || "" }} departments={departments} suppliers={suppliers} packages={packages ?? []} requestItems={departmentItems.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, unit: item.unit }))} projectAddress={request.projects?.address || ""} />
         {clientActions.length ? <section className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-5"><h2 className="text-lg font-bold text-slate-950">Client updates</h2><div className="mt-3 divide-y divide-amber-200">{clientActions.map((event) => <article key={event.id} className="py-3 first:pt-0 last:pb-0"><div className="flex flex-wrap items-start justify-between gap-2"><h3 className="text-sm font-bold text-slate-900">{event.title}</h3><time className="text-xs text-slate-500">{new Date(event.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>{event.description ? <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{event.description}</p> : null}</article>)}</div></section> : null}
       </div>
     </main>

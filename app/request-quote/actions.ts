@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto"
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
 
 import { sendQuoteIntakeEmail } from "@/lib/cart-submission-email"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -81,6 +82,19 @@ async function saveWithSupabaseFunction(payload: QuoteIntakePayload) {
 async function findClientByEmail(supabase: ReturnType<typeof createAdminClient>, email: string) {
   const { data } = await supabase.from("profiles").select("id,email").ilike("email", email).limit(1).maybeSingle<{ id: string; email: string }>()
   return data
+}
+
+function organizeMaterialListAfterResponse(requestId: string) {
+  after(async () => {
+    try {
+      const { error: invokeError } = await createAdminClient().functions.invoke("client-material-list-ai", {
+        body: { requestId },
+      })
+      if (invokeError) console.error("client_material_list_ai_failed", { requestId, reason: invokeError.message })
+    } catch (cause) {
+      console.error("client_material_list_ai_failed", { requestId, reason: cause instanceof Error ? cause.message : "unknown" })
+    }
+  })
 }
 
 export async function submitQuoteRequestFormAction(_previousState: QuoteRequestFormState, formData: FormData): Promise<QuoteRequestFormState> {
@@ -297,6 +311,8 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
         },
       },
     }).eq("request_id", requestId)
+
+    if (requestKind === "quote_request") organizeMaterialListAfterResponse(requestId)
 
     revalidatePath("/admin/users")
     revalidatePath("/owner/materials/requests")

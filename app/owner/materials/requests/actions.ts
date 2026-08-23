@@ -1,5 +1,7 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
+
 import { sendManagerClientReplyEmail } from "@/lib/cart-submission-email"
 import { requireStaffProfile } from "@/lib/auth"
 import { generateRequestClientQuotePdf, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
@@ -30,6 +32,17 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ])
+
+export async function organizeClientMaterialRequestAction(formData: FormData) {
+  const requestId = String(formData.get("requestId") || "").trim()
+  if (!/^[0-9a-f-]{36}$/i.test(requestId)) return
+  const { supabase } = await requireStaffProfile("customers")
+  const { data: request } = await supabase.from("quote_requests").select("id").eq("id", requestId).maybeSingle<{ id: string }>()
+  if (!request) return
+  await supabase.functions.invoke("client-material-list-ai", { body: { requestId } })
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  revalidatePath("/admin/supplier-quotes")
+}
 
 export async function sendClientReplyAction(formData: FormData): Promise<ReplyResult> {
   const requestId = String(formData.get("requestId") || "").trim()

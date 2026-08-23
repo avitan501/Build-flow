@@ -1,5 +1,5 @@
 import { requireStaffProfile } from "@/lib/auth"
-import { requestMaterialChartCsv, toRequestMaterialChartRow, type RequestMaterialChartSource } from "@/lib/request-material-chart"
+import { preferredRequestMaterialSources, requestMaterialChartCsv, toRequestMaterialChartRow, type RequestMaterialChartSource } from "@/lib/request-material-chart"
 
 function filePart(value: string) {
   return value.normalize("NFKD").replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 80) || "client-request"
@@ -16,7 +16,7 @@ export async function GET(_request: Request, context: RouteContext<"/admin/suppl
   if (!request) return new Response("Request not found.", { status: 404 })
   if (error) return new Response("The request chart could not be prepared.", { status: 500 })
 
-  const csv = requestMaterialChartCsv((items ?? []).map(toRequestMaterialChartRow))
+  const csv = requestMaterialChartCsv(preferredRequestMaterialSources(items ?? []).map(toRequestMaterialChartRow))
   const caseNumber = request.id.replaceAll("-", "").slice(0, 8).toUpperCase()
   const fileName = `${filePart(request.title)}-${caseNumber}.csv`
   return new Response(`\uFEFF${csv}`, {

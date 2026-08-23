@@ -16,6 +16,11 @@ export type RequestMaterialChartRow = {
   details: string
 }
 
+export function preferredRequestMaterialSources(sources: RequestMaterialChartSource[]) {
+  const organized = sources.filter((source) => source.metadata?.ai_organized === true)
+  return organized.length ? organized : sources
+}
+
 type LegacyAnswer = {
   label?: unknown
   question?: unknown
@@ -41,8 +46,8 @@ function answerDetails(value: unknown) {
 export function toRequestMaterialChartRow(source: RequestMaterialChartSource): RequestMaterialChartRow {
   const metadataDetails = clean(source.metadata?.request_details, 2000)
   const details = [
-    clean(source.department, 160),
-    clean(source.item_type, 80).replaceAll("_", " "),
+    clean(source.metadata?.dimensions, 300) && `Size: ${clean(source.metadata?.dimensions, 300)}`,
+    clean(source.metadata?.thickness, 160) && `Thickness: ${clean(source.metadata?.thickness, 160)}`,
     metadataDetails,
     ...answerDetails(source.answers),
   ].filter(Boolean)

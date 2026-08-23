@@ -5,7 +5,7 @@ import path from "node:path"
 import { parseSupplierQuoteText } from "../lib/supplier-quote-parser"
 import { normalizeSupplierQuoteAiPayload } from "../lib/supplier-quote-ai"
 import { detectSupplierMatch, inferSupplierName } from "../lib/supplier-quote-supplier"
-import { requestMaterialChartCsv, toRequestMaterialChartRow } from "../lib/request-material-chart"
+import { preferredRequestMaterialSources, requestMaterialChartCsv, toRequestMaterialChartRow } from "../lib/request-material-chart"
 
 const root = process.cwd()
 
@@ -116,10 +116,41 @@ test("client request chart keeps quantity, item, and details in stable columns",
     requestId: "request-1",
     quantity: "24 sheets",
     item: "1/2 in. drywall 4 x 8",
-    details: "Sheet Rock · material · Deliver to the second floor · Board type: Moisture resistant",
+    details: "Deliver to the second floor · Board type: Moisture resistant",
   })
   expect(requestMaterialChartCsv([row])).toContain('"Quantity","Item","Details"')
   expect(requestMaterialChartCsv([{ ...row, item: "=unsafe" }])).toContain('"\'=unsafe"')
+
+  const original = { request_id: "request-1", name: "Messy request", department: "Others", item_type: "custom_priced", quantity: 1, unit: "request", answers: [], metadata: { request_details: "raw notes" } }
+  const organized = { request_id: "request-1", name: "2 x 4 x 8 stud", department: "Framing", item_type: "material", quantity: 40, unit: "pieces", answers: [], metadata: { ai_organized: true, dimensions: "2 x 4 x 8 ft." } }
+  expect(preferredRequestMaterialSources([original, organized])).toEqual([organized])
+})
+
+test("client material lists are organized securely in the background", async () => {
+  const [requestAction, publicIntake, aiFunction, ownerPage, ownerActions, supplierDraft] = await Promise.all([
+    readFile(path.join(root, "app/request-quote/actions.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/public-quote-intake/index.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/client-material-list-ai/index.ts"), "utf8"),
+    readFile(path.join(root, "app/owner/materials/requests/[requestId]/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8"),
+    readFile(path.join(root, "app/owner/materials/requests/[requestId]/supplier-request/page.tsx"), "utf8"),
+  ])
+
+  expect(requestAction).toContain("organizeMaterialListAfterResponse")
+  expect(requestAction).toContain('functions.invoke("client-material-list-ai"')
+  expect(publicIntake).toContain("EdgeRuntime.waitUntil")
+  expect(aiFunction).toContain("openai_supplier_quote_api_key")
+  expect(aiFunction).toContain('model: "gpt-5-mini"')
+  expect(aiFunction).toContain("store: false")
+  expect(aiFunction).toContain('reasoning: { effort: "low" }')
+  expect(aiFunction).toContain('documentType: { type: "string", enum: ["material_list", "plan", "other"] }')
+  expect(aiFunction).toContain("Do not invent missing information")
+  expect(aiFunction).toContain("ai_organized: true")
+  expect(ownerPage).toContain("AI organized")
+  expect(ownerPage).toContain("Size and details")
+  expect(ownerPage).toContain("Organize with AI")
+  expect(ownerActions).toContain("organizeClientMaterialRequestAction")
+  expect(supplierDraft).toContain("preferredRequestMaterialSources")
 })
 
 test("supplier detection matches the directory or keeps the name read from the invoice", async () => {

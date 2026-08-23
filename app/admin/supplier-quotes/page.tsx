@@ -4,7 +4,7 @@ import Link from "next/link"
 import { SupplierQuoteUploadForm } from "@/components/buildflow/supplier-quote-upload-form"
 import { requireStaffProfile } from "@/lib/auth"
 import { materialCatalogDepartmentOptions, type CatalogSupplier } from "@/lib/material-catalog"
-import { toRequestMaterialChartRow, type RequestMaterialChartSource } from "@/lib/request-material-chart"
+import { preferredRequestMaterialSources, toRequestMaterialChartRow, type RequestMaterialChartSource } from "@/lib/request-material-chart"
 import { supplierQuoteStatusLabel, type SupplierQuoteClient, type SupplierQuoteRecord, type SupplierQuoteRequestOption } from "@/lib/supplier-quotes"
 
 type RequestRow = { id: string; title: string; status: string; project_id: string; owner_id: string; created_at: string }
@@ -59,11 +59,11 @@ export default async function SupplierQuotesPage({ searchParams }: {
     }
   })
   const openRequests = requests.filter((request) => !["draft", "closed"].includes(request.status))
-  const requestItemsByRequestId = new Map<string, ReturnType<typeof toRequestMaterialChartRow>[]>()
+  const requestItemSourcesByRequestId = new Map<string, RequestMaterialChartSource[]>()
   for (const item of requestItemsResult.data ?? []) {
-    const row = toRequestMaterialChartRow(item)
-    requestItemsByRequestId.set(item.request_id, [...(requestItemsByRequestId.get(item.request_id) ?? []), row])
+    requestItemSourcesByRequestId.set(item.request_id, [...(requestItemSourcesByRequestId.get(item.request_id) ?? []), item])
   }
+  const requestItemsByRequestId = new Map([...requestItemSourcesByRequestId].map(([requestId, sources]) => [requestId, preferredRequestMaterialSources(sources).map(toRequestMaterialChartRow)]))
   const requestedRequestId = filters.request?.trim() || ""
   const initialRequestId = openRequests.some((request) => request.id === requestedRequestId) ? requestedRequestId : ""
   const clientById = new Map(clients.map((client) => [client.id, client]))
