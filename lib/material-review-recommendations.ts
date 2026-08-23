@@ -1,67 +1,104 @@
 import { materialReviewReasons, type ReviewableMaterialItem } from "@/lib/client-material-review"
 
+export type RecommendationField = "quantity" | "dimensions" | "thickness" | "productType" | "screwLength"
+
+export type RecommendationOption = {
+  value: string
+  confidence: number
+}
+
 export type MaterialReviewRecommendation = {
   label: string
-  note: string
-  patch: { dimensions?: string; thickness?: string; unit?: string }
   choices: Array<{
-    field: "dimensions" | "thickness"
+    field: RecommendationField
     label: string
-    options: string[]
+    options: RecommendationOption[]
     recommended: string
   }>
   resolvesAllReasons: boolean
 }
 
+function option(value: string, confidence: number): RecommendationOption {
+  return { value, confidence }
+}
+
+function quantityChoices(item: ReviewableMaterialItem) {
+  const quantity = String(item.quantity)
+  const nearby = [1, 5, 10, 12, 15, 20, 25, 50, 100, 220]
+    .filter((value) => value !== item.quantity)
+    .map((value) => option(String(value), 0))
+  return {
+    field: "quantity" as const,
+    label: `Quantity (${item.unit || "each"})`,
+    options: [option(quantity, 100), ...nearby],
+    recommended: quantity,
+  }
+}
+
+function hasChoice(choices: MaterialReviewRecommendation["choices"], field: RecommendationField) {
+  return choices.some((choice) => choice.field === field)
+}
+
 export function materialReviewRecommendation(item: ReviewableMaterialItem): MaterialReviewRecommendation {
   const name = item.name.toLowerCase()
   const reasons = materialReviewReasons(item)
-  const needsThickness = reasons.some((reason) => /thickness/i.test(reason))
-  const needsSize = reasons.some((reason) => /\b(?:size|dimension|width|length)\b/i.test(reason))
-  const patch: MaterialReviewRecommendation["patch"] = {}
-  const choices: MaterialReviewRecommendation["choices"] = []
-  const recommendations: string[] = []
+  const isDrywallBoard = /\b(?:drywall|sheetrock|gypsum|greenboard|blueboard)\b/.test(name) && !/\bscrews?\b/.test(name)
+  const isCementBoard = /\b(?:cement\s+board|wonderboard)\b/.test(name)
+  const isDrywallScrew = /\b(?:(?:drywall|sheetrock)\s+)?screws?\b/.test(name)
+  const isSheetMaterial = isDrywallBoard || isCementBoard || /\b(?:plywood|osb)\b/.test(name)
+  const choices: MaterialReviewRecommendation["choices"] = [quantityChoices(item)]
 
-  if (needsThickness && /\b(?:drywall|sheetrock|gypsum|greenboard|blueboard)\b/.test(name)) {
-    patch.thickness = /\btype\s*x\b/.test(name) ? "5/8 in." : "1/2 in."
-    choices.push({ field: "thickness", label: "Thickness", options: [patch.thickness, ...["1/2 in.", "5/8 in.", "3/8 in.", "1/4 in."].filter((value) => value !== patch.thickness)], recommended: patch.thickness })
-    recommendations.push(`${patch.thickness} thickness`)
-  } else if (needsThickness && /\b(?:cement\s+board|wonderboard)\b/.test(name)) {
-    patch.thickness = "1/2 in."
-    choices.push({ field: "thickness", label: "Thickness", options: ["1/2 in.", "1/4 in."], recommended: patch.thickness })
-    recommendations.push("1/2 in. thickness")
-  } else if (needsThickness && /\b(?:plywood|osb)\b/.test(name)) {
-    patch.thickness = /\bosb\b/.test(name) ? "7/16 in." : "1/2 in."
-    choices.push({ field: "thickness", label: "Thickness", options: [patch.thickness, ...["7/16 in.", "1/2 in.", "5/8 in.", "3/4 in."].filter((value) => value !== patch.thickness)], recommended: patch.thickness })
-    recommendations.push(`${patch.thickness} thickness`)
+  if (isDrywallBoard) {
+    const typeOptions = /\b(?:greenboard|moisture)\b/.test(name)
+      ? [option("Moisture-resistant (green)", 90), option("Regular drywall", 6), option("Type X fire-resistant", 3), option("Mold-resistant (purple)", 1)]
+      : /\btype\s*x\b/.test(name)
+        ? [option("Type X fire-resistant", 95), option("Regular drywall", 3), option("Moisture-resistant (green)", 1), option("Mold-resistant (purple)", 1)]
+        : [option("Regular drywall", 65), option("Type X fire-resistant", 20), option("Moisture-resistant (green)", 10), option("Mold-resistant (purple)", 5)]
+    const thicknessOptions = /\btype\s*x\b/.test(name)
+      ? [option("5/8 in.", 90), option("1/2 in.", 8), option("3/8 in.", 1), option("1/4 in.", 1)]
+      : [option("1/2 in.", 72), option("5/8 in.", 20), option("3/8 in.", 5), option("1/4 in.", 3)]
+    choices.push(
+      { field: "productType", label: "Board type", options: typeOptions, recommended: typeOptions[0].value },
+      { field: "thickness", label: "Thickness", options: thicknessOptions, recommended: thicknessOptions[0].value },
+      { field: "dimensions", label: "Sheet size", options: [option("4 x 8 ft.", 70), option("4 x 12 ft.", 18), option("4 x 10 ft.", 12)], recommended: "4 x 8 ft." },
+    )
+  } else if (isCementBoard) {
+    choices.push(
+      { field: "thickness", label: "Thickness", options: [option("1/2 in.", 75), option("1/4 in.", 25)], recommended: "1/2 in." },
+      { field: "dimensions", label: "Sheet size", options: [option("3 x 5 ft.", 85), option("4 x 8 ft.", 15)], recommended: "3 x 5 ft." },
+    )
+  } else if (/\b(?:plywood|osb)\b/.test(name)) {
+    const recommended = /\bosb\b/.test(name) ? "7/16 in." : "1/2 in."
+    choices.push({
+      field: "thickness",
+      label: "Thickness",
+      options: [recommended, ...["7/16 in.", "1/2 in.", "5/8 in.", "3/4 in."].filter((value) => value !== recommended)]
+        .map((value, index) => option(value, index === 0 ? 60 : index === 1 ? 20 : 10)),
+      recommended,
+    })
   }
 
-  if (needsSize && /\b(?:drywall|sheetrock|gypsum|greenboard|blueboard)\b/.test(name)) {
-    patch.dimensions = "4 x 8 ft."
-    choices.push({ field: "dimensions", label: "Sheet size", options: ["4 x 8 ft.", "4 x 10 ft.", "4 x 12 ft."], recommended: patch.dimensions })
-    recommendations.push("4 x 8 ft. sheets")
+  if (isDrywallScrew) {
+    choices.push({
+      field: "screwLength",
+      label: "Screw length",
+      options: [option("1 1/4 in.", 55), option("1 5/8 in.", 30), option("2 in.", 10), option("3 in.", 5)],
+      recommended: "1 1/4 in.",
+    })
   }
 
   const resolvesAllReasons = reasons.every((reason) =>
-    (/thickness/i.test(reason) && choices.some((choice) => choice.field === "thickness"))
-    || (/\b(?:size|dimension|width|length)\b/i.test(reason) && choices.some((choice) => choice.field === "dimensions"))
+    (/quantity/i.test(reason) && hasChoice(choices, "quantity"))
+    || (/thickness/i.test(reason) && hasChoice(choices, "thickness"))
+    || (/\b(?:type|grade)\b/i.test(reason) && hasChoice(choices, "productType"))
+    || (/\b(?:screw\s+)?length\b/i.test(reason) && (hasChoice(choices, "screwLength") || hasChoice(choices, "dimensions")))
+    || (/\b(?:size|dimension|width)\b/i.test(reason) && hasChoice(choices, "dimensions"))
+    || (/\bunit\b/i.test(reason) && Boolean(item.unit))
   )
 
-  if (recommendations.length) {
-    return {
-      label: `Suggested: ${recommendations.join(" · ")}`,
-      note: "Common residential choice. Confirm the plans or client requirements before marking it ready.",
-      patch,
-      choices,
-      resolvesAllReasons,
-    }
-  }
-
   return {
-    label: `Ask the client: ${reasons.join("; ")}`,
-    note: "No reliable standard value can be selected without the client or plans.",
-    patch,
+    label: isSheetMaterial || isDrywallScrew ? "AI suggestions" : "Confirm quantity",
     choices,
-    resolvesAllReasons: false,
+    resolvesAllReasons,
   }
 }

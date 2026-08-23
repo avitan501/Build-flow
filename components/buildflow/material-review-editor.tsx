@@ -12,10 +12,17 @@ function metadataText(item: ReviewableMaterialItem, key: string) {
   return typeof item.metadata?.[key] === "string" ? String(item.metadata[key]) : ""
 }
 
+function initialChoice(item: ReviewableMaterialItem, field: string, recommended: string, allowedValues: string[]) {
+  if (field === "quantity") return String(item.quantity)
+  const metadataKey = field === "productType" ? "product_type" : field === "screwLength" ? "screw_length" : field
+  const savedValue = metadataText(item, metadataKey)
+  return allowedValues.includes(savedValue) ? savedValue : recommended
+}
+
 export function MaterialReviewEditor({ requestId, item }: { requestId: string; item: ReviewableMaterialItem }) {
   const router = useRouter()
   const recommendation = materialReviewRecommendation(item)
-  const [choices, setChoices] = useState<Record<string, string>>(() => Object.fromEntries(recommendation.choices.map((choice) => [choice.field, choice.recommended])))
+  const [choices, setChoices] = useState<Record<string, string>>(() => Object.fromEntries(recommendation.choices.map((choice) => [choice.field, initialChoice(item, choice.field, choice.recommended, choice.options.map((option) => option.value))])))
   const [feedback, setFeedback] = useState("")
   const [pending, startTransition] = useTransition()
 
@@ -26,10 +33,12 @@ export function MaterialReviewEditor({ requestId, item }: { requestId: string; i
       formData.set("requestId", requestId)
       formData.set("itemId", item.id)
       formData.set("name", item.name)
-      formData.set("quantity", String(item.quantity))
+      formData.set("quantity", choices.quantity || String(item.quantity))
       formData.set("unit", item.unit || "")
       formData.set("dimensions", choices.dimensions || metadataText(item, "dimensions"))
       formData.set("thickness", choices.thickness || metadataText(item, "thickness"))
+      formData.set("productType", choices.productType || metadataText(item, "product_type"))
+      formData.set("screwLength", choices.screwLength || metadataText(item, "screw_length"))
       formData.set("details", metadataText(item, "request_details"))
       formData.set("markReady", String(recommendation.resolvesAllReasons))
       const result = await updateOrganizedMaterialItemAction(formData)
@@ -40,10 +49,12 @@ export function MaterialReviewEditor({ requestId, item }: { requestId: string; i
     })
   }
 
-  return <div className="mt-2 flex flex-wrap items-end gap-2 rounded-md bg-amber-50 px-2.5 py-2">
-    <div className="min-w-44 flex-1"><p className="text-xs font-bold text-slate-950">{recommendation.label}</p><p className="text-[10px] leading-4 text-slate-500">{recommendation.note}</p></div>
-    {recommendation.choices.map((choice) => <label key={choice.field} className="grid min-w-32 gap-0.5 text-[10px] font-bold text-slate-600">{choice.label}<select value={choices[choice.field]} onChange={(event) => setChoices((current) => ({ ...current, [choice.field]: event.target.value }))} className="h-8 rounded-md border border-amber-300 bg-white px-2 text-xs font-semibold text-slate-950">{choice.options.map((option) => <option key={option}>{option}</option>)}</select></label>)}
-    {recommendation.choices.length ? <button type="button" onClick={save} disabled={pending} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-50"><Check className="h-3.5 w-3.5" />{pending ? "Saving" : "Apply"}</button> : null}
+  return <div className="mt-2 rounded-md bg-amber-50 p-2">
+    <div className="mb-1.5 flex items-center justify-between gap-2"><p className="text-[11px] font-bold text-slate-950">{recommendation.label}</p><span className="text-[9px] font-semibold text-slate-500">AI confidence</span></div>
+    <div className="grid grid-cols-2 items-end gap-1.5 sm:flex sm:flex-wrap">
+    {recommendation.choices.map((choice) => <label key={choice.field} className="grid min-w-0 gap-0.5 text-[9px] font-bold text-slate-600 sm:min-w-32">{choice.label}<select aria-label={choice.label} value={choices[choice.field]} onChange={(event) => setChoices((current) => ({ ...current, [choice.field]: event.target.value }))} className="h-8 min-w-0 rounded-md border border-amber-300 bg-white px-1.5 text-[11px] font-semibold text-slate-950">{choice.options.map((option) => <option key={option.value} value={option.value}>{option.value} · {option.confidence}%</option>)}</select></label>)}
+    {recommendation.choices.length ? <button type="button" onClick={save} disabled={pending} className="col-span-2 inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-50 sm:col-span-1"><Check className="h-3.5 w-3.5" />{pending ? "Saving" : "Apply"}</button> : null}
+    </div>
     {feedback ? <p role="status" className="w-full text-[10px] font-semibold text-slate-700">{feedback}</p> : null}
   </div>
 }

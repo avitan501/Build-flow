@@ -55,6 +55,8 @@ export async function updateOrganizedMaterialItemAction(formData: FormData) {
   const unit = String(formData.get("unit") || "").trim().replace(/\s+/g, " ").slice(0, 60)
   const dimensions = String(formData.get("dimensions") || "").trim().replace(/\s+/g, " ").slice(0, 300)
   const thickness = String(formData.get("thickness") || "").trim().replace(/\s+/g, " ").slice(0, 160)
+  const productType = String(formData.get("productType") || "").trim().replace(/\s+/g, " ").slice(0, 160)
+  const screwLength = String(formData.get("screwLength") || "").trim().replace(/\s+/g, " ").slice(0, 80)
   const details = String(formData.get("details") || "").trim().replace(/\s+/g, " ").slice(0, 1200)
   const markReady = formData.get("markReady") === "true"
   if (!/^[0-9a-f-]{36}$/i.test(requestId) || !/^[0-9a-f-]{36}$/i.test(itemId)) return { ok: false as const, error: "This item could not be identified." }
@@ -73,6 +75,8 @@ export async function updateOrganizedMaterialItemAction(formData: FormData) {
     ...(item.metadata ?? {}),
     dimensions,
     thickness,
+    product_type: productType,
+    screw_length: screwLength,
     request_details: details,
     manually_reviewed_at: new Date().toISOString(),
     manually_reviewed_by: user.id,

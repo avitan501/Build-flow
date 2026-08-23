@@ -35,6 +35,8 @@ export function materialSearchQuery(item: ReviewableMaterialItem) {
     item.name,
     text(item.metadata?.dimensions),
     text(item.metadata?.thickness),
+    text(item.metadata?.product_type),
+    text(item.metadata?.screw_length),
     text(item.metadata?.request_details),
   ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 240)
 }

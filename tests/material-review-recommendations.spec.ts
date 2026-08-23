@@ -13,19 +13,36 @@ const base = {
 
 test("recommends common residential drywall specifications without silently approving them", () => {
   expect(materialReviewRecommendation(base)).toMatchObject({
-    patch: { thickness: "1/2 in.", dimensions: "4 x 8 ft." },
     resolvesAllReasons: true,
   })
   expect(materialReviewRecommendation(base).choices).toEqual(expect.arrayContaining([
-    expect.objectContaining({ field: "thickness", options: expect.arrayContaining(["1/2 in.", "5/8 in."]) }),
-    expect.objectContaining({ field: "dimensions", options: expect.arrayContaining(["4 x 8 ft.", "4 x 12 ft."]) }),
+    expect.objectContaining({ field: "quantity", options: expect.arrayContaining([expect.objectContaining({ value: "12", confidence: 100 })]) }),
+    expect.objectContaining({ field: "productType", options: expect.arrayContaining([expect.objectContaining({ value: "Regular drywall", confidence: 65 })]) }),
+    expect.objectContaining({ field: "thickness", options: expect.arrayContaining([expect.objectContaining({ value: "1/2 in.", confidence: 72 })]) }),
+    expect.objectContaining({ field: "dimensions", options: expect.arrayContaining([expect.objectContaining({ value: "4 x 8 ft.", confidence: 70 })]) }),
   ]))
-  expect(materialReviewRecommendation({ ...base, name: "Type X drywall" }).patch.thickness).toBe("5/8 in.")
+  expect(materialReviewRecommendation({ ...base, name: "Type X drywall" }).choices.find((choice) => choice.field === "thickness")?.recommended).toBe("5/8 in.")
 })
 
-test("asks the client when no dependable standard value exists", () => {
+test("keeps the extracted quantity available when no dependable product recommendation exists", () => {
   const recommendation = materialReviewRecommendation({ ...base, name: "Vinyl siding", department: "Siding", metadata: { review_status: "missing", review_reasons: ["Color is missing"] } })
-  expect(recommendation.patch).toEqual({})
-  expect(recommendation.choices).toEqual([])
-  expect(recommendation.label).toContain("Ask the client")
+  expect(recommendation.choices).toHaveLength(1)
+  expect(recommendation.choices[0]).toMatchObject({ field: "quantity", recommended: "12" })
+  expect(recommendation.resolvesAllReasons).toBe(false)
+})
+
+test("offers material-specific controls for WonderBoard and drywall screws", () => {
+  const wonderBoard = materialReviewRecommendation({ ...base, name: "WonderBoard cement backerboard" })
+  expect(wonderBoard.choices).toEqual(expect.arrayContaining([
+    expect.objectContaining({ field: "quantity" }),
+    expect.objectContaining({ field: "thickness", recommended: "1/2 in." }),
+    expect.objectContaining({ field: "dimensions", recommended: "3 x 5 ft." }),
+  ]))
+
+  const screws = materialReviewRecommendation({ ...base, name: "Sheetrock screws", unit: "boxes", quantity: 2, metadata: { review_status: "missing", review_reasons: ["Screw length is missing"] } })
+  expect(screws.choices).toEqual(expect.arrayContaining([
+    expect.objectContaining({ field: "quantity", recommended: "2" }),
+    expect.objectContaining({ field: "screwLength", recommended: "1 1/4 in.", options: expect.arrayContaining([expect.objectContaining({ value: "1 5/8 in.", confidence: 30 })]) }),
+  ]))
+  expect(screws.resolvesAllReasons).toBe(true)
 })
