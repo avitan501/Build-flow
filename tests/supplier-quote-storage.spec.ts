@@ -5,16 +5,19 @@ import path from "node:path"
 import { parseSupplierQuoteText } from "../lib/supplier-quote-parser"
 import { normalizeSupplierQuoteAiPayload } from "../lib/supplier-quote-ai"
 import { detectSupplierMatch, inferSupplierName } from "../lib/supplier-quote-supplier"
+import { requestMaterialChartCsv, toRequestMaterialChartRow } from "../lib/request-material-chart"
 
 const root = process.cwd()
 
 test("manager supplier quote storage is private, durable, and routable", async () => {
-  const [navigation, page, uploadForm, workspace, actions, migration, clientMigration] = await Promise.all([
+  const [navigation, page, uploadForm, workspace, actions, chartRoute, chartHelper, migration, clientMigration] = await Promise.all([
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/supplier-quotes/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/supplier-quote-upload-form.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/supplier-quote-workspace.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/supplier-quotes/actions.ts"), "utf8"),
+    readFile(path.join(root, "app/admin/supplier-quotes/requests/[requestId]/chart/route.ts"), "utf8"),
+    readFile(path.join(root, "lib/request-material-chart.ts"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260820110800_create_supplier_quote_storage.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260820160124_link_supplier_quotes_to_clients.sql"), "utf8"),
   ])
@@ -56,10 +59,22 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(page).toContain('name="supplier"')
   expect(page).toContain('name="client"')
   expect(page).toContain('name="date" type="date"')
-  expect(page).toContain("No quotes match these filters")
+  expect(page).toContain("No linked quotes match these filters")
   expect(page).toContain("Open client requests")
-  expect(page).toContain("View client list")
-  expect(page).toContain("Add supplier quote")
+  expect(page).toContain("Full request")
+  expect(page).toContain("Quotes without a client")
+  expect(page).toContain("Client-linked supplier quotes")
+  expect(page).toContain("Use chart for supplier quote")
+  expect(page).toContain("Download chart")
+  expect(page).toContain("Quantity")
+  expect(page).toContain("Details")
+  expect(page).toContain('quote.client_id')
+  expect(chartRoute).toContain('requireStaffProfile("suppliers")')
+  expect(chartRoute).toContain('"Content-Disposition"')
+  expect(chartRoute).toContain('"Cache-Control": "private, no-store"')
+  expect(chartHelper).toContain("requestMaterialChartCsv")
+  expect(chartHelper).toContain("request_details")
+  expect(page).toContain("Use chart for supplier quote")
   expect(page).toContain("New submitted requests will appear here automatically.")
   expect(page).toContain('href={`/admin/quote-comparison/${comparison.id}`}')
   expect(workspace).toContain("quote.client_name_snapshot")
@@ -83,6 +98,28 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(clientMigration).toContain("supplier_quotes_client_updated_idx")
   expect(page).toContain('"supplier-quote-ocr"')
   expect(actions).toContain("supplierQuoteAiInvoker")
+})
+
+test("client request chart keeps quantity, item, and details in stable columns", () => {
+  const row = toRequestMaterialChartRow({
+    request_id: "request-1",
+    name: "1/2 in. drywall 4 x 8",
+    department: "Sheet Rock",
+    item_type: "material",
+    quantity: 24,
+    unit: "sheets",
+    answers: [{ label: "Board type", value: "Moisture resistant" }],
+    metadata: { request_details: "Deliver to the second floor" },
+  })
+
+  expect(row).toEqual({
+    requestId: "request-1",
+    quantity: "24 sheets",
+    item: "1/2 in. drywall 4 x 8",
+    details: "Sheet Rock · material · Deliver to the second floor · Board type: Moisture resistant",
+  })
+  expect(requestMaterialChartCsv([row])).toContain('"Quantity","Item","Details"')
+  expect(requestMaterialChartCsv([{ ...row, item: "=unsafe" }])).toContain('"\'=unsafe"')
 })
 
 test("supplier detection matches the directory or keeps the name read from the invoice", async () => {
