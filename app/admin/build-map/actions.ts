@@ -17,6 +17,9 @@ type SearchResult =
 
 type TaskResult = { ok: true } | { ok: false; error: string }
 
+const DASHBOARD_AI_MODELS = new Set(["luna", "terra", "sol"])
+const DASHBOARD_AI_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
+
 function clean(value: unknown, limit: number) {
   return String(value ?? "").trim().slice(0, limit)
 }
@@ -69,10 +72,16 @@ export async function setTodayTaskCompletedAction(input: { id: string; completed
   return { ok: true }
 }
 
-export async function searchManagerDashboardAction(queryInput: string): Promise<SearchResult> {
+export async function searchManagerDashboardAction(formData: FormData): Promise<SearchResult> {
   const { supabase, user, access } = await requireManagerPortalProfile()
-  const query = clean(queryInput, 500)
-  if (query.length < 2) return { ok: false, error: "Type a question about clients, requests, quotes, suppliers, or goals." }
+  const queryInput = clean(formData.get("query"), 2000)
+  const modelInput = clean(formData.get("model"), 20)
+  const model = DASHBOARD_AI_MODELS.has(modelInput) ? modelInput : "terra"
+  const imageValue = formData.get("image")
+  const image = imageValue instanceof File && imageValue.size > 0 ? imageValue : null
+  if (image && (!DASHBOARD_AI_IMAGE_TYPES.has(image.type) || image.size > 4 * 1024 * 1024)) return { ok: false, error: "Use a JPG, PNG, or WebP photo under 4 MB." }
+  const query = queryInput || (image ? "Review this construction photo and explain what you see, what should be checked, and the next action." : "")
+  if (query.length < 2) return { ok: false, error: "Type a question or add a construction photo." }
   const [requestsResult, goalsResult, clientsResult, quotesResult] = await Promise.all([
     supabase.from("quote_requests").select("id,title,status,updated_at").order("updated_at", { ascending: false }).limit(80),
     supabase.from("manager_goals").select("title,details,status,updated_at").order("updated_at", { ascending: false }).limit(80),
@@ -91,22 +100,36 @@ export async function searchManagerDashboardAction(queryInput: string): Promise<
     clients: clientsResult.data ?? [],
     supplierQuotes: quotesResult.data ?? [],
     goals: goals.map(({ title, status, updated_at }) => ({ title, status, updated_at })),
+    websitePages: [
+      { name: "Manager dashboard", path: "/admin/build-map" },
+      { name: "Customer directory", path: "/admin/users" },
+      { name: "Client material requests", path: "/owner/materials/requests" },
+      { name: "Supplier directory", path: "/admin/vendors" },
+      { name: "Supplier quote storage", path: "/admin/supplier-quotes" },
+      { name: "Material catalog", path: "/admin/catalog" },
+      { name: "Quote comparison", path: "/admin/quote-comparison" },
+      { name: "Communications", path: "/admin/communications" },
+      { name: "Daily summary", path: "/admin/daily-summary" },
+      { name: "Goals and progress", path: "/admin/goals-progress" },
+    ],
   })
 
   let answer = ""
   try {
+    const imageDataUrl = image ? `data:${image.type};base64,${Buffer.from(await image.arrayBuffer()).toString("base64")}` : null
     const { data, error } = await supabase.functions.invoke<{ ok?: boolean; answer?: string; error?: string }>("aura-messaging-broker", {
-      body: { action: "dashboard_ai", query, context },
+      body: { action: "dashboard_ai", query, context, model, imageDataUrl },
     })
     answer = !error && data?.ok ? clean(data.answer, 3000) : ""
   } catch {
     answer = ""
   }
-  if (!answer) answer = liveSearchFallback(query, collections)
+  if (!answer) answer = image ? "The photo could not be analyzed right now. Remove it and search the business records, or try the photo again." : liveSearchFallback(query, collections)
 
   const title = "Dashboard AI search"
   const existing = await supabase.from("manager_goals").select("id,details").eq("created_by", user.id).eq("title", title).limit(1).maybeSingle<{ id: string; details: string | null }>()
-  const history: DashboardAiHistoryItem[] = [{ id: crypto.randomUUID(), query, answer: answer.slice(0, 3000), createdAt: new Date().toISOString() }, ...parseDashboardAiHistory(existing.data?.details)].slice(0, 20)
+  const historyQuery = `${query}${image ? ` [Photo: ${clean(image.name, 80)}]` : ""}`
+  const history: DashboardAiHistoryItem[] = [{ id: crypto.randomUUID(), query: historyQuery, answer: answer.slice(0, 3000), createdAt: new Date().toISOString() }, ...parseDashboardAiHistory(existing.data?.details)].slice(0, 20)
   const details = serializeDashboardAiHistory(history)
   const assignee = access.owner ? "david" : "carlos"
   if (existing.data) await supabase.from("manager_goals").update({ details, status: "completed" }).eq("id", existing.data.id)

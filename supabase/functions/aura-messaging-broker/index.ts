@@ -275,22 +275,35 @@ function openAiOutputText(payload: Record<string, unknown>) {
   }).join("\n").trim();
 }
 
-async function dashboardAi(queryValue: unknown, contextValue: unknown) {
+const dashboardAiModels = {
+  luna: { id: "gpt-5.6-luna", effort: "low" },
+  terra: { id: "gpt-5.6-terra", effort: "low" },
+  sol: { id: "gpt-5.6-sol", effort: "medium" },
+} as const;
+
+async function dashboardAi(queryValue: unknown, contextValue: unknown, modelValue: unknown, imageValue: unknown) {
   const apiKey = await secret(secretNames.openaiKey);
   if (!apiKey) throw new Error("Avantia AI is not connected.");
-  const query = typeof queryValue === "string" ? queryValue.trim().slice(0, 500) : "";
+  const query = typeof queryValue === "string" ? queryValue.trim().slice(0, 2000) : "";
   const context = typeof contextValue === "string" ? contextValue.slice(0, 180_000) : "";
+  const modelKey = typeof modelValue === "string" && modelValue in dashboardAiModels ? modelValue as keyof typeof dashboardAiModels : "terra";
+  const selectedModel = dashboardAiModels[modelKey];
+  const imageDataUrl = typeof imageValue === "string" && /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(imageValue) && imageValue.length <= 5_600_000 ? imageValue : "";
   if (query.length < 2 || !context) throw new Error("Enter a question about the current business data.");
+  const content: Array<Record<string, unknown>> = [
+    { type: "input_text", text: `Authorized Avantia snapshot:\n${context}\n\nEmployee question: ${query}` },
+    ...(imageDataUrl ? [{ type: "input_image", image_url: imageDataUrl, detail: "auto" }] : []),
+  ];
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-5-mini",
+      model: selectedModel.id,
       store: false,
-      reasoning: { effort: "low" },
-      max_output_tokens: 550,
-      instructions: "You are Avantia Build's internal operations assistant. Answer only from the supplied authorized business snapshot. Be concise, state when data is missing, and suggest the exact Avantia page to open when useful. Never invent prices, client details, or completion status.",
-      input: `Authorized business snapshot:\n${context}\n\nEmployee question: ${query}`,
+      reasoning: { effort: selectedModel.effort },
+      max_output_tokens: 1000,
+      instructions: "You are Avantia Build's internal assistant for Carlos and authorized staff. For questions about Avantia clients, requests, suppliers, quotes, goals, tasks, or website pages, use only the supplied authorized snapshot and never invent private facts, prices, or completion status. For general construction questions, answer from professional construction knowledge, clearly label assumptions, distinguish material guidance from labor, and recommend checking plans, manufacturer instructions, local code, or a licensed professional when safety or compliance matters. Analyze an attached image when present, but state what cannot be confirmed visually. Be direct, practical, and concise. Suggest an exact Avantia path from the snapshot when useful.",
+      input: [{ role: "user", content }],
     }),
   });
   const payload = await response.json() as Record<string, unknown>;
@@ -397,7 +410,7 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, id });
     }
     if (input.action === "dashboard_ai") {
-      const answer = await dashboardAi(input.query, input.context);
+      const answer = await dashboardAi(input.query, input.context, input.model, input.imageDataUrl);
       return json({ ok: true, answer });
     }
     return json({ error: "Unsupported action" }, 400);
