@@ -20,6 +20,8 @@ const secretNames = {
   twoChatWebhookToken: "aura_2chat_webhook_token",
   quoKey: "aura_quo_api_key",
   quoFrom: "aura_quo_from_number",
+  quoWebhookSecret: "aura_quo_webhook_signing_secret",
+  quoPhoneNumberId: "aura_quo_phone_number_id",
   openaiKey: "openai_supplier_quote_api_key",
 } as const;
 
@@ -105,6 +107,47 @@ async function twoChatConfig() {
 async function quoConfig() {
   const [apiKey, from] = await Promise.all([secret(secretNames.quoKey), secret(secretNames.quoFrom)]);
   return apiKey && from ? { apiKey, from } : null;
+}
+
+async function quoWebhookConfig() {
+  const [signingSecret, phoneNumberId] = await Promise.all([
+    secret(secretNames.quoWebhookSecret),
+    secret(secretNames.quoPhoneNumberId),
+  ]);
+  return signingSecret && phoneNumberId ? { signingSecret, phoneNumberId } : null;
+}
+
+async function hmacSha256Base64(encodedKey: string, data: string) {
+  let keyBytes: Uint8Array;
+  try {
+    keyBytes = Uint8Array.from(atob(encodedKey), (character) => character.charCodeAt(0));
+  } catch {
+    return null;
+  }
+  if (keyBytes.length === 0) return null;
+  const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(data));
+  return btoa(String.fromCharCode(...new Uint8Array(signature)));
+}
+
+async function validQuoSignature(rawBody: string, supplied: string | null, encodedSecret: string) {
+  if (!supplied) return false;
+  let compactPayload: string;
+  try {
+    compactPayload = JSON.stringify(JSON.parse(rawBody));
+  } catch {
+    return false;
+  }
+
+  for (const candidate of supplied.split(",")) {
+    const [scheme, version, timestamp, digest, ...extra] = candidate.trim().split(";");
+    if (scheme !== "hmac" || version !== "1" || !timestamp || !digest || extra.length > 0) continue;
+    const timestampMs = Number(timestamp);
+    if (!Number.isFinite(timestampMs) || Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000) continue;
+    const expected = await hmacSha256Base64(encodedSecret, `${timestamp}.${compactPayload}`);
+    if (expected && constantTimeEqual(expected, digest)) return true;
+  }
+  return false;
 }
 
 async function hmacSha1Base64(key: string, data: string) {
@@ -306,6 +349,162 @@ async function handleTwoChatWebhook(req: Request) {
     occurredAt: message.occurredAt,
   });
   return json({ ok: true });
+}
+
+type QuoWebhookPayload = {
+  id?: string;
+  object?: string;
+  createdAt?: string;
+  type?: string;
+  data?: {
+    object?: {
+      id?: string;
+      callId?: string;
+      from?: string;
+      to?: string | string[];
+      direction?: string;
+      body?: string;
+      text?: string;
+      status?: string;
+      createdAt?: string;
+      completedAt?: string | null;
+      phoneNumberId?: string;
+      conversationId?: string;
+      media?: Array<{ url?: string; type?: string; duration?: number }>;
+      voicemail?: { url?: string; type?: string; duration?: number } | null;
+      summary?: string[];
+      nextSteps?: string[];
+      dialogue?: Array<{ content?: string; identifier?: string }>;
+      duration?: number;
+    };
+  };
+};
+
+const quoEventTypes = new Set([
+  "message.received",
+  "message.delivered",
+  "call.ringing",
+  "call.completed",
+  "call.recording.completed",
+  "call.summary.completed",
+  "call.transcript.completed",
+]);
+
+function safeIso(value: unknown, fallback: string) {
+  const parsed = new Date(typeof value === "string" ? value : fallback);
+  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
+async function handleQuoWebhook(req: Request) {
+  const config = await quoWebhookConfig();
+  if (!config) return json({ error: "Q U O incoming events are not connected" }, 503);
+  const rawBody = await req.text();
+  if (!await validQuoSignature(rawBody, req.headers.get("openphone-signature"), config.signingSecret)) {
+    return json({ error: "Invalid signature" }, 401);
+  }
+
+  let payload: QuoWebhookPayload;
+  try {
+    payload = JSON.parse(rawBody) as QuoWebhookPayload;
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
+  const eventId = payload.id?.trim() || "";
+  const eventType = payload.type?.trim() || "";
+  const object = payload.data?.object;
+  const activityId = object?.callId?.trim() || object?.id?.trim() || "";
+  if (!eventId || payload.object !== "event" || !quoEventTypes.has(eventType) || !object || !activityId) {
+    return json({ error: "Unsupported event" }, 400);
+  }
+  if (object.phoneNumberId && object.phoneNumberId !== config.phoneNumberId) {
+    return json({ error: "Phone number not allowed" }, 403);
+  }
+
+  const prior = await sql<{ processed_at: string | null }[]>`
+    select processed_at from public.aura_webhook_events
+    where provider = 'quo' and external_event_id = ${eventId}
+    limit 1
+  `;
+  if (prior[0]?.processed_at) return json({ ok: true, duplicate: true });
+
+  await sql`
+    insert into public.aura_webhook_events (provider, external_event_id, event_type, activity_id, raw_payload, error_message)
+    values ('quo', ${eventId}, ${eventType}, ${activityId}, ${JSON.stringify(payload)}::jsonb, null)
+    on conflict (provider, external_event_id) do update set
+      event_type = excluded.event_type,
+      activity_id = excluded.activity_id,
+      raw_payload = excluded.raw_payload,
+      error_message = null
+  `;
+
+  const existing = await sql<Record<string, unknown>[]>`
+    select * from public.aura_communications
+    where provider = 'quo' and external_activity_id = ${activityId}
+    limit 1
+  `;
+  const current = existing[0];
+  if (!object.phoneNumberId && !current) {
+    await sql`
+      update public.aura_webhook_events set error_message = 'Related call has not arrived yet.'
+      where provider = 'quo' and external_event_id = ${eventId}
+    `;
+    return json({ error: "Related call has not arrived yet" }, 409);
+  }
+
+  const to = Array.isArray(object.to) ? object.to[0] : object.to;
+  const direction = object.direction === "outgoing" ? "outgoing" : object.direction === "internal" ? "internal" : "incoming";
+  const counterpartyPhone = normalizePhone(direction === "outgoing" ? to : object.from) || (current?.counterparty_phone as string | null) || null;
+  const businessPhone = normalizePhone(direction === "outgoing" ? object.from : to) || (current?.business_phone as string | null) || null;
+  const linkedContact = await contactId(counterpartyPhone);
+  const occurredAt = safeIso(object.createdAt, payload.createdAt || new Date().toISOString());
+  const lastEventAt = safeIso(payload.createdAt, occurredAt);
+  const completedAt = object.completedAt ? safeIso(object.completedAt, lastEventAt) : null;
+  const calculatedDuration = completedAt
+    ? Math.max(0, Math.round((new Date(completedAt).getTime() - new Date(occurredAt).getTime()) / 1000))
+    : null;
+  const media = [...(object.media || []), ...(object.voicemail ? [object.voicemail] : [])];
+  const summary = object.summary?.filter(Boolean).join("\n") || null;
+  const transcript = object.dialogue
+    ?.filter((line) => line.content)
+    .map((line) => `${line.identifier ? `${line.identifier}: ` : ""}${line.content}`)
+    .join("\n") || null;
+  const channel = eventType.startsWith("call.") ? "call" : "sms";
+  const body = object.body?.trim() || object.text?.trim() || null;
+  const durationSeconds = Number.isFinite(object.duration) ? Math.max(0, Math.round(object.duration as number)) : calculatedDuration;
+
+  await sql`
+    insert into public.aura_communications (
+      provider, channel, external_activity_id, external_conversation_id, contact_id, direction,
+      counterparty_phone, business_phone, body, summary, transcript, next_steps, media, status,
+      duration_seconds, occurred_at, last_event_at
+    ) values (
+      'quo', ${channel}, ${activityId}, ${object.conversationId || null}, ${linkedContact || (current?.contact_id as string | null) || null}, ${direction},
+      ${counterpartyPhone}, ${businessPhone}, ${body}, ${summary}, ${transcript},
+      ${JSON.stringify(object.nextSteps || [])}::jsonb, ${JSON.stringify(media)}::jsonb, ${object.status || null},
+      ${durationSeconds}, ${occurredAt}, ${lastEventAt}
+    )
+    on conflict (provider, external_activity_id) do update set
+      channel = excluded.channel,
+      external_conversation_id = coalesce(excluded.external_conversation_id, aura_communications.external_conversation_id),
+      contact_id = coalesce(excluded.contact_id, aura_communications.contact_id),
+      direction = coalesce(excluded.direction, aura_communications.direction),
+      counterparty_phone = coalesce(excluded.counterparty_phone, aura_communications.counterparty_phone),
+      business_phone = coalesce(excluded.business_phone, aura_communications.business_phone),
+      body = coalesce(excluded.body, aura_communications.body),
+      summary = coalesce(excluded.summary, aura_communications.summary),
+      transcript = coalesce(excluded.transcript, aura_communications.transcript),
+      next_steps = case when excluded.next_steps = '[]'::jsonb then aura_communications.next_steps else excluded.next_steps end,
+      media = case when excluded.media = '[]'::jsonb then aura_communications.media else excluded.media end,
+      status = coalesce(excluded.status, aura_communications.status),
+      duration_seconds = coalesce(excluded.duration_seconds, aura_communications.duration_seconds),
+      last_event_at = greatest(excluded.last_event_at, aura_communications.last_event_at),
+      updated_at = now()
+  `;
+  await sql`
+    update public.aura_webhook_events set processed_at = now(), error_message = null
+    where provider = 'quo' and external_event_id = ${eventId}
+  `;
+  return json({ ok: true, duplicate: false });
 }
 
 async function sendTwoChatWhatsApp(toValue: unknown, bodyValue: unknown, mediaUrlValue?: unknown) {
@@ -757,6 +956,9 @@ Deno.serve(async (req: Request) => {
   if (req.method === "POST" && url.searchParams.get("mode") === "2chat-webhook") {
     try { return await handleTwoChatWebhook(req); } catch { return json({ error: "Processing failed" }, 500); }
   }
+  if (req.method === "POST" && url.searchParams.get("mode") === "quo-webhook") {
+    try { return await handleQuoWebhook(req); } catch { return json({ error: "Processing failed" }, 500); }
+  }
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const manager = await requireManager(req);
   if (!manager) return json({ error: "Manager authorization required" }, 401);
@@ -764,13 +966,13 @@ Deno.serve(async (req: Request) => {
   try { input = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
   try {
     if (input.action === "status") {
-      const [twoChat, twilio, sms] = await Promise.all([twoChatConfig(), twilioConfig(), quoConfig()]);
-      return json({ ok: true, whatsapp: Boolean(twoChat || twilio), whatsappProvider: twoChat ? "2chat" : twilio ? "twilio" : null, sms: Boolean(sms), email: Boolean(Deno.env.get("RESEND_API_KEY")) });
+      const [twoChat, twilio, sms, smsReceive] = await Promise.all([twoChatConfig(), twilioConfig(), quoConfig(), quoWebhookConfig()]);
+      return json({ ok: true, whatsapp: Boolean(twoChat || twilio), whatsappProvider: twoChat ? "2chat" : twilio ? "twilio" : null, sms: Boolean(sms), smsReceive: Boolean(smsReceive), email: Boolean(Deno.env.get("RESEND_API_KEY")) });
     }
     if (input.action === "dashboard") {
       const activeTwoChat = await twoChatConfig();
       if (!activeTwoChat) await syncRecentTwilioWhatsApp();
-      const [communications, contacts, twilio, sms] = await Promise.all([
+      const [communications, contacts, twilio, sms, smsReceive] = await Promise.all([
         sql`
           select id, contact_id, provider, channel, direction, counterparty_phone, counterparty_email,
             subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at
@@ -786,13 +988,14 @@ Deno.serve(async (req: Request) => {
         `,
         twilioConfig(),
         quoConfig(),
+        quoWebhookConfig(),
       ]);
       return json({
         ok: true,
         communications,
         contacts,
         connections: {
-          quo: { receive: false, send: Boolean(sms) },
+          quo: { receive: Boolean(smsReceive), send: Boolean(sms) },
           whatsapp: { receive: Boolean(activeTwoChat || twilio), send: Boolean(activeTwoChat || twilio), provider: activeTwoChat ? "2chat" : twilio ? "twilio" : null },
           email: { receive: false, send: Boolean(Deno.env.get("RESEND_API_KEY")) },
         },
@@ -854,6 +1057,19 @@ Deno.serve(async (req: Request) => {
         saveSecret(secretNames.quoFrom, from, "Aura Q U O SMS sender"),
       ]);
       return json({ ok: true, sms: true });
+    }
+    if (input.action === "configure_quo_webhook") {
+      if (!manager.isOwner) return json({ error: "Only the owner can change provider credentials." }, 403);
+      const signingSecret = typeof input.signingSecret === "string" ? input.signingSecret.trim() : "";
+      const phoneNumberId = typeof input.phoneNumberId === "string" ? input.phoneNumberId.trim() : "";
+      if (!/^[A-Za-z0-9+/=_-]{20,}$/.test(signingSecret) || !/^[A-Za-z0-9_-]{8,}$/.test(phoneNumberId)) {
+        return json({ error: "Enter the Q U O webhook signing secret and business-line ID." }, 400);
+      }
+      await Promise.all([
+        saveSecret(secretNames.quoWebhookSecret, signingSecret, "Aura Q U O webhook signing secret"),
+        saveSecret(secretNames.quoPhoneNumberId, phoneNumberId, "Aura Q U O allowed phone number ID"),
+      ]);
+      return json({ ok: true, smsReceive: true });
     }
     if (input.action === "send_whatsapp") {
       const id = await twoChatConfig()

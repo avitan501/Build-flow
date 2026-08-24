@@ -67,7 +67,7 @@ export default async function AuraOwnerPage() {
           </div>
         </header>
 
-        <AuraConnectionSetup whatsappReady={connections.whatsapp.send} smsReady={connections.quo.send} />
+        <AuraConnectionSetup whatsappReady={connections.whatsapp.send} smsReady={connections.quo.send} smsReceiveReady={connections.quo.receive} />
 
         <section className="grid gap-3 sm:grid-cols-3">
           {([

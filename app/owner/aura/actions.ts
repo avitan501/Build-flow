@@ -207,6 +207,12 @@ export async function configureAuraProviderAction(formData: FormData): Promise<S
         apiKey: String(formData.get("apiKey") || ""),
         from: String(formData.get("from") || ""),
       });
+    } else if (provider === "quo-webhook") {
+      await invokeMessagingBroker(supabase, {
+        action: "configure_quo_webhook",
+        signingSecret: String(formData.get("signingSecret") || ""),
+        phoneNumberId: String(formData.get("phoneNumberId") || ""),
+      });
     } else {
       return { ok: false, error: "Choose a supported connection." };
     }
@@ -214,6 +220,8 @@ export async function configureAuraProviderAction(formData: FormData): Promise<S
     return { ok: false, error: error instanceof Error ? error.message : "Connection could not be saved." };
   }
   revalidatePath("/owner/aura");
+  revalidatePath("/owner/aura/connect");
+  revalidatePath("/admin/communications");
   return { ok: true };
 }
 

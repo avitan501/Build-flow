@@ -168,6 +168,25 @@ test("Aura Q U O webhook rejects unsigned requests", async ({ request }) => {
   expect(await unsignedWebhook.text()).toBe("Invalid signature");
 });
 
+test("Aura Q U O inbound events use Vault-backed verification", async () => {
+  const [route, broker, actions, setup] = await Promise.all([
+    readFile(path.join(process.cwd(), "app/api/aura/quo/route.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "app/owner/aura/actions.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "components/buildflow/aura-connection-setup.tsx"), "utf8"),
+  ]);
+
+  expect(route).toContain("mode=quo-webhook");
+  expect(route).toContain('"openphone-signature": signature');
+  expect(broker).toContain('quoWebhookSecret: "aura_quo_webhook_signing_secret"');
+  expect(broker).toContain('quoPhoneNumberId: "aura_quo_phone_number_id"');
+  expect(broker).toContain("validQuoSignature");
+  expect(broker).toContain('input.action === "configure_quo_webhook"');
+  expect(broker).toContain('quo: { receive: Boolean(smsReceive), send: Boolean(sms) }');
+  expect(actions).toContain('provider === "quo-webhook"');
+  expect(setup).toContain("Connect incoming calls & texts");
+});
+
 test("Aura email webhook rejects unsigned requests", async ({ request }) => {
   const unsignedWebhook = await request.post("/api/aura/resend", {
     data: {

@@ -1,5 +1,6 @@
-import { parseQuoEvent, storeQuoEvent, verifyQuoSignature } from "@/lib/aura/quo";
+import { parseQuoEvent } from "@/lib/aura/quo";
 import { notifyManagersSafely } from "@/lib/manager-push-notifications";
+import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,11 +15,38 @@ function response(body: string, status: number) {
     },
   });
 }
+
+async function forwardToSecureAuraBroker(rawBody: string, signature: string) {
+  const { url, anonKey } = getSupabasePublicEnv();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!serviceRoleKey) return { ok: false, status: 503 };
+
+  const brokerResponse = await fetch(`${url}/functions/v1/aura-messaging-broker?mode=quo-webhook`, {
+    method: "POST",
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+      "openphone-signature": signature,
+    },
+    body: rawBody,
+    cache: "no-store",
+  });
+  let result: { duplicate?: boolean } = {};
+  try {
+    result = await brokerResponse.json() as { duplicate?: boolean };
+  } catch {
+    // The status remains the source of truth when the broker returns no JSON.
+  }
+  return { ok: brokerResponse.ok, status: brokerResponse.status, duplicate: Boolean(result.duplicate) };
+}
+
 export async function POST(request: Request) {
   const rawBody = await request.text();
-  if (!verifyQuoSignature(rawBody, request.headers.get("openphone-signature"))) {
-    return response("Invalid signature", 401);
-  }
+  const signature = request.headers.get("openphone-signature") || "";
+  if (!signature) return response("Invalid signature", 401);
+  const broker = await forwardToSecureAuraBroker(rawBody, signature);
+  if (!broker.ok) return response(broker.status === 401 ? "Invalid signature" : "Processing failed", broker.status);
 
   let payload: unknown;
   try {
@@ -31,11 +59,9 @@ export async function POST(request: Request) {
   if (!parsed.success) return response("Unsupported event", 400);
 
   try {
-    const result = await storeQuoEvent(parsed.data);
-    if (!result.accepted) return response("Phone number not allowed", 403);
     const activity = parsed.data.data.object;
     const isIncomingCall = parsed.data.type === "call.ringing" && activity.direction !== "outgoing";
-    if (!result.duplicate && (isIncomingCall || parsed.data.type === "message.received")) {
+    if (!broker.duplicate && (isIncomingCall || parsed.data.type === "message.received")) {
       const from = activity.from || "Unknown number";
       await notifyManagersSafely({
         eventType: "call_message",
