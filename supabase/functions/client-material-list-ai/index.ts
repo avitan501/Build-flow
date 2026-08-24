@@ -3,7 +3,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js"
 
-import { detectExplicitQuantityUnit, materialRequiresThickness, removeResolvedQuantityUnitReasons, verifiedThickness } from "./material-list-normalization.ts"
+import { detectExplicitQuantityUnit, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, verifiedThickness } from "./material-list-normalization.ts"
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -91,6 +91,8 @@ Do not invent missing information. Copy the shortest exact text fragment support
 Never ask for or mark a quantity or sales unit missing when it is already printed in the supporting source text. Recognize quantity-first, item-first, abbreviated, bulleted, and table formats. These all mean the same thing: "14 squares siding", "Siding: 14 squares", "14 sq siding", "| 14 | squares | siding |", and "| siding | 14 | squares |". Likewise, recognize singular and plural construction units such as box/boxes, roll/rolls, sheet/sheets, pail/pails, and case/cases.
 
 Treat department labels such as "Siding list", "Framing materials", "Electrical takeoff", or a standalone department heading as headings, never as material rows.
+
+Recognize standard fastener nomenclature. For example, 3\" x .120, 3\" x 120, or 3 in x 120 on a coil framing nail means a 3-inch nail with a 0.120-inch shank diameter. Likewise, 2\" x .099 or 2\" x 099 means a 2-inch nail with a 0.099-inch shank. Preserve these as length and shank specifications and do not ask what 120 or 099 means when the item is clearly a nail or fastener.
 
 For siding, a panel-area quantity such as "40 squares siding" is not a complete siding order. Unless the source explicitly requests panels only, mark the row missing when any required ordering detail is absent: material/manufacturer, profile, color, waste allowance, starter-strip linear feet, outside-corner count/height/post size, inside-corner count/height/post size, J-channel/opening-trim linear feet/profile, or the inclusion/exclusion of house wrap, soffit, fascia, insulation, and fasteners. Never calculate perimeter, corners, or opening trim from siding squares alone.
 
@@ -236,16 +238,18 @@ Deno.serve(async (request: Request) => {
       const normalizedUnit = clean(item.unit, 60) || detected?.unit || ""
       const missingQuantity = !Number.isFinite(quantity) || Number(quantity) <= 0
       const missingUnit = !normalizedUnit
-      const dimensions = clean(item.dimensions, 300)
+      const proposedDimensions = clean(item.dimensions, 300)
       const proposedThickness = clean(item.thickness, 160)
       const thickness = verifiedThickness(proposedThickness, typedSource || sourceText)
       const details = clean(item.details, 1200)
       const originalReviewReasons = item.reviewReasons.map((reason) => clean(reason, 240)).filter(Boolean).slice(0, 5)
-      const reviewReasons = removeResolvedQuantityUnitReasons(originalReviewReasons, detected)
+      const fastenerDimensions = recognizedFastenerDimensions(item.name, [sourceText, proposedDimensions, details].filter(Boolean).join(" "))
+      const dimensions = fastenerDimensions || proposedDimensions
+      const reviewReasons = removeResolvedFastenerReasons(removeResolvedQuantityUnitReasons(originalReviewReasons, detected), fastenerDimensions)
       const missingThickness = materialRequiresThickness(item.name) && !thickness
-      const onlyResolvedQuantityUnit = Boolean(detected && originalReviewReasons.length && reviewReasons.length === 0)
-      const aiReviewStatus = onlyResolvedQuantityUnit && item.reviewStatus === "missing" ? "ready" : item.reviewStatus
-      const reviewStatus = missingQuantity || missingUnit || missingThickness ? "missing" : aiReviewStatus === "ready" && item.needsReview && !onlyResolvedQuantityUnit ? "check" : aiReviewStatus
+      const allReviewReasonsResolved = Boolean((detected || fastenerDimensions) && originalReviewReasons.length && reviewReasons.length === 0)
+      const aiReviewStatus = allReviewReasonsResolved && item.reviewStatus !== "ready" ? "ready" : item.reviewStatus
+      const reviewStatus = missingQuantity || missingUnit || missingThickness ? "missing" : aiReviewStatus === "ready" && item.needsReview && !allReviewReasonsResolved ? "check" : aiReviewStatus
       return {
         request_id: source.request_id,
         project_id: source.project_id,

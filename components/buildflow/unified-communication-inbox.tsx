@@ -1,0 +1,321 @@
+"use client"
+
+import { ArrowLeft, CheckCheck, ChevronDown, CircleAlert, Clock3, ImagePlus, Mail, MessageCircle, Paperclip, Phone, Plus, Search, Send, Smartphone, X } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
+
+import { prepareQuoPhotoMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
+import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard"
+import { normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identity"
+import type { SupplierRoutingOption } from "@/lib/shop-qualification"
+
+export type AuraLeadRecipient = {
+  id: string
+  full_name: string
+  company_name: string | null
+  phone: string | null
+  email: string | null
+}
+
+type Connections = {
+  quo: { receive: boolean; send: boolean }
+  whatsapp: { receive: boolean; send: boolean }
+  email: { receive: boolean; send: boolean }
+}
+
+type Channel = "call" | "sms" | "whatsapp" | "email"
+type ContactKind = "customer" | "lead" | "supplier" | "contact"
+type ContactFilter = "all" | ContactKind
+
+type DirectoryEntry = {
+  key: string
+  id: string
+  name: string
+  company: string
+  phone: string
+  whatsapp: string
+  email: string
+  kind: ContactKind
+}
+
+type Conversation = {
+  key: string
+  name: string
+  company: string
+  phone: string
+  email: string
+  kind: ContactKind
+  messages: AuraCommunicationRow[]
+  latest: AuraCommunicationRow
+  channels: AuraCommunicationRow["channel"][]
+}
+
+const QUICK_REPLIES = ["Received, thank you.", "I need a few more details.", "I am checking current pricing.", "Everything is ready to proceed."]
+
+function identityKey(phone?: string | null, email?: string | null) {
+  return normalizeAuraPhone(phone) || email?.trim().toLowerCase() || ""
+}
+
+function formatTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const today = new Date()
+  if (date.toDateString() === today.toDateString()) return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date)
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date)
+}
+
+function formatMessageTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date)
+}
+
+function initials(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "?"
+}
+
+function contactKindLabel(kind: ContactKind) {
+  if (kind === "supplier") return "Supplier / Vendor"
+  return kind[0].toUpperCase() + kind.slice(1)
+}
+
+function contactKindTone(kind: ContactKind) {
+  if (kind === "supplier") return "bg-amber-100 text-amber-800"
+  if (kind === "lead") return "bg-violet-100 text-violet-700"
+  if (kind === "customer") return "bg-emerald-100 text-emerald-700"
+  return "bg-slate-100 text-slate-600"
+}
+
+function channelIcon(channel: AuraCommunicationRow["channel"], className = "h-3.5 w-3.5") {
+  if (channel === "whatsapp") return <MessageCircle className={`${className} text-emerald-600`} />
+  if (channel === "email") return <Mail className={`${className} text-violet-600`} />
+  if (channel === "call") return <Phone className={`${className} text-amber-600`} />
+  return <Smartphone className={`${className} text-sky-600`} />
+}
+
+function statusIcon(status: string | null) {
+  if (["failed", "undelivered"].includes(status || "")) return <CircleAlert className="h-3 w-3 text-rose-600" />
+  if (["delivered", "read"].includes(status || "")) return <CheckCheck className="h-3 w-3 text-emerald-600" />
+  return <Clock3 className="h-3 w-3 text-slate-400" />
+}
+
+function messageText(message: AuraCommunicationRow) {
+  return message.body || message.transcript || message.summary || message.subject || (message.channel === "call" ? "Phone call" : "Message")
+}
+
+function quoCallHref(phone: string) {
+  if (typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+    return `openphone://dial?number=${encodeURIComponent(phone)}&from=${encodeURIComponent("+15169088319")}&action=call`
+  }
+  return `tel:${phone}`
+}
+
+function ExpandableMessage({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const long = text.length > 520 || text.split("\n").length > 8
+  return <div><p className={`whitespace-pre-wrap break-words text-sm leading-5 ${long && !expanded ? "max-h-32 overflow-hidden" : ""}`}>{text}</p>{long ? <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-[#0066cc]">{expanded ? "Show less" : "Show more"}<ChevronDown className={`h-3 w-3 transition ${expanded ? "rotate-180" : ""}`} /></button> : null}</div>
+}
+
+export function UnifiedCommunicationInbox({ communications, contacts, customers, leads = [], suppliers = [], connections, initialChannelFilter = "all", initialQuery = "" }: {
+  communications: AuraCommunicationRow[]
+  contacts: AuraContactRow[]
+  customers: AuraCustomerIdentity[]
+  leads?: AuraLeadRecipient[]
+  suppliers?: SupplierRoutingOption[]
+  connections: Connections
+  initialChannelFilter?: string
+  initialQuery?: string
+}) {
+  const router = useRouter()
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const [query, setQuery] = useState(initialQuery)
+  const [contactFilter, setContactFilter] = useState<ContactFilter>("all")
+  const [channelFilter, setChannelFilter] = useState(initialChannelFilter)
+  const [activeKey, setActiveKey] = useState(() => identityKey(communications[0]?.counterparty_phone, communications[0]?.counterparty_email) || "__new__")
+  const [mobileThreadOpen, setMobileThreadOpen] = useState(false)
+  const [channel, setChannel] = useState<Channel>(() => {
+    const initial = communications[0]?.channel
+    return initial === "email" || initial === "sms" || initial === "whatsapp" ? initial : "whatsapp"
+  })
+  const [recipientType, setRecipientType] = useState<Exclude<ContactKind, "contact">>("customer")
+  const [selectedRecipientId, setSelectedRecipientId] = useState("")
+  const [recipient, setRecipient] = useState(() => communications[0]?.channel === "email" ? communications[0]?.counterparty_email || "" : communications[0]?.counterparty_phone || "")
+  const [subject, setSubject] = useState("")
+  const [message, setMessage] = useState("")
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null)
+  const [pending, startTransition] = useTransition()
+
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible") router.refresh() }
+    const timer = window.setInterval(refresh, 10_000)
+    window.addEventListener("focus", refresh)
+    document.addEventListener("visibilitychange", refresh)
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh) }
+  }, [router])
+
+  const directory = useMemo(() => {
+    const entries: DirectoryEntry[] = [
+      ...customers.map((item) => ({ key: `customer:${item.id}`, id: item.id, name: item.full_name || item.company_name || item.email || item.phone || "Unnamed customer", company: item.company_name || "", phone: item.phone || "", whatsapp: item.phone || "", email: item.email || "", kind: "customer" as const })),
+      ...leads.map((item) => ({ key: `lead:${item.id}`, id: item.id, name: item.full_name || item.company_name || item.email || item.phone || "Unnamed lead", company: item.company_name || "", phone: item.phone || "", whatsapp: item.phone || "", email: item.email || "", kind: "lead" as const })),
+      ...suppliers.map((item) => ({ key: `supplier:${item.id}`, id: item.id, name: item.name || item.contactName || item.email || item.phone || "Unnamed supplier", company: item.contactName || item.contactLabel || "", phone: item.phone || "", whatsapp: item.whatsapp || "", email: item.email || "", kind: "supplier" as const })),
+      ...contacts.map((item) => ({ key: `contact:${item.id}`, id: item.id, name: item.full_name || item.company || item.email || item.normalized_phone || "Unnamed contact", company: item.company || "", phone: item.normalized_phone || "", whatsapp: item.normalized_phone || "", email: item.email || "", kind: "contact" as const })),
+    ]
+    const alias = new Map<string, DirectoryEntry>()
+    for (const entry of entries) {
+      for (const value of [identityKey(entry.phone, null), identityKey(entry.whatsapp, null), identityKey(null, entry.email)]) {
+        if (value && !alias.has(value)) alias.set(value, entry)
+      }
+    }
+    return { entries, alias }
+  }, [contacts, customers, leads, suppliers])
+
+  const conversations = useMemo(() => {
+    const grouped = new Map<string, AuraCommunicationRow[]>()
+    for (const communication of communications) {
+      if (channelFilter !== "all" && communication.channel !== channelFilter) continue
+      const rawKey = identityKey(communication.counterparty_phone, communication.counterparty_email) || `unknown:${communication.contact_id || communication.id}`
+      const canonical = directory.alias.get(rawKey)?.key || rawKey
+      grouped.set(canonical, [...(grouped.get(canonical) || []), communication])
+    }
+    return [...grouped.entries()].map(([key, items]) => {
+      const ordered = [...items].sort((left, right) => Date.parse(left.occurred_at) - Date.parse(right.occurred_at))
+      const latest = ordered[ordered.length - 1]
+      const rawKey = identityKey(latest.counterparty_phone, latest.counterparty_email)
+      const entry = directory.entries.find((item) => item.key === key) || directory.alias.get(rawKey)
+      return {
+        key,
+        name: entry?.name || latest.counterparty_phone || latest.counterparty_email || "Unknown contact",
+        company: entry?.company || "",
+        phone: entry?.phone || latest.counterparty_phone || "",
+        email: entry?.email || latest.counterparty_email || "",
+        kind: entry?.kind || "contact",
+        messages: ordered,
+        latest,
+        channels: [...new Set(ordered.map((item) => item.channel))],
+      } satisfies Conversation
+    }).sort((left, right) => Date.parse(right.latest.occurred_at) - Date.parse(left.latest.occurred_at))
+  }, [channelFilter, communications, directory])
+
+  const filteredConversations = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    return conversations.filter((conversation) => {
+      if (contactFilter !== "all" && conversation.kind !== contactFilter) return false
+      if (!needle) return true
+      return [conversation.name, conversation.company, conversation.phone, conversation.email, ...conversation.messages.map(messageText)].some((value) => value.toLowerCase().includes(needle))
+    })
+  }, [contactFilter, conversations, query])
+
+  const activeConversation = conversations.find((conversation) => conversation.key === activeKey) || (activeKey !== "__new__" ? conversations[0] : undefined)
+  const recipientOptions = directory.entries.filter((entry) => entry.kind === recipientType)
+  const selectedChannelReady = channel === "call" || (channel === "sms" ? connections.quo.send : channel === "whatsapp" ? connections.whatsapp.send : connections.email.send)
+
+  function openConversation(conversation: Conversation) {
+    setActiveKey(conversation.key)
+    setMobileThreadOpen(true)
+    const latestChannel = [...conversation.messages].reverse().find((item) => ["sms", "whatsapp", "email"].includes(item.channel))?.channel
+    const nextChannel: Channel = latestChannel === "email" || latestChannel === "sms" || latestChannel === "whatsapp" ? latestChannel : "whatsapp"
+    setChannel(nextChannel)
+    setRecipient(nextChannel === "email" ? conversation.email : conversation.phone)
+    setSelectedRecipientId("")
+    setMessage("")
+    setFeedback(null)
+  }
+
+  function newConversation() {
+    setActiveKey("__new__")
+    setMobileThreadOpen(true)
+    setSelectedRecipientId("")
+    setRecipient("")
+    setMessage("")
+    setFeedback(null)
+  }
+
+  function selectNewRecipient(id: string) {
+    setSelectedRecipientId(id)
+    const entry = recipientOptions.find((item) => item.id === id)
+    setRecipient(channel === "email" ? entry?.email || "" : channel === "whatsapp" ? entry?.whatsapp || entry?.phone || "" : entry?.phone || entry?.whatsapp || "")
+  }
+
+  function changeChannel(nextChannel: Channel) {
+    setChannel(nextChannel)
+    const entry = recipientOptions.find((item) => item.id === selectedRecipientId)
+    if (activeConversation) setRecipient(nextChannel === "email" ? activeConversation.email : activeConversation.phone)
+    else if (entry) setRecipient(nextChannel === "email" ? entry.email : nextChannel === "whatsapp" ? entry.whatsapp || entry.phone : entry.phone || entry.whatsapp)
+    setFeedback(null)
+  }
+
+  function sendMessage() {
+    if (channel === "call") return
+    const messageChannel = channel
+    setFeedback(null)
+    startTransition(async () => {
+      if (messageChannel === "sms" && photo) {
+        const formData = new FormData()
+        formData.set("phone", recipient)
+        formData.set("message", message)
+        formData.set("photo", photo)
+        const prepared = await prepareQuoPhotoMessageAction(formData)
+        if (!prepared.ok) { setFeedback({ tone: "error", text: prepared.error }); return }
+        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) window.location.href = prepared.deepLink
+        else {
+          await navigator.clipboard?.writeText(message).catch(() => undefined)
+          window.open(prepared.quoWebUrl, "_blank", "noopener,noreferrer")
+          window.open(prepared.attachmentUrl, "_blank", "noopener,noreferrer")
+          setFeedback({ tone: "success", text: "Q U O opened. Attach the prepared image from the second tab." })
+        }
+        setPhoto(null)
+        if (photoInputRef.current) photoInputRef.current.value = ""
+        return
+      }
+      const result = await sendAuraMessageAction({ channel: messageChannel, recipient, subject, message })
+      if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return }
+      setMessage("")
+      setFeedback({ tone: "success", text: `${messageChannel === "sms" ? "Text" : messageChannel === "whatsapp" ? "WhatsApp" : "Email"} sent and saved.` })
+      router.refresh()
+    })
+  }
+
+  const threadVisible = mobileThreadOpen || activeKey === "__new__"
+
+  return <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm md:h-[calc(100dvh-8rem)] md:min-h-[38rem]" aria-label="Unified communications inbox">
+    <div className="grid min-h-[42rem] md:h-full md:min-h-0 md:grid-cols-[20rem_minmax(0,1fr)]">
+      <aside className={`${threadVisible ? "hidden md:flex" : "flex"} min-h-0 flex-col border-r border-slate-200 bg-white`}>
+        <header className="shrink-0 border-b border-slate-200 p-3">
+          <div className="flex items-center justify-between gap-3"><div><h1 className="text-lg font-bold">Inbox</h1><p className="text-[11px] text-slate-500">All calls and messages</p></div><button type="button" onClick={newConversation} className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#0071e3] text-white" aria-label="New conversation"><Plus className="h-4 w-4" /></button></div>
+          <label className="relative mt-3 block"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><span className="sr-only">Search conversations</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search chats" className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-[#0071e3]" /></label>
+          <div className="mt-2 flex gap-1 overflow-x-auto pb-1">{([['all', 'All'], ['customer', 'Customers'], ['lead', 'Leads'], ['supplier', 'Suppliers / Vendors']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setContactFilter(value)} className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${contactFilter === value ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600"}`}>{label}</button>)}</div>
+          <label className="mt-2 block"><span className="sr-only">Filter channel</span><select value={channelFilter} onChange={(event) => setChannelFilter(event.target.value)} className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold"><option value="all">All channels</option><option value="whatsapp">WhatsApp</option><option value="sms">Text</option><option value="email">Email</option><option value="call">Calls</option></select></label>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {filteredConversations.map((conversation) => <button key={conversation.key} type="button" onClick={() => openConversation(conversation)} className={`flex w-full items-start gap-3 border-b border-slate-100 px-3 py-3 text-left ${activeKey === conversation.key ? "bg-sky-50" : "hover:bg-slate-50"}`}><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">{initials(conversation.name)}</span><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><strong className="truncate text-sm">{conversation.name}</strong><time className="shrink-0 text-[10px] text-slate-400">{formatTime(conversation.latest.occurred_at)}</time></span><span className="mt-0.5 flex items-center gap-1.5"><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${contactKindTone(conversation.kind)}`}>{contactKindLabel(conversation.kind)}</span>{conversation.channels.slice(0, 3).map((item) => <span key={item}>{channelIcon(item, "h-3 w-3")}</span>)}</span><span className="mt-1 block truncate text-xs text-slate-500">{messageText(conversation.latest)}</span></span></button>)}
+          {!filteredConversations.length ? <p className="p-6 text-center text-sm text-slate-500">No conversations found.</p> : null}
+        </div>
+      </aside>
+
+      <div className={`${threadVisible ? "flex" : "hidden md:flex"} min-h-0 flex-col bg-[#f5f5f7]`}>
+        {activeKey === "__new__" ? <header className="shrink-0 border-b border-slate-200 bg-white p-3"><div className="flex items-center gap-2"><button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations"><ArrowLeft className="h-5 w-5" /></button><div><h2 className="font-bold">New conversation</h2><p className="text-xs text-slate-500">Choose a person and channel</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]"><select value={recipientType} onChange={(event) => { setRecipientType(event.target.value as Exclude<ContactKind, "contact">); setSelectedRecipientId(""); setRecipient("") }} className="h-10 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="customer">Customers</option><option value="lead">Leads</option><option value="supplier">Suppliers / Vendors</option></select><select value={selectedRecipientId} onChange={(event) => selectNewRecipient(event.target.value)} className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="">Choose a contact</option>{recipientOptions.map((item) => <option key={item.key} value={item.id}>{item.name}{item.company && item.company !== item.name ? ` · ${item.company}` : ""}</option>)}</select></div></header> : activeConversation ? <header className="flex shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3 py-2.5"><button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations"><ArrowLeft className="h-5 w-5" /></button><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold">{initials(activeConversation.name)}</span><div className="min-w-0 flex-1"><h2 className="truncate text-sm font-bold">{activeConversation.name}</h2><div className="mt-0.5 flex items-center gap-2"><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${contactKindTone(activeConversation.kind)}`}>{contactKindLabel(activeConversation.kind)}</span><span className="truncate text-[10px] text-slate-500">{activeConversation.phone || activeConversation.email}</span></div></div>{activeConversation.phone ? <a href={quoCallHref(activeConversation.phone)} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white" aria-label={`Call ${activeConversation.name}`}><Phone className="h-4 w-4" /></a> : null}</header> : null}
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5">
+          {activeConversation ? <div className="mx-auto grid max-w-3xl gap-2">{activeConversation.messages.map((item) => { const outgoing = item.direction === "outgoing"; const text = messageText(item); const media = item.media ?? []; return <article key={item.id} className={`flex ${outgoing ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-lg border px-3 py-2 shadow-sm sm:max-w-[75%] ${outgoing ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}><ExpandableMessage text={text} />{media.length ? <div className="mt-2 flex flex-wrap gap-2">{media.map((attachment, index) => attachment.url ? <a key={`${attachment.url}-${index}`} href={attachment.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-[10px] font-bold"><Paperclip className="h-3 w-3" />Attachment</a> : null)}</div> : null}<div className="mt-1.5 flex items-center justify-end gap-1.5 text-[9px] text-slate-400"><span>{channelIcon(item.channel, "h-3 w-3")}</span><time>{formatMessageTime(item.occurred_at)}</time>{outgoing ? statusIcon(item.status) : null}</div></div></article>})}</div> : <div className="flex h-full min-h-48 items-center justify-center text-center"><div><MessageCircle className="mx-auto h-10 w-10 text-slate-300" /><p className="mt-3 text-sm font-semibold text-slate-600">Start a conversation</p></div></div>}
+        </div>
+
+        <footer className="shrink-0 border-t border-slate-200 bg-white p-2.5 sm:p-3">
+          <div className="mx-auto max-w-3xl">
+            <div className="flex gap-1.5 overflow-x-auto pb-2">{QUICK_REPLIES.map((reply) => <button key={reply} type="button" onClick={() => setMessage(reply)} className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600">{reply}</button>)}</div>
+            <div className="flex items-end gap-2 rounded-lg border border-slate-300 bg-white p-1.5 focus-within:border-[#0071e3]">
+              <select value={channel} onChange={(event) => changeChannel(event.target.value as Channel)} className="h-9 w-[6.6rem] shrink-0 rounded-md border-0 bg-slate-100 px-2 text-[10px] font-bold"><option value="whatsapp">WhatsApp</option><option value="sms">Text</option><option value="email">Email</option></select>
+              <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={1} maxLength={1600} placeholder="Write a message" className="max-h-28 min-h-9 min-w-0 flex-1 resize-y border-0 bg-transparent px-1 py-2 text-sm leading-5 outline-none" />
+              {channel === "sms" ? <label className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-500" aria-label="Add photo"><ImagePlus className="h-4 w-4" /><input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] || null)} /></label> : null}
+              <button type="button" onClick={sendMessage} disabled={pending || !selectedChannelReady || !recipient.trim() || !message.trim()} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0071e3] text-white disabled:bg-slate-300" aria-label="Send message"><Send className="h-4 w-4" /></button>
+            </div>
+            {channel === "email" ? <input value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Email subject" className="mt-2 h-9 w-full rounded-md border border-slate-300 px-3 text-xs" /> : null}
+            {photo ? <div className="mt-2 flex items-center justify-between rounded-md bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold"><span className="truncate">{photo.name}</span><button type="button" onClick={() => { setPhoto(null); if (photoInputRef.current) photoInputRef.current.value = "" }} aria-label="Remove photo"><X className="h-3.5 w-3.5" /></button></div> : null}
+            {!selectedChannelReady ? <p className="mt-2 text-xs font-semibold text-amber-700">This channel still needs a connection.</p> : null}
+            {feedback ? <p className={`mt-2 text-xs font-semibold ${feedback.tone === "success" ? "text-emerald-700" : "text-rose-700"}`} role="status">{feedback.text}</p> : null}
+          </div>
+        </footer>
+      </div>
+    </div>
+  </section>
+}

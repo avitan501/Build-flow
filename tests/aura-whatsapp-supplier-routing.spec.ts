@@ -9,7 +9,7 @@ test("manager WhatsApp shortcut opens the internal filtered communication log", 
   const [shell, page, workspace] = await Promise.all([
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/communications/page.tsx"), "utf8"),
-    readFile(path.join(root, "components/buildflow/aura-communication-workspace.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8"),
   ])
 
   expect(shell).toContain("/admin/communications?channel=whatsapp")
@@ -21,7 +21,7 @@ test("manager WhatsApp shortcut opens the internal filtered communication log", 
 test("manager communications can reach customers, leads, and suppliers", async () => {
   const [page, workspace] = await Promise.all([
     readFile(path.join(root, "app/admin/communications/page.tsx"), "utf8"),
-    readFile(path.join(root, "components/buildflow/aura-communication-workspace.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8"),
   ])
 
   expect(page).toContain('from("manager_outreach_leads")')
@@ -30,27 +30,25 @@ test("manager communications can reach customers, leads, and suppliers", async (
   expect(page).toContain("suppliers={liveAura.suppliers}")
   expect(workspace).toContain('<option value="customer">Customers</option>')
   expect(workspace).toContain('<option value="lead">Leads</option>')
-  expect(workspace).toContain('<option value="supplier">Suppliers</option>')
-  expect(workspace).toContain('if (channel === "whatsapp") return recipient.whatsapp || recipient.phone')
-  expect(workspace).toContain("Contact someone")
-  expect(workspace).toContain("InlineCommunicationReply")
-  expect(workspace).toContain("replyToCommunication")
+  expect(workspace).toContain('<option value="supplier">Suppliers / Vendors</option>')
+  expect(workspace).toContain('nextChannel === "whatsapp"')
+  expect(workspace).toContain("Unified communications inbox")
+  expect(workspace).toContain("Suppliers / Vendors")
+  expect(workspace).toContain("ExpandableMessage")
 })
 
 test("manager communications support removable photos and phone-number history", async () => {
   const [workspace, actions] = await Promise.all([
-    readFile(path.join(root, "components/buildflow/aura-communication-workspace.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/aura/actions.ts"), "utf8"),
   ])
 
-  expect(workspace).toContain('aria-label="Remove attached photo"')
-  expect(workspace).toContain("By phone number")
-  expect(workspace).toContain("communicationsByNumber")
+  expect(workspace).toContain('aria-label="Remove photo"')
+  expect(workspace).toContain("Search chats")
+  expect(workspace).toContain("activeConversation.messages.map")
   expect(workspace).toContain("prepared.quoWebUrl")
   expect(workspace).toContain("prepared.attachmentUrl")
-  expect(workspace).toContain("Confirm Delivered or Read")
   expect(workspace).toContain("window.setInterval(refresh, 10_000)")
-  expect(workspace).toContain("Live · updates every 10 sec")
   expect(actions).toContain('quoWebUrl: "https://my.quo.com/inbox"')
   expect(actions).toContain("attachmentUrl: signed.data.signedUrl")
 })

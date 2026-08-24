@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { detectExplicitQuantityUnit, materialRequiresThickness, removeResolvedQuantityUnitReasons, verifiedThickness } from "../supabase/functions/client-material-list-ai/material-list-normalization"
+import { detectExplicitQuantityUnit, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, verifiedThickness } from "../supabase/functions/client-material-list-ai/material-list-normalization"
 
 const sidingFormats = [
   "14 squares of siding",
@@ -49,4 +49,11 @@ test("rejects quantities and unsupported values presented as thickness", () => {
   expect(verifiedThickness("1/2 in.", "12 sheets of drywall")).toBe("")
   expect(materialRequiresThickness("Sheetrock drywall")).toBe(true)
   expect(materialRequiresThickness("Sheetrock screws")).toBe(false)
+})
+
+test("recognizes common coil nail length and shank notation without unnecessary clarification", () => {
+  expect(recognizedFastenerDimensions('3" x 120 coil framing nail', '2 boxes 3"x120 coil framing nail')).toBe("3 in. length x 0.120 in. shank")
+  expect(recognizedFastenerDimensions('2" x 099 coil smooth shank nail', '5 box 2\" x .099 coil smooth shank nail')).toBe("2 in. length x 0.099 in. shank")
+  expect(removeResolvedFastenerReasons(["Clarify whether 3x120 means nail length and shank diameter"], "3 in. length x 0.120 in. shank")).toEqual([])
+  expect(recognizedFastenerDimensions("120 pieces lumber", "120 pieces lumber")).toBe("")
 })

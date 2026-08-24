@@ -44,6 +44,20 @@ export function removeResolvedQuantityUnitReasons(reasons: string[], detected: D
   return reasons.filter((reason) => !/\b(?:quantity|sales?\s+unit|selling\s+unit|unit\s+(?:is\s+)?missing)\b/i.test(reason))
 }
 
+export function recognizedFastenerDimensions(name: string, sourceText: string) {
+  if (!/\b(?:nails?|fasteners?)\b/i.test(name)) return ""
+  const normalized = sourceText.replace(/[\u201c\u201d]/g, '"').replace(/\s+/g, " ")
+  const match = normalized.match(/(\d+(?:\s+\d+\s*\/\s*\d+|\s*\/\s*\d+|(?:\.\d+)?))\s*(?:"|in(?:\.|ch(?:es)?)?)\s*[x×]\s*(?:0?\.)?(\d{2,3})\b/i)
+  if (!match) return ""
+  const length = match[1].replace(/\s+/g, " ").replace(/\s*\/\s*/g, "/")
+  return `${length} in. length x 0.${match[2]} in. shank`
+}
+
+export function removeResolvedFastenerReasons(reasons: string[], dimensions: string) {
+  if (!dimensions) return reasons
+  return reasons.filter((reason) => !/\b(?:shank|diameter|nail\s+(?:size|length)|fastener\s+(?:size|dimension)|clarify\s+whether)\b/i.test(reason))
+}
+
 function thicknessMeasurements(value: string) {
   const normalized = value
     .toLowerCase()
