@@ -21,25 +21,6 @@ export type ExaCatalogSearchResult = {
   matchConfidence: "exact" | "likely"
 }
 
-export type ProductCallResult = {
-  title: string
-  url: string
-  domain: string
-  snippet: string
-  phone: string | null
-  matchConfidence: "exact" | "likely"
-}
-
-export type ProductSalesContact = {
-  company: string
-  contactName: string | null
-  role: string
-  phone: string | null
-  email: string | null
-  url: string
-  domain: string
-}
-
 export type ProductSearchLink = { label: string; url: string }
 
 type ExaResponse = {
