@@ -32,8 +32,8 @@ export function InlineCommunicationReply({ active, channel, feedback, message, p
       </div>
       <textarea value={message} onChange={(event) => onMessageChange(event.target.value)} rows={3} maxLength={1600} placeholder="Write your reply" className="mt-1 w-full resize-none rounded-md border border-slate-300 p-3 text-sm leading-6" />
       <div className="mt-2 flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold capitalize text-slate-500">Reply by {channel}</span>
-        <button type="button" onClick={onSend} disabled={pending || !ready || !recipient.trim() || !message.trim()} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Sending..." : "Send reply"}</button>
+        <span className="whitespace-nowrap text-[11px] font-semibold capitalize text-slate-500">Reply by {channel}</span>
+        <button type="button" onClick={onSend} disabled={pending || !ready || !recipient.trim() || !message.trim()} className="inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-md bg-[#0071e3] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Sending..." : "Send reply"}</button>
       </div>
       {feedback ? <p className={`mt-2 text-xs font-semibold ${feedback.tone === "success" ? "text-emerald-700" : "text-rose-700"}`} role="status">{feedback.text}</p> : null}
     </div>
