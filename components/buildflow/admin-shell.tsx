@@ -22,7 +22,6 @@ import { useState, type ReactNode } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { EmployeeActivityReporter } from "@/components/buildflow/employee-activity-reporter";
-import { ManagerNotificationControl } from "@/components/buildflow/manager-notification-control";
 
 const GOOGLE_MEET_URL = "https://meet.google.com/";
 const communicationLinks = [
@@ -125,7 +124,6 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
           <UserRound className="h-4 w-4" />
           My Account
         </Link>
-        <ManagerNotificationControl navigation />
         <EmployeeActivityReporter owner={access.owner} />
       </div>
     </div>

@@ -31,6 +31,8 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain('assignee="david"');
   expect(page.indexOf('assignee="carlos"')).toBeLessThan(page.indexOf('assignee="david"'));
   expect(page).toContain("Manager tools");
+  expect(page).toContain('id="dashboard-settings-heading"');
+  expect(page).toContain("<ManagerNotificationControl settings />");
   expect(page).toContain("ManagerTodayTasks");
   expect(page).toContain("TODAY_TASK_PREFIX");
   expect(page).toContain("ManagerDashboardAiSearch");

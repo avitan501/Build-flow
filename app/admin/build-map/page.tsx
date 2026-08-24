@@ -22,6 +22,7 @@ import Link from "next/link";
 import { AddManagerGoal, CustomManagerGoals, type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { EmployeeClockStatus } from "@/components/buildflow/employee-clock-status";
 import { ManagerDashboardAiSearch } from "@/components/buildflow/manager-dashboard-ai-search";
+import { ManagerNotificationControl } from "@/components/buildflow/manager-notification-control";
 import { ManagerTodayTasks, type ManagerTodayTask } from "@/components/buildflow/manager-today-tasks";
 import { DAILY_WORK_SUMMARY_PREFIX, parseDailyWorkSummary } from "@/lib/daily-work-summary";
 import { requireManagerPortalProfile } from "@/lib/auth";
@@ -234,5 +235,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
     </div></section>
 
     <details className="group mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4"><span><strong id="manager-tools-heading" className="text-base">Manager tools</strong><span className="ml-2 text-xs text-slate-500">Directories, suppliers, and settings</span></span><span className="text-xs font-semibold text-[#0066cc] group-open:hidden">Open</span></summary><div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-3">{managerSections.map((section) => { const Icon = section.icon; return <section key={section.title} className="overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="flex items-center gap-3 border-b border-slate-100 px-3 py-2"><span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-[#0066cc]"><Icon className="h-4 w-4" /></span><h3 className="text-sm font-semibold">{section.title}</h3></header><div>{section.links.map((item) => { const external = item.href.startsWith("https://"); return <Link key={item.href} href={item.href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="group flex min-h-11 items-center justify-between gap-3 border-b border-slate-100 px-3 text-sm font-semibold text-slate-700 last:border-b-0 hover:bg-slate-50 hover:text-[#0066cc]"><span>{item.label}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5" /></Link>; })}</div></section>; })}</div></details>
+
+    <section aria-labelledby="dashboard-settings-heading" className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="border-b border-slate-100 px-4 py-3"><h2 id="dashboard-settings-heading" className="text-sm font-semibold">Settings</h2></header><ManagerNotificationControl settings /></section>
   </div></main>;
 }
