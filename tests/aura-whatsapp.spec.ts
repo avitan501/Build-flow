@@ -61,6 +61,9 @@ test("Twilio replies use the direct connection or the secure Vault broker", asyn
   expect(route).toContain('"x-avantia-canonical-url": request.url');
   expect(route).toContain("if (!storedByBroker) await processTwilioWhatsAppWebhook(params)");
   expect(broker).toContain('req.headers.get("x-avantia-canonical-url") || req.url');
+  expect(broker).toContain("syncRecentTwilioWhatsApp");
+  expect(broker).toContain('direction === "inbound"');
+  expect(broker).toContain("await syncRecentTwilioWhatsApp()");
 });
 
 test("missed Twilio replies are synchronized and ADD commands remain idempotent", async () => {

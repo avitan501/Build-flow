@@ -237,6 +237,39 @@ async function sendTwilioWhatsApp(
   return result.sid;
 }
 
+async function syncRecentTwilioWhatsApp() {
+  const config = await twilioConfig();
+  if (!config) return 0;
+  const query = new URLSearchParams({ To: `whatsapp:${config.from}`, PageSize: "50" });
+  const response = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${config.accountSid}/Messages.json?${query.toString()}`,
+    { headers: { Authorization: `Basic ${btoa(`${config.accountSid}:${config.authToken}`)}` } },
+  );
+  if (!response.ok) throw new Error(`Twilio history returned HTTP ${response.status}.`);
+  const payload = await response.json() as {
+    messages?: Array<{
+      sid?: string;
+      direction?: string;
+      from?: string;
+      to?: string;
+      body?: string;
+      status?: string;
+    }>;
+  };
+  const incoming = (payload.messages || []).filter((message) => message.direction === "inbound" && message.sid);
+  await Promise.all(incoming.map((message) => storeCommunication({
+    provider: "whatsapp",
+    channel: "whatsapp",
+    externalId: message.sid as string,
+    direction: "incoming",
+    counterpartyPhone: normalizePhone((message.from || "").replace(/^whatsapp:/i, "")),
+    businessPhone: normalizePhone((message.to || "").replace(/^whatsapp:/i, "")),
+    body: message.body?.trim() || null,
+    status: message.status || "received",
+  })));
+  return incoming.length;
+}
+
 async function sendQuoSms(toValue: unknown, bodyValue: unknown) {
   const config = await quoConfig();
   if (!config) throw new Error("Text messaging is not connected.");
@@ -351,6 +384,7 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, whatsapp: Boolean(await twilioConfig()), sms: Boolean(await quoConfig()), email: Boolean(Deno.env.get("RESEND_API_KEY")) });
     }
     if (input.action === "dashboard") {
+      await syncRecentTwilioWhatsApp();
       const [communications, contacts, whatsapp, sms] = await Promise.all([
         sql`
           select id, contact_id, provider, channel, direction, counterparty_phone, counterparty_email,
