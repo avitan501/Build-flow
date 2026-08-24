@@ -20,6 +20,25 @@ type ManagerAuraData = {
   }
 }
 
+async function loadManagerAura(
+  supabase: Awaited<ReturnType<typeof requireManagerPortalProfile>>["supabase"],
+): Promise<ManagerAuraData | null> {
+  try {
+    const dashboard = await loadAuraDashboard(createAdminClient())
+    return {
+      ok: true,
+      communications: dashboard.communications,
+      contacts: dashboard.contacts,
+      connections: dashboard.connections,
+    }
+  } catch {
+    return supabase.functions
+      .invoke<ManagerAuraData>("aura-messaging-broker", { body: { action: "dashboard" } })
+      .then((result) => result.data?.ok ? result.data : null)
+      .catch(() => null)
+  }
+}
+
 export default async function CommunicationsPage({
   searchParams,
 }: {
@@ -31,18 +50,12 @@ export default async function CommunicationsPage({
   const initialChannelFilter = ["all", "call", "sms", "whatsapp", "email"].includes(requestedChannel || "") ? requestedChannel! : "all"
   const { supabase, access } = await requireManagerPortalProfile()
   if (access.customers) await syncRecentTwilioWhatsAppMessages().catch(() => null)
-  const admin = createAdminClient()
   const [clientsResult, logsResult, threads, aura] = await Promise.all([
     access.customers ? supabase.from("profiles").select("id,full_name,email,phone,company_name").eq("role", "client").eq("is_active", true).order("full_name").limit(500) : Promise.resolve({ data: [] }),
     supabase.from("manager_goals").select("details,updated_at").like("details", `${COMMUNICATION_LOG_PREFIX}%`).order("updated_at", { ascending: false }).limit(100),
     listInboxThreads().catch(() => []),
     access.customers
-      ? loadAuraDashboard(admin).then((dashboard) => ({
-          ok: true,
-          communications: dashboard.communications,
-          contacts: dashboard.contacts,
-          connections: dashboard.connections,
-        } satisfies ManagerAuraData)).catch(() => null)
+      ? loadManagerAura(supabase)
       : Promise.resolve(null),
   ])
   const clients = (clientsResult.data ?? []).map((client) => ({ id: String(client.id), name: String(client.full_name || client.email || "Client") }))

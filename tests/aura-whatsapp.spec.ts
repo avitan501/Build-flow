@@ -73,7 +73,9 @@ test("missed Twilio replies are synchronized and ADD commands remain idempotent"
   expect(ownerCommand).toContain("processAuraOwnerCommand");
   expect(ownerCommand).toContain("createAuraIntake");
   expect(managerPage).toContain("await syncRecentTwilioWhatsAppMessages()");
-  expect(managerPage).toContain("loadAuraDashboard(admin)");
+  expect(managerPage).toContain("loadManagerAura(supabase)");
+  expect(managerPage).toContain("loadAuraDashboard(createAdminClient())");
+  expect(managerPage).toContain("aura-messaging-broker");
 });
 
 test("lead and customer actions offer confirmed WhatsApp video attachments", async () => {
