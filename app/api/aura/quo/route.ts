@@ -17,15 +17,11 @@ function response(body: string, status: number) {
 }
 
 async function forwardToSecureAuraBroker(rawBody: string, signature: string) {
-  const { url, anonKey } = getSupabasePublicEnv();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!serviceRoleKey) return { ok: false, status: 503 };
+  const { url } = getSupabasePublicEnv();
 
   const brokerResponse = await fetch(`${url}/functions/v1/aura-messaging-broker?mode=quo-webhook`, {
     method: "POST",
     headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
       "Content-Type": "application/json",
       "openphone-signature": signature,
     },
