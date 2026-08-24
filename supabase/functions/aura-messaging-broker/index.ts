@@ -195,11 +195,19 @@ async function handleTwilioWebhook(req: Request) {
   return twiml();
 }
 
-async function sendTwilioWhatsApp(toValue: unknown, bodyValue: unknown, canonicalCallbackUrl: string) {
+async function sendTwilioWhatsApp(
+  toValue: unknown,
+  bodyValue: unknown,
+  canonicalCallbackUrl: string,
+  mediaUrlValue?: unknown,
+) {
   const config = await twilioConfig();
   if (!config) throw new Error("WhatsApp is not connected.");
   const to = normalizePhone(toValue);
   const body = typeof bodyValue === "string" ? bodyValue.trim().slice(0, 1600) : "";
+  const mediaUrl = typeof mediaUrlValue === "string" && /^https:\/\/build\.avantiap\.com\/videos\/[a-z0-9-]+\.mp4$/i.test(mediaUrlValue)
+    ? mediaUrlValue
+    : null;
   if (!to || !body) throw new Error("Enter a valid WhatsApp number and message.");
   const form = new URLSearchParams({
     From: `whatsapp:${config.from}`,
@@ -207,6 +215,7 @@ async function sendTwilioWhatsApp(toValue: unknown, bodyValue: unknown, canonica
     Body: body,
     StatusCallback: canonicalCallbackUrl,
   });
+  if (mediaUrl) form.set("MediaUrl", mediaUrl);
   const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${config.accountSid}/Messages.json`, {
     method: "POST",
     headers: { Authorization: `Basic ${btoa(`${config.accountSid}:${config.authToken}`)}`, "Content-Type": "application/x-www-form-urlencoded" },
@@ -214,7 +223,17 @@ async function sendTwilioWhatsApp(toValue: unknown, bodyValue: unknown, canonica
   });
   const result = await response.json() as { sid?: string; status?: string; message?: string };
   if (!response.ok || !result.sid) throw new Error(result.message || `Twilio returned HTTP ${response.status}.`);
-  await storeCommunication({ provider: "whatsapp", channel: "whatsapp", externalId: result.sid, direction: "outgoing", counterpartyPhone: to, businessPhone: config.from, body, status: result.status || "queued" });
+  await storeCommunication({
+    provider: "whatsapp",
+    channel: "whatsapp",
+    externalId: result.sid,
+    direction: "outgoing",
+    counterpartyPhone: to,
+    businessPhone: config.from,
+    body,
+    status: result.status || "queued",
+    media: mediaUrl ? [{ url: mediaUrl, type: "video/mp4" }] : [],
+  });
   return result.sid;
 }
 
@@ -402,7 +421,7 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, sms: true });
     }
     if (input.action === "send_whatsapp") {
-      const id = await sendTwilioWhatsApp(input.to, input.message, "https://build.avantiap.com/api/aura/whatsapp/twilio");
+      const id = await sendTwilioWhatsApp(input.to, input.message, "https://build.avantiap.com/api/aura/whatsapp/twilio", input.mediaUrl);
       return json({ ok: true, id });
     }
     if (input.action === "send_sms") {

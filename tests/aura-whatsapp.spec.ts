@@ -93,7 +93,12 @@ test("lead and customer actions offer confirmed WhatsApp video attachments", asy
   expect(contactActions).toContain("Confirm send");
   expect(actions).toContain("sendAuraVideoAction");
   expect(actions).toContain('type: "video/mp4"');
+  expect(actions).toContain('action: "send_whatsapp"');
+  expect(actions).toContain("mediaUrl,");
   expect(actions).toContain("sendTwilioWhatsAppMessage(phone, caption, mediaUrl)");
+  const broker = await readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8");
+  expect(broker).toContain('form.set("MediaUrl", mediaUrl)');
+  expect(broker).toContain("build\\.avantiap\\.com\\/videos");
   expect(videos).toContain("How to Request Materials");
   expect(videos).toContain("Why Contractors Hire Avantia");
   for (const asset of assets) {

@@ -130,7 +130,7 @@ export async function sendAuraVideoAction(input: {
   recipient: string;
   videoId: string;
 }): Promise<SendAuraVideoResult> {
-  const { access } = await requireManagerPortalProfile();
+  const { supabase, access } = await requireManagerPortalProfile();
   if (!access.customers) return { ok: false, error: "Customer communication access is required." };
   const phone = normalizeAuraPhone(input.recipient);
   const video = findAuraShareVideo(input.videoId);
@@ -140,18 +140,27 @@ export async function sendAuraVideoAction(input: {
   const mediaUrl = new URL(video.path, PRODUCTION_SITE_ORIGIN).toString();
   const caption = `Avantia Build — ${video.title}`;
   try {
-    const sent = await sendTwilioWhatsAppMessage(phone, caption, mediaUrl);
-    if (!sent.sent) return { ok: false, error: "WhatsApp sending is not configured." };
-    await storeAuraCommunication({
-      provider: "whatsapp",
-      channel: "whatsapp",
-      externalActivityId: sent.messageId || `whatsapp-video-${crypto.randomUUID()}`,
-      direction: "outgoing",
-      counterpartyPhone: phone,
-      body: caption,
-      status: "queued",
-      media: [{ url: mediaUrl, type: "video/mp4", duration: 20 }],
-    });
+    try {
+      await invokeMessagingBroker(supabase, {
+        action: "send_whatsapp",
+        to: phone,
+        message: caption,
+        mediaUrl,
+      });
+    } catch {
+      const sent = await sendTwilioWhatsAppMessage(phone, caption, mediaUrl);
+      if (!sent.sent) return { ok: false, error: "WhatsApp sending is not configured." };
+      await storeAuraCommunication({
+        provider: "whatsapp",
+        channel: "whatsapp",
+        externalActivityId: sent.messageId || `whatsapp-video-${crypto.randomUUID()}`,
+        direction: "outgoing",
+        counterpartyPhone: phone,
+        body: caption,
+        status: "queued",
+        media: [{ url: mediaUrl, type: "video/mp4", duration: 20 }],
+      });
+    }
   } catch {
     return { ok: false, error: "The WhatsApp video could not be sent. Confirm that this contact can receive WhatsApp messages." };
   }
