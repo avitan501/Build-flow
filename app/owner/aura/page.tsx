@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AuraCommunicationWorkspace } from "@/components/buildflow/aura-communication-workspace";
 import { AuraConnectionSetup } from "@/components/buildflow/aura-connection-setup";
 import { loadAuraDashboard } from "@/lib/aura/dashboard";
+import { syncRecentTwilioWhatsAppMessages } from "@/lib/aura/twilio-whatsapp";
 import { requireOwnerAccess } from "@/lib/owner-access";
 
 import { cancelAuraIntakeAction, confirmAuraIntakeAction } from "./actions";
@@ -26,6 +27,7 @@ function emptyState(label: string) {
 
 export default async function AuraOwnerPage() {
   const { supabase } = await requireOwnerAccess("/owner/aura");
+  await syncRecentTwilioWhatsAppMessages().catch(() => null);
   const { intakes, contacts, leads, tasks, communications, customers, connections } = await loadAuraDashboard(supabase);
 
   return (

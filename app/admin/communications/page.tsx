@@ -2,9 +2,12 @@ import { CommunicationCenter } from "@/components/buildflow/communication-center
 import { AuraCommunicationWorkspace } from "@/components/buildflow/aura-communication-workspace"
 import { requireManagerPortalProfile } from "@/lib/auth"
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard"
+import { loadAuraDashboard } from "@/lib/aura/dashboard"
 import type { AuraCustomerIdentity } from "@/lib/aura/identity"
+import { syncRecentTwilioWhatsAppMessages } from "@/lib/aura/twilio-whatsapp"
 import { COMMUNICATION_LOG_PREFIX, parseCommunicationLog } from "@/lib/manager-command-center"
 import { listInboxThreads } from "@/lib/whatsapp-draft-inbox"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 type ManagerAuraData = {
   ok?: boolean
@@ -27,12 +30,19 @@ export default async function CommunicationsPage({
   const requestedSearch = Array.isArray(query.q) ? query.q[0] : query.q
   const initialChannelFilter = ["all", "call", "sms", "whatsapp", "email"].includes(requestedChannel || "") ? requestedChannel! : "all"
   const { supabase, access } = await requireManagerPortalProfile()
+  if (access.customers) await syncRecentTwilioWhatsAppMessages().catch(() => null)
+  const admin = createAdminClient()
   const [clientsResult, logsResult, threads, aura] = await Promise.all([
     access.customers ? supabase.from("profiles").select("id,full_name,email,phone,company_name").eq("role", "client").eq("is_active", true).order("full_name").limit(500) : Promise.resolve({ data: [] }),
     supabase.from("manager_goals").select("details,updated_at").like("details", `${COMMUNICATION_LOG_PREFIX}%`).order("updated_at", { ascending: false }).limit(100),
     listInboxThreads().catch(() => []),
     access.customers
-      ? supabase.functions.invoke<ManagerAuraData>("aura-messaging-broker", { body: { action: "dashboard" } }).then((result) => result.data?.ok ? result.data : null).catch(() => null)
+      ? loadAuraDashboard(admin).then((dashboard) => ({
+          ok: true,
+          communications: dashboard.communications,
+          contacts: dashboard.contacts,
+          connections: dashboard.connections,
+        } satisfies ManagerAuraData)).catch(() => null)
       : Promise.resolve(null),
   ])
   const clients = (clientsResult.data ?? []).map((client) => ({ id: String(client.id), name: String(client.full_name || client.email || "Client") }))

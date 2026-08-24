@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import path from "node:path";
 
 test("Aura dashboard is private", async ({ page }) => {
@@ -57,6 +58,46 @@ test("Twilio replies use the same server connection as outbound WhatsApp", async
   expect(route).toContain("verifyTwilioWhatsAppRequest(request.url, signature, params)");
   expect(route).toContain("await processTwilioWhatsAppWebhook(params)");
   expect(route).not.toContain("functions/v1/aura-messaging-broker?mode=twilio-webhook");
+});
+
+test("missed Twilio replies are synchronized and ADD commands remain idempotent", async () => {
+  const [twilioSource, ownerCommand, managerPage] = await Promise.all([
+    readFile(path.join(process.cwd(), "lib/aura/twilio-whatsapp.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "lib/aura/owner-command.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "app/admin/communications/page.tsx"), "utf8"),
+  ]);
+
+  expect(twilioSource).toContain("syncRecentTwilioWhatsAppMessages");
+  expect(twilioSource).toContain('message.direction === "inbound"');
+  expect(twilioSource).toContain("existing.has(message.sid)");
+  expect(ownerCommand).toContain("processAuraOwnerCommand");
+  expect(ownerCommand).toContain("createAuraIntake");
+  expect(managerPage).toContain("await syncRecentTwilioWhatsAppMessages()");
+  expect(managerPage).toContain("loadAuraDashboard(admin)");
+});
+
+test("lead and customer actions offer confirmed WhatsApp video attachments", async () => {
+  const [actions, contactActions, videos] = await Promise.all([
+    readFile(path.join(process.cwd(), "app/owner/aura/actions.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "components/buildflow/contact-actions.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "lib/aura/share-videos.ts"), "utf8"),
+  ]);
+  const assets = [
+    "avantia-request-material-whatsapp-en-clear-20s.mp4",
+    "avantia-why-contractors-hire-us-en-slow.mp4",
+  ];
+
+  expect(contactActions).toContain("Send video");
+  expect(contactActions).toContain("Confirm send");
+  expect(actions).toContain("sendAuraVideoAction");
+  expect(actions).toContain('type: "video/mp4"');
+  expect(actions).toContain("sendTwilioWhatsAppMessage(phone, caption, mediaUrl)");
+  expect(videos).toContain("How to Request Materials");
+  expect(videos).toContain("Why Contractors Hire Avantia");
+  for (const asset of assets) {
+    const details = await stat(path.join(process.cwd(), "public/videos", asset));
+    expect(details.size).toBeGreaterThan(100_000);
+  }
 });
 
 test("Aura Q U O webhook rejects unsigned requests", async ({ request }) => {

@@ -1,12 +1,13 @@
 "use client"
 
-import { ChevronDown, ImagePlus, LoaderCircle, Mail, MessageCircle, Phone, Send, Smartphone, X } from "lucide-react"
+import { ChevronDown, ImagePlus, LoaderCircle, Mail, MessageCircle, Phone, Play, Send, Smartphone, Video, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
-import { prepareQuoPhotoMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
+import { prepareQuoPhotoMessageAction, sendAuraMessageAction, sendAuraVideoAction } from "@/app/owner/aura/actions"
 import { normalizeAuraPhone } from "@/lib/aura/identity"
+import { auraShareVideos, type AuraShareVideoId } from "@/lib/aura/share-videos"
 
 type Channel = "sms" | "whatsapp" | "email"
 type TemplateKey = "welcome" | "friendly_follow_up" | "request_material_list" | "quote_follow_up" | "order_follow_up" | "custom"
@@ -51,7 +52,11 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
   const [subject, setSubject] = useState("")
   const [photo, setPhoto] = useState<File | null>(null)
   const [feedback, setFeedback] = useState("")
+  const [videoMenuOpen, setVideoMenuOpen] = useState(false)
+  const [selectedVideoId, setSelectedVideoId] = useState<AuraShareVideoId | null>(null)
+  const [videoFeedback, setVideoFeedback] = useState("")
   const [pending, startTransition] = useTransition()
+  const selectedVideo = auraShareVideos.find((video) => video.id === selectedVideoId) || null
 
   function resetComposer() {
     setChannel(null)
@@ -106,12 +111,31 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     })
   }
 
+  function confirmVideoSend() {
+    if (!selectedVideo) return
+    setVideoFeedback("")
+    startTransition(async () => {
+      const result = await sendAuraVideoAction({ recipient: normalizedPhone, videoId: selectedVideo.id })
+      if (!result.ok) { setVideoFeedback(result.error); return }
+      setVideoFeedback(`${result.title} was sent by WhatsApp.`)
+      setSelectedVideoId(null)
+      router.refresh()
+    })
+  }
+
   const buttonClass = "inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-30"
 
   return <>
-    <div className="flex items-center gap-1" aria-label={`Contact ${name}`}>
+    <div className="relative flex flex-wrap items-center gap-1" aria-label={`Contact ${name}`}>
       <a href={normalizedPhone ? callHref(normalizedPhone) : undefined} aria-disabled={!normalizedPhone} title="Call with Q U O" aria-label={`Call ${name} with Q U O`} className={`${buttonClass} w-9 ${normalizedPhone ? "" : "pointer-events-none opacity-30"}`}><Phone className="h-4 w-4" /></a>
       <button type="button" disabled={!normalizedPhone && !email} onClick={openComposer} className={`${buttonClass} gap-2 px-3 text-xs font-semibold`}><Send className="h-3.5 w-3.5" />Send message<ChevronDown className="h-3.5 w-3.5" /></button>
+      <div className="relative">
+        <button type="button" disabled={!normalizedPhone || pending} onClick={() => setVideoMenuOpen((open) => !open)} aria-expanded={videoMenuOpen} className={`${buttonClass} gap-2 px-3 text-xs font-semibold`}><Video className="h-3.5 w-3.5" />Send video<ChevronDown className="h-3.5 w-3.5" /></button>
+        {videoMenuOpen ? <div className="absolute right-0 top-11 z-40 w-[min(19rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+          {auraShareVideos.map((video) => <button key={video.id} type="button" onClick={() => { setSelectedVideoId(video.id); setVideoMenuOpen(false); setVideoFeedback("") }} className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left hover:bg-slate-50"><span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white"><Play className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-slate-900">{video.title}</span><span className="mt-0.5 block text-[11px] text-slate-500">{video.durationLabel}</span></span></button>)}
+        </div> : null}
+      </div>
+      {videoFeedback ? <p role="status" className={`basis-full pt-1 text-xs font-semibold ${videoFeedback.includes("was sent") ? "text-emerald-700" : "text-rose-700"}`}>{videoFeedback}</p> : null}
     </div>
 
     {channel && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[180] grid place-items-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="contact-compose-title" onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}>
@@ -127,6 +151,14 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
           {feedback ? <p role="alert" className="text-sm font-semibold text-rose-700">{feedback}</p> : null}
         </div>
         <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3"><button type="button" onClick={close} disabled={pending} className="min-h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold">Cancel</button><button type="button" onClick={send} disabled={pending || !message.trim()} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{channel === "sms" && photo ? "Open Q U O" : "Send"}</button></footer>
+      </section>
+    </div>, document.body) : null}
+
+    {selectedVideo && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[180] grid place-items-center bg-slate-950/55 p-4" role="dialog" aria-modal="true" aria-labelledby="send-video-title" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) setSelectedVideoId(null) }}>
+      <section className="w-full max-w-sm overflow-hidden rounded-lg bg-white shadow-2xl">
+        <header className="flex items-start justify-between gap-3 border-b border-slate-200 p-4"><div><p className="text-[10px] font-bold uppercase text-[#0066cc]">WhatsApp video · {selectedVideo.durationLabel}</p><h2 id="send-video-title" className="mt-1 text-lg font-semibold">{selectedVideo.title}</h2></div><button type="button" disabled={pending} onClick={() => setSelectedVideoId(null)} aria-label="Close" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200"><X className="h-4 w-4" /></button></header>
+        <div className="p-4"><video src={selectedVideo.path} controls playsInline preload="metadata" className="aspect-video w-full rounded-md bg-slate-950 object-contain" /><p className="mt-3 text-sm text-slate-600">Send this video to <strong className="text-slate-900">{name}</strong> at {normalizedPhone}?</p>{videoFeedback ? <p role="alert" className="mt-3 text-sm font-semibold text-rose-700">{videoFeedback}</p> : null}</div>
+        <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3"><button type="button" disabled={pending} onClick={() => setSelectedVideoId(null)} className="min-h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold">Cancel</button><button type="button" disabled={pending} onClick={confirmVideoSend} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Confirm send</button></footer>
       </section>
     </div>, document.body) : null}
   </>

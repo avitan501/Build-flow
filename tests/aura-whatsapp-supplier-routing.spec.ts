@@ -32,16 +32,18 @@ test("supplier draft supports channel checkboxes and an exact safe preview", asy
 })
 
 test("owner ADD WhatsApp commands require AI review and confirmation", async () => {
-  const [route, intake] = await Promise.all([
+  const [route, command, intake] = await Promise.all([
     readFile(path.join(root, "app/api/aura/whatsapp/twilio/route.ts"), "utf8"),
+    readFile(path.join(root, "lib/aura/owner-command.ts"), "utf8"),
     readFile(path.join(root, "lib/aura/intake.ts"), "utf8"),
   ])
 
-  expect(route).toContain("OWNER_ADD_PHONE")
-  expect(route).toContain("createAuraIntake")
-  expect(route).toContain("confirmAuraIntakeByCode")
-  expect(route).toContain("cancelAuraIntakeByCode")
-  expect(route).toContain("/^add")
+  expect(route).toContain("processAuraOwnerCommand")
+  expect(command).toContain("OWNER_ADD_PHONE")
+  expect(command).toContain("createAuraIntake")
+  expect(command).toContain("confirmAuraIntakeByCode")
+  expect(command).toContain("cancelAuraIntakeByCode")
+  expect(command).toContain("/^add")
   expect(intake).toContain('z.enum(["client", "lead", "task", "material_request"])')
   expect(intake).toContain("Reply CONFIRM")
 })

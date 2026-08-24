@@ -11,9 +11,12 @@ import {
   type AuraMessageChannel,
 } from "@/lib/aura/communications";
 import { sendAuraWhatsAppText } from "@/lib/aura/whatsapp";
+import { findAuraShareVideo } from "@/lib/aura/share-videos";
+import { sendTwilioWhatsAppMessage } from "@/lib/aura/twilio-whatsapp";
 import { requireOwnerAccess } from "@/lib/owner-access";
 import { requireManagerPortalProfile } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url";
 
 function requireUuid(value: FormDataEntryValue | null) {
   const id = typeof value === "string" ? value.trim() : "";
@@ -25,6 +28,7 @@ function requireUuid(value: FormDataEntryValue | null) {
 
 export type SendAuraMessageResult = { ok: true } | { ok: false; error: string };
 export type PrepareQuoPhotoResult = { ok: true; deepLink: string } | { ok: false; error: string };
+export type SendAuraVideoResult = { ok: true; title: string } | { ok: false; error: string };
 
 type BrokerResult = { ok?: boolean; error?: string; id?: string };
 
@@ -120,6 +124,42 @@ export async function prepareQuoPhotoMessageAction(formData: FormData): Promise<
   }
   const params = new URLSearchParams({ number: phone, from: "+15169088319", text: message, attachments: signed.data.signedUrl });
   return { ok: true, deepLink: `openphone://message?${params.toString()}` };
+}
+
+export async function sendAuraVideoAction(input: {
+  recipient: string;
+  videoId: string;
+}): Promise<SendAuraVideoResult> {
+  const { access } = await requireManagerPortalProfile();
+  if (!access.customers) return { ok: false, error: "Customer communication access is required." };
+  const phone = normalizeAuraPhone(input.recipient);
+  const video = findAuraShareVideo(input.videoId);
+  if (!phone) return { ok: false, error: "This contact needs a valid WhatsApp number." };
+  if (!video) return { ok: false, error: "Choose an Avantia video." };
+
+  const mediaUrl = new URL(video.path, PRODUCTION_SITE_ORIGIN).toString();
+  const caption = `Avantia Build — ${video.title}`;
+  try {
+    const sent = await sendTwilioWhatsAppMessage(phone, caption, mediaUrl);
+    if (!sent.sent) return { ok: false, error: "WhatsApp sending is not configured." };
+    await storeAuraCommunication({
+      provider: "whatsapp",
+      channel: "whatsapp",
+      externalActivityId: sent.messageId || `whatsapp-video-${crypto.randomUUID()}`,
+      direction: "outgoing",
+      counterpartyPhone: phone,
+      body: caption,
+      status: "queued",
+      media: [{ url: mediaUrl, type: "video/mp4", duration: 20 }],
+    });
+  } catch {
+    return { ok: false, error: "The WhatsApp video could not be sent. Confirm that this contact can receive WhatsApp messages." };
+  }
+
+  revalidatePath("/owner/aura");
+  revalidatePath("/admin/communications");
+  revalidatePath("/admin/users");
+  return { ok: true, title: video.title };
 }
 
 export async function configureAuraProviderAction(formData: FormData): Promise<SendAuraMessageResult> {

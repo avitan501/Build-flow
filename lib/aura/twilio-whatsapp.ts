@@ -8,6 +8,7 @@ import {
   updateAuraCommunicationStatus,
 } from "@/lib/aura/communications";
 import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const TWILIO_WHATSAPP_WEBHOOK_PATH = "/api/aura/whatsapp/twilio";
 
@@ -39,6 +40,14 @@ export function verifyTwilioWhatsAppRequest(
 }
 
 export async function sendTwilioWhatsAppText(toValue: string, bodyValue: string) {
+  return sendTwilioWhatsAppMessage(toValue, bodyValue);
+}
+
+export async function sendTwilioWhatsAppMessage(
+  toValue: string,
+  bodyValue: string,
+  mediaUrl?: string,
+) {
   const config = getTwilioWhatsAppConfig();
   if (!config) return { sent: false as const, reason: "not_configured" as const };
   const to = normalizeAuraPhone(toValue);
@@ -50,9 +59,68 @@ export async function sendTwilioWhatsAppText(toValue: string, bodyValue: string)
     from: `whatsapp:${config.from}`,
     to: `whatsapp:${to}`,
     body,
+    ...(mediaUrl ? { mediaUrl: [mediaUrl] } : {}),
     statusCallback: `${PRODUCTION_SITE_ORIGIN}${TWILIO_WHATSAPP_WEBHOOK_PATH}`,
   });
   return { sent: true as const, messageId: message.sid || null };
+}
+
+export async function syncRecentTwilioWhatsAppMessages() {
+  const config = getTwilioWhatsAppConfig();
+  if (!config) return { synced: 0, commands: 0 };
+
+  const client = twilio(config.accountSid, config.authToken);
+  const messages = await client.messages.list({
+    to: `whatsapp:${config.from}`,
+    limit: 50,
+  });
+  const incoming = messages
+    .filter((message) => message.direction === "inbound" && message.from?.startsWith("whatsapp:"))
+    .sort((left, right) => (left.dateSent?.getTime() || 0) - (right.dateSent?.getTime() || 0));
+  if (incoming.length === 0) return { synced: 0, commands: 0 };
+
+  const supabase = createAdminClient();
+  const messageIds = incoming.map((message) => message.sid);
+  const { data: existingRows, error } = await supabase
+    .from("aura_communications")
+    .select("external_activity_id")
+    .eq("provider", "whatsapp")
+    .in("external_activity_id", messageIds);
+  if (error) throw new Error(`Unable to check recent WhatsApp messages: ${error.message}`);
+  const existing = new Set((existingRows || []).map((row) => row.external_activity_id));
+
+  let synced = 0;
+  let commands = 0;
+  for (const message of incoming) {
+    const from = normalizeAuraPhone(withoutWhatsAppPrefix(message.from || ""));
+    if (!from) continue;
+    await storeAuraCommunication({
+      provider: "whatsapp",
+      channel: "whatsapp",
+      externalActivityId: message.sid,
+      direction: "incoming",
+      counterpartyPhone: from,
+      businessPhone: config.from,
+      body: message.body || null,
+      status: message.status || "received",
+      occurredAt: message.dateSent?.toISOString(),
+    });
+    if (!existing.has(message.sid)) {
+      synced += 1;
+      const { processAuraOwnerCommand } = await import("@/lib/aura/owner-command");
+      const reply = await processAuraOwnerCommand({
+        from,
+        body: message.body?.trim() || "",
+        externalMessageId: message.sid,
+        rawPayload: { source: "twilio_sync", sid: message.sid },
+      });
+      if (reply) {
+        await sendTwilioWhatsAppMessage(from, reply);
+        commands += 1;
+      }
+    }
+  }
+  return { synced, commands };
 }
 
 export async function processTwilioWhatsAppWebhook(params: URLSearchParams) {
