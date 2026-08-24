@@ -1,10 +1,13 @@
-import { getSupabasePublicEnv } from "@/lib/supabase/env";
 import {
   buildAuraPreview,
   cancelAuraIntakeByCode,
   confirmAuraIntakeByCode,
   createAuraIntake,
 } from "@/lib/aura/intake";
+import {
+  processTwilioWhatsAppWebhook,
+  verifyTwilioWhatsAppRequest,
+} from "@/lib/aura/twilio-whatsapp";
 import { notifyManagersSafely } from "@/lib/manager-push-notifications";
 
 export const dynamic = "force-dynamic";
@@ -32,22 +35,12 @@ export async function POST(request: Request) {
   const signature = request.headers.get("x-twilio-signature");
   if (!signature) return twimlResponse(401);
   const rawBody = await request.text();
-  const { url, anonKey } = getSupabasePublicEnv();
-  try {
-    const response = await fetch(`${url}/functions/v1/aura-messaging-broker?mode=twilio-webhook`, {
-      method: "POST",
-      headers: {
-        apikey: anonKey,
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-Avantia-Canonical-Url": request.url,
-        "X-Twilio-Signature": signature,
-      },
-      body: rawBody,
-      cache: "no-store",
-    });
-    if (!response.ok) return twimlResponse(response.status);
+  const params = new URLSearchParams(rawBody);
+  if (!verifyTwilioWhatsAppRequest(request.url, signature, params)) return twimlResponse(401);
 
-    const params = new URLSearchParams(rawBody);
+  try {
+    await processTwilioWhatsAppWebhook(params);
+
     const from = (params.get("From") || "").replace(/^whatsapp:/i, "");
     const body = (params.get("Body") || "").trim();
     const externalMessageId = params.get("MessageSid") || params.get("SmsSid") || "";

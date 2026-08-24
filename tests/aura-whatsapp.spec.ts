@@ -48,6 +48,17 @@ test("Aura webhook rejects unverified requests", async ({ request }) => {
   expect(unsignedTwilioWebhook.status()).toBe(401);
 });
 
+test("Twilio replies use the same server connection as outbound WhatsApp", async () => {
+  const route = await readFile(
+    path.join(process.cwd(), "app/api/aura/whatsapp/twilio/route.ts"),
+    "utf8",
+  );
+
+  expect(route).toContain("verifyTwilioWhatsAppRequest(request.url, signature, params)");
+  expect(route).toContain("await processTwilioWhatsAppWebhook(params)");
+  expect(route).not.toContain("functions/v1/aura-messaging-broker?mode=twilio-webhook");
+});
+
 test("Aura Q U O webhook rejects unsigned requests", async ({ request }) => {
   const unsignedWebhook = await request.post("/api/aura/quo", {
     data: {
