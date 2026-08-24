@@ -2,7 +2,7 @@
 
 import { ArrowDownLeft, ArrowUpRight, CheckCheck, CircleAlert, Clock3, ImagePlus, Mail, MessageCircle, Phone, Search, Send, Smartphone, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { prepareQuoPhotoMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions";
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard";
@@ -136,6 +136,20 @@ export function AuraCommunicationWorkspace({
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    const timer = window.setInterval(refresh, 10_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [router]);
 
   const contactById = useMemo(() => new Map(contacts.map((contact) => [contact.id, contact])), [contacts]);
   const directoryRecipients = useMemo<Record<RecipientType, DirectoryRecipient[]>>(() => ({
@@ -301,7 +315,7 @@ export function AuraCommunicationWorkspace({
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="aura-history-heading">
           <header className="border-b border-slate-200 p-4 sm:p-5">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0066cc]">Communication history</p>
-            <h2 id="aura-history-heading" className="mt-1 text-xl font-semibold">Calls and messages</h2>
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-2"><h2 id="aura-history-heading" className="text-xl font-semibold">Calls and messages</h2><span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold uppercase text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Live · updates every 10 sec</span></div>
             <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
               <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><span className="sr-only">Search communications</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search contact, phone, or message" className="min-h-11 w-full rounded-md border border-slate-300 pl-10 pr-3 text-sm" /></label>
               <label><span className="sr-only">Filter by channel</span><select value={channelFilter} onChange={(event) => setChannelFilter(event.target.value)} className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"><option value="all">All channels</option><option value="call">Calls</option><option value="sms">SMS</option><option value="whatsapp">WhatsApp</option><option value="email">Email</option></select></label>

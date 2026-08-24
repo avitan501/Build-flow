@@ -7,7 +7,6 @@ import { useMemo, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
 import { previewRequestClientQuoteAction, sendClientReplyAction, sendRequestClientQuoteAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
-import { supplierCanReceiveDepartmentRequest } from "@/lib/material-catalog"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
 
@@ -48,7 +47,6 @@ export function RequestManagementPanel({
   comparisons: RequestComparisonSummary[]
 }) {
   const router = useRouter()
-  const [department, setDepartment] = useState(() => departments.length === 1 ? departments[0] : "")
   const [supplierIds, setSupplierIds] = useState<string[]>([])
   const [greeting, setGreeting] = useState<"hi" | "hello" | "morning" | "afternoon">("hi")
   const [replyBlock, setReplyBlock] = useState<string>(() => requestItems.some((item) => item.reviewReasons.length) ? "missing" : "received")
@@ -72,10 +70,8 @@ export function RequestManagementPanel({
   const [ach, setAch] = useState({ bankName: "", accountOwner: "", routingNumber: "", accountNumber: "" })
   const [quoteFeedback, setQuoteFeedback] = useState("")
   const [pending, startTransition] = useTransition()
-  const eligibleSuppliers = useMemo(
-    () => department ? suppliers.filter((supplier) => supplierCanReceiveDepartmentRequest(supplier, department)) : [],
-    [department, suppliers],
-  )
+  const routeDepartment = departments.length === 1 ? departments[0] : departments.length > 1 ? "Multiple departments" : "Others"
+  const availableSuppliers = useMemo(() => [...suppliers].sort((left, right) => left.name.localeCompare(right.name)), [suppliers])
 
   const firstName = client.name.trim().split(/\s+/)[0] || "there"
   const missingQuestions = useMemo(() => requestItems.flatMap((item) => item.reviewReasons.map((reason) => `${item.name}: ${reason}`)), [requestItems])
@@ -92,8 +88,8 @@ export function RequestManagementPanel({
   }
 
   function createSupplierRequest() {
-    if (!department || !supplierIds.length) return
-    const query = new URLSearchParams({ department })
+    if (!supplierIds.length) return
+    const query = new URLSearchParams({ department: routeDepartment })
     supplierIds.forEach((supplierId) => query.append("supplier", supplierId))
     router.push(`/owner/materials/requests/${requestId}/supplier-request?${query.toString()}`)
   }
@@ -185,14 +181,13 @@ export function RequestManagementPanel({
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold"><span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-sky-700" />Send to another supplier</span><ChevronDown className="h-4 w-4 text-slate-400 transition group-open/route:rotate-180" /></summary>
             <div className="border-t border-slate-200 p-3">
           <div className="mt-3 grid gap-3">
-            <label className="grid gap-1.5 text-sm font-semibold text-slate-700">Department<select value={department} onChange={(event) => { setDepartment(event.target.value); setSupplierIds([]) }} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-950"><option value="">Choose department</option>{departments.map((entry) => <option key={entry}>{entry}</option>)}</select></label>
             <fieldset>
-              <legend className="text-sm font-semibold text-slate-700">Suppliers</legend>
+              <legend className="text-sm font-semibold text-slate-700">Choose any supplier</legend>
               <div className="mt-1.5 max-h-56 overflow-y-auto rounded-lg border border-slate-300 bg-white p-2">
-                {!department ? <p className="px-2 py-4 text-center text-sm text-slate-500">Choose a department first.</p> : eligibleSuppliers.length ? eligibleSuppliers.map((entry) => <label key={entry.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 text-sm hover:bg-slate-50"><input type="checkbox" checked={supplierIds.includes(entry.id)} onChange={() => toggleSupplier(entry.id)} className="h-4 w-4 rounded border-slate-300 accent-[#0071e3]" /><span className="min-w-0"><span className="block truncate font-semibold">{entry.name}</span><span className="block truncate text-xs text-slate-500">{entry.email} · {(entry.trustLevel || "not-reviewed").replaceAll("-", " ")}</span></span></label>) : <p className="px-2 py-4 text-center text-sm leading-5 text-slate-500">No eligible suppliers are assigned to {department}. Add the category and set the trust level to First-time trial or higher in Supplier Directory.</p>}
+                {availableSuppliers.length ? availableSuppliers.map((entry) => <label key={entry.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 text-sm hover:bg-slate-50"><input type="checkbox" checked={supplierIds.includes(entry.id)} onChange={() => toggleSupplier(entry.id)} className="h-4 w-4 rounded border-slate-300 accent-[#0071e3]" /><span className="min-w-0"><span className="block truncate font-semibold">{entry.name}</span><span className="block truncate text-xs text-slate-500">{entry.email || entry.phone || entry.whatsapp || "No contact method"} · {(entry.trustLevel || "not-reviewed").replaceAll("-", " ")}</span></span></label>) : <p className="px-2 py-4 text-center text-sm leading-5 text-slate-500">No suppliers are saved in Supplier Directory.</p>}
               </div>
             </fieldset>
-            <button type="button" onClick={createSupplierRequest} disabled={!department || !supplierIds.length} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50"><Route className="h-4 w-4" />Create request for {supplierIds.length || ""} supplier{supplierIds.length === 1 ? "" : "s"}</button>
+            <button type="button" onClick={createSupplierRequest} disabled={!supplierIds.length} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50"><Route className="h-4 w-4" />Create request for {supplierIds.length || ""} supplier{supplierIds.length === 1 ? "" : "s"}</button>
           </div>
           {packages.length ? <div className="mt-4 border-t border-slate-200 pt-3"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Current routes</p><div className="mt-2 grid gap-2">{packages.map((pkg) => <div key={pkg.id} className="flex items-center justify-between gap-3 text-sm"><span className="font-semibold">{pkg.department}</span><span className="text-right text-slate-600">{suppliers.find((entry) => entry.id === pkg.supplier_id)?.name || "Not assigned"} · {pkg.status.replaceAll("_", " ")}</span></div>)}</div></div> : null}
             </div>

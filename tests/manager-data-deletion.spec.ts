@@ -74,6 +74,8 @@ test("customer directory only lists clients and verifies contact updates", async
   expect(page).not.toContain('aria-label="Customer and request overview"')
   expect(page).toContain("clientCustomers.length")
   expect(page).toContain("CustomerContactForm")
+  expect(page).toContain('aria-label="Directory order"')
+  expect(page).toContain('<option value="alphabetical">A–Z</option>')
   expect(actions).toContain('select("full_name,company_name,phone,role")')
   expect(actions).toContain('saved.role !== "client"')
   expect(actions).toContain('message: "Contact saved."')

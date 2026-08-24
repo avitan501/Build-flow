@@ -208,6 +208,7 @@ export function SupplierRoutingManager({
   const [trialDepartment, setTrialDepartment] = useState("All departments")
   const [trialSearch, setTrialSearch] = useState("")
   const [supplierDirectorySearch, setSupplierDirectorySearch] = useState("")
+  const [supplierDirectorySort, setSupplierDirectorySort] = useState<"saved" | "alphabetical">("saved")
   const [trialCatalogStatus, setTrialCatalogStatus] = useState("")
   const [supplierDraftNotesOpen, setSupplierDraftNotesOpen] = useState(false)
   const [supplierNotesOpen, setSupplierNotesOpen] = useState<Record<string, boolean>>({})
@@ -271,10 +272,10 @@ export function SupplierRoutingManager({
       : assignmentTargets.find((target) => target.id === selectedTargetId) ?? assignmentTargets[0] ?? SERVICE_ASSIGNMENT_TARGETS[0]
   const selectedSetting = useMemo(() => selectedSettingFor(settings, selectedTarget.id, assignmentTargets), [assignmentTargets, selectedTarget.id, settings])
   const selectedSupplier = settings.suppliers.find((supplier) => supplier.id === selectedSupplierId) ?? settings.suppliers[0] ?? null
-  const filteredDirectorySuppliers = useMemo(
-    () => settings.suppliers.filter((supplier) => supplierMatchesDirectorySearch(supplier, supplierDirectorySearch)),
-    [settings.suppliers, supplierDirectorySearch],
-  )
+  const filteredDirectorySuppliers = useMemo(() => {
+    const matching = settings.suppliers.filter((supplier) => supplierMatchesDirectorySearch(supplier, supplierDirectorySearch))
+    return supplierDirectorySort === "alphabetical" ? [...matching].sort((left, right) => left.name.localeCompare(right.name)) : matching
+  }, [settings.suppliers, supplierDirectorySearch, supplierDirectorySort])
   const selectedSupplierMatchesSearch = !supplierDirectorySearch.trim()
     || filteredDirectorySuppliers.some((supplier) => supplier.id === selectedSupplier?.id)
   const existingVendorIdentities = useMemo(
@@ -1219,7 +1220,8 @@ export function SupplierRoutingManager({
                   <p className="text-sm font-semibold text-slate-700">Supplier directory</p>
                   <button type="button" onClick={refreshSupplierDirectory} disabled={supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${supplierSavePending ? "animate-spin" : ""}`} />Refresh</button>
                 </div>
-                <label className="relative mb-3 block">
+                <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
+                <label className="relative block">
                   <span className="sr-only">Search active suppliers</span>
                   <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
@@ -1231,6 +1233,8 @@ export function SupplierRoutingManager({
                   />
                   {supplierDirectorySearch ? <button type="button" onClick={() => updateSupplierDirectorySearch("")} aria-label="Clear supplier search" className="absolute right-1.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900"><X className="h-4 w-4" /></button> : null}
                 </label>
+                <label><span className="sr-only">Supplier order</span><select value={supplierDirectorySort} onChange={(event) => setSupplierDirectorySort(event.target.value as "saved" | "alphabetical")} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold"><option value="saved">Saved order</option><option value="alphabetical">A–Z</option></select></label>
+                </div>
                 <p className="mb-3 text-xs font-semibold text-slate-500">
                   {supplierDirectorySearch.trim() ? `${filteredDirectorySuppliers.length} of ${settings.suppliers.length} active vendors` : `${settings.suppliers.length} active vendor${settings.suppliers.length === 1 ? "" : "s"}`}
                 </p>

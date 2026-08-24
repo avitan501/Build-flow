@@ -6,12 +6,13 @@ import { requireStaffProfile } from "@/lib/auth"
 export async function POST(request: Request) {
   try {
     await requireStaffProfile("quotes")
-    const body = await request.json() as { query?: unknown; department?: unknown; zipCode?: unknown; domains?: unknown }
+    const body = await request.json() as { query?: unknown; department?: unknown; zipCode?: unknown; domains?: unknown; excludeDomains?: unknown }
     const result = await searchCatalogWithExa({
       query: String(body.query ?? ""),
       department: String(body.department ?? ""),
       zipCode: String(body.zipCode ?? ""),
       domains: Array.isArray(body.domains) ? body.domains.filter((value): value is string => typeof value === "string") : undefined,
+      excludeDomains: Array.isArray(body.excludeDomains) ? body.excludeDomains.filter((value): value is string => typeof value === "string") : undefined,
     })
     return NextResponse.json(result, { status: result.ok ? 200 : result.code === "not_configured" || result.code === "provider_error" ? 503 : 400 })
   } catch (error) {

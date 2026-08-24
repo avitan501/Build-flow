@@ -89,7 +89,7 @@ function directoryConversation(communications: AuraCommunicationRow[], phoneValu
     }))
 }
 
-export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string; status?: string; customer?: string }> }) {
+export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string; status?: string; customer?: string; sort?: string }> }) {
   const { supabase, profile, user } = await requireStaffProfile("customers")
   const isOwner = isApprovedManagerIdentity({
     email: user.email || profile?.email,
@@ -101,6 +101,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const view = params.view === "requests" ? "requests" : params.view === "leads" ? "leads" : "customers"
   const search = params.q?.trim().toLowerCase() || ""
   const status = params.status?.trim() || "all"
+  const sort = ["newest", "oldest", "alphabetical"].includes(params.sort || "") ? params.sort! : "newest"
 
   const [customersResult, leadsResult, requestsResult, projectsResult, auditResult, categoriesResult, communicationResult, auraResult] = await Promise.all([
     supabase
@@ -110,7 +111,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
       .returns<CustomerRecord[]>(),
     supabase
       .from("manager_outreach_leads")
-      .select("id,full_name,company_name,email,phone,notes,status,relationship_level,preferred_language")
+      .select("id,full_name,company_name,email,phone,notes,status,relationship_level,preferred_language,created_at,updated_at")
       .order("updated_at", { ascending: false })
       .returns<OutreachLeadRecord[]>(),
     supabase
@@ -171,19 +172,19 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const filteredCustomers = clientCustomers.filter((customer) => {
     if (!search) return true
     return [customer.full_name, customer.email, customer.company_name, customer.phone].filter(Boolean).join(" ").toLowerCase().includes(search)
-  })
+  }).sort((left, right) => sort === "alphabetical" ? customerName(left).localeCompare(customerName(right)) : sort === "oldest" ? left.created_at.localeCompare(right.created_at) : right.created_at.localeCompare(left.created_at))
   const filteredLeads = leads.filter((lead) => {
     if (status !== "all" && lead.status !== status) return false
     if (!search) return true
     return [lead.full_name, lead.email, lead.company_name, lead.phone, lead.notes].filter(Boolean).join(" ").toLowerCase().includes(search)
-  })
+  }).sort((left, right) => sort === "alphabetical" ? left.full_name.localeCompare(right.full_name) : sort === "oldest" ? (left.created_at || "").localeCompare(right.created_at || "") : (right.created_at || "").localeCompare(left.created_at || ""))
   const filteredRequests = requests.filter((request) => {
     if (params.customer && request.owner_id !== params.customer) return false
     if (status !== "all" && request.status !== status) return false
     if (!search) return true
     const customer = customerMap.get(request.owner_id)
     return [request.title, request.projects?.name, request.projects?.address, customer?.full_name, customer?.email].filter(Boolean).join(" ").toLowerCase().includes(search)
-  })
+  }).sort((left, right) => sort === "alphabetical" ? left.title.localeCompare(right.title) : sort === "oldest" ? left.created_at.localeCompare(right.created_at) : right.created_at.localeCompare(left.created_at))
   const openRequests = requests.filter((request) => deletableRequestStatuses.has(request.status)).length
   const statuses = Array.from(new Set(requests.map((request) => request.status))).sort()
   const leadStatuses = Array.from(new Set(leads.map((lead) => lead.status))).sort()
@@ -211,11 +212,12 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           <Link href="/admin/users?view=requests" className={`flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-semibold ${view === "requests" ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}><ClipboardList className="h-4 w-4 shrink-0" /><span className="truncate">Requests</span><span className={`rounded-full px-2 py-0.5 text-xs ${view === "requests" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}>{openRequests}</span></Link>
         </nav>
 
-        <form className="mt-4 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto_auto]" action="/admin/users">
+        <form className="mt-4 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]" action="/admin/users">
           <input type="hidden" name="view" value={view} />
           {params.customer ? <input type="hidden" name="customer" value={params.customer} /> : null}
           <label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><span className="sr-only">Search</span><input name="q" defaultValue={params.q || ""} placeholder={view === "customers" ? "Search name, email, company, or phone" : view === "leads" ? "Search lead, company, phone, email, or notes" : "Search request, address, or customer"} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
           {view === "requests" ? <select name="status" defaultValue={status} aria-label="Request status" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="all">All statuses</option>{statuses.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select> : view === "leads" ? <select name="status" defaultValue={status} aria-label="Lead status" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="all">All statuses</option>{leadStatuses.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select> : <span />}
+          <select name="sort" defaultValue={sort} aria-label="Directory order" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="newest">Newest added</option><option value="oldest">Oldest added</option><option value="alphabetical">A–Z</option></select>
           <button type="submit" className="min-h-11 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white">Apply</button>
         </form>
 

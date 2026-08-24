@@ -7,6 +7,7 @@ export type ExaCatalogSearchInput = {
   department?: string
   zipCode?: string
   domains?: string[]
+  excludeDomains?: string[]
 }
 
 export type ExaCatalogSearchResult = {
@@ -17,6 +18,7 @@ export type ExaCatalogSearchResult = {
   imageUrl: string | null
   priceText: string | null
   publishedDate: string | null
+  matchConfidence: "exact" | "likely"
 }
 
 export type ProductSearchLink = { label: string; url: string }
@@ -50,6 +52,24 @@ function findPrice(value: string) {
   return match?.[0] ?? null
 }
 
+function isSearchPage(value: string) {
+  try {
+    const url = new URL(value)
+    return /(^|\/)(search|s)(\/|$)/i.test(url.pathname)
+      || ["q", "query", "search", "searchTerm", "keyword", "tbm"].some((key) => url.searchParams.has(key))
+  } catch {
+    return true
+  }
+}
+
+function matchConfidence(query: string, title: string, source: string): "exact" | "likely" {
+  const tokens = [...new Set(query.toLowerCase().match(/[a-z0-9]+/g) ?? [])].filter((token) => token.length > 1)
+  if (!tokens.length) return "likely"
+  const haystack = `${title} ${source}`.toLowerCase()
+  const matched = tokens.filter((token) => haystack.includes(token)).length
+  return matched / tokens.length >= 0.7 ? "exact" : "likely"
+}
+
 export function productSearchLinks(queryValue: string): ProductSearchLink[] {
   const query = clean(queryValue, 240)
   const encoded = encodeURIComponent(query)
@@ -60,7 +80,7 @@ export function productSearchLinks(queryValue: string): ProductSearchLink[] {
   ]
 }
 
-async function runExaSearch(query: string, department: string, zipCode: string, domains: string[]) {
+async function runExaSearch(query: string, department: string, zipCode: string, domains: string[], excludeDomains: string[]) {
   const apiKey = process.env.EXA_API_KEY!
   const location = zipCode ? ` near ZIP code ${zipCode}` : ""
   const category = department ? ` for the ${department} construction department` : ""
@@ -68,11 +88,12 @@ async function runExaSearch(query: string, department: string, zipCode: string, 
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey },
     body: JSON.stringify({
-      query: `${query}${category}${location}. Find exact product pages, not search or category pages.`,
-      type: "auto",
-      numResults: 5,
-      contents: { highlights: { maxCharacters: 1200 } },
+      query: `${query}${category}${location}. Find the exact purchasable construction product from multiple suppliers. Return direct product detail pages with a current displayed price, model, size, and package quantity. Exclude search, category, article, and installation-service pages.`,
+      type: "deep-lite",
+      numResults: 12,
+      contents: { highlights: { query: "current product price model size package quantity availability", maxCharacters: 1800 }, maxAgeHours: 0 },
       ...(domains.length ? { includeDomains: domains } : {}),
+      ...(excludeDomains.length ? { excludeDomains } : {}),
     }),
   })
   if (!response.ok) {
@@ -84,8 +105,10 @@ async function runExaSearch(query: string, department: string, zipCode: string, 
   const results = (payload.results ?? []).flatMap((result) => {
     const url = exactUrl(clean(result.url, 2000))
     const title = clean(result.title, 300)
-    if (!url || !title) return []
+    if (!url || !title || isSearchPage(url)) return []
     const source = clean((result.highlights ?? []).join(" ") || result.text, 1600)
+    const priceText = findPrice(source)
+    if (!priceText) return []
     let domain = ""
     try { domain = new URL(url).hostname.replace(/^www\./, "") } catch { /* validated above */ }
     return [{
@@ -94,14 +117,15 @@ async function runExaSearch(query: string, department: string, zipCode: string, 
       domain,
       snippet: source,
       imageUrl: exactUrl(clean(result.image, 2000)) || null,
-      priceText: findPrice(source),
+      priceText,
       publishedDate: clean(result.publishedDate, 40) || null,
+      matchConfidence: matchConfidence(query, title, source),
     }]
   })
   return { ok: true as const, results, checkedAt: new Date().toISOString() }
 }
 
-const cachedExaSearch = unstable_cache(runExaSearch, ["exa-catalog-search-v2"], { revalidate: 86_400 })
+const cachedExaSearch = unstable_cache(runExaSearch, ["exa-catalog-search-v3"], { revalidate: 3_600 })
 
 export async function searchCatalogWithExa(input: ExaCatalogSearchInput) {
   const query = clean(input.query, 240)
@@ -112,8 +136,9 @@ export async function searchCatalogWithExa(input: ExaCatalogSearchInput) {
   const department = clean(input.department, 100)
   const zipCode = clean(input.zipCode, 12)
   const domains = (input.domains ?? []).map((domain) => clean(domain, 120)).filter(Boolean).slice(0, 5)
+  const excludeDomains = (input.excludeDomains ?? []).map((domain) => clean(domain, 120)).filter(Boolean).slice(0, 12)
   try {
-    return { ...await cachedExaSearch(query, department, zipCode, domains), fallbackLinks }
+    return { ...await cachedExaSearch(query, department, zipCode, domains, excludeDomains), fallbackLinks }
   } catch {
     return { ok: false as const, code: "provider_error" as const, error: "Live price search could not be completed. Use the retailer links below.", fallbackLinks }
   }

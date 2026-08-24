@@ -24,6 +24,8 @@ export type OutreachLeadRecord = {
   status: "new" | "contacted" | "qualified" | "not_interested";
   relationship_level: number;
   preferred_language: "en" | "es";
+  created_at?: string;
+  updated_at?: string;
 };
 
 const EMPTY_LEAD = { fullName: "", companyName: "", email: "", phone: "", notes: "", relationshipLevel: 1, preferredLanguage: "en" };

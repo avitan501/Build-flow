@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation"
 
 import { SupplierRequestDraft } from "@/components/buildflow/supplier-request-draft"
 import { requireStaffProfile } from "@/lib/auth"
-import { normalizeMaterialCatalogDepartment, supplierCanReceiveDepartmentRequest } from "@/lib/material-catalog"
+import { normalizeMaterialCatalogDepartment } from "@/lib/material-catalog"
 import { preferredRequestMaterialSources, type RequestMaterialChartSource } from "@/lib/request-material-chart"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 
@@ -50,12 +50,11 @@ export default async function SupplierRequestDraftPage({
 
   const preferredItems = preferredRequestMaterialSources(items ?? [])
   const departmentValue = Array.isArray(query.department) ? query.department[0] : query.department
-  const department = normalizeMaterialCatalogDepartment(departmentValue)
-  const requestDepartments = new Set(preferredItems.map((item) => normalizeMaterialCatalogDepartment(item.department)))
-  if (!departmentValue?.trim() || !requestDepartments.has(department)) redirect(`/owner/materials/requests/${requestId}`)
-  const matchingItems = preferredItems.filter((item) => normalizeMaterialCatalogDepartment(item.department) === department)
+  const itemDepartments = [...new Set(preferredItems.map((item) => normalizeMaterialCatalogDepartment(item.department)))]
+  const department = departmentValue?.trim() || (itemDepartments.length === 1 ? itemDepartments[0] : itemDepartments.length > 1 ? "Multiple departments" : "Others")
+  const matchingItems = preferredItems
   const selectedSuppliers = (managerSettings?.state?.qualificationSettings?.suppliers ?? [])
-    .filter((supplier) => supplierIds.includes(supplier.id) && supplierCanReceiveDepartmentRequest(supplier, department))
+    .filter((supplier) => supplierIds.includes(supplier.id))
     .map((supplier) => ({
       id: supplier.id,
       name: supplier.name,

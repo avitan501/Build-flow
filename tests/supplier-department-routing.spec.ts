@@ -45,7 +45,7 @@ test("supplier routing requires category, a contact channel, and an approved tru
   expect(supplierIsAddedToCatalogDepartment({ catalogEnabledDepartments: [] }, "Sheet Rock")).toBe(false)
 })
 
-test("supplier categories and routing filters are enforced in the manager UI and server draft", async () => {
+test("supplier categories remain available while manual request routing allows any saved supplier", async () => {
   const [directory, requestPanel, supplierDraftPage, catalog] = await Promise.all([
     readFile(path.join(root, "components/buildflow/supplier-routing-manager.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8"),
@@ -55,10 +55,15 @@ test("supplier categories and routing filters are enforced in the manager UI and
 
   expect(directory).toContain("Categories supplied")
   expect(directory).toContain("catalogDepartments")
-  expect(requestPanel).toContain("supplierCanReceiveDepartmentRequest")
-  expect(requestPanel).toContain("Choose a department first.")
-  expect(supplierDraftPage).toContain("supplierCanReceiveDepartmentRequest")
-  expect(supplierDraftPage).toContain("requestDepartments.has(department)")
+  expect(directory).toContain("supplierDirectorySort")
+  expect(directory).toContain("Supplier order")
+  expect(directory).toContain("A–Z")
+  expect(requestPanel).toContain("Choose any supplier")
+  expect(requestPanel).toContain("availableSuppliers")
+  expect(requestPanel).not.toContain("supplierCanReceiveDepartmentRequest")
+  expect(requestPanel).not.toContain("Choose a department first.")
+  expect(supplierDraftPage).toContain("matchingItems = preferredItems")
+  expect(supplierDraftPage).not.toContain("supplierCanReceiveDepartmentRequest")
   expect(catalog).toContain("supplierServesMaterialDepartment")
   expect(catalog).toContain("Previous supplier")
   expect(catalog).toContain("Next supplier")

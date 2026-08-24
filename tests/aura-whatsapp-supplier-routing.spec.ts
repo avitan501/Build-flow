@@ -47,6 +47,8 @@ test("manager communications support removable photos and phone-number history",
   expect(workspace).toContain("prepared.quoWebUrl")
   expect(workspace).toContain("prepared.attachmentUrl")
   expect(workspace).toContain("Confirm Delivered or Read")
+  expect(workspace).toContain("window.setInterval(refresh, 10_000)")
+  expect(workspace).toContain("Live · updates every 10 sec")
   expect(actions).toContain('quoWebUrl: "https://my.quo.com/inbox"')
   expect(actions).toContain("attachmentUrl: signed.data.signedUrl")
 })
