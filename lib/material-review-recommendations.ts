@@ -69,13 +69,21 @@ export function materialReviewRecommendation(item: ReviewableMaterialItem): Mate
     )
   } else if (/\b(?:plywood|osb)\b/.test(name)) {
     const recommended = /\bosb\b/.test(name) ? "7/16 in." : "1/2 in."
-    choices.push({
-      field: "thickness",
-      label: "Thickness",
-      options: [recommended, ...["7/16 in.", "1/2 in.", "5/8 in.", "3/4 in."].filter((value) => value !== recommended)]
-        .map((value, index) => option(value, index === 0 ? 60 : index === 1 ? 20 : 10)),
-      recommended,
-    })
+    choices.push(
+      {
+        field: "thickness",
+        label: "Thickness",
+        options: [recommended, ...["7/16 in.", "1/2 in.", "5/8 in.", "3/4 in."].filter((value) => value !== recommended)]
+          .map((value, index) => option(value, index === 0 ? 60 : index === 1 ? 20 : 10)),
+        recommended,
+      },
+      {
+        field: "dimensions",
+        label: "Sheet size",
+        options: [option("4 x 8 ft.", 95), option("4 x 10 ft.", 3), option("4 x 12 ft.", 2)],
+        recommended: "4 x 8 ft.",
+      },
+    )
   }
 
   if (isDrywallScrew) {
@@ -92,7 +100,7 @@ export function materialReviewRecommendation(item: ReviewableMaterialItem): Mate
     || (/thickness/i.test(reason) && hasChoice(choices, "thickness"))
     || (/\b(?:type|grade)\b/i.test(reason) && hasChoice(choices, "productType"))
     || (/\b(?:screw\s+)?length\b/i.test(reason) && (hasChoice(choices, "screwLength") || hasChoice(choices, "dimensions")))
-    || (/\b(?:size|dimension|width)\b/i.test(reason) && hasChoice(choices, "dimensions"))
+    || (/\b(?:size|dimensions?|width)\b/i.test(reason) && hasChoice(choices, "dimensions"))
     || (/\bunit\b/i.test(reason) && Boolean(item.unit))
   )
 

@@ -19,7 +19,7 @@ function initialChoice(item: ReviewableMaterialItem, field: string, recommended:
   return allowedValues.includes(savedValue) ? savedValue : recommended
 }
 
-export function MaterialReviewEditor({ requestId, item }: { requestId: string; item: ReviewableMaterialItem }) {
+export function MaterialReviewEditor({ requestId, item, onSaved }: { requestId: string; item: ReviewableMaterialItem; onSaved?: (item: ReviewableMaterialItem) => void }) {
   const router = useRouter()
   const recommendation = materialReviewRecommendation(item)
   const [choices, setChoices] = useState<Record<string, string>>(() => Object.fromEntries(recommendation.choices.map((choice) => [choice.field, initialChoice(item, choice.field, choice.recommended, choice.options.map((option) => option.value))])))
@@ -44,6 +44,18 @@ export function MaterialReviewEditor({ requestId, item }: { requestId: string; i
       const result = await updateOrganizedMaterialItemAction(formData)
       setFeedback(result.ok ? "Saved." : result.error)
       if (result.ok) {
+        onSaved?.({
+          ...item,
+          quantity: Number(choices.quantity || item.quantity),
+          metadata: {
+            ...(item.metadata ?? {}),
+            dimensions: choices.dimensions || metadataText(item, "dimensions"),
+            thickness: choices.thickness || metadataText(item, "thickness"),
+            product_type: choices.productType || metadataText(item, "product_type"),
+            screw_length: choices.screwLength || metadataText(item, "screw_length"),
+            ...(recommendation.resolvesAllReasons ? { review_status: "ready", review_reasons: [], needs_review: false } : {}),
+          },
+        })
         router.refresh()
       }
     })

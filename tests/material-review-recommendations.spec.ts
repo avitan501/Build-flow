@@ -46,3 +46,19 @@ test("offers material-specific controls for WonderBoard and drywall screws", () 
   ]))
   expect(screws.resolvesAllReasons).toBe(true)
 })
+
+test("offers both sheet size and thickness so plywood review can be completed", () => {
+  const plywood = materialReviewRecommendation({
+    ...base,
+    name: "CDX plywood",
+    quantity: 45,
+    unit: "pc",
+    metadata: { review_status: "missing", review_reasons: ["Plywood sheet dimensions are missing", "Thickness is missing"] },
+  })
+
+  expect(plywood.choices).toEqual(expect.arrayContaining([
+    expect.objectContaining({ field: "thickness" }),
+    expect.objectContaining({ field: "dimensions", recommended: "4 x 8 ft." }),
+  ]))
+  expect(plywood.resolvesAllReasons).toBe(true)
+})
