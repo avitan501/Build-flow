@@ -28,12 +28,11 @@ export default async function RequestQuotePage({ searchParams }: { searchParams?
             Back
           </Link>
           <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">{department ? `${department.label} request` : "Send your material list"}</h1>
-          <p className="mt-1 text-sm text-slate-600">Type what you need or attach a file.</p>
+          <p className="mt-1 text-sm text-slate-600">PDF, photo, or blueprint.</p>
         </div>
       </section>
       <div className="mx-auto max-w-3xl py-4 sm:px-6 sm:py-6">
         <QuoteRequestForm key={requestedItem ?? "blank-request"} defaultDepartment={department?.label} defaultMaterialDetails={requestedItemPrompt ?? (requestedItem ? `Please provide pricing and availability for: ${requestedItem}` : undefined)} />
-        <p className="px-4 py-4 text-center text-xs"><a href="tel:+15169088319" className="font-semibold text-[#0066cc]">Call (516) 908-8319</a></p>
         {department ? <div className="px-5 sm:px-0"><DepartmentEssentials data={department.essentials} /></div> : null}
       </div>
     </main>

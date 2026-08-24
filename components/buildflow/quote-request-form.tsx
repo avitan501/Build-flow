@@ -123,7 +123,7 @@ export function QuoteRequestForm({ mode = "request", defaultDepartment, defaultM
 
     <label className="mt-4 block">
       <span className="mb-1.5 block text-sm font-semibold text-slate-900">{beatQuote ? "Anything we should know?" : "What do you need?"}</span>
-      <textarea name="details" rows={4} maxLength={5000} defaultValue={defaultMaterialDetails} placeholder={beatQuote ? "Optional notes" : "Paste or type your material list"} className={`${inputClass} h-auto min-h-24 resize-y py-2.5`} />
+      <textarea name="details" rows={4} maxLength={5000} defaultValue={defaultMaterialDetails} placeholder={beatQuote ? "Optional notes" : "Paste your list or request any item. We’ll look for it."} className={`${inputClass} h-auto min-h-24 resize-y py-2.5`} />
     </label>
 
     <div className="mt-3 flex min-w-0 items-center gap-2">
@@ -131,7 +131,7 @@ export function QuoteRequestForm({ mode = "request", defaultDepartment, defaultM
         <FileUp className="h-4 w-4 text-[#0071e3]" />{selectedFileName ? "Change file" : beatQuote ? "Add quote" : "Add file"}
         <input ref={attachmentRef} aria-label={beatQuote ? "Attach the supplier quote" : "Attach a plan or material list"} type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={(event) => validateAttachment(event.currentTarget.files?.[0])} className="sr-only" />
       </label>
-      {selectedFileName ? <><span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-600">{selectedFileName}</span><button type="button" onClick={removeAttachment} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100" aria-label="Remove file"><X className="h-4 w-4" /></button></> : <span className="truncate text-xs text-slate-500">{beatQuote ? "Required" : "PDF or photo"}</span>}
+      {selectedFileName ? <><span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-600">{selectedFileName}</span><button type="button" onClick={removeAttachment} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100" aria-label="Remove file"><X className="h-4 w-4" /></button></> : <span className="truncate text-xs text-slate-500">{beatQuote ? "Required" : "PDF, photo, or blueprint"}</span>}
     </div>
 
     <fieldset className="mt-4">

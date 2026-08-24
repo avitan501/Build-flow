@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { MobileMenuDrawer, type MobileMenuLink } from "@/components/buildflow/mobile-menu-drawer";
+import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { ShopTranslationBoundary, useShopLanguage } from "@/components/buildflow/shop-language-provider";
 import { placeholderImageMetadata } from "@/lib/shop-catalog";
 import { SHOP_CATEGORY_NAMES, SHOP_POPULAR_SEARCHES } from "@/lib/shop";
@@ -73,6 +74,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isShopPage = Boolean(pathname) && pathname.startsWith("/shop");
   const isHome = pathname === "/";
+  const isRequestQuotePage = pathname === "/request-quote";
   const shopQuery = isShopPage ? searchParams.get("q") ?? "" : "";
   const accountLabel = isSignedIn ? displayName?.split(/\s+/)[0] || "My Account" : "Log in";
 
@@ -204,6 +206,10 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
                 </span>
               </button>
             </>
+          ) : isRequestQuotePage ? (
+            <Link href="/" prefetch={false} aria-label="Avantia Build home" className="flex min-h-11 min-w-0 flex-1 items-center justify-center px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 md:flex-none">
+              <AvantiaBuildLockup compact />
+            </Link>
           ) : (
             <Link href="/" prefetch={false} aria-label="Avantia Build home" className="flex min-h-11 min-w-0 items-center px-1 text-[13px] font-semibold tracking-tight text-[#1d1d1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 md:flex-none">
               Avantia
@@ -274,7 +280,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
           </Link> : null}
 
         </div>
-        {!isShopPage && pathname !== "/" ? (
+        {!isShopPage && pathname !== "/" && !isRequestQuotePage ? (
           <div className="border-t border-slate-200/70 px-3 py-2 md:hidden">
             <Link href="/request-quote" className="mx-auto flex min-h-9 max-w-md items-center justify-between rounded-full bg-[#0E2A4A] px-4 text-xs font-semibold text-white">
               <span>Need materials or pricing?</span>
