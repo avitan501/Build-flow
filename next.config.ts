@@ -37,10 +37,20 @@ const nextConfig: NextConfig = {
       "/upload",
     ];
 
-    return privateRoutes.map((source) => ({
-      source,
-      headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
-    }));
+    return [
+      ...privateRoutes.map((source) => ({
+        source,
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      })),
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'; connect-src 'self'" },
+        ],
+      },
+    ];
   },
 };
 

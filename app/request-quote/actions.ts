@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { after } from "next/server"
 
 import { sendQuoteIntakeEmail } from "@/lib/cart-submission-email"
+import { notifyManagersSafely } from "@/lib/manager-push-notifications"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getSupabasePublicEnv } from "@/lib/supabase/env"
 
@@ -313,6 +314,13 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     }).eq("request_id", requestId)
 
     if (requestKind === "quote_request") organizeMaterialListAfterResponse(requestId)
+    after(() => notifyManagersSafely({
+      eventType: "new_order",
+      title: requestKind === "beat_quote" ? "New quote to beat" : "New material request",
+      body: `${fullName}${company ? ` · ${company}` : ""} · ${departments.join(", ") || "General materials"}`,
+      href: `/owner/materials/requests/${requestId}`,
+      tag: `avantia-request-${requestId}`,
+    }))
 
     revalidatePath("/admin/users")
     revalidatePath("/owner/materials/requests")
@@ -334,6 +342,13 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     try {
       const saved = await saveWithSupabaseFunction(intakePayload)
       if (saved?.ok) {
+        after(() => notifyManagersSafely({
+          eventType: "new_order",
+          title: requestKind === "beat_quote" ? "New quote to beat" : "New material request",
+          body: `${fullName}${company ? ` · ${company}` : ""} · ${departments.join(", ") || "General materials"}`,
+          href: `/owner/materials/requests/${saved.requestId}`,
+          tag: `avantia-request-${saved.requestId}`,
+        }))
         revalidatePath("/admin/users")
         revalidatePath("/owner/materials/requests")
         return {

@@ -5,6 +5,7 @@ import {
   confirmAuraIntakeByCode,
   createAuraIntake,
 } from "@/lib/aura/intake";
+import { notifyManagersSafely } from "@/lib/manager-push-notifications";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -50,6 +51,15 @@ export async function POST(request: Request) {
     const from = (params.get("From") || "").replace(/^whatsapp:/i, "");
     const body = (params.get("Body") || "").trim();
     const externalMessageId = params.get("MessageSid") || params.get("SmsSid") || "";
+    if (from && body && externalMessageId) {
+      await notifyManagersSafely({
+        eventType: "call_message",
+        title: "New WhatsApp message",
+        body: `${from} · ${body.slice(0, 160)}`,
+        href: "/admin/communications?channel=whatsapp",
+        tag: `avantia-whatsapp-${externalMessageId}`,
+      });
+    }
     if (from !== OWNER_ADD_PHONE || !body || !externalMessageId) return twimlResponse();
 
     const command = /^(CONFIRM|CANCEL)\s+([A-Z0-9]{4,12})$/i.exec(body);

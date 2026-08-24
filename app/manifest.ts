@@ -5,8 +5,11 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Avantia Build",
     short_name: "Avantia Build",
     description: "Get construction materials priced and delivered to your jobsite.",
-    start_url: "/",
+    id: "/",
+    start_url: "/admin/build-map",
+    scope: "/",
     display: "standalone",
+    orientation: "portrait-primary",
     background_color: "#f5f7fa",
     theme_color: "#071126",
     icons: [

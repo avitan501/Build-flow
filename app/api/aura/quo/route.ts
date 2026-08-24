@@ -1,4 +1,5 @@
 import { parseQuoEvent, storeQuoEvent, verifyQuoSignature } from "@/lib/aura/quo";
+import { notifyManagersSafely } from "@/lib/manager-push-notifications";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -32,6 +33,18 @@ export async function POST(request: Request) {
   try {
     const result = await storeQuoEvent(parsed.data);
     if (!result.accepted) return response("Phone number not allowed", 403);
+    const activity = parsed.data.data.object;
+    const isIncomingCall = parsed.data.type === "call.ringing" && activity.direction !== "outgoing";
+    if (!result.duplicate && (isIncomingCall || parsed.data.type === "message.received")) {
+      const from = activity.from || "Unknown number";
+      await notifyManagersSafely({
+        eventType: "call_message",
+        title: parsed.data.type === "call.ringing" ? "Incoming call" : "New text message",
+        body: parsed.data.type === "call.ringing" ? `Call from ${from}` : `${from} · ${(activity.body || activity.text || "New message").slice(0, 160)}`,
+        href: parsed.data.type === "call.ringing" ? "/admin/communications?channel=call" : "/admin/communications?channel=sms",
+        tag: `avantia-quo-${parsed.data.id}`,
+      });
+    }
     return response("EVENT_RECEIVED", 200);
   } catch {
     return response("Processing failed", 500);

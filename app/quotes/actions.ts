@@ -1,8 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 
 import { requireSignedInProfile } from "@/lib/auth";
+import { notifyManagersSafely } from "@/lib/manager-push-notifications";
 import { createProjectEvent, type ProjectMaterialRecord, type ProjectQuoteItemRecord, type ProjectQuoteRecord, type ProjectRecord } from "@/lib/projects";
 
 function redirectToQuotes(projectId: string, key: "error" | "success", value: string) {
@@ -236,6 +238,14 @@ export async function approveQuoteAction(formData: FormData) {
     description: "A project quote was approved.",
     metadata: { quote_id: quoteId },
   });
+
+  after(() => notifyManagersSafely({
+    eventType: "quote_approval",
+    title: "Client approved a quote",
+    body: `Quote ${quoteId.slice(0, 8).toUpperCase()} was approved for a total of $${Number(verifiedQuote.total).toFixed(2)}.`,
+    href: `/quotes?projectId=${encodeURIComponent(projectId)}`,
+    tag: `avantia-quote-approved-${quoteId}`,
+  }));
 
   redirectToQuotes(projectId, "success", "quote-approved");
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 
 import { requireSignedInProfile } from "@/lib/auth";
 import { sendCartSubmissionEmail } from "@/lib/cart-submission-email";
@@ -9,6 +10,7 @@ import type { ShopCartItemDetails, ShopCustomCartItem } from "@/lib/shop-cart";
 import { buildShopProducts } from "@/lib/shop-catalog";
 import { calculateShopCartTax, type ShopCartQuoteLineInput } from "@/lib/shop-checkout";
 import { loadShopItems } from "@/lib/shop-loader";
+import { notifyManagersSafely } from "@/lib/manager-push-notifications";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function redirectToCart(key: "error" | "success", value: string): never {
@@ -268,6 +270,14 @@ export async function createQuoteFromCartAction(formData: FormData) {
       : emailResult.status === "not_configured"
         ? "cart-quote-created-email-not-configured"
         : "cart-quote-created-email-failed";
+
+  after(() => notifyManagersSafely({
+    eventType: "new_order",
+    title: "New shop order request",
+    body: `${profile?.full_name || user.email || "Client"} · ${quoteItems.length} item${quoteItems.length === 1 ? "" : "s"} · $${total.toFixed(2)}`,
+    href: `/quotes?projectId=${encodeURIComponent(projectId)}`,
+    tag: `avantia-cart-${quoteId}`,
+  }));
 
   redirect(`/quotes?projectId=${encodeURIComponent(projectId)}&success=${successCode}`);
 }

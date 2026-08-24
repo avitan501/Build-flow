@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
 
 import { getSessionWithProfile } from "@/lib/auth"
 import { sendClientRequestActionEmail, sendProjectRequestNotificationEmail } from "@/lib/cart-submission-email"
@@ -16,6 +17,7 @@ import {
 } from "@/lib/material-questionnaires"
 import { applyStorefrontQuestionnaireDefaults, storefrontQuestionnaireDefaultsForDepartment } from "@/lib/material-questionnaire-preview"
 import { loadMaterialQuestionnaireForDepartment } from "@/lib/material-questionnaires-server"
+import { notifyManagersSafely } from "@/lib/manager-push-notifications"
 import { createProjectEvent } from "@/lib/projects"
 import type { QuoteRequestAnswer } from "@/lib/quote-requests"
 
@@ -151,6 +153,13 @@ async function finalizeNewProjectRequest(
     description: notification.owner === "sent" ? "Owner and client notifications were processed." : "Request saved; owner email needs attention.",
     metadata: { quote_request_id: requestId, owner_email: notification.owner, client_email: notification.client },
   })
+  after(() => notifyManagersSafely({
+    eventType: "new_order",
+    title: "New material request",
+    body: `${session.profile?.full_name || session.user.email || "Client"} · ${request.title}`,
+    href: `/owner/materials/requests/${requestId}`,
+    tag: `avantia-request-${requestId}`,
+  }))
   return notification
 }
 
@@ -567,6 +576,13 @@ export async function submitQuoteRequestAction(input: { projectId: string; reque
     description: "Supplier packages are waiting for manager approval.",
     metadata: { quote_request_id: input.requestId },
   })
+  after(() => notifyManagersSafely({
+    eventType: "new_order",
+    title: "New material request",
+    body: `${session.profile?.full_name || session.user.email || "Client"} · ${request.title}`,
+    href: `/owner/materials/requests/${input.requestId}`,
+    tag: `avantia-request-${input.requestId}`,
+  }))
   revalidatePath(`/projects/${input.projectId}`)
   return { ok: true, data: undefined }
 }
