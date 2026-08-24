@@ -35,6 +35,32 @@ test("manager communications can reach customers, leads, and suppliers", async (
   expect(workspace).toContain("Contact someone")
 })
 
+test("manager communications support removable photos and phone-number history", async () => {
+  const [workspace, actions] = await Promise.all([
+    readFile(path.join(root, "components/buildflow/aura-communication-workspace.tsx"), "utf8"),
+    readFile(path.join(root, "app/owner/aura/actions.ts"), "utf8"),
+  ])
+
+  expect(workspace).toContain('aria-label="Remove attached photo"')
+  expect(workspace).toContain("By phone number")
+  expect(workspace).toContain("communicationsByNumber")
+  expect(workspace).toContain("prepared.quoWebUrl")
+  expect(workspace).toContain("prepared.attachmentUrl")
+  expect(workspace).toContain("Confirm Delivered or Read")
+  expect(actions).toContain('quoWebUrl: "https://my.quo.com/inbox"')
+  expect(actions).toContain("attachmentUrl: signed.data.signedUrl")
+})
+
+test("WhatsApp failures explain Sandbox and reply-window requirements", async () => {
+  const actions = await readFile(path.join(root, "app/owner/aura/actions.ts"), "utf8")
+
+  expect(actions).toContain("function whatsappSendError")
+  expect(actions).toContain('detail.includes("63015")')
+  expect(actions).toContain('detail.includes("63016")')
+  expect(actions).toContain("joined the Avantia Twilio Sandbox")
+  expect(actions).toContain("outside the 24-hour reply window")
+})
+
 test("supplier draft supports channel checkboxes and an exact safe preview", async () => {
   const draft = await readFile(path.join(root, "components/buildflow/supplier-request-draft.tsx"), "utf8")
   const page = await readFile(path.join(root, "app/owner/materials/requests/[requestId]/supplier-request/page.tsx"), "utf8")

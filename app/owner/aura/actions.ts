@@ -27,7 +27,7 @@ function requireUuid(value: FormDataEntryValue | null) {
 }
 
 export type SendAuraMessageResult = { ok: true } | { ok: false; error: string };
-export type PrepareQuoPhotoResult = { ok: true; deepLink: string } | { ok: false; error: string };
+export type PrepareQuoPhotoResult = { ok: true; deepLink: string; attachmentUrl: string; quoWebUrl: string } | { ok: false; error: string };
 export type SendAuraVideoResult = { ok: true; title: string } | { ok: false; error: string };
 
 type BrokerResult = { ok?: boolean; error?: string; id?: string };
@@ -39,6 +39,17 @@ async function invokeMessagingBroker(
   const { data, error } = await supabase.functions.invoke<BrokerResult>("aura-messaging-broker", { body });
   if (error || !data?.ok) throw new Error(data?.error || error?.message || "Messaging service is unavailable.");
   return data;
+}
+
+function whatsappSendError(error: unknown) {
+  const detail = error instanceof Error ? error.message : "";
+  if (detail.includes("63016") || /outside.*window|template/i.test(detail)) {
+    return "This WhatsApp conversation is outside the 24-hour reply window. Start it with an approved WhatsApp template, or ask the recipient to message Avantia first.";
+  }
+  if (detail.includes("63015") || /sandbox|not.*joined/i.test(detail)) {
+    return "This recipient has not joined the Avantia Twilio Sandbox. They must join and message the Sandbox before this test connection can reach them.";
+  }
+  return "WhatsApp could not deliver this message. The current Sandbox can reach only joined recipients, and free-form messages require a recent incoming WhatsApp message.";
 }
 
 export async function sendAuraMessageAction(input: {
@@ -68,11 +79,13 @@ export async function sendAuraMessageAction(input: {
         await sendAuraQuoText(phone!, message);
       }
     } else if (channel === "whatsapp") {
+      let brokerError: unknown = null;
       try {
         await invokeMessagingBroker(supabase, { action: "send_whatsapp", to: phone, message });
-      } catch {
+      } catch (error) {
+        brokerError = error;
         const sent = await sendAuraWhatsAppText(phone!, message);
-        if (!sent.sent) return { ok: false, error: "WhatsApp sending is not configured." };
+        if (!sent.sent) return { ok: false, error: whatsappSendError(brokerError) };
         await storeAuraCommunication({
           provider: "whatsapp",
           channel: "whatsapp",
@@ -92,9 +105,9 @@ export async function sendAuraMessageAction(input: {
     } else {
       return { ok: false, error: "Choose SMS, WhatsApp, or email." };
     }
-  } catch {
+  } catch (error) {
     const channelName = channel === "sms" ? "Q U O" : channel === "whatsapp" ? "WhatsApp" : "Email";
-    return { ok: false, error: `${channelName} could not send this message.` };
+    return { ok: false, error: channel === "whatsapp" ? whatsappSendError(error) : `${channelName} could not send this message.` };
   }
 
   revalidatePath("/owner/aura");
@@ -123,7 +136,12 @@ export async function prepareQuoPhotoMessageAction(formData: FormData): Promise<
     return { ok: false, error: "The photo link could not be prepared." };
   }
   const params = new URLSearchParams({ number: phone, from: "+15169088319", text: message, attachments: signed.data.signedUrl });
-  return { ok: true, deepLink: `openphone://message?${params.toString()}` };
+  return {
+    ok: true,
+    deepLink: `openphone://message?${params.toString()}`,
+    attachmentUrl: signed.data.signedUrl,
+    quoWebUrl: "https://my.quo.com/inbox",
+  };
 }
 
 export async function sendAuraVideoAction(input: {
