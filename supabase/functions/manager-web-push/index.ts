@@ -18,6 +18,7 @@ type Preferences = {
 type EventType = "new_order" | "call_message" | "supplier_update" | "quote_approval" | "delivery_update" | "test"
 type Subscription = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string }
 type QueueEvent = { id: number; event_type: EventType; title: string; body: string; href: string; tag: string | null }
+type NotificationLog = { id: string; event_type: EventType; title: string; body: string; href: string; delivered_count: number; failed_count: number; created_at: string }
 
 const defaults: Preferences = {
   new_orders: true,
@@ -173,12 +174,14 @@ Deno.serve(async (request: Request) => {
     if (!user) return json({ error: "Manager authorization required" }, 401)
 
     if (action === "status") {
-      const [key, prefs, countResult] = await Promise.all([
+      const [key, prefs, countResult, historyResult] = await Promise.all([
         publicKey(),
         preferences(user.id),
         admin.from("manager_push_subscriptions").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+        admin.from("manager_push_notification_log").select("id,event_type,title,body,href,delivered_count,failed_count,created_at").order("created_at", { ascending: false }).limit(100),
       ])
-      return json({ publicKey: key, preferences: prefs, deviceCount: countResult.count ?? 0 })
+      if (historyResult.error) throw new Error(`Notification history is unavailable: ${historyResult.error.message}`)
+      return json({ publicKey: key, preferences: prefs, deviceCount: countResult.count ?? 0, notifications: (historyResult.data ?? []) as NotificationLog[] })
     }
 
     if (action === "subscribe") {

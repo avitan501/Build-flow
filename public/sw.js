@@ -1,3 +1,9 @@
+self.addEventListener("install", () => self.skipWaiting());
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener("push", (event) => {
   let payload = {};
   try {
@@ -20,15 +26,13 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const href = new URL(event.notification.data?.href || "/admin/build-map", self.location.origin).href;
+  const destination = new URL(event.notification.data?.href || "/admin/build-map", self.location.origin);
+  if (destination.origin !== self.location.origin) destination.href = new URL("/admin/build-map", self.location.origin).href;
   event.waitUntil((async () => {
     const windows = await clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const client of windows) {
-      if ("focus" in client) {
-        await client.navigate(href);
-        return client.focus();
-      }
+      if (client.url === destination.href && "focus" in client) return client.focus();
     }
-    return clients.openWindow(href);
+    return clients.openWindow(destination.href);
   })());
 });
