@@ -53,9 +53,9 @@ export function ManagerTodayTasks({ tasks }: { tasks: ManagerTodayTask[] }) {
     })
   }
 
-  return <details className="group mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="today-tasks-heading">
-    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3">
-      <span className="flex min-w-0 items-center gap-2"><ClipboardCheck className="h-4 w-4 shrink-0 text-[#0071e3]" /><span id="today-tasks-heading" className="text-sm font-semibold">Today&apos;s tasks</span><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{openCount} open</span></span>
+  return <details className="group min-w-0 overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm [&[open]]:col-span-2 sm:[&[open]]:col-span-4" aria-labelledby="today-tasks-heading">
+    <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 px-3">
+      <span className="flex min-w-0 items-center gap-2"><ClipboardCheck className="h-4 w-4 shrink-0 text-[#0071e3]" /><span id="today-tasks-heading" className="truncate text-xs font-semibold">Today&apos;s tasks</span><span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{openCount}</span></span>
       <span className="flex items-center gap-2">{pending ? <LoaderCircle className="h-4 w-4 animate-spin text-[#0071e3]" aria-label="Saving task" /> : null}<ChevronDown className="h-4 w-4 text-slate-400 transition group-open:rotate-180" /></span>
     </summary>
     <header className="flex items-center justify-between gap-3 border-t border-slate-200 px-3 py-2 sm:px-4">

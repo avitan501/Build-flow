@@ -27,7 +27,6 @@ import { EmployeeActivityReporter } from "@/components/buildflow/employee-activi
 
 const GOOGLE_MEET_URL = "https://meet.google.com/";
 const communicationLinks = [
-  { href: "/admin/communications", label: "Messages and calls", shortLabel: "Messages", icon: PhoneCall },
   { href: GOOGLE_MEET_URL, label: "Open Google Meet", shortLabel: "Meet", icon: Video },
   { href: "/admin/communications?channel=whatsapp", label: "View all WhatsApp conversations", shortLabel: "WhatsApp", icon: MessageCircle },
 ] as const;
@@ -109,8 +108,13 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
       </nav>
 
       <div className="border-t border-slate-100 px-5 pb-5 pt-3">
+        {access.communications ? <Link href="/admin/communications" onClick={onNavigate} className={`mb-2 flex min-h-11 items-center gap-3 rounded-md px-2 text-sm font-semibold ${isActive(pathname, "/admin/communications") ? "bg-sky-50 text-[#0066cc]" : "text-slate-800 hover:bg-slate-50"}`}>
+          <PhoneCall className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 flex-1">Messages &amp; Calls</span>
+          <ChevronRight className="h-3.5 w-3.5 text-slate-300" aria-hidden="true" />
+        </Link> : null}
         <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Quick Access</p>
-        <div className="grid grid-cols-3 gap-1" aria-label="Communication shortcuts">
+        <div className="grid grid-cols-2 gap-1" aria-label="Communication shortcuts">
           {communicationLinks.map((link) => {
             const Icon = link.icon;
             const external = link.href.startsWith("https://");

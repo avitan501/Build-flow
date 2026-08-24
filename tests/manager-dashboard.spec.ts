@@ -43,7 +43,8 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(shell).toContain('<span className="min-w-0 flex-1">Manager Dashboard</span>');
   expect(shell).toContain('{ href: "/admin/users", label: "Customer Directory"');
   expect(shell).toContain('const homeHref = "/admin/build-map"');
-  expect(shell).toContain('{ href: "/admin/communications", label: "Messages and calls"');
+  expect(shell).toContain('<span className="min-w-0 flex-1">Messages &amp; Calls</span>');
+  expect(shell.indexOf("Messages &amp; Calls")).toBeGreaterThan(shell.indexOf("</nav>"));
   expect(shell).not.toContain('label: "Aura Communications"');
   expect(shell).not.toContain('label: "Manager Settings"');
   expect(shell).toContain("EmployeeActivityReporter");

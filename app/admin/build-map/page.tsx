@@ -208,13 +208,11 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9"><div className="mx-auto max-w-7xl">
     <header className="border-b border-slate-200 pb-3"><h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1></header>
 
-    <section aria-label="Today workspace" className="mt-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+    <section aria-label="Today workspace" className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
       <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled />
       <ManagerTodayTasks tasks={todayTasks} />
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <Link href="/admin/daily-summary" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white"><CalendarDays className="h-4 w-4" />Daily summary</Link>
-        <EmployeeClockStatus checkInAt={todaySummary?.checkInAt ?? null} checkOutAt={todaySummary?.checkOutAt ?? null} />
-      </div>
+      <Link href="/admin/daily-summary" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 shadow-sm"><CalendarDays className="h-4 w-4 text-[#0071e3]" />Daily summary</Link>
+      <EmployeeClockStatus compact checkInAt={todaySummary?.checkInAt ?? null} checkOutAt={todaySummary?.checkOutAt ?? null} />
     </section>
 
     {!pipelineAvailable ? <p role="alert" className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Some request counts could not load. Refresh before using the pipeline totals.</p> : null}

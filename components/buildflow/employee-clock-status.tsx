@@ -13,7 +13,7 @@ function elapsedLabel(start: string, currentTime: number, end?: string | null) {
   return `${hours}h ${String(minutes).padStart(2, "0")}m`
 }
 
-export function EmployeeClockStatus({ checkInAt, checkOutAt }: { checkInAt: string | null; checkOutAt: string | null }) {
+export function EmployeeClockStatus({ checkInAt, checkOutAt, compact = false }: { checkInAt: string | null; checkOutAt: string | null; compact?: boolean }) {
   const [currentTime, setCurrentTime] = useState(() => Date.now())
   const active = Boolean(checkInAt && !checkOutAt)
 
@@ -29,9 +29,9 @@ export function EmployeeClockStatus({ checkInAt, checkOutAt }: { checkInAt: stri
     return `Carlos clocked in · ${elapsedLabel(checkInAt, currentTime)}`
   }, [checkInAt, checkOutAt, currentTime])
 
-  return <span className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 text-xs font-semibold ${active ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-600"}`}>
+  return <span className={`inline-flex min-h-12 items-center gap-2 rounded-md border px-3 text-xs font-semibold ${compact ? "w-full justify-center" : ""} ${active ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-600"}`}>
     <Clock3 className="h-4 w-4" />
     <span className={`h-2 w-2 rounded-full ${active ? "bg-emerald-500" : "bg-slate-300"}`} />
-    {label}
+    <span className={compact ? "truncate" : ""}>{label}</span>
   </span>
 }
