@@ -7,7 +7,7 @@ import { createPortal } from "react-dom"
 
 import { prepareQuoPhotoMessageAction, sendAuraMessageAction, sendAuraVideoAction } from "@/app/owner/aura/actions"
 import { normalizeAuraPhone } from "@/lib/aura/identity"
-import { auraShareVideos, type AuraShareVideoId } from "@/lib/aura/share-videos"
+import { auraShareVideos, buildAuraShareVideoCaption, type AuraShareVideoId } from "@/lib/aura/share-videos"
 
 type Channel = "sms" | "whatsapp" | "email"
 type TemplateKey = "welcome" | "friendly_follow_up" | "request_material_list" | "quote_follow_up" | "order_follow_up" | "custom"
@@ -115,7 +115,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     if (!selectedVideo) return
     setVideoFeedback("")
     startTransition(async () => {
-      const result = await sendAuraVideoAction({ recipient: normalizedPhone, videoId: selectedVideo.id })
+      const result = await sendAuraVideoAction({ recipient: normalizedPhone, recipientName: name, videoId: selectedVideo.id })
       if (!result.ok) { setVideoFeedback(result.error); return }
       setVideoFeedback(`${result.title} was sent by WhatsApp.`)
       setSelectedVideoId(null)
@@ -157,7 +157,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     {selectedVideo && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[180] grid place-items-center bg-slate-950/55 p-4" role="dialog" aria-modal="true" aria-labelledby="send-video-title" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) setSelectedVideoId(null) }}>
       <section className="w-full max-w-sm overflow-hidden rounded-lg bg-white shadow-2xl">
         <header className="flex items-start justify-between gap-3 border-b border-slate-200 p-4"><div><p className="text-[10px] font-bold uppercase text-[#0066cc]">WhatsApp video · {selectedVideo.durationLabel}</p><h2 id="send-video-title" className="mt-1 text-lg font-semibold">{selectedVideo.title}</h2></div><button type="button" disabled={pending} onClick={() => setSelectedVideoId(null)} aria-label="Close" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200"><X className="h-4 w-4" /></button></header>
-        <div className="p-4"><video src={selectedVideo.path} controls playsInline preload="metadata" className="aspect-video w-full rounded-md bg-slate-950 object-contain" /><p className="mt-3 text-sm text-slate-600">Send this video to <strong className="text-slate-900">{name}</strong> at {normalizedPhone}?</p>{videoFeedback ? <p role="alert" className="mt-3 text-sm font-semibold text-rose-700">{videoFeedback}</p> : null}</div>
+        <div className="p-4"><video src={selectedVideo.path} controls playsInline preload="metadata" className="aspect-video w-full rounded-md bg-slate-950 object-contain" /><p className="mt-3 text-sm text-slate-600">Send this video to <strong className="text-slate-900">{name}</strong> at {normalizedPhone}?</p><div className="mt-3 max-h-44 overflow-y-auto rounded-md bg-slate-50 p-3"><p className="whitespace-pre-wrap text-xs leading-5 text-slate-700">{buildAuraShareVideoCaption(selectedVideo, name)}</p></div>{videoFeedback ? <p role="alert" className="mt-3 text-sm font-semibold text-rose-700">{videoFeedback}</p> : null}</div>
         <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3"><button type="button" disabled={pending} onClick={() => setSelectedVideoId(null)} className="min-h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold">Cancel</button><button type="button" disabled={pending} onClick={confirmVideoSend} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Confirm send</button></footer>
       </section>
     </div>, document.body) : null}

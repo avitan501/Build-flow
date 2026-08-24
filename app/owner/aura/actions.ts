@@ -11,7 +11,7 @@ import {
   type AuraMessageChannel,
 } from "@/lib/aura/communications";
 import { sendAuraWhatsAppText } from "@/lib/aura/whatsapp";
-import { findAuraShareVideo } from "@/lib/aura/share-videos";
+import { buildAuraShareVideoCaption, findAuraShareVideo } from "@/lib/aura/share-videos";
 import { sendTwilioWhatsAppMessage } from "@/lib/aura/twilio-whatsapp";
 import { requireOwnerAccess } from "@/lib/owner-access";
 import { requireManagerPortalProfile } from "@/lib/auth";
@@ -146,6 +146,7 @@ export async function prepareQuoPhotoMessageAction(formData: FormData): Promise<
 
 export async function sendAuraVideoAction(input: {
   recipient: string;
+  recipientName?: string;
   videoId: string;
 }): Promise<SendAuraVideoResult> {
   const { supabase, access } = await requireManagerPortalProfile();
@@ -156,7 +157,7 @@ export async function sendAuraVideoAction(input: {
   if (!video) return { ok: false, error: "Choose an Avantia video." };
 
   const mediaUrl = new URL(video.path, PRODUCTION_SITE_ORIGIN).toString();
-  const caption = `Avantia Build — ${video.title}`;
+  const caption = buildAuraShareVideoCaption(video, input.recipientName);
   try {
     try {
       await invokeMessagingBroker(supabase, {
