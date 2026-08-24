@@ -597,6 +597,10 @@ Deno.serve(async (req: Request) => {
     }
     return json({ error: "Unsupported action" }, 400);
   } catch (error) {
+    console.error("aura_broker_action_failed", {
+      action: typeof input?.action === "string" ? input.action : "unknown",
+      message: error instanceof Error ? error.message : "Messaging request failed.",
+    });
     return json({ error: error instanceof Error ? error.message : "Messaging request failed." }, 400);
   }
 });
