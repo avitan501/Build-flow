@@ -43,13 +43,14 @@ async function invokeMessagingBroker(
 
 function whatsappSendError(error: unknown) {
   const detail = error instanceof Error ? error.message : "";
+  if (/2Chat/i.test(detail)) return detail;
   if (detail.includes("63016") || /outside.*window|template/i.test(detail)) {
     return "This WhatsApp conversation is outside the 24-hour reply window. Start it with an approved WhatsApp template, or ask the recipient to message Avantia first.";
   }
   if (detail.includes("63015") || /sandbox|not.*joined/i.test(detail)) {
     return "This recipient has not joined the Avantia Twilio Sandbox. They must join and message the Sandbox before this test connection can reach them.";
   }
-  return "WhatsApp could not deliver this message. The current Sandbox can reach only joined recipients, and free-form messages require a recent incoming WhatsApp message.";
+  return "WhatsApp could not deliver this message. Confirm that the business number is connected and try again.";
 }
 
 export async function sendAuraMessageAction(input: {
@@ -194,11 +195,10 @@ export async function configureAuraProviderAction(formData: FormData): Promise<S
   const { supabase } = await requireOwnerAccess("/owner/aura");
   const provider = String(formData.get("provider") || "");
   try {
-    if (provider === "twilio") {
+    if (provider === "2chat") {
       await invokeMessagingBroker(supabase, {
-        action: "configure_twilio",
-        accountSid: String(formData.get("accountSid") || ""),
-        authToken: String(formData.get("authToken") || ""),
+        action: "configure_2chat",
+        apiKey: String(formData.get("apiKey") || ""),
         from: String(formData.get("from") || ""),
       });
     } else if (provider === "quo") {

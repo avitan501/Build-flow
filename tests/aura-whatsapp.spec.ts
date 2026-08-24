@@ -47,6 +47,41 @@ test("Aura webhook rejects unverified requests", async ({ request }) => {
     },
   });
   expect(unsignedTwilioWebhook.status()).toBe(401);
+
+  const unsignedTwoChatWebhook = await request.post("/api/aura/whatsapp/2chat", {
+    data: {
+      id: "MSG-test",
+      sent_by: "user",
+      remote_phone_number: "+13475675077",
+      message: { text: "Hello" },
+    },
+  });
+  expect(unsignedTwoChatWebhook.status()).toBe(401);
+});
+
+test("2Chat uses a protected webhook and the secure Vault broker", async () => {
+  const [route, broker, actions, setup, dashboard] = await Promise.all([
+    readFile(path.join(process.cwd(), "app/api/aura/whatsapp/2chat/route.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "app/owner/aura/actions.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "components/buildflow/aura-connection-setup.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "lib/aura/dashboard.ts"), "utf8"),
+  ]);
+
+  expect(route).toContain('searchParams.get("token")');
+  expect(route).toContain('functions/v1/aura-messaging-broker?mode=2chat-webhook');
+  expect(route).toContain('"x-avantia-2chat-token": token');
+  expect(route).toContain("processAuraOwnerCommand");
+  expect(broker).toContain('input.action === "configure_2chat"');
+  expect(broker).toContain("https://api.p.2chat.io/open/whatsapp/send-message");
+  expect(broker).toContain("https://api.p.2chat.io/open/webhooks/subscribe/");
+  expect(broker).toContain("aura_2chat_webhook_token");
+  expect(broker).toContain('input.action === "send_sms"');
+  expect(actions).toContain('provider === "2chat"');
+  expect(actions).toContain('action: "configure_2chat"');
+  expect(setup).toContain("2Chat WhatsApp");
+  expect(setup).toContain('value="quo"');
+  expect(dashboard).toContain("Boolean(brokerStatus?.whatsapp)");
 });
 
 test("Twilio replies use the direct connection or the secure Vault broker", async () => {

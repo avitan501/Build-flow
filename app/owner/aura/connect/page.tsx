@@ -22,7 +22,7 @@ export default async function AuraConnectionPage() {
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#0066cc]">Owner setup</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight">Connect WhatsApp & Text</h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Connect Twilio WhatsApp and Q U O text messaging without Vercel access.
+            Connect 2Chat WhatsApp and Q U O text messaging securely without Vercel access.
           </p>
         </header>
         <AuraConnectionSetup whatsappReady={Boolean(data?.ok && data.whatsapp)} smsReady={Boolean(data?.ok && data.sms)} defaultOpen />

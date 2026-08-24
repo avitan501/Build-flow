@@ -15,6 +15,9 @@ const secretNames = {
   twilioSid: "aura_twilio_account_sid",
   twilioToken: "aura_twilio_auth_token",
   twilioFrom: "aura_twilio_whatsapp_from",
+  twoChatKey: "aura_2chat_api_key",
+  twoChatFrom: "aura_2chat_whatsapp_from",
+  twoChatWebhookToken: "aura_2chat_webhook_token",
   quoKey: "aura_quo_api_key",
   quoFrom: "aura_quo_from_number",
   openaiKey: "openai_supplier_quote_api_key",
@@ -90,6 +93,15 @@ async function twilioConfig() {
   return accountSid && authToken && from ? { accountSid, authToken, from } : null;
 }
 
+async function twoChatConfig() {
+  const [apiKey, from, webhookToken] = await Promise.all([
+    secret(secretNames.twoChatKey),
+    secret(secretNames.twoChatFrom),
+    secret(secretNames.twoChatWebhookToken),
+  ]);
+  return apiKey && from && webhookToken ? { apiKey, from, webhookToken } : null;
+}
+
 async function quoConfig() {
   const [apiKey, from] = await Promise.all([secret(secretNames.quoKey), secret(secretNames.quoFrom)]);
   return apiKey && from ? { apiKey, from } : null;
@@ -141,8 +153,11 @@ async function storeCommunication(input: {
   body: string | null;
   status: string;
   media?: Array<{ url?: string; type?: string }>;
+  occurredAt?: string | null;
 }) {
-  const now = new Date().toISOString();
+  const now = input.occurredAt && !Number.isNaN(Date.parse(input.occurredAt))
+    ? new Date(input.occurredAt).toISOString()
+    : new Date().toISOString();
   const linkedContact = await contactId(input.counterpartyPhone || null, input.counterpartyEmail || null);
   await sql`
     insert into public.aura_communications (
@@ -193,6 +208,160 @@ async function handleTwilioWebhook(req: Request) {
     `;
   }
   return twiml();
+}
+
+type TwoChatPayload = {
+  event?: string;
+  message_uuid?: string;
+  timestamp?: string;
+  id?: string;
+  uuid?: string;
+  created_at?: string;
+  remote_phone_number?: string;
+  channel_phone_number?: string;
+  sent_by?: string;
+  message?: {
+    id?: string;
+    uuid?: string;
+    created_at?: string;
+    remote_phone_number?: string;
+    channel_phone_number?: string;
+    sent_by?: string;
+    text?: string;
+    message?: {
+      text?: string;
+      media?: { url?: string; type?: string; mime_type?: string };
+    };
+    media?: { url?: string; type?: string; mime_type?: string };
+  };
+};
+
+function twoChatMessage(payload: TwoChatPayload) {
+  const nested = payload.message;
+  const content = nested?.message;
+  const media = content?.media || nested?.media;
+  return {
+    externalId: nested?.uuid || nested?.id || payload.uuid || payload.id || null,
+    remotePhone: normalizePhone(nested?.remote_phone_number || payload.remote_phone_number),
+    businessPhone: normalizePhone(nested?.channel_phone_number || payload.channel_phone_number),
+    sentBy: nested?.sent_by || payload.sent_by || "user",
+    body: content?.text?.trim() || nested?.text?.trim() || null,
+    media: media?.url ? [{ url: media.url, type: media.mime_type || media.type }] : [],
+    occurredAt: nested?.created_at || payload.created_at || new Date().toISOString(),
+  };
+}
+
+async function handleTwoChatWebhook(req: Request) {
+  const config = await twoChatConfig();
+  const suppliedToken = req.headers.get("x-avantia-2chat-token") || "";
+  if (!config || !suppliedToken || !constantTimeEqual(config.webhookToken, suppliedToken)) {
+    return json({ error: "Invalid webhook token" }, 401);
+  }
+
+  let payload: TwoChatPayload;
+  try {
+    payload = await req.json() as TwoChatPayload;
+  } catch {
+    return json({ error: "Invalid JSON" }, 400);
+  }
+
+  if (payload.event === "whatsapp.number.status" || payload.event === "qr-received" || payload.event === "disconnected") {
+    return json({ ok: true });
+  }
+
+  const receiptStatuses: Record<string, string> = {
+    "message.sent": "sent",
+    "message.not-sent": "failed",
+    "message.received": "delivered",
+    "message.read": "read",
+    "whatsapp.message.receipt.sent": "sent",
+    "whatsapp.message.receipt.not-sent": "failed",
+    "whatsapp.message.receipt.received": "delivered",
+    "whatsapp.message.receipt.read": "read",
+  };
+  const receiptStatus = payload.event ? receiptStatuses[payload.event] : null;
+  if (receiptStatus && payload.message_uuid) {
+    await sql`
+      update public.aura_communications
+      set status = ${receiptStatus}, last_event_at = now(), updated_at = now()
+      where provider = 'whatsapp' and external_activity_id = ${payload.message_uuid}
+    `;
+    return json({ ok: true });
+  }
+
+  const message = twoChatMessage(payload);
+  if (!message.externalId) return json({ error: "Message ID is required" }, 400);
+  if (!message.remotePhone) return json({ error: "Remote phone is required" }, 400);
+  const direction = message.sentBy === "user" ? "incoming" : "outgoing";
+  await storeCommunication({
+    provider: "whatsapp",
+    channel: "whatsapp",
+    externalId: message.externalId,
+    direction,
+    counterpartyPhone: message.remotePhone,
+    businessPhone: message.businessPhone || config.from,
+    body: message.body,
+    status: direction === "incoming" ? "received" : "sent",
+    media: message.media,
+    occurredAt: message.occurredAt,
+  });
+  return json({ ok: true });
+}
+
+async function sendTwoChatWhatsApp(toValue: unknown, bodyValue: unknown, mediaUrlValue?: unknown) {
+  const config = await twoChatConfig();
+  if (!config) throw new Error("2Chat WhatsApp is not connected.");
+  const to = normalizePhone(toValue);
+  const body = typeof bodyValue === "string" ? bodyValue.trim().slice(0, 4096) : "";
+  const mediaUrl = typeof mediaUrlValue === "string" && /^https:\/\/build\.avantiap\.com\/[a-z0-9/_\-.]+$/i.test(mediaUrlValue)
+    ? mediaUrlValue
+    : null;
+  if (!to || (!body && !mediaUrl)) throw new Error("Enter a valid WhatsApp number and message.");
+
+  const response = await fetch("https://api.p.2chat.io/open/whatsapp/send-message", {
+    method: "POST",
+    headers: { "X-User-API-Key": config.apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ from_number: config.from, to_number: to, text: body || undefined, url: mediaUrl || undefined }),
+  });
+  const result = await response.json() as { success?: boolean; message_uuid?: string; message?: string };
+  if (!response.ok || !result.success || !result.message_uuid) {
+    throw new Error(result.message || `2Chat returned HTTP ${response.status}.`);
+  }
+  await storeCommunication({
+    provider: "whatsapp",
+    channel: "whatsapp",
+    externalId: result.message_uuid,
+    direction: "outgoing",
+    counterpartyPhone: to,
+    businessPhone: config.from,
+    body: body || null,
+    status: "queued",
+    media: mediaUrl ? [{ url: mediaUrl, type: mediaUrl.endsWith(".mp4") ? "video/mp4" : undefined }] : [],
+  });
+  return result.message_uuid;
+}
+
+async function subscribeTwoChatWebhook(apiKey: string, from: string, webhookToken: string) {
+  const hookUrl = `https://build.avantiap.com/api/aura/whatsapp/2chat?token=${encodeURIComponent(webhookToken)}`;
+  const events = [
+    "whatsapp.message.received",
+    "whatsapp.message.sent",
+    "whatsapp.message.receipt.sent",
+    "whatsapp.message.receipt.not-sent",
+    "whatsapp.message.receipt.received",
+    "whatsapp.message.receipt.read",
+  ];
+  const results = await Promise.all(events.map(async (event) => {
+    const response = await fetch(`https://api.p.2chat.io/open/webhooks/subscribe/${event}`, {
+      method: "POST",
+      headers: { "X-User-API-Key": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ hook_url: hookUrl, on_number: from }),
+    });
+    return { event, ok: response.ok || response.status === 409 };
+  }));
+  if (!results.find((result) => result.event === "whatsapp.message.received")?.ok) {
+    throw new Error("2Chat could not activate incoming-message delivery. Confirm the WhatsApp number is connected by QR.");
+  }
 }
 
 async function sendTwilioWhatsApp(
@@ -585,6 +754,9 @@ Deno.serve(async (req: Request) => {
   if (req.method === "POST" && url.searchParams.get("mode") === "twilio-webhook") {
     try { return await handleTwilioWebhook(req); } catch { return twiml(500); }
   }
+  if (req.method === "POST" && url.searchParams.get("mode") === "2chat-webhook") {
+    try { return await handleTwoChatWebhook(req); } catch { return json({ error: "Processing failed" }, 500); }
+  }
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const manager = await requireManager(req);
   if (!manager) return json({ error: "Manager authorization required" }, 401);
@@ -592,11 +764,13 @@ Deno.serve(async (req: Request) => {
   try { input = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
   try {
     if (input.action === "status") {
-      return json({ ok: true, whatsapp: Boolean(await twilioConfig()), sms: Boolean(await quoConfig()), email: Boolean(Deno.env.get("RESEND_API_KEY")) });
+      const [twoChat, twilio, sms] = await Promise.all([twoChatConfig(), twilioConfig(), quoConfig()]);
+      return json({ ok: true, whatsapp: Boolean(twoChat || twilio), whatsappProvider: twoChat ? "2chat" : twilio ? "twilio" : null, sms: Boolean(sms), email: Boolean(Deno.env.get("RESEND_API_KEY")) });
     }
     if (input.action === "dashboard") {
-      await syncRecentTwilioWhatsApp();
-      const [communications, contacts, whatsapp, sms] = await Promise.all([
+      const activeTwoChat = await twoChatConfig();
+      if (!activeTwoChat) await syncRecentTwilioWhatsApp();
+      const [communications, contacts, twilio, sms] = await Promise.all([
         sql`
           select id, contact_id, provider, channel, direction, counterparty_phone, counterparty_email,
             subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at
@@ -619,7 +793,7 @@ Deno.serve(async (req: Request) => {
         contacts,
         connections: {
           quo: { receive: false, send: Boolean(sms) },
-          whatsapp: { receive: Boolean(whatsapp), send: Boolean(whatsapp) },
+          whatsapp: { receive: Boolean(activeTwoChat || twilio), send: Boolean(activeTwoChat || twilio), provider: activeTwoChat ? "2chat" : twilio ? "twilio" : null },
           email: { receive: false, send: Boolean(Deno.env.get("RESEND_API_KEY")) },
         },
       });
@@ -654,6 +828,22 @@ Deno.serve(async (req: Request) => {
       ]);
       return json({ ok: true, whatsapp: true });
     }
+    if (input.action === "configure_2chat") {
+      if (!manager.isOwner) return json({ error: "Only the owner can change provider credentials." }, 403);
+      const apiKey = typeof input.apiKey === "string" ? input.apiKey.trim() : "";
+      const from = normalizePhone(input.from);
+      if (apiKey.length < 20 || !from) return json({ error: "Enter a valid 2Chat API key and WhatsApp number." }, 400);
+      const validation = await fetch("https://api.p.2chat.io/open/info", { headers: { "X-User-API-Key": apiKey } });
+      if (!validation.ok) return json({ error: "2Chat rejected this API key." }, 400);
+      const webhookToken = crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "");
+      await subscribeTwoChatWebhook(apiKey, from, webhookToken);
+      await Promise.all([
+        saveSecret(secretNames.twoChatKey, apiKey, "Aura 2Chat API key"),
+        saveSecret(secretNames.twoChatFrom, from, "Aura 2Chat WhatsApp sender"),
+        saveSecret(secretNames.twoChatWebhookToken, webhookToken, "Aura 2Chat webhook token"),
+      ]);
+      return json({ ok: true, whatsapp: true, whatsappProvider: "2chat" });
+    }
     if (input.action === "configure_quo") {
       if (!manager.isOwner) return json({ error: "Only the owner can change provider credentials." }, 403);
       const apiKey = typeof input.apiKey === "string" ? input.apiKey.trim() : "";
@@ -666,7 +856,9 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, sms: true });
     }
     if (input.action === "send_whatsapp") {
-      const id = await sendTwilioWhatsApp(input.to, input.message, "https://build.avantiap.com/api/aura/whatsapp/twilio", input.mediaUrl);
+      const id = await twoChatConfig()
+        ? await sendTwoChatWhatsApp(input.to, input.message, input.mediaUrl)
+        : await sendTwilioWhatsApp(input.to, input.message, "https://build.avantiap.com/api/aura/whatsapp/twilio", input.mediaUrl);
       return json({ ok: true, id });
     }
     if (input.action === "send_sms") {

@@ -31,11 +31,10 @@ export function AuraConnectionSetup({ whatsappReady, smsReady, defaultOpen = fal
       </div>
       {open ? <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <form action={submit} className="grid gap-3 rounded-md border border-slate-200 p-4">
-          <input type="hidden" name="provider" value="twilio" />
-          <h3 className="font-semibold">Twilio WhatsApp</h3>
-          <label className="grid gap-1 text-xs font-semibold">Account SID<input required name="accountSid" autoComplete="off" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label>
-          <label className="grid gap-1 text-xs font-semibold">Auth token<input required type="password" name="authToken" autoComplete="new-password" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label>
-          <label className="grid gap-1 text-xs font-semibold">WhatsApp Sandbox number<input required name="from" inputMode="tel" placeholder="+1 415 523 8886" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label>
+          <input type="hidden" name="provider" value="2chat" />
+          <div><h3 className="font-semibold">2Chat WhatsApp</h3><p className="mt-1 text-xs leading-5 text-slate-500">First connect the business WhatsApp number by QR in 2Chat, then save its API key here.</p></div>
+          <label className="grid gap-1 text-xs font-semibold">API key<input required type="password" name="apiKey" autoComplete="new-password" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label>
+          <label className="grid gap-1 text-xs font-semibold">Connected WhatsApp number<input required name="from" inputMode="tel" placeholder="(516) 908-8319" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label>
           <button disabled={pending} className="min-h-11 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50">Connect WhatsApp</button>
         </form>
         <form action={submit} className="grid gap-3 rounded-md border border-slate-200 p-4">

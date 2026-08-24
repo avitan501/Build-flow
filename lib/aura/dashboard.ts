@@ -104,7 +104,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
       .eq("role", "client")
       .eq("is_active", true)
       .limit(500),
-    brokerClient.functions.invoke<{ ok?: boolean; whatsapp?: boolean; sms?: boolean; email?: boolean }>("aura-messaging-broker", {
+    brokerClient.functions.invoke<{ ok?: boolean; whatsapp?: boolean; whatsappProvider?: string | null; sms?: boolean; email?: boolean }>("aura-messaging-broker", {
       body: { action: "status" },
     }),
   ]);
@@ -127,6 +127,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
       },
       whatsapp: {
         receive:
+          Boolean(brokerStatus?.whatsapp) ||
           Boolean(process.env.AURA_WHATSAPP_APP_SECRET && process.env.AURA_WHATSAPP_VERIFY_TOKEN) ||
           canUseTwilioWhatsApp(),
         send: Boolean(brokerStatus?.whatsapp) || canSendAuraWhatsApp(),
