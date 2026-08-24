@@ -81,7 +81,7 @@ export function ManagerDashboardAiSearch({ initialHistory, enabled }: { initialH
     })
   }
 
-  return <details className="group mt-3">
+  return <details className="group">
     <summary className="inline-flex min-h-9 cursor-pointer list-none items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 shadow-sm hover:border-slate-400">
       <Plus className="h-4 w-4 text-[#0071e3] group-open:hidden" />
       <X className="hidden h-4 w-4 text-slate-500 group-open:block" />

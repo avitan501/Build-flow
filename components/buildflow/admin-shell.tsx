@@ -7,7 +7,6 @@ import {
   Columns3,
   CreditCard,
   LayoutDashboard,
-  Settings,
   Sparkles,
   Menu,
   MessageCircle,
@@ -28,7 +27,7 @@ import { EmployeeActivityReporter } from "@/components/buildflow/employee-activi
 
 const GOOGLE_MEET_URL = "https://meet.google.com/";
 const communicationLinks = [
-  { href: "/admin/communications", label: "Calls & Communications", shortLabel: "Calls", icon: PhoneCall },
+  { href: "/admin/communications", label: "Messages and calls", shortLabel: "Messages", icon: PhoneCall },
   { href: GOOGLE_MEET_URL, label: "Open Google Meet", shortLabel: "Meet", icon: Video },
   { href: "/admin/communications?channel=whatsapp", label: "View all WhatsApp conversations", shortLabel: "WhatsApp", icon: MessageCircle },
 ] as const;
@@ -53,13 +52,11 @@ function navigationLinks(access: ManagerAccess) {
       { href: "/admin/vendors", label: "Supplier Directory", icon: Store },
       { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },
     ] : []),
-    ...(access.communications ? [{ href: "/admin/communications", label: "Aura Communications", icon: PhoneCall }] : []),
     ...(access.suppliers ? [
       { href: "/admin/supplier-quotes", label: "Supplier Quote Storage", icon: Archive },
       { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
     ] : []),
     ...(access.aiTools ? [{ href: "/admin/ai-tools", label: "AI Tools — Coming Soon", icon: Sparkles }] : []),
-    ...(access.managerSettings ? [{ href: "/admin/settings", label: "Manager Settings", icon: Settings }] : []),
     ...(access.owner ? [{ href: "/admin/payments", label: "Payments", icon: CreditCard }] : []),
   ];
 }

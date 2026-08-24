@@ -9,7 +9,6 @@ import {
   PackageCheck,
   PhoneCall,
   Send,
-  Settings,
   ShoppingCart,
   Sparkles,
   Store,
@@ -186,8 +185,8 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
 
   const managerSections = [
     { title: "Customers", icon: Users, links: access.customers ? [{ href: "/admin/users", label: "Customer Directory" }, { href: "/owner/materials/requests", label: "Client Requests" }] : [] },
-    { title: "Calls & Communications", icon: PhoneCall, links: [
-      ...(access.communications ? [{ href: "/admin/communications", label: "Aura Communications" }] : []),
+    { title: "Messages & Calls", icon: PhoneCall, links: [
+      ...(access.communications ? [{ href: "/admin/communications", label: "Messages" }] : []),
       { href: QUO_INBOX_URL, label: "Calls & Messages" },
       { href: WHATSAPP_URL, label: "WhatsApp" },
       { href: "/admin/daily-summary", label: "Daily Work Summary" },
@@ -204,21 +203,25 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
     ...(access.owner ? [
       { title: "Payments", icon: CreditCard, links: [{ href: "/admin/payments", label: "Payment Center" }] },
     ] : []),
-    { title: "Manager Settings", icon: Settings, links: [{ href: "/admin/goals-progress", label: "Goals & Progress" }, ...(access.managerSettings ? [{ href: "/admin/settings", label: "Communication Status" }] : [])] },
   ].filter((section) => section.links.length > 0);
 
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9"><div className="mx-auto max-w-7xl">
-    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5"><div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Dashboard</h1><p className="mt-2 text-sm text-slate-600">Today&apos;s requests, targets, and tools in one place.</p></div><div className="flex flex-wrap items-center gap-2"><EmployeeClockStatus checkInAt={todaySummary?.checkInAt ?? null} checkOutAt={todaySummary?.checkOutAt ?? null} /><Link href="/admin/daily-summary" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white"><CalendarDays className="h-4 w-4" />Daily summary</Link></div></header>
+    <header className="border-b border-slate-200 pb-3"><h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1></header>
+
+    <section aria-label="Today workspace" className="mt-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled />
+      <ManagerTodayTasks tasks={todayTasks} />
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Link href="/admin/daily-summary" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-3 text-xs font-semibold text-white"><CalendarDays className="h-4 w-4" />Daily summary</Link>
+        <EmployeeClockStatus checkInAt={todaySummary?.checkInAt ?? null} checkOutAt={todaySummary?.checkOutAt ?? null} />
+      </div>
+    </section>
 
     {!pipelineAvailable ? <p role="alert" className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Some request counts could not load. Refresh before using the pipeline totals.</p> : null}
 
-    <section aria-labelledby="pipeline-heading" className="mt-5"><div className="flex items-center justify-between gap-3"><div><h2 id="pipeline-heading" className="text-xl font-semibold">Request pipeline</h2><p className="mt-1 text-xs text-slate-500">Open work only. Completed and cancelled requests are excluded.</p></div>{selectedStage ? <Link href="/admin/build-map#open-requests" className="text-xs font-semibold text-[#0066cc]">Show all</Link> : null}</div>
+    <section aria-labelledby="pipeline-heading" className="mt-5"><div className="flex items-center justify-between gap-3"><div><h2 id="pipeline-heading" className="text-xl font-semibold">Orders &amp; Requests</h2><p className="mt-1 text-xs text-slate-500">Open work only. Completed and cancelled requests are excluded.</p></div>{selectedStage ? <Link href="/admin/build-map#open-requests" className="text-xs font-semibold text-[#0066cc]">Show all</Link> : null}</div>
       <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">{pipelineStages.map((item) => { const Icon = item.icon; return <Link key={item.id} href={`/admin/build-map?stage=${item.id}#open-requests`} className={`flex min-h-24 items-center gap-3 rounded-lg border p-3 transition hover:shadow-sm ${item.tone}`}><Icon className="h-4 w-4 shrink-0 text-slate-700" /><div className="min-w-0 flex-1"><span className={`text-2xl font-semibold tabular-nums ${item.numberTone}`}>{stageCounts.get(item.id) ?? 0}</span><h3 className="mt-0.5 text-xs font-semibold leading-4">{item.label}</h3></div></Link>; })}</div>
     </section>
-
-    <ManagerTodayTasks tasks={todayTasks} />
-
-    <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled />
 
     <section id="open-requests" className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"><header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><h2 className="font-semibold">{selectedStage ? pipelineStages.find((item) => item.id === selectedStage)?.label : "Requests needing work"}</h2><p className="mt-0.5 text-xs text-slate-500">Most recently updated first</p></div><span className="text-sm font-semibold tabular-nums text-slate-500">{selectedStage ? stageCounts.get(selectedStage) : requests.length}</span></header>
       {visibleRequests.length ? <div>{visibleRequests.map(({ request, stage: requestStage }) => { const client = clientMap.get(request.owner_id); const stageInfo = pipelineStages.find((item) => item.id === requestStage)!; return <Link key={request.id} href={`/owner/materials/requests/${request.id}`} className="group flex min-h-16 items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${requestStage === "received" ? "bg-amber-500" : requestStage === "pricing" ? "bg-sky-500" : requestStage === "approval" ? "bg-violet-500" : "bg-emerald-500"}`} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{request.title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{client?.full_name || client?.email || "Client"} · {stageInfo.label}</span></span><span className="hidden shrink-0 text-xs text-slate-400 sm:block">{formatUpdated(request.updated_at)}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" /></Link>; })}</div> : <p className="px-4 py-8 text-center text-sm text-slate-500">No open requests in this stage.</p>}
