@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, Mail, MessageCircle, Phone, Search, Send, Smartphone } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CheckCheck, CircleAlert, Clock3, ImagePlus, Mail, MessageCircle, Phone, Search, Send, Smartphone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
@@ -49,6 +49,19 @@ function quoCallHref(phone: string) {
     return `openphone://dial?number=${encodeURIComponent(phone)}&from=${encodeURIComponent("+15169088319")}&action=call`;
   }
   return `tel:${phone}`;
+}
+
+function channelTone(channel: AuraCommunicationRow["channel"]) {
+  if (channel === "whatsapp") return "bg-emerald-100 text-emerald-700";
+  if (channel === "email") return "bg-violet-100 text-violet-700";
+  if (channel === "call") return "bg-amber-100 text-amber-700";
+  return "bg-sky-100 text-sky-700";
+}
+
+function statusAppearance(status: string | null) {
+  if (["failed", "undelivered"].includes(status || "")) return { Icon: CircleAlert, label: status || "Failed", tone: "bg-rose-100 text-rose-700" };
+  if (["delivered", "read"].includes(status || "")) return { Icon: CheckCheck, label: status || "Delivered", tone: "bg-emerald-100 text-emerald-700" };
+  return { Icon: Clock3, label: status || "Pending", tone: "bg-amber-100 text-amber-800" };
 }
 
 export function AuraCommunicationWorkspace({
@@ -205,8 +218,11 @@ export function AuraCommunicationWorkspace({
             const detail = communication.summary || communication.body || communication.transcript;
             const duration = durationLabel(communication.duration_seconds);
             const Icon = communication.channel === "call" ? Phone : communication.channel === "whatsapp" ? MessageCircle : communication.channel === "email" ? Mail : Smartphone;
-            const statusTone = ["failed", "undelivered"].includes(communication.status || "") ? "bg-rose-100 text-rose-700" : ["delivered", "read"].includes(communication.status || "") ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600";
-            return <article key={communication.id} className="flex gap-3 p-4 sm:p-5"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-sky-50 text-[#0066cc]"><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{matchedCustomer ? customerLabel(matchedCustomer) : contactName(contact, communication)}</h3><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">{communication.channel} · {communication.direction || "unknown"}</span>{communication.status ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${statusTone}`}>{communication.status}</span> : null}{matches.length === 0 ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">Unmatched</span> : matches.length > 1 ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">Match conflict</span> : null}</div><p className="mt-1 text-xs text-slate-500">{communication.counterparty_phone || communication.counterparty_email}</p></div><time className="text-xs text-slate-500">{formatDate(communication.occurred_at)}</time></div>{detail ? <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{detail}</p> : null}{duration ? <p className="mt-2 text-xs font-semibold text-slate-500">Duration {duration}</p> : null}{communication.next_steps.length ? <p className="mt-2 text-xs font-semibold text-[#0066cc]">Next: {communication.next_steps.join(" · ")}</p> : null}</div></article>;
+            const incoming = communication.direction === "incoming";
+            const DirectionIcon = incoming ? ArrowDownLeft : ArrowUpRight;
+            const status = statusAppearance(communication.status);
+            const StatusIcon = status.Icon;
+            return <article key={communication.id} className={`flex gap-3 p-4 sm:p-5 ${incoming ? "bg-emerald-50/40" : "bg-sky-50/30"}`}><span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${channelTone(communication.channel)}`}><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{matchedCustomer ? customerLabel(matchedCustomer) : contactName(contact, communication)}</h3><span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${incoming ? "bg-emerald-100 text-emerald-800" : "bg-sky-100 text-sky-800"}`}><DirectionIcon className="h-3 w-3" />{incoming ? "Received" : "Sent"}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${channelTone(communication.channel)}`}>{communication.channel}</span>{communication.status ? <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${status.tone}`}><StatusIcon className="h-3 w-3" />{status.label}</span> : null}{matches.length === 0 ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">Unmatched</span> : matches.length > 1 ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">Match conflict</span> : null}</div><p className="mt-1 text-xs text-slate-500">{communication.counterparty_phone || communication.counterparty_email}</p></div><time className="text-xs text-slate-500">{formatDate(communication.occurred_at)}</time></div>{detail ? <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{detail}</p> : null}{duration ? <p className="mt-2 text-xs font-semibold text-slate-500">Duration {duration}</p> : null}{communication.next_steps.length ? <p className="mt-2 text-xs font-semibold text-[#0066cc]">Next: {communication.next_steps.join(" · ")}</p> : null}</div></article>;
           })}</div> : <p className="p-8 text-center text-sm text-slate-500">No communications match this filter.</p>}
         </section>
       </div>

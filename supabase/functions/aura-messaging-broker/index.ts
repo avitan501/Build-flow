@@ -240,7 +240,7 @@ async function sendTwilioWhatsApp(
 async function syncRecentTwilioWhatsApp() {
   const config = await twilioConfig();
   if (!config) return 0;
-  const query = new URLSearchParams({ To: `whatsapp:${config.from}`, PageSize: "50" });
+  const query = new URLSearchParams({ PageSize: "50" });
   const response = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${config.accountSid}/Messages.json?${query.toString()}`,
     { headers: { Authorization: `Basic ${btoa(`${config.accountSid}:${config.authToken}`)}` } },
@@ -256,7 +256,11 @@ async function syncRecentTwilioWhatsApp() {
       status?: string;
     }>;
   };
-  const incoming = (payload.messages || []).filter((message) => message.direction === "inbound" && message.sid);
+  const whatsappMessages = (payload.messages || []).filter((message) =>
+    message.sid && (message.from?.startsWith("whatsapp:") || message.to?.startsWith("whatsapp:")),
+  );
+  const incoming = whatsappMessages.filter((message) => message.direction === "inbound");
+  const outgoing = whatsappMessages.filter((message) => message.direction !== "inbound");
   await Promise.all(incoming.map((message) => storeCommunication({
     provider: "whatsapp",
     channel: "whatsapp",
@@ -267,6 +271,11 @@ async function syncRecentTwilioWhatsApp() {
     body: message.body?.trim() || null,
     status: message.status || "received",
   })));
+  await Promise.all(outgoing.map((message) => sql`
+    update public.aura_communications
+    set status = ${message.status || "queued"}, last_event_at = now(), updated_at = now()
+    where provider = 'whatsapp' and external_activity_id = ${message.sid as string}
+  `));
   return incoming.length;
 }
 

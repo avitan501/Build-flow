@@ -1,4 +1,4 @@
-import { Mail, MessageCircle, Phone, Smartphone } from "lucide-react"
+import { ArrowDownLeft, ArrowUpRight, CheckCheck, CircleAlert, Clock3, Mail, MessageCircle, Phone, Smartphone } from "lucide-react"
 import Link from "next/link"
 
 export type DirectoryConversationEntry = {
@@ -29,12 +29,18 @@ function ChannelIcon({ channel }: { channel: DirectoryConversationEntry["channel
 
 function ConversationRow({ entry }: { entry: DirectoryConversationEntry }) {
   const failed = entry.status === "failed" || entry.status === "undelivered"
+  const complete = entry.status === "delivered" || entry.status === "read" || entry.status === "received"
+  const incoming = entry.direction === "incoming"
+  const DirectionIcon = incoming ? ArrowDownLeft : ArrowUpRight
+  const StatusIcon = failed ? CircleAlert : complete ? CheckCheck : Clock3
+  const channelTone = entry.channel === "whatsapp" ? "bg-emerald-100 text-emerald-700" : entry.channel === "email" ? "bg-violet-100 text-violet-700" : entry.channel === "call" ? "bg-amber-100 text-amber-700" : "bg-sky-100 text-sky-700"
   return <div className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-2 py-2.5">
-    <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-sky-50 text-[#0066cc]"><ChannelIcon channel={entry.channel} /></span>
+    <span className={`inline-flex h-7 w-7 items-center justify-center rounded-md ${channelTone}`}><ChannelIcon channel={entry.channel} /></span>
     <div className="min-w-0">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold uppercase text-slate-500">
-        <span>{entry.channel} · {entry.direction || "activity"}</span>
-        {entry.status ? <span className={failed ? "text-rose-700" : "text-emerald-700"}>{entry.status}</span> : null}
+      <div className="flex flex-wrap items-center gap-1 text-[10px] font-bold uppercase text-slate-500">
+        <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${incoming ? "bg-emerald-100 text-emerald-800" : "bg-sky-100 text-sky-800"}`}><DirectionIcon className="h-3 w-3" />{incoming ? "Received" : "Sent"}</span>
+        <span className={`rounded-full px-1.5 py-0.5 ${channelTone}`}>{entry.channel}</span>
+        {entry.status ? <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${failed ? "bg-rose-100 text-rose-700" : complete ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}><StatusIcon className="h-3 w-3" />{entry.status}</span> : null}
         <time className="ml-auto font-medium normal-case text-slate-400">{formatConversationDate(entry.occurredAt)}</time>
       </div>
       <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-700">{entry.message || "Communication recorded"}</p>
