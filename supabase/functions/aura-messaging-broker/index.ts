@@ -389,6 +389,25 @@ type PriceResearchResult = {
   matchConfidence: "exact" | "likely";
 };
 
+type PriceResearchCallResult = {
+  title: string;
+  url: string;
+  domain: string;
+  snippet: string;
+  phone: string | null;
+  matchConfidence: "exact" | "likely";
+};
+
+type PriceResearchSalesContact = {
+  company: string;
+  contactName: string | null;
+  role: string;
+  phone: string | null;
+  email: string | null;
+  url: string;
+  domain: string;
+};
+
 function directProductUrl(value: unknown) {
   if (typeof value !== "string") return null;
   try {
@@ -420,28 +439,28 @@ async function priceResearch(queryValue: unknown, departmentValue: unknown, zipC
       model: dashboardAiModels.terra.id,
       store: false,
       reasoning: { effort: "low" },
-      max_output_tokens: 2400,
+      max_output_tokens: 4000,
       tools: [{
         type: "web_search_preview",
         search_context_size: "medium",
         user_location: { type: "approximate", country: "US", region: "New York" },
       }],
       tool_choice: "required",
-      instructions: "You research current US construction-material prices for Avantia Build. Find only direct purchasable product-detail pages with a visibly published price. Never return search pages, category pages, articles, installers, lead-generation pages, estimates, or invented prices. Match the requested model, material, dimensions, grade, thickness, package quantity, and unit as closely as possible. Use multiple independent suppliers. If a specification differs, mark it likely instead of exact. Return no row when a direct page or displayed price cannot be verified.",
-      input: `Product: ${query}\nDepartment: ${department || "Construction materials"}\nDelivery ZIP: ${zipCode || "11516"}\nDo not return these already checked domains: ${excludeDomains.join(", ") || "none"}.`,
+      instructions: "You are Avantia Build's construction-product sourcing researcher. Produce three distinct groups for the requested delivery ZIP: (1) up to 3 direct purchasable product-detail pages with a visibly published price, (2) up to 3 relevant stores or suppliers that publicly list a phone number and should be called for price or local availability, and (3) up to 3 public, official sales contacts or sales departments. Match model/SKU, material, dimensions, grade, thickness, package quantity, and unit as closely as possible. Never return search pages, articles, installers, lead-generation pages, private contact details, guessed people, guessed phone numbers, invented prices, or unsupported availability. A named person may be returned only when the company's official website publicly identifies that person for sales; otherwise use Sales desk or Contractor sales. Prefer suppliers serving the delivery ZIP. If a product specification differs, mark it likely instead of exact. Return an empty group when it cannot be verified.",
+      input: `Item number or description: ${query}\nDepartment: ${department || "Construction materials"}\nDelivery ZIP: ${zipCode || "11516"}\nDo not return these already checked domains: ${excludeDomains.join(", ") || "none"}.`,
       text: {
         format: {
           type: "json_schema",
-          name: "construction_product_prices",
+          name: "construction_product_sourcing",
           strict: true,
           schema: {
             type: "object",
             additionalProperties: false,
-            required: ["results"],
+            required: ["buyNow", "callForPrice", "salesContacts"],
             properties: {
-              results: {
+              buyNow: {
                 type: "array",
-                maxItems: 12,
+                maxItems: 5,
                 items: {
                   type: "object",
                   additionalProperties: false,
@@ -456,6 +475,41 @@ async function priceResearch(queryValue: unknown, departmentValue: unknown, zipC
                   },
                 },
               },
+              callForPrice: {
+                type: "array",
+                maxItems: 5,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["title", "url", "domain", "snippet", "phone", "matchConfidence"],
+                  properties: {
+                    title: { type: "string" },
+                    url: { type: "string" },
+                    domain: { type: "string" },
+                    snippet: { type: "string" },
+                    phone: { type: "string" },
+                    matchConfidence: { type: "string", enum: ["exact", "likely"] },
+                  },
+                },
+              },
+              salesContacts: {
+                type: "array",
+                maxItems: 5,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["company", "contactName", "role", "phone", "email", "url", "domain"],
+                  properties: {
+                    company: { type: "string" },
+                    contactName: { type: "string" },
+                    role: { type: "string" },
+                    phone: { type: "string" },
+                    email: { type: "string" },
+                    url: { type: "string" },
+                    domain: { type: "string" },
+                  },
+                },
+              },
             },
           },
         },
@@ -464,13 +518,17 @@ async function priceResearch(queryValue: unknown, departmentValue: unknown, zipC
   });
   const payload = await response.json() as Record<string, unknown>;
   if (!response.ok) throw new Error("AI price research could not run right now.");
-  let parsed: { results?: Array<Record<string, unknown>> };
+  let parsed: {
+    buyNow?: Array<Record<string, unknown>>;
+    callForPrice?: Array<Record<string, unknown>>;
+    salesContacts?: Array<Record<string, unknown>>;
+  };
   try {
-    parsed = JSON.parse(openAiOutputText(payload)) as { results?: Array<Record<string, unknown>> };
+    parsed = JSON.parse(openAiOutputText(payload)) as typeof parsed;
   } catch {
     throw new Error("AI price research returned an unreadable result.");
   }
-  const results = (parsed.results ?? []).flatMap((result): PriceResearchResult[] => {
+  const buyNow = (parsed.buyNow ?? []).flatMap((result): PriceResearchResult[] => {
     const url = directProductUrl(result.url);
     const priceText = typeof result.priceText === "string" && /\$\s?\d/.test(result.priceText) ? result.priceText.trim().slice(0, 40) : "";
     if (!url || !priceText) return [];
@@ -487,7 +545,39 @@ async function priceResearch(queryValue: unknown, departmentValue: unknown, zipC
       matchConfidence: result.matchConfidence === "exact" ? "exact" : "likely",
     }];
   });
-  return results;
+  const callForPrice = (parsed.callForPrice ?? []).flatMap((result): PriceResearchCallResult[] => {
+    const url = directProductUrl(result.url);
+    const phone = normalizePhone(result.phone);
+    if (!url || !phone) return [];
+    const domain = new URL(url).hostname.replace(/^www\./, "");
+    if (excludeDomains.includes(domain.toLowerCase())) return [];
+    return [{
+      title: typeof result.title === "string" ? result.title.trim().slice(0, 300) : domain,
+      url,
+      domain,
+      snippet: typeof result.snippet === "string" ? result.snippet.trim().slice(0, 1200) : "",
+      phone,
+      matchConfidence: result.matchConfidence === "exact" ? "exact" : "likely",
+    }];
+  });
+  const salesContacts = (parsed.salesContacts ?? []).flatMap((result): PriceResearchSalesContact[] => {
+    const url = directProductUrl(result.url);
+    const phone = normalizePhone(result.phone);
+    const email = validEmail(result.email);
+    if (!url || (!phone && !email)) return [];
+    const domain = new URL(url).hostname.replace(/^www\./, "");
+    if (excludeDomains.includes(domain.toLowerCase())) return [];
+    return [{
+      company: typeof result.company === "string" ? result.company.trim().slice(0, 200) : domain,
+      contactName: typeof result.contactName === "string" && result.contactName.trim() ? result.contactName.trim().slice(0, 160) : null,
+      role: typeof result.role === "string" && result.role.trim() ? result.role.trim().slice(0, 160) : "Sales desk",
+      phone,
+      email,
+      url,
+      domain,
+    }];
+  });
+  return { buyNow, callForPrice, salesContacts };
 }
 
 Deno.serve(async (req: Request) => {
@@ -593,7 +683,7 @@ Deno.serve(async (req: Request) => {
     }
     if (input.action === "price_research") {
       const results = await priceResearch(input.query, input.department, input.zipCode, input.excludeDomains);
-      return json({ ok: true, results, checkedAt: new Date().toISOString(), provider: "openai_web_search" });
+      return json({ ok: true, results: results.buyNow, ...results, checkedAt: new Date().toISOString(), provider: "openai_web_search" });
     }
     return json({ error: "Unsupported action" }, 400);
   } catch (error) {

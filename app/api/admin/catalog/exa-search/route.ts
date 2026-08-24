@@ -15,11 +15,12 @@ export async function POST(request: Request) {
       domains: Array.isArray(body.domains) ? body.domains.filter((value): value is string => typeof value === "string") : undefined,
       excludeDomains: Array.isArray(body.excludeDomains) ? body.excludeDomains.filter((value): value is string => typeof value === "string") : undefined,
     })
-    if (result.ok && result.results.length) return NextResponse.json(result)
-
     const { data, error } = await supabase.functions.invoke<{
       ok?: boolean
       results?: Array<Record<string, unknown>>
+      buyNow?: Array<Record<string, unknown>>
+      callForPrice?: Array<Record<string, unknown>>
+      salesContacts?: Array<Record<string, unknown>>
       checkedAt?: string
       error?: string
     }>("aura-messaging-broker", {
@@ -31,7 +32,16 @@ export async function POST(request: Request) {
         excludeDomains: Array.isArray(body.excludeDomains) ? body.excludeDomains.filter((value): value is string => typeof value === "string") : [],
       },
     })
-    if (!error && data?.ok) return NextResponse.json({ ok: true, results: data.results ?? [], checkedAt: data.checkedAt ?? new Date().toISOString(), fallbackLinks })
+    if (!error && data?.ok) return NextResponse.json({
+      ok: true,
+      results: data.buyNow ?? data.results ?? [],
+      buyNow: data.buyNow ?? data.results ?? [],
+      callForPrice: data.callForPrice ?? [],
+      salesContacts: data.salesContacts ?? [],
+      checkedAt: data.checkedAt ?? new Date().toISOString(),
+      fallbackLinks,
+    })
+    if (result.ok && result.results.length) return NextResponse.json({ ...result, buyNow: result.results, callForPrice: [], salesContacts: [] })
     return NextResponse.json({ ...result, error: data?.error || result.error, fallbackLinks }, { status: result.code === "invalid" ? 400 : 503 })
   } catch (error) {
     console.error("Manager Exa catalog search unauthorized or failed", error)
