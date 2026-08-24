@@ -21,7 +21,6 @@ import Link from "next/link";
 import { AddManagerGoal, CustomManagerGoals, type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { EmployeeClockStatus } from "@/components/buildflow/employee-clock-status";
 import { ManagerDashboardAiSearch } from "@/components/buildflow/manager-dashboard-ai-search";
-import { ManagerNotificationControl } from "@/components/buildflow/manager-notification-control";
 import { ManagerTodayTasks, type ManagerTodayTask } from "@/components/buildflow/manager-today-tasks";
 import { DAILY_WORK_SUMMARY_PREFIX, parseDailyWorkSummary } from "@/lib/daily-work-summary";
 import { requireManagerPortalProfile } from "@/lib/auth";
@@ -207,7 +206,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   ].filter((section) => section.links.length > 0);
 
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9"><div className="mx-auto max-w-7xl">
-    <header className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3"><h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1><ManagerNotificationControl /></header>
+    <header className="border-b border-slate-200 pb-3"><h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1></header>
 
     <section aria-label="Today workspace" className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
       <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled />

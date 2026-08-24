@@ -6,10 +6,12 @@ import { expect, test } from "@playwright/test";
 const root = process.cwd();
 
 test("manager push notifications stay private and cover business events", async () => {
-  const [api, sender, dashboard, control, serviceWorker, migration, quo, whatsapp, publicRequest, cart, quotes] = await Promise.all([
+  const [api, sender, dashboard, shell, adminClient, control, serviceWorker, migration, quo, whatsapp, publicRequest, cart, quotes] = await Promise.all([
     readFile(path.join(root, "app/api/manager-notifications/route.ts"), "utf8"),
     readFile(path.join(root, "lib/manager-push-notifications.ts"), "utf8"),
     readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
+    readFile(path.join(root, "lib/supabase/admin.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/manager-notification-control.tsx"), "utf8"),
     readFile(path.join(root, "public/sw.js"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260824011214_add_manager_web_push_notifications.sql"), "utf8"),
@@ -25,7 +27,9 @@ test("manager push notifications stay private and cover business events", async 
   expect(api).toContain('action: z.literal("subscribe")');
   expect(sender).toContain("get_manager_web_push_private_key");
   expect(sender).not.toContain("privateKey:");
-  expect(dashboard).toContain("ManagerNotificationControl");
+  expect(dashboard).not.toContain("ManagerNotificationControl");
+  expect(shell).toContain("<ManagerNotificationControl navigation />");
+  expect(adminClient).toContain("getSupabasePublicEnv().url");
   expect(control).toContain("Add to Home Screen");
   expect(control).toContain("Send test notification");
   expect(serviceWorker).toContain('self.addEventListener("push"');

@@ -104,7 +104,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
     }
 
     return isAdmin
-      ? [{ href: managerHref, label: "Manager", description: "Customers, suppliers, communications, and business tools", prominent: true }]
+      ? [{ href: managerHref, label: "Manager", description: "Customers, suppliers, communications, and business tools" }]
       : [];
   }, [isAdmin, isPreviewAdminEnabled, managerHref]);
 

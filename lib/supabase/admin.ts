@@ -2,6 +2,8 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 
+import { getSupabasePublicEnv } from "@/lib/supabase/env";
+
 function requireEnv(name: string, value: string | undefined) {
   if (!value) {
     throw new Error(`Missing required environment variable: ${name}`);
@@ -11,7 +13,7 @@ function requireEnv(name: string, value: string | undefined) {
 }
 
 export function createAdminClient() {
-  const url = requireEnv("NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const url = getSupabasePublicEnv().url;
   const serviceRoleKey = requireEnv(
     "SUPABASE_SERVICE_ROLE_KEY",
     process.env.SUPABASE_SERVICE_ROLE_KEY,

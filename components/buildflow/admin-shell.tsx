@@ -1,9 +1,7 @@
 "use client";
 
 import {
-  ChevronLeft,
   Archive,
-  ChevronRight,
   Columns3,
   CreditCard,
   LayoutDashboard,
@@ -24,6 +22,7 @@ import { useState, type ReactNode } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { EmployeeActivityReporter } from "@/components/buildflow/employee-activity-reporter";
+import { ManagerNotificationControl } from "@/components/buildflow/manager-notification-control";
 
 const GOOGLE_MEET_URL = "https://meet.google.com/";
 const communicationLinks = [
@@ -86,9 +85,8 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
         <Link href={homeHref} onClick={onNavigate} aria-label="Avantia Build manager portal">
           <AvantiaBuildLockup />
         </Link>
-        <Link href="/" onClick={onNavigate} className="mt-4 flex min-h-10 items-center gap-2 text-sm font-semibold text-[#0066cc] hover:text-[#004f9e]">
-          <ChevronLeft className="h-4 w-4" />
-          Go to Customer Website
+        <Link href="/" onClick={onNavigate} className="mt-4 flex min-h-10 items-center text-sm font-semibold text-[#0066cc] hover:text-[#004f9e]">
+          Customer Website
         </Link>
       </div>
 
@@ -96,13 +94,12 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
         <Link href={homeHref} onClick={onNavigate} className={`group flex min-h-11 items-center gap-3 rounded-md px-2 text-sm font-semibold transition ${isActive(pathname, homeHref) ? "bg-sky-50 text-[#0066cc]" : "text-slate-800 hover:bg-slate-50"}`}>
           <LayoutDashboard className="h-5 w-5 shrink-0" />
           <span className="min-w-0 flex-1">Manager Dashboard</span>
-          <ChevronRight className="h-3.5 w-3.5 text-slate-300 transition group-hover:translate-x-0.5" aria-hidden="true" />
         </Link>
         <div className="mt-1">
           {links.map((link) => {
             const Icon = link.icon;
             const active = isActive(pathname, link.href);
-            return <Link key={link.href} href={link.href} onClick={onNavigate} className={`group flex min-h-11 items-center gap-3 rounded-md px-2 text-sm font-semibold transition ${active ? "bg-sky-50 text-[#0066cc]" : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"}`}><Icon className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1">{link.label}</span><ChevronRight className="h-3.5 w-3.5 text-slate-300 transition group-hover:translate-x-0.5" aria-hidden="true" /></Link>;
+            return <Link key={link.href} href={link.href} onClick={onNavigate} className={`group flex min-h-11 items-center gap-3 rounded-md px-2 text-sm font-semibold transition ${active ? "bg-sky-50 text-[#0066cc]" : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"}`}><Icon className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1">{link.label}</span></Link>;
           })}
         </div>
       </nav>
@@ -111,7 +108,6 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
         {access.communications ? <Link href="/admin/communications" onClick={onNavigate} className={`mb-2 flex min-h-11 items-center gap-3 rounded-md px-2 text-sm font-semibold ${isActive(pathname, "/admin/communications") ? "bg-sky-50 text-[#0066cc]" : "text-slate-800 hover:bg-slate-50"}`}>
           <PhoneCall className="h-4 w-4 shrink-0" />
           <span className="min-w-0 flex-1">Messages &amp; Calls</span>
-          <ChevronRight className="h-3.5 w-3.5 text-slate-300" aria-hidden="true" />
         </Link> : null}
         <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Quick Access</p>
         <div className="grid grid-cols-2 gap-1" aria-label="Communication shortcuts">
@@ -129,6 +125,7 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
           <UserRound className="h-4 w-4" />
           My Account
         </Link>
+        <ManagerNotificationControl navigation />
         <EmployeeActivityReporter owner={access.owner} />
       </div>
     </div>
@@ -156,7 +153,7 @@ export function AdminShell({ children, access }: { children: ReactNode; access: 
             <Menu className="h-5 w-5" />
           </button>
           <div className="min-w-0"><AvantiaBuildLockup compact /></div>
-          <span className="inline-flex h-11 items-center rounded-lg bg-slate-950 px-3 text-xs font-bold uppercase tracking-[0.12em] text-white">{access.owner ? "Owner" : "Manager"}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{access.owner ? "Owner" : "Manager"}</span>
         </header>
         {children}
       </div>

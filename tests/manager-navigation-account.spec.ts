@@ -5,20 +5,20 @@ import { expect, test } from "@playwright/test";
 
 const root = process.cwd();
 
-test("customer navigation exposes one prominent manager entry and My Account", async () => {
+test("customer navigation exposes one clean manager entry and My Account", async () => {
   const [header, drawer] = await Promise.all([
     readFile(path.join(root, "components/buildflow/mobile-client-header.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/mobile-menu-drawer.tsx"), "utf8"),
   ]);
 
   expect(header).toContain('label: "Manager"');
-  expect(header).toContain("prominent: true");
+  expect(header).not.toContain("prominent: true");
   expect(header).not.toContain('href: "/admin/ai-tools"');
   expect(header).not.toContain('href: "/admin/traffic"');
   expect(header).not.toContain('href: "/admin/users"');
   expect(header).not.toContain('href: "/admin/vendors"');
   expect(drawer).toContain("My Account");
-  expect(drawer).toContain("link.prominent");
+  expect(drawer).not.toContain(">›</span>");
 });
 
 test("My Account remains personal and saves notification preferences", async () => {
