@@ -1,8 +1,9 @@
-import { renderShopToolPage } from "@/app/shop/tool-page"
+import { permanentRedirect } from "next/navigation"
+
 import { shopDepartmentMetadata } from "@/lib/site-metadata"
 
 export const metadata = shopDepartmentMetadata("paper-work", "Paperwork")
 
-export default async function PaperWorkPage({ searchParams }: { searchParams?: Promise<{ project?: string }> }) {
-  return renderShopToolPage("paper-work", searchParams)
+export default function PaperWorkPage() {
+  permanentRedirect("/shop?category=Services")
 }
