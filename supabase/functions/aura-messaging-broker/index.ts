@@ -168,7 +168,7 @@ async function handleTwilioWebhook(req: Request) {
   if (!config) return twiml(503);
   const rawBody = await req.text();
   const params = new URLSearchParams(rawBody);
-  const canonicalUrl = req.headers.get("x-avantia-canonical-url") || "";
+  const canonicalUrl = req.headers.get("x-avantia-canonical-url") || req.url;
   if (!await validTwilioSignature(canonicalUrl, params, req.headers.get("x-twilio-signature"), config.authToken)) {
     return twiml(401);
   }

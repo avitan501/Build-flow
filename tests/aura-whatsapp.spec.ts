@@ -49,15 +49,18 @@ test("Aura webhook rejects unverified requests", async ({ request }) => {
   expect(unsignedTwilioWebhook.status()).toBe(401);
 });
 
-test("Twilio replies use the same server connection as outbound WhatsApp", async () => {
-  const route = await readFile(
-    path.join(process.cwd(), "app/api/aura/whatsapp/twilio/route.ts"),
-    "utf8",
-  );
+test("Twilio replies use the direct connection or the secure Vault broker", async () => {
+  const [route, broker] = await Promise.all([
+    readFile(path.join(process.cwd(), "app/api/aura/whatsapp/twilio/route.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+  ]);
 
   expect(route).toContain("verifyTwilioWhatsAppRequest(request.url, signature, params)");
   expect(route).toContain("await processTwilioWhatsAppWebhook(params)");
-  expect(route).not.toContain("functions/v1/aura-messaging-broker?mode=twilio-webhook");
+  expect(route).toContain("functions/v1/aura-messaging-broker?mode=twilio-webhook");
+  expect(route).toContain('"x-avantia-canonical-url": request.url');
+  expect(route).toContain("if (!storedByBroker) await processTwilioWhatsAppWebhook(params)");
+  expect(broker).toContain('req.headers.get("x-avantia-canonical-url") || req.url');
 });
 
 test("missed Twilio replies are synchronized and ADD commands remain idempotent", async () => {

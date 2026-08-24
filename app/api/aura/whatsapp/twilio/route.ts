@@ -1,9 +1,11 @@
 import { processAuraOwnerCommand } from "@/lib/aura/owner-command";
 import {
+  canUseTwilioWhatsApp,
   processTwilioWhatsAppWebhook,
   verifyTwilioWhatsAppRequest,
 } from "@/lib/aura/twilio-whatsapp";
 import { notifyManagersSafely } from "@/lib/manager-push-notifications";
+import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -24,15 +26,46 @@ function twimlResponse(status = 200, message = "") {
   });
 }
 
+async function forwardToSecureAuraBroker(request: Request, signature: string, rawBody: string) {
+  const { url, anonKey } = getSupabasePublicEnv();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!serviceRoleKey) return false;
+
+  const response = await fetch(`${url}/functions/v1/aura-messaging-broker?mode=twilio-webhook`, {
+    method: "POST",
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "x-avantia-canonical-url": request.url,
+      "x-twilio-signature": signature,
+    },
+    body: rawBody,
+    cache: "no-store",
+  });
+  return response.ok;
+}
+
 export async function POST(request: Request) {
   const signature = request.headers.get("x-twilio-signature");
   if (!signature) return twimlResponse(401);
   const rawBody = await request.text();
   const params = new URLSearchParams(rawBody);
-  if (!verifyTwilioWhatsAppRequest(request.url, signature, params)) return twimlResponse(401);
+
+  let storedByBroker = false;
+  if (canUseTwilioWhatsApp()) {
+    if (!verifyTwilioWhatsAppRequest(request.url, signature, params)) return twimlResponse(401);
+  } else {
+    try {
+      storedByBroker = await forwardToSecureAuraBroker(request, signature, rawBody);
+    } catch {
+      return twimlResponse(503);
+    }
+    if (!storedByBroker) return twimlResponse(401);
+  }
 
   try {
-    await processTwilioWhatsAppWebhook(params);
+    if (!storedByBroker) await processTwilioWhatsAppWebhook(params);
 
     const from = (params.get("From") || "").replace(/^whatsapp:/i, "");
     const body = (params.get("Body") || "").trim();
