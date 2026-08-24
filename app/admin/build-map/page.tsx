@@ -4,6 +4,7 @@ import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ClipboardList,
   CreditCard,
   MessageCircleQuestion,
@@ -121,23 +122,28 @@ function formatUpdated(value: string) {
 }
 
 function FixedTarget({ title, detail, href, icon: Icon }: { title: string; detail: string; href: string; icon: typeof Target }) {
-  return <Link href={href} className="group flex min-h-16 items-center gap-3 border-b border-slate-100 px-1 py-3 last:border-b-0">
+  return <Link href={href} className="group flex min-h-14 items-center gap-3 border-b border-slate-100 py-2.5 last:border-b-0">
     <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-700"><Icon className="h-4 w-4" /></span>
     <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-950">{title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{detail}</span></span>
     <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" />
   </Link>;
 }
 
-function PersonGoals({ assignee, goals, children }: { assignee: "carlos" | "david"; goals: ManagerGoalRecord[]; children: React.ReactNode }) {
+function GoalDisclosure({ assignee, goals, priorityCount, children }: { assignee: "carlos" | "david"; goals: ManagerGoalRecord[]; priorityCount: number; children: React.ReactNode }) {
   const name = assignee === "carlos" ? "Carlos" : "David";
-  return <section className="border-t border-slate-200 pt-5 first:border-t-0 first:pt-0">
-    <header className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-3"><span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-slate-950 text-white"><UserRound className="h-5 w-5" /></span><div><h2 className="text-xl font-semibold">{name}</h2><p className="text-xs text-slate-500">{goals.filter((goal) => goal.status === "open").length} custom goals open</p></div></div>
-      <AddManagerGoal assignee={assignee} />
-    </header>
-    <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 shadow-sm">{children}</div>
-    <CustomManagerGoals goals={goals} />
-  </section>;
+  const openGoals = goals.filter((goal) => goal.status === "open").length;
+  return <details className="group border-t border-slate-200 first:border-t-0">
+    <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 py-3">
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white"><UserRound className="h-4 w-4" /></span>
+      <span className="min-w-0 flex-1"><strong className="block text-sm font-semibold">{name} goals</strong><span className="mt-0.5 block text-xs text-slate-500">{priorityCount} priorities{openGoals ? ` · ${openGoals} custom open` : ""}</span></span>
+      <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true" />
+    </summary>
+    <div className="border-t border-slate-100 bg-slate-50/60 p-3 sm:p-4">
+      <div className="flex justify-end"><AddManagerGoal assignee={assignee} /></div>
+      <div className="mt-2 rounded-md border border-slate-200 bg-white px-3">{children}</div>
+      <CustomManagerGoals goals={goals} />
+    </div>
+  </details>;
 }
 
 export default async function AdminDashboardPage({ searchParams }: { searchParams: Promise<{ stage?: string }> }) {
@@ -230,19 +236,19 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
       {visibleRequests.length ? <div>{visibleRequests.map(({ request, stage: requestStage }) => { const client = clientMap.get(request.owner_id); const stageInfo = pipelineStages.find((item) => item.id === requestStage)!; const StatusIcon = stageInfo.icon; return <Link key={request.id} href={`/owner/materials/requests/${request.id}`} className="group flex min-h-16 items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50"><span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border ${pipelineTone[requestStage]}`} title={stageInfo.symbolLabel}><StatusIcon className="h-4 w-4" aria-hidden="true" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{request.title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{client?.full_name || client?.email || "Client"} · {stageInfo.label}</span></span><span className="hidden shrink-0 text-xs text-slate-400 sm:block">{formatUpdated(request.updated_at)}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" /></Link>; })}</div> : <p className="px-4 py-8 text-center text-sm text-slate-500">No open requests in this stage.</p>}
     </section>
 
-    <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="border-b border-slate-200 px-4 py-3"><h2 id="targets-heading" className="font-semibold">Carlos targets</h2><p className="mt-0.5 text-xs text-slate-500">Open goals and daily outreach priorities</p></header><div className="grid gap-7 p-4 sm:p-5">
-      <PersonGoals assignee="carlos" goals={regularGoals.filter((goal) => goal.assignee === "carlos")}>
+    <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="border-b border-slate-200 px-4 py-3"><h2 id="targets-heading" className="font-semibold">Goals</h2><p className="mt-0.5 text-xs text-slate-500">Open a person to view priorities and add goals</p></header>
+      <GoalDisclosure assignee="carlos" priorityCount={3} goals={regularGoals.filter((goal) => goal.assignee === "carlos")}>
         <FixedTarget title="Client Target" detail={`${openLeads} open leads · ${clients.length} active clients`} href="/admin/goals-progress" icon={Users} />
         <FixedTarget title="Find suppliers' best-priced items" detail="Collect pricing and update the material catalog" href="/admin/catalog" icon={ShoppingCart} />
         <FixedTarget title="Supplier Affiliate Program" detail="Track applications and supplier opportunities" href="/admin/goals-progress" icon={Store} />
-      </PersonGoals>
-      {access.owner ? <details className="group border-t border-slate-200 pt-4"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between"><span className="font-semibold">David goals</span><span className="text-xs font-semibold text-[#0066cc] group-open:hidden">Open</span></summary><div className="pt-4"><PersonGoals assignee="david" goals={regularGoals.filter((goal) => goal.assignee === "david")}>
+      </GoalDisclosure>
+      {access.owner ? <GoalDisclosure assignee="david" priorityCount={2} goals={regularGoals.filter((goal) => goal.assignee === "david")}>
           <FixedTarget title="Fix Website" detail={`${websiteNotes.filter((goal) => goal.status === "open").length} open website notes`} href="/admin/goals-progress" icon={CheckCircle2} />
           <FixedTarget title="Launch Beat Your Quote" detail="Campaign, flyer, and customer upload flow" href="/admin/goals-progress" icon={Send} />
-        </PersonGoals></div></details> : null}
-    </div></section>
+        </GoalDisclosure> : null}
+    </section>
 
-    <details className="group mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4"><span><strong id="manager-tools-heading" className="text-base">Manager tools</strong><span className="ml-2 text-xs text-slate-500">Directories, suppliers, and settings</span></span><span className="text-xs font-semibold text-[#0066cc] group-open:hidden">Open</span></summary><div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-3">{managerSections.map((section) => { const Icon = section.icon; return <section key={section.title} className="overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="flex items-center gap-3 border-b border-slate-100 px-3 py-2"><span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-[#0066cc]"><Icon className="h-4 w-4" /></span><h3 className="text-sm font-semibold">{section.title}</h3></header><div>{section.links.map((item) => { const external = item.href.startsWith("https://"); return <Link key={item.href} href={item.href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="group flex min-h-11 items-center justify-between gap-3 border-b border-slate-100 px-3 text-sm font-semibold text-slate-700 last:border-b-0 hover:bg-slate-50 hover:text-[#0066cc]"><span>{item.label}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5" /></Link>; })}</div></section>; })}</div></details>
+    <details className="group mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"><summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4"><Store className="h-4 w-4 text-[#0066cc]" /><span className="min-w-0 flex-1"><strong id="manager-tools-heading" className="block text-sm">Manager tools</strong><span className="block truncate text-xs text-slate-500">Directories, suppliers, and settings</span></span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" /></summary><div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-3">{managerSections.map((section) => { const Icon = section.icon; return <section key={section.title} className="overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="flex items-center gap-3 border-b border-slate-100 px-3 py-2"><span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-[#0066cc]"><Icon className="h-4 w-4" /></span><h3 className="text-sm font-semibold">{section.title}</h3></header><div>{section.links.map((item) => { const external = item.href.startsWith("https://"); return <Link key={item.href} href={item.href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="group flex min-h-11 items-center justify-between gap-3 border-b border-slate-100 px-3 text-sm font-semibold text-slate-700 last:border-b-0 hover:bg-slate-50 hover:text-[#0066cc]"><span>{item.label}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5" /></Link>; })}</div></section>; })}</div></details>
 
     <section aria-labelledby="dashboard-settings-heading" className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="border-b border-slate-100 px-4 py-3"><h2 id="dashboard-settings-heading" className="text-sm font-semibold">Settings</h2></header><ManagerNotificationControl settings /></section>
   </div></main>;

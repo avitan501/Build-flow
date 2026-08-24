@@ -14,7 +14,7 @@ test("Goals and Client Target stay in the dashboard instead of manager navigatio
   expect(shell).not.toContain("sharedMoreLinks");
   expect(shell).not.toContain('label: "Directories & Catalog"');
   expect(shell).not.toContain('label: "Supplier Pricing"');
-  expect(shell).toContain("Go to Customer Website");
+  expect(shell).toContain("Customer Website");
   expect(shell).toContain("Quick Access");
   expect(shell).not.toContain('label: "Tasks"');
   expect(shell).not.toContain('label: "Quotes & Orders"');
@@ -54,7 +54,7 @@ test("Goals & Progress allows manager employees while owner controls stay protec
   expect(page).toContain('if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos")');
   expect(page).toContain('access.owner ? <section aria-labelledby="david-goals-title"');
   expect(dashboard).toContain('if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos")');
-  expect(dashboard).toContain('access.owner ? <details className="group border-t border-slate-200 pt-4"');
+  expect(dashboard).toContain('access.owner ? <GoalDisclosure assignee="david" priorityCount={2}');
   expect(actions).toContain('if (!access.owner && assignee !== "carlos")');
   expect(actions.match(/if \(!access\.owner\).*\.eq\("assignee", "carlos"\)/g)?.length).toBe(2);
 });
