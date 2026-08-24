@@ -378,6 +378,118 @@ async function dashboardAi(queryValue: unknown, contextValue: unknown, modelValu
   return answer;
 }
 
+type PriceResearchResult = {
+  title: string;
+  url: string;
+  domain: string;
+  snippet: string;
+  imageUrl: null;
+  priceText: string;
+  publishedDate: string | null;
+  matchConfidence: "exact" | "likely";
+};
+
+function directProductUrl(value: unknown) {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value.trim());
+    if (!/^https?:$/.test(url.protocol)) return null;
+    if (/(^|\/)(search|s)(\/|$)/i.test(url.pathname)) return null;
+    if (["q", "query", "search", "searchTerm", "keyword", "tbm"].some((key) => url.searchParams.has(key))) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+async function priceResearch(queryValue: unknown, departmentValue: unknown, zipCodeValue: unknown, excludeDomainsValue: unknown) {
+  const apiKey = await secret(secretNames.openaiKey);
+  if (!apiKey) throw new Error("Avantia AI is not connected.");
+  const query = typeof queryValue === "string" ? queryValue.trim().slice(0, 300) : "";
+  const department = typeof departmentValue === "string" ? departmentValue.trim().slice(0, 100) : "";
+  const zipCode = typeof zipCodeValue === "string" ? zipCodeValue.replace(/[^0-9-]/g, "").slice(0, 10) : "11516";
+  const excludeDomains = Array.isArray(excludeDomainsValue)
+    ? excludeDomainsValue.filter((value): value is string => typeof value === "string").map((value) => value.trim().toLowerCase()).filter(Boolean).slice(0, 15)
+    : [];
+  if (query.length < 2) throw new Error("Enter a material or product to research.");
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: dashboardAiModels.terra.id,
+      store: false,
+      reasoning: { effort: "low" },
+      max_output_tokens: 2400,
+      tools: [{
+        type: "web_search_preview",
+        search_context_size: "medium",
+        user_location: { type: "approximate", country: "US", region: "New York" },
+      }],
+      tool_choice: "required",
+      instructions: "You research current US construction-material prices for Avantia Build. Find only direct purchasable product-detail pages with a visibly published price. Never return search pages, category pages, articles, installers, lead-generation pages, estimates, or invented prices. Match the requested model, material, dimensions, grade, thickness, package quantity, and unit as closely as possible. Use multiple independent suppliers. If a specification differs, mark it likely instead of exact. Return no row when a direct page or displayed price cannot be verified.",
+      input: `Product: ${query}\nDepartment: ${department || "Construction materials"}\nDelivery ZIP: ${zipCode || "11516"}\nDo not return these already checked domains: ${excludeDomains.join(", ") || "none"}.`,
+      text: {
+        format: {
+          type: "json_schema",
+          name: "construction_product_prices",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required: ["results"],
+            properties: {
+              results: {
+                type: "array",
+                maxItems: 12,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["title", "url", "domain", "snippet", "priceText", "matchConfidence"],
+                  properties: {
+                    title: { type: "string" },
+                    url: { type: "string" },
+                    domain: { type: "string" },
+                    snippet: { type: "string" },
+                    priceText: { type: "string" },
+                    matchConfidence: { type: "string", enum: ["exact", "likely"] },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+  });
+  const payload = await response.json() as Record<string, unknown>;
+  if (!response.ok) throw new Error("AI price research could not run right now.");
+  let parsed: { results?: Array<Record<string, unknown>> };
+  try {
+    parsed = JSON.parse(openAiOutputText(payload)) as { results?: Array<Record<string, unknown>> };
+  } catch {
+    throw new Error("AI price research returned an unreadable result.");
+  }
+  const results = (parsed.results ?? []).flatMap((result): PriceResearchResult[] => {
+    const url = directProductUrl(result.url);
+    const priceText = typeof result.priceText === "string" && /\$\s?\d/.test(result.priceText) ? result.priceText.trim().slice(0, 40) : "";
+    if (!url || !priceText) return [];
+    const domain = new URL(url).hostname.replace(/^www\./, "");
+    if (excludeDomains.includes(domain.toLowerCase())) return [];
+    return [{
+      title: typeof result.title === "string" ? result.title.trim().slice(0, 300) : domain,
+      url,
+      domain,
+      snippet: typeof result.snippet === "string" ? result.snippet.trim().slice(0, 1200) : "",
+      imageUrl: null,
+      priceText,
+      publishedDate: null,
+      matchConfidence: result.matchConfidence === "exact" ? "exact" : "likely",
+    }];
+  });
+  return results;
+}
+
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   if (req.method === "POST" && url.searchParams.get("mode") === "twilio-webhook") {
@@ -478,6 +590,10 @@ Deno.serve(async (req: Request) => {
     if (input.action === "dashboard_ai") {
       const answer = await dashboardAi(input.query, input.context, input.model, input.imageDataUrl);
       return json({ ok: true, answer });
+    }
+    if (input.action === "price_research") {
+      const results = await priceResearch(input.query, input.department, input.zipCode, input.excludeDomains);
+      return json({ ok: true, results, checkedAt: new Date().toISOString(), provider: "openai_web_search" });
     }
     return json({ error: "Unsupported action" }, 400);
   } catch (error) {

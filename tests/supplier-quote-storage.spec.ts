@@ -128,7 +128,7 @@ test("client request chart keeps quantity, item, and details in stable columns",
 })
 
 test("client material lists are organized securely in the background", async () => {
-  const [requestAction, publicIntake, aiFunction, ownerPage, ownerActions, organizerButton, organizedList, reviewEditor, priceCheck, supplierDraft] = await Promise.all([
+  const [requestAction, publicIntake, aiFunction, ownerPage, ownerActions, organizerButton, organizedList, reviewEditor, priceCheck, supplierDraft, priceRoute, messagingBroker] = await Promise.all([
     readFile(path.join(root, "app/request-quote/actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/public-quote-intake/index.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/client-material-list-ai/index.ts"), "utf8"),
@@ -139,6 +139,8 @@ test("client material lists are organized securely in the background", async () 
     readFile(path.join(root, "components/buildflow/material-review-editor.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-price-check.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/[requestId]/supplier-request/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/api/admin/catalog/exa-search/route.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
   ])
 
   expect(requestAction).toContain("organizeMaterialListAfterResponse")
@@ -199,6 +201,8 @@ test("client material lists are organized securely in the background", async () 
   expect(priceCheck).toContain("AI price research")
   expect(priceCheck).toContain("fallbackLinks")
   expect(priceCheck).toContain("Find more sources")
+  expect(priceRoute).toContain('action: "price_research"')
+  expect(messagingBroker).toContain('type: "web_search_preview"')
   expect(priceCheck).toContain("matchConfidence")
   expect(ownerActions).toContain("organizeClientMaterialRequestAction")
   expect(ownerActions).toContain("updateOrganizedMaterialItemAction")
