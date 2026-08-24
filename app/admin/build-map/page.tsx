@@ -1,18 +1,19 @@
 import {
   ArrowRight,
+  BadgeDollarSign,
   BarChart3,
   CalendarDays,
   CheckCircle2,
   ClipboardList,
-  Clock3,
   CreditCard,
-  PackageCheck,
+  MessageCircleQuestion,
   PhoneCall,
   Send,
   ShoppingCart,
   Sparkles,
   Store,
   Target,
+  Truck,
   UserRound,
   Users,
 } from "lucide-react";
@@ -72,40 +73,35 @@ const pipelineStages: Array<{
   label: string;
   description: string;
   icon: typeof ClipboardList;
-  tone: string;
-  numberTone: string;
+  symbolLabel: string;
 }> = [
   {
     id: "received",
     label: "Received / needs shopping",
     description: "New client requests that still need supplier pricing.",
     icon: ClipboardList,
-    tone: "border-amber-200 bg-amber-50",
-    numberTone: "text-amber-900",
+    symbolLabel: "New request",
   },
   {
     id: "pricing",
     label: "Priced / not sent",
     description: "Supplier pricing received, but no client quote was sent.",
-    icon: ShoppingCart,
-    tone: "border-sky-200 bg-sky-50",
-    numberTone: "text-sky-900",
+    icon: BadgeDollarSign,
+    symbolLabel: "Pricing ready",
   },
   {
     id: "approval",
     label: "Waiting for client",
     description: "Client quote sent and waiting for approval.",
-    icon: Clock3,
-    tone: "border-violet-200 bg-violet-50",
-    numberTone: "text-violet-900",
+    icon: MessageCircleQuestion,
+    symbolLabel: "Waiting for client reply",
   },
   {
     id: "delivery",
     label: "Payment received / delivery",
     description: "Payment received; supplier delivery still needs completion.",
-    icon: PackageCheck,
-    tone: "border-emerald-200 bg-emerald-50",
-    numberTone: "text-emerald-900",
+    icon: Truck,
+    symbolLabel: "Ready for delivery",
   },
 ];
 
@@ -218,11 +214,11 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
     {!pipelineAvailable ? <p role="alert" className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Some request counts could not load. Refresh before using the pipeline totals.</p> : null}
 
     <section aria-labelledby="pipeline-heading" className="mt-5"><div className="flex items-center justify-between gap-3"><div><h2 id="pipeline-heading" className="text-xl font-semibold">Orders &amp; Requests</h2><p className="mt-1 text-xs text-slate-500">Open work only. Completed and cancelled requests are excluded.</p></div>{selectedStage ? <Link href="/admin/build-map#open-requests" className="text-xs font-semibold text-[#0066cc]">Show all</Link> : null}</div>
-      <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">{pipelineStages.map((item) => { const Icon = item.icon; return <Link key={item.id} href={`/admin/build-map?stage=${item.id}#open-requests`} className={`flex min-h-24 items-center gap-3 rounded-lg border p-3 transition hover:shadow-sm ${item.tone}`}><Icon className="h-4 w-4 shrink-0 text-slate-700" /><div className="min-w-0 flex-1"><span className={`text-2xl font-semibold tabular-nums ${item.numberTone}`}>{stageCounts.get(item.id) ?? 0}</span><h3 className="mt-0.5 text-xs font-semibold leading-4">{item.label}</h3></div></Link>; })}</div>
+      <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">{pipelineStages.map((item) => { const Icon = item.icon; return <Link key={item.id} href={`/admin/build-map?stage=${item.id}#open-requests`} className="flex min-h-24 items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:shadow-sm"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-800" title={item.symbolLabel}><Icon className="h-5 w-5" aria-hidden="true" /></span><div className="min-w-0 flex-1"><span className="text-2xl font-semibold tabular-nums text-slate-950">{stageCounts.get(item.id) ?? 0}</span><h3 className="mt-0.5 text-xs font-semibold leading-4">{item.label}</h3></div></Link>; })}</div>
     </section>
 
     <section id="open-requests" className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"><header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><h2 className="font-semibold">{selectedStage ? pipelineStages.find((item) => item.id === selectedStage)?.label : "Requests needing work"}</h2><p className="mt-0.5 text-xs text-slate-500">Most recently updated first</p></div><span className="text-sm font-semibold tabular-nums text-slate-500">{selectedStage ? stageCounts.get(selectedStage) : requests.length}</span></header>
-      {visibleRequests.length ? <div>{visibleRequests.map(({ request, stage: requestStage }) => { const client = clientMap.get(request.owner_id); const stageInfo = pipelineStages.find((item) => item.id === requestStage)!; return <Link key={request.id} href={`/owner/materials/requests/${request.id}`} className="group flex min-h-16 items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${requestStage === "received" ? "bg-amber-500" : requestStage === "pricing" ? "bg-sky-500" : requestStage === "approval" ? "bg-violet-500" : "bg-emerald-500"}`} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{request.title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{client?.full_name || client?.email || "Client"} · {stageInfo.label}</span></span><span className="hidden shrink-0 text-xs text-slate-400 sm:block">{formatUpdated(request.updated_at)}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" /></Link>; })}</div> : <p className="px-4 py-8 text-center text-sm text-slate-500">No open requests in this stage.</p>}
+      {visibleRequests.length ? <div>{visibleRequests.map(({ request, stage: requestStage }) => { const client = clientMap.get(request.owner_id); const stageInfo = pipelineStages.find((item) => item.id === requestStage)!; const StatusIcon = stageInfo.icon; return <Link key={request.id} href={`/owner/materials/requests/${request.id}`} className="group flex min-h-16 items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50"><span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-700" title={stageInfo.symbolLabel}><StatusIcon className="h-4 w-4" aria-hidden="true" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{request.title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{client?.full_name || client?.email || "Client"} · {stageInfo.label}</span></span><span className="hidden shrink-0 text-xs text-slate-400 sm:block">{formatUpdated(request.updated_at)}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" /></Link>; })}</div> : <p className="px-4 py-8 text-center text-sm text-slate-500">No open requests in this stage.</p>}
     </section>
 
     <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="border-b border-slate-200 px-4 py-3"><h2 id="targets-heading" className="font-semibold">Carlos targets</h2><p className="mt-0.5 text-xs text-slate-500">Open goals and daily outreach priorities</p></header><div className="grid gap-7 p-4 sm:p-5">

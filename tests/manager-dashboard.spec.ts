@@ -21,6 +21,10 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain("Priced / not sent");
   expect(page).toContain("Waiting for client");
   expect(page).toContain("Payment received / delivery");
+  expect(page).toContain("BadgeDollarSign");
+  expect(page).toContain("MessageCircleQuestion");
+  expect(page).toContain("Ready for delivery");
+  expect(page).not.toContain('className={`h-2.5 w-2.5 shrink-0 rounded-full');
   expect(page).toContain("client_quote_status");
   expect(page).toContain("Carlos targets");
   expect(page).toContain('assignee="carlos"');
