@@ -242,7 +242,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                   {!isSelf && customer.role === "client" ? <div className="w-full border-t border-slate-200 pt-3"><DeleteManagerRecordButton id={customer.id} kind="customer" label={customerName(customer)} projectCount={projectCount.get(customer.id) ?? 0} requestCount={requestCount.get(customer.id) ?? 0} /></div> : null}
                 </div></details> : null}
                 </div>
-                <ContactConversation entries={conversationEntries} />
+                <ContactConversation entries={conversationEntries} historyHref={`/admin/communications?channel=whatsapp&q=${encodeURIComponent(customer.phone || customer.email || customerName(customer))}`} />
               </article>
             })}
             {filteredCustomers.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No customers match this search.</p> : null}

@@ -160,7 +160,7 @@ export function OutreachLeadDirectory({ leads, conversations, senderName }: { le
           <div className="ml-auto"><ContactActions name={lead.full_name} phone={lead.phone} email={lead.email} senderName={senderName} /></div>
         </div>
       </div>
-      <ContactConversation entries={conversations[lead.id] ?? []} />
+      <ContactConversation entries={conversations[lead.id] ?? []} historyHref={`/admin/communications?channel=whatsapp&q=${encodeURIComponent(lead.phone || lead.email || lead.full_name)}`} />
     </article>)}
     {error ? <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
   </section>;

@@ -97,7 +97,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
       .from("aura_communications")
       .select("id, contact_id, provider, channel, direction, counterparty_phone, counterparty_email, subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at")
       .order("occurred_at", { ascending: false })
-      .limit(50),
+      .limit(500),
     supabase
       .from("profiles")
       .select("id, full_name, company_name, phone, email")

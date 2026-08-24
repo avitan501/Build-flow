@@ -79,6 +79,7 @@ export type CatalogSupplier = {
   name: string
   email?: string
   phone?: string
+  whatsapp?: string
   portalUrl?: string
   materials?: string | string[]
   trustLevel?: SupplierTrustLevel
@@ -150,10 +151,10 @@ export function supplierIsAddedToCatalogDepartment(
 }
 
 export function supplierCanReceiveDepartmentRequest(
-  supplier: Pick<CatalogSupplier, "catalogDepartments" | "email" | "trustLevel">,
+  supplier: Pick<CatalogSupplier, "catalogDepartments" | "email" | "phone" | "whatsapp" | "trustLevel">,
   department: string,
 ) {
-  return Boolean(supplier.email?.trim())
+  return Boolean(supplier.email?.trim() || supplier.phone?.trim() || supplier.whatsapp?.trim())
     && hasRoutableSupplierTrust(supplier.trustLevel)
     && supplierServesMaterialDepartment(supplier, department)
 }

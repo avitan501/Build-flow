@@ -27,11 +27,10 @@ import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { EmployeeActivityReporter } from "@/components/buildflow/employee-activity-reporter";
 
 const GOOGLE_MEET_URL = "https://meet.google.com/";
-const WHATSAPP_CALL_URL = "https://web.whatsapp.com/";
 const communicationLinks = [
   { href: "/admin/communications", label: "Calls & Communications", shortLabel: "Calls", icon: PhoneCall },
   { href: GOOGLE_MEET_URL, label: "Open Google Meet", shortLabel: "Meet", icon: Video },
-  { href: WHATSAPP_CALL_URL, label: "Open WhatsApp to make a call", shortLabel: "WhatsApp", icon: MessageCircle },
+  { href: "/admin/communications?channel=whatsapp", label: "View all WhatsApp conversations", shortLabel: "WhatsApp", icon: MessageCircle },
 ] as const;
 
 type ManagerAccess = {

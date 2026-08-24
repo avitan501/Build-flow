@@ -30,7 +30,7 @@ test("manager navigation is compact and keeps communication shortcuts at the bot
   expect(shell).toContain('shortLabel: "Meet"')
   expect(shell).toContain('shortLabel: "WhatsApp"')
   expect(shell).toContain('const GOOGLE_MEET_URL = "https://meet.google.com/"')
-  expect(shell).toContain('const WHATSAPP_CALL_URL = "https://web.whatsapp.com/"')
+  expect(shell).toContain('/admin/communications?channel=whatsapp')
   expect(shell.lastIndexOf("communicationLinks.map")).toBeGreaterThan(shell.indexOf("</nav>"))
 })
 

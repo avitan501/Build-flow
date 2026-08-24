@@ -1,4 +1,5 @@
 import { Mail, MessageCircle, Phone, Smartphone } from "lucide-react"
+import Link from "next/link"
 
 export type DirectoryConversationEntry = {
   id: string
@@ -41,11 +42,12 @@ function ConversationRow({ entry }: { entry: DirectoryConversationEntry }) {
   </div>
 }
 
-export function ContactConversation({ entries }: { entries: DirectoryConversationEntry[] }) {
+export function ContactConversation({ entries, historyHref }: { entries: DirectoryConversationEntry[]; historyHref?: string }) {
   if (!entries.length) {
     return <section className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3" aria-label="Conversation">
       <p className="text-[11px] font-bold uppercase text-slate-400">Conversation</p>
       <p className="mt-1 text-xs text-slate-500">No calls or messages yet.</p>
+      {historyHref ? <Link href={historyHref} className="mt-2 inline-flex text-xs font-semibold text-[#0066cc]">Open WhatsApp log</Link> : null}
     </section>
   }
 
@@ -53,7 +55,7 @@ export function ContactConversation({ entries }: { entries: DirectoryConversatio
   return <section className="rounded-md border border-slate-200 bg-slate-50 px-3" aria-label="Conversation">
     <div className="flex items-center justify-between border-b border-slate-200 py-2">
       <p className="text-[11px] font-bold uppercase text-slate-600">Conversation</p>
-      <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500">{entries.length}</span>
+      <div className="flex items-center gap-2">{historyHref ? <Link href={historyHref} className="text-[10px] font-bold text-[#0066cc]">WhatsApp log</Link> : null}<span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500">{entries.length}</span></div>
     </div>
     <ConversationRow entry={latest} />
     {entries.length > 1 ? <details className="border-t border-slate-200">

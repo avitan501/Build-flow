@@ -27,7 +27,7 @@ test("material departments normalize old request labels and include Others", () 
   expect(materialCatalogDepartmentOptions(["Custom Millwork"])).toContain("Custom Millwork")
 })
 
-test("supplier routing requires category, email, and an approved trust level", () => {
+test("supplier routing requires category, a contact channel, and an approved trust level", () => {
   const trialSupplier = {
     catalogDepartments: ["Framing", "Sheet Rock"],
     email: "quotes@example.com",
@@ -38,6 +38,8 @@ test("supplier routing requires category, email, and an approved trust level", (
   expect(supplierCanReceiveDepartmentRequest({ ...trialSupplier, trustLevel: "not-reviewed" }, "Framing")).toBe(false)
   expect(supplierCanReceiveDepartmentRequest({ ...trialSupplier, trustLevel: "do-not-use" }, "Framing")).toBe(false)
   expect(supplierCanReceiveDepartmentRequest({ ...trialSupplier, email: "" }, "Framing")).toBe(false)
+  expect(supplierCanReceiveDepartmentRequest({ ...trialSupplier, email: "", phone: "+15165550123" }, "Framing")).toBe(true)
+  expect(supplierCanReceiveDepartmentRequest({ ...trialSupplier, email: "", whatsapp: "+15165550124" }, "Framing")).toBe(true)
   expect(supplierCanReceiveDepartmentRequest(trialSupplier, "Electrical")).toBe(false)
   expect(supplierIsAddedToCatalogDepartment({ catalogEnabledDepartments: ["Sheet rock"] }, "Sheet Rock")).toBe(true)
   expect(supplierIsAddedToCatalogDepartment({ catalogEnabledDepartments: [] }, "Sheet Rock")).toBe(false)

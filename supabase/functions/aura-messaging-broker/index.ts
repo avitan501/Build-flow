@@ -338,7 +338,7 @@ Deno.serve(async (req: Request) => {
             subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at
           from public.aura_communications
           order by occurred_at desc
-          limit 50
+          limit 500
         `,
         sql`
           select id, full_name, normalized_phone, email, company, notes, created_at

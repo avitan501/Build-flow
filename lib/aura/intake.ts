@@ -11,6 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const optionalText = z.string().max(500).nullable();
 
 export const auraProposalSchema = z.object({
+  recordType: z.enum(["client", "lead", "task", "material_request"]).optional(),
   summary: z.string().min(1).max(400),
   contact: z
     .object({
@@ -105,6 +106,9 @@ Rules:
 - A contact is a person or company the owner may need to reach.
 - A lead is a possible job, customer opportunity, or sales opportunity.
 - A task is a concrete follow-up action for the owner.
+- Classify the primary record as client, lead, task, or material_request.
+- A material_request is a customer or supplier shopping list, quote request, order request, or request to source construction materials. Represent it as a lead plus a concrete task for Carlos so it is never lost.
+- Operational follow-up tasks are assigned to Carlos; start the task notes with "Assigned to Carlos." when appropriate.
 - A single message may contain a contact, a lead, multiple tasks, or any combination.
 - Resolve relative dates using the supplied current time and time zone. Return dueAt as an ISO 8601 timestamp with an offset, or null when no reliable deadline exists.
 - If important information is unclear, list it in missingInformation and set needsFollowUp to true.
@@ -154,7 +158,8 @@ export async function transcribeAuraAudio(audio: Uint8Array) {
 }
 
 export function buildAuraPreview(proposal: AuraProposal, code: string) {
-  const lines = ["Aura understood:", proposal.summary];
+  const typeLabel = proposal.recordType === "material_request" ? "Material request" : proposal.recordType === "client" ? "Client/contact" : proposal.recordType === "lead" ? "Lead" : "Carlos task";
+  const lines = ["Aura understood:", `Type: ${typeLabel}`, proposal.summary];
 
   if (proposal.contact) {
     const identity = [proposal.contact.fullName, proposal.contact.company, proposal.contact.phone, proposal.contact.email]

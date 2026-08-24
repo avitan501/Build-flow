@@ -56,7 +56,14 @@ export default async function SupplierRequestDraftPage({
   const matchingItems = preferredItems.filter((item) => normalizeMaterialCatalogDepartment(item.department) === department)
   const selectedSuppliers = (managerSettings?.state?.qualificationSettings?.suppliers ?? [])
     .filter((supplier) => supplierIds.includes(supplier.id) && supplierCanReceiveDepartmentRequest(supplier, department))
-    .map((supplier) => ({ id: supplier.id, name: supplier.name, email: supplier.email!.trim() }))
+    .map((supplier) => ({
+      id: supplier.id,
+      name: supplier.name,
+      email: supplier.email?.trim() || "",
+      phone: supplier.phone?.trim() || "",
+      whatsapp: supplier.whatsapp?.trim() || "",
+      preferredDeliveryMethod: supplier.preferredDeliveryMethod || "manual",
+    }))
   if (!selectedSuppliers.length) redirect(`/owner/materials/requests/${requestId}`)
 
   const materialList = matchingItems.flatMap(itemDetails).join("\n") || `Request: ${request.title}`

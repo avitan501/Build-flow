@@ -53,7 +53,8 @@ export async function sendAuraMessageAction(input: {
     return { ok: false, error: `Enter a valid customer ${input.channel === "email" ? "email address" : "phone number"}.` };
   }
   if (!message) return { ok: false, error: "Enter a message." };
-  if (message.length > 1600) return { ok: false, error: "Keep the message under 1,600 characters." };
+  const messageLimit = channel === "email" ? 10_000 : 1_600;
+  if (message.length > messageLimit) return { ok: false, error: `Keep the ${channel === "email" ? "email" : "message"} under ${messageLimit.toLocaleString("en-US")} characters.` };
 
   try {
     if (channel === "sms") {

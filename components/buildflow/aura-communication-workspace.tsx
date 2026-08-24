@@ -56,15 +56,19 @@ export function AuraCommunicationWorkspace({
   contacts,
   customers,
   connections,
+  initialChannelFilter = "all",
+  initialQuery = "",
 }: {
   communications: AuraCommunicationRow[];
   contacts: AuraContactRow[];
   customers: AuraCustomerIdentity[];
   connections: Connections;
+  initialChannelFilter?: string;
+  initialQuery?: string;
 }) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [channelFilter, setChannelFilter] = useState("all");
+  const [query, setQuery] = useState(initialQuery);
+  const [channelFilter, setChannelFilter] = useState(initialChannelFilter);
   const [channel, setChannel] = useState<"call" | "sms" | "whatsapp" | "email">("call");
   const [recipient, setRecipient] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
