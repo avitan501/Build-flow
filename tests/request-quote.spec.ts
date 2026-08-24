@@ -1,47 +1,62 @@
+import { readFile } from "node:fs/promises"
+import path from "node:path"
+
 import { expect, test } from "@playwright/test"
 
-test("quote request is an Avantia-branded internal workflow", async ({ page }) => {
+const root = process.cwd()
+
+test("preferred reply methods persist in normal and fallback request storage", async () => {
+  const [form, action, fallback] = await Promise.all([
+    readFile(path.join(root, "components/buildflow/quote-request-form.tsx"), "utf8"),
+    readFile(path.join(root, "app/request-quote/actions.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/public-quote-intake/index.ts"), "utf8"),
+  ])
+
+  expect(form).toContain('name="contactMethods"')
+  expect(action).toContain("contact_methods: intakePayload.contactMethods")
+  expect(fallback).toContain('questionId: "preferred_contact"')
+  expect(fallback).toContain("contact_methods: contactMethods.length")
+})
+
+test("quote request is a compact contact and material workflow", async ({ page }) => {
   await page.goto("/request-quote")
 
   await expect(page).toHaveURL(/\/request-quote$/)
-  await expect(page.getByRole("heading", { name: "Get Pricing for Your Materials" })).toBeVisible()
-  await expect(page.getByRole("link", { name: "Back to Home" })).toHaveAttribute("href", "/")
+  await expect(page.getByRole("heading", { name: "Send your material list" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/")
   await expect(page.getByTestId("quote-request-form")).toBeVisible()
   await expect(page.getByText("BLDR", { exact: false })).toHaveCount(0)
   await expect(page.getByLabel("Full name")).toBeVisible()
   await expect(page.getByLabel("First name")).toHaveCount(0)
   await expect(page.getByLabel("Last name")).toHaveCount(0)
-  await expect(page.getByText("Add job-site details (optional)", { exact: true })).toBeVisible()
   await expect(page.getByLabel("Phone", { exact: true })).toHaveAttribute("required", "")
-  await expect(page.getByText("Company (optional)", { exact: true })).toBeVisible()
+  await expect(page.getByLabel("Company", { exact: true })).toHaveAttribute("placeholder", "Company (optional)")
   await expect(page.getByLabel(/Project name/)).toHaveCount(0)
   await expect(page.getByText(/I am a/)).toHaveCount(0)
   await expect(page.getByRole("navigation", { name: "Mobile homepage" })).toHaveCount((page.viewportSize()?.width ?? 0) < 1024 ? 1 : 0)
-  await page.getByText("Add job-site details (optional)", { exact: true }).click()
-  await expect(page.getByLabel(/Job-site address/)).toHaveAttribute("autocomplete", "street-address")
-  await expect(page.getByRole("button", { name: "Use current location" })).toBeVisible()
-  await expect(page.getByRole("radio", { name: "ASAP" })).not.toHaveAttribute("required", "")
-  await expect(page.getByRole("radio", { name: "Later" })).toBeVisible()
-  await page.getByText("Choose departments (optional)", { exact: true }).click()
-  await expect(page.getByText("Framing", { exact: true })).toBeVisible()
-  await expect(page.getByText("Flooring", { exact: true })).toBeVisible()
+  await expect(page.getByLabel("What do you need?")).toHaveAttribute("placeholder", "Paste or type your material list")
+  await expect(page.getByRole("checkbox", { name: "WhatsApp" })).toBeChecked()
+  await expect(page.getByRole("checkbox", { name: "Text" })).not.toBeChecked()
+  await expect(page.getByRole("checkbox", { name: "Call" })).not.toBeChecked()
+  await expect(page.getByRole("checkbox", { name: "Email" })).not.toBeChecked()
   const attachment = page.getByLabel(/Attach a plan or material list/)
   await expect(attachment).toBeVisible()
   await expect(attachment).toHaveAttribute("accept", ".pdf,.jpg,.jpeg,.png,.webp")
-  await expect(page.getByText("PDF, JPG, PNG, or WebP. Maximum 25 MB.")).toBeVisible()
+  await expect(page.getByText(/Maximum 25 MB/)).toHaveCount(0)
+  await expect(page.getByText("By sending this request", { exact: false })).toHaveCount(0)
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
   expect(overflow).toBe(false)
 
   if ((page.viewportSize()?.width ?? 0) > 1000) {
-    expect((await page.getByTestId("quote-request-form").boundingBox())?.width ?? 0).toBeGreaterThan(700)
+    expect((await page.getByTestId("quote-request-form").boundingBox())?.width ?? 0).toBeGreaterThan(600)
   }
 })
 
 test("take care products open detailed Avantia panels and prefill the request", async ({ page }) => {
   await page.goto("/request-quote?request=high-end")
 
-  await expect(page.getByRole("heading", { name: "Take Care of Yourself Materials" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Take Care of Yourself request" })).toBeVisible()
   await expect(page.getByTestId("department-essentials").locator("article")).toHaveCount(10)
 
   await page.getByRole("button", { name: "View Noam2 Shabbat Water Bar" }).click()
@@ -57,7 +72,7 @@ test("take care products open detailed Avantia panels and prefill the request", 
 
   await dialog.getByRole("link", { name: "Request this item" }).click()
   await expect(page).toHaveURL(/request=high-end&item=Noam2/)
-  await expect(page.getByLabel(/Material details or list/)).toHaveValue("Please provide pricing and availability for: Noam2 Shabbat Water Bar")
+  await expect(page.getByLabel("What do you need?")).toHaveValue("Please provide pricing and availability for: Noam2 Shabbat Water Bar")
 })
 
 test("custom glass explains the options and opens an editable detail request", async ({ page }) => {
@@ -70,7 +85,7 @@ test("custom glass explains the options and opens an editable detail request", a
   await expect(dialog.getByText("Width x height and thickness")).toBeVisible()
   await dialog.getByRole("link", { name: "Request this item" }).click()
 
-  const details = page.getByLabel(/Material details or list/)
+  const details = page.getByLabel("What do you need?")
   await expect(details).toContainText("Product type:")
   await expect(details).toContainText("Width x height:")
   await details.fill("Custom shower glass, 72 x 84 in., 3/8 in. thick, quantity 1")
@@ -82,9 +97,9 @@ test("beat a quote is a dedicated upload request", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Upload a Quote. We'll Try to Beat It." })).toBeVisible()
   await expect(page.getByRole("link", { name: "Back to Home" })).toHaveAttribute("href", "/")
-  await expect(page.getByText("Attach the supplier quote", { exact: false })).toBeVisible()
+  await expect(page.getByLabel("Attach the supplier quote")).toBeVisible()
   await expect(page.locator('input[name="requestKind"]')).toHaveValue("beat_quote")
-  await expect(page.getByRole("button", { name: "Submit Quote for Review" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Send quote" })).toBeVisible()
   await expect(page.getByRole("checkbox", { name: "Framing" })).toHaveCount(0)
   await expect(page.getByRole("navigation", { name: "Mobile homepage" })).toHaveCount((page.viewportSize()?.width ?? 0) < 1024 ? 1 : 0)
 
@@ -96,8 +111,8 @@ test("beat a quote is a dedicated upload request", async ({ page }) => {
 test("plan over the storage limit stays on the form and shows a useful error", async ({ page }) => {
   await page.goto("/request-quote")
   await page.getByLabel("Full name").fill("Large Plan Test Client")
-  await page.getByLabel("Email").fill("client@example.com")
-  await page.getByLabel(/Material details or list/).fill("Please quote the attached construction plan.")
+  await page.getByRole("textbox", { name: "Email" }).fill("client@example.com")
+  await page.getByLabel("What do you need?").fill("Please quote the attached construction plan.")
   await page.getByLabel(/Attach a plan or material list/).setInputFiles({
     name: "large-plan.pdf",
     mimeType: "application/pdf",
@@ -105,11 +120,11 @@ test("plan over the storage limit stays on the form and shows a useful error", a
   })
 
   const form = page.getByTestId("quote-request-form")
-  await expect(form.getByRole("alert")).toContainText("maximum upload size is 25 MB")
-  await page.getByRole("button", { name: "Send for Pricing" }).click()
-  await expect(page.getByRole("heading", { name: "Get Pricing for Your Materials" })).toBeVisible()
+  await expect(form.getByRole("alert")).toContainText("too large")
+  await page.getByRole("button", { name: "Send request" }).click()
+  await expect(page.getByRole("heading", { name: "Send your material list" })).toBeVisible()
   await expect(page.getByText("This page couldn’t load")).toHaveCount(0)
 
-  await page.getByRole("button", { name: "Remove file" }).click()
+  await form.locator('button[aria-label="Remove file"]').click()
   await expect(form.getByRole("alert")).toHaveCount(0)
 })

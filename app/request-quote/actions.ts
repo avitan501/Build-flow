@@ -56,6 +56,7 @@ type QuoteIntakePayload = {
   zip: string
   timeframe: string
   departments: string[]
+  contactMethods: string[]
   details: string
   attachment?: { filename: string; content?: string; storagePath?: string; type: string; size?: number }
 }
@@ -120,6 +121,8 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
   const details = field(formData, "details", 5000)
   const requestKind = field(formData, "requestKind", 30) === "beat_quote" ? "beat_quote" : "quote_request"
   const departments = formData.getAll("departments").map((value) => String(value).trim()).filter(Boolean).slice(0, 12)
+  const allowedContactMethods = new Set(["WhatsApp", "Text", "Call", "Email"])
+  const contactMethods = formData.getAll("contactMethods").map((value) => String(value).trim()).filter((value) => allowedContactMethods.has(value)).slice(0, 4)
 
   if (!firstName || !lastName) return error("Enter your full name, including first and last name.")
   if (!/^\S+@\S+\.\S+$/.test(email)) return error("Enter a valid email address.")
@@ -171,6 +174,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
     zip,
     timeframe,
     departments,
+    contactMethods: contactMethods.length ? contactMethods : ["WhatsApp"],
     details,
     attachment: attachment ? { filename: attachment.filename, content: attachment.content, storagePath: attachment.storagePath, type: attachment.type, size: attachment.size } : undefined,
   }
@@ -239,6 +243,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
       ...(projectType ? [{ questionId: "project_type", label: "Project type", value: projectType }] : []),
       ...(timeframe ? [{ questionId: "timeframe", label: "Materials needed", value: timeframe }] : []),
       ...(departments.length ? [{ questionId: "departments", label: "Departments", value: departments.join(", ") }] : []),
+      { questionId: "preferred_contact", label: "Reply by", value: intakePayload.contactMethods.join(", ") },
       { questionId: "request_details", label: "Request details", value: details },
     ]
     const { error: itemError } = await supabase.from("quote_request_items").insert({
@@ -253,7 +258,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
       unit_price: 0,
       qualification_status: "answered",
       answers,
-      metadata: { reference_id: referenceId, source: requestKind === "beat_quote" ? "beat_a_quote_form" : "public_quote_form", request_details: details },
+      metadata: { reference_id: referenceId, source: requestKind === "beat_quote" ? "beat_a_quote_form" : "public_quote_form", request_details: details, contact_methods: intakePayload.contactMethods },
     })
     if (itemError) throw new Error("request_item_create_failed")
 
@@ -305,6 +310,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
         reference_id: referenceId,
         source: requestKind === "beat_quote" ? "beat_a_quote_form" : "public_quote_form",
         request_details: details,
+        contact_methods: intakePayload.contactMethods,
         email_delivery: {
           owner: emailDelivery.owner.status,
           client: emailDelivery.client.status,

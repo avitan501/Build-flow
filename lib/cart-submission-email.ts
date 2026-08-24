@@ -824,6 +824,7 @@ export type QuoteIntakeEmailInput = {
   zip: string
   timeframe: string
   departments: string[]
+  contactMethods?: string[]
   details: string
   attachment?: { filename: string; content?: string }
 }
@@ -898,6 +899,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
     `Job site: ${address || "Not provided"}`,
     `Needed: ${input.timeframe || "Not provided"}`,
     `Departments: ${departmentText}`,
+    `Reply by: ${input.contactMethods?.join(", ") || "WhatsApp"}`,
     "",
     "Request details:",
     input.details || "See attached file",
@@ -922,7 +924,8 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
             <strong>Reference:</strong> ${escapeHtml(input.referenceId)}<br />
             <strong>Customer:</strong> ${escapeHtml(fullName)}<br />
             <strong>Phone:</strong> ${escapeHtml(input.phone || "Not provided")}<br />
-            <strong>Email:</strong> ${escapeHtml(input.email)}${input.company ? `<br /><strong>Company:</strong> ${escapeHtml(input.company)}` : ""}
+            <strong>Email:</strong> ${escapeHtml(input.email)}${input.company ? `<br /><strong>Company:</strong> ${escapeHtml(input.company)}` : ""}<br />
+            <strong>Reply by:</strong> ${escapeHtml(input.contactMethods?.join(", ") || "WhatsApp")}
           </div>
           <h2 style="margin:24px 0 8px;font-size:17px">Job details</h2>
           <p style="margin:0"><strong>Location:</strong> ${escapeHtml(address || "Not provided")}<br /><strong>Departments:</strong> ${escapeHtml(departmentText)}</p>

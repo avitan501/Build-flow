@@ -18,6 +18,7 @@ type QuotePayload = {
   zip: string
   timeframe: string
   departments: string[]
+  contactMethods?: string[]
   details: string
   attachment?: { filename: string; content?: string; storagePath?: string; type: string; size?: number }
 }
@@ -430,11 +431,15 @@ Deno.serve(async (request) => {
     if (requestError || !quote) throw new Error("request_create_failed")
     requestId = quote.id
 
+    const contactMethods = Array.isArray(payload.contactMethods)
+      ? payload.contactMethods.filter((value) => ["WhatsApp", "Text", "Call", "Email"].includes(value)).slice(0, 4)
+      : []
     const answers = [
       ...(payload.customerType ? [{ questionId: "customer_type", label: "Customer type", value: payload.customerType }] : []),
       ...(payload.projectType ? [{ questionId: "project_type", label: "Project type", value: payload.projectType }] : []),
       ...(payload.timeframe ? [{ questionId: "timeframe", label: "Materials needed", value: payload.timeframe }] : []),
       ...(payload.departments.length ? [{ questionId: "departments", label: "Departments", value: payload.departments.join(", ") }] : []),
+      { questionId: "preferred_contact", label: "Reply by", value: (contactMethods.length ? contactMethods : ["WhatsApp"]).join(", ") },
       { questionId: "request_details", label: "Request details", value: payload.details },
     ]
     const { error: itemError } = await supabase.from("quote_request_items").insert({
@@ -449,7 +454,7 @@ Deno.serve(async (request) => {
       unit_price: 0,
       qualification_status: "answered",
       answers,
-      metadata: { reference_id: payload.referenceId, source: "public_quote_form", request_details: payload.details },
+      metadata: { reference_id: payload.referenceId, source: "public_quote_form", request_details: payload.details, contact_methods: contactMethods.length ? contactMethods : ["WhatsApp"] },
     })
     if (itemError) throw new Error("request_item_create_failed")
 
@@ -509,6 +514,7 @@ Deno.serve(async (request) => {
       `Project: ${payload.projectName || "Not named"}`,
       `Address: ${address || "Not provided"}`,
       `Departments: ${departmentText}`,
+      `Reply by: ${(contactMethods.length ? contactMethods : ["WhatsApp"]).join(", ")}`,
       `Needed: ${payload.timeframe || "Not provided"}`,
       "",
       payload.details,
@@ -518,7 +524,7 @@ Deno.serve(async (request) => {
       subject: `NEW MATERIAL REQUEST - ${fullName} - ${payload.referenceId}`,
       replyTo: email,
       text: ownerText,
-      html: `<div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5"><div style="max-width:680px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff"><div style="padding:20px 22px;border-bottom:1px solid #e5eaf1"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:12px"><img src="${siteUrl}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px"></td><td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br><span style="font-size:13px;color:#64748b">Material request desk</span></td></tr></table></div><div style="padding:24px 22px"><p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">New material request</p><h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">${escapeHtml(fullName)} sent a request</h1><p style="margin:10px 0 0;color:#475569">${escapeHtml(departmentText)}${payload.timeframe ? ` &bull; Needed ${escapeHtml(payload.timeframe)}` : ""}</p><p style="margin:22px 0"><a href="${requestUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Request</a></p><div style="padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}<br><strong>Customer:</strong> ${escapeHtml(fullName)}<br><strong>Phone:</strong> ${escapeHtml(payload.phone || "Not provided")}<br><strong>Email:</strong> ${escapeHtml(email)}${payload.company ? `<br><strong>Company:</strong> ${escapeHtml(payload.company)}` : ""}</div><h2 style="margin:24px 0 8px;font-size:17px">Job details</h2><p style="margin:0"><strong>Location:</strong> ${escapeHtml(address || "Not provided")}<br><strong>Departments:</strong> ${escapeHtml(departmentText)}</p><h2 style="margin:24px 0 8px;font-size:17px">What they need</h2><p style="margin:0;white-space:pre-wrap">${escapeHtml(payload.details || "See attached file")}</p>${payload.attachment?.filename ? `<p style="margin:20px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(payload.attachment.filename)}</p>` : ""}</div></div></div>`,
+      html: `<div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5"><div style="max-width:680px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff"><div style="padding:20px 22px;border-bottom:1px solid #e5eaf1"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:12px"><img src="${siteUrl}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px"></td><td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br><span style="font-size:13px;color:#64748b">Material request desk</span></td></tr></table></div><div style="padding:24px 22px"><p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">New material request</p><h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">${escapeHtml(fullName)} sent a request</h1><p style="margin:10px 0 0;color:#475569">${escapeHtml(departmentText)}${payload.timeframe ? ` &bull; Needed ${escapeHtml(payload.timeframe)}` : ""}</p><p style="margin:22px 0"><a href="${requestUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Request</a></p><div style="padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}<br><strong>Customer:</strong> ${escapeHtml(fullName)}<br><strong>Phone:</strong> ${escapeHtml(payload.phone || "Not provided")}<br><strong>Email:</strong> ${escapeHtml(email)}${payload.company ? `<br><strong>Company:</strong> ${escapeHtml(payload.company)}` : ""}<br><strong>Reply by:</strong> ${escapeHtml((contactMethods.length ? contactMethods : ["WhatsApp"]).join(", "))}</div><h2 style="margin:24px 0 8px;font-size:17px">Job details</h2><p style="margin:0"><strong>Location:</strong> ${escapeHtml(address || "Not provided")}<br><strong>Departments:</strong> ${escapeHtml(departmentText)}</p><h2 style="margin:24px 0 8px;font-size:17px">What they need</h2><p style="margin:0;white-space:pre-wrap">${escapeHtml(payload.details || "See attached file")}</p>${payload.attachment?.filename ? `<p style="margin:20px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(payload.attachment.filename)}</p>` : ""}</div></div></div>`,
       attachment: payload.attachment,
     })
     const clientText = `Hi ${payload.firstName},\n\nWe received your Avantia Build quote request. Someone from our team will contact you within the next 24 hours.\n\nReference: ${payload.referenceId}\nProject: ${payload.projectName || "Not named"}\n\nMaterials requested:\n${requestedItemsText(customerItems)}${payload.attachment?.filename ? `\nAttachment: ${payload.attachment.filename}` : ""}\n\n${companyContactText()}`
@@ -535,6 +541,7 @@ Deno.serve(async (request) => {
         reference_id: payload.referenceId,
         source: "public_quote_form",
         request_details: payload.details,
+        contact_methods: contactMethods.length ? contactMethods : ["WhatsApp"],
         email_delivery: {
           owner: ownerEmail.status,
           client: clientEmail.status,
