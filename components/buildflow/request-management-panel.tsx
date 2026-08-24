@@ -1,6 +1,7 @@
 "use client"
 
-import { Download, FileText, Mail, MessageSquareText, Paperclip, Phone, Plus, Route, Send, Trash2, X } from "lucide-react"
+import { BadgeDollarSign, ChevronDown, Download, ExternalLink, FileText, Mail, MessageSquareText, Paperclip, Phone, Plus, Route, Send, Trash2, X } from "lucide-react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
@@ -8,9 +9,11 @@ import { createPortal } from "react-dom"
 import { previewRequestClientQuoteAction, sendClientReplyAction, sendRequestClientQuoteAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
 import { supplierCanReceiveDepartmentRequest } from "@/lib/material-catalog"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
+import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
 
 type PackageRoute = { id: string; department: string; supplier_id: string | null; status: string }
 type QuoteLine = { key: string; description: string; quantity: number; unit: string; unitPrice: number }
+export type RequestComparisonSummary = { id: string; title: string; status: string; quoteNumber: string; updatedAt: string; bids: Array<{ id: string; supplierName: string; landedTotal: number; pricedItemCount: number; itemCount: number; recommended: boolean }> }
 
 const actionClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:border-sky-400 hover:bg-sky-50"
 
@@ -30,6 +33,8 @@ export function RequestManagementPanel({
   packages,
   requestItems,
   projectAddress,
+  currentStage,
+  comparisons,
 }: {
   requestId: string
   requestTitle: string
@@ -39,6 +44,8 @@ export function RequestManagementPanel({
   packages: PackageRoute[]
   requestItems: Array<{ id: string; name: string; quantity: number; unit: string | null; reviewReasons: string[] }>
   projectAddress: string
+  currentStage: ManagerPipelineStage
+  comparisons: RequestComparisonSummary[]
 }) {
   const router = useRouter()
   const [department, setDepartment] = useState(() => departments.length === 1 ? departments[0] : "")
@@ -164,13 +171,19 @@ export function RequestManagementPanel({
   }
 
   return (
-    <section className="mt-4 rounded-lg border border-slate-200 bg-white p-5" aria-labelledby="request-management-heading">
-      <div className="flex items-center gap-2"><Route className="h-5 w-5 text-[#0066cc]" /><h2 id="request-management-heading" className="text-xl font-bold">Manage request</h2></div>
-      <p className="mt-1 text-sm text-slate-600">Reply to the client or prepare one pricing request for several suppliers.</p>
+    <div className="grid gap-2">
+      <details open={currentStage === "pricing"} className="group overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 py-3">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-sky-200 bg-sky-50 text-sky-700"><BadgeDollarSign className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-[10px] font-bold uppercase tracking-[.12em] text-sky-700">Step 3</span><span className="block font-bold">Get supplier pricing</span><span className="block truncate text-xs font-medium text-slate-500">{comparisons.some((comparison) => comparison.bids.length) ? `${comparisons.reduce((total, comparison) => total + comparison.bids.length, 0)} supplier quote${comparisons.reduce((total, comparison) => total + comparison.bids.length, 0) === 1 ? "" : "s"} received` : packages.length ? `${packages.length} supplier request${packages.length === 1 ? "" : "s"} sent` : "No supplier prices received yet"}</span></span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" />
+        </summary>
+        <div className="border-t border-slate-200 p-4">
+          {comparisons.length ? <div className="mb-3 grid gap-2">{comparisons.map((comparison) => <article key={comparison.id} className="rounded-md border border-slate-200 bg-slate-50 p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-bold">{comparison.title}</h3><p className="mt-0.5 text-xs text-slate-500">{comparison.bids.length ? `${comparison.bids.length} supplier response${comparison.bids.length === 1 ? "" : "s"}` : "Waiting for supplier response"}</p></div><Link href={`/admin/quote-comparison/${comparison.id}`} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-[#0066cc]">Compare <ExternalLink className="h-3.5 w-3.5" /></Link></div>{comparison.bids.length ? <div className="mt-2 divide-y divide-slate-200 border-t border-slate-200">{comparison.bids.map((bid) => <div key={bid.id} className="flex items-center justify-between gap-3 py-2 text-xs"><span className="min-w-0 truncate font-semibold">{bid.supplierName}{bid.recommended ? " · Best match" : ""}</span><span className="shrink-0 text-right"><strong className="block text-sm tabular-nums">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(bid.landedTotal)}</strong><span className="text-slate-500">{bid.pricedItemCount}/{bid.itemCount} items</span></span></div>)}</div> : null}</article>)}</div> : <p className="mb-3 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">Supplier answers and prices will appear here after a quote is linked to this request.</p>}
 
-      <div className="mt-5 grid gap-5">
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <h3 className="font-bold text-slate-950">Create supplier request</h3>
+          <details className="group/route rounded-md border border-slate-200 bg-slate-50">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold"><span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-sky-700" />Send to another supplier</span><ChevronDown className="h-4 w-4 text-slate-400 transition group-open/route:rotate-180" /></summary>
+            <div className="border-t border-slate-200 p-3">
           <div className="mt-3 grid gap-3">
             <label className="grid gap-1.5 text-sm font-semibold text-slate-700">Department<select value={department} onChange={(event) => { setDepartment(event.target.value); setSupplierIds([]) }} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-950"><option value="">Choose department</option>{departments.map((entry) => <option key={entry}>{entry}</option>)}</select></label>
             <fieldset>
@@ -182,11 +195,15 @@ export function RequestManagementPanel({
             <button type="button" onClick={createSupplierRequest} disabled={!department || !supplierIds.length} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50"><Route className="h-4 w-4" />Create request for {supplierIds.length || ""} supplier{supplierIds.length === 1 ? "" : "s"}</button>
           </div>
           {packages.length ? <div className="mt-4 border-t border-slate-200 pt-3"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Current routes</p><div className="mt-2 grid gap-2">{packages.map((pkg) => <div key={pkg.id} className="flex items-center justify-between gap-3 text-sm"><span className="font-semibold">{pkg.department}</span><span className="text-right text-slate-600">{suppliers.find((entry) => entry.id === pkg.supplier_id)?.name || "Not assigned"} · {pkg.status.replaceAll("_", " ")}</span></div>)}</div></div> : null}
+            </div>
+          </details>
         </div>
+      </details>
 
-        <div className="border-t border-slate-200 pt-4">
+      <details open={currentStage === "approval"} className="group overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 py-3"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-violet-200 bg-violet-50 text-violet-700"><MessageSquareText className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block text-[10px] font-bold uppercase tracking-[.12em] text-violet-700">Step 4</span><span className="block font-bold">Reply to client</span><span className="block truncate text-xs font-medium text-slate-500">Questions, pricing, estimate, or approval</span></span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" /></summary>
+        <div className="border-t border-slate-200 p-4">
           <div>
-            <div className="flex items-center gap-2"><MessageSquareText className="h-5 w-5 text-[#0066cc]" /><h3 className="font-bold text-slate-950">Reply to client</h3></div>
             {missingQuestions.length ? <p className="mt-1 text-xs font-semibold text-amber-700">{missingQuestions.length} missing details can be added to the reply automatically.</p> : null}
 
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -212,7 +229,7 @@ export function RequestManagementPanel({
           </div>
 
         </div>
-      </div>
+      </details>
       {feedback ? <p className={`mt-4 rounded-lg border px-4 py-3 text-sm font-semibold ${feedbackError ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`} role="status">{feedback}</p> : null}
 
       {quoteOpen && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[150] grid place-items-center overflow-y-auto bg-slate-950/55 p-2 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="request-quote-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !pending) setQuoteOpen(false) }}>
@@ -247,6 +264,6 @@ export function RequestManagementPanel({
           <footer className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-4 py-3"><button type="button" onClick={downloadQuote} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Working..." : "Send estimate"}</button></footer>
         </section>
       </div>, document.body) : null}
-    </section>
+    </div>
   )
 }

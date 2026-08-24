@@ -169,15 +169,17 @@ test("client material lists are organized securely in the background", async () 
   expect(aiFunction).toContain("existing.length && !force")
   expect(aiFunction).toContain("previous_organized_items_replace_failed")
   expect(aiFunction).toContain('.insert(rows).select("id")')
-  expect(ownerPage).toContain("AI organizer")
-  expect(ownerPage).toContain("Original customer request")
+  expect(ownerPage).toContain("Step 1")
+  expect(ownerPage).toContain("Review client list")
+  expect(ownerPage).toContain("Step 2")
+  expect(ownerPage).toContain("Organize with AI")
   expect(ownerPage).toContain("Confirmed material list")
-  expect(ownerPage.indexOf("<CustomerRequestStatus")).toBeLessThan(ownerPage.indexOf('className="mt-4 grid gap-4"'))
-  expect(ownerPage).toContain('className="order-1')
-  expect(ownerPage).toContain('className="order-2')
+  expect(ownerPage.indexOf("<CustomerRequestStatus")).toBeLessThan(ownerPage.indexOf('className="mt-3 grid gap-2"'))
+  expect(ownerPage).toContain('open={currentStage === "received" && organizedItems.length === 0}')
+  expect(ownerPage).toContain('comparisons={comparisonSummaries}')
+  expect(ownerPage).toContain('quote_comparison_bids')
   expect(ownerPage).toContain('updatedAt={request.updated_at}')
   expect(ownerPage).toContain("OrganizedMaterialList")
-  expect(ownerPage).toContain("Organize with AI")
   expect(ownerPage).toContain("refresh={organizedItems.length > 0}")
   expect(ownerPage).toContain("Last AI review:")
   expect(organizedList).toContain("divide-y divide-slate-200")
@@ -208,6 +210,26 @@ test("client material lists are organized securely in the background", async () 
   expect(organizerButton).toContain("router.refresh()")
   expect(organizerButton).toContain("disabled={isPending}")
   expect(supplierDraft).toContain("preferredRequestMaterialSources")
+})
+
+test("request workspace uses the same colored four-step workflow as the dashboard", async () => {
+  const [dashboard, status, management] = await Promise.all([
+    readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/customer-request-status.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8"),
+  ])
+  for (const tone of ["amber-50", "sky-50", "violet-50", "emerald-50"]) {
+    expect(dashboard).toContain(tone)
+    expect(status).toContain(tone)
+  }
+  expect(status).toContain("Review request")
+  expect(status).toContain("Supplier pricing")
+  expect(status).toContain("Client approval")
+  expect(status).toContain("Payment & delivery")
+  expect(management).toContain("Step 3")
+  expect(management).toContain("Send to another supplier")
+  expect(management).toContain("Supplier answers and prices will appear here")
+  expect(management).toContain("Step 4")
 })
 
 test("material review status clearly separates ready, check, and missing rows", () => {
