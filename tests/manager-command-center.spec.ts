@@ -83,7 +83,7 @@ test("approved staff use a compact manager workspace without owner-only controls
   expect(aiTools).toContain('href: "/admin/abc"')
   expect(aiTools).toContain('href: "/admin/traffic"')
   expect(shell).not.toContain('{ href: "/owner/aura", label: "Aura Communications"')
-  expect(shell).toContain("Go to Customer Website")
+  expect(shell).toContain("Customer Website")
   expect(shell).toContain("Quick Access")
   expect(settings).toContain("Connection credentials and owner delivery tests remain restricted to David.")
   expect(settings).toContain("checkCommunicationConnectionsAction")

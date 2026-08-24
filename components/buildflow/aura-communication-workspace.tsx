@@ -7,6 +7,15 @@ import { useMemo, useState, useTransition } from "react";
 import { prepareQuoPhotoMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions";
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard";
 import { customersForIdentity, normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identity";
+import type { SupplierRoutingOption } from "@/lib/shop-qualification";
+
+export type AuraLeadRecipient = {
+  id: string;
+  full_name: string;
+  company_name: string | null;
+  phone: string | null;
+  email: string | null;
+};
 
 type Connections = {
   quo: { receive: boolean; send: boolean };
@@ -44,6 +53,31 @@ function customerLabel(customer: AuraCustomerIdentity) {
   return customer.full_name || customer.company_name || customer.email || customer.phone || "Unnamed customer";
 }
 
+function leadLabel(lead: AuraLeadRecipient) {
+  return lead.full_name || lead.company_name || lead.email || lead.phone || "Unnamed lead";
+}
+
+function supplierLabel(supplier: SupplierRoutingOption) {
+  return supplier.name || supplier.contactName || supplier.email || supplier.phone || "Unnamed supplier";
+}
+
+type RecipientType = "customer" | "lead" | "supplier";
+type DirectoryRecipient = {
+  id: string;
+  label: string;
+  company: string;
+  phone: string;
+  whatsapp: string;
+  email: string;
+};
+
+function recipientDestination(recipient: DirectoryRecipient | undefined, channel: "call" | "sms" | "whatsapp" | "email") {
+  if (!recipient) return "";
+  if (channel === "email") return recipient.email;
+  if (channel === "whatsapp") return recipient.whatsapp || recipient.phone;
+  return recipient.phone || recipient.whatsapp;
+}
+
 function quoCallHref(phone: string) {
   if (typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
     return `openphone://dial?number=${encodeURIComponent(phone)}&from=${encodeURIComponent("+15169088319")}&action=call`;
@@ -68,6 +102,8 @@ export function AuraCommunicationWorkspace({
   communications,
   contacts,
   customers,
+  leads = [],
+  suppliers = [],
   connections,
   initialChannelFilter = "all",
   initialQuery = "",
@@ -75,6 +111,8 @@ export function AuraCommunicationWorkspace({
   communications: AuraCommunicationRow[];
   contacts: AuraContactRow[];
   customers: AuraCustomerIdentity[];
+  leads?: AuraLeadRecipient[];
+  suppliers?: SupplierRoutingOption[];
   connections: Connections;
   initialChannelFilter?: string;
   initialQuery?: string;
@@ -84,7 +122,8 @@ export function AuraCommunicationWorkspace({
   const [channelFilter, setChannelFilter] = useState(initialChannelFilter);
   const [channel, setChannel] = useState<"call" | "sms" | "whatsapp" | "email">("call");
   const [recipient, setRecipient] = useState("");
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [recipientType, setRecipientType] = useState<RecipientType>("customer");
+  const [selectedRecipientId, setSelectedRecipientId] = useState("");
   const [manualDestination, setManualDestination] = useState(false);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -93,6 +132,12 @@ export function AuraCommunicationWorkspace({
   const [pending, startTransition] = useTransition();
 
   const contactById = useMemo(() => new Map(contacts.map((contact) => [contact.id, contact])), [contacts]);
+  const directoryRecipients = useMemo<Record<RecipientType, DirectoryRecipient[]>>(() => ({
+    customer: customers.map((customer) => ({ id: customer.id, label: customerLabel(customer), company: customer.company_name || "", phone: customer.phone || "", whatsapp: customer.phone || "", email: customer.email || "" })),
+    lead: leads.map((lead) => ({ id: lead.id, label: leadLabel(lead), company: lead.company_name || "", phone: lead.phone || "", whatsapp: lead.phone || "", email: lead.email || "" })),
+    supplier: suppliers.map((supplier) => ({ id: supplier.id, label: supplierLabel(supplier), company: supplier.contactName || supplier.contactLabel || "", phone: supplier.phone || "", whatsapp: supplier.whatsapp || "", email: supplier.email || "" })),
+  }), [customers, leads, suppliers]);
+  const activeRecipients = directoryRecipients[recipientType];
   const filteredCommunications = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return communications.filter((communication) => {
@@ -118,11 +163,17 @@ export function AuraCommunicationWorkspace({
     document.getElementById("aura-compose")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function chooseCustomer(id: string) {
-    setSelectedCustomerId(id);
+  function chooseRecipient(id: string) {
+    setSelectedRecipientId(id);
     setManualDestination(false);
-    const customer = customers.find((item) => item.id === id);
-    setRecipient(channel === "email" ? customer?.email || "" : customer?.phone || "");
+    setRecipient(recipientDestination(activeRecipients.find((item) => item.id === id), channel));
+  }
+
+  function chooseRecipientType(value: RecipientType) {
+    setRecipientType(value);
+    setSelectedRecipientId("");
+    setManualDestination(false);
+    setRecipient("");
   }
 
   function sendMessage() {
@@ -163,7 +214,7 @@ export function AuraCommunicationWorkspace({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0066cc]">New message</p>
-              <h2 id="aura-compose-heading" className="mt-1 text-xl font-semibold">Contact a customer</h2>
+              <h2 id="aura-compose-heading" className="mt-1 text-xl font-semibold">Contact someone</h2>
             </div>
             {channel !== "email" && recipient ? <a href={`tel:${recipient}`} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold"><Phone className="h-4 w-4" />Call</a> : null}
           </div>
@@ -174,22 +225,29 @@ export function AuraCommunicationWorkspace({
               ["whatsapp", "WhatsApp", MessageCircle],
               ["email", "Email", Mail],
             ] as const).map(([value, label, Icon]) => (
-              <button key={value} type="button" onClick={() => { setChannel(value); setFeedback(null); const customer = customers.find((item) => item.id === selectedCustomerId); if (customer && !manualDestination) setRecipient(value === "email" ? customer.email || "" : customer.phone || ""); }} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold ${channel === value ? "border-[#0071e3] bg-[#0071e3] text-white" : "border-slate-300 bg-white text-slate-800"}`}>
+              <button key={value} type="button" onClick={() => { setChannel(value); setFeedback(null); if (!manualDestination) setRecipient(recipientDestination(activeRecipients.find((item) => item.id === selectedRecipientId), value)); }} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold ${channel === value ? "border-[#0071e3] bg-[#0071e3] text-white" : "border-slate-300 bg-white text-slate-800"}`}>
                 <Icon className="h-4 w-4" />{label}
               </button>
             ))}
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <label className="grid gap-1.5 text-xs font-semibold">Customer
-              <select value={selectedCustomerId} onChange={(event) => chooseCustomer(event.target.value)} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal">
-                <option value="">Choose a customer</option>
-                {customers.map((customer) => <option key={customer.id} value={customer.id}>{customerLabel(customer)}{customer.company_name && customer.company_name !== customerLabel(customer) ? ` · ${customer.company_name}` : ""}</option>)}
+          <div className="mt-3 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)_auto]">
+            <label className="grid gap-1.5 text-xs font-semibold">Contact type
+              <select value={recipientType} onChange={(event) => chooseRecipientType(event.target.value as RecipientType)} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal">
+                <option value="customer">Customers</option>
+                <option value="lead">Leads</option>
+                <option value="supplier">Suppliers</option>
               </select>
             </label>
-            <button type="button" onClick={() => { setManualDestination((value) => !value); setSelectedCustomerId(""); setRecipient(""); }} className="min-h-11 self-end rounded-md border border-slate-300 px-3 text-sm font-semibold">{manualDestination ? "Use customer list" : "Enter manually"}</button>
+            <label className="grid gap-1.5 text-xs font-semibold">{recipientType === "customer" ? "Customer" : recipientType === "lead" ? "Lead" : "Supplier"}
+              <select value={selectedRecipientId} onChange={(event) => chooseRecipient(event.target.value)} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-normal">
+                <option value="">Choose {recipientType === "customer" ? "a customer" : recipientType === "lead" ? "a lead" : "a supplier"}</option>
+                {activeRecipients.map((item) => <option key={item.id} value={item.id}>{item.label}{item.company && item.company !== item.label ? ` · ${item.company}` : ""}</option>)}
+              </select>
+            </label>
+            <button type="button" onClick={() => { setManualDestination((value) => !value); setSelectedRecipientId(""); setRecipient(""); }} className="min-h-11 self-end rounded-md border border-slate-300 px-3 text-sm font-semibold">{manualDestination ? "Use saved contacts" : "Enter manually"}</button>
           </div>
           <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-            <label className="grid gap-1.5 text-xs font-semibold">{channel === "email" ? "Customer email" : "Customer phone"}<input value={recipient} onChange={(event) => setRecipient(event.target.value)} readOnly={!manualDestination && Boolean(selectedCustomerId)} inputMode={channel === "email" ? "email" : "tel"} autoComplete={channel === "email" ? "email" : "tel"} placeholder={channel === "email" ? "customer@example.com" : "(516) 555-0123"} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal read-only:bg-slate-50" /></label>
+            <label className="grid gap-1.5 text-xs font-semibold">{channel === "email" ? "Email" : "Phone"}<input value={recipient} onChange={(event) => setRecipient(event.target.value)} readOnly={!manualDestination && Boolean(selectedRecipientId)} inputMode={channel === "email" ? "email" : "tel"} autoComplete={channel === "email" ? "email" : "tel"} placeholder={channel === "email" ? "name@example.com" : "(516) 555-0123"} className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal read-only:bg-slate-50" /></label>
             {channel === "call" ? <a href={normalizedPhone ? quoCallHref(normalizedPhone) : undefined} aria-disabled={!normalizedPhone} className={`inline-flex min-h-11 self-end items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold ${normalizedPhone ? "bg-emerald-600 text-white" : "pointer-events-none bg-slate-200 text-slate-400"}`}><Phone className="h-4 w-4" />Call with Q U O</a> : null}
             {channel === "email" ? <label className="grid gap-1.5 text-xs font-semibold md:col-span-2">Subject<input value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={200} placeholder="Message from Avantia Build" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label> : null}
             {channel !== "call" ? <label className="grid gap-1.5 text-xs font-semibold md:col-span-2">Message<textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1600} rows={4} placeholder="Write the message here" className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-6" /></label> : null}
@@ -204,10 +262,10 @@ export function AuraCommunicationWorkspace({
 
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="aura-history-heading">
           <header className="border-b border-slate-200 p-4 sm:p-5">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0066cc]">Customer history</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0066cc]">Communication history</p>
             <h2 id="aura-history-heading" className="mt-1 text-xl font-semibold">Calls and messages</h2>
             <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
-              <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><span className="sr-only">Search communications</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search customer, phone, or message" className="min-h-11 w-full rounded-md border border-slate-300 pl-10 pr-3 text-sm" /></label>
+              <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><span className="sr-only">Search communications</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search contact, phone, or message" className="min-h-11 w-full rounded-md border border-slate-300 pl-10 pr-3 text-sm" /></label>
               <label><span className="sr-only">Filter by channel</span><select value={channelFilter} onChange={(event) => setChannelFilter(event.target.value)} className="min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm"><option value="all">All channels</option><option value="call">Calls</option><option value="sms">SMS</option><option value="whatsapp">WhatsApp</option><option value="email">Email</option></select></label>
             </div>
           </header>
@@ -228,7 +286,7 @@ export function AuraCommunicationWorkspace({
       </div>
 
       <aside className="h-fit overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <header className="border-b border-slate-200 p-4"><h2 className="font-semibold">Customer contacts</h2><p className="mt-1 text-xs text-slate-500">Call or start a message</p></header>
+        <header className="border-b border-slate-200 p-4"><h2 className="font-semibold">Recent contacts</h2><p className="mt-1 text-xs text-slate-500">Call or start a message</p></header>
         {contacts.length ? <div className="divide-y divide-slate-100">{contacts.map((contact) => <article key={contact.id} className="p-4"><h3 className="text-sm font-semibold">{contact.full_name || contact.company || "Unnamed contact"}</h3><p className="mt-1 truncate text-xs text-slate-500">{contact.normalized_phone || contact.email || "No contact method"}</p>{contact.normalized_phone ? <div className="mt-3 grid grid-cols-2 gap-2"><a href={quoCallHref(contact.normalized_phone)} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 text-xs font-semibold"><Phone className="h-3.5 w-3.5" />Q U O call</a><button type="button" onClick={() => chooseContact(contact)} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-slate-950 text-xs font-semibold text-white"><MessageCircle className="h-3.5 w-3.5" />Message</button></div> : contact.email ? <button type="button" onClick={() => { setChannel("email"); setRecipient(contact.email || ""); document.getElementById("aura-compose")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-md bg-slate-950 text-xs font-semibold text-white"><Mail className="h-3.5 w-3.5" />Email</button> : null}</article>)}</div> : <p className="p-5 text-sm text-slate-500">Contacts appear after an Aura intake is confirmed.</p>}
       </aside>
     </div>

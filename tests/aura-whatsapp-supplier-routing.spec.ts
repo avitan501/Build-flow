@@ -18,6 +18,23 @@ test("manager WhatsApp shortcut opens the internal filtered communication log", 
   expect(workspace).toContain("useState(initialQuery)")
 })
 
+test("manager communications can reach customers, leads, and suppliers", async () => {
+  const [page, workspace] = await Promise.all([
+    readFile(path.join(root, "app/admin/communications/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/aura-communication-workspace.tsx"), "utf8"),
+  ])
+
+  expect(page).toContain('from("manager_outreach_leads")')
+  expect(page).toContain('rpc("staff_load_supplier_directory_snapshot")')
+  expect(page).toContain("leads={liveAura.leads}")
+  expect(page).toContain("suppliers={liveAura.suppliers}")
+  expect(workspace).toContain('<option value="customer">Customers</option>')
+  expect(workspace).toContain('<option value="lead">Leads</option>')
+  expect(workspace).toContain('<option value="supplier">Suppliers</option>')
+  expect(workspace).toContain('if (channel === "whatsapp") return recipient.whatsapp || recipient.phone')
+  expect(workspace).toContain("Contact someone")
+})
+
 test("supplier draft supports channel checkboxes and an exact safe preview", async () => {
   const draft = await readFile(path.join(root, "components/buildflow/supplier-request-draft.tsx"), "utf8")
   const page = await readFile(path.join(root, "app/owner/materials/requests/[requestId]/supplier-request/page.tsx"), "utf8")
