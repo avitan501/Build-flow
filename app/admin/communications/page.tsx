@@ -24,6 +24,13 @@ async function loadManagerAura(
   supabase: Awaited<ReturnType<typeof requireManagerPortalProfile>>["supabase"],
 ): Promise<ManagerAuraData | null> {
   try {
+    const result = await supabase.functions.invoke<ManagerAuraData>("aura-messaging-broker", { body: { action: "dashboard" } })
+    if (result.data?.ok) return result.data
+  } catch {
+    // Fall back to the database snapshot when the provider broker is unavailable.
+  }
+
+  try {
     const dashboard = await loadAuraDashboard(createAdminClient())
     return {
       ok: true,
@@ -32,10 +39,7 @@ async function loadManagerAura(
       connections: dashboard.connections,
     }
   } catch {
-    return supabase.functions
-      .invoke<ManagerAuraData>("aura-messaging-broker", { body: { action: "dashboard" } })
-      .then((result) => result.data?.ok ? result.data : null)
-      .catch(() => null)
+    return null
   }
 }
 
