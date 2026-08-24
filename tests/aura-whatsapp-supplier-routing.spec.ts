@@ -33,6 +33,8 @@ test("manager communications can reach customers, leads, and suppliers", async (
   expect(workspace).toContain('<option value="supplier">Suppliers</option>')
   expect(workspace).toContain('if (channel === "whatsapp") return recipient.whatsapp || recipient.phone')
   expect(workspace).toContain("Contact someone")
+  expect(workspace).toContain("InlineCommunicationReply")
+  expect(workspace).toContain("replyToCommunication")
 })
 
 test("manager communications support removable photos and phone-number history", async () => {

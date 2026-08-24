@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { prepareQuoPhotoMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions";
+import { InlineCommunicationReply } from "@/components/buildflow/inline-communication-reply";
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard";
 import { customersForIdentity, normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identity";
 import type { SupplierRoutingOption } from "@/lib/shop-qualification";
@@ -133,6 +134,7 @@ export function AuraCommunicationWorkspace({
   const [message, setMessage] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [historyView, setHistoryView] = useState<"timeline" | "number">("timeline");
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -204,6 +206,16 @@ export function AuraCommunicationWorkspace({
     setRecipient("");
   }
 
+  function replyToCommunication(communication: AuraCommunicationRow) {
+    setChannel(communication.channel === "email" || communication.channel === "whatsapp" || communication.channel === "sms" ? communication.channel : "sms");
+    setRecipient(communication.counterparty_email || communication.counterparty_phone || "");
+    setSelectedRecipientId("");
+    setManualDestination(true);
+    setMessage("");
+    setReplyingToId(communication.id);
+    setFeedback(null);
+  }
+
   function sendMessage() {
     if (channel === "call") return;
     const messageChannel = channel;
@@ -235,6 +247,7 @@ export function AuraCommunicationWorkspace({
         return;
       }
       setMessage("");
+      setReplyingToId(null);
       const channelName = messageChannel === "sms" ? "SMS" : messageChannel === "whatsapp" ? "WhatsApp" : "Email";
       setFeedback({ tone: "success", text: messageChannel === "whatsapp" ? "WhatsApp was submitted. Confirm Delivered or Read in the history below; Queued does not guarantee delivery." : `${channelName} sent and saved to the timeline.` });
       router.refresh();
@@ -255,7 +268,7 @@ export function AuraCommunicationWorkspace({
     const DirectionIcon = incoming ? ArrowDownLeft : ArrowUpRight;
     const status = statusAppearance(communication.status);
     const StatusIcon = status.Icon;
-    return <article key={communication.id} className={`flex gap-3 p-4 sm:p-5 ${incoming ? "bg-emerald-50/40" : "bg-sky-50/30"}`}><span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${channelTone(communication.channel)}`}><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{matchedCustomer ? customerLabel(matchedCustomer) : contactName(contact, communication)}</h3><span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${incoming ? "bg-emerald-100 text-emerald-800" : "bg-sky-100 text-sky-800"}`}><DirectionIcon className="h-3 w-3" />{incoming ? "Received" : "Sent"}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${channelTone(communication.channel)}`}>{communication.channel}</span>{communication.status ? <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${status.tone}`}><StatusIcon className="h-3 w-3" />{status.label}</span> : null}{matches.length === 0 ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">Unmatched</span> : matches.length > 1 ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">Match conflict</span> : null}</div><p className="mt-1 text-xs text-slate-500">{communication.counterparty_phone || communication.counterparty_email}</p></div><time className="text-xs text-slate-500">{formatDate(communication.occurred_at)}</time></div>{detail ? <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{detail}</p> : null}{duration ? <p className="mt-2 text-xs font-semibold text-slate-500">Duration {duration}</p> : null}{communication.next_steps.length ? <p className="mt-2 text-xs font-semibold text-[#0066cc]">Next: {communication.next_steps.join(" · ")}</p> : null}</div></article>;
+    return <article key={communication.id} className={`flex gap-3 p-4 sm:p-5 ${incoming ? "bg-emerald-50/40" : "bg-sky-50/30"}`}><span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${channelTone(communication.channel)}`}><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{matchedCustomer ? customerLabel(matchedCustomer) : contactName(contact, communication)}</h3><span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${incoming ? "bg-emerald-100 text-emerald-800" : "bg-sky-100 text-sky-800"}`}><DirectionIcon className="h-3 w-3" />{incoming ? "Received" : "Sent"}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${channelTone(communication.channel)}`}>{communication.channel}</span>{communication.status ? <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${status.tone}`}><StatusIcon className="h-3 w-3" />{status.label}</span> : null}{matches.length === 0 ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">Unmatched</span> : matches.length > 1 ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">Match conflict</span> : null}</div><p className="mt-1 text-xs text-slate-500">{communication.counterparty_phone || communication.counterparty_email}</p></div><time className="text-xs text-slate-500">{formatDate(communication.occurred_at)}</time></div>{detail ? <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{detail}</p> : null}{duration ? <p className="mt-2 text-xs font-semibold text-slate-500">Duration {duration}</p> : null}{communication.next_steps.length ? <p className="mt-2 text-xs font-semibold text-[#0066cc]">Next: {communication.next_steps.join(" · ")}</p> : null}{incoming && communication.channel !== "call" ? <InlineCommunicationReply active={replyingToId === communication.id} channel={channel} feedback={feedback} message={message} pending={pending} ready={selectedChannelReady} recipient={recipient} onMessageChange={setMessage} onOpen={() => replyToCommunication(communication)} onSend={sendMessage} /> : null}</div></article>;
   }
 
   return (
