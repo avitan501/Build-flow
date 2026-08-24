@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownLeft, ArrowUpRight, CheckCheck, CircleAlert, Clock3, ImagePlus, Mail, MessageCircle, Phone, Search, Send, Smartphone, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CheckCheck, ChevronDown, CircleAlert, Clock3, ImagePlus, Mail, MessageCircle, MessageSquarePlus, Phone, Reply, Search, Send, Smartphone, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
@@ -71,6 +71,13 @@ type DirectoryRecipient = {
   email: string;
 };
 
+const QUICK_REPLIES = [
+  { label: "Received", text: "Thank you. We received your message and are reviewing it now." },
+  { label: "Need details", text: "Thank you. I have a question before we continue: " },
+  { label: "Checking price", text: "We are checking the current price and availability. I will update you as soon as I have the options." },
+  { label: "Ready to proceed", text: "Your request is ready. Please confirm that you would like us to proceed." },
+] as const;
+
 function recipientDestination(recipient: DirectoryRecipient | undefined, channel: "call" | "sms" | "whatsapp" | "email") {
   if (!recipient) return "";
   if (channel === "email") return recipient.email;
@@ -133,6 +140,7 @@ export function AuraCommunicationWorkspace({
   const [message, setMessage] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [historyView, setHistoryView] = useState<"timeline" | "number">("timeline");
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -187,8 +195,11 @@ export function AuraCommunicationWorkspace({
 
   function chooseContact(contact: AuraContactRow) {
     if (!contact.normalized_phone) return;
+    setChannel("sms");
     setRecipient(contact.normalized_phone);
-    document.getElementById("aura-compose")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const composer = document.getElementById("aura-compose") as HTMLDetailsElement | null;
+    if (composer) composer.open = true;
+    composer?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function chooseRecipient(id: string) {
@@ -235,6 +246,7 @@ export function AuraCommunicationWorkspace({
         return;
       }
       setMessage("");
+      setReplyingToId(null);
       const channelName = messageChannel === "sms" ? "SMS" : messageChannel === "whatsapp" ? "WhatsApp" : "Email";
       setFeedback({ tone: "success", text: messageChannel === "whatsapp" ? "WhatsApp was submitted. Confirm Delivered or Read in the history below; Queued does not guarantee delivery." : `${channelName} sent and saved to the timeline.` });
       router.refresh();
@@ -243,6 +255,33 @@ export function AuraCommunicationWorkspace({
 
   const selectedChannelReady = channel === "call" || (channel === "sms" ? connections.quo.send : channel === "whatsapp" ? connections.whatsapp.send : connections.email.send);
   const normalizedPhone = normalizeAuraPhone(recipient);
+
+  function replyToCommunication(communication: AuraCommunicationRow) {
+    const replyChannel = communication.channel === "call" ? "sms" : communication.channel;
+    setChannel(replyChannel);
+    setRecipient(communication.counterparty_email || communication.counterparty_phone || "");
+    setSelectedRecipientId("");
+    setManualDestination(true);
+    setReplyingToId(communication.id);
+    setFeedback(null);
+  }
+
+  function replyComposer(compact = false) {
+    if (channel === "call") return null;
+    return <div className={`${compact ? "mt-3 border-t border-slate-200 pt-3" : "mt-4"}`}>
+      <div className="flex flex-wrap gap-1.5" aria-label="Quick replies">
+        {QUICK_REPLIES.map((option) => <button key={option.label} type="button" onClick={() => setMessage(option.text)} className="min-h-8 rounded-full border border-slate-300 bg-white px-3 text-[11px] font-semibold text-slate-700 hover:border-[#0071e3] hover:text-[#0066cc]">{option.label}</button>)}
+      </div>
+      <div className="mt-2 overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-[#0071e3] focus-within:ring-2 focus-within:ring-sky-100">
+        <textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1600} rows={compact ? 3 : 4} placeholder="Write your reply..." className="block w-full resize-y border-0 bg-transparent px-3 py-3 text-sm leading-6 outline-none" />
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-2 py-2">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase text-slate-500">{channel === "whatsapp" ? <MessageCircle className="h-3.5 w-3.5 text-emerald-600" /> : channel === "email" ? <Mail className="h-3.5 w-3.5 text-violet-600" /> : <Smartphone className="h-3.5 w-3.5 text-sky-600" />}{channel}</span>
+          <button type="button" onClick={sendMessage} disabled={pending || !selectedChannelReady || !recipient.trim() || !message.trim()} className="inline-flex min-h-9 items-center gap-2 rounded-md bg-[#0071e3] px-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-3.5 w-3.5" />{pending ? "Sending..." : "Send reply"}</button>
+        </div>
+      </div>
+      {feedback ? <p className={`mt-2 text-xs font-semibold ${feedback.tone === "success" ? "text-emerald-700" : "text-rose-700"}`} role="status">{feedback.text}</p> : null}
+    </div>;
+  }
 
   function communicationEntry(communication: AuraCommunicationRow) {
     const contact = communication.contact_id ? contactById.get(communication.contact_id) : undefined;
@@ -255,19 +294,22 @@ export function AuraCommunicationWorkspace({
     const DirectionIcon = incoming ? ArrowDownLeft : ArrowUpRight;
     const status = statusAppearance(communication.status);
     const StatusIcon = status.Icon;
-    return <article key={communication.id} className={`flex gap-3 p-4 sm:p-5 ${incoming ? "bg-emerald-50/40" : "bg-sky-50/30"}`}><span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${channelTone(communication.channel)}`}><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{matchedCustomer ? customerLabel(matchedCustomer) : contactName(contact, communication)}</h3><span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${incoming ? "bg-emerald-100 text-emerald-800" : "bg-sky-100 text-sky-800"}`}><DirectionIcon className="h-3 w-3" />{incoming ? "Received" : "Sent"}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${channelTone(communication.channel)}`}>{communication.channel}</span>{communication.status ? <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${status.tone}`}><StatusIcon className="h-3 w-3" />{status.label}</span> : null}{matches.length === 0 ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">Unmatched</span> : matches.length > 1 ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-700">Match conflict</span> : null}</div><p className="mt-1 text-xs text-slate-500">{communication.counterparty_phone || communication.counterparty_email}</p></div><time className="text-xs text-slate-500">{formatDate(communication.occurred_at)}</time></div>{detail ? <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{detail}</p> : null}{duration ? <p className="mt-2 text-xs font-semibold text-slate-500">Duration {duration}</p> : null}{communication.next_steps.length ? <p className="mt-2 text-xs font-semibold text-[#0066cc]">Next: {communication.next_steps.join(" · ")}</p> : null}</div></article>;
+    return <article key={communication.id} className={`flex p-3 sm:p-4 ${incoming ? "justify-start" : "justify-end"}`}><div className={`flex w-full max-w-2xl gap-2.5 ${incoming ? "flex-row" : "flex-row-reverse"}`}><span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${channelTone(communication.channel)}`}><Icon className="h-3.5 w-3.5" /></span><div className={`min-w-0 flex-1 rounded-lg border px-3 py-2.5 ${incoming ? "border-slate-200 bg-white" : "border-sky-200 bg-sky-50"}`}><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><h3 className="truncate text-xs font-bold">{matchedCustomer ? customerLabel(matchedCustomer) : contactName(contact, communication)}</h3><span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${incoming ? "bg-emerald-100 text-emerald-800" : "bg-sky-100 text-sky-800"}`}><DirectionIcon className="h-3 w-3" />{incoming ? "Received" : "Sent"}</span><span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${channelTone(communication.channel)}`}>{communication.channel}</span></div><p className="mt-0.5 truncate text-[10px] text-slate-500">{communication.counterparty_phone || communication.counterparty_email}</p></div><time className="shrink-0 text-[10px] text-slate-400">{formatDate(communication.occurred_at)}</time></div>{detail ? <p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-slate-700">{detail}</p> : null}<div className="mt-2 flex flex-wrap items-center gap-2">{communication.status ? <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase ${status.tone.replace(/bg-\S+\s/, "")}`}><StatusIcon className="h-3 w-3" />{status.label}</span> : null}{duration ? <span className="text-[10px] font-semibold text-slate-500">Duration {duration}</span> : null}{incoming && communication.channel !== "call" ? <button type="button" onClick={() => replyToCommunication(communication)} className="ml-auto inline-flex min-h-7 items-center gap-1 rounded-md px-2 text-[11px] font-bold text-[#0066cc] hover:bg-sky-50"><Reply className="h-3.5 w-3.5" />Reply</button> : null}</div>{communication.next_steps.length ? <p className="mt-2 text-[10px] font-semibold text-[#0066cc]">Next: {communication.next_steps.join(" · ")}</p> : null}{replyingToId === communication.id ? replyComposer(true) : null}</div></div></article>;
   }
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="grid min-w-0 gap-5">
-        <section id="aura-compose" className="scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-labelledby="aura-compose-heading">
+        <details id="aura-compose" className="group scroll-mt-24 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 py-3 sm:px-5">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-sky-50 text-[#0066cc]"><MessageSquarePlus className="h-4 w-4" /></span>
+            <span className="min-w-0 flex-1"><strong id="aura-compose-heading" className="block text-sm">Start a new conversation</strong><span className="block truncate text-xs text-slate-500">Customer, lead, supplier, or phone number</span></span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" />
+          </summary>
+          <div className="border-t border-slate-200 p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0066cc]">New message</p>
-              <h2 id="aura-compose-heading" className="mt-1 text-xl font-semibold">Contact someone</h2>
-            </div>
-            {channel !== "email" && recipient ? <a href={`tel:${recipient}`} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold"><Phone className="h-4 w-4" />Call</a> : null}
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0066cc]">New message</p>
+            {channel !== "email" && recipient ? <a href={`tel:${recipient}`} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 text-xs font-semibold"><Phone className="h-4 w-4" />Call</a> : null}
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Communication method">
             {([
@@ -310,7 +352,8 @@ export function AuraCommunicationWorkspace({
           {!selectedChannelReady ? <p className="mt-3 text-sm font-semibold text-amber-700">This channel needs its API credentials. Open Phone connections above and press Connect WhatsApp & Text.</p> : null}
           {feedback ? <p className={`mt-3 text-sm font-semibold ${feedback.tone === "success" ? "text-emerald-700" : "text-rose-700"}`} role="status">{feedback.text}</p> : null}
           {channel !== "call" ? <div className="mt-4 flex justify-end"><button type="button" onClick={sendMessage} disabled={pending || !selectedChannelReady || !recipient.trim() || !message.trim()} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Sending..." : channel === "sms" && photo ? "Open Q U O with photo" : channel === "sms" ? "Send text" : channel === "whatsapp" ? "Send WhatsApp" : "Send email"}</button></div> : null}
-        </section>
+          </div>
+        </details>
 
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="aura-history-heading">
           <header className="border-b border-slate-200 p-4 sm:p-5">
@@ -331,7 +374,7 @@ export function AuraCommunicationWorkspace({
 
       <aside className="h-fit overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <header className="border-b border-slate-200 p-4"><h2 className="font-semibold">Recent contacts</h2><p className="mt-1 text-xs text-slate-500">Call or start a message</p></header>
-        {contacts.length ? <div className="divide-y divide-slate-100">{contacts.map((contact) => <article key={contact.id} className="p-4"><h3 className="text-sm font-semibold">{contact.full_name || contact.company || "Unnamed contact"}</h3><p className="mt-1 truncate text-xs text-slate-500">{contact.normalized_phone || contact.email || "No contact method"}</p>{contact.normalized_phone ? <div className="mt-3 grid grid-cols-2 gap-2"><a href={quoCallHref(contact.normalized_phone)} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 text-xs font-semibold"><Phone className="h-3.5 w-3.5" />Q U O call</a><button type="button" onClick={() => chooseContact(contact)} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-slate-950 text-xs font-semibold text-white"><MessageCircle className="h-3.5 w-3.5" />Message</button></div> : contact.email ? <button type="button" onClick={() => { setChannel("email"); setRecipient(contact.email || ""); document.getElementById("aura-compose")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-md bg-slate-950 text-xs font-semibold text-white"><Mail className="h-3.5 w-3.5" />Email</button> : null}</article>)}</div> : <p className="p-5 text-sm text-slate-500">Contacts appear after an Aura intake is confirmed.</p>}
+        {contacts.length ? <div className="divide-y divide-slate-100">{contacts.map((contact) => <article key={contact.id} className="p-4"><h3 className="text-sm font-semibold">{contact.full_name || contact.company || "Unnamed contact"}</h3><p className="mt-1 truncate text-xs text-slate-500">{contact.normalized_phone || contact.email || "No contact method"}</p>{contact.normalized_phone ? <div className="mt-3 grid grid-cols-2 gap-2"><a href={quoCallHref(contact.normalized_phone)} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 text-xs font-semibold"><Phone className="h-3.5 w-3.5" />Q U O call</a><button type="button" onClick={() => chooseContact(contact)} className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md bg-slate-950 text-xs font-semibold text-white"><MessageCircle className="h-3.5 w-3.5" />Message</button></div> : contact.email ? <button type="button" onClick={() => { setChannel("email"); setRecipient(contact.email || ""); const composer = document.getElementById("aura-compose") as HTMLDetailsElement | null; if (composer) composer.open = true; composer?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-md bg-slate-950 text-xs font-semibold text-white"><Mail className="h-3.5 w-3.5" />Email</button> : null}</article>)}</div> : <p className="p-5 text-sm text-slate-500">Contacts appear after an Aura intake is confirmed.</p>}
       </aside>
     </div>
   );
