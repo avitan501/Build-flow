@@ -37,6 +37,24 @@ test("MDF liquidation product keeps pricing, minimum, and five photos without pu
   expect(catalog.match(/\["[1-5]",/g)).toHaveLength(5);
 });
 
+test("Bruce flooring and 24 x 48 tile are separate liquidation products", async () => {
+  const catalog = await readFile(path.join(root, "lib/shop-catalog.ts"), "utf8");
+
+  expect(catalog).toContain('id: "liquidation-bruce-redefine-fox-den-1rd6r003"');
+  expect(catalog).toContain('name: "Bruce reDefine Fox Den Rigid Core Vinyl Flooring"');
+  expect(catalog).toContain('price: 1.6');
+  expect(catalog).toContain('UPC 840051572886');
+  expect(catalog).toContain('23.64 sq. ft. per carton; approximately $37.82 per carton');
+  expect(catalog).toContain('/images/liquidation/bruce-redefine-fox-den-official.webp');
+  expect(catalog).toContain('/images/liquidation/bruce-redefine-fox-den-plank.jpg');
+  expect(catalog).toContain('/images/liquidation/bruce-redefine-fox-den-carton.jpg');
+
+  expect(catalog).toContain('id: "liquidation-24x48-large-format-tile"');
+  expect(catalog).toContain('name: "24 in. x 48 in. Large-Format Tile"');
+  expect(catalog).toContain('price: 1.9');
+  expect(catalog).toContain('color and finish to be confirmed');
+});
+
 test("Order Materials opens the service hub while category links retain the catalog", async () => {
   const [shopPage, catalogExperience, detailExperience] = await Promise.all([
     readFile(path.join(root, "app/shop/page.tsx"), "utf8"),

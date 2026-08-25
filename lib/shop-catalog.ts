@@ -1155,6 +1155,93 @@ const LIQUIDATION_MDF_PRODUCT: ShopCatalogProduct = {
   detailBullets: ["Brand new", "20-board minimum", "Listed in Carteret, NJ"],
 }
 
+const LIQUIDATION_BRUCE_FOX_DEN_PRODUCT: ShopCatalogProduct = {
+  id: "liquidation-bruce-redefine-fox-den-1rd6r003",
+  slug: "bruce-redefine-fox-den-rigid-core-vinyl-flooring-1rd6r003",
+  name: "Bruce reDefine Fox Den Rigid Core Vinyl Flooring",
+  description: "Bruce reDefine Fox Den waterproof rigid-core vinyl plank flooring in a medium-brown Elm visual. Liquidation price is $1.60 per sq. ft., or approximately $37.82 per unopened 23.64 sq. ft. carton. Availability and carton condition must be confirmed before purchase.",
+  shortDescription: "Model 1RD6R003 · 7 in. x 48 in. waterproof rigid-core planks · $1.60 per sq. ft.",
+  category: "Liquidation",
+  unit: "Per sq. ft. - 23.64 sq. ft./carton",
+  price: 1.6,
+  supplierName: "Avantia Build Liquidation",
+  quoteNumber: null,
+  image: "/images/liquidation/bruce-redefine-fox-den-official.webp",
+  imageUrl: "/images/liquidation/bruce-redefine-fox-den-official.webp",
+  imageAlt: "Bruce reDefine Fox Den medium-brown rigid-core vinyl flooring",
+  imageSource: "https://www.bruce.com/en-us/products/rigid-core/redefine/1rd6r003.html",
+  imageLicense: "Bruce manufacturer product image",
+  imageCredit: "Bruce",
+  imageCategory: "Liquidation",
+  gallery: [
+    {
+      imageUrl: "/images/liquidation/bruce-redefine-fox-den-plank.jpg",
+      imageAlt: "Bruce reDefine Fox Den rigid-core vinyl plank from the available liquidation stock",
+      imageSource: "Owner-provided product photo",
+      imageLicense: "Owner-provided asset",
+      imageCredit: "Avantia Build",
+      imageCategory: "Liquidation",
+    },
+    {
+      imageUrl: "/images/liquidation/bruce-redefine-fox-den-carton.jpg",
+      imageAlt: "Bruce reDefine Fox Den carton label showing model and package specifications",
+      imageSource: "Owner-provided product photo",
+      imageLicense: "Owner-provided asset",
+      imageCredit: "Avantia Build",
+      imageCategory: "Liquidation",
+    },
+  ],
+  specLine: "Model 1RD6R003 · UPC 840051572886 · 7 in. x 48 in. x 6.5 mm",
+  availability: "Confirm availability",
+  featuredLabel: "Liquidation",
+  popularUse: "Waterproof residential and light-commercial flooring",
+  reviewLabel: "Liquidation inventory",
+  rating: 5,
+  relatedCategories: ["Flooring", "Tile work"],
+  productType: "material",
+  detailBullets: [
+    "Fox Den medium-brown Elm visual with embossed, low-gloss finish",
+    "22 mil wear layer with pre-attached underlayment",
+    "10 click-lock planks per carton",
+    "23.64 sq. ft. per carton; approximately $37.82 per carton at the liquidation rate",
+    "100% waterproof; carton weight 48.94 lb.",
+  ],
+}
+
+const LIQUIDATION_24X48_TILE_PRODUCT: ShopCatalogProduct = {
+  id: "liquidation-24x48-large-format-tile",
+  slug: "24x48-large-format-tile-liquidation",
+  name: "24 in. x 48 in. Large-Format Tile",
+  description: "Large-format 24 in. x 48 in. liquidation tile priced at $1.90 per sq. ft. Color, finish, material type, edge, box coverage, and available quantity must be confirmed before purchase.",
+  shortDescription: "24 in. x 48 in. large-format tile · $1.90 per sq. ft.",
+  category: "Liquidation",
+  unit: "Per sq. ft.",
+  price: 1.9,
+  supplierName: "Avantia Build Liquidation",
+  quoteNumber: null,
+  image: "/images/materials/photos/tile.jpg",
+  imageUrl: "/images/materials/photos/tile.jpg",
+  imageAlt: "Large-format tile displays in a flooring showroom",
+  imageSource: "Avantia Build generated product showroom image",
+  imageLicense: "Project-owned generated image",
+  imageCredit: "Avantia Build",
+  imageCategory: "Liquidation",
+  gallery: [],
+  specLine: "24 in. x 48 in. · color and finish to be confirmed",
+  availability: "Confirm availability",
+  featuredLabel: "Liquidation",
+  popularUse: "Large-format floor and wall tile projects",
+  reviewLabel: "Liquidation inventory",
+  rating: 5,
+  relatedCategories: ["Tile work", "Flooring"],
+  productType: "material",
+  detailBullets: [
+    "Large 24 in. x 48 in. format",
+    "Liquidation price shown per square foot",
+    "Confirm color, finish, material, edge, box coverage, and stock before ordering",
+  ],
+}
+
 export const APPLIANCE_RENTAL_PRODUCTS: ShopCatalogProduct[] = [
   {
     id: "rental-appliance-ge-jgbs30retss",
@@ -1248,7 +1335,13 @@ export const APPLIANCE_RENTAL_PRODUCTS: ShopCatalogProduct[] = [
   },
 ]
 
-export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [LIQUIDATION_MDF_PRODUCT, ...APPLIANCE_RENTAL_PRODUCTS, ...SEEDED_SHOP_PRODUCTS]
+export const SAMPLE_SHOP_PRODUCTS: ShopCatalogProduct[] = [
+  LIQUIDATION_BRUCE_FOX_DEN_PRODUCT,
+  LIQUIDATION_24X48_TILE_PRODUCT,
+  LIQUIDATION_MDF_PRODUCT,
+  ...APPLIANCE_RENTAL_PRODUCTS,
+  ...SEEDED_SHOP_PRODUCTS,
+]
 
 export function slugifyShopProduct(value: string) {
   return value
