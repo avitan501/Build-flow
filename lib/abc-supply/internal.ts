@@ -116,7 +116,7 @@ async function abcRequest(path: string, init: RequestInit) {
   return payload;
 }
 
-function parseAccounts(payload: unknown) {
+export function parseAbcAccounts(payload: unknown) {
   if (!payload || typeof payload !== "object") throw new Error("ABC returned an unexpected account response.");
   const root = payload as Record<string, unknown>;
   const nested = root.data && typeof root.data === "object" ? root.data as Record<string, unknown> : null;
@@ -151,7 +151,7 @@ function parseAccounts(payload: unknown) {
   });
 }
 
-function parseBranch(payload: unknown): AbcBranchDetails | null {
+export function parseAbcBranch(payload: unknown): AbcBranchDetails | null {
   if (!payload || typeof payload !== "object") return null;
   const root = payload as Record<string, unknown>;
   const branch = root.branch && typeof root.branch === "object" ? root.branch as Record<string, unknown> : root;
@@ -174,19 +174,19 @@ function parseBranch(payload: unknown): AbcBranchDetails | null {
   };
 }
 
-function parseBranches(payload: unknown) {
+export function parseAbcBranches(payload: unknown) {
   const entries = Array.isArray(payload)
     ? payload
     : payload && typeof payload === "object" && Array.isArray((payload as { branches?: unknown }).branches)
       ? (payload as { branches: unknown[] }).branches
       : [];
   return entries.flatMap((entry) => {
-    const branch = parseBranch(entry);
+    const branch = parseAbcBranch(entry);
     return branch ? [branch] : [];
   });
 }
 
-function parseCatalogItems(payload: unknown, selectedBranch: string): AbcCatalogItem[] {
+export function parseAbcCatalogItems(payload: unknown, selectedBranch: string): AbcCatalogItem[] {
   if (!payload || typeof payload !== "object") throw new Error("ABC returned an unexpected product-search response.");
   const items = (payload as { items?: unknown }).items;
   if (!Array.isArray(items)) throw new Error("ABC returned an unexpected product-search response.");
@@ -196,13 +196,21 @@ function parseCatalogItems(payload: unknown, selectedBranch: string): AbcCatalog
     const item = entry as Record<string, unknown>;
     const itemNumber = String(item.itemNumber || "").trim();
     if (!itemNumber) return [];
-    const uoms = Array.isArray(item.uoms) ? item.uoms.flatMap((entryUom) => {
+    const rawUoms = Array.isArray(item.uoms) ? item.uoms.flatMap((entryUom) => {
       if (!entryUom || typeof entryUom !== "object") return [];
       const uom = entryUom as Record<string, unknown>;
       const code = String(uom.code || "").trim();
       if (!code) return [];
       return [{ code, name: String(uom.name || code), description: String(uom.description || "") }];
     }) : [];
+    const uomsByCode = new Map<string, (typeof rawUoms)[number]>();
+    for (const uom of rawUoms) {
+      const key = uom.code.toUpperCase();
+      const current = uomsByCode.get(key);
+      if (!current || uom.description.toLowerCase() === "stocking") uomsByCode.set(key, uom);
+    }
+    const uoms = [...uomsByCode.values()]
+      .sort((a, b) => Number(b.description.toLowerCase() === "stocking") - Number(a.description.toLowerCase() === "stocking"));
     const branches = Array.isArray(item.branches) ? item.branches : [];
     const availableAtSelectedBranch = branches.some((entryBranch) => {
       if (!entryBranch || typeof entryBranch !== "object") return false;
@@ -246,12 +254,12 @@ export async function searchAbcInternalAccounts() {
       pagination: { itemsPerPage: 100, pageNumber: 1 },
     }),
   });
-  const accounts = parseAccounts(payload);
+  const accounts = parseAbcAccounts(payload);
   const branchNumbers = [...new Set(accounts.flatMap((account) => account.branches.map((branch: { number: string }) => branch.number)))];
   const details = await Promise.all(branchNumbers.map(async (number) => {
     try {
       const result = await abcRequest(`/api/location/v1/branches/${encodeURIComponent(number)}`, { method: "GET" });
-      return parseBranch(result);
+      return parseAbcBranch(result);
     } catch {
       return null;
     }
@@ -265,7 +273,7 @@ export async function searchAbcInternalAccounts() {
 
 export async function searchAbcInternalBranches(state: string) {
   const payload = await abcRequest(`/api/location/v1/branches?state=${encodeURIComponent(state)}`, { method: "GET" });
-  return parseBranches(payload);
+  return parseAbcBranches(payload);
 }
 
 export async function searchAbcInternalItems(query: string, branchNumber: string) {
@@ -291,7 +299,7 @@ export async function searchAbcInternalItems(query: string, branchNumber: string
       pagination: { itemsPerPage: 24, pageNumber: 1 },
     }),
   });
-  return parseCatalogItems(payload, branchNumber);
+  return parseAbcCatalogItems(payload, branchNumber);
 }
 
 export async function priceAbcInternalItems(request: {
