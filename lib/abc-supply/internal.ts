@@ -243,7 +243,7 @@ export function parseAbcCatalogItems(payload: unknown, selectedBranch: string): 
   });
 }
 
-export async function searchAbcInternalAccounts() {
+export async function searchAbcInternalAccountAccess() {
   const payload = await abcRequest("/api/account/v1/search/accounts", {
     method: "POST",
     body: JSON.stringify({
@@ -254,7 +254,11 @@ export async function searchAbcInternalAccounts() {
       pagination: { itemsPerPage: 100, pageNumber: 1 },
     }),
   });
-  const accounts = parseAbcAccounts(payload);
+  return parseAbcAccounts(payload);
+}
+
+export async function searchAbcInternalAccounts() {
+  const accounts = await searchAbcInternalAccountAccess();
   const branchNumbers = [...new Set(accounts.flatMap((account) => account.branches.map((branch: { number: string }) => branch.number)))];
   const details = await Promise.all(branchNumbers.map(async (number) => {
     try {
