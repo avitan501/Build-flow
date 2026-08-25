@@ -16,6 +16,7 @@ type ManagerAuraData = {
   communications?: AuraCommunicationRow[]
   contacts?: AuraContactRow[]
   connections?: {
+    voice?: { receive: boolean; send: boolean; recording: boolean; phone: string | null }
     quo: { receive: boolean; send: boolean }
     whatsapp: { receive: boolean; send: boolean }
     email: { receive: boolean; send: boolean }

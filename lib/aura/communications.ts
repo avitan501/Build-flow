@@ -158,7 +158,7 @@ export async function sendAuraEmail(toValue: string, subjectValue: string, bodyV
       to: [to],
       subject,
       text: body,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#172033"><p>${escapeHtml(body).replaceAll("\n", "<br />")}</p><p style="margin-top:24px;color:#667085">Avantia Build · (516) 908-8319</p></div>`,
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#172033"><p>${escapeHtml(body).replaceAll("\n", "<br />")}</p><p style="margin-top:24px;color:#667085">Avantia Build · (347) 937-8665</p></div>`,
       reply_to: "office@build.avantiap.com",
     }),
     cache: "no-store",

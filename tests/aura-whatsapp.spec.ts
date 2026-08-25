@@ -9,13 +9,13 @@ test("Aura dashboard is private", async ({ page }) => {
   await expect(page).toHaveURL(/\/login\?next=%2Fowner%2Faura$/);
 });
 
-test("Aura broker routes email through Supabase with the business Gmail as reply-to", async () => {
+test("Aura broker routes email through Supabase with the business mailbox as reply-to", async () => {
   const [broker, actions] = await Promise.all([
     readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
     readFile(path.join(process.cwd(), "app/owner/aura/actions.ts"), "utf8"),
   ]);
   expect(broker).toContain('input.action === "send_email"');
-  expect(broker).toContain('reply_to: "buildavantiap@gmail.com"');
+  expect(broker).toContain('reply_to: "office@build.avantiap.com"');
   expect(broker).toContain('Deno.env.get("RESEND_API_KEY")');
   expect(actions).toContain('action: "send_email"');
 });
@@ -57,6 +57,35 @@ test("Aura webhook rejects unverified requests", async ({ request }) => {
     },
   });
   expect(unsignedTwoChatWebhook.status()).toBe(401);
+
+  const unsignedTwoChatCallWebhook = await request.post("/api/aura/2chat/calls", {
+    data: { uuid: "CDRtest", direction: "I", from: "+13475675077", received_on_number: "+13479378665" },
+  });
+  expect(unsignedTwoChatCallWebhook.status()).toBe(401);
+});
+
+test("2Chat browser calls keep secrets server-side and store recordings", async () => {
+  const [route, broker, actions, inbox, softphone] = await Promise.all([
+    readFile(path.join(process.cwd(), "app/api/aura/2chat/calls/route.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "app/owner/aura/actions.ts"), "utf8"),
+    readFile(path.join(process.cwd(), "components/buildflow/unified-communication-inbox.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "components/buildflow/two-chat-softphone.tsx"), "utf8"),
+  ]);
+  expect(route).toContain("mode=2chat-call-webhook");
+  expect(route).toContain('"x-avantia-2chat-token": token');
+  expect(broker).toContain('TWO_CHAT_BUSINESS_PHONE = "+13479378665"');
+  expect(broker).toContain('input.action === "activate_2chat_whatsapp"');
+  expect(broker).toContain("activeTwoChatWhatsAppConfig");
+  expect(broker).toContain('input.action === "twochat_voice_token"');
+  expect(broker).toContain("/open/sdk/access-token");
+  expect(broker).toContain("call.status.update");
+  expect(broker).toContain("gpt-4o-mini-transcribe");
+  expect(actions).toContain('action: "twochat_voice_token"');
+  expect(softphone).toContain('import("@2chat/voice-sdk")');
+  expect(inbox).toContain("Call from (347) 937-8665");
+  expect(inbox).toContain("Assign to customer, lead, or supplier");
+  expect(broker).not.toContain('await sendTwilioWhatsApp(input.to, input.message');
 });
 
 test("2Chat uses a protected webhook and the secure Vault broker", async () => {
@@ -84,7 +113,7 @@ test("2Chat uses a protected webhook and the secure Vault broker", async () => {
   expect(dashboard).toContain("Boolean(brokerStatus?.whatsapp)");
 });
 
-test("Twilio replies use the direct connection or the secure Vault broker", async () => {
+test("legacy Twilio webhooks remain verified but cannot become the active WhatsApp fallback", async () => {
   const [route, broker] = await Promise.all([
     readFile(path.join(process.cwd(), "app/api/aura/whatsapp/twilio/route.ts"), "utf8"),
     readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
@@ -96,9 +125,7 @@ test("Twilio replies use the direct connection or the secure Vault broker", asyn
   expect(route).toContain('"x-avantia-canonical-url": request.url');
   expect(route).toContain("if (!storedByBroker) await processTwilioWhatsAppWebhook(params)");
   expect(broker).toContain('req.headers.get("x-avantia-canonical-url") || req.url');
-  expect(broker).toContain("syncRecentTwilioWhatsApp");
-  expect(broker).toContain('direction === "inbound"');
-  expect(broker).toContain("await syncRecentTwilioWhatsApp()");
+  expect(broker).not.toContain("if (!activeTwoChat) await syncRecentTwilioWhatsApp()");
 });
 
 test("missed Twilio replies are synchronized and ADD commands remain idempotent", async () => {
@@ -141,11 +168,11 @@ test("lead and customer actions offer confirmed WhatsApp video attachments", asy
   expect(actions).toContain("buildAuraShareVideoCaption(video, input.recipientName)");
   expect(contactActions).toContain("buildAuraShareVideoCaption(selectedVideo, name)");
   const broker = await readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8");
-  expect(broker).toContain('form.set("MediaUrl", mediaUrl)');
-  expect(broker).toContain("build\\.avantiap\\.com\\/videos");
+  expect(broker).toContain("url: mediaUrl || undefined");
+  expect(broker).toContain("build\\.avantiap\\.com\\/");
   expect(videos).toContain("How to Request Materials");
   expect(videos).toContain("Why Contractors Hire Avantia");
-  expect(videos).toContain("https://wa.me/15169088319");
+  expect(videos).toContain("https://wa.me/13479378665");
   expect(videos).toContain("welcome to Avantia Build");
   for (const asset of assets) {
     const details = await stat(path.join(process.cwd(), "public/videos", asset));

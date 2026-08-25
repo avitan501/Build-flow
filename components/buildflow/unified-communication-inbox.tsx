@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import { prepareQuoPhotoMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
+import { linkCommunicationContactAction } from "@/app/admin/communications/actions"
+import { TwoChatSoftphone } from "@/components/buildflow/two-chat-softphone"
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard"
 import { normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identity"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
@@ -18,6 +20,7 @@ export type AuraLeadRecipient = {
 }
 
 type Connections = {
+  voice?: { receive: boolean; send: boolean; recording: boolean; phone: string | null }
   quo: { receive: boolean; send: boolean }
   whatsapp: { receive: boolean; send: boolean }
   email: { receive: boolean; send: boolean }
@@ -120,13 +123,6 @@ function messageText(message: AuraCommunicationRow) {
   return message.channel === "call" ? "Phone call" : "Message"
 }
 
-function quoCallHref(phone: string) {
-  if (typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-    return `openphone://dial?number=${encodeURIComponent(phone)}&from=${encodeURIComponent("+15169088319")}&action=call`
-  }
-  return `tel:${phone}`
-}
-
 function ExpandableMessage({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false)
   const long = text.length > 520 || text.split("\n").length > 8
@@ -162,6 +158,8 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const [photo, setPhoto] = useState<File | null>(null)
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null)
   const [pending, startTransition] = useTransition()
+  const [softphone, setSoftphone] = useState<{ phone: string; name: string } | null>(null)
+  const [linkTarget, setLinkTarget] = useState("")
 
   useEffect(() => {
     const refresh = () => { if (document.visibilityState === "visible") router.refresh() }
@@ -182,6 +180,15 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     for (const entry of entries) {
       for (const value of [identityKey(entry.phone, null), identityKey(entry.whatsapp, null), identityKey(null, entry.email)]) {
         if (value && !alias.has(value)) alias.set(value, entry)
+      }
+    }
+    for (const contact of contacts) {
+      const match = contact.notes?.match(/^Avantia link:(customer|lead|supplier):([A-Za-z0-9_-]+)$/)
+      if (!match) continue
+      const target = entries.find((entry) => entry.kind === match[1] && entry.id === match[2])
+      if (!target) continue
+      for (const value of [identityKey(contact.normalized_phone, null), identityKey(null, contact.email)]) {
+        if (value) alias.set(value, target)
       }
     }
     return { entries, alias }
@@ -293,6 +300,28 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     })
   }
 
+  function linkConversation() {
+    const entry = directory.entries.find((item) => item.key === linkTarget)
+    if (!entry || entry.kind === "contact" || !activeConversation) return
+    const linkedKind: Exclude<ContactKind, "contact"> = entry.kind
+    startTransition(async () => {
+      const result = await linkCommunicationContactAction({
+        kind: linkedKind,
+        sourceId: entry.id,
+        name: entry.name,
+        company: entry.company,
+        phone: entry.phone,
+        email: entry.email,
+        conversationPhone: activeConversation.phone,
+        conversationEmail: activeConversation.email,
+      })
+      if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return }
+      setLinkTarget("")
+      setFeedback({ tone: "success", text: `Conversation assigned to ${entry.name}.` })
+      router.refresh()
+    })
+  }
+
   const threadVisible = mobileThreadOpen || activeKey === "__new__"
 
   return <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm md:h-[calc(100dvh-8rem)] md:min-h-[38rem]" aria-label="Unified communications inbox">
@@ -311,10 +340,10 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       </aside>
 
       <div className={`${threadVisible ? "flex" : "hidden md:flex"} min-h-0 flex-col bg-[#f5f5f7]`}>
-        {activeKey === "__new__" ? <header className="shrink-0 border-b border-slate-200 bg-white p-3"><div className="flex items-center gap-2"><button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations"><ArrowLeft className="h-5 w-5" /></button><div><h2 className="font-bold">New conversation</h2><p className="text-xs text-slate-500">Choose a person and channel</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]"><select value={recipientType} onChange={(event) => { setRecipientType(event.target.value as Exclude<ContactKind, "contact">); setSelectedRecipientId(""); setRecipient("") }} className="h-10 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="customer">Customers</option><option value="lead">Leads</option><option value="supplier">Suppliers / Vendors</option></select><select value={selectedRecipientId} onChange={(event) => selectNewRecipient(event.target.value)} className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="">Choose a contact</option>{recipientOptions.map((item) => <option key={item.key} value={item.id}>{item.name}{item.company && item.company !== item.name ? ` · ${item.company}` : ""}</option>)}</select></div></header> : activeConversation ? <header className="flex shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3 py-2.5"><button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations"><ArrowLeft className="h-5 w-5" /></button><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold">{initials(activeConversation.name)}</span><div className="min-w-0 flex-1"><h2 className="truncate text-sm font-bold">{activeConversation.name}</h2><div className="mt-0.5 flex items-center gap-2"><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${contactKindTone(activeConversation.kind)}`}>{contactKindLabel(activeConversation.kind)}</span><span className="truncate text-[10px] text-slate-500">{activeConversation.phone || activeConversation.email}</span></div></div>{activeConversation.phone ? <a href={quoCallHref(activeConversation.phone)} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white" aria-label={`Call ${activeConversation.name}`}><Phone className="h-4 w-4" /></a> : null}</header> : null}
+        {activeKey === "__new__" ? <header className="shrink-0 border-b border-slate-200 bg-white p-3"><div className="flex items-center gap-2"><button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations"><ArrowLeft className="h-5 w-5" /></button><div><h2 className="font-bold">New conversation</h2><p className="text-xs text-slate-500">Choose a person and channel</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]"><select value={recipientType} onChange={(event) => { setRecipientType(event.target.value as Exclude<ContactKind, "contact">); setSelectedRecipientId(""); setRecipient("") }} className="h-10 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="customer">Customers</option><option value="lead">Leads</option><option value="supplier">Suppliers / Vendors</option></select><select value={selectedRecipientId} onChange={(event) => selectNewRecipient(event.target.value)} className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="">Choose a contact</option>{recipientOptions.map((item) => <option key={item.key} value={item.id}>{item.name}{item.company && item.company !== item.name ? ` · ${item.company}` : ""}</option>)}</select></div></header> : activeConversation ? <header className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5"><div className="flex items-center gap-3"><button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations"><ArrowLeft className="h-5 w-5" /></button><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold">{initials(activeConversation.name)}</span><div className="min-w-0 flex-1"><h2 className="truncate text-sm font-bold">{activeConversation.name}</h2><div className="mt-0.5 flex items-center gap-2"><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${contactKindTone(activeConversation.kind)}`}>{contactKindLabel(activeConversation.kind)}</span><span className="truncate text-[10px] text-slate-500">{activeConversation.phone || activeConversation.email}</span></div></div>{activeConversation.phone ? <button type="button" onClick={() => connections.voice?.send ? setSoftphone({ phone: activeConversation.phone, name: activeConversation.name }) : window.location.assign(`tel:${activeConversation.phone}`)} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white" aria-label={`Call ${activeConversation.name}`} title={connections.voice?.send ? "Call from (347) 937-8665" : "Call from this device"}><Phone className="h-4 w-4" /></button> : null}</div>{activeConversation.kind === "contact" ? <div className="mt-2 flex gap-2"><select value={linkTarget} onChange={(event) => setLinkTarget(event.target.value)} className="h-9 min-w-0 flex-1 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs font-semibold"><option value="">Assign to customer, lead, or supplier</option>{directory.entries.filter((entry) => entry.kind !== "contact").map((entry) => <option key={entry.key} value={entry.key}>{contactKindLabel(entry.kind)} · {entry.name}</option>)}</select><button type="button" onClick={linkConversation} disabled={!linkTarget || pending} className="h-9 rounded-md bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40">Assign</button></div> : null}</header> : null}
 
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5">
-          {activeConversation ? <div className="mx-auto grid max-w-3xl gap-2">{activeConversation.messages.map((item) => { const outgoing = item.direction === "outgoing"; const text = messageText(item); const media = Array.isArray(item.media) ? item.media : []; return <article key={item.id} className={`flex ${outgoing ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-lg border px-3 py-2 shadow-sm sm:max-w-[75%] ${outgoing ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}><ExpandableMessage text={text} />{media.length ? <div className="mt-2 flex flex-wrap gap-2">{media.map((attachment, index) => attachment.url ? <a key={`${attachment.url}-${index}`} href={attachment.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-[10px] font-bold"><Paperclip className="h-3 w-3" />Attachment</a> : null)}</div> : null}<div className="mt-1.5 flex items-center justify-end gap-1.5 text-[9px] text-slate-400"><span>{channelIcon(item.channel, "h-3 w-3")}</span><time>{formatMessageTime(item.occurred_at)}</time>{outgoing ? statusIcon(item.status) : null}</div></div></article>})}</div> : <div className="flex h-full min-h-48 items-center justify-center text-center"><div><MessageCircle className="mx-auto h-10 w-10 text-slate-300" /><p className="mt-3 text-sm font-semibold text-slate-600">Start a conversation</p></div></div>}
+          {activeConversation ? <div className="mx-auto grid max-w-3xl gap-2">{activeConversation.messages.map((item) => { const outgoing = item.direction === "outgoing"; const text = messageText(item); const media = Array.isArray(item.media) ? item.media : []; return <article key={item.id} className={`flex ${outgoing ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-lg border px-3 py-2 shadow-sm sm:max-w-[75%] ${outgoing ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}><ExpandableMessage text={text} />{item.channel === "call" && item.summary && item.summary !== text ? <p className="mt-2 border-t border-slate-200 pt-2 text-xs leading-5 text-slate-600"><strong>Summary:</strong> {item.summary}</p> : null}{item.next_steps?.length ? <p className="mt-1 text-xs font-semibold text-[#0066cc]">Next: {item.next_steps.join(" · ")}</p> : null}{media.length ? <div className="mt-2 flex flex-wrap gap-2">{media.map((attachment, index) => attachment.url ? attachment.type?.startsWith("audio/") ? <audio key={`${attachment.url}-${index}`} controls preload="none" className="h-9 max-w-full" src={attachment.url} /> : <a key={`${attachment.url}-${index}`} href={attachment.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-[10px] font-bold"><Paperclip className="h-3 w-3" />Attachment</a> : null)}</div> : null}<div className="mt-1.5 flex items-center justify-end gap-1.5 text-[9px] text-slate-400"><span>{channelIcon(item.channel, "h-3 w-3")}</span><time>{formatMessageTime(item.occurred_at)}</time>{item.duration_seconds ? <span>{Math.floor(item.duration_seconds / 60)}:{String(item.duration_seconds % 60).padStart(2, "0")}</span> : null}{outgoing ? statusIcon(item.status) : null}</div></div></article>})}</div> : <div className="flex h-full min-h-48 items-center justify-center text-center"><div><MessageCircle className="mx-auto h-10 w-10 text-slate-300" /><p className="mt-3 text-sm font-semibold text-slate-600">Start a conversation</p></div></div>}
         </div>
 
         <footer className="shrink-0 border-t border-slate-200 bg-white p-2.5 sm:p-3">
@@ -334,5 +363,6 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         </footer>
       </div>
     </div>
+    <TwoChatSoftphone open={Boolean(softphone)} phone={softphone?.phone || ""} name={softphone?.name || "Contact"} onClose={() => setSoftphone(null)} />
   </section>
 }

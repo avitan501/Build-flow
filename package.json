@@ -11,6 +11,7 @@
     "test:e2e:prod": "PLAYWRIGHT_BASE_URL=https://build-flow-wfl3.vercel.app playwright test"
   },
   "dependencies": {
+    "@2chat/voice-sdk": "0.2.1",
     "@ai-sdk/openai": "4.0.42",
     "@napi-rs/canvas": "^1.0.0",
     "@supabase/ssr": "^0.10.2",

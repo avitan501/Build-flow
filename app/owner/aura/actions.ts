@@ -31,6 +31,9 @@ export type PrepareQuoPhotoResult = { ok: true; deepLink: string; attachmentUrl:
 export type SendAuraVideoResult = { ok: true; title: string } | { ok: false; error: string };
 
 type BrokerResult = { ok?: boolean; error?: string; id?: string };
+export type TwoChatVoiceTokenResult =
+  | { ok: true; token: string; from: string; expiresAt: string | null }
+  | { ok: false; error: string };
 
 async function invokeMessagingBroker(
   supabase: Awaited<ReturnType<typeof requireOwnerAccess>>["supabase"],
@@ -114,6 +117,35 @@ export async function sendAuraMessageAction(input: {
   revalidatePath("/owner/aura");
   revalidatePath("/admin/communications");
   revalidatePath("/admin/users");
+  return { ok: true };
+}
+
+export async function getTwoChatVoiceTokenAction(): Promise<TwoChatVoiceTokenResult> {
+  const { supabase, access } = await requireManagerPortalProfile();
+  if (!access.customers) return { ok: false, error: "Customer communication access is required." };
+  try {
+    const { data, error } = await supabase.functions.invoke<BrokerResult & { token?: string; from?: string; expiresAt?: string | null }>("aura-messaging-broker", {
+      body: { action: "twochat_voice_token" },
+    });
+    if (error || !data?.ok || !data.token || !data.from) throw new Error(data?.error || error?.message || "2Chat calling is unavailable.");
+    return { ok: true, token: data.token, from: data.from, expiresAt: data.expiresAt || null };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "2Chat calling is unavailable." };
+  }
+}
+
+export async function activateAuraTwoChatChannelAction(channel: "voice" | "whatsapp"): Promise<SendAuraMessageResult> {
+  const { supabase } = await requireOwnerAccess("/owner/aura/connect");
+  try {
+    await invokeMessagingBroker(supabase, {
+      action: channel === "voice" ? "activate_2chat_voice" : "activate_2chat_whatsapp",
+    });
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "The 2Chat channel could not be activated." };
+  }
+  revalidatePath("/owner/aura");
+  revalidatePath("/owner/aura/connect");
+  revalidatePath("/admin/communications");
   return { ok: true };
 }
 

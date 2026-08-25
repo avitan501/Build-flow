@@ -104,7 +104,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
       .eq("role", "client")
       .eq("is_active", true)
       .limit(500),
-    brokerClient.functions.invoke<{ ok?: boolean; whatsapp?: boolean; whatsappProvider?: string | null; sms?: boolean; smsReceive?: boolean; email?: boolean }>("aura-messaging-broker", {
+    brokerClient.functions.invoke<{ ok?: boolean; whatsapp?: boolean; whatsappProvider?: string | null; sms?: boolean; smsReceive?: boolean; voice?: boolean; voiceRecording?: boolean; voicePhone?: string | null; email?: boolean }>("aura-messaging-broker", {
       body: { action: "status" },
     }),
   ]);
@@ -121,6 +121,12 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
     communications: (communicationsResult.data || []) as AuraCommunicationRow[],
     customers: (customersResult.data || []) as AuraCustomerIdentity[],
     connections: {
+      voice: {
+        receive: Boolean(brokerStatus?.voice),
+        send: Boolean(brokerStatus?.voice),
+        recording: Boolean(brokerStatus?.voiceRecording),
+        phone: brokerStatus?.voicePhone || null,
+      },
       quo: {
         receive: Boolean(brokerStatus?.smsReceive) || Boolean(process.env.AURA_QUO_WEBHOOK_SIGNING_SECRET && process.env.AURA_QUO_PHONE_NUMBER_IDS),
         send: Boolean(brokerStatus?.sms) || canSendAuraQuoText(),

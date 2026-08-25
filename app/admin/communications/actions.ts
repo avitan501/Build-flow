@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
+import { normalizeAuraEmail, normalizeAuraPhone } from "@/lib/aura/communications"
 import { serializeCommunicationLog, type CommunicationLog } from "@/lib/manager-command-center"
+import { createAdminClient } from "@/lib/supabase/admin"
 
+type ContactKind = "customer" | "lead" | "supplier"
 type Result = { ok: true } | { ok: false; error: string }
 
 export async function saveCommunicationLogAction(input: {
@@ -43,4 +46,52 @@ export async function saveCommunicationLogAction(input: {
   if (result.error) return { ok: false, error: "The communication could not be added to the client log." }
   revalidatePath("/admin/communications")
   return { ok: true }
+}
+
+export async function linkCommunicationContactAction(input: {
+  kind: ContactKind
+  sourceId: string
+  name: string
+  company?: string
+  phone?: string
+  email?: string
+  conversationPhone?: string
+  conversationEmail?: string
+}) {
+  const { access } = await requireManagerPortalProfile()
+  if (!access.customers) return { ok: false as const, error: "Customer communication access is required." }
+  if (!new Set<ContactKind>(["customer", "lead", "supplier"]).has(input.kind) || !/^[A-Za-z0-9_-]{1,160}$/.test(input.sourceId)) {
+    return { ok: false as const, error: "Choose a valid contact." }
+  }
+  const conversationPhone = normalizeAuraPhone(input.conversationPhone || "")
+  const conversationEmail = normalizeAuraEmail(input.conversationEmail || "")
+  if (!conversationPhone && !conversationEmail) return { ok: false as const, error: "This conversation has no phone or email to link." }
+
+  const admin = createAdminClient()
+  let existingQuery = admin.from("aura_contacts").select("id").limit(1)
+  existingQuery = conversationPhone ? existingQuery.eq("normalized_phone", conversationPhone) : existingQuery.ilike("email", conversationEmail!)
+  const existing = await existingQuery.maybeSingle()
+  if (existing.error) return { ok: false as const, error: "The contact link could not be checked." }
+
+  const contactValues = {
+    full_name: input.name.trim().slice(0, 160) || "Linked contact",
+    company: input.company?.trim().slice(0, 160) || null,
+    normalized_phone: conversationPhone,
+    email: conversationEmail,
+    notes: `Avantia link:${input.kind}:${input.sourceId}`,
+  }
+  const contact = existing.data?.id
+    ? await admin.from("aura_contacts").update(contactValues).eq("id", existing.data.id).select("id").single()
+    : await admin.from("aura_contacts").insert(contactValues).select("id").single()
+  if (contact.error || !contact.data?.id) return { ok: false as const, error: "The contact link could not be saved." }
+
+  let communicationQuery = admin.from("aura_communications").update({ contact_id: contact.data.id })
+  communicationQuery = conversationPhone
+    ? communicationQuery.eq("counterparty_phone", conversationPhone)
+    : communicationQuery.ilike("counterparty_email", conversationEmail!)
+  const updated = await communicationQuery
+  if (updated.error) return { ok: false as const, error: "The conversation could not be assigned." }
+
+  revalidatePath("/admin/communications")
+  return { ok: true as const }
 }

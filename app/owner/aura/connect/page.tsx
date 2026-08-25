@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AuraConnectionPage() {
   const { supabase } = await requireOwnerAccess("/owner/aura/connect");
-  const { data } = await supabase.functions.invoke<{ ok?: boolean; whatsapp?: boolean; sms?: boolean; smsReceive?: boolean }>(
+  const { data } = await supabase.functions.invoke<{ ok?: boolean; whatsapp?: boolean; voice?: boolean; voiceRecording?: boolean; sms?: boolean; smsReceive?: boolean }>(
     "aura-messaging-broker",
     { body: { action: "status" } },
   );
@@ -25,7 +25,7 @@ export default async function AuraConnectionPage() {
             Connect 2Chat WhatsApp and Q U O text messaging securely without Vercel access.
           </p>
         </header>
-        <AuraConnectionSetup whatsappReady={Boolean(data?.ok && data.whatsapp)} smsReady={Boolean(data?.ok && data.sms)} smsReceiveReady={Boolean(data?.ok && data.smsReceive)} defaultOpen />
+        <AuraConnectionSetup whatsappReady={Boolean(data?.ok && data.whatsapp)} voiceReady={Boolean(data?.ok && data.voice)} voiceRecording={Boolean(data?.ok && data.voiceRecording)} smsReady={Boolean(data?.ok && data.sms)} smsReceiveReady={Boolean(data?.ok && data.smsReceive)} defaultOpen />
       </section>
     </main>
   );
