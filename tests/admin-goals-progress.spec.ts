@@ -176,7 +176,7 @@ test("affiliate tracker is persistent, owner-only, filterable, and setup-gated",
   expect(migration).toContain("'Developer/API Integration','In Progress'");
 });
 
-test("Carlos has a call-ready list of 50 public affiliate targets", async () => {
+test("Carlos has a call-ready list of 50 relevant affiliate targets with honest contact routes", async () => {
   const [page, component, data] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/affiliate-call-list.tsx"), "utf8"),
@@ -184,10 +184,11 @@ test("Carlos has a call-ready list of 50 public affiliate targets", async () => 
   ]);
 
   expect(page).toContain("<AffiliateCallList />");
-  expect(page).toContain("50 public company numbers ready to call.");
-  expect(component).toContain("50 affiliate targets");
-  expect(component).toContain("Affiliate or Partnerships Manager");
-  expect(component).toContain("public company phone numbers, not personal numbers");
+  expect(page).toContain("50 construction-focused targets with direct call routes first.");
+  expect(component).toContain("50 construction-focused targets");
+  expect(component).toContain("Direct business");
+  expect(component).toContain("Network managed");
+  expect(component).toContain("Only public business numbers are shown");
   expect((data.match(/\btarget\(/g) ?? []).length).toBe(50);
 
   const companies = [...data.matchAll(/target\(\d+, "([^"]+)"/g)].map((match) => match[1]);

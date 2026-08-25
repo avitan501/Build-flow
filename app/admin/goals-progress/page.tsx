@@ -81,7 +81,7 @@ async function OwnerAffiliateGoal() {
     ...attachment,
     signed_url: (await supabase.storage.from("affiliate-confirmations").createSignedUrl(attachment.file_path, 1800)).data?.signedUrl ?? null,
   })));
-  return <GoalDisclosure number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 affiliate targets · Call list, applications, and setup."><div className="grid gap-4"><AffiliateCallList programs={programResult.data ?? []} /><AffiliateProgramTracker programs={programResult.data ?? []} checklist={checklistResult.data ?? []} activities={activityResult.data ?? []} attachments={signedAttachments} integrations={integrationResult.data ?? []} settings={settingsResult.data} hideHeading /></div></GoalDisclosure>;
+  return <GoalDisclosure number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 construction-focused targets · Direct call routes first."><div className="grid gap-4"><AffiliateCallList programs={programResult.data ?? []} /><AffiliateProgramTracker programs={programResult.data ?? []} checklist={checklistResult.data ?? []} activities={activityResult.data ?? []} attachments={signedAttachments} integrations={integrationResult.data ?? []} settings={settingsResult.data} hideHeading /></div></GoalDisclosure>;
 }
 
 function FixWebsiteGoal({ notes }: { notes: ManagerGoalRecord[] }) {
@@ -132,7 +132,7 @@ export default async function GoalsProgressPage() {
     <header className="border-b border-slate-200 pb-6"><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Goals &amp; Progress</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Company priorities organized by owner. Add new goals under the person responsible for completing them.</p></header>
 
     <div className="mt-7 grid gap-9">
-      <section aria-labelledby="carlos-goals-title"><PersonHeader assignee="carlos" description="Clients, suppliers, and pricing outreach" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "carlos")} /><div className="mt-4 grid gap-4"><ClientTargetGoal clients={clients} leads={leads} canManageClients={access.customers} /><SupplierPricingGoal />{access.owner ? <OwnerAffiliateGoal /> : <GoalDisclosure number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 public company numbers ready to call."><AffiliateCallList /></GoalDisclosure>}</div></section>
+      <section aria-labelledby="carlos-goals-title"><PersonHeader assignee="carlos" description="Clients, suppliers, and pricing outreach" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "carlos")} /><div className="mt-4 grid gap-4"><ClientTargetGoal clients={clients} leads={leads} canManageClients={access.customers} /><SupplierPricingGoal />{access.owner ? <OwnerAffiliateGoal /> : <GoalDisclosure number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 construction-focused targets with direct call routes first."><AffiliateCallList /></GoalDisclosure>}</div></section>
 
       {access.owner ? <section aria-labelledby="david-goals-title"><PersonHeader assignee="david" description="Website and campaign launch" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "david")} /><div className="mt-4 grid gap-4"><FixWebsiteGoal notes={websiteNotes} /><BeatQuoteGoal owner /></div></section> : null}
     </div>
