@@ -1,6 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowRight, ChevronDown } from "lucide-react"
+import { ArrowRight, Boxes, ChevronDown } from "lucide-react"
 
 const DEPARTMENT_STORIES = [
   {
@@ -81,10 +81,27 @@ const DEPARTMENT_STORIES = [
 
 export function ShopShowroom({ embedded = false }: { embedded?: boolean }) {
   const Root = embedded ? "section" : "main"
+  const CollectionRoot = embedded ? "details" : "div"
 
   return (
-    <Root className="block overflow-hidden bg-[#f5f5f7] py-3 text-[#1d1d1f] sm:py-5" aria-label={embedded ? "Shop materials" : undefined}>
-      {DEPARTMENT_STORIES.map((department, departmentIndex) => (
+    <Root className={`block overflow-hidden bg-[#f5f5f7] text-[#1d1d1f] ${embedded ? "px-3 py-4 sm:px-5 sm:py-7" : "py-3 sm:py-5"}`} aria-label={embedded ? "Shop materials" : undefined}>
+      <CollectionRoot className={embedded ? "group/showroom mx-auto block w-full max-w-[110rem] overflow-hidden rounded-[8px] border border-black/10 bg-white shadow-[0_10px_34px_rgba(0,0,0,.07)]" : "contents"}>
+        {embedded ? (
+          <summary className="flex min-h-[84px] cursor-pointer list-none items-center gap-4 px-5 py-4 outline-none transition hover:bg-black/[.025] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0071e3] [&::-webkit-details-marker]:hidden sm:min-h-[100px] sm:px-8">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#f5f5f7] text-[#0066cc] sm:h-12 sm:w-12">
+              <Boxes className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-xl font-semibold leading-tight sm:text-3xl">Shop Materials</span>
+              <span className="mt-1 block truncate text-sm text-black/50 sm:text-base">Browse eight construction departments</span>
+            </span>
+            <span className="hidden shrink-0 text-sm font-semibold text-[#0066cc] sm:block">View departments</span>
+            <ChevronDown className="h-5 w-5 shrink-0 text-black/55 transition-transform duration-300 group-open/showroom:rotate-180" aria-hidden="true" />
+          </summary>
+        ) : null}
+
+        <div className={embedded ? "border-t border-black/10 bg-[#f5f5f7] py-2 sm:py-3" : "contents"}>
+        {DEPARTMENT_STORIES.map((department, departmentIndex) => (
         <details
           id={department.title.toLowerCase().replaceAll(" & ", "-").replaceAll(", ", "-").replaceAll(" ", "-")}
           key={department.title}
@@ -119,16 +136,18 @@ export function ShopShowroom({ embedded = false }: { embedded?: boolean }) {
             </div>
           </div>
         </details>
-      ))}
+        ))}
 
-      <section className="bg-[#f5f5f7] px-6 py-20 text-center sm:px-10 sm:py-28">
+        <section className="bg-[#f5f5f7] px-6 py-20 text-center sm:px-10 sm:py-28">
         <h2 className="text-[clamp(2.3rem,5vw,4.5rem)] font-semibold leading-none tracking-[0]">Don&apos;t see the exact item?</h2>
         <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-black/55 sm:text-lg">Send a photo, model number, supplier quote, list, or blueprint. We&apos;ll organize the request and find the material.</p>
         <div className="mt-7 flex flex-wrap justify-center gap-4">
           <Link href="/request-quote?request=custom-item" className="inline-flex min-h-11 items-center justify-center rounded-[8px] bg-[#0071e3] px-6 text-sm font-semibold text-white hover:bg-[#0077ed]">Find an item</Link>
           <Link href="/request-quote" className="inline-flex min-h-11 items-center justify-center text-sm font-semibold text-[#0066cc] hover:underline">Send a list <span className="ml-1" aria-hidden="true">›</span></Link>
         </div>
-      </section>
+        </section>
+        </div>
+      </CollectionRoot>
     </Root>
   )
 }
