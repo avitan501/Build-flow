@@ -10,7 +10,13 @@ export async function POST(request: Request) {
   await requireAdminProfile();
   try {
     const pricing = await request.json();
-    const payload = await callAbcBridge({ action: "pricing", pricing });
+    if (!pricing || typeof pricing !== "object") {
+      return NextResponse.json({ error: "Check the ABC pricing fields." }, { status: 400 });
+    }
+    const payload = await callAbcBridge({ action: "pricing", pricing: { ...pricing, serviceFeePercent: 0 } });
+    if (!payload?.pricing || typeof payload.pricing !== "object") {
+      return NextResponse.json({ error: "ABC Sandbox did not return a pricing result." }, { status: 502, headers: { "Cache-Control": "no-store, max-age=0" } });
+    }
     return NextResponse.json(payload, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "ABC pricing request failed." }, { status: 502, headers: { "Cache-Control": "no-store, max-age=0" } });
