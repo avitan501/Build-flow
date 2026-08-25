@@ -11,6 +11,7 @@ import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import { ShopTranslationBoundary, useShopLanguage } from "@/components/buildflow/shop-language-provider";
 import { placeholderImageMetadata } from "@/lib/shop-catalog";
 import { SHOP_CATEGORY_NAMES, SHOP_POPULAR_SEARCHES } from "@/lib/shop";
+import { SHOP_COMING_SOON_LINKS, SHOP_MENU_MATERIAL_LINKS, SHOP_SERVICE_LINKS } from "@/lib/shop-navigation";
 import { shopSearchSuggestions } from "@/lib/shop-search";
 
 type MobileClientHeaderProps = {
@@ -69,6 +70,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
   const router = useRouter();
   const { language, setLanguage } = useShopLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [shopDirectoryOpen, setShopDirectoryOpen] = useState(false);
   const [shopSearchOpen, setShopSearchOpen] = useState(false);
   const [draftQuery, setDraftQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -96,6 +98,12 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
     { href: "/shop", label: "Shop Materials", description: "Browse products and departments" },
     { href: "/request-quote", label: "Request Material Pricing", description: "Send a list, photo, or plan" },
     { href: "/beat-a-quote", label: "Beat My Quote", description: "Upload a supplier quote for a better price" },
+  ], []);
+
+  const shopLinks = useMemo<MobileMenuLink[]>(() => [
+    ...SHOP_MENU_MATERIAL_LINKS.map((item) => ({ href: item.href, label: item.label, description: item.description, section: "Materials" as const, imageUrl: item.imageUrl })),
+    ...SHOP_SERVICE_LINKS.map((item) => ({ href: item.href, label: item.label, description: item.description, section: "Services" as const, imageUrl: item.imageUrl })),
+    ...SHOP_COMING_SOON_LINKS.map((item) => ({ href: item.href, label: item.label, description: item.description, section: "Coming Soon" as const, imageUrl: item.imageUrl, badge: item.badge, disabled: item.disabled })),
   ], []);
 
   const adminLinks = useMemo<MobileMenuLink[]>(() => {
@@ -161,7 +169,10 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
             aria-label="Open navigation menu"
             aria-expanded={menuOpen}
             aria-controls="mobile-navigation-drawer"
-            onClick={() => setMenuOpen(true)}
+            onClick={() => {
+              setShopDirectoryOpen(false);
+              setMenuOpen(true);
+            }}
             className={
               isHome
                 ? "inline-flex min-h-10 items-center gap-2 rounded-full bg-[#1d1d1f]/60 px-3 text-sm font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] transition hover:bg-[#1d1d1f]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/75"
@@ -224,12 +235,16 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
               >
                 Home
               </Link>
-              <Link
-                href="/shop"
+              <button
+                type="button"
+                onClick={() => {
+                  setShopDirectoryOpen(true);
+                  setMenuOpen(true);
+                }}
                 className={`rounded-full px-3 py-2 text-[13px] leading-none font-medium transition ${pathname === "/shop" ? "bg-[#f2f5f7] text-[#1d1d1f]" : "text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"}`}
               >
                 Shop Materials
-              </Link>
+              </button>
               <Link
                 href="/request-quote"
                 className={`rounded-full px-3 py-2 text-[13px] leading-none font-medium transition ${pathname === "/request-quote" ? "bg-[#f2f5f7] text-[#1d1d1f]" : "text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"}`}
@@ -290,7 +305,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
         ) : null}
       </div>
 
-      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} primaryLinks={primaryLinks} adminLinks={adminLinks} isSignedIn={isSignedIn} />
+      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} primaryLinks={primaryLinks} shopLinks={shopLinks} shopOpen={shopDirectoryOpen} onShopOpenChange={setShopDirectoryOpen} adminLinks={adminLinks} isSignedIn={isSignedIn} />
 
       {shopSearchOpen ? (
         <div id="shop-search-overlay" role="dialog" aria-modal="true" className="fixed inset-0 z-[80] bg-white/96 backdrop-blur-sm">

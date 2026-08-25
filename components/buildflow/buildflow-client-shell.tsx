@@ -31,14 +31,16 @@ export function AvantiaBuildClientShell({ children }: AvantiaBuildClientShellPro
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#d9e7fb_0%,#f4f8fd_34%,#dbe8f9_100%)] lg:px-3 lg:py-3">
+    <div className={isShopLanding || isHome ? "min-h-screen bg-white" : "min-h-screen bg-[radial-gradient(circle_at_top,#d9e7fb_0%,#f4f8fd_34%,#dbe8f9_100%)] lg:px-3 lg:py-3"}>
       <div
-        className={`mx-auto flex min-h-screen w-full flex-col bg-[linear-gradient(180deg,#f9fcff_0%,#f2f7ff_42%,#ffffff_100%)] lg:min-h-[calc(100vh-3rem)] lg:rounded-[34px] lg:border lg:border-white/70 lg:shadow-[0_28px_80px_rgba(15,23,42,0.16)] ${
-          isOwnerWorkspace
+        className={`mx-auto flex min-h-screen w-full flex-col ${isShopLanding ? "max-w-none bg-black" : isHome ? "max-w-none bg-white" : "bg-[linear-gradient(180deg,#f9fcff_0%,#f2f7ff_42%,#ffffff_100%)] lg:min-h-[calc(100vh-3rem)] lg:rounded-[34px] lg:border lg:border-white/70 lg:shadow-[0_28px_80px_rgba(15,23,42,0.16)]"} ${
+          isShopLanding || isHome
+            ? "max-w-none"
+            : isOwnerWorkspace
             ? "max-w-[96rem] lg:overflow-visible"
             : isManagerPreview
               ? "max-w-[96rem] lg:overflow-visible"
-            : isHome || isAccount || isShopLanding || isShopFlow || isProjectFlow || isQuoteRequest || isAiFlow || isQuoteComparisonPreview
+            : isAccount || isShopFlow || isProjectFlow || isQuoteRequest || isAiFlow || isQuoteComparisonPreview
               ? "max-w-[96rem] lg:overflow-visible"
               : "max-w-[31rem] lg:overflow-hidden"
         }`}

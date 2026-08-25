@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { ArrowRight, Check, PackageCheck, Search, Truck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { CoverageScrollSection } from "@/components/buildflow/coverage-scroll-section";
 import { ScrollFocusIsland } from "@/components/buildflow/scroll-focus-island";
 import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase";
-import { HomepageShopPicker } from "@/components/buildflow/homepage-shop-picker";
-import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools";
+import { ShopShowroom } from "@/components/buildflow/shop-showroom";
 
 type Language = "en" | "es";
 
@@ -67,6 +66,8 @@ const problemIcons = [Truck, Search, PackageCheck] as const;
 const HOMEPAGE_STORY_LOOP_END = 12.25;
 
 export function ConstructionConciergeHome() {
+  const mobileVideoRef = useRef<HTMLVideoElement>(null);
+  const desktopVideoRef = useRef<HTMLVideoElement>(null);
   const [language, setLanguage] = useState<Language>("en");
   const [showHeroActions, setShowHeroActions] = useState(false);
   const [showStickyOrder, setShowStickyOrder] = useState(false);
@@ -89,6 +90,14 @@ export function ConstructionConciergeHome() {
     return () => window.removeEventListener("scroll", updateStickyOrder);
   }, []);
 
+  useEffect(() => {
+    const videos = [mobileVideoRef.current, desktopVideoRef.current].filter((video): video is HTMLVideoElement => Boolean(video));
+    const applyPace = () => videos.forEach((video) => { video.playbackRate = 1.35; });
+    applyPace();
+    videos.forEach((video) => video.addEventListener("play", applyPace));
+    return () => videos.forEach((video) => video.removeEventListener("play", applyPace));
+  }, []);
+
   function loopHomepageStory(event: React.SyntheticEvent<HTMLVideoElement>) {
     const video = event.currentTarget;
     if (video.currentTime < HOMEPAGE_STORY_LOOP_END) return;
@@ -96,14 +105,18 @@ export function ConstructionConciergeHome() {
     void video.play();
   }
 
+  function setHomepageStoryPace(event: React.SyntheticEvent<HTMLVideoElement>) {
+    event.currentTarget.playbackRate = 1.35;
+  }
+
   return (
     <main className="overflow-x-clip bg-[#f4f5f7] text-[#071126]">
       <section data-homepage-hero className="relative isolate flex min-h-[min(88svh,56rem)] items-start justify-center overflow-hidden bg-[#071126] text-white sm:aspect-video sm:min-h-0 sm:items-center">
-        <video className="absolute inset-0 -z-20 h-full w-full object-cover object-bottom sm:hidden" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v13-mobile-poster.png" onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
+        <video ref={mobileVideoRef} className="absolute inset-0 -z-20 h-full w-full object-cover object-[center_30%] sm:hidden" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v13-mobile-poster.png" onLoadedMetadata={setHomepageStoryPace} onCanPlay={setHomepageStoryPace} onPlay={setHomepageStoryPace} onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
           <source src="/videos/avantia-hero-background-v13-mobile.webm" type="video/webm" />
           <source src="/videos/avantia-hero-background-v13-mobile.mp4" type="video/mp4" />
         </video>
-        <video className="absolute inset-0 -z-20 hidden h-full w-full object-cover sm:block" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v13-desktop-poster.png" onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
+        <video ref={desktopVideoRef} className="absolute inset-0 -z-20 hidden h-full w-full object-cover object-[center_30%] sm:block" autoPlay muted loop playsInline preload="metadata" poster="/videos/avantia-hero-background-v13-desktop-poster.png" onLoadedMetadata={setHomepageStoryPace} onCanPlay={setHomepageStoryPace} onPlay={setHomepageStoryPace} onTimeUpdate={loopHomepageStory} data-loop-end={HOMEPAGE_STORY_LOOP_END} aria-label="Construction material ordering, delivery, and jobsite work">
           <source src="/videos/avantia-hero-background-v13-desktop.webm" type="video/webm" />
           <source src="/videos/avantia-hero-background-v13-desktop.mp4" type="video/mp4" />
         </video>
@@ -129,11 +142,7 @@ export function ConstructionConciergeHome() {
 
       </section>
 
-      <section className="bg-white px-4 py-3 sm:px-8 sm:py-6 lg:px-10" aria-label="Avantia builder shop">
-        <div className="mx-auto w-full max-w-7xl">
-          <HomepageShopPicker projects={[]} categories={SHOP_TOOL_CATEGORIES} isSignedIn={false} homepageCompact />
-        </div>
-      </section>
+      <ShopShowroom embedded />
 
       <section className="px-3 py-8 sm:px-5 sm:py-14" aria-labelledby="full-service-heading">
         <div className="mx-auto max-w-[88rem]">

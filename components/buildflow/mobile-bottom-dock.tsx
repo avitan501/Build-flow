@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const HIDDEN_DOCK_PATHS = new Set(["/", "/login", "/signup", "/reset-password"]);
+const HIDDEN_DOCK_PATHS = new Set(["/", "/shop", "/login", "/signup", "/reset-password"]);
 
 function shouldShowDock(pathname: string) {
   return !HIDDEN_DOCK_PATHS.has(pathname) && !pathname.startsWith("/admin") && !pathname.startsWith("/ai/renovation-estimator");
