@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { after } from "next/server"
 
 import { sendQuoteIntakeEmail } from "@/lib/cart-submission-email"
+import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone"
 import { notifyManagersSafely } from "@/lib/manager-push-notifications"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getSupabasePublicEnv } from "@/lib/supabase/env"
@@ -81,9 +82,16 @@ async function saveWithSupabaseFunction(payload: QuoteIntakePayload) {
   return response.json() as Promise<{ ok: true; requestId: string }>
 }
 
-async function findClientByEmail(supabase: ReturnType<typeof createAdminClient>, email: string) {
-  const { data } = await supabase.from("profiles").select("id,email").ilike("email", email).limit(1).maybeSingle<{ id: string; email: string }>()
-  return data
+async function findClientByContact(supabase: ReturnType<typeof createAdminClient>, email: string, phone: string) {
+  if (email) {
+    const { data } = await supabase.from("profiles").select("id,email").ilike("email", email).limit(1).maybeSingle<{ id: string; email: string }>()
+    if (data) return data
+  }
+  if (phone) {
+    const { data } = await supabase.from("profiles").select("id,email").eq("phone", phone).limit(1).maybeSingle<{ id: string; email: string }>()
+    if (data) return data
+  }
+  return null
 }
 
 function organizeMaterialListAfterResponse(requestId: string) {
@@ -107,7 +115,8 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
   const firstName = nameParts[0] || ""
   const lastName = nameParts.slice(1).join(" ")
   const email = field(formData, "email", 160).toLowerCase()
-  const phone = field(formData, "phone", 40)
+  const phoneInput = field(formData, "phone", 40)
+  const phone = normalizePhoneNumber(phoneInput)
   const company = field(formData, "company", 120)
   const customerType = field(formData, "customerType", 80)
   const projectName = field(formData, "projectName", 140)
@@ -125,8 +134,11 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
   const contactMethods = formData.getAll("contactMethods").map((value) => String(value).trim()).filter((value) => allowedContactMethods.has(value)).slice(0, 4)
 
   if (!firstName || !lastName) return error("Enter your full name, including first and last name.")
-  if (!/^\S+@\S+\.\S+$/.test(email)) return error("Enter a valid email address.")
-  if (phone.replace(/\D/g, "").length < 7) return error("Enter a valid phone number.")
+  if (!email && !phone) return error("Enter an email address or phone number.")
+  if (email && !/^\S+@\S+\.\S+$/.test(email)) return error("Enter a valid email address.")
+  if (phone && phone.replace(/\D/g, "").length < 7) return error("Enter a valid phone number.")
+  const accountEmail = email || phoneLoginEmailForPhone(phone)
+  if (!accountEmail) return error("Enter an email address or phone number.")
 
   const uploaded = formData.get("attachment")
   const attachmentPath = field(formData, "attachmentPath", 300)
@@ -186,7 +198,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
 
   try {
     const supabase = createAdminClient()
-    const existingClient = await findClientByEmail(supabase, email)
+    const existingClient = await findClientByContact(supabase, email, phone)
 
     if (existingClient) {
       clientId = existingClient.id
@@ -198,7 +210,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
       if (profileError) throw new Error("profile_update_failed")
     } else {
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
+        email: accountEmail,
         password: `${randomUUID()}Aa1!`,
         email_confirm: true,
         user_metadata: { full_name: fullName, phone, company_name: company || null },
@@ -208,7 +220,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
       createdClient = true
       const { error: profileError } = await supabase.from("profiles").upsert({
         id: clientId,
-        email,
+        email: accountEmail,
         full_name: fullName,
         phone,
         company_name: company || null,

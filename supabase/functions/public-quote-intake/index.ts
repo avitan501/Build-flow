@@ -145,13 +145,27 @@ async function sendEmail(input: { to: string; subject: string; html: string; tex
 }
 
 function valid(payload: QuotePayload) {
+  const email = (payload.email || "").trim()
+  const phone = (payload.phone || "").trim()
   return payload.referenceId?.startsWith("AB-")
     && payload.firstName?.length > 0
     && payload.lastName?.length > 0
-    && /^\S+@\S+\.\S+$/.test(payload.email || "")
-    && (!(payload.phone || "").trim() || payload.phone.replace(/\D/g, "").length >= 7)
+    && Boolean(email || phone)
+    && (!email || /^\S+@\S+\.\S+$/.test(email))
+    && (!phone || phone.replace(/\D/g, "").length >= 7)
     && Array.isArray(payload.departments)
     && ((payload.details || "").trim().length >= 3 || Boolean(payload.attachment))
+}
+
+function normalizePhone(value: string) {
+  const digits = value.replace(/\D/g, "")
+  if (digits.length === 10) return `+1${digits}`
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`
+  return digits ? `+${digits}` : ""
+}
+
+function phoneAccountEmail(phone: string) {
+  return `phone-${phone.replace(/\D/g, "")}@phone-login.buildflow.local`
 }
 
 function hasValidPublicKey(request: Request) {
@@ -339,12 +353,12 @@ Deno.serve(async (request) => {
       : await sendEmail({
           to: "avitanneto@gmail.com",
           subject: `NEW MATERIAL REQUEST - ${fullName} - ${payload.referenceId}`,
-          replyTo: payload.email,
+          replyTo: payload.email || undefined,
           text: ownerText,
-          html: `<div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5"><div style="max-width:680px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff"><div style="padding:20px 22px;border-bottom:1px solid #e5eaf1"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:12px"><img src="${siteUrl}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px"></td><td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br><span style="font-size:13px;color:#64748b">Material request desk</span></td></tr></table></div><div style="padding:24px 22px"><p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">New material request</p><h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">${escapeHtml(fullName)} sent a request</h1><p style="margin:10px 0 0;color:#475569">${escapeHtml(departmentText)}${payload.timeframe ? ` &bull; Needed ${escapeHtml(payload.timeframe)}` : ""}</p><p style="margin:22px 0"><a href="${requestUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Request</a></p><div style="padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}<br><strong>Customer:</strong> ${escapeHtml(fullName)}<br><strong>Phone:</strong> ${escapeHtml(payload.phone || "Not provided")}<br><strong>Email:</strong> ${escapeHtml(payload.email)}${payload.company ? `<br><strong>Company:</strong> ${escapeHtml(payload.company)}` : ""}</div><h2 style="margin:24px 0 8px;font-size:17px">Job details</h2><p style="margin:0"><strong>Location:</strong> ${escapeHtml(address || "Not provided")}<br><strong>Departments:</strong> ${escapeHtml(departmentText)}</p><h2 style="margin:24px 0 8px;font-size:17px">What they need</h2><p style="margin:0;white-space:pre-wrap">${escapeHtml(payload.details || "See attached file")}</p>${attachment?.filename ? `<p style="margin:20px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(attachment.filename)}</p>` : ""}</div></div></div>`,
+          html: `<div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5"><div style="max-width:680px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff"><div style="padding:20px 22px;border-bottom:1px solid #e5eaf1"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:12px"><img src="${siteUrl}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px"></td><td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br><span style="font-size:13px;color:#64748b">Material request desk</span></td></tr></table></div><div style="padding:24px 22px"><p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">New material request</p><h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">${escapeHtml(fullName)} sent a request</h1><p style="margin:10px 0 0;color:#475569">${escapeHtml(departmentText)}${payload.timeframe ? ` &bull; Needed ${escapeHtml(payload.timeframe)}` : ""}</p><p style="margin:22px 0"><a href="${requestUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Request</a></p><div style="padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}<br><strong>Customer:</strong> ${escapeHtml(fullName)}<br><strong>Phone:</strong> ${escapeHtml(payload.phone || "Not provided")}<br><strong>Email:</strong> ${escapeHtml(payload.email || "Not provided")}${payload.company ? `<br><strong>Company:</strong> ${escapeHtml(payload.company)}` : ""}</div><h2 style="margin:24px 0 8px;font-size:17px">Job details</h2><p style="margin:0"><strong>Location:</strong> ${escapeHtml(address || "Not provided")}<br><strong>Departments:</strong> ${escapeHtml(departmentText)}</p><h2 style="margin:24px 0 8px;font-size:17px">What they need</h2><p style="margin:0;white-space:pre-wrap">${escapeHtml(payload.details || "See attached file")}</p>${attachment?.filename ? `<p style="margin:20px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(attachment.filename)}</p>` : ""}</div></div></div>`,
           attachment,
         })
-    const client = rawPayload.sendClient === false
+    const client = rawPayload.sendClient === false || !payload.email
       ? { status: "skipped" as const }
       : await sendEmail({
           to: payload.email,
@@ -376,6 +390,8 @@ Deno.serve(async (request) => {
   if (!valid(payload)) return json({ error: "invalid_request" }, 400)
   const fullName = `${payload.firstName.trim()} ${payload.lastName.trim()}`
   const email = payload.email.trim().toLowerCase()
+  const phone = normalizePhone(payload.phone || "")
+  const accountEmail = email || phoneAccountEmail(phone)
   const address = [payload.street, payload.city, payload.state, payload.zip].map((value) => value?.trim()).filter(Boolean).join(", ")
   let clientId = ""
   let projectId = ""
@@ -384,26 +400,34 @@ Deno.serve(async (request) => {
   let createdClient = false
 
   try {
-    const { data: profile } = await supabase.from("profiles").select("id").ilike("email", email).limit(1).maybeSingle<{ id: string }>()
+    let profile: { id: string } | null = null
+    if (email) {
+      const result = await supabase.from("profiles").select("id").ilike("email", email).limit(1).maybeSingle<{ id: string }>()
+      profile = result.data
+    }
+    if (!profile && phone) {
+      const result = await supabase.from("profiles").select("id").eq("phone", phone).limit(1).maybeSingle<{ id: string }>()
+      profile = result.data
+    }
     if (profile) {
       clientId = profile.id
-      const { error } = await supabase.from("profiles").update({ full_name: fullName, phone: payload.phone || null, company_name: payload.company || null }).eq("id", clientId)
+      const { error } = await supabase.from("profiles").update({ full_name: fullName, phone: phone || null, company_name: payload.company || null }).eq("id", clientId)
       if (error) throw new Error("profile_update_failed")
     } else {
       const { data, error } = await supabase.auth.admin.createUser({
-        email,
+        email: accountEmail,
         password: `${crypto.randomUUID()}Aa1!`,
         email_confirm: true,
-        user_metadata: { full_name: fullName, phone: payload.phone || null, company_name: payload.company || null },
+        user_metadata: { full_name: fullName, phone: phone || null, company_name: payload.company || null },
       })
       if (error || !data.user) throw new Error("client_create_failed")
       clientId = data.user.id
       createdClient = true
       const { error: profileError } = await supabase.from("profiles").upsert({
         id: clientId,
-        email,
+        email: accountEmail,
         full_name: fullName,
-        phone: payload.phone || null,
+        phone: phone || null,
         company_name: payload.company || null,
         role: "client",
         approval_status: "pending",
@@ -508,7 +532,7 @@ Deno.serve(async (request) => {
       "New Avantia Build quote request",
       `Reference: ${payload.referenceId}`,
       `Customer: ${fullName}`,
-      `Email: ${email}`,
+      `Email: ${email || "Not provided"}`,
       `Phone: ${payload.phone || "Not provided"}`,
       `Company: ${payload.company || "Not provided"}`,
       `Project: ${payload.projectName || "Not named"}`,
@@ -522,19 +546,19 @@ Deno.serve(async (request) => {
     const ownerEmail = await sendEmail({
       to: "avitanneto@gmail.com",
       subject: `NEW MATERIAL REQUEST - ${fullName} - ${payload.referenceId}`,
-      replyTo: email,
+      replyTo: email || undefined,
       text: ownerText,
-      html: `<div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5"><div style="max-width:680px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff"><div style="padding:20px 22px;border-bottom:1px solid #e5eaf1"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:12px"><img src="${siteUrl}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px"></td><td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br><span style="font-size:13px;color:#64748b">Material request desk</span></td></tr></table></div><div style="padding:24px 22px"><p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">New material request</p><h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">${escapeHtml(fullName)} sent a request</h1><p style="margin:10px 0 0;color:#475569">${escapeHtml(departmentText)}${payload.timeframe ? ` &bull; Needed ${escapeHtml(payload.timeframe)}` : ""}</p><p style="margin:22px 0"><a href="${requestUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Request</a></p><div style="padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}<br><strong>Customer:</strong> ${escapeHtml(fullName)}<br><strong>Phone:</strong> ${escapeHtml(payload.phone || "Not provided")}<br><strong>Email:</strong> ${escapeHtml(email)}${payload.company ? `<br><strong>Company:</strong> ${escapeHtml(payload.company)}` : ""}<br><strong>Reply by:</strong> ${escapeHtml((contactMethods.length ? contactMethods : ["WhatsApp"]).join(", "))}</div><h2 style="margin:24px 0 8px;font-size:17px">Job details</h2><p style="margin:0"><strong>Location:</strong> ${escapeHtml(address || "Not provided")}<br><strong>Departments:</strong> ${escapeHtml(departmentText)}</p><h2 style="margin:24px 0 8px;font-size:17px">What they need</h2><p style="margin:0;white-space:pre-wrap">${escapeHtml(payload.details || "See attached file")}</p>${payload.attachment?.filename ? `<p style="margin:20px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(payload.attachment.filename)}</p>` : ""}</div></div></div>`,
+      html: `<div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5"><div style="max-width:680px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff"><div style="padding:20px 22px;border-bottom:1px solid #e5eaf1"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:12px"><img src="${siteUrl}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px"></td><td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br><span style="font-size:13px;color:#64748b">Material request desk</span></td></tr></table></div><div style="padding:24px 22px"><p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">New material request</p><h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">${escapeHtml(fullName)} sent a request</h1><p style="margin:10px 0 0;color:#475569">${escapeHtml(departmentText)}${payload.timeframe ? ` &bull; Needed ${escapeHtml(payload.timeframe)}` : ""}</p><p style="margin:22px 0"><a href="${requestUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Request</a></p><div style="padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}<br><strong>Customer:</strong> ${escapeHtml(fullName)}<br><strong>Phone:</strong> ${escapeHtml(payload.phone || "Not provided")}<br><strong>Email:</strong> ${escapeHtml(email || "Not provided")}${payload.company ? `<br><strong>Company:</strong> ${escapeHtml(payload.company)}` : ""}<br><strong>Reply by:</strong> ${escapeHtml((contactMethods.length ? contactMethods : ["WhatsApp"]).join(", "))}</div><h2 style="margin:24px 0 8px;font-size:17px">Job details</h2><p style="margin:0"><strong>Location:</strong> ${escapeHtml(address || "Not provided")}<br><strong>Departments:</strong> ${escapeHtml(departmentText)}</p><h2 style="margin:24px 0 8px;font-size:17px">What they need</h2><p style="margin:0;white-space:pre-wrap">${escapeHtml(payload.details || "See attached file")}</p>${payload.attachment?.filename ? `<p style="margin:20px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(payload.attachment.filename)}</p>` : ""}</div></div></div>`,
       attachment: payload.attachment,
     })
     const clientText = `Hi ${payload.firstName},\n\nWe received your Avantia Build quote request. Someone from our team will contact you within the next 24 hours.\n\nReference: ${payload.referenceId}\nProject: ${payload.projectName || "Not named"}\n\nMaterials requested:\n${requestedItemsText(customerItems)}${payload.attachment?.filename ? `\nAttachment: ${payload.attachment.filename}` : ""}\n\n${companyContactText()}`
-    const clientEmail = await sendEmail({
+    const clientEmail = email ? await sendEmail({
       to: email,
       subject: `Material request received - ${payload.referenceId}`,
       replyTo: companyEmail,
       text: clientText,
       html: customerEmailShell(`<p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p><h1 style="margin:0;font-size:25px;line-height:1.25;color:#071126">Your request is in.</h1><p style="margin:12px 0;color:#475569">Hi ${escapeHtml(payload.firstName)}, we will review your details and contact you within 24 hours.</p><div style="margin:20px 0;padding:15px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}${payload.projectName ? `<br><strong>Project:</strong> ${escapeHtml(payload.projectName)}` : ""}</div><h2 style="margin:22px 0 0;font-size:17px;color:#071126">Materials requested</h2>${requestedItemsHtml(customerItems)}${payload.attachment?.filename ? `<p style="margin:14px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(payload.attachment.filename)}</p>` : ""}<p style="margin:22px 0 0"><a href="${siteUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Avantia Build</a></p>`),
-    })
+    }) : { status: "skipped" as const }
 
     await supabase.from("quote_request_items").update({
       metadata: {

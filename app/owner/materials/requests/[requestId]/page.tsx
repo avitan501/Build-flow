@@ -7,6 +7,7 @@ import { OrganizeMaterialListButton } from "@/components/buildflow/organize-mate
 import { OrganizedMaterialList } from "@/components/buildflow/organized-material-list"
 import { RequestManagementPanel, type RequestComparisonSummary } from "@/components/buildflow/request-management-panel"
 import { requireStaffProfile } from "@/lib/auth"
+import { contactEmailForDisplay } from "@/lib/auth-phone"
 import { normalizeMaterialCatalogDepartment } from "@/lib/material-catalog"
 import type { MaterialQuestionnaireResponse, MaterialRequestAnswer } from "@/lib/material-questionnaires"
 import { quoteRequestStatusLabel, type QuoteRequestStatus } from "@/lib/quote-requests"
@@ -49,6 +50,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
       : Promise.resolve({ data: [] as MaterialRequestAnswer[] }),
   ])
   const answers = answersResult.data ?? []
+  const clientEmail = contactEmailForDisplay(profile?.email)
   const comparisonIds = (comparisons ?? []).map((comparison) => comparison.id)
   const [comparisonItemsResult, comparisonBidsResult] = comparisonIds.length ? await Promise.all([
     supabase.from("quote_comparison_items").select("*").in("comparison_id", comparisonIds).order("sort_order").returns<QuoteComparisonItemRecord[]>(),
@@ -81,7 +83,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
       <div className="mx-auto max-w-6xl">
         <Link href="/admin/users?view=requests" className="text-sm font-semibold text-[#0066cc]">Back to Customer Requests</Link>
         <header className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#0066cc]">{quoteRequestStatusLabel(request.status)}</p><span className="text-xs text-slate-400">#{request.id.slice(0, 8).toUpperCase()}</span></div><h1 className="mt-0.5 truncate text-xl font-bold sm:text-2xl">{request.title}</h1>{projectLabel ? <p className="mt-0.5 truncate text-xs text-slate-500">{projectLabel}{request.projects?.name !== "Material Requests" && request.projects?.address ? ` · ${request.projects.address}` : ""}</p> : null}</div><div className="min-w-0 border-t border-slate-100 pt-2 text-sm sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0"><p className="font-bold text-slate-950">{profile?.full_name || "Client"}</p><div className="flex flex-wrap gap-x-3 text-xs text-slate-500"><span>{profile?.email}</span>{profile?.phone ? <span>{profile.phone}</span> : null}</div></div></div>
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#0066cc]">{quoteRequestStatusLabel(request.status)}</p><span className="text-xs text-slate-400">#{request.id.slice(0, 8).toUpperCase()}</span></div><h1 className="mt-0.5 truncate text-xl font-bold sm:text-2xl">{request.title}</h1>{projectLabel ? <p className="mt-0.5 truncate text-xs text-slate-500">{projectLabel}{request.projects?.name !== "Material Requests" && request.projects?.address ? ` · ${request.projects.address}` : ""}</p> : null}</div><div className="min-w-0 border-t border-slate-100 pt-2 text-sm sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0"><p className="font-bold text-slate-950">{profile?.full_name || "Client"}</p><div className="flex flex-wrap gap-x-3 text-xs text-slate-500">{clientEmail ? <span>{clientEmail}</span> : null}{profile?.phone ? <span>{profile.phone}</span> : null}</div></div></div>
         </header>
         <CustomerRequestStatus requestId={request.id} status={request.status} currentStage={currentStage} updatedAt={request.updated_at} assignedTo="Carlos" />
         <div className="mt-3 grid gap-2">
@@ -110,7 +112,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
             </div>
           </details>
         </div>
-        <div className="mt-2"><RequestManagementPanel requestId={request.id} requestTitle={request.title} client={{ name: profile?.full_name || "Client", email: profile?.email || "", phone: profile?.phone || "" }} departments={departments} suppliers={suppliers} packages={packages ?? []} requestItems={departmentItems.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, unit: item.unit, reviewReasons: Array.isArray(item.metadata?.review_reasons) ? item.metadata.review_reasons.filter((reason): reason is string => typeof reason === "string" && Boolean(reason.trim())) : [] }))} projectAddress={request.projects?.address || ""} currentStage={currentStage} comparisons={comparisonSummaries} /></div>
+        <div className="mt-2"><RequestManagementPanel requestId={request.id} requestTitle={request.title} client={{ name: profile?.full_name || "Client", email: clientEmail, phone: profile?.phone || "" }} departments={departments} suppliers={suppliers} packages={packages ?? []} requestItems={departmentItems.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, unit: item.unit, reviewReasons: Array.isArray(item.metadata?.review_reasons) ? item.metadata.review_reasons.filter((reason): reason is string => typeof reason === "string" && Boolean(reason.trim())) : [] }))} projectAddress={request.projects?.address || ""} currentStage={currentStage} comparisons={comparisonSummaries} /></div>
         {clientActions.length ? <section className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-5"><h2 className="text-lg font-bold text-slate-950">Activity history</h2><div className="mt-3 divide-y divide-amber-200">{clientActions.map((event) => <article key={event.id} className="py-3 first:pt-0 last:pb-0"><div className="flex flex-wrap items-start justify-between gap-2"><h3 className="text-sm font-bold text-slate-900">{event.title}</h3><time className="text-xs text-slate-500">{new Date(event.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>{event.description ? <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{event.description}</p> : null}</article>)}</div></section> : null}
       </div>
     </main>

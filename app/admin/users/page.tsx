@@ -10,6 +10,7 @@ import { ContactConversation, type DirectoryConversationEntry } from "@/componen
 import { DeleteManagerRecordButton } from "@/components/buildflow/delete-manager-record-button"
 import { ManagerCreateClientRequest } from "@/components/buildflow/manager-create-client-request"
 import { requireStaffProfile } from "@/lib/auth"
+import { contactEmailForDisplay } from "@/lib/auth-phone"
 import type { AuraCommunicationRow } from "@/lib/aura/dashboard"
 import { normalizeAuraEmail, normalizeAuraPhone } from "@/lib/aura/identity"
 import { MATERIAL_DEPARTMENTS } from "@/lib/material-questionnaires"
@@ -68,7 +69,7 @@ function formatDate(value: string) {
 }
 
 function customerName(customer: Pick<CustomerRecord, "full_name" | "email"> | undefined) {
-  return customer?.full_name?.trim() || customer?.email || "Customer"
+  return customer?.full_name?.trim() || contactEmailForDisplay(customer?.email) || "Customer"
 }
 
 function directoryConversation(communications: AuraCommunicationRow[], phoneValue: string | null, emailValue: string | null) {
@@ -153,7 +154,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const requests = requestsResult.data ?? []
   const projects = projectsResult.data ?? []
   const audits = auditResult.data ?? []
-  const managerCustomers = clientCustomers.filter((customer) => customer.is_active).map((customer) => ({ id: customer.id, name: customerName(customer), email: customer.email }))
+  const managerCustomers = clientCustomers.filter((customer) => customer.is_active).map((customer) => ({ id: customer.id, name: customerName(customer), email: contactEmailForDisplay(customer.email) || null }))
   const departments = Array.from(new Set([...(categoriesResult.data ?? []).map((category) => category.department_key), ...MATERIAL_DEPARTMENTS]))
   const customerMap = new Map(customers.map((customer) => [customer.id, customer]))
   const requestCount = new Map<string, number>()
@@ -224,19 +225,20 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
         {view === "customers" ? (
           <section className="mt-4 grid gap-3" aria-label="Customer accounts">
             {filteredCustomers.map((customer) => {
+              const visibleEmail = contactEmailForDisplay(customer.email)
               const isSelf = customer.id === profile?.id
               const communicationLogs = communicationByClient.get(customer.id) ?? []
               const conversationEntries = [
-                ...directoryConversation(auraCommunications, customer.phone, customer.email),
+                ...directoryConversation(auraCommunications, customer.phone, visibleEmail),
                 ...communicationLogs.map<DirectoryConversationEntry>((log) => ({ id: `manual-${log.id}`, channel: log.channel === "call" ? "call" : "whatsapp", direction: log.direction === "inbound" ? "incoming" : "outgoing", message: [log.summary, log.outcome ? `Next: ${log.outcome}` : ""].filter(Boolean).join(" · "), status: "recorded", occurredAt: log.createdAt })),
               ].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
               return <article key={customer.id} className="grid min-w-0 gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.85fr)]">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0"><h2 className="text-base font-bold">{customerName(customer)}</h2><p className="mt-1 break-all text-sm text-slate-600">{customer.email || "No email"}</p><p className="mt-1 text-xs text-slate-500">{customer.company_name || "No company"}{customer.phone ? ` · ${customer.phone}` : " · No phone"}</p></div>
+                    <div className="min-w-0"><h2 className="text-base font-bold">{customerName(customer)}</h2><p className="mt-1 break-all text-sm text-slate-600">{visibleEmail || "No email"}</p><p className="mt-1 text-xs text-slate-500">{customer.company_name || "No company"}{customer.phone ? ` · ${customer.phone}` : " · No phone"}</p></div>
                     <div className="flex flex-wrap justify-end gap-2"><span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badgeTone(customer.role)}`}>{customer.role}</span>{isSelf ? <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">Your account</span> : null}</div>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-4 border-y border-slate-100 py-2.5 text-xs"><Link href={`/admin/users?view=requests&customer=${customer.id}`} className="font-semibold text-[#0066cc]"><strong>{requestCount.get(customer.id) ?? 0}</strong> requests</Link><span className="text-slate-500">Joined {formatDate(customer.created_at)}</span><div className="ml-auto"><ContactActions name={customerName(customer)} phone={customer.phone} email={customer.email} senderName={senderName} /></div></div>
+                  <div className="mt-3 flex flex-wrap items-center gap-4 border-y border-slate-100 py-2.5 text-xs"><Link href={`/admin/users?view=requests&customer=${customer.id}`} className="font-semibold text-[#0066cc]"><strong>{requestCount.get(customer.id) ?? 0}</strong> requests</Link><span className="text-slate-500">Joined {formatDate(customer.created_at)}</span><div className="ml-auto"><ContactActions name={customerName(customer)} phone={customer.phone} email={visibleEmail || null} senderName={senderName} /></div></div>
                   <details className="mt-3"><summary className="cursor-pointer text-xs font-semibold text-slate-700">Edit customer</summary><CustomerContactForm customer={{ id: customer.id, fullName: customer.full_name || "", companyName: customer.company_name || "", phone: customer.phone || "" }} /></details>
                   {isOwner ? <details className="mt-3"><summary className="cursor-pointer text-xs font-semibold text-slate-700">Owner-only account controls</summary><div className="mt-3 flex flex-wrap items-end gap-3 rounded-lg bg-slate-50 p-3">
                   <div className="flex flex-wrap gap-2"><form action={approvePendingUser}><input type="hidden" name="userId" value={customer.id} /><button type="submit" disabled={isSelf || customer.approval_status === "approved"} className="min-h-10 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white disabled:opacity-35">Approve</button></form><form action={suspendUser}><input type="hidden" name="userId" value={customer.id} /><button type="submit" disabled={isSelf || customer.approval_status === "suspended"} className="min-h-10 rounded-lg border border-amber-300 bg-white px-4 text-sm font-semibold text-amber-800 disabled:opacity-35">Suspend</button></form><form action={rejectUser}><input type="hidden" name="userId" value={customer.id} /><button type="submit" disabled={isSelf || customer.approval_status === "rejected"} className="min-h-10 rounded-lg border border-rose-200 bg-white px-4 text-sm font-semibold text-rose-700 disabled:opacity-35">Reject</button></form></div>
@@ -244,7 +246,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                   {!isSelf && customer.role === "client" ? <div className="w-full border-t border-slate-200 pt-3"><DeleteManagerRecordButton id={customer.id} kind="customer" label={customerName(customer)} projectCount={projectCount.get(customer.id) ?? 0} requestCount={requestCount.get(customer.id) ?? 0} /></div> : null}
                 </div></details> : null}
                 </div>
-                <ContactConversation entries={conversationEntries} historyHref={`/admin/communications?channel=whatsapp&q=${encodeURIComponent(customer.phone || customer.email || customerName(customer))}`} />
+                <ContactConversation entries={conversationEntries} historyHref={`/admin/communications?channel=whatsapp&q=${encodeURIComponent(customer.phone || visibleEmail || customerName(customer))}`} />
               </article>
             })}
             {filteredCustomers.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No customers match this search.</p> : null}

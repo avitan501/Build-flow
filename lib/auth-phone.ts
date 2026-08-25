@@ -28,3 +28,12 @@ export function phoneLoginEmailForPhone(phone: string) {
 
   return `phone-${digits}@${PHONE_LOGIN_EMAIL_DOMAIN}`;
 }
+
+export function isPhoneLoginEmail(value: string | null | undefined) {
+  return Boolean(value?.trim().toLowerCase().endsWith(`@${PHONE_LOGIN_EMAIL_DOMAIN}`));
+}
+
+export function contactEmailForDisplay(value: string | null | undefined) {
+  const email = value?.trim() || "";
+  return isPhoneLoginEmail(email) ? "" : email;
+}

@@ -117,8 +117,9 @@ export function QuoteRequestForm({ mode = "request", defaultDepartment, defaultM
     <div className="grid grid-cols-2 gap-2">
       <label><span className="sr-only">Full name</span><input aria-label="Full name" name="fullName" required autoComplete="name" placeholder="Full name" className={inputClass} /></label>
       <label><span className="sr-only">Company</span><input aria-label="Company" name="company" autoComplete="organization" placeholder="Company (optional)" className={inputClass} /></label>
-      <label><span className="sr-only">Email</span><input aria-label="Email" name="email" required type="email" autoComplete="email" placeholder="Email" className={inputClass} /></label>
-      <label><span className="sr-only">Phone</span><input aria-label="Phone" name="phone" required type="tel" inputMode="tel" autoComplete="tel" placeholder="Phone" className={inputClass} /></label>
+      <label><span className="sr-only">Email</span><input aria-label="Email" name="email" type="email" autoComplete="email" placeholder="Email" className={inputClass} /></label>
+      <label><span className="sr-only">Phone</span><input aria-label="Phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="Phone" className={inputClass} /></label>
+      <p className="col-span-2 text-xs font-medium text-slate-500">Email or phone — enter at least one.</p>
     </div>
 
     <label className="mt-4 block">

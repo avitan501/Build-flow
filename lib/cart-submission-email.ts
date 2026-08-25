@@ -867,11 +867,11 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
       requestId: input.requestId,
       quote: { ...input, attachment: input.attachment ? { filename: input.attachment.filename } : undefined },
       sendOwner: true,
-      sendClient: true,
+      sendClient: Boolean(input.email),
     })
     return {
       owner: fallback.owner ?? fallback.result ?? { status: "failed", error: "Owner email could not be sent." },
-      client: fallback.client ?? fallback.result ?? { status: "failed", error: "Client email could not be sent." },
+      client: input.email ? fallback.client ?? fallback.result ?? { status: "failed", error: "Client email could not be sent." } : { status: "skipped" },
     }
   }
 
@@ -889,7 +889,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
     "",
     `Reference: ${input.referenceId}`,
     `Customer: ${fullName}`,
-    `Email: ${input.email}`,
+    `Email: ${input.email || "Not provided"}`,
     `Phone: ${input.phone || "Not provided"}`,
     `Company: ${input.company || "Not provided"}`,
     `Customer type: ${input.customerType || "Not provided"}`,
@@ -924,7 +924,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
             <strong>Reference:</strong> ${escapeHtml(input.referenceId)}<br />
             <strong>Customer:</strong> ${escapeHtml(fullName)}<br />
             <strong>Phone:</strong> ${escapeHtml(input.phone || "Not provided")}<br />
-            <strong>Email:</strong> ${escapeHtml(input.email)}${input.company ? `<br /><strong>Company:</strong> ${escapeHtml(input.company)}` : ""}<br />
+            <strong>Email:</strong> ${escapeHtml(input.email || "Not provided")}${input.company ? `<br /><strong>Company:</strong> ${escapeHtml(input.company)}` : ""}<br />
             <strong>Reply by:</strong> ${escapeHtml(input.contactMethods?.join(", ") || "WhatsApp")}
           </div>
           <h2 style="margin:24px 0 8px;font-size:17px">Job details</h2>
@@ -944,7 +944,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
     subject: `${beatQuote ? "NEW QUOTE TO BEAT" : "NEW MATERIAL REQUEST"} - ${fullName} - ${input.referenceId}`,
     html,
     text,
-    replyTo: input.email,
+    replyTo: input.email || undefined,
     idempotencyKey: `avantia-intake-owner-${input.referenceId}`,
     attachments: input.attachment?.content ? [{ filename: input.attachment.filename, content: input.attachment.content }] : undefined,
   })
@@ -969,7 +969,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
     name: departmentText,
     details: [input.details || "See the attached file."],
   }]
-  const client = await sendEmail({
+  const client = input.email ? await sendEmail({
         apiKey,
         from,
         to: input.email,
@@ -990,7 +990,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
         text: clientText,
         replyTo: COMPANY_EMAIL,
         idempotencyKey: `avantia-intake-client-${input.referenceId}`,
-      })
+      }) : { status: "skipped" as const }
 
   if (owner.status === "sent" && client.status === "sent") return { owner, client }
 
@@ -998,7 +998,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
     requestId: input.requestId,
     quote: { ...input, attachment: input.attachment ? { filename: input.attachment.filename } : undefined },
     sendOwner: owner.status !== "sent",
-    sendClient: client.status !== "sent",
+    sendClient: Boolean(input.email) && client.status !== "sent",
   })
   return {
     owner: owner.status === "sent" ? owner : fallback.owner ?? fallback.result ?? owner,

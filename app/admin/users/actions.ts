@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdminProfile, requireStaffProfile } from "@/lib/auth";
+import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type AdminAction = "approve" | "reject" | "suspend" | "change_role";
@@ -30,23 +31,38 @@ function validUuid(value: string) {
   return UUID_PATTERN.test(value.trim());
 }
 
+function normalizeClientContact(input: ManagerNewClientInput) {
+  const email = input.email.trim().toLowerCase().slice(0, 320);
+  const phone = normalizePhoneNumber(input.phone?.trim().slice(0, 40) || "");
+  if (!email && !phone) return { ok: false, error: "Enter an email address or phone number." } as const;
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid client email address." } as const;
+  if (phone && phone.replace(/\D/g, "").length < 7) return { ok: false, error: "Enter a valid client phone number." } as const;
+  const accountEmail = email || phoneLoginEmailForPhone(phone);
+  if (!accountEmail) return { ok: false, error: "Enter an email address or phone number." } as const;
+  return { ok: true, email, phone: phone || null, accountEmail } as const;
+}
+
+async function findClientByContact(supabase: Awaited<ReturnType<typeof requireStaffProfile>>["supabase"], email: string, phone: string | null) {
+  if (email) {
+    const result = await supabase.from("profiles").select("id,role,is_active").ilike("email", email).limit(1).maybeSingle<{ id: string; role: string; is_active: boolean }>();
+    if (result.error || result.data) return result;
+  }
+  if (phone) return supabase.from("profiles").select("id,role,is_active").eq("phone", phone).limit(1).maybeSingle<{ id: string; role: string; is_active: boolean }>();
+  return { data: null, error: null };
+}
+
 export async function createTargetClientAction(input: ManagerNewClientInput): Promise<CreateTargetClientResult> {
   const { supabase } = await requireStaffProfile("customers");
   const fullName = input.fullName.trim().replace(/\s+/g, " ").slice(0, 160);
-  const email = input.email.trim().toLowerCase().slice(0, 320);
-  const phone = input.phone?.trim().slice(0, 40) || null;
+  const contact = normalizeClientContact(input);
   const companyName = input.companyName?.trim().slice(0, 180) || null;
   const preferredLanguage = input.preferredLanguage === "es" ? "es" : "en";
 
   if (fullName.length < 2) return { ok: false, error: "Enter the client's name." };
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid client email address." };
+  if (!contact.ok) return { ok: false, error: contact.error };
+  const { email, phone, accountEmail } = contact;
 
-  const { data: existingClient, error: existingClientError } = await supabase
-    .from("profiles")
-    .select("id,role,is_active")
-    .ilike("email", email)
-    .limit(1)
-    .maybeSingle<{ id: string; role: string; is_active: boolean }>();
+  const { data: existingClient, error: existingClientError } = await findClientByContact(supabase, email, phone);
 
   if (existingClientError) return { ok: false, error: "Could not check the client directory." };
   if (existingClient) {
@@ -63,7 +79,7 @@ export async function createTargetClientAction(input: ManagerNewClientInput): Pr
     customerId?: string;
     error?: string;
   }>("create-manager-client", {
-    body: { fullName, email, phone, companyName },
+    body: { fullName, email: accountEmail, phone, companyName },
   });
 
   if (createClientError || !createdClient?.ok || !validUuid(createdClient.customerId || "")) {
@@ -312,18 +328,13 @@ export async function createRequestForClientAction(input: {
 
   if (input.newClient) {
     const fullName = input.newClient.fullName.trim().replace(/\s+/g, " ").slice(0, 160);
-    const email = input.newClient.email.trim().toLowerCase().slice(0, 320);
-    const phone = input.newClient.phone?.trim().slice(0, 40) || null;
+    const contact = normalizeClientContact(input.newClient);
     const companyName = input.newClient.companyName?.trim().slice(0, 180) || null;
     if (fullName.length < 2) return { ok: false, error: "Enter the new client's name." };
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid client email address." };
+    if (!contact.ok) return { ok: false, error: contact.error };
+    const { email, phone, accountEmail } = contact;
 
-    const { data: existingClient, error: existingClientError } = await supabase
-      .from("profiles")
-      .select("id,role,is_active")
-      .ilike("email", email)
-      .limit(1)
-      .maybeSingle<{ id: string; role: string; is_active: boolean }>();
+    const { data: existingClient, error: existingClientError } = await findClientByContact(supabase, email, phone);
     if (existingClientError) return { ok: false, error: "Could not check the client directory." };
     if (existingClient) {
       if (existingClient.role !== "client") return { ok: false, error: "That email belongs to a staff account." };
@@ -335,7 +346,7 @@ export async function createRequestForClientAction(input: {
         customerId?: string;
         error?: string;
       }>("create-manager-client", {
-        body: { fullName, email, phone, companyName },
+        body: { fullName, email: accountEmail, phone, companyName },
       });
       if (createClientError || !createdClient?.ok || !validUuid(createdClient.customerId || "")) {
         if (createdClient?.error === "email_in_use_by_staff") return { ok: false, error: "That email belongs to a staff account." };

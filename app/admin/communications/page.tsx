@@ -1,6 +1,7 @@
 import { CommunicationCenter } from "@/components/buildflow/communication-center"
 import { UnifiedCommunicationInbox, type AuraLeadRecipient } from "@/components/buildflow/unified-communication-inbox"
 import { requireManagerPortalProfile } from "@/lib/auth"
+import { contactEmailForDisplay } from "@/lib/auth-phone"
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard"
 import { loadAuraDashboard } from "@/lib/aura/dashboard"
 import type { AuraCustomerIdentity } from "@/lib/aura/identity"
@@ -65,9 +66,12 @@ export default async function CommunicationsPage({
       ? loadManagerAura(supabase)
       : Promise.resolve(null),
   ])
-  const clients = (clientsResult.data ?? []).map((client) => ({ id: String(client.id), name: String(client.full_name || client.email || "Client") }))
+  const customers = (clientsResult.data ?? []).map((client) => ({
+    ...client,
+    email: contactEmailForDisplay(client.email) || null,
+  })) as AuraCustomerIdentity[]
+  const clients = customers.map((client) => ({ id: String(client.id), name: String(client.full_name || client.email || "Client") }))
   const logs = (logsResult.data ?? []).map((row) => parseCommunicationLog(row.details)).filter((log) => log !== null)
-  const customers = (clientsResult.data ?? []) as AuraCustomerIdentity[]
   const supplierSnapshot = suppliersResult.data as { settings?: ShopQualificationSettings } | null
   const leads = (leadsResult.data ?? []) as AuraLeadRecipient[]
   const suppliers = (supplierSnapshot?.settings?.suppliers ?? []).filter((supplier): supplier is SupplierRoutingOption => Boolean(supplier?.id && supplier?.name))

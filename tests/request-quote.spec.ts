@@ -18,6 +18,24 @@ test("preferred reply methods persist in normal and fallback request storage", a
   expect(fallback).toContain("contact_methods: contactMethods.length")
 })
 
+test("public requests require email or phone instead of requiring both", async () => {
+  const [form, action, emailDelivery, fallback] = await Promise.all([
+    readFile(path.join(root, "components/buildflow/quote-request-form.tsx"), "utf8"),
+    readFile(path.join(root, "app/request-quote/actions.ts"), "utf8"),
+    readFile(path.join(root, "lib/cart-submission-email.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/public-quote-intake/index.ts"), "utf8"),
+  ])
+
+  expect(form).not.toContain('name="email" required')
+  expect(form).not.toContain('name="phone" required')
+  expect(form).toContain("Email or phone — enter at least one.")
+  expect(action).toContain("if (!email && !phone)")
+  expect(action).toContain("phoneLoginEmailForPhone")
+  expect(emailDelivery).toContain("sendClient: Boolean(input.email)")
+  expect(fallback).toContain("Boolean(email || phone)")
+  expect(fallback).toContain("phone-login.buildflow.local")
+})
+
 test("quote request is a compact contact and material workflow", async ({ page }) => {
   await page.goto("/request-quote")
 
@@ -29,7 +47,9 @@ test("quote request is a compact contact and material workflow", async ({ page }
   await expect(page.getByLabel("Full name")).toBeVisible()
   await expect(page.getByLabel("First name")).toHaveCount(0)
   await expect(page.getByLabel("Last name")).toHaveCount(0)
-  await expect(page.getByLabel("Phone", { exact: true })).toHaveAttribute("required", "")
+  await expect(page.getByRole("textbox", { name: "Email", exact: true })).not.toHaveAttribute("required", "")
+  await expect(page.getByLabel("Phone", { exact: true })).not.toHaveAttribute("required", "")
+  await expect(page.getByText("Email or phone — enter at least one.")).toBeVisible()
   await expect(page.getByLabel("Company", { exact: true })).toHaveAttribute("placeholder", "Company (optional)")
   await expect(page.getByLabel(/Project name/)).toHaveCount(0)
   await expect(page.getByText(/I am a/)).toHaveCount(0)
