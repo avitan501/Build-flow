@@ -32,6 +32,18 @@ test("Aura receives signed Resend email events through the secure broker", async
   expect(broker).toContain('email: { receive: Boolean(Deno.env.get("AURA_RESEND_WEBHOOK_SECRET"))');
 });
 
+test("Aura normalizes legacy JSON strings before rendering communications", async () => {
+  const dashboard = await readFile(path.join(process.cwd(), "lib/aura/dashboard.ts"), "utf8");
+  const managerPage = await readFile(path.join(process.cwd(), "app/admin/communications/page.tsx"), "utf8");
+  const broker = await readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8");
+
+  expect(dashboard).toContain("normalizeAuraCommunications");
+  expect(dashboard).toContain("JSON.parse(value)");
+  expect(managerPage).toContain("normalizeAuraCommunications(aura.communications)");
+  expect(broker).toContain("sql.json(input.nextSteps || [])");
+  expect(broker).toContain("sql.json(input.media || [])");
+});
+
 test("Aura webhook rejects unverified requests", async ({ request }) => {
   const verification = await request.get("/api/aura/whatsapp", {
     params: {

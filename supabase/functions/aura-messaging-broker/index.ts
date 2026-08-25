@@ -300,8 +300,8 @@ async function storeCommunication(input: {
       ${input.provider}, ${input.channel}, ${input.externalId}, ${linkedContact}, ${input.direction},
       ${input.counterpartyPhone || null}, ${input.counterpartyEmail || null}, ${input.businessPhone || null},
       ${input.subject || null}, ${input.body}, ${input.summary || null}, ${input.transcript || null},
-      ${JSON.stringify(input.nextSteps || [])}::jsonb, ${input.status},
-      ${JSON.stringify(input.media || [])}::jsonb, ${input.durationSeconds ?? null}, ${now}, ${now}
+      ${sql.json(input.nextSteps || [])}, ${input.status},
+      ${sql.json(input.media || [])}, ${input.durationSeconds ?? null}, ${now}, ${now}
     )
     on conflict (provider, external_activity_id) do update set
       status = excluded.status,
@@ -378,7 +378,7 @@ async function transcribeTwoChatCall(externalId: string, recordingUrl: string) {
   }
   await sql`
     update public.aura_communications
-    set transcript = ${transcript}, summary = ${summary}, next_steps = ${JSON.stringify(nextSteps)}::jsonb, updated_at = now()
+    set transcript = ${transcript}, summary = ${summary}, next_steps = ${sql.json(nextSteps)}, updated_at = now()
     where provider = 'manual' and external_activity_id = ${externalId}
   `;
 }
@@ -717,7 +717,7 @@ async function handleQuoWebhook(req: Request) {
     ) values (
       'quo', ${channel}, ${activityId}, ${object.conversationId || null}, ${linkedContact || (current?.contact_id as string | null) || null}, ${direction},
       ${counterpartyPhone}, ${businessPhone}, ${body}, ${summary}, ${transcript},
-      ${JSON.stringify(object.nextSteps || [])}::jsonb, ${JSON.stringify(media)}::jsonb, ${object.status || null},
+      ${sql.json(object.nextSteps || [])}, ${sql.json(media)}, ${object.status || null},
       ${durationSeconds}, ${occurredAt}, ${lastEventAt}
     )
     on conflict (provider, external_activity_id) do update set

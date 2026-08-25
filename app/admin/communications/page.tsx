@@ -3,7 +3,7 @@ import { UnifiedCommunicationInbox, type AuraLeadRecipient } from "@/components/
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { contactEmailForDisplay } from "@/lib/auth-phone"
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard"
-import { loadAuraDashboard } from "@/lib/aura/dashboard"
+import { loadAuraDashboard, normalizeAuraCommunications } from "@/lib/aura/dashboard"
 import type { AuraCustomerIdentity } from "@/lib/aura/identity"
 import { syncRecentTwilioWhatsAppMessages } from "@/lib/aura/twilio-whatsapp"
 import { COMMUNICATION_LOG_PREFIX, parseCommunicationLog } from "@/lib/manager-command-center"
@@ -78,7 +78,7 @@ export default async function CommunicationsPage({
   const suppliers = (supplierSnapshot?.settings?.suppliers ?? []).filter((supplier): supplier is SupplierRoutingOption => Boolean(supplier?.id && supplier?.name))
   const liveAura = aura?.communications && aura.contacts && aura.connections
     ? {
-        communications: aura.communications,
+        communications: normalizeAuraCommunications(aura.communications),
         contacts: aura.contacts,
         customers,
         leads,

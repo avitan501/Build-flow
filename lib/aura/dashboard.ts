@@ -68,6 +68,28 @@ export type AuraCommunicationRow = {
   occurred_at: string;
 };
 
+function jsonArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed as T[] : [];
+  } catch {
+    return [];
+  }
+}
+
+export function normalizeAuraCommunications(rows: unknown[] | null | undefined): AuraCommunicationRow[] {
+  return (rows || []).map((value) => {
+    const row = value as AuraCommunicationRow;
+    return {
+      ...row,
+      next_steps: jsonArray<string>(row.next_steps),
+      media: jsonArray<{ url?: string; type?: string; duration?: number }>(row.media),
+    };
+  });
+}
+
 export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: SupabaseClient = supabase) {
   const [intakesResult, contactsResult, leadsResult, tasksResult, communicationsResult, customersResult, brokerResult] = await Promise.all([
     supabase
@@ -118,7 +140,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
     contacts: (contactsResult.data || []) as AuraContactRow[],
     leads: (leadsResult.data || []) as AuraLeadRow[],
     tasks: (tasksResult.data || []) as AuraTaskRow[],
-    communications: (communicationsResult.data || []) as AuraCommunicationRow[],
+    communications: normalizeAuraCommunications(communicationsResult.data),
     customers: (customersResult.data || []) as AuraCustomerIdentity[],
     connections: {
       voice: {
