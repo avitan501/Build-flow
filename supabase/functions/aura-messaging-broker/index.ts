@@ -142,6 +142,79 @@ async function hmacSha256Base64(encodedKey: string, data: string) {
   return btoa(String.fromCharCode(...new Uint8Array(signature)));
 }
 
+async function validResendSignature(rawBody: string, req: Request, webhookSecret: string) {
+  const id = req.headers.get("svix-id");
+  const timestamp = req.headers.get("svix-timestamp");
+  const signature = req.headers.get("svix-signature");
+  if (!id || !timestamp || !signature) return false;
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isFinite(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > 300) return false;
+  const encodedKey = webhookSecret.startsWith("whsec_") ? webhookSecret.slice("whsec_".length) : webhookSecret;
+  const expected = await hmacSha256Base64(encodedKey, `${id}.${timestamp}.${rawBody}`);
+  if (!expected) return false;
+  return signature.split(" ").some((candidate) => {
+    const [version, supplied] = candidate.split(",", 2);
+    return version === "v1" && Boolean(supplied) && constantTimeEqual(expected, supplied);
+  });
+}
+
+function emailAddress(value: unknown) {
+  if (typeof value !== "string") return null;
+  const match = value.trim().match(/<([^<>\s]+@[^<>\s]+)>$/) || value.trim().match(/^([^\s<>]+@[^\s<>]+)$/);
+  return match?.[1]?.toLowerCase() || null;
+}
+
+function stripEmailHtml(value: string) {
+  return value
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function handleResendWebhook(req: Request) {
+  const rawBody = await req.text();
+  const webhookSecret = Deno.env.get("AURA_RESEND_WEBHOOK_SECRET") || "";
+  if (!webhookSecret || !(await validResendSignature(rawBody, req, webhookSecret))) return json({ error: "Invalid signature" }, 401);
+  let event: {
+    type?: string;
+    created_at?: string;
+    data?: {
+      email_id?: string;
+      created_at?: string;
+      from?: string;
+      subject?: string;
+      attachments?: Array<{ filename?: string; content_type?: string }>;
+    };
+  };
+  try { event = JSON.parse(rawBody); } catch { return json({ error: "Invalid JSON" }, 400); }
+  if (event.type !== "email.received" || !event.data?.email_id) return json({ ok: true, ignored: true });
+  const apiKey = Deno.env.get("RESEND_API_KEY") || "";
+  if (!apiKey) return json({ error: "Email receiving is not configured" }, 503);
+  const response = await fetch(`https://api.resend.com/emails/receiving/${encodeURIComponent(event.data.email_id)}`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!response.ok) return json({ error: "Unable to retrieve received email" }, 502);
+  const email = await response.json() as { text?: string | null; html?: string | null };
+  const attachments = event.data.attachments || [];
+  const attachmentNames = attachments.map((item) => item.filename).filter(Boolean);
+  const body = (email.text?.trim() || (email.html ? stripEmailHtml(email.html) : "")).slice(0, 20_000);
+  await storeCommunication({
+    provider: "manual",
+    channel: "email",
+    externalId: event.data.email_id,
+    direction: "incoming",
+    counterpartyEmail: emailAddress(event.data.from),
+    subject: event.data.subject || null,
+    body: [body, attachmentNames.length ? `Attachments: ${attachmentNames.join(", ")}` : ""].filter(Boolean).join("\n\n"),
+    status: "received",
+    media: attachments.map((item) => ({ type: item.content_type })),
+    occurredAt: event.data.created_at || event.created_at,
+  });
+  return json({ ok: true });
+}
+
 async function validQuoSignature(rawBody: string, supplied: string | null, encodedSecret: string) {
   if (!supplied) return false;
   let compactPayload: string;
@@ -1042,6 +1115,9 @@ Deno.serve(async (req: Request) => {
   if (req.method === "POST" && url.searchParams.get("mode") === "quo-webhook") {
     try { return await handleQuoWebhook(req); } catch { return json({ error: "Processing failed" }, 500); }
   }
+  if (req.method === "POST" && url.searchParams.get("mode") === "resend-webhook") {
+    try { return await handleResendWebhook(req); } catch { return json({ error: "Processing failed" }, 500); }
+  }
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const manager = await requireManager(req);
   if (!manager) return json({ error: "Manager authorization required" }, 401);
@@ -1082,7 +1158,7 @@ Deno.serve(async (req: Request) => {
           quo: { receive: Boolean(smsReceive), send: Boolean(sms) },
           voice: { receive: voice.ready, send: voice.ready, recording: voice.recording, phone: voice.ready ? TWO_CHAT_BUSINESS_PHONE : null },
           whatsapp: { receive: Boolean(activeTwoChat), send: Boolean(activeTwoChat), provider: activeTwoChat ? "2chat" : null },
-          email: { receive: false, send: Boolean(Deno.env.get("RESEND_API_KEY")) },
+          email: { receive: Boolean(Deno.env.get("AURA_RESEND_WEBHOOK_SECRET")), send: Boolean(Deno.env.get("RESEND_API_KEY")) },
         },
       });
     }

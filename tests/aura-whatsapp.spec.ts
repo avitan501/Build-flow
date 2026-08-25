@@ -20,6 +20,18 @@ test("Aura broker routes email through Supabase with the business mailbox as rep
   expect(actions).toContain('action: "send_email"');
 });
 
+test("Aura receives signed Resend email events through the secure broker", async () => {
+  const broker = await readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8");
+
+  expect(broker).toContain('url.searchParams.get("mode") === "resend-webhook"');
+  expect(broker).toContain('Deno.env.get("AURA_RESEND_WEBHOOK_SECRET")');
+  expect(broker).toContain("validResendSignature");
+  expect(broker).toContain("https://api.resend.com/emails/receiving/");
+  expect(broker).toContain('channel: "email"');
+  expect(broker).toContain('direction: "incoming"');
+  expect(broker).toContain('email: { receive: Boolean(Deno.env.get("AURA_RESEND_WEBHOOK_SECRET"))');
+});
+
 test("Aura webhook rejects unverified requests", async ({ request }) => {
   const verification = await request.get("/api/aura/whatsapp", {
     params: {
