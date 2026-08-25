@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, Link2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Link2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 import { AbcSupplyPricing } from "@/components/buildflow/abc-supply-pricing";
@@ -35,7 +35,7 @@ export default async function AbcAccountPage({ searchParams }: Props) {
 
       <header className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Supplier connection</p><h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Connect myABCsupply</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Authorize AvantiaBuild to show only your ABC Ship-To accounts, eligible branches, products those branches offer, valid units, and private account pricing.</p></div>
+          <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Supplier connection</p><h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Connect myABCsupply</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Connect your ABC account to search products and view your account pricing.</p></div>
           <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${connection.connected ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}><ShieldCheck className="h-4 w-4" />{connection.connected ? `Connected · ${connection.environment || "ABC"}` : "Not connected"}</span>
         </div>
         {message ? <p className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${message.className}`}>{message.text}</p> : null}
@@ -46,21 +46,7 @@ export default async function AbcAccountPage({ searchParams }: Props) {
         </div>
       </header>
 
-      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-        <h2 className="text-xl font-semibold">ABC-approved customer workflow</h2>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {["Select authorized Ship-To account", "Select its authorized ABC branch", "Search ABC products offered there", "Choose ABC unit and quantity", "Verify the branch offers the item", "Request private account price"].map((step, index) => <div key={step} className="flex gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-800"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><span>{index + 1}. {step}</span></div>)}
-        </div>
-      </section>
-
-      <section className="rounded-[28px] border border-sky-200 bg-sky-50 p-5 text-sm leading-6 text-slate-700">
-        <h2 className="font-semibold text-slate-950">New York service setup</h2>
-        <p className="mt-1">AvantiaBuild serves Cedarhurst, New York 11516. ABC has public New York locations, but private pricing can only use the branches ABC returns for the connected customer&apos;s selected Ship-To account. If no New York branch appears, the customer must ask their ABC account administrator or branch representative to add the correct New York location.</p>
-      </section>
-
-      {connection.connected ? <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-xl font-semibold">Build an ABC material estimate</h2><p className="mt-1 text-sm leading-6 text-slate-600">ABC Supply remains the material seller. AvantiaBuild retrieves the customer&apos;s authorized information and does not submit an order from this screen.</p><div className="mt-5"><AbcSupplyPricing connectionMode="connected-user" /></div></section> : <section className="rounded-[28px] border border-dashed border-slate-300 bg-white p-8 text-center"><h2 className="text-lg font-semibold">Connect before pricing</h2><p className="mt-2 text-sm text-slate-600">The customer&apos;s ABC authorization is required before AvantiaBuild can retrieve Ship-To accounts or private prices.</p></section>}
-
-      <section className="rounded-[24px] border border-slate-200 bg-white p-5 text-sm leading-6 text-slate-700"><h2 className="font-semibold text-slate-950">Support plan</h2><p className="mt-1">Primary integration contact: David Avitan, AvantiaBuild · office@build.avantiap.com. AvantiaBuild handles connection and workflow questions; ABC Supply handles account eligibility, branch authorization, material availability, final pricing, delivery, and purchasing.</p></section>
+      {connection.connected ? <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-xl font-semibold">ABC Supply pricing</h2><p className="mt-1 text-sm leading-6 text-slate-600">Choose your Ship-To account and branch, then search ABC products. ABC Supply remains the seller; this page does not place orders.</p><div className="mt-5"><AbcSupplyPricing connectionMode="connected-user" /></div></section> : <section className="rounded-[28px] border border-dashed border-slate-300 bg-white p-8 text-center"><h2 className="text-lg font-semibold">Connect to view pricing</h2><p className="mt-2 text-sm text-slate-600">Connect your myABCsupply account to continue.</p></section>}
     </div>
   </main>;
 }
