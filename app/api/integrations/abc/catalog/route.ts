@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { callAbcBridge } from "@/lib/abc-supply/bridge";
-import { requireAdminProfile } from "@/lib/auth";
+import { requireAdminProfile, requireSignedInProfile } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const preferredRegion = "iad1";
 
 export async function POST(request: Request) {
-  await requireAdminProfile();
+  const connectedUser = new URL(request.url).searchParams.get("mode") === "connected-user";
+  if (connectedUser) await requireSignedInProfile(); else await requireAdminProfile();
   try {
     const body = await request.json() as { query?: unknown; branchNumber?: unknown };
     const query = String(body.query || "").trim();
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
     if (query.length < 2 || !branchNumber) {
       return NextResponse.json({ error: "Select a branch and enter at least two letters." }, { status: 400 });
     }
-    const payload = await callAbcBridge({ action: "searchItems", query, branchNumber });
+    const payload = await callAbcBridge({ action: "searchItems", query, branchNumber, connectionMode: connectedUser ? "connected-user" : "automatic" });
     return NextResponse.json(payload, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error) {
     return NextResponse.json(
