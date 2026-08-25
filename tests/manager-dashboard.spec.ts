@@ -28,7 +28,9 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain("client_quote_status");
   expect(page).toContain('id="targets-heading" className="font-semibold">Goals');
   expect(page).toContain('<GoalDisclosure assignee="carlos" priorityCount={3}');
-  expect(page).toContain('<GoalDisclosure assignee="david" priorityCount={2}');
+  expect(page).toContain('<GoalDisclosure assignee="david" priorityCount={3}');
+  expect(page).toContain('title="ABC Supply Demo"');
+  expect(page).toContain('href="/admin/abc"');
   expect(page).toContain("Open a person to view priorities and add goals");
   expect(page).toContain('assignee="carlos"');
   expect(page).toContain('assignee="david"');

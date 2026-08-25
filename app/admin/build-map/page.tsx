@@ -242,9 +242,10 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
         <FixedTarget title="Find suppliers' best-priced items" detail="Collect pricing and update the material catalog" href="/admin/catalog" icon={ShoppingCart} />
         <FixedTarget title="Supplier Affiliate Program" detail="Track applications and supplier opportunities" href="/admin/goals-progress" icon={Store} />
       </GoalDisclosure>
-      {access.owner ? <GoalDisclosure assignee="david" priorityCount={2} goals={regularGoals.filter((goal) => goal.assignee === "david")}>
+      {access.owner ? <GoalDisclosure assignee="david" priorityCount={3} goals={regularGoals.filter((goal) => goal.assignee === "david")}>
           <FixedTarget title="Fix Website" detail={`${websiteNotes.filter((goal) => goal.status === "open").length} open website notes`} href="/admin/goals-progress" icon={CheckCircle2} />
           <FixedTarget title="Launch Beat Your Quote" detail="Campaign, flyer, and customer upload flow" href="/admin/goals-progress" icon={Send} />
+          <FixedTarget title="ABC Supply Demo" detail="Live product search and account pricing" href="/admin/abc" icon={BadgeDollarSign} />
         </GoalDisclosure> : null}
     </section>
 

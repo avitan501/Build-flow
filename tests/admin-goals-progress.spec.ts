@@ -39,6 +39,8 @@ test("Goals & Progress allows manager employees while owner controls stay protec
   expect(page).toContain("Clients in the system");
   expect(page).toContain("Call suppliers and find what they sell cheaper than anyone else");
   expect(page).toContain("Launch campaign: Beat Your Quote");
+  expect(page).toContain("ABC Supply Demo");
+  expect(page).toContain('href="/admin/abc"');
   expect(page).toContain('PersonHeader assignee="david"');
   expect(page).toContain('PersonHeader assignee="carlos"');
   expect(page).toContain("<AffiliateProgramTracker");
@@ -54,7 +56,8 @@ test("Goals & Progress allows manager employees while owner controls stay protec
   expect(page).toContain('if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos")');
   expect(page).toContain('access.owner ? <section aria-labelledby="david-goals-title"');
   expect(dashboard).toContain('if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos")');
-  expect(dashboard).toContain('access.owner ? <GoalDisclosure assignee="david" priorityCount={2}');
+  expect(dashboard).toContain('access.owner ? <GoalDisclosure assignee="david" priorityCount={3}');
+  expect(dashboard).toContain('title="ABC Supply Demo"');
   expect(actions).toContain('if (!access.owner && assignee !== "carlos")');
   expect(actions.match(/if \(!access\.owner\).*\.eq\("assignee", "carlos"\)/g)?.length).toBe(2);
 });

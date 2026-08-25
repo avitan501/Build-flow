@@ -96,6 +96,12 @@ function BeatQuoteGoal({ owner }: { owner: boolean }) {
   </GoalDisclosure>;
 }
 
+function AbcSupplyDemoGoal() {
+  return <GoalDisclosure number={3} eyebrow="Supplier pricing" title="ABC Supply Demo" description="Live product search and account pricing.">
+    <Link href="/admin/abc" className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#0071e3] px-5 text-sm font-semibold text-white">Open ABC Supply Demo<ArrowRight className="h-4 w-4" /></Link>
+  </GoalDisclosure>;
+}
+
 function ClientTargetGoal({ clients, leads, canManageClients }: { clients: ClientTarget[]; leads: OutreachLeadRecord[]; canManageClients: boolean }) {
   return <GoalDisclosure number={1} eyebrow="Outreach" title="Client Target" description="Leads to contact and active clients in one place.">
     <div className="flex flex-wrap gap-2">{canManageClients ? <><AddOutreachLead /><AddTargetClient /></> : null}<ClientTargetCallGuide /></div>
@@ -134,7 +140,7 @@ export default async function GoalsProgressPage() {
     <div className="mt-7 grid gap-9">
       <section aria-labelledby="carlos-goals-title"><PersonHeader assignee="carlos" description="Clients, suppliers, and pricing outreach" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "carlos")} /><div className="mt-4 grid gap-4"><ClientTargetGoal clients={clients} leads={leads} canManageClients={access.customers} /><SupplierPricingGoal />{access.owner ? <OwnerAffiliateGoal /> : <GoalDisclosure number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 construction-focused targets with direct call routes first."><AffiliateCallList /></GoalDisclosure>}</div></section>
 
-      {access.owner ? <section aria-labelledby="david-goals-title"><PersonHeader assignee="david" description="Website and campaign launch" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "david")} /><div className="mt-4 grid gap-4"><FixWebsiteGoal notes={websiteNotes} /><BeatQuoteGoal owner /></div></section> : null}
+      {access.owner ? <section aria-labelledby="david-goals-title"><PersonHeader assignee="david" description="Website, campaigns, and supplier pricing" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "david")} /><div className="mt-4 grid gap-4"><FixWebsiteGoal notes={websiteNotes} /><BeatQuoteGoal owner /><AbcSupplyDemoGoal /></div></section> : null}
     </div>
   </div></main>;
 }
