@@ -98,6 +98,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
     { href: "/shop", label: "Shop Materials", description: "Browse products and departments" },
     { href: "/request-quote", label: "Request Material Pricing", description: "Send a list, photo, or plan" },
     { href: "/beat-a-quote", label: "Beat My Quote", description: "Upload a supplier quote for a better price" },
+    { href: "/delivery", label: "Jobsite Delivery", description: "Plan a material pickup and delivery" },
   ], []);
 
   const shopLinks = useMemo<MobileMenuLink[]>(() => [

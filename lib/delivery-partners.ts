@@ -1,0 +1,38 @@
+export const DELIVERY_PARTNERS = [
+  {
+    name: "Curri",
+    bestFor: "Construction materials and heavy jobsite loads",
+    vehicles: "Cars through box trucks, hotshots, dedicated routes, and LTL",
+    integration: "API can request rates, book deliveries, manage jobs, and return delivery history.",
+    applyUrl: "https://www.curri.com/get-started",
+    docsUrl: "https://docs.curri.com/",
+    recommendation: "Best first application for AvantiaBuild",
+  },
+  {
+    name: "Roadie",
+    bestFor: "Same-day construction supplies and broad local coverage",
+    vehicles: "Car, pickup, van, and big-and-bulky delivery options",
+    integration: "Business account works without a custom build; the API supports shipment creation, updates, tracking, and proof of delivery.",
+    applyUrl: "https://www.roadie.com/industries/construction-supplies-delivery",
+    docsUrl: "https://docs.roadie.com/",
+    recommendation: "Fastest practical backup",
+  },
+  {
+    name: "GoShare",
+    bestFor: "Pickup trucks, cargo vans, box trucks, and moving help",
+    vehicles: "Pickup trucks through box trucks, with one or two delivery professionals",
+    integration: "API has estimate and booking endpoints; production keys come from its sales team.",
+    applyUrl: "https://goshare.co/business/",
+    docsUrl: "https://api.goshare.co/",
+    recommendation: "Strong for bulky material",
+  },
+  {
+    name: "Uber Direct",
+    bestFor: "Small, urgent items that fit normal courier vehicles",
+    vehicles: "Courier vehicle depends on the market and approved account",
+    integration: "API creates a live quote first, then creates and tracks the delivery with that quote ID.",
+    applyUrl: "https://merchants.ubereats.com/us/en/services/uber-direct/",
+    docsUrl: "https://developer.uber.com/docs/deliveries/get-started",
+    recommendation: "Use after confirming material-size limits",
+  },
+] as const;
