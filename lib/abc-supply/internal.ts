@@ -2,7 +2,37 @@ import "server-only";
 
 import { getAbcInternalConfig } from "@/lib/abc-supply/config";
 
-type AbcPricingLineRequest = { id: string; itemNumber: string; quantity: number; uom?: string };
+type AbcPricingLineRequest = {
+  id: string;
+  itemNumber: string;
+  quantity: number;
+  uom?: string;
+  length?: { value: number; uom: "ft" | "in" };
+};
+type AbcBranchDetails = {
+  number: string;
+  name: string;
+  status: string;
+  city: string;
+  state: string;
+  postal: string;
+  addressLine1: string;
+  phone: string;
+  website: string;
+};
+
+export type AbcCatalogItem = {
+  itemNumber: string;
+  itemDescription: string;
+  familyName: string;
+  status: string;
+  isDimensional: boolean;
+  color: string;
+  imageUrl: string;
+  uoms: Array<{ code: string; name: string; description: string }>;
+  variations: Array<{ value: number; uom: string }>;
+  availableAtSelectedBranch: boolean;
+};
 type AbcPricingResponse = {
   requestId?: string;
   shipToNumber: string;
@@ -108,10 +138,100 @@ function parseAccounts(payload: unknown) {
         name: String(branch.name || branch.branchName || `Branch ${branchNumber}`),
         status: String(branch.status || ""),
         homeBranch: Boolean(branch.homeBranch || branch.isHomeBranch),
+        city: "",
+        state: "",
+        postal: "",
+        addressLine1: "",
+        phone: "",
+        website: "",
       }];
     }) : [];
     if (!number || branches.length === 0) return [];
     return [{ name: String(account.name || account.shipToName || `Ship-to ${number}`), number, status: String(account.status || ""), branches }];
+  });
+}
+
+function parseBranch(payload: unknown): AbcBranchDetails | null {
+  if (!payload || typeof payload !== "object") return null;
+  const root = payload as Record<string, unknown>;
+  const branch = root.branch && typeof root.branch === "object" ? root.branch as Record<string, unknown> : root;
+  const address = root.address && typeof root.address === "object" ? root.address as Record<string, unknown> : {};
+  const contact = root.contact && typeof root.contact === "object" ? root.contact as Record<string, unknown> : {};
+  const links = root.links && typeof root.links === "object" ? root.links as Record<string, unknown> : {};
+  const phones = Array.isArray(contact.phones) ? contact.phones : [];
+  const number = String(branch.number || branch.branchNumber || "").trim();
+  if (!number) return null;
+  return {
+    number,
+    name: String(branch.name || branch.branchName || `ABC Supply branch ${number}`),
+    status: String(branch.status || ""),
+    city: String(address.city || ""),
+    state: String(address.state || ""),
+    postal: String(address.postal || ""),
+    addressLine1: String(address.addressLine1 || ""),
+    phone: String(phones[0] || ""),
+    website: String(links.website || ""),
+  };
+}
+
+function parseBranches(payload: unknown) {
+  const entries = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object" && Array.isArray((payload as { branches?: unknown }).branches)
+      ? (payload as { branches: unknown[] }).branches
+      : [];
+  return entries.flatMap((entry) => {
+    const branch = parseBranch(entry);
+    return branch ? [branch] : [];
+  });
+}
+
+function parseCatalogItems(payload: unknown, selectedBranch: string): AbcCatalogItem[] {
+  if (!payload || typeof payload !== "object") throw new Error("ABC returned an unexpected product-search response.");
+  const items = (payload as { items?: unknown }).items;
+  if (!Array.isArray(items)) throw new Error("ABC returned an unexpected product-search response.");
+
+  return items.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const item = entry as Record<string, unknown>;
+    const itemNumber = String(item.itemNumber || "").trim();
+    if (!itemNumber) return [];
+    const uoms = Array.isArray(item.uoms) ? item.uoms.flatMap((entryUom) => {
+      if (!entryUom || typeof entryUom !== "object") return [];
+      const uom = entryUom as Record<string, unknown>;
+      const code = String(uom.code || "").trim();
+      if (!code) return [];
+      return [{ code, name: String(uom.name || code), description: String(uom.description || "") }];
+    }) : [];
+    const branches = Array.isArray(item.branches) ? item.branches : [];
+    const availableAtSelectedBranch = branches.some((entryBranch) => {
+      if (!entryBranch || typeof entryBranch !== "object") return false;
+      const branch = entryBranch as Record<string, unknown>;
+      return String(branch.number || branch.branchNumber || "") === selectedBranch;
+    });
+    const color = item.color && typeof item.color === "object" ? item.color as Record<string, unknown> : {};
+    const images = Array.isArray(item.images) ? item.images : [];
+    const primaryImage = images.find((image) => image && typeof image === "object" && String((image as Record<string, unknown>).type || "").toLowerCase().includes("primary"));
+    const variations = Array.isArray(item.variations) ? item.variations.flatMap((entryVariation) => {
+      if (!entryVariation || typeof entryVariation !== "object") return [];
+      const variation = entryVariation as Record<string, unknown>;
+      const value = Number(variation.value ?? variation.length);
+      const uom = String(variation.uom || variation.unit || "").trim();
+      return Number.isFinite(value) && value > 0 && uom ? [{ value, uom }] : [];
+    }) : [];
+
+    return [{
+      itemNumber,
+      itemDescription: String(item.itemDescription || item.description || itemNumber),
+      familyName: String(item.familyName || ""),
+      status: String(item.status || ""),
+      isDimensional: Boolean(item.isDimensional),
+      color: String(color.name || ""),
+      imageUrl: primaryImage && typeof primaryImage === "object" ? String((primaryImage as Record<string, unknown>).href || "") : "",
+      uoms,
+      variations,
+      availableAtSelectedBranch,
+    }];
   });
 }
 
@@ -126,7 +246,52 @@ export async function searchAbcInternalAccounts() {
       pagination: { itemsPerPage: 100, pageNumber: 1 },
     }),
   });
-  return parseAccounts(payload);
+  const accounts = parseAccounts(payload);
+  const branchNumbers = [...new Set(accounts.flatMap((account) => account.branches.map((branch: { number: string }) => branch.number)))];
+  const details = await Promise.all(branchNumbers.map(async (number) => {
+    try {
+      const result = await abcRequest(`/api/location/v1/branches/${encodeURIComponent(number)}`, { method: "GET" });
+      return parseBranch(result);
+    } catch {
+      return null;
+    }
+  }));
+  const detailsByNumber = new Map(details.flatMap((branch) => branch ? [[branch.number, branch]] : []));
+  return accounts.map((account) => ({
+    ...account,
+    branches: account.branches.map((branch: Record<string, unknown>) => ({ ...branch, ...(detailsByNumber.get(String(branch.number)) || {}) })),
+  }));
+}
+
+export async function searchAbcInternalBranches(state: string) {
+  const payload = await abcRequest(`/api/location/v1/branches?state=${encodeURIComponent(state)}`, { method: "GET" });
+  return parseBranches(payload);
+}
+
+export async function searchAbcInternalItems(query: string, branchNumber: string) {
+  const itemNumberSearch = /^[A-Za-z0-9._/-]+$/.test(query) && /\d/.test(query);
+  const payload = await abcRequest("/api/product/v1/search/items", {
+    method: "POST",
+    body: JSON.stringify({
+      filters: [
+        {
+          key: itemNumberSearch ? "itemNumber" : "itemDescription",
+          condition: "contains",
+          values: [query],
+          joinCondition: "and",
+        },
+        {
+          key: "branchNumber",
+          condition: "equals",
+          values: [branchNumber],
+          joinCondition: null,
+        },
+      ],
+      embed: ["branches", "variations"],
+      pagination: { itemsPerPage: 24, pageNumber: 1 },
+    }),
+  });
+  return parseCatalogItems(payload, branchNumber);
 }
 
 export async function priceAbcInternalItems(request: {

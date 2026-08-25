@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { canUseAbcSupply } from "@/lib/abc-supply/access";
-import { priceAbcInternalItems, searchAbcInternalAccounts } from "@/lib/abc-supply/internal";
+import {
+  priceAbcInternalItems,
+  searchAbcInternalAccounts,
+  searchAbcInternalBranches,
+  searchAbcInternalItems,
+} from "@/lib/abc-supply/internal";
 import type { ProfileRecord } from "@/lib/auth";
 import { isOwnerIdentity } from "@/lib/owner-access";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -16,6 +21,7 @@ type PricingInput = {
   itemNumber: string;
   quantity: number;
   uom?: string;
+  length?: { value: number; uom: "ft" | "in" };
 };
 
 function parsePricingInput(value: unknown): PricingInput | null {
@@ -27,6 +33,8 @@ function parsePricingInput(value: unknown): PricingInput | null {
   const uom = String(body.uom || "").trim();
   const purpose = String(body.purpose || "estimating");
   const quantity = Number(body.quantity);
+  const lengthValue = body.lengthValue === undefined || body.lengthValue === "" ? null : Number(body.lengthValue);
+  const lengthUom = String(body.lengthUom || "").trim().toLowerCase();
 
   if (!/^[A-Za-z0-9-]{1,30}$/.test(shipToNumber)) return null;
   if (!/^[A-Za-z0-9-]{1,12}$/.test(branchNumber)) return null;
@@ -34,7 +42,16 @@ function parsePricingInput(value: unknown): PricingInput | null {
   if (uom && !/^[A-Za-z0-9-]{1,12}$/.test(uom)) return null;
   if (!("estimating quoting ordering".split(" ")).includes(purpose)) return null;
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) return null;
-  return { shipToNumber, branchNumber, itemNumber, quantity, purpose: purpose as PricingInput["purpose"], ...(uom ? { uom } : {}) };
+  if (lengthValue !== null && (!Number.isFinite(lengthValue) || lengthValue <= 0 || !["ft", "in"].includes(lengthUom))) return null;
+  return {
+    shipToNumber,
+    branchNumber,
+    itemNumber,
+    quantity,
+    purpose: purpose as PricingInput["purpose"],
+    ...(uom ? { uom } : {}),
+    ...(lengthValue !== null ? { length: { value: lengthValue, uom: lengthUom as "ft" | "in" } } : {}),
+  };
 }
 
 async function authenticateOwner(request: Request) {
@@ -57,10 +74,28 @@ export async function POST(request: Request) {
   if (!await authenticateOwner(request)) return NextResponse.json({ error: "Owner authentication required." }, { status: 401 });
 
   try {
-    const body = await request.json() as { action?: unknown; pricing?: unknown };
+    const body = await request.json() as { action?: unknown; pricing?: unknown; query?: unknown; branchNumber?: unknown; state?: unknown };
     if (body.action === "accounts") {
       const accounts = await searchAbcInternalAccounts();
       return NextResponse.json({ ok: true, accounts, connectionMode: "automatic" }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+    }
+    if (body.action === "branches") {
+      const state = String(body.state || "NY").trim().toUpperCase();
+      if (!/^[A-Z]{2}$/.test(state)) return NextResponse.json({ error: "Enter a valid two-letter state." }, { status: 400 });
+      const branches = await searchAbcInternalBranches(state);
+      return NextResponse.json({ ok: true, branches }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+    }
+    if (body.action === "searchItems") {
+      const query = String(body.query || "").trim();
+      const branchNumber = String(body.branchNumber || "").trim();
+      if (query.length < 2 || query.length > 100 || !/^[A-Za-z0-9._/\- ']+$/.test(query)) {
+        return NextResponse.json({ error: "Enter at least two letters or a valid ABC item number." }, { status: 400 });
+      }
+      if (!/^[A-Za-z0-9-]{1,12}$/.test(branchNumber)) {
+        return NextResponse.json({ error: "Select an ABC branch before searching products." }, { status: 400 });
+      }
+      const items = await searchAbcInternalItems(query, branchNumber);
+      return NextResponse.json({ ok: true, items }, { headers: { "Cache-Control": "no-store, max-age=0" } });
     }
     if (body.action !== "pricing") return NextResponse.json({ error: "Unsupported ABC action." }, { status: 400 });
 
@@ -71,7 +106,13 @@ export async function POST(request: Request) {
       shipToNumber: input.shipToNumber,
       branchNumber: input.branchNumber,
       purpose: input.purpose,
-      lines: [{ id: "1", itemNumber: input.itemNumber, quantity: input.quantity, ...(input.uom ? { uom: input.uom.toUpperCase() } : {}) }],
+      lines: [{
+        id: "1",
+        itemNumber: input.itemNumber,
+        quantity: input.quantity,
+        ...(input.uom ? { uom: input.uom.toUpperCase() } : {}),
+        ...(input.length ? { length: input.length } : {}),
+      }],
     });
     const line = response.lines[0];
     if (!line) return NextResponse.json({ error: "ABC did not return a pricing line." }, { status: 502 });
