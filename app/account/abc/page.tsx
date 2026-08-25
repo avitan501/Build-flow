@@ -35,7 +35,7 @@ export default async function AbcAccountPage({ searchParams }: Props) {
 
       <header className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Supplier connection</p><h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Connect myABCsupply</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Authorize AvantiaBuild to show only your ABC Ship-To accounts, eligible branches, available products, valid units, and private account pricing.</p></div>
+          <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Supplier connection</p><h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Connect myABCsupply</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Authorize AvantiaBuild to show only your ABC Ship-To accounts, eligible branches, products those branches offer, valid units, and private account pricing.</p></div>
           <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${connection.connected ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}><ShieldCheck className="h-4 w-4" />{connection.connected ? `Connected · ${connection.environment || "ABC"}` : "Not connected"}</span>
         </div>
         {message ? <p className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${message.className}`}>{message.text}</p> : null}
@@ -49,7 +49,7 @@ export default async function AbcAccountPage({ searchParams }: Props) {
       <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <h2 className="text-xl font-semibold">ABC-approved customer workflow</h2>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {["Select authorized Ship-To account", "Select its authorized ABC branch", "Search ABC products at that branch", "Choose ABC unit and quantity", "Verify availability", "Request private account price"].map((step, index) => <div key={step} className="flex gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-800"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><span>{index + 1}. {step}</span></div>)}
+          {["Select authorized Ship-To account", "Select its authorized ABC branch", "Search ABC products offered there", "Choose ABC unit and quantity", "Verify the branch offers the item", "Request private account price"].map((step, index) => <div key={step} className="flex gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-800"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><span>{index + 1}. {step}</span></div>)}
         </div>
       </section>
 

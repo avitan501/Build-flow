@@ -86,6 +86,23 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
     () => items.find((item) => item.itemNumber === selectedItemNumber) || null,
     [items, selectedItemNumber],
   );
+  const authorizedNewYorkBranches = useMemo(
+    () => selectedAccount?.branches.filter((branch) => branch.state?.toUpperCase() === "NY") || [],
+    [selectedAccount],
+  );
+  const nearbyNewYorkBranches = useMemo(() => {
+    const priorityCities = ["Freeport", "Hicksville", "Jamaica", "Brooklyn", "Bronx"];
+    return [...newYorkBranches].sort((a, b) => {
+      const aCity = a.city || "";
+      const bCity = b.city || "";
+      const aPriority = priorityCities.indexOf(aCity);
+      const bPriority = priorityCities.indexOf(bCity);
+      if (aPriority === -1 && bPriority === -1) return aCity.localeCompare(bCity);
+      if (aPriority === -1) return 1;
+      if (bPriority === -1) return -1;
+      return aPriority - bPriority;
+    });
+  }, [newYorkBranches]);
 
   function branchLabel(branch: AbcBranch) {
     const location = [branch.city, branch.state, branch.postal].filter(Boolean).join(", ");
@@ -116,12 +133,10 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
             : "ABC Sandbox did not return an enrolled Ship-To account. Ask ABC to attach its test account to AvantiaBuild Source System ID 798.");
         }
         setAccounts(nextAccounts);
-        const demoAccount = nextAccounts.find((account) => account.number === "2010466-2");
-        const firstAccount = demoAccount || nextAccounts.find((account) => account.status.toLowerCase() === "active") || nextAccounts[0];
+        const firstAccount = nextAccounts.find((account) => account.status.toLowerCase() === "active") || nextAccounts[0];
         if (firstAccount) {
           setShipToNumber(firstAccount.number);
-          const demoBranch = firstAccount.branches.find((branch) => branch.number === "1281");
-          const firstBranch = demoBranch || firstAccount.branches.find((branch) => branch.homeBranch) || firstAccount.branches[0];
+          const firstBranch = firstAccount.branches.find((branch) => branch.homeBranch) || firstAccount.branches[0];
           if (firstBranch) setBranchNumber(firstBranch.number);
         }
       })
@@ -178,7 +193,7 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
     const response = await fetch(`/api/integrations/abc/catalog?mode=${connectionMode}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, branchNumber }),
+      body: JSON.stringify({ query, shipToNumber, branchNumber }),
     }).catch(() => null);
     const payload = response ? await response.json().catch(() => null) as { items?: AbcCatalogItem[]; error?: string } | null : null;
     if (!response || !response.ok) {
@@ -221,7 +236,7 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
   return (
     <div className="space-y-5">
       <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-slate-700">
-        <span className="font-semibold text-slate-950">ABC certification workflow:</span> select an authorized Ship-To and branch, search ABC&apos;s catalog, choose an available item and its valid unit, then request the private account price.
+        <span className="font-semibold text-slate-950">ABC certification workflow:</span> select an authorized Ship-To and branch, search ABC&apos;s catalog, choose an item offered by that branch and its valid unit, then request the private account price.
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -252,11 +267,14 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
       {connectionMode === "automatic" ? <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
         <p className="font-semibold text-slate-950">New York branch directory</p>
         <p className="mt-1">ABC has {newYorkBranches.length} public New York location{newYorkBranches.length === 1 ? "" : "s"}. This directory proves New York coverage only. A location becomes price-eligible after ABC attaches it to the selected Ship-To account.</p>
-        {newYorkBranches.length ? <p className="mt-2 text-xs text-slate-500">Examples: {newYorkBranches.slice(0, 3).map(branchLabel).join(" · ")}</p> : null}
+        {authorizedNewYorkBranches.length
+          ? <p className="mt-2 font-semibold text-emerald-700">{authorizedNewYorkBranches.length} New York branch{authorizedNewYorkBranches.length === 1 ? " is" : "es are"} authorized for the selected Ship-To.</p>
+          : <p className="mt-2 font-semibold text-amber-800">New York pricing is pending: ABC has not attached a New York branch to this Sandbox Ship-To account yet.</p>}
+        {nearbyNewYorkBranches.length ? <p className="mt-2 text-xs text-slate-500">Nearby public locations: {nearbyNewYorkBranches.slice(0, 3).map(branchLabel).join(" · ")}</p> : null}
       </div> : <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950"><span className="font-semibold">Customer-authorized workflow.</span> Only branches returned for this customer&apos;s selected Ship-To account appear in the branch list.</div>}
 
       <form onSubmit={handleSearch} className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <label className="text-sm font-semibold text-slate-800" htmlFor="abc-product-search">Search ABC products available at the selected branch</label>
+        <label className="text-sm font-semibold text-slate-800" htmlFor="abc-product-search">Search products offered for ordering at the selected branch</label>
         <div className="mt-2 flex flex-col gap-2 sm:flex-row">
           <input id="abc-product-search" value={query} onChange={(event) => setQuery(event.target.value)} required minLength={2} placeholder="Try roofing shingles or an ABC item number" className="min-h-12 flex-1 rounded-2xl border border-slate-200 bg-white px-4 text-slate-950 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
           <button disabled={searching || !branchNumber} className="min-h-12 rounded-2xl bg-slate-950 px-6 font-semibold text-white disabled:opacity-50">{searching ? "Searching ABC…" : "Search ABC catalog"}</button>
@@ -266,10 +284,10 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
       {!searching && hasSearched && items.length === 0 ? <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">ABC returned no products for this search at the selected branch. Try a broader product description or another authorized branch.</p> : null}
 
       {items.length ? <section className="space-y-3" aria-label="ABC product results">
-        <div className="flex items-end justify-between gap-3"><div><h3 className="font-semibold text-slate-950">ABC product results</h3><p className="text-sm text-slate-500">{items.length} available match{items.length === 1 ? "" : "es"} at this branch</p></div></div>
+        <div className="flex items-end justify-between gap-3"><div><h3 className="font-semibold text-slate-950">ABC product results</h3><p className="text-sm text-slate-500">{items.length} match{items.length === 1 ? "" : "es"} offered for ordering at this branch</p></div></div>
         <div className="grid gap-3 lg:grid-cols-2">
           {items.map((item) => <button type="button" key={item.itemNumber} onClick={() => chooseItem(item)} className={`rounded-2xl border p-4 text-left transition ${selectedItemNumber === item.itemNumber ? "border-[#0071e3] bg-sky-50 ring-2 ring-sky-100" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-            <div className="flex items-start justify-between gap-3"><p className="font-semibold text-slate-950">{item.itemDescription}</p><span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">Available</span></div>
+            <div className="flex items-start justify-between gap-3"><p className="font-semibold text-slate-950">{item.itemDescription}</p><span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">Offered here</span></div>
             <p className="mt-2 text-xs text-slate-500">Item {item.itemNumber}{item.color ? ` · ${item.color}` : ""}</p>
             <p className="mt-2 text-xs text-slate-600">Units: {item.uoms.map((uom) => `${uom.name} (${uom.code})`).join(", ") || "ABC default stocking unit"}</p>
           </button>)}
@@ -277,7 +295,7 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
       </section> : null}
 
       {selectedItem ? <form onSubmit={handleSubmit} className="grid gap-4 rounded-[26px] border border-sky-200 bg-sky-50/60 p-5 sm:grid-cols-2">
-        <div className="sm:col-span-2"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Selected ABC product</p><p className="mt-1 font-semibold text-slate-950">{selectedItem.itemDescription}</p><p className="mt-1 text-xs text-slate-500">Item {selectedItem.itemNumber} · Availability returned for authorized branch {branchNumber}</p></div>
+        <div className="sm:col-span-2"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Selected ABC product</p><p className="mt-1 font-semibold text-slate-950">{selectedItem.itemDescription}</p><p className="mt-1 text-xs text-slate-500">Item {selectedItem.itemNumber} · ABC lists this item for ordering through authorized branch {branchNumber}. This is not an inventory count.</p></div>
         <input type="hidden" name="shipToNumber" value={shipToNumber} />
         <input type="hidden" name="branchNumber" value={branchNumber} />
         <input type="hidden" name="itemNumber" value={selectedItem.itemNumber} />
@@ -302,7 +320,7 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
 
       {error ? <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950"><p className="font-semibold">ABC needs attention</p><p>{error}</p><button type="button" onClick={() => { setError(""); setAccountsLoading(true); setReloadKey((value) => value + 1); }} className="mt-3 rounded-full border border-amber-300 bg-white px-4 py-2 text-xs font-semibold text-amber-950">Retry ABC connection</button></div> : null}
 
-      <p className="text-xs leading-5 text-slate-500">This screen retrieves authorized account, availability, unit, and pricing information for an estimate. It does not publish ABC pricing, compare suppliers, or submit an ABC order.</p>
+      <p className="text-xs leading-5 text-slate-500">ABC availability means the branch offers the item for ordering; it does not mean the item is physically in stock. This screen retrieves authorized account, branch offering, unit, and pricing information for an estimate. It does not publish ABC pricing, compare suppliers, or submit an ABC order.</p>
 
       {result ? (
         <section className="rounded-[26px] border border-emerald-200 bg-emerald-50/70 p-5">
@@ -317,7 +335,7 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
             <div className="rounded-2xl bg-white p-4"><dt className="text-xs text-slate-500">Avantia Build service fee</dt><dd className="mt-1 text-lg font-semibold text-[#0071e3]">Not active · {money(0, result.currencyCode)}</dd></div>
             <div className="rounded-2xl bg-slate-950 p-4 text-white"><dt className="text-xs text-slate-300">Customer estimate total</dt><dd className="mt-1 text-lg font-semibold">{money(result.clientEstimateTotal, result.currencyCode)}</dd></div>
           </dl>
-          <p className="mt-4 text-xs leading-5 text-slate-600">Availability verified at branch {result.branchNumber} before pricing · Ship-To {result.shipToNumber} · Priced {new Date(result.pricedAt).toLocaleString("en-US")}. Recheck before purchase because availability and pricing can change.</p>
+          <p className="mt-4 text-xs leading-5 text-slate-600">Ordering eligibility verified at branch {result.branchNumber} before pricing · Ship-To {result.shipToNumber} · Priced {new Date(result.pricedAt).toLocaleString("en-US")}. This is not a stock count. Recheck before purchase because branch offering and pricing can change.</p>
         </section>
       ) : null}
     </div>
