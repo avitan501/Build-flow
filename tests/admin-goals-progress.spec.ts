@@ -176,6 +176,27 @@ test("affiliate tracker is persistent, owner-only, filterable, and setup-gated",
   expect(migration).toContain("'Developer/API Integration','In Progress'");
 });
 
+test("Carlos has a call-ready list of 50 public affiliate targets", async () => {
+  const [page, component, data] = await Promise.all([
+    readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/affiliate-call-list.tsx"), "utf8"),
+    readFile(path.join(root, "lib/affiliate-call-list.ts"), "utf8"),
+  ]);
+
+  expect(page).toContain("<AffiliateCallList />");
+  expect(page).toContain("50 public company numbers ready to call.");
+  expect(component).toContain("50 affiliate targets");
+  expect(component).toContain("Affiliate or Partnerships Manager");
+  expect(component).toContain("public company phone numbers, not personal numbers");
+  expect((data.match(/\btarget\(/g) ?? []).length).toBe(50);
+
+  const companies = [...data.matchAll(/target\(\d+, "([^"]+)"/g)].map((match) => match[1]);
+  const phones = [...data.matchAll(/target\(\d+, "[^"]+", "([\d-]+)"/g)].map((match) => match[1]);
+  expect(new Set(companies).size).toBe(50);
+  expect(phones).toHaveLength(50);
+  expect(phones.every((phone) => /^\d{3}-\d{3}-\d{4}$/.test(phone))).toBe(true);
+});
+
 test("Beat Your Quote flyer is owner-only and has print and sharing controls", async () => {
   const flyer = await readFile(path.join(root, "app/admin/goals-progress/beat-your-quote-flyer/page.tsx"), "utf8");
   const actions = await readFile(path.join(root, "components/buildflow/campaign-flyer-actions.tsx"), "utf8");
