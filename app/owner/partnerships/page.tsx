@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 };
 
 export default async function SupplierPartnershipsPage() {
-  await requireStaffProfile("suppliers");
-  const progress = await loadSupplierPartnerProgress();
+  const { supabase } = await requireStaffProfile("suppliers");
+  const progress = await loadSupplierPartnerProgress(supabase);
 
   return <SupplierPartnershipWorkspace partners={SUPPLIER_PARTNERS} initialProgress={progress} emailSendingReady={canSendAuraEmail()} />;
 }

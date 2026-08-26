@@ -26,14 +26,14 @@ const inputSchema = z.object({
 export type SupplierPartnerUpdateInput = z.infer<typeof inputSchema>;
 
 export async function updateSupplierPartnerAction(input: SupplierPartnerUpdateInput) {
-  await requireStaffProfile("suppliers");
+  const { supabase, user } = await requireStaffProfile("suppliers");
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Please check the information and try again." };
 
   const partner = findSupplierPartner(parsed.data.slug);
   if (!partner) return { ok: false as const, error: "Supplier was not found." };
 
-  const allProgress = await loadSupplierPartnerProgress();
+  const allProgress = await loadSupplierPartnerProgress(supabase);
   const current = allProgress[partner.slug] || emptySupplierPartnerProgress(partner);
   const now = new Date().toISOString();
   const activities = [...current.activities];
@@ -65,7 +65,11 @@ export async function updateSupplierPartnerAction(input: SupplierPartnerUpdateIn
     updatedAt: now,
   };
 
-  await saveSupplierPartnerProgress(partner.slug, progress);
+  try {
+    await saveSupplierPartnerProgress(supabase, user.id, partner.slug, progress);
+  } catch {
+    return { ok: false as const, error: "The supplier record could not be saved. Please try again." };
+  }
   revalidatePath("/owner/partnerships");
   revalidatePath("/owner/aura");
   return { ok: true as const, progress };
@@ -77,7 +81,7 @@ const emailSchema = z.object({
 });
 
 export async function sendSupplierPartnerEmailAction(input: z.infer<typeof emailSchema>) {
-  await requireStaffProfile("suppliers");
+  const { supabase, user } = await requireStaffProfile("suppliers");
   const parsed = emailSchema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Add the correct supplier email first." };
   const partner = findSupplierPartner(parsed.data.slug);
@@ -90,7 +94,7 @@ export async function sendSupplierPartnerEmailAction(input: z.infer<typeof email
     return { ok: false as const, error: error instanceof Error ? error.message : "The email could not be sent." };
   }
 
-  const allProgress = await loadSupplierPartnerProgress();
+  const allProgress = await loadSupplierPartnerProgress(supabase);
   const current = allProgress[partner.slug] || emptySupplierPartnerProgress(partner);
   const now = new Date().toISOString();
   const progress = {
@@ -100,7 +104,11 @@ export async function sendSupplierPartnerEmailAction(input: z.infer<typeof email
     activities: [{ id: crypto.randomUUID(), type: "email" as const, detail: `Email sent to ${parsed.data.recipient}`, at: now }, ...current.activities].slice(0, 30),
     updatedAt: now,
   };
-  await saveSupplierPartnerProgress(partner.slug, progress);
+  try {
+    await saveSupplierPartnerProgress(supabase, user.id, partner.slug, progress);
+  } catch {
+    return { ok: false as const, error: "The email was sent, but the supplier status could not be saved." };
+  }
   revalidatePath("/owner/partnerships");
   revalidatePath("/owner/aura");
   return { ok: true as const, progress };

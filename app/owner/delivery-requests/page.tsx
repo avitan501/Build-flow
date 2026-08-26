@@ -11,8 +11,8 @@ function dateLabel(value: string) {
 }
 
 export default async function OwnerDeliveryRequestsPage() {
-  await requireStaffProfile("suppliers");
-  const requests = await loadDeliveryRequests();
+  const { supabase } = await requireStaffProfile("suppliers");
+  const requests = await loadDeliveryRequests(supabase);
 
   return (
     <main className="min-h-screen bg-[#f3f6f9] px-4 py-6 text-slate-950 sm:px-8">

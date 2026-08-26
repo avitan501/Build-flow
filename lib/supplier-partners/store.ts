@@ -1,92 +1,102 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import {
   SUPPLIER_PARTNERS,
   emptySupplierPartnerProgress,
   type SupplierPartnerProgress,
 } from "@/lib/supplier-partners/catalog";
-import { createAdminClient } from "@/lib/supabase/admin";
 
-const SOURCE_PREFIX = "supplier-partnership:";
-const NOTES_PREFIX = "supplier_partner_v1:";
+export const SUPPLIER_PARTNER_NOTES_PREFIX = "supplier_partner_v2:";
 
-type TaskRow = {
-  source_item_key: string | null;
-  notes: string | null;
+type GoalRow = {
+  id: string;
+  details: string | null;
   updated_at: string;
 };
 
-export function supplierPartnerTaskKey(slug: string) {
-  return `${SOURCE_PREFIX}${slug}`;
-}
+type StoredSupplierPartnerProgress = {
+  slug: string;
+  progress: SupplierPartnerProgress;
+};
 
-export function parseSupplierPartnerProgress(notes: string | null): SupplierPartnerProgress | null {
-  if (!notes?.startsWith(NOTES_PREFIX)) return null;
+export function parseSupplierPartnerProgress(details: string | null): StoredSupplierPartnerProgress | null {
+  if (!details?.startsWith(SUPPLIER_PARTNER_NOTES_PREFIX)) return null;
   try {
-    return JSON.parse(notes.slice(NOTES_PREFIX.length)) as SupplierPartnerProgress;
+    const parsed = JSON.parse(details.slice(SUPPLIER_PARTNER_NOTES_PREFIX.length)) as StoredSupplierPartnerProgress;
+    if (!parsed.slug || !parsed.progress) return null;
+    return parsed;
   } catch {
     return null;
   }
 }
 
-export function serializeSupplierPartnerProgress(progress: SupplierPartnerProgress) {
-  return `${NOTES_PREFIX}${JSON.stringify(progress)}`;
+export function serializeSupplierPartnerProgress(slug: string, progress: SupplierPartnerProgress) {
+  return `${SUPPLIER_PARTNER_NOTES_PREFIX}${JSON.stringify({ slug, progress })}`;
 }
 
-export async function loadSupplierPartnerProgress() {
-  const supabase = createAdminClient();
+export async function loadSupplierPartnerProgress(supabase: SupabaseClient) {
   const { data, error } = await supabase
-    .from("aura_tasks")
-    .select("source_item_key, notes, updated_at")
-    .like("source_item_key", `${SOURCE_PREFIX}%`);
+    .from("manager_goals")
+    .select("id, details, updated_at")
+    .eq("assignee", "carlos")
+    .like("details", `${SUPPLIER_PARTNER_NOTES_PREFIX}%`);
 
   if (error) throw new Error(`Unable to load supplier progress: ${error.message}`);
 
-  const stored = new Map<string, TaskRow>();
-  for (const row of (data || []) as TaskRow[]) {
-    if (row.source_item_key) stored.set(row.source_item_key.slice(SOURCE_PREFIX.length), row);
+  const stored = new Map<string, { row: GoalRow; progress: SupplierPartnerProgress }>();
+  for (const row of (data || []) as GoalRow[]) {
+    const parsed = parseSupplierPartnerProgress(row.details);
+    if (parsed) stored.set(parsed.slug, { row, progress: parsed.progress });
   }
 
   return Object.fromEntries(
     SUPPLIER_PARTNERS.map((partner) => {
-      const row = stored.get(partner.slug);
-      const parsed = parseSupplierPartnerProgress(row?.notes || null);
+      const storedProgress = stored.get(partner.slug);
       return [
         partner.slug,
-        parsed
-          ? { ...emptySupplierPartnerProgress(partner), ...parsed, updatedAt: row?.updated_at || parsed.updatedAt }
+        storedProgress
+          ? {
+              ...emptySupplierPartnerProgress(partner),
+              ...storedProgress.progress,
+              updatedAt: storedProgress.row.updated_at || storedProgress.progress.updatedAt,
+            }
           : emptySupplierPartnerProgress(partner),
       ];
     }),
   ) as Record<string, SupplierPartnerProgress>;
 }
 
-export async function saveSupplierPartnerProgress(slug: string, progress: SupplierPartnerProgress) {
-  const supabase = createAdminClient();
-  const sourceItemKey = supplierPartnerTaskKey(slug);
+export async function saveSupplierPartnerProgress(
+  supabase: SupabaseClient,
+  userId: string,
+  slug: string,
+  progress: SupplierPartnerProgress,
+) {
+  const partner = SUPPLIER_PARTNERS.find((item) => item.slug === slug);
+  if (!partner) throw new Error("Supplier was not found.");
+
+  const title = `Carlos supplier partnership · ${partner.company}`;
   const { data: existing, error: readError } = await supabase
-    .from("aura_tasks")
+    .from("manager_goals")
     .select("id")
-    .eq("source_item_key", sourceItemKey)
+    .eq("assignee", "carlos")
+    .eq("title", title)
     .maybeSingle();
 
   if (readError) throw new Error(`Unable to read supplier progress: ${readError.message}`);
 
-  const partner = SUPPLIER_PARTNERS.find((item) => item.slug === slug);
-  if (!partner) throw new Error("Supplier was not found.");
-
   const payload = {
-    title: `Carlos supplier partnership · ${partner.company}`,
-    notes: serializeSupplierPartnerProgress(progress),
-    due_at: progress.followUpDate ? new Date(`${progress.followUpDate}T14:00:00.000Z`).toISOString() : null,
-    priority: progress.status === "Follow-up" ? "high" : "normal",
-    status: progress.status === "Set up" || progress.status === "Not a fit" ? "done" : "open",
-    source_item_key: sourceItemKey,
+    assignee: "carlos" as const,
+    title,
+    details: serializeSupplierPartnerProgress(slug, progress),
+    status: progress.status === "Set up" || progress.status === "Not a fit" ? "completed" : "open",
   };
 
   const result = existing
-    ? await supabase.from("aura_tasks").update(payload).eq("id", existing.id)
-    : await supabase.from("aura_tasks").insert(payload);
+    ? await supabase.from("manager_goals").update(payload).eq("id", existing.id)
+    : await supabase.from("manager_goals").insert({ ...payload, created_by: userId });
 
   if (result.error) throw new Error(`Unable to save supplier progress: ${result.error.message}`);
 }

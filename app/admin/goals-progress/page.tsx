@@ -18,6 +18,7 @@ import { AddOutreachLead, ClientLanguageSelect, OutreachLeadList, type OutreachL
 import { AddManagerGoal, CustomManagerGoals, type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { WebsiteFixNotes } from "@/components/buildflow/website-fix-notes";
 import { DAILY_WORK_SUMMARY_PREFIX } from "@/lib/daily-work-summary";
+import { SUPPLIER_PARTNER_NOTES_PREFIX } from "@/lib/supplier-partners/store";
 import type {
   AffiliateActivity,
   AffiliateAttachment,
@@ -132,7 +133,11 @@ export default async function GoalsProgressPage() {
   const goals = goalResult.error ? [] : goalResult.data ?? [];
   const leads = leadResult.error ? [] : leadResult.data ?? [];
   const websiteNotes = goals.filter((goal) => goal.details?.startsWith(WEBSITE_FIX_NOTE_PREFIX));
-  const regularGoals = goals.filter((goal) => !goal.details?.startsWith(WEBSITE_FIX_NOTE_PREFIX) && !goal.details?.startsWith(DAILY_WORK_SUMMARY_PREFIX));
+  const regularGoals = goals.filter((goal) =>
+    !goal.details?.startsWith(WEBSITE_FIX_NOTE_PREFIX) &&
+    !goal.details?.startsWith(DAILY_WORK_SUMMARY_PREFIX) &&
+    !goal.details?.startsWith(SUPPLIER_PARTNER_NOTES_PREFIX)
+  );
 
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-10"><div className="mx-auto max-w-6xl">
     <header className="border-b border-slate-200 pb-6"><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Goals &amp; Progress</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Company priorities organized by owner. Add new goals under the person responsible for completing them.</p></header>

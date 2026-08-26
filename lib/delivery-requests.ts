@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const DELIVERY_TASK_PREFIX = "delivery-request:";
 export const DELIVERY_NOTES_PREFIX = "delivery_request_v1:";
@@ -38,8 +38,7 @@ export function parseDeliveryRequest(notes: string | null) {
   }
 }
 
-export async function loadDeliveryRequests() {
-  const supabase = createAdminClient();
+export async function loadDeliveryRequests(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from("aura_tasks")
     .select("id, notes, created_at, updated_at")

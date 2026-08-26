@@ -124,7 +124,7 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
         <header className="overflow-hidden rounded-[28px] bg-[#10233f] px-5 py-6 text-white shadow-[0_22px_55px_rgba(15,35,63,0.2)] sm:px-8 sm:py-8">
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#e1b85b]">Carlos tasks · owner only</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#e1b85b]">Carlos supplier desk</p>
               <h1 className="mt-2 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">Supplier partnerships</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Every researched company, the right call, the right ask, and the next follow-up in one place.</p>
             </div>
