@@ -6,13 +6,14 @@ import { expect, test } from "@playwright/test";
 const root = process.cwd();
 
 test("Carlos supplier workspace uses staff access and persistent manager goals", async () => {
-  const [page, actions, store, goalsPage, deliveryPage, deliveryStore] = await Promise.all([
+  const [page, actions, store, goalsPage, deliveryPage, deliveryStore, managerShell] = await Promise.all([
     readFile(path.join(root, "app/owner/partnerships/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/partnerships/actions.ts"), "utf8"),
     readFile(path.join(root, "lib/supplier-partners/store.ts"), "utf8"),
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/delivery-requests/page.tsx"), "utf8"),
     readFile(path.join(root, "lib/delivery-requests.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
   ]);
 
   expect(page).toContain('requireStaffProfile("suppliers")');
@@ -26,6 +27,8 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(deliveryPage).toContain('requireStaffProfile("suppliers")');
   expect(deliveryPage).toContain("loadDeliveryRequests(supabase)");
   expect(deliveryStore).not.toContain("createAdminClient");
+  expect(managerShell).toContain('{ href: "/owner/partnerships", label: "Supplier Partnerships", icon: Handshake }');
+  expect(managerShell).toContain("...(access.suppliers ? [");
 });
 
 test("every Carlos supplier record has working local assets and complete links", async () => {
