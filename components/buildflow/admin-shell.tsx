@@ -4,7 +4,6 @@ import {
   Archive,
   Columns3,
   CreditCard,
-  Handshake,
   LayoutDashboard,
   Sparkles,
   Menu,
@@ -48,7 +47,6 @@ function navigationLinks(access: ManagerAccess) {
     ...(access.customers ? [{ href: "/admin/users", label: "Customer Directory", icon: Users }] : []),
     ...(access.suppliers ? [
       { href: "/admin/vendors", label: "Supplier Directory", icon: Store },
-      { href: "/owner/partnerships", label: "Supplier Partnerships", icon: Handshake },
       { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },
     ] : []),
     ...(access.suppliers ? [

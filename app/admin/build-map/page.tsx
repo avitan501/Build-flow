@@ -3,13 +3,11 @@ import {
   BadgeDollarSign,
   BarChart3,
   CalendarDays,
-  CheckCircle2,
   ChevronDown,
   ClipboardList,
   CreditCard,
   MessageCircleQuestion,
   PhoneCall,
-  Send,
   ShoppingCart,
   Sparkles,
   Store,
@@ -174,7 +172,6 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
 
   const goals = goalsResult.data ?? [];
   const dashboardHistory = parseDashboardAiHistory(goals.find((goal) => goal.title === "Dashboard AI search" && goal.details?.startsWith(DASHBOARD_AI_HISTORY_PREFIX))?.details);
-  const websiteNotes = goals.filter((goal) => goal.details?.startsWith(WEBSITE_FIX_NOTE_PREFIX));
   const newYorkDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
   const todayKey = newYorkDate.format(new Date());
   const todaySummaryRow = goals.find((goal) => goal.title === `Daily summary - ${todayKey}` && goal.details?.startsWith(DAILY_WORK_SUMMARY_PREFIX));
@@ -237,16 +234,13 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
     </section>
 
     <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="border-b border-slate-200 px-4 py-3"><h2 id="targets-heading" className="font-semibold">Goals</h2><p className="mt-0.5 text-xs text-slate-500">Open a person to view priorities and add goals</p></header>
-      <GoalDisclosure assignee="carlos" priorityCount={3} goals={regularGoals.filter((goal) => goal.assignee === "carlos")}>
-        <FixedTarget title="Client Target" detail={`${openLeads} open leads · ${clients.length} active clients`} href="/admin/goals-progress" icon={Users} />
-        <FixedTarget title="Find suppliers' best-priced items" detail="Collect pricing and update the material catalog" href="/admin/catalog" icon={ShoppingCart} />
-        <FixedTarget title="Supplier Affiliate Program" detail="Track applications and supplier opportunities" href="/admin/goals-progress" icon={Store} />
+      <GoalDisclosure assignee="carlos" priorityCount={access.owner ? 5 : 4} goals={regularGoals.filter((goal) => goal.assignee === "carlos")}>
+        <FixedTarget title="Client Target" detail={`${openLeads} open leads · ${clients.length} active clients`} href="/admin/goals-progress#client-target" icon={Users} />
+        <FixedTarget title="Call Supplier" detail="Find what each supplier sells cheaper than anyone else" href="/admin/goals-progress#call-suppliers" icon={ShoppingCart} />
+        <FixedTarget title="Supplier Affiliate Program" detail="Track applications and supplier opportunities" href="/admin/goals-progress#supplier-affiliate-program" icon={Store} />
+        <FixedTarget title="Supplier Partnership" detail="Outreach drafts, follow-ups, and partnership progress" href="/admin/goals-progress#supplier-partnerships" icon={Store} />
+        {access.owner ? <FixedTarget title="ABC Supply Demo" detail="Live product search and account pricing" href="/admin/goals-progress#abc-supply-demo" icon={BadgeDollarSign} /> : null}
       </GoalDisclosure>
-      {access.owner ? <GoalDisclosure assignee="david" priorityCount={3} goals={regularGoals.filter((goal) => goal.assignee === "david")}>
-          <FixedTarget title="Fix Website" detail={`${websiteNotes.filter((goal) => goal.status === "open").length} open website notes`} href="/admin/goals-progress" icon={CheckCircle2} />
-          <FixedTarget title="Launch Beat Your Quote" detail="Campaign, flyer, and customer upload flow" href="/admin/goals-progress" icon={Send} />
-          <FixedTarget title="ABC Supply Demo" detail="Live product search and account pricing" href="/admin/abc" icon={BadgeDollarSign} />
-        </GoalDisclosure> : null}
     </section>
 
     <details className="group mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"><summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4"><Store className="h-4 w-4 text-[#0066cc]" /><span className="min-w-0 flex-1"><strong id="manager-tools-heading" className="block text-sm">Manager tools</strong><span className="block truncate text-xs text-slate-500">Directories, suppliers, and settings</span></span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" /></summary><div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-3">{managerSections.map((section) => { const Icon = section.icon; return <section key={section.title} className="overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="flex items-center gap-3 border-b border-slate-100 px-3 py-2"><span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-[#0066cc]"><Icon className="h-4 w-4" /></span><h3 className="text-sm font-semibold">{section.title}</h3></header><div>{section.links.map((item) => { const external = item.href.startsWith("https://"); return <Link key={item.href} href={item.href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="group flex min-h-11 items-center justify-between gap-3 border-b border-slate-100 px-3 text-sm font-semibold text-slate-700 last:border-b-0 hover:bg-slate-50 hover:text-[#0066cc]"><span>{item.label}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5" /></Link>; })}</div></section>; })}</div></details>

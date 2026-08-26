@@ -27,7 +27,10 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(deliveryPage).toContain('requireStaffProfile("suppliers")');
   expect(deliveryPage).toContain("loadDeliveryRequests(supabase)");
   expect(deliveryStore).not.toContain("createAdminClient");
-  expect(managerShell).toContain('{ href: "/owner/partnerships", label: "Supplier Partnerships", icon: Handshake }');
+  expect(managerShell).not.toContain('href: "/owner/partnerships"');
+  expect(goalsPage).toContain('title="Supplier Partnership"');
+  expect(page).toContain('body: { action: "status" }');
+  expect(actions).toContain('action: "send_email"');
   expect(managerShell).toContain("...(access.suppliers ? [");
 });
 

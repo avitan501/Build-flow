@@ -13,7 +13,11 @@ export const metadata: Metadata = {
 
 export default async function SupplierPartnershipsPage() {
   const { supabase } = await requireStaffProfile("suppliers");
-  const progress = await loadSupplierPartnerProgress(supabase);
+  const [progress, brokerResult] = await Promise.all([
+    loadSupplierPartnerProgress(supabase),
+    supabase.functions.invoke<{ ok?: boolean; email?: boolean }>("aura-messaging-broker", { body: { action: "status" } }),
+  ]);
+  const emailSendingReady = canSendAuraEmail() || Boolean(brokerResult.data?.ok && brokerResult.data.email);
 
-  return <SupplierPartnershipWorkspace partners={SUPPLIER_PARTNERS} initialProgress={progress} emailSendingReady={canSendAuraEmail()} />;
+  return <SupplierPartnershipWorkspace partners={SUPPLIER_PARTNERS} initialProgress={progress} emailSendingReady={emailSendingReady} />;
 }

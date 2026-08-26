@@ -1,8 +1,6 @@
 import {
   ArrowRight,
-  ArrowUpRight,
   CircleDollarSign,
-  Megaphone,
   PhoneCall,
   Target,
   UserRound,
@@ -16,7 +14,6 @@ import { AffiliateCallList } from "@/components/buildflow/affiliate-call-list";
 import { ClientTargetCallGuide } from "@/components/buildflow/client-target-call-guide";
 import { AddOutreachLead, ClientLanguageSelect, OutreachLeadList, type OutreachLeadRecord } from "@/components/buildflow/client-target-outreach";
 import { AddManagerGoal, CustomManagerGoals, type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
-import { WebsiteFixNotes } from "@/components/buildflow/website-fix-notes";
 import { DAILY_WORK_SUMMARY_PREFIX } from "@/lib/daily-work-summary";
 import { SUPPLIER_PARTNER_NOTES_PREFIX } from "@/lib/supplier-partners/store";
 import type {
@@ -28,8 +25,6 @@ import type {
   AffiliateTrackerSettings,
 } from "@/lib/affiliate-tracker";
 import { requireAdminProfile, requireManagerPortalProfile } from "@/lib/auth";
-
-const WEBSITE_FIX_NOTE_PREFIX = "website_fix_note:";
 
 type ClientTarget = {
   id: string;
@@ -48,8 +43,8 @@ function GoalNumber({ children }: { children: number | string }) {
   return <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">{children}</span>;
 }
 
-function GoalDisclosure({ number, eyebrow, title, description, children }: { number: number; eyebrow: string; title: string; description?: string; children: ReactNode }) {
-  return <details className="group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+function GoalDisclosure({ id, number, eyebrow, title, description, children }: { id?: string; number: number; eyebrow: string; title: string; description?: string; children: ReactNode }) {
+  return <details id={id} className="group scroll-mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
     <summary className="flex min-h-20 cursor-pointer list-none items-center gap-3 p-4 sm:p-5">
       <GoalNumber>{number}</GoalNumber>
       <div className="min-w-0 flex-1"><p className="text-[11px] font-semibold uppercase text-[#0066cc]">{eyebrow}</p><h3 className="mt-0.5 text-base font-semibold sm:text-lg">{title}</h3>{description ? <p className="mt-1 line-clamp-1 text-xs text-slate-500 sm:text-sm">{description}</p> : null}</div>
@@ -82,29 +77,17 @@ async function OwnerAffiliateGoal() {
     ...attachment,
     signed_url: (await supabase.storage.from("affiliate-confirmations").createSignedUrl(attachment.file_path, 1800)).data?.signedUrl ?? null,
   })));
-  return <GoalDisclosure number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 construction-focused targets · Direct call routes first."><div className="grid gap-4"><AffiliateCallList programs={programResult.data ?? []} /><AffiliateProgramTracker programs={programResult.data ?? []} checklist={checklistResult.data ?? []} activities={activityResult.data ?? []} attachments={signedAttachments} integrations={integrationResult.data ?? []} settings={settingsResult.data} hideHeading /></div></GoalDisclosure>;
-}
-
-function FixWebsiteGoal({ notes }: { notes: ManagerGoalRecord[] }) {
-  const openNotes = notes.filter((note) => note.status === "open").length;
-  return <GoalDisclosure number={1} eyebrow="Website" title="Fix Website" description={`${openNotes} open notes · Add, change, or remove items before publishing.`}><WebsiteFixNotes notes={notes} /></GoalDisclosure>;
-}
-
-function BeatQuoteGoal({ owner }: { owner: boolean }) {
-  return <GoalDisclosure number={2} eyebrow="Campaign" title="Launch campaign: Beat Your Quote" description="Send the flyer to contractors who already have a material quote.">
-    <div className="flex gap-3 rounded-md bg-sky-50 p-4"><Megaphone className="h-5 w-5 shrink-0 text-[#0066cc]" /><p className="text-sm leading-6 text-slate-700">Send the flyer to contractors who already have a material quote and invite them to upload it for comparison.</p></div>
-    <div className="mt-4 flex flex-wrap gap-2">{owner ? <Link href="/admin/goals-progress/beat-your-quote-flyer" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white">Open campaign flyer<ArrowRight className="h-4 w-4" /></Link> : null}<Link href="/beat-a-quote" target="_blank" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold">Test customer page<ArrowUpRight className="h-4 w-4" /></Link></div>
-  </GoalDisclosure>;
+  return <GoalDisclosure id="supplier-affiliate-program" number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 construction-focused targets · Direct call routes first."><div className="grid gap-4"><AffiliateCallList programs={programResult.data ?? []} /><AffiliateProgramTracker programs={programResult.data ?? []} checklist={checklistResult.data ?? []} activities={activityResult.data ?? []} attachments={signedAttachments} integrations={integrationResult.data ?? []} settings={settingsResult.data} hideHeading /></div></GoalDisclosure>;
 }
 
 function AbcSupplyDemoGoal() {
-  return <GoalDisclosure number={3} eyebrow="Supplier pricing" title="ABC Supply Demo" description="Live product search and account pricing.">
+  return <GoalDisclosure id="abc-supply-demo" number={5} eyebrow="Supplier pricing" title="ABC Supply Demo" description="Live product search and account pricing.">
     <Link href="/admin/abc" className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#0071e3] px-5 text-sm font-semibold text-white">Open ABC Supply Demo<ArrowRight className="h-4 w-4" /></Link>
   </GoalDisclosure>;
 }
 
 function ClientTargetGoal({ clients, leads, canManageClients }: { clients: ClientTarget[]; leads: OutreachLeadRecord[]; canManageClients: boolean }) {
-  return <GoalDisclosure number={1} eyebrow="Outreach" title="Client Target" description="Leads to contact and active clients in one place.">
+  return <GoalDisclosure id="client-target" number={1} eyebrow="Outreach" title="Client Target" description="Leads to contact and active clients in one place.">
     <div className="flex flex-wrap gap-2">{canManageClients ? <><AddOutreachLead /><AddTargetClient /></> : null}<ClientTargetCallGuide /></div>
     <div className="mt-4 grid gap-4 lg:grid-cols-2">
       <OutreachLeadList leads={leads} />
@@ -114,16 +97,22 @@ function ClientTargetGoal({ clients, leads, canManageClients }: { clients: Clien
 }
 
 function SupplierPricingGoal() {
-  return <GoalDisclosure number={2} eyebrow="Purchasing" title="Call suppliers and find what they sell cheaper than anyone else" description="Collect strongest-priced items, delivery minimums, and lead times.">
+  return <GoalDisclosure id="call-suppliers" number={2} eyebrow="Purchasing" title="Call Supplier" description="Find what each supplier sells cheaper than anyone else.">
     <div className="grid gap-3 text-sm text-slate-600"><p className="flex gap-2"><CircleDollarSign className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />Ask each supplier for their strongest-priced items, delivery minimum, lead time, and quote expiration.</p><p className="flex gap-2"><Target className="mt-0.5 h-4 w-4 shrink-0 text-[#0066cc]" />Enter the prices in the catalog and keep the best suppliers per department.</p></div>
     <div className="mt-4 flex flex-wrap gap-2"><Link href="/owner/partnerships" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white">Show supplier partnerships<ArrowRight className="h-4 w-4" /></Link><Link href="/admin/vendors" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white">Supplier Directory<ArrowRight className="h-4 w-4" /></Link><Link href="/admin/catalog" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold">Enter catalog prices</Link><Link href="/owner/delivery-requests" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold">Delivery requests</Link></div>
   </GoalDisclosure>;
 }
 
+function SupplierPartnershipGoal() {
+  return <GoalDisclosure id="supplier-partnerships" number={4} eyebrow="Supplier relationships" title="Supplier Partnership" description="Show contacts, outreach drafts, follow-ups, and partnership progress.">
+    <p className="text-sm leading-6 text-slate-600">Open Carlos&apos;s supplier workspace to contact researched companies and track every next step.</p>
+    <Link href="/owner/partnerships" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white">Open Supplier Partnerships<ArrowRight className="h-4 w-4" /></Link>
+  </GoalDisclosure>;
+}
+
 export default async function GoalsProgressPage() {
   const { supabase, access } = await requireManagerPortalProfile();
-  let goalsQuery = supabase.from("manager_goals").select("id,assignee,title,details,status").order("status").order("created_at", { ascending: false });
-  if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos");
+  const goalsQuery = supabase.from("manager_goals").select("id,assignee,title,details,status").eq("assignee", "carlos").order("status").order("created_at", { ascending: false });
   const [clientResult, goalResult, leadResult] = await Promise.all([
     supabase.from("profiles").select("id,full_name,company_name,email,phone,preferred_language").eq("role", "client").eq("is_active", true).order("created_at", { ascending: false }).limit(5).returns<ClientTarget[]>(),
     goalsQuery.returns<ManagerGoalRecord[]>(),
@@ -132,20 +121,14 @@ export default async function GoalsProgressPage() {
   const clients = clientResult.error ? [] : clientResult.data ?? [];
   const goals = goalResult.error ? [] : goalResult.data ?? [];
   const leads = leadResult.error ? [] : leadResult.data ?? [];
-  const websiteNotes = goals.filter((goal) => goal.details?.startsWith(WEBSITE_FIX_NOTE_PREFIX));
   const regularGoals = goals.filter((goal) =>
-    !goal.details?.startsWith(WEBSITE_FIX_NOTE_PREFIX) &&
     !goal.details?.startsWith(DAILY_WORK_SUMMARY_PREFIX) &&
     !goal.details?.startsWith(SUPPLIER_PARTNER_NOTES_PREFIX)
-  );
+  ).filter((goal) => goal.assignee === "carlos");
 
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-10"><div className="mx-auto max-w-6xl">
-    <header className="border-b border-slate-200 pb-6"><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Goals &amp; Progress</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Company priorities organized by owner. Add new goals under the person responsible for completing them.</p></header>
+    <header className="border-b border-slate-200 pb-6"><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Carlos Goals</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Client outreach, supplier calls, partnerships, affiliate programs, and ABC pricing in one workspace.</p></header>
 
-    <div className="mt-7 grid gap-9">
-      <section aria-labelledby="carlos-goals-title"><PersonHeader assignee="carlos" description="Clients, suppliers, and pricing outreach" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "carlos")} /><div className="mt-4 grid gap-4"><ClientTargetGoal clients={clients} leads={leads} canManageClients={access.customers} /><SupplierPricingGoal />{access.owner ? <OwnerAffiliateGoal /> : <GoalDisclosure number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 construction-focused targets with direct call routes first."><AffiliateCallList /></GoalDisclosure>}</div></section>
-
-      {access.owner ? <section aria-labelledby="david-goals-title"><PersonHeader assignee="david" description="Website, campaigns, and supplier pricing" /><CustomManagerGoals goals={regularGoals.filter((goal) => goal.assignee === "david")} /><div className="mt-4 grid gap-4"><FixWebsiteGoal notes={websiteNotes} /><BeatQuoteGoal owner /><AbcSupplyDemoGoal /></div></section> : null}
-    </div>
+    <section aria-labelledby="carlos-goals-title" className="mt-7"><PersonHeader assignee="carlos" description="Clients, suppliers, and pricing outreach" /><CustomManagerGoals goals={regularGoals} /><div className="mt-4 grid gap-4"><ClientTargetGoal clients={clients} leads={leads} canManageClients={access.customers} /><SupplierPricingGoal />{access.owner ? <OwnerAffiliateGoal /> : <GoalDisclosure id="supplier-affiliate-program" number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 construction-focused targets with direct call routes first."><AffiliateCallList /></GoalDisclosure>}<SupplierPartnershipGoal />{access.owner ? <AbcSupplyDemoGoal /> : null}</div></section>
   </div></main>;
 }

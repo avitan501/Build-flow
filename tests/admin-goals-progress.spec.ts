@@ -21,7 +21,7 @@ test("Goals and Client Target stay in the dashboard instead of manager navigatio
   expect(shell).not.toContain('label: "Tasks & Daily Summary"');
 });
 
-test("Goals & Progress allows manager employees while owner controls stay protected", async () => {
+test("Carlos Goals keeps every Carlos priority together and hides David goals", async () => {
   const [page, actions, dashboard] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/goals-progress/goal-actions.ts"), "utf8"),
@@ -31,17 +31,15 @@ test("Goals & Progress allows manager employees while owner controls stay protec
   expect(page).toContain("await requireManagerPortalProfile()");
   expect(page).toContain("async function OwnerAffiliateGoal()");
   expect(page).toContain("const { supabase } = await requireAdminProfile()");
-  expect(page).toContain("Fix Website");
-  expect(page).toContain("<WebsiteFixNotes");
+  expect(page).toContain("Carlos Goals");
   expect(page).toContain("Client Target");
   expect(page).toContain("<AddOutreachLead />");
   expect(page).toContain("<OutreachLeadList");
   expect(page).toContain("Clients in the system");
-  expect(page).toContain("Call suppliers and find what they sell cheaper than anyone else");
-  expect(page).toContain("Launch campaign: Beat Your Quote");
+  expect(page).toContain('title="Call Supplier"');
+  expect(page).toContain('title="Supplier Partnership"');
   expect(page).toContain("ABC Supply Demo");
   expect(page).toContain('href="/admin/abc"');
-  expect(page).toContain('PersonHeader assignee="david"');
   expect(page).toContain('PersonHeader assignee="carlos"');
   expect(page).toContain("<AffiliateProgramTracker");
   expect(page).toContain("access.owner ? <OwnerAffiliateGoal />");
@@ -49,15 +47,16 @@ test("Goals & Progress allows manager employees while owner controls stay protec
   expect(page).toContain("<AddTargetClient />");
   expect(page).toContain("<ClientTargetCallGuide />");
   expect(page).toContain('title="Supplier Affiliate Program"');
-  expect(page).toContain("<GoalDisclosure number={3}");
+  expect(page).toContain('<GoalDisclosure id="supplier-affiliate-program" number={3}');
   expect(page).toContain('supabase.from("manager_goals")');
   expect(page).toContain("<AddManagerGoal");
-  expect(page.indexOf('PersonHeader assignee="carlos"')).toBeLessThan(page.indexOf('PersonHeader assignee="david"'));
-  expect(page).toContain('if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos")');
-  expect(page).toContain('access.owner ? <section aria-labelledby="david-goals-title"');
+  expect(page).not.toContain('PersonHeader assignee="david"');
+  expect(page).toContain('.eq("assignee", "carlos")');
+  expect(page).not.toContain('david-goals-title');
   expect(dashboard).toContain('if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos")');
-  expect(dashboard).toContain('access.owner ? <GoalDisclosure assignee="david" priorityCount={3}');
+  expect(dashboard).not.toContain('GoalDisclosure assignee="david"');
   expect(dashboard).toContain('title="ABC Supply Demo"');
+  expect(dashboard).toContain('title="Supplier Partnership"');
   expect(actions).toContain('if (!access.owner && assignee !== "carlos")');
   expect(actions.match(/if \(!access\.owner\).*\.eq\("assignee", "carlos"\)/g)?.length).toBe(2);
 });

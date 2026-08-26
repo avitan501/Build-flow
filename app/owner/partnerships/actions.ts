@@ -86,10 +86,15 @@ export async function sendSupplierPartnerEmailAction(input: z.infer<typeof email
   if (!parsed.success) return { ok: false as const, error: "Add the correct supplier email first." };
   const partner = findSupplierPartner(parsed.data.slug);
   if (!partner) return { ok: false as const, error: "Supplier was not found." };
-  if (!canSendAuraEmail()) return { ok: false as const, error: "AvantiaBuild email sending is not connected." };
-
   try {
-    await sendAuraEmail(parsed.data.recipient, partner.emailSubject, partner.emailBody);
+    if (canSendAuraEmail()) {
+      await sendAuraEmail(parsed.data.recipient, partner.emailSubject, partner.emailBody);
+    } else {
+      const { data, error } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>("aura-messaging-broker", {
+        body: { action: "send_email", to: parsed.data.recipient, subject: partner.emailSubject, message: partner.emailBody },
+      });
+      if (error || !data?.ok) throw new Error(data?.error || "AvantiaBuild email sending is not connected.");
+    }
   } catch (error) {
     return { ok: false as const, error: error instanceof Error ? error.message : "The email could not be sent." };
   }
