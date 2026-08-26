@@ -1,13 +1,13 @@
 "use client"
 
-import { CalendarClock, ChevronDown, Download, ExternalLink, FileText, Mail, MessageSquareText, Paperclip, Phone, Plus, Route, Send, Trash2, X } from "lucide-react"
+import { CalendarClock, ChevronDown, Download, ExternalLink, FileText, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, Route, Send, Trash2, X } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
-import { previewRequestClientQuoteAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
+import { previewRequestClientQuoteAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestWorkflowStepAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
 import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
@@ -59,6 +59,8 @@ export function RequestManagementPanel({
   currentStage,
   comparisons,
   clientReplyCompleted,
+  step3CompletedOverride,
+  step4CompletedOverride,
 }: {
   requestId: string
   requestTitle: string
@@ -71,6 +73,8 @@ export function RequestManagementPanel({
   currentStage: ManagerPipelineStage
   comparisons: RequestComparisonSummary[]
   clientReplyCompleted: boolean
+  step3CompletedOverride: boolean | null
+  step4CompletedOverride: boolean | null
 }) {
   const router = useRouter()
   const [supplierIds, setSupplierIds] = useState<string[]>([])
@@ -78,7 +82,7 @@ export function RequestManagementPanel({
   const [replyBlock, setReplyBlock] = useState<string>(() => requestItems.some((item) => item.reviewReasons.length) ? "missing" : "received")
   const [replyNote, setReplyNote] = useState("")
   const [attachment, setAttachment] = useState<File | null>(null)
-  const [deliveryMethod, setDeliveryMethod] = useState<"email" | "text">(client.email ? "email" : "text")
+  const [deliveryMethod, setDeliveryMethod] = useState<"email" | "whatsapp" | "text">(client.email ? "email" : "whatsapp")
   const [feedback, setFeedback] = useState("")
   const [feedbackError, setFeedbackError] = useState(false)
   const [deliveryDate, setDeliveryDate] = useState("")
@@ -167,7 +171,10 @@ export function RequestManagementPanel({
         const result = await sendAuraMessageAction({ channel: "sms", recipient: client.phone, message: clientMessage })
         setFeedbackError(!result.ok)
         setFeedback(result.ok ? `Text sent directly to ${client.phone} from Q U O.` : result.error)
-        if (result.ok) setClientReplyDone(true)
+        if (result.ok) {
+          setClientReplyDone(true)
+          await updateRequestWorkflowStepAction({ requestId, step: 4, completed: true })
+        }
         return
       }
       const formData = new FormData()
@@ -189,6 +196,19 @@ export function RequestManagementPanel({
       }
       setFeedbackError(false)
       setFeedback("Q U O is ready with the message and file. Review it and press Send.")
+    })
+  }
+
+  function sendClientWhatsApp() {
+    startTransition(async () => {
+      setFeedback("")
+      const result = await sendAuraMessageAction({ channel: "whatsapp", recipient: client.phone, message: clientMessage })
+      setFeedbackError(!result.ok)
+      setFeedback(result.ok ? `WhatsApp message sent to ${client.phone}.` : result.error)
+      if (result.ok) {
+        setClientReplyDone(true)
+        await updateRequestWorkflowStepAction({ requestId, step: 4, completed: true })
+      }
     })
   }
 
@@ -271,14 +291,15 @@ export function RequestManagementPanel({
   }
 
   const supplierQuoteCount = comparisons.reduce((total, comparison) => total + comparison.bids.length, 0)
-  const pricingComplete = supplierQuoteCount > 0
+  const pricingComplete = step3CompletedOverride ?? supplierQuoteCount > 0
   const pricingStatus = pricingComplete ? "complete" : currentStage === "pricing" ? "active" : "upcoming"
-  const replyStatus = clientReplyDone ? "complete" : currentStage === "approval" || currentStage === "delivery" || pricingComplete ? "active" : "upcoming"
+  const replyComplete = step4CompletedOverride ?? clientReplyDone
+  const replyStatus = replyComplete ? "complete" : currentStage === "approval" || currentStage === "delivery" || pricingComplete ? "active" : "upcoming"
 
   return (
     <div className="grid gap-2">
-      <details open={currentStage === "pricing"} className={workflowStepCardClass(pricingStatus)}>
-        <RequestWorkflowStepHeader step={3} title="Get supplier pricing" detail={pricingComplete ? `${supplierQuoteCount} supplier quote${supplierQuoteCount === 1 ? "" : "s"} received` : packages.length ? `${packages.length} supplier request${packages.length === 1 ? "" : "s"} sent` : "No supplier prices received yet"} status={pricingStatus} icon="pricing" />
+      <details open={currentStage === "pricing"} className={workflowStepCardClass()}>
+        <RequestWorkflowStepHeader requestId={requestId} step={3} title="Get supplier pricing" detail={supplierQuoteCount ? `${supplierQuoteCount} supplier quote${supplierQuoteCount === 1 ? "" : "s"} received` : packages.length ? `${packages.length} supplier request${packages.length === 1 ? "" : "s"} sent` : "No supplier prices received yet"} status={pricingStatus} icon="pricing" />
         <div className="border-t border-slate-200 p-4">
           {comparisons.length ? <div className="mb-3 grid gap-2">{comparisons.map((comparison) => <article key={comparison.id} className="rounded-md border border-slate-200 bg-slate-50 p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-bold">{comparison.title}</h3><p className="mt-0.5 text-xs text-slate-500">{comparison.bids.length ? `${comparison.bids.length} supplier response${comparison.bids.length === 1 ? "" : "s"}` : "Waiting for supplier response"}</p></div><Link href={`/admin/quote-comparison/${comparison.id}`} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-[#0066cc]">Compare <ExternalLink className="h-3.5 w-3.5" /></Link></div>{comparison.bids.length ? <div className="mt-2 divide-y divide-slate-200 border-t border-slate-200">{comparison.bids.map((bid) => <div key={bid.id} className="flex items-center justify-between gap-3 py-2 text-xs"><span className="min-w-0 truncate font-semibold">{bid.supplierName}{bid.recommended ? " · Best match" : ""}</span><span className="shrink-0 text-right"><strong className="block text-sm tabular-nums">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(bid.landedTotal)}</strong><span className="text-slate-500">{bid.pricedItemCount}/{bid.itemCount} items</span></span></div>)}</div> : null}</article>)}</div> : <p className="mb-3 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">Supplier answers and prices will appear here after a quote is linked to this request.</p>}
 
@@ -300,8 +321,8 @@ export function RequestManagementPanel({
         </div>
       </details>
 
-      <details open={currentStage === "approval" || currentStage === "delivery"} className={workflowStepCardClass(replyStatus)}>
-        <RequestWorkflowStepHeader step={4} title="Reply to client" detail={clientReplyDone ? "Client reply sent" : "Questions, pricing, estimate, delivery, or approval"} status={replyStatus} icon="reply" />
+      <details open={currentStage === "approval" || currentStage === "delivery"} className={workflowStepCardClass()}>
+        <RequestWorkflowStepHeader requestId={requestId} step={4} title="Contact client" detail={replyComplete ? "Client contacted" : "Send an update, estimate, or delivery window"} status={replyStatus} icon="reply" />
         <div className="border-t border-slate-200 p-4">
           <div>
             {missingQuestions.length ? <p className="mt-1 text-xs font-semibold text-amber-700">{missingQuestions.length} missing details can be added to the reply automatically.</p> : null}
@@ -313,12 +334,7 @@ export function RequestManagementPanel({
                 <label className="grid gap-1 text-xs font-bold text-slate-600">Window starts<input type="time" value={deliveryWindowStart} onChange={(event) => setDeliveryWindowStart(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
                 <label className="grid gap-1 text-xs font-bold text-slate-600">Window length (hours)<input type="number" min="0.5" max="12" step="0.5" value={deliveryWindowHours} onChange={(event) => setDeliveryWindowHours(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
                 <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2 lg:col-span-3">Delivery address<input value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} placeholder="Jobsite delivery address" className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950" /></label>
-                <div className={`rounded-xl border px-4 py-3 sm:col-span-2 lg:col-span-3 ${deliveryWindowReady ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
-                  <p className="text-[10px] font-black uppercase tracking-[.12em] text-slate-500">Client will see</p>
-                  <p className="mt-1 text-sm font-black text-slate-950">{deliveryWindowStart && deliveryWindowEnd ? `Between ${deliveryTimeLabel(deliveryWindowStart)} and ${deliveryTimeLabel(deliveryWindowEnd)}` : "Choose a start time and window length"}</p>
-                  <p className="mt-1 text-xs text-slate-600">The end time is calculated automatically from the duration. The reply will show a window, not one exact arrival time.</p>
-                  {deliveryWindowStart && !deliveryWindowEnd ? <p className="mt-1 text-xs font-bold text-rose-700">Choose a shorter window that ends before midnight.</p> : null}
-                </div>
+                {deliveryWindowStart && !deliveryWindowEnd ? <p className="text-xs font-bold text-rose-700 sm:col-span-2 lg:col-span-3">Choose a shorter window that ends before midnight.</p> : null}
                 <button type="button" onClick={saveDeliverySchedule} disabled={pending || !deliveryWindowReady} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45 sm:col-span-2 lg:col-span-3"><CalendarClock className="h-4 w-4" />{pending ? "Saving..." : "Save window and prepare client message"}</button>
               </div>
             </details>
@@ -331,17 +347,23 @@ export function RequestManagementPanel({
             <label className="mt-3 grid gap-1 text-xs font-bold text-slate-600">Add a note <span className="font-normal text-slate-400">(optional)</span><textarea value={replyNote} onChange={(event) => setReplyNote(event.target.value)} rows={2} placeholder="Write a short note" className="resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
             <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50"><summary className="cursor-pointer px-3 py-2 text-xs font-bold text-[#0066cc]">Preview message</summary><div className="whitespace-pre-wrap border-t border-slate-200 px-3 py-3 text-sm leading-6 text-slate-700" aria-label="Reply preview">{clientMessage}</div></details>
 
-            <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
-              <button type="button" onClick={() => setDeliveryMethod("email")} disabled={!client.email} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold ${deliveryMethod === "email" ? "bg-white text-slate-950 shadow-sm" : "text-slate-600"} disabled:opacity-40`}><Mail className="h-4 w-4" />Email</button>
-              <button type="button" onClick={() => setDeliveryMethod("text")} disabled={!client.phone} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold ${deliveryMethod === "text" ? "bg-white text-slate-950 shadow-sm" : "text-slate-600"} disabled:opacity-40`}><MessageSquareText className="h-4 w-4" />Text</button>
+            <div className="mt-5 border-t border-slate-200 pt-4">
+              <p className="text-[10px] font-black uppercase tracking-[.16em] text-[#8b6a27]">Contact client</p>
+              <p className="mt-1 text-sm font-semibold text-[#12263f]">Choose how you want to send this update.</p>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1.5">
+              <button type="button" onClick={() => setDeliveryMethod("email")} disabled={!client.email} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-2 text-xs font-bold transition sm:text-sm ${deliveryMethod === "email" ? "bg-[#17304f] text-white shadow-sm" : "text-slate-600 hover:bg-white"} disabled:opacity-40`}><Mail className="h-4 w-4" />Email</button>
+              <button type="button" onClick={() => setDeliveryMethod("whatsapp")} disabled={!client.phone} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-2 text-xs font-bold transition sm:text-sm ${deliveryMethod === "whatsapp" ? "bg-[#17304f] text-white shadow-sm" : "text-slate-600 hover:bg-white"} disabled:opacity-40`}><MessageCircle className="h-4 w-4" />WhatsApp</button>
+              <button type="button" onClick={() => setDeliveryMethod("text")} disabled={!client.phone} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-2 text-xs font-bold transition sm:text-sm ${deliveryMethod === "text" ? "bg-[#17304f] text-white shadow-sm" : "text-slate-600 hover:bg-white"} disabled:opacity-40`}><MessageSquareText className="h-4 w-4" />Q U O Text</button>
             </div>
 
             <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 text-sm font-semibold text-slate-700"><Paperclip className="h-4 w-4" /><span className="min-w-0 flex-1 truncate">{attachment?.name || "Attach quote, order, photo, or file (optional)"}</span><input type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.mp4,.mov" onChange={(event) => setAttachment(event.target.files?.[0] || null)} className="sr-only" /></label>
             {deliveryMethod === "text" && attachment ? <p className="mt-2 text-xs font-medium text-slate-600">Q U O supports common files up to 5 MB. Review the prepared message in Q U O and press Send.</p> : null}
+            {deliveryMethod === "whatsapp" && attachment ? <p className="mt-2 text-xs font-semibold text-amber-700">For this attachment, choose Email or Q U O Text. WhatsApp sends the written message only.</p> : null}
 
             <div className="mt-3 flex flex-wrap gap-2">
-              {deliveryMethod === "email" ? <button type="button" onClick={sendClientEmail} disabled={pending || !client.email} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50"><Send className="h-4 w-4" />{pending ? "Sending..." : "Send email reply"}</button> : <button type="button" onClick={sendClientText} disabled={pending || !client.phone} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50"><MessageSquareText className="h-4 w-4" />{pending ? "Preparing..." : attachment ? "Open Q U O with file" : "Send text"}</button>}
-              {client.phone ? <a href={`tel:${client.phone}`} className={actionClass}><Phone className="h-4 w-4" />Call</a> : null}
+              {deliveryMethod === "email" ? <button type="button" onClick={sendClientEmail} disabled={pending || !client.email} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-[#17304f] px-4 text-sm font-bold text-white disabled:opacity-50"><Send className="h-4 w-4" />{pending ? "Sending..." : "Send email"}</button> : deliveryMethod === "whatsapp" ? <button type="button" onClick={sendClientWhatsApp} disabled={pending || !client.phone || Boolean(attachment)} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-[#17304f] px-4 text-sm font-bold text-white disabled:opacity-45"><MessageCircle className="h-4 w-4" />{pending ? "Sending..." : "Send WhatsApp"}</button> : <button type="button" onClick={sendClientText} disabled={pending || !client.phone} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-[#17304f] px-4 text-sm font-bold text-white disabled:opacity-50"><MessageSquareText className="h-4 w-4" />{pending ? "Preparing..." : attachment ? "Open Q U O with file" : "Send Q U O text"}</button>}
+              {client.phone ? <a href={`tel:${client.phone}`} className={`${actionClass} min-h-12 border-[#cda548] text-[#17304f]`}><Phone className="h-4 w-4" />Call client</a> : null}
             </div>
             <button type="button" onClick={() => setQuoteOpen(true)} className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#0071e3] bg-sky-50 px-4 text-sm font-bold text-[#0066cc]"><FileText className="h-4 w-4" />Create and send estimate</button>
           </div>

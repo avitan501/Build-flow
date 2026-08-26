@@ -42,6 +42,13 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
   if (!request) notFound()
   const clientActions = (clientActionEvents ?? []).filter((event) => typeof event.metadata?.client_action === "string")
   const clientReplyCompleted = clientActions.some((event) => ["email_reply", "estimate_sent"].includes(String(event.metadata.client_action)))
+  const workflowOverrides = new Map<number, boolean>()
+  for (const event of clientActionEvents ?? []) {
+    if (event.metadata?.manager_action !== "workflow_step_status") continue
+    const step = Number(event.metadata.workflow_step)
+    if (workflowOverrides.has(step) || typeof event.metadata.workflow_completed !== "boolean") continue
+    workflowOverrides.set(step, event.metadata.workflow_completed)
+  }
 
   const [{ data: profile }, answersResult] = await Promise.all([
     supabase.from("profiles").select("full_name,email,phone").eq("id", request.owner_id).maybeSingle<{ full_name: string | null; email: string | null; phone: string | null }>(),
@@ -77,6 +84,8 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
     const analyses = analyzeQuoteComparison(comparisonItems, comparisonBids)
     return { id: comparison.id, title: comparison.title, status: comparison.status, quoteNumber: comparison.quote_number, updatedAt: comparison.updated_at, bids: analyses.map((analysis) => ({ id: analysis.bidId, supplierName: analysis.supplierName, landedTotal: analysis.landedTotal, pricedItemCount: analysis.pricedItemCount, itemCount: analysis.itemCount, recommended: analysis.isRecommended })) }
   })
+  const step1Complete = workflowOverrides.get(1) ?? true
+  const step2Complete = workflowOverrides.get(2) ?? organizedItems.length > 0
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-3 pb-28 pt-4 text-slate-950 sm:px-6">
@@ -87,14 +96,14 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
         </header>
         <CustomerRequestStatus requestId={request.id} status={request.status} currentStage={currentStage} updatedAt={request.updated_at} assignedTo="Carlos" />
         <div className="mt-3 grid gap-2">
-          <details open={currentStage === "received"} className={`order-2 ${workflowStepCardClass(organizedItems.length ? "complete" : "active")}`}>
-            <RequestWorkflowStepHeader step={2} title="Organize with AI" detail={organizedItems.length ? `${organizedItems.length} organized item${organizedItems.length === 1 ? "" : "s"}` : "Create a clean material list"} status={organizedItems.length ? "complete" : "active"} icon="organize" />
-            <div className="border-t border-slate-200 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm text-slate-500">Create a structured copy without changing the original request.</p>{organizationCompletedLabel ? <p className="mt-1 text-xs font-semibold text-slate-400">Last AI review: {organizationCompletedLabel} ET</p> : null}</div>{organizationStatus !== "processing" ? <OrganizeMaterialListButton requestId={request.id} refresh={organizedItems.length > 0} /> : null}</div>
-            {organizedItems.length ? <div className="mt-4 border-t border-slate-200 pt-3"><h3 className="text-sm font-bold">Confirmed material list</h3><OrganizedMaterialList requestId={request.id} items={organizedItems} /></div> : <div className={`mt-4 rounded-lg px-4 py-3 text-sm font-semibold ${organizationStatus === "failed" ? "bg-rose-50 text-rose-800" : organizationStatus === "plan_requires_takeoff" ? "bg-amber-50 text-amber-800" : "bg-sky-50 text-sky-800"}`}>{organizationStatus === "processing" ? "AI is organizing this material list." : organizationStatus === "failed" ? "Automatic organization needs another attempt." : organizationStatus === "plan_requires_takeoff" ? "This appears to be a plan and requires a takeoff before materials can be listed." : "The original request is saved. Select Organize with AI to create the material chart."}</div>}
+          <details open={currentStage === "received"} className={`order-2 ${workflowStepCardClass()}`}>
+            <RequestWorkflowStepHeader requestId={request.id} step={2} title="Organize request" detail={organizedItems.length ? `${organizedItems.length} organized item${organizedItems.length === 1 ? "" : "s"}` : "Create a clean material list"} status={step2Complete ? "complete" : "active"} icon="organize" />
+            <div className="border-t border-slate-200 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm text-slate-500">Create a structured copy without changing the original request.</p>{organizationCompletedLabel ? <p className="mt-1 text-xs font-semibold text-slate-400">Last review: {organizationCompletedLabel} ET</p> : null}</div>{organizationStatus !== "processing" ? <OrganizeMaterialListButton requestId={request.id} refresh={organizedItems.length > 0} /> : null}</div>
+            {organizedItems.length ? <div className="mt-4 border-t border-slate-200 pt-3"><h3 className="text-sm font-bold">Confirmed material list</h3><OrganizedMaterialList requestId={request.id} items={organizedItems} /></div> : <div className={`mt-4 rounded-lg px-4 py-3 text-sm font-semibold ${organizationStatus === "failed" ? "bg-rose-50 text-rose-800" : organizationStatus === "plan_requires_takeoff" ? "bg-amber-50 text-amber-800" : "bg-sky-50 text-sky-800"}`}>{organizationStatus === "processing" ? "The material list is being organized." : organizationStatus === "failed" ? "Automatic organization needs another attempt." : organizationStatus === "plan_requires_takeoff" ? "This appears to be a plan and requires a takeoff before materials can be listed." : "The original request is saved. Select Organize request to create the material chart."}</div>}
             </div>
           </details>
-          <details open={currentStage === "received" && organizedItems.length === 0} className={`order-1 ${workflowStepCardClass("complete")}`}>
-            <RequestWorkflowStepHeader step={1} title="Review client list" detail={`${originalItems.length} item${originalItems.length === 1 ? "" : "s"} · ${signedFiles.length} file${signedFiles.length === 1 ? "" : "s"}`} status="complete" icon="review" />
+          <details open={currentStage === "received" && organizedItems.length === 0} className={`order-1 ${workflowStepCardClass()}`}>
+            <RequestWorkflowStepHeader requestId={request.id} step={1} title="Review client list" detail={`${originalItems.length} item${originalItems.length === 1 ? "" : "s"} · ${signedFiles.length} file${signedFiles.length === 1 ? "" : "s"}`} status={step1Complete ? "complete" : "active"} icon="review" />
             <div className="border-t border-slate-200 p-4"><p className="text-sm text-slate-500">The customer’s original notes, selections, and files remain unchanged.</p>
             <div className="mt-4 divide-y divide-slate-100">
               {originalItems.length ? originalItems.map((item) => {
@@ -112,7 +121,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
             </div>
           </details>
         </div>
-        <div className="mt-2"><RequestManagementPanel requestId={request.id} requestTitle={request.title} client={{ name: profile?.full_name || "Client", email: clientEmail, phone: profile?.phone || "" }} departments={departments} suppliers={suppliers} packages={packages ?? []} requestItems={departmentItems.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, unit: item.unit, reviewReasons: Array.isArray(item.metadata?.review_reasons) ? item.metadata.review_reasons.filter((reason): reason is string => typeof reason === "string" && Boolean(reason.trim())) : [] }))} projectAddress={request.projects?.address || ""} currentStage={currentStage} comparisons={comparisonSummaries} clientReplyCompleted={clientReplyCompleted} /></div>
+        <div className="mt-2"><RequestManagementPanel requestId={request.id} requestTitle={request.title} client={{ name: profile?.full_name || "Client", email: clientEmail, phone: profile?.phone || "" }} departments={departments} suppliers={suppliers} packages={packages ?? []} requestItems={departmentItems.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, unit: item.unit, reviewReasons: Array.isArray(item.metadata?.review_reasons) ? item.metadata.review_reasons.filter((reason): reason is string => typeof reason === "string" && Boolean(reason.trim())) : [] }))} projectAddress={request.projects?.address || ""} currentStage={currentStage} comparisons={comparisonSummaries} clientReplyCompleted={clientReplyCompleted} step3CompletedOverride={workflowOverrides.get(3) ?? null} step4CompletedOverride={workflowOverrides.get(4) ?? null} /></div>
         {clientActions.length ? <section className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-5"><h2 className="text-lg font-bold text-slate-950">Activity history</h2><div className="mt-3 divide-y divide-amber-200">{clientActions.map((event) => <article key={event.id} className="py-3 first:pt-0 last:pb-0"><div className="flex flex-wrap items-start justify-between gap-2"><h3 className="text-sm font-bold text-slate-900">{event.title}</h3><time className="text-xs text-slate-500">{new Date(event.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>{event.description ? <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{event.description}</p> : null}</article>)}</div></section> : null}
       </div>
     </main>

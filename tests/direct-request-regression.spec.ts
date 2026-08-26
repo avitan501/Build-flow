@@ -102,11 +102,12 @@ test("manager request endpoint rejects unsafe or invalid submissions before data
 })
 
 test("manager reply composer supports templates attachments email and text", async () => {
-  const [panel, actions, email, edgeFunction] = await Promise.all([
+  const [panel, actions, email, edgeFunction, workflowStep] = await Promise.all([
     readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8"),
     readFile(path.join(root, "lib/cart-submission-email.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/send-supplier-quote/index.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/request-workflow-step-header.tsx"), "utf8"),
   ])
 
   expect(panel).toContain("REPLY_BLOCKS")
@@ -134,6 +135,11 @@ test("manager reply composer supports templates attachments email and text", asy
   expect(panel).toContain("Create and send estimate")
   expect(panel).toContain("Download PDF")
   expect(panel).toContain("Text estimate")
+  expect(panel).toContain("Send WhatsApp")
+  expect(panel).toContain("Call client")
+  expect(workflowStep).toContain("Mark done")
+  expect(workflowStep).toContain("Reopen")
+  expect(workflowStep).toContain("updateRequestWorkflowStepAction")
   expect(actions).toContain("sendRequestClientQuoteAction")
   expect(actions).toContain("previewRequestClientQuoteAction")
   expect(email).toContain("attachments: input.attachment ? [input.attachment] : undefined")

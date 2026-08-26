@@ -24,12 +24,12 @@ export function OrganizeMaterialListButton({ requestId, refresh = false }: { req
         return
       }
       if (!result.itemCount) {
-        setNotice(result.status === "plan" ? "This file needs a plan takeoff before materials can be listed." : "AI did not find material rows. Review the original request or attachment.")
+        setNotice(result.status === "plan" ? "This file needs a plan takeoff before materials can be listed." : "No material rows were found. Review the original request or attachment.")
       } else {
         const remaining = result.reviewCount
           ? `${result.reviewCount} still need details.`
           : "All items are ready for supplier pricing."
-        setNotice(`${refresh ? "AI rechecked" : "AI organized"} ${result.itemCount} items. ${remaining}`)
+        setNotice(`${refresh ? "Rechecked" : "Organized"} ${result.itemCount} items. ${remaining}`)
       }
       router.refresh()
     })
@@ -38,7 +38,7 @@ export function OrganizeMaterialListButton({ requestId, refresh = false }: { req
   return (
     <div className="grid justify-items-start gap-2">
       <button type="button" onClick={organize} disabled={isPending} className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">
-        {isPending ? "Organizing..." : refresh ? "Recheck with AI" : "Organize with AI"}
+        {isPending ? "Organizing..." : refresh ? "Reorganize request" : "Organize request"}
       </button>
       {error ? <p role="alert" className="max-w-sm text-xs font-semibold text-rose-700">{error}</p> : null}
       {notice ? <p role="status" className="max-w-sm text-xs font-semibold text-emerald-700">{notice}</p> : null}

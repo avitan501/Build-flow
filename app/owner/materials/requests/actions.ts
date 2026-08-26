@@ -257,6 +257,40 @@ export async function scheduleRequestDeliveryAction(input: { requestId: string; 
   return { ok: true }
 }
 
+export async function updateRequestWorkflowStepAction(input: { requestId: string; step: number; completed: boolean }) {
+  const requestId = String(input.requestId || "").trim()
+  const step = Number(input.step)
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !Number.isInteger(step) || step < 1 || step > 4 || typeof input.completed !== "boolean") {
+    return { ok: false as const, error: "This workflow step could not be updated." }
+  }
+
+  const { supabase } = await requireStaffProfile("customers")
+  const { data: request } = await supabase
+    .from("quote_requests")
+    .select("id,owner_id,project_id")
+    .eq("id", requestId)
+    .maybeSingle<{ id: string; owner_id: string; project_id: string }>()
+  if (!request) return { ok: false as const, error: "Request not found." }
+
+  const { error } = await supabase.from("project_events").insert({
+    project_id: request.project_id,
+    owner_id: request.owner_id,
+    event_type: "status_changed",
+    source: "admin",
+    title: input.completed ? `Step ${step} completed` : `Step ${step} reopened`,
+    description: input.completed ? "Marked done by the Manager." : "Reopened by the Manager for additional work.",
+    metadata: {
+      quote_request_id: request.id,
+      manager_action: "workflow_step_status",
+      workflow_step: step,
+      workflow_completed: input.completed,
+    },
+  })
+  if (error) return { ok: false as const, error: "The workflow step could not be updated." }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const }
+}
+
 async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
   const { supabase } = await requireStaffProfile("customers")
   const requestId = String(input.requestId || "").trim()
