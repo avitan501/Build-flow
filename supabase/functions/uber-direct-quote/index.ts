@@ -73,6 +73,7 @@ Deno.serve(async (request) => {
     const dropoffAddress = typeof body?.dropoffAddress === "string" ? body.dropoffAddress.trim() : "";
     const weightPounds = Number(body?.weightPounds);
     const vehicle = body?.vehicle;
+    const scheduledPickupAt = typeof body?.scheduledPickupAt === "string" ? body.scheduledPickupAt : null;
     if (
       pickupAddress.length < 8 || pickupAddress.length > 300 ||
       dropoffAddress.length < 8 || dropoffAddress.length > 300 ||
@@ -80,6 +81,14 @@ Deno.serve(async (request) => {
       (vehicle !== "small" && vehicle !== "car")
     ) {
       return json({ ok: false, code: "invalid_quote", error: "Enter both complete addresses and a package weight up to 50 lb." }, 400);
+    }
+    const readyAt = scheduledPickupAt ? new Date(scheduledPickupAt) : null;
+    if (readyAt && (
+      !Number.isFinite(readyAt.getTime()) ||
+      readyAt.getTime() < Date.now() + 60 * 60 * 1000 ||
+      readyAt.getTime() > Date.now() + 30 * 24 * 60 * 60 * 1000
+    )) {
+      return json({ ok: false, code: "invalid_schedule", error: "Choose a scheduled pickup between 1 hour and 30 days from now." }, 400);
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
@@ -122,6 +131,10 @@ Deno.serve(async (request) => {
         body: JSON.stringify({
           pickup_address: pickupAddress,
           dropoff_address: dropoffAddress,
+          ...(readyAt ? {
+            pickup_ready_dt: readyAt.toISOString(),
+            pickup_deadline_dt: new Date(readyAt.getTime() + 60 * 60 * 1000).toISOString(),
+          } : {}),
         }),
       },
     );

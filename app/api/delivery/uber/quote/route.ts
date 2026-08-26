@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { getSessionWithProfile } from "@/lib/auth";
 import { managerCapabilities } from "@/lib/owner-identity";
-import { quoteUberDirect, UberDirectError } from "@/lib/uber-direct";
 
 export const runtime = "nodejs";
 export const preferredRegion = "iad1";
@@ -44,18 +43,27 @@ export async function POST(request: Request) {
       }
     }
 
-    const quote = await quoteUberDirect(parsed.data);
-    return NextResponse.json(
-      { ok: true, provider: "Uber Direct", quote },
-      { headers: { "Cache-Control": "no-store, max-age=0" } },
-    );
-  } catch (error) {
-    if (error instanceof UberDirectError) {
+    const { data, error } = await supabase.functions.invoke<{
+      ok?: boolean;
+      code?: string;
+      providerCode?: string;
+      error?: string;
+      quote?: unknown;
+    }>("uber-direct-quote", { body: parsed.data });
+    if (error || !data?.ok || !data.quote) {
+      let payload = data;
+      const context = (error as { context?: Response } | null)?.context;
+      if (!payload && context) payload = await context.clone().json().catch(() => null);
       return NextResponse.json(
-        { ok: false, code: error.code, providerCode: error.code, error: error.message },
-        { status: error.code === "tax_form_required" ? 503 : 502, headers: { "Cache-Control": "no-store, max-age=0" } },
+        payload || { ok: false, code: "quote_failed", error: "Uber could not return a live quote right now." },
+        { status: context?.status || 502, headers: { "Cache-Control": "no-store, max-age=0" } },
       );
     }
+    return NextResponse.json(
+      data,
+      { headers: { "Cache-Control": "no-store, max-age=0" } },
+    );
+  } catch {
     return NextResponse.json({ ok: false, code: "quote_failed", error: "Uber could not return a live quote right now." }, { status: 502, headers: { "Cache-Control": "no-store, max-age=0" } });
   }
 }
