@@ -14,7 +14,7 @@ import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import { analyzeQuoteComparison, type QuoteComparisonBidRecord, type QuoteComparisonItemRecord, type QuoteComparisonRecord } from "@/lib/quote-comparison"
 import { managerPipelineStage } from "@/lib/manager-dashboard"
 
-type RequestDetails = { id: string; project_id: string; owner_id: string; title: string; status: QuoteRequestStatus; created_at: string; updated_at: string; submitted_at: string | null; projects: { name: string; address: string | null } | null }
+type RequestDetails = { id: string; project_id: string; owner_id: string; title: string; status: QuoteRequestStatus; manager_assignee: string; created_at: string; updated_at: string; submitted_at: string | null; projects: { name: string; address: string | null } | null }
 type Attachment = { id: string; material_response_id: string | null; file_name: string; file_path: string; file_type: string | null }
 type RequestItem = { id: string; name: string; department: string; item_type: string; quantity: number; unit: string | null; answers: unknown; metadata: Record<string, unknown> | null }
 type LegacyAnswer = { questionId?: string; label?: string; value?: string; question?: string; answer?: string }
@@ -35,7 +35,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
   const { requestId } = await params
   const { supabase } = await requireStaffProfile("customers")
   const [{ data: request, error: requestError }, { data: responses }, { data: attachments }, { data: items }, { data: managerSettings }, { data: packages }, { data: clientActionEvents }, { data: comparisons }] = await Promise.all([
-    supabase.from("quote_requests").select("id,project_id,owner_id,title,status,created_at,updated_at,submitted_at,projects(name,address)").eq("id", requestId).maybeSingle<RequestDetails>(),
+    supabase.from("quote_requests").select("id,project_id,owner_id,title,status,manager_assignee,created_at,updated_at,submitted_at,projects(name,address)").eq("id", requestId).maybeSingle<RequestDetails>(),
     supabase.from("material_questionnaire_responses").select("id, request_id, project_id, owner_id, category_id, category_name_snapshot, category_slug_snapshot, definition_version, definition_snapshot, status, completed_at, created_at, updated_at").eq("request_id", requestId).order("created_at").returns<MaterialQuestionnaireResponse[]>(),
     supabase.from("quote_request_attachments").select("id,material_response_id,file_name,file_path,file_type").eq("request_id", requestId).returns<Attachment[]>(),
     supabase.from("quote_request_items").select("id,name,department,item_type,quantity,unit,answers,metadata").eq("request_id", requestId).order("created_at").returns<RequestItem[]>(),
@@ -100,7 +100,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
         <header className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#0066cc]">{quoteRequestStatusLabel(request.status)}</p><span className="text-xs text-slate-400">#{request.id.slice(0, 8).toUpperCase()}</span></div><h1 className="mt-0.5 truncate text-xl font-bold sm:text-2xl">{request.title}</h1>{projectLabel ? <p className="mt-0.5 truncate text-xs text-slate-500">{projectLabel}{request.projects?.name !== "Material Requests" && request.projects?.address ? ` · ${request.projects.address}` : ""}</p> : null}</div><div className="min-w-0 border-t border-slate-100 pt-2 text-sm sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0"><p className="font-bold text-slate-950">{profile?.full_name || "Client"}</p><div className="flex flex-wrap gap-x-3 text-xs text-slate-500">{clientEmail ? <span>{clientEmail}</span> : null}{profile?.phone ? <span>{profile.phone}</span> : null}</div></div></div>
         </header>
-        <CustomerRequestStatus requestId={request.id} status={request.status} currentStage={currentStage} updatedAt={request.updated_at} assignedTo="Carlos" />
+        <CustomerRequestStatus requestId={request.id} status={request.status} currentStage={currentStage} updatedAt={request.updated_at} assignee={request.manager_assignee} />
         <div className="mt-3 grid gap-2">
           <details open={currentStage === "received"} className={`order-2 ${workflowStepCardClass}`}>
             <RequestWorkflowStepHeader requestId={request.id} step={2} title="Organize request" detail={organizedItems.length ? `${organizedItems.length} organized item${organizedItems.length === 1 ? "" : "s"}` : "Create a clean material list"} status={step2Complete ? "complete" : "active"} icon="organize" />

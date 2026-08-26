@@ -10,6 +10,7 @@ type InboxRequest = {
   owner_id: string
   title: string
   status: string
+  manager_assignee: string
   created_at: string
   submitted_at: string | null
   projects: { name: string; address: string | null } | null
@@ -26,7 +27,7 @@ export default async function MaterialRequestsInboxPage({
   const [{ data, error }, { data: customerProfiles }, { data: categories }] = await Promise.all([
     supabase
       .from("quote_requests")
-      .select("id, owner_id, title, status, created_at, submitted_at, projects(name,address), material_questionnaire_responses(id,category_name_snapshot,status)")
+      .select("id, owner_id, title, status, manager_assignee, created_at, submitted_at, projects(name,address), material_questionnaire_responses(id,category_name_snapshot,status)")
       .order("created_at", { ascending: false })
       .returns<InboxRequest[]>(),
     supabase.from("profiles").select("id,full_name,email,role,is_active").order("full_name").returns<Array<{ id: string; full_name: string | null; email: string | null; role: string; is_active: boolean }>>(),
@@ -40,7 +41,7 @@ export default async function MaterialRequestsInboxPage({
   const departments = Array.from(new Set([...(categories ?? []).map((category) => category.department_key), ...MATERIAL_DEPARTMENTS]))
   const activeRequests = requests.filter((request) => request.status !== "closed")
   const closedRequests = requests.filter((request) => request.status === "closed")
-  const statusLabels: Record<string, string> = { draft: "Draft", submitted: "New", in_review: "In progress", quoted: "Quote sent", closed: "Closed" }
+  const statusLabels: Record<string, string> = { draft: "Draft", submitted: "New", in_review: "In progress", quoted: "Quote sent", closed: "Archived" }
 
   function requestCard(request: InboxRequest) {
     const profile = profileMap.get(request.owner_id)
@@ -51,7 +52,7 @@ export default async function MaterialRequestsInboxPage({
         <p className="mt-2 text-xs text-slate-500">{profile?.full_name || profile?.email || "Client"} · {new Date(request.created_at).toLocaleString()}</p>
         <div className="mt-3 flex flex-wrap gap-2">{request.material_questionnaire_responses.length ? request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{response.category_name_snapshot}</span>) : <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700">Direct quote request</span>}</div>
       </Link>
-      <MaterialRequestStatusControl requestId={request.id} status={request.status} />
+      <MaterialRequestStatusControl requestId={request.id} status={request.status} assignee={request.manager_assignee} />
     </article>
   }
 
@@ -72,7 +73,7 @@ export default async function MaterialRequestsInboxPage({
           {activeRequests.map(requestCard)}
           {requests.length === 0 ? <div className="rounded-[20px] border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No customer requests have been submitted yet.</div> : null}
         </div>
-        {closedRequests.length ? <details className="group mt-6 overflow-hidden rounded-[20px] border border-slate-200 bg-white"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4 text-sm font-bold text-slate-700"><span>Closed requests</span><span className="text-xs text-slate-500">{closedRequests.length} · <span className="group-open:hidden">Show</span><span className="hidden group-open:inline">Hide</span></span></summary><div className="grid gap-3 border-t border-slate-200 bg-slate-50 p-3 sm:p-4">{closedRequests.map(requestCard)}</div></details> : null}
+        {closedRequests.length ? <details className="group mt-6 overflow-hidden rounded-[20px] border border-slate-200 bg-white"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4 text-sm font-bold text-slate-700"><span>Archived requests</span><span className="text-xs text-slate-500">{closedRequests.length} · <span className="group-open:hidden">Show</span><span className="hidden group-open:inline">Hide</span></span></summary><div className="grid gap-3 border-t border-slate-200 bg-slate-50 p-3 sm:p-4">{closedRequests.map(requestCard)}</div></details> : null}
       </div>
     </main>
   )

@@ -26,8 +26,8 @@ test("direct checkout removes project selection and preserves manager request de
   expect(ownerDetail).not.toContain("createAdminClient")
 })
 
-test("manager can create and manage a structured request on behalf of a client", async () => {
-  const [component, actions, apiRoute, requestMigration, customerPage, inboxPage, clientFunction, requestActions, statusControl, catalogAdmin] = await Promise.all([
+test("manager can create, assign, and archive a structured request on behalf of a client", async () => {
+  const [component, actions, apiRoute, requestMigration, customerPage, inboxPage, clientFunction, requestActions, statusControl, assigneeControl, assigneeMigration, catalogAdmin] = await Promise.all([
     readFile(path.join(root, "components/buildflow/manager-create-client-request.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/users/actions.ts"), "utf8"),
     readFile(path.join(root, "app/api/admin/client-requests/route.ts"), "utf8"),
@@ -37,6 +37,8 @@ test("manager can create and manage a structured request on behalf of a client",
     readFile(path.join(root, "supabase/functions/create-manager-client/index.ts"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-request-status-control.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/material-request-assignee-control.tsx"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260826220722_add_material_request_assignee.sql"), "utf8"),
     readFile(path.join(root, "components/buildflow/owner-materials-admin-shell.tsx"), "utf8"),
   ])
 
@@ -87,15 +89,21 @@ test("manager can create and manage a structured request on behalf of a client",
   expect(inboxPage).toContain("ManagerCreateClientRequest")
   expect(inboxPage).toContain("Client request created successfully")
   expect(inboxPage).toContain("MaterialRequestStatusControl")
-  expect(inboxPage).toContain("Closed requests")
+  expect(inboxPage).toContain("Archived requests")
   expect(inboxPage).not.toContain("/admin/settings/material-order-questions")
   expect(catalogAdmin).not.toContain("/admin/settings/material-order-questions")
   expect(requestActions).toContain("updateMaterialRequestStatusAction")
   expect(requestActions).toContain('manager_action: "request_status"')
   expect(requestActions).toContain('.update({ status }).eq("id", requestId).select("id")')
-  expect(statusControl).toContain("Close this material request?")
-  expect(statusControl).toContain("Reopen")
+  expect(statusControl).toContain("Archive this material request?")
+  expect(statusControl).toContain("Restore")
+  expect(statusControl).not.toContain(">Close<")
   expect(statusControl).toContain("Quote sent")
+  expect(assigneeControl).toContain('label: "Carlos"')
+  expect(assigneeControl).toContain('label: "David"')
+  expect(requestActions).toContain("updateMaterialRequestAssigneeAction")
+  expect(assigneeMigration).toContain("manager_assignee text not null default 'carlos'")
+  expect(assigneeMigration).toContain("manager_assignee in ('carlos', 'david')")
   await expect(access(path.join(root, "app/admin/settings/material-order-questions/page.tsx"))).rejects.toThrow()
 })
 

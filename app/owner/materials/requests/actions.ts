@@ -10,8 +10,10 @@ type ReplyResult = { ok: true; providerId: string | null } | { ok: false; error:
 type QuoteResult = { ok: true; providerId: string | null; pdfBase64?: string; fileName?: string } | { ok: false; error: string }
 type DeliveryScheduleResult = { ok: true } | { ok: false; error: string }
 export type MaterialRequestStatus = "submitted" | "in_review" | "quoted" | "closed"
+export type MaterialRequestAssignee = "carlos" | "david"
 
 const MATERIAL_REQUEST_STATUSES = new Set<MaterialRequestStatus>(["submitted", "in_review", "quoted", "closed"])
+const MATERIAL_REQUEST_ASSIGNEES = new Set<MaterialRequestAssignee>(["carlos", "david"])
 
 export type RequestClientQuoteInput = {
   requestId: string
@@ -55,7 +57,7 @@ export async function updateMaterialRequestStatusAction(input: { requestId: stri
   const { data: updated, error: updateError } = await supabase.from("quote_requests").update({ status }).eq("id", requestId).select("id").maybeSingle<{ id: string }>()
   if (updateError || !updated) return { ok: false as const, error: "The request status could not be changed." }
 
-  const labels: Record<MaterialRequestStatus, string> = { submitted: "New", in_review: "In progress", quoted: "Quote sent", closed: "Closed" }
+  const labels: Record<MaterialRequestStatus, string> = { submitted: "New", in_review: "In progress", quoted: "Quote sent", closed: "Archived" }
   const { error: eventError } = await supabase.from("project_events").insert({
     project_id: request.project_id,
     owner_id: request.owner_id,
@@ -75,6 +77,40 @@ export async function updateMaterialRequestStatusAction(input: { requestId: stri
   revalidatePath("/admin/build-map")
   revalidatePath("/admin/users")
   revalidatePath("/admin/supplier-quotes")
+  return { ok: true as const }
+}
+
+export async function updateMaterialRequestAssigneeAction(input: { requestId: string; assignee: MaterialRequestAssignee }) {
+  const requestId = String(input.requestId || "").trim()
+  const assignee = String(input.assignee || "").toLowerCase() as MaterialRequestAssignee
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !MATERIAL_REQUEST_ASSIGNEES.has(assignee)) return { ok: false as const, error: "Choose Carlos or David." }
+
+  const { supabase } = await requireStaffProfile("customers")
+  const { data: request } = await supabase.from("quote_requests").select("id,owner_id,project_id,manager_assignee").eq("id", requestId).maybeSingle<{ id: string; owner_id: string; project_id: string; manager_assignee: string }>()
+  if (!request) return { ok: false as const, error: "Request not found." }
+  if (request.manager_assignee === assignee) return { ok: true as const }
+
+  const { data: updated, error: updateError } = await supabase.from("quote_requests").update({ manager_assignee: assignee }).eq("id", requestId).select("id").maybeSingle<{ id: string }>()
+  if (updateError || !updated) return { ok: false as const, error: "The assignment could not be changed." }
+
+  const name = assignee === "david" ? "David" : "Carlos"
+  const { error: eventError } = await supabase.from("project_events").insert({
+    project_id: request.project_id,
+    owner_id: request.owner_id,
+    event_type: "status_changed",
+    source: "admin",
+    title: `Material request assigned to ${name}`,
+    description: `Manager assigned this material request to ${name}.`,
+    metadata: { quote_request_id: request.id, manager_action: "request_assignee", previous_assignee: request.manager_assignee, request_assignee: assignee },
+  })
+  if (eventError) {
+    await supabase.from("quote_requests").update({ manager_assignee: request.manager_assignee }).eq("id", requestId)
+    return { ok: false as const, error: "The assignment was not changed because its history could not be saved." }
+  }
+
+  revalidatePath("/owner/materials/requests")
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  revalidatePath("/admin/build-map")
   return { ok: true as const }
 }
 
