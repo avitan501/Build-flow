@@ -1,4 +1,4 @@
-import { materialQuantity, materialReviewReasons, materialSalesUnit, suggestedSalesUnits, type ReviewableMaterialItem } from "@/lib/client-material-review"
+import { materialQuantity, materialReviewReasons, materialSalesUnit, type ReviewableMaterialItem } from "@/lib/client-material-review"
 
 export type RecommendationField = "quantity" | "unit" | "dimensions" | "thickness" | "productType" | "screwLength"
 
@@ -31,7 +31,7 @@ function quantityChoices(item: ReviewableMaterialItem) {
     .map((value) => option(String(value), 0))
   return {
     field: "quantity" as const,
-    label: `Quantity (${item.unit || "each"})`,
+    label: `Quantity (${materialSalesUnit(item)})`,
     options: [option(quantity, 100), ...nearby],
     recommended: quantity,
   }
@@ -48,12 +48,8 @@ export function materialReviewRecommendation(item: ReviewableMaterialItem): Mate
   const isCementBoard = /\b(?:cement\s+board|wonderboard)\b/.test(name)
   const isDrywallScrew = /\b(?:(?:drywall|sheetrock)\s+)?screws?\b/.test(name)
   const isSheetMaterial = isDrywallBoard || isCementBoard || /\b(?:plywood|osb)\b/.test(name)
-  const choices: MaterialReviewRecommendation["choices"] = [quantityChoices(item)]
-  const unitNeedsConfirmation = !item.unit || /^(?:unspecified|quantity required|unknown|n\/a)$/i.test(item.unit.trim()) || reasons.some((reason) => /\bunit\b/i.test(reason))
-  if (unitNeedsConfirmation) {
-    const units = suggestedSalesUnits(item)
-    choices.push({ field: "unit", label: "Sales unit", options: units.map((value, index) => option(value, index === 0 ? 80 : index === 1 ? 15 : 5)), recommended: materialSalesUnit(item) })
-  }
+  const choices: MaterialReviewRecommendation["choices"] = []
+  if (reasons.some((reason) => /\bquantity\b/i.test(reason))) choices.push(quantityChoices(item))
 
   if (isDrywallBoard) {
     const typeOptions = /\b(?:greenboard|moisture)\b/.test(name)
@@ -103,16 +99,16 @@ export function materialReviewRecommendation(item: ReviewableMaterialItem): Mate
   }
 
   const resolvesAllReasons = reasons.every((reason) =>
-    (/quantity/i.test(reason) && hasChoice(choices, "quantity"))
+    (/quantity/i.test(reason) && materialQuantity(item) > 0)
     || (/thickness/i.test(reason) && hasChoice(choices, "thickness"))
     || (/\b(?:type|grade)\b/i.test(reason) && hasChoice(choices, "productType"))
     || (/\b(?:screw\s+)?length\b/i.test(reason) && (hasChoice(choices, "screwLength") || hasChoice(choices, "dimensions")))
     || (/\b(?:size|dimensions?|width)\b/i.test(reason) && hasChoice(choices, "dimensions"))
-    || (/\bunit\b/i.test(reason) && hasChoice(choices, "unit"))
+    || (/\bunit\b/i.test(reason) && Boolean(materialSalesUnit(item)))
   )
 
   return {
-    label: isSheetMaterial || isDrywallScrew || unitNeedsConfirmation ? "Confirm order details" : "Confirm quantity",
+    label: isSheetMaterial || isDrywallScrew || choices.length > 1 ? "Confirm order details" : "Confirm item detail",
     choices,
     resolvesAllReasons,
   }

@@ -8,6 +8,7 @@ import { detectSupplierMatch, inferSupplierName } from "../lib/supplier-quote-su
 import { preferredRequestMaterialSources, requestMaterialChartCsv, toRequestMaterialChartRow } from "../lib/request-material-chart"
 import { catalogMatchScore } from "../lib/catalog-match-score"
 import { cleanMaterialRequestDetails, materialQuantity, materialReviewReasons, materialReviewStatus, materialReviewSummary, materialSalesUnit, materialSearchQuery, suggestedSalesUnits } from "../lib/client-material-review"
+import { materialReviewRecommendation } from "../lib/material-review-recommendations"
 
 const root = process.cwd()
 
@@ -322,6 +323,7 @@ test("organized rows use safe order defaults without showing false missing error
   expect(materialSalesUnit(waterHeater)).toBe("each")
   expect(materialReviewReasons(waterHeater)).toEqual([])
   expect(materialReviewStatus(waterHeater)).toBe("ready")
+  expect(materialReviewRecommendation(waterHeater).choices).toEqual([])
 })
 
 test("supplier detection matches the directory or keeps the name read from the invoice", async () => {
