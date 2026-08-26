@@ -31,7 +31,8 @@ test("manager push notifications stay private and cover business events", async 
   expect(edgeFunction).toContain("notifications:");
   expect(edgeFunction).toContain(".limit(100)");
   expect(dashboard).toContain("<ManagerNotificationControl settings />");
-  expect(dashboard).toContain("<ManagerNotificationCenter />");
+  expect(dashboard).not.toContain("ManagerNotificationCenter");
+  expect(dashboard).toContain('id="phone-notifications"');
   expect(dashboard.indexOf("<ManagerNotificationControl settings />")).toBeGreaterThan(dashboard.indexOf("Manager tools"));
   expect(shell).not.toContain("ManagerNotificationControl");
   expect(control).toContain("Add to Home Screen");

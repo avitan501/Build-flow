@@ -8,21 +8,19 @@ import {
   CreditCard,
   MessageCircleQuestion,
   PhoneCall,
-  ShoppingCart,
   Sparkles,
   Store,
-  Target,
   Truck,
   UserRound,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 
-import { AddManagerGoal, CustomManagerGoals, type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
+import { CarlosGoalsWorkspace } from "@/app/admin/goals-progress/page";
+import type { ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { EmployeeClockStatus } from "@/components/buildflow/employee-clock-status";
 import { ManagerDashboardAiSearch } from "@/components/buildflow/manager-dashboard-ai-search";
 import { ManagerNotificationControl } from "@/components/buildflow/manager-notification-control";
-import { ManagerNotificationCenter } from "@/components/buildflow/manager-notification-center";
 import { ManagerTodayTasks, type ManagerTodayTask } from "@/components/buildflow/manager-today-tasks";
 import { DAILY_WORK_SUMMARY_PREFIX, parseDailyWorkSummary } from "@/lib/daily-work-summary";
 import { requireManagerPortalProfile } from "@/lib/auth";
@@ -66,7 +64,6 @@ type ClientRow = {
   email: string | null;
 };
 
-type LeadRow = { id: string; status: string };
 type DashboardGoalRecord = ManagerGoalRecord & { created_at: string; updated_at: string };
 
 const pipelineTone: Record<ManagerPipelineStage, string> = {
@@ -119,14 +116,6 @@ function formatUpdated(value: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
 }
 
-function FixedTarget({ title, detail, href, icon: Icon }: { title: string; detail: string; href: string; icon: typeof Target }) {
-  return <Link href={href} className="group flex min-h-14 items-center gap-3 border-b border-slate-100 py-2.5 last:border-b-0">
-    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-700"><Icon className="h-4 w-4" /></span>
-    <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-950">{title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{detail}</span></span>
-    <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5" />
-  </Link>;
-}
-
 function GoalDisclosure({ assignee, goals, priorityCount, children }: { assignee: "carlos" | "david"; goals: ManagerGoalRecord[]; priorityCount: number; children: React.ReactNode }) {
   const name = assignee === "carlos" ? "Carlos" : "David";
   const openGoals = goals.filter((goal) => goal.status === "open").length;
@@ -136,11 +125,7 @@ function GoalDisclosure({ assignee, goals, priorityCount, children }: { assignee
       <span className="min-w-0 flex-1"><strong className="block text-sm font-semibold">{name} goals</strong><span className="mt-0.5 block text-xs text-slate-500">{priorityCount} priorities{openGoals ? ` · ${openGoals} custom open` : ""}</span></span>
       <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true" />
     </summary>
-    <div className="border-t border-slate-100 bg-slate-50/60 p-3 sm:p-4">
-      <div className="flex justify-end"><AddManagerGoal assignee={assignee} /></div>
-      <div className="mt-2 rounded-md border border-slate-200 bg-white px-3">{children}</div>
-      <CustomManagerGoals goals={goals} />
-    </div>
+    <div className="border-t border-slate-100 bg-slate-50/60">{children}</div>
   </details>;
 }
 
@@ -151,12 +136,11 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   let goalsQuery = supabase.from("manager_goals").select("id,assignee,title,details,status,created_at,updated_at").order("created_at", { ascending: false });
   if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos");
 
-  const [requestsResult, comparisonsResult, packagesResult, goalsResult, leadsResult, clientsResult] = await Promise.all([
+  const [requestsResult, comparisonsResult, packagesResult, goalsResult, clientsResult] = await Promise.all([
     supabase.from("quote_requests").select("id,owner_id,title,status,updated_at").order("updated_at", { ascending: false }).limit(250).returns<RequestRow[]>(),
     supabase.from("quote_comparisons").select("id,request_id,status,client_quote_status,updated_at").order("updated_at", { ascending: false }).limit(500).returns<ComparisonRow[]>(),
     supabase.from("supplier_packages").select("request_id,status").order("updated_at", { ascending: false }).limit(500).returns<SupplierPackageRow[]>(),
     goalsQuery.returns<DashboardGoalRecord[]>(),
-    supabase.from("manager_outreach_leads").select("id,status").returns<LeadRow[]>(),
     supabase.from("profiles").select("id,full_name,email").eq("role", "client").eq("is_active", true).order("created_at", { ascending: false }).limit(500).returns<ClientRow[]>(),
   ]);
 
@@ -189,8 +173,6 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
     COMMUNICATION_LOG_PREFIX,
     TODAY_TASK_PREFIX,
   ].some((prefix) => goal.details?.startsWith(prefix)));
-  const openLeads = (leadsResult.data ?? []).filter((lead) => !["converted", "not_interested"].includes(lead.status)).length;
-
   const managerSections = [
     { title: "Customers", icon: Users, links: access.customers ? [{ href: "/admin/users", label: "Customer Directory" }, { href: "/owner/materials/requests", label: "Client Requests" }] : [] },
     { title: "Messages & Calls", icon: PhoneCall, links: [
@@ -200,7 +182,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
       { href: "/admin/daily-summary", label: "Daily Work Summary" },
     ] },
     { title: "Suppliers", icon: Store, links: [
-      ...(access.suppliers ? [{ href: "/admin/vendors", label: "Supplier Directory" }, { href: "/admin/supplier-quotes", label: "Supplier Quotes" }, { href: "/admin/catalog", label: "Material Catalog" }, { href: "/admin/quote-comparison", label: "Quote Comparison" }] : []),
+      ...(access.suppliers ? [{ href: "/admin/vendors", label: "Supplier Directory" }, { href: "/admin/supplier-quotes", label: "Supplier Quote Storage" }, { href: "/admin/catalog", label: "Material Catalog" }, { href: "/admin/quote-comparison", label: "Quote Comparison" }] : []),
     ] },
     ...(access.aiTools ? [
       { title: "AI Tools", icon: Sparkles, links: [{ href: "/admin/ai-tools", label: "All AI Tools" }, { href: "/admin/ai-tools/jobsite-delivery", label: "Jobsite Delivery" }, ...(access.owner ? [{ href: "/admin/abc", label: "ABC Private Pricing" }] : [])] },
@@ -214,7 +196,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   ].filter((section) => section.links.length > 0);
 
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9"><div className="mx-auto max-w-7xl">
-    <header className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3"><h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1><ManagerNotificationCenter /></header>
+    <header className="border-b border-slate-200 pb-3"><h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1></header>
 
     <section aria-label="Today workspace" className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
       <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled />
@@ -235,16 +217,10 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
 
     <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="border-b border-slate-200 px-4 py-3"><h2 id="targets-heading" className="font-semibold">Goals</h2><p className="mt-0.5 text-xs text-slate-500">Open a person to view priorities and add goals</p></header>
       <GoalDisclosure assignee="carlos" priorityCount={access.owner ? 5 : 4} goals={regularGoals.filter((goal) => goal.assignee === "carlos")}>
-        <FixedTarget title="Client Target" detail={`${openLeads} open leads · ${clients.length} active clients`} href="/admin/goals-progress#client-target" icon={Users} />
-        <FixedTarget title="Call Supplier" detail="Find what each supplier sells cheaper than anyone else" href="/admin/goals-progress#call-suppliers" icon={ShoppingCart} />
-        <FixedTarget title="Supplier Affiliate Program" detail="Track applications and supplier opportunities" href="/admin/goals-progress#supplier-affiliate-program" icon={Store} />
-        <FixedTarget title="Supplier Partnership" detail="Outreach drafts, follow-ups, and partnership progress" href="/admin/goals-progress#supplier-partnerships" icon={Store} />
-        {access.owner ? <FixedTarget title="ABC Supply Demo" detail="Live product search and account pricing" href="/admin/goals-progress#abc-supply-demo" icon={BadgeDollarSign} /> : null}
+        <CarlosGoalsWorkspace embedded />
       </GoalDisclosure>
     </section>
 
-    <details className="group mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"><summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4"><Store className="h-4 w-4 text-[#0066cc]" /><span className="min-w-0 flex-1"><strong id="manager-tools-heading" className="block text-sm">Manager tools</strong><span className="block truncate text-xs text-slate-500">Directories, suppliers, and settings</span></span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" /></summary><div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-3">{managerSections.map((section) => { const Icon = section.icon; return <section key={section.title} className="overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="flex items-center gap-3 border-b border-slate-100 px-3 py-2"><span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-[#0066cc]"><Icon className="h-4 w-4" /></span><h3 className="text-sm font-semibold">{section.title}</h3></header><div>{section.links.map((item) => { const external = item.href.startsWith("https://"); return <Link key={item.href} href={item.href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="group flex min-h-11 items-center justify-between gap-3 border-b border-slate-100 px-3 text-sm font-semibold text-slate-700 last:border-b-0 hover:bg-slate-50 hover:text-[#0066cc]"><span>{item.label}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5" /></Link>; })}</div></section>; })}</div></details>
-
-    <section aria-labelledby="dashboard-settings-heading" className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="border-b border-slate-100 px-4 py-3"><h2 id="dashboard-settings-heading" className="text-sm font-semibold">Settings</h2></header><ManagerNotificationControl settings /></section>
+    <details className="group mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"><summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4"><Store className="h-4 w-4 text-[#0066cc]" /><span className="min-w-0 flex-1"><strong id="manager-tools-heading" className="block text-sm">Manager tools</strong><span className="block truncate text-xs text-slate-500">Directories, suppliers, AI tools, payments, and notifications</span></span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" /></summary><div className="border-t border-slate-200"><div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3">{managerSections.map((section) => { const Icon = section.icon; return <section key={section.title} className="overflow-hidden rounded-lg border border-slate-200 bg-white"><header className="flex items-center gap-3 border-b border-slate-100 px-3 py-2"><span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-[#0066cc]"><Icon className="h-4 w-4" /></span><h3 className="text-sm font-semibold">{section.title}</h3></header><div>{section.links.map((item) => { const external = item.href.startsWith("https://"); return <Link key={item.href} href={item.href} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="group flex min-h-11 items-center justify-between gap-3 border-b border-slate-100 px-3 text-sm font-semibold text-slate-700 last:border-b-0 hover:bg-slate-50 hover:text-[#0066cc]"><span>{item.label}</span><ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5" /></Link>; })}</div></section>; })}</div><section id="phone-notifications" aria-labelledby="phone-notifications-heading" className="border-t border-slate-200 bg-slate-50/60"><header className="px-4 pt-4"><h2 id="phone-notifications-heading" className="text-sm font-semibold">Phone notifications</h2><p className="mt-1 text-xs text-slate-500">Manage alerts for new requests, messages, supplier quotes, and payments.</p></header><ManagerNotificationControl settings /></section></div></details>
   </div></main>;
 }

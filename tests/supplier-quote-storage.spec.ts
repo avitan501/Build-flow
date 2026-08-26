@@ -25,8 +25,8 @@ test("manager supplier quote storage is private, durable, and routable", async (
     readFile(path.join(root, "supabase/migrations/20260820160124_link_supplier_quotes_to_clients.sql"), "utf8"),
   ])
 
-  expect(navigation).toContain('href: "/admin/supplier-quotes"')
-  expect(navigation).toContain('label: "Supplier Quote Storage"')
+  expect(navigation).not.toContain('href: "/admin/supplier-quotes"')
+  expect(navigation).not.toContain('label: "Supplier Quote Storage"')
   expect(page).toContain('requireStaffProfile("suppliers")')
   expect(actions).toContain('requireStaffProfile("suppliers")')
   expect(actions).toContain("extractSupplierQuoteFile")

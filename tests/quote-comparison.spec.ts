@@ -144,10 +144,10 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
     readFile(path.join(root, "supabase/migrations/20260814153520_add_quote_tax_percentage.sql"), "utf8"),
   ]);
 
-  expect(navigation).toContain('{ href: "/admin/quote-comparison", label: "Quote Comparison"');
+  expect(navigation).not.toContain('{ href: "/admin/quote-comparison", label: "Quote Comparison"');
   expect(navigation).toContain('...(access.suppliers ? [');
   expect(navigation).toContain('Messages &amp; Calls');
-  expect(navigation).toContain('label: "Open Google Meet"');
+  expect(navigation).toContain('label: "Schedule a Google Meet with Carlos"');
   expect(navigation).toContain('label: "View all WhatsApp conversations"');
   expect(navigation).toContain('href="/admin/communications"');
   expect(navigation.indexOf("communicationLinks.map")).toBeGreaterThan(navigation.indexOf("</nav>"));

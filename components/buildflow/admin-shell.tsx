@@ -1,11 +1,7 @@
 "use client";
 
 import {
-  Archive,
-  Columns3,
-  CreditCard,
   LayoutDashboard,
-  Sparkles,
   Menu,
   MessageCircle,
   PhoneCall,
@@ -23,9 +19,9 @@ import { useState, type ReactNode } from "react";
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { EmployeeActivityReporter } from "@/components/buildflow/employee-activity-reporter";
 
-const GOOGLE_MEET_URL = "https://meet.google.com/";
+const CARLOS_MEETING_URL = "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Avantia%20Build%20meeting%20with%20Carlos&details=Avantia%20Build%20manager%20meeting&add=buildavantiap%40gmail.com";
 const communicationLinks = [
-  { href: GOOGLE_MEET_URL, label: "Open Google Meet", shortLabel: "Meet", icon: Video },
+  { href: CARLOS_MEETING_URL, label: "Schedule a Google Meet with Carlos", shortLabel: "Meet", icon: Video },
   { href: "/admin/communications?channel=whatsapp", label: "View all WhatsApp conversations", shortLabel: "WhatsApp", icon: MessageCircle },
 ] as const;
 
@@ -49,12 +45,6 @@ function navigationLinks(access: ManagerAccess) {
       { href: "/admin/vendors", label: "Supplier Directory", icon: Store },
       { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },
     ] : []),
-    ...(access.suppliers ? [
-      { href: "/admin/supplier-quotes", label: "Supplier Quote Storage", icon: Archive },
-      { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
-    ] : []),
-    ...(access.aiTools ? [{ href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles }] : []),
-    ...(access.owner ? [{ href: "/admin/payments", label: "Payments", icon: CreditCard }] : []),
   ];
 }
 

@@ -77,7 +77,7 @@ test("approved staff use a compact manager workspace without owner-only controls
   expect(identity).toContain("operationsManager")
   for (const removedHeading of ["Directories & Catalog", "Supplier Pricing"]) expect(shell).not.toContain(removedHeading)
   for (const removedSection of ['label: "Tasks"', 'label: "Quotes & Orders"']) expect(shell).not.toContain(removedSection)
-  expect(shell).toContain('label: "AI Tools"')
+  expect(shell).not.toContain('label: "AI Tools"')
   expect(shell).not.toContain('href: "/admin/abc"')
   expect(shell).not.toContain('href: "/admin/traffic"')
   expect(aiTools).toContain('href: "/admin/abc"')

@@ -8,8 +8,9 @@ import { managerPipelineStage } from "@/lib/manager-dashboard";
 const root = process.cwd();
 
 test("manager dashboard is the employee daily command center", async () => {
-  const [page, shell, goalActions, dashboardActions, todayTasks] = await Promise.all([
+  const [page, goalsPage, shell, goalActions, dashboardActions, todayTasks] = await Promise.all([
     readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/goals-progress/goal-actions.ts"), "utf8"),
     readFile(path.join(root, "app/admin/build-map/actions.ts"), "utf8"),
@@ -29,14 +30,16 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain('id="targets-heading" className="font-semibold">Goals');
   expect(page).toContain('<GoalDisclosure assignee="carlos" priorityCount={access.owner ? 5 : 4}');
   expect(page).not.toContain('GoalDisclosure assignee="david"');
-  expect(page).toContain('title="ABC Supply Demo"');
-  expect(page).toContain('title="Supplier Partnership"');
-  expect(page).toContain('href="/admin/goals-progress#abc-supply-demo"');
+  expect(page).toContain("<CarlosGoalsWorkspace embedded />");
+  expect(page).not.toContain('href="/admin/goals-progress#abc-supply-demo"');
+  expect(goalsPage).toContain('title="ABC Supply Demo"');
+  expect(goalsPage).toContain('title="Supplier Partnership"');
   expect(page).toContain("Open a person to view priorities and add goals");
   expect(page).toContain('assignee="carlos"');
   expect(page).not.toContain('assignee="david"');
   expect(page).toContain("Manager tools");
-  expect(page).toContain('id="dashboard-settings-heading"');
+  expect(page).toContain('id="phone-notifications"');
+  expect(page).not.toContain("ManagerNotificationCenter");
   expect(page).toContain("<ManagerNotificationControl settings />");
   expect(page).toContain("ManagerTodayTasks");
   expect(page).toContain("TODAY_TASK_PREFIX");

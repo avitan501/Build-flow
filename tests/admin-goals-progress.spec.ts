@@ -53,10 +53,12 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).not.toContain('PersonHeader assignee="david"');
   expect(page).toContain('.eq("assignee", "carlos")');
   expect(page).not.toContain('david-goals-title');
+  expect(page).toContain("export async function CarlosGoalsWorkspace");
+  expect(page).toContain("if (embedded) return");
   expect(dashboard).toContain('if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos")');
   expect(dashboard).not.toContain('GoalDisclosure assignee="david"');
-  expect(dashboard).toContain('title="ABC Supply Demo"');
-  expect(dashboard).toContain('title="Supplier Partnership"');
+  expect(dashboard).toContain("<CarlosGoalsWorkspace embedded />");
+  expect(dashboard).not.toContain('href="/admin/goals-progress#client-target"');
   expect(actions).toContain('if (!access.owner && assignee !== "carlos")');
   expect(actions.match(/if \(!access\.owner\).*\.eq\("assignee", "carlos"\)/g)?.length).toBe(2);
 });

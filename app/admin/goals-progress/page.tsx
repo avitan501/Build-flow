@@ -110,7 +110,7 @@ function SupplierPartnershipGoal() {
   </GoalDisclosure>;
 }
 
-export default async function GoalsProgressPage() {
+export async function CarlosGoalsWorkspace({ embedded = false }: { embedded?: boolean }) {
   const { supabase, access } = await requireManagerPortalProfile();
   const goalsQuery = supabase.from("manager_goals").select("id,assignee,title,details,status").eq("assignee", "carlos").order("status").order("created_at", { ascending: false });
   const [clientResult, goalResult, leadResult] = await Promise.all([
@@ -126,9 +126,21 @@ export default async function GoalsProgressPage() {
     !goal.details?.startsWith(SUPPLIER_PARTNER_NOTES_PREFIX)
   ).filter((goal) => goal.assignee === "carlos");
 
+  const goalsWorkspace = <>
+    {embedded ? <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-semibold text-slate-950">Carlos&apos;s priorities</h3><p className="mt-0.5 text-xs text-slate-500">Open any goal below. It stays on this dashboard.</p></div><AddManagerGoal assignee="carlos" /></div> : null}
+    <CustomManagerGoals goals={regularGoals} />
+    <div className="mt-4 grid gap-3 sm:gap-4"><ClientTargetGoal clients={clients} leads={leads} canManageClients={access.customers} /><SupplierPricingGoal />{access.owner ? <OwnerAffiliateGoal /> : <GoalDisclosure id="supplier-affiliate-program" number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 construction-focused targets with direct call routes first."><AffiliateCallList /></GoalDisclosure>}<SupplierPartnershipGoal />{access.owner ? <AbcSupplyDemoGoal /> : null}</div>
+  </>;
+
+  if (embedded) return <div className="p-3 sm:p-4">{goalsWorkspace}</div>;
+
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-10"><div className="mx-auto max-w-6xl">
     <header className="border-b border-slate-200 pb-6"><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Carlos Goals</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Client outreach, supplier calls, partnerships, affiliate programs, and ABC pricing in one workspace.</p></header>
 
-    <section aria-labelledby="carlos-goals-title" className="mt-7"><PersonHeader assignee="carlos" description="Clients, suppliers, and pricing outreach" /><CustomManagerGoals goals={regularGoals} /><div className="mt-4 grid gap-4"><ClientTargetGoal clients={clients} leads={leads} canManageClients={access.customers} /><SupplierPricingGoal />{access.owner ? <OwnerAffiliateGoal /> : <GoalDisclosure id="supplier-affiliate-program" number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 construction-focused targets with direct call routes first."><AffiliateCallList /></GoalDisclosure>}<SupplierPartnershipGoal />{access.owner ? <AbcSupplyDemoGoal /> : null}</div></section>
+    <section aria-labelledby="carlos-goals-title" className="mt-7"><PersonHeader assignee="carlos" description="Clients, suppliers, and pricing outreach" />{goalsWorkspace}</section>
   </div></main>;
+}
+
+export default async function GoalsProgressPage() {
+  return <CarlosGoalsWorkspace />;
 }
