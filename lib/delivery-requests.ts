@@ -18,6 +18,13 @@ export type SavedDeliveryRequest = {
   jobsiteName: string;
   jobsiteAddress: string;
   jobsiteCoordinates: string;
+  pickupContactName?: string;
+  pickupPhone?: string;
+  dropoffContactName?: string;
+  dropoffPhone?: string;
+  itemDescription?: string;
+  weightPounds?: number;
+  scheduledPickupAt?: string | null;
   vehicle: string;
   speed: string;
   estimate: {
@@ -33,6 +40,15 @@ export type SavedDeliveryRequest = {
     pickupMinutes: number | null;
     durationMinutes: number | null;
     expiresAt: string;
+  };
+  providerDelivery?: {
+    provider: "Uber Direct";
+    deliveryId: string;
+    trackingUrl: string | null;
+    status: string;
+    fee: number | null;
+    currency: string;
+    createdAt: string;
   };
   status: "new" | "quoted" | "dispatched" | "completed" | "cancelled";
   createdAt: string;

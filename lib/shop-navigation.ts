@@ -274,15 +274,6 @@ export const SHOP_COMING_SOON_LINKS: ShopNavigationItem[] = [
     disabled: true,
   },
   {
-    href: "/request-quote?request=delivery-management",
-    label: "Jobsite Delivery",
-    description: "Expanded live delivery coordination is coming soon.",
-    imageUrl: "/images/buildflow-retail/avantia-jobsite-material-delivery-v2.webp",
-    imageAlt: "Construction materials arriving at an active jobsite",
-    badge: "Coming soon",
-    disabled: true,
-  },
-  {
     href: "/request-quote?request=tool-rental",
     label: "Tools & Equipment",
     description: "Equipment reservations and rental coordination are coming soon.",

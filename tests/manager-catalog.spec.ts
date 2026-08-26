@@ -13,7 +13,7 @@ test("manager navigation is compact and keeps communication shortcuts at the bot
   expect(shell).toContain('label: "Material Catalog"')
   expect(shell).toContain('href: "/admin/catalog"')
   expect(shell).not.toContain('label: "Website Traffic"')
-  expect(shell).toContain('label: "AI Tools — Coming Soon"')
+  expect(shell).toContain('label: "AI Tools"')
   expect(shell).toContain("Manager Dashboard")
   expect(shell).toContain('Messages &amp; Calls')
   expect(shell).not.toContain('label: "Directories & Catalog"')

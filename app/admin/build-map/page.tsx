@@ -206,7 +206,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
       ...(access.suppliers ? [{ href: "/admin/vendors", label: "Supplier Directory" }, { href: "/admin/supplier-quotes", label: "Supplier Quotes" }, { href: "/admin/catalog", label: "Material Catalog" }, { href: "/admin/quote-comparison", label: "Quote Comparison" }] : []),
     ] },
     ...(access.aiTools ? [
-      { title: "AI Tools", icon: Sparkles, links: [{ href: "/admin/ai-tools", label: "AI Tools coming soon" }, ...(access.owner ? [{ href: "/admin/abc", label: "ABC Private Pricing" }] : [])] },
+      { title: "AI Tools", icon: Sparkles, links: [{ href: "/admin/ai-tools", label: "All AI Tools" }, { href: "/admin/ai-tools/jobsite-delivery", label: "Jobsite Delivery" }, ...(access.owner ? [{ href: "/admin/abc", label: "ABC Private Pricing" }] : [])] },
     ] : []),
     ...(access.traffic ? [
       { title: "Website Traffic", icon: BarChart3, links: [{ href: "/admin/traffic", label: "Open Website Traffic" }] },

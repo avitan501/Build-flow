@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getSessionWithProfile } from "@/lib/auth";
+import { managerCapabilities } from "@/lib/owner-identity";
 
 export const runtime = "nodejs";
 export const preferredRegion = "iad1";
@@ -15,9 +16,18 @@ const quoteSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const { supabase, user } = await getSessionWithProfile();
+    const { supabase, user, profile } = await getSessionWithProfile();
     if (!user || !supabase) {
       return NextResponse.json({ ok: false, code: "sign_in_required", error: "Sign in to request a live Uber price." }, { status: 401 });
+    }
+    const access = managerCapabilities({
+      email: user.email || profile?.email || null,
+      role: profile?.role,
+      approvalStatus: profile?.approval_status,
+      isActive: profile?.is_active,
+    });
+    if (!access.aiTools) {
+      return NextResponse.json({ ok: false, code: "manager_access_required", error: "Manager AI Tools access is required." }, { status: 403 });
     }
 
     const parsed = quoteSchema.safeParse(await request.json());

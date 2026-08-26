@@ -1,9 +1,8 @@
 "use client"
 
-import Link from "next/link"
 import { useMemo, useState, useTransition } from "react"
 
-import { saveDeliveryRequestAction } from "@/app/delivery/actions"
+import { saveDeliveryRequestAction } from "@/app/admin/ai-tools/jobsite-delivery/actions"
 import { DELIVERY_PARTNERS } from "@/lib/delivery-partners"
 import {
   calculateDeliveryEstimate,
@@ -29,6 +28,21 @@ type LiveUberQuote = {
   expiresAt: string
 }
 
+type DeliveryHistoryItem = {
+  storeName: string
+  pickupAddress: string
+  pickupCoordinates: string
+  jobsiteName: string
+  jobsiteAddress: string
+  jobsiteCoordinates: string
+}
+
+type DeliveryEstimatorProps = {
+  defaultContactName: string
+  defaultContactPhone: string
+  deliveryHistory: DeliveryHistoryItem[]
+}
+
 function PinIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -50,7 +64,7 @@ function RouteLine() {
   )
 }
 
-export function DeliveryEstimator() {
+export function DeliveryEstimator({ defaultContactName, defaultContactPhone, deliveryHistory }: DeliveryEstimatorProps) {
   const [storeName, setStoreName] = useState("")
   const [orderNumber, setOrderNumber] = useState("")
   const [pickupAddress, setPickupAddress] = useState("")
@@ -58,17 +72,27 @@ export function DeliveryEstimator() {
   const [jobsiteName, setJobsiteName] = useState("")
   const [jobsiteAddress, setJobsiteAddress] = useState("")
   const [jobsiteCoordinates, setJobsiteCoordinates] = useState("")
+  const [pickupContactName, setPickupContactName] = useState(defaultContactName)
+  const [pickupPhone, setPickupPhone] = useState(defaultContactPhone)
+  const [dropoffContactName, setDropoffContactName] = useState("")
+  const [dropoffPhone, setDropoffPhone] = useState("")
+  const [itemDescription, setItemDescription] = useState("")
+  const [deliveryTiming, setDeliveryTiming] = useState<"asap" | "later">("asap")
+  const [scheduledPickupLocal, setScheduledPickupLocal] = useState("")
   const [weightPounds, setWeightPounds] = useState("20")
   const [vehicle, setVehicle] = useState<DeliveryVehicle>("small")
   const [speed, setSpeed] = useState<DeliverySpeed>("rush")
   const [locationState, setLocationState] = useState<"idle" | "loading" | "error">("idle")
   const [savedReference, setSavedReference] = useState("")
+  const [savedTaskId, setSavedTaskId] = useState("")
+  const [savedFingerprint, setSavedFingerprint] = useState("")
   const [saveMessage, setSaveMessage] = useState("")
-  const [needsLogin, setNeedsLogin] = useState(false)
   const [liveQuote, setLiveQuote] = useState<LiveUberQuote | null>(null)
   const [liveQuoteState, setLiveQuoteState] = useState<"idle" | "loading" | "error">("idle")
   const [liveQuoteMessage, setLiveQuoteMessage] = useState("")
-  const [liveQuoteNeedsLogin, setLiveQuoteNeedsLogin] = useState(false)
+  const [scheduleConfirmed, setScheduleConfirmed] = useState(false)
+  const [scheduleState, setScheduleState] = useState<"idle" | "loading" | "scheduled" | "error">("idle")
+  const [scheduleMessage, setScheduleMessage] = useState("")
   const [isPending, startTransition] = useTransition()
 
   const origin = useMemo(() => parseCoordinatePair(pickupCoordinates), [pickupCoordinates])
@@ -83,12 +107,26 @@ export function DeliveryEstimator() {
   const parsedWeight = Number(weightPounds)
   const uberPackageEligible = (vehicle === "small" || vehicle === "car") && Number.isFinite(parsedWeight) && parsedWeight > 0 && parsedWeight <= 50
   const readyForLiveQuote = pickupAddress.trim().length >= 8 && jobsiteAddress.trim().length >= 8 && uberPackageEligible
-  const readyToSave = Boolean(storeName.trim() && estimate)
+  const scheduledPickupMs = scheduledPickupLocal ? new Date(scheduledPickupLocal).getTime() : Number.NaN
+  const timingReady = deliveryTiming === "asap" || (Number.isFinite(scheduledPickupMs) && scheduledPickupMs > Date.now() + 10 * 60 * 1000)
+  const readyToSave = Boolean(storeName.trim() && estimate && timingReady)
+  const draftFingerprint = JSON.stringify([storeName, pickupAddress, pickupCoordinates, jobsiteName, jobsiteAddress, jobsiteCoordinates, pickupContactName, pickupPhone, dropoffContactName, dropoffPhone, itemDescription, weightPounds, vehicle, speed, deliveryTiming, scheduledPickupLocal, liveQuote?.quoteId || ""])
+  const storeSuggestions = useMemo(() => Array.from(new Set(deliveryHistory.map((item) => item.storeName).filter(Boolean))), [deliveryHistory])
+  const pickupAddressSuggestions = useMemo(() => Array.from(new Set(deliveryHistory.map((item) => item.pickupAddress).filter(Boolean))), [deliveryHistory])
+  const jobsiteAddressSuggestions = useMemo(() => Array.from(new Set(deliveryHistory.map((item) => item.jobsiteAddress).filter(Boolean))), [deliveryHistory])
+
+  function updateStoreName(value: string) {
+    setStoreName(value)
+    const match = deliveryHistory.find((item) => item.storeName.trim().toLowerCase() === value.trim().toLowerCase())
+    if (!match) return
+    setPickupAddress(match.pickupAddress)
+    setPickupCoordinates(match.pickupCoordinates)
+    resetLiveQuote()
+  }
 
   function resetLiveQuote() {
     setLiveQuote(null)
     setLiveQuoteMessage("")
-    setLiveQuoteNeedsLogin(false)
     setLiveQuoteState("idle")
   }
 
@@ -101,7 +139,6 @@ export function DeliveryEstimator() {
 
     setLiveQuoteState("loading")
     setLiveQuoteMessage("")
-    setLiveQuoteNeedsLogin(false)
     try {
       const response = await fetch("/api/delivery/uber/quote", {
         method: "POST",
@@ -116,7 +153,6 @@ export function DeliveryEstimator() {
       const payload = await response.json() as { ok?: boolean; error?: string; code?: string; quote?: LiveUberQuote }
       if (!response.ok || !payload.ok || !payload.quote) {
         setLiveQuote(null)
-        setLiveQuoteNeedsLogin(response.status === 401 || payload.code === "sign_in_required")
         setLiveQuoteMessage(payload.error || "Uber could not return a live quote right now.")
         setLiveQuoteState("error")
         return
@@ -150,9 +186,10 @@ export function DeliveryEstimator() {
   function saveRequest() {
     if (!readyToSave || !estimate) return
 
-    const localReference = `DLV-${Date.now().toString().slice(-6)}`
+    const scheduledPickupAt = deliveryTiming === "later" && scheduledPickupLocal
+      ? new Date(scheduledPickupLocal).toISOString()
+      : null
     const request = {
-      reference: localReference,
       storeName: storeName.trim(),
       orderNumber: orderNumber.trim(),
       pickupAddress: pickupAddress.trim(),
@@ -160,6 +197,13 @@ export function DeliveryEstimator() {
       jobsiteName: jobsiteName.trim(),
       jobsiteAddress: jobsiteAddress.trim(),
       jobsiteCoordinates,
+      pickupContactName: pickupContactName.trim(),
+      pickupPhone: pickupPhone.trim(),
+      dropoffContactName: dropoffContactName.trim(),
+      dropoffPhone: dropoffPhone.trim(),
+      itemDescription: itemDescription.trim(),
+      weightPounds: parsedWeight,
+      scheduledPickupAt,
       vehicle,
       speed,
       estimate,
@@ -177,15 +221,8 @@ export function DeliveryEstimator() {
       createdAt: new Date().toISOString(),
     }
 
-    try {
-      const previous = JSON.parse(window.localStorage.getItem("buildflow-delivery-requests") ?? "[]") as unknown[]
-      window.localStorage.setItem("buildflow-delivery-requests", JSON.stringify([request, ...previous].slice(0, 20)))
-    } catch {
-      window.localStorage.setItem("buildflow-delivery-requests", JSON.stringify([request]))
-    }
-
+    setSavedReference("")
     setSaveMessage("")
-    setNeedsLogin(false)
     startTransition(async () => {
       const result = await saveDeliveryRequestAction({
         storeName: request.storeName,
@@ -195,6 +232,13 @@ export function DeliveryEstimator() {
         jobsiteName: request.jobsiteName,
         jobsiteAddress: request.jobsiteAddress,
         jobsiteCoordinates: request.jobsiteCoordinates,
+        pickupContactName: request.pickupContactName,
+        pickupPhone: request.pickupPhone,
+        dropoffContactName: request.dropoffContactName,
+        dropoffPhone: request.dropoffPhone,
+        itemDescription: request.itemDescription,
+        weightPounds: request.weightPounds,
+        scheduledPickupAt: request.scheduledPickupAt,
         vehicle,
         speed,
         estimate: {
@@ -206,18 +250,44 @@ export function DeliveryEstimator() {
       })
       if (result.ok) {
         setSavedReference(result.reference)
-        setSaveMessage("Saved to your AvantiaBuild account and the owner delivery desk.")
+        setSavedTaskId(result.taskId)
+        setSavedFingerprint(draftFingerprint)
+        setSaveMessage("Saved to the Manager delivery queue.")
         return
       }
-      setSavedReference(localReference)
-      const loginRequired = Boolean("needsLogin" in result && result.needsLogin)
-      setNeedsLogin(loginRequired)
-      setSaveMessage(loginRequired ? "Saved on this device. Sign in to save it to AvantiaBuild." : result.error)
+      setSaveMessage(result.error)
     })
+  }
+
+  async function scheduleDelivery() {
+    if (!savedTaskId || !liveQuote || !scheduleConfirmed) return
+    setScheduleState("loading")
+    setScheduleMessage("")
+    try {
+      const response = await fetch("/api/delivery/uber/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: savedTaskId, confirmed: true }),
+      })
+      const payload = await response.json() as { ok?: boolean; error?: string; delivery?: { deliveryId?: string } }
+      if (!response.ok || !payload.ok) {
+        setScheduleState("error")
+        setScheduleMessage(payload.error || "Uber could not schedule this delivery.")
+        return
+      }
+      setScheduleState("scheduled")
+      setScheduleMessage(`Uber delivery ${payload.delivery?.deliveryId || "scheduled"} is confirmed.`)
+    } catch {
+      setScheduleState("error")
+      setScheduleMessage("Uber could not schedule this delivery.")
+    }
   }
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#f5f8fc_0%,#eaf1fa_48%,#f8fafc_100%)] px-4 pb-28 pt-4 text-slate-950 sm:px-6 sm:pb-12 lg:px-8 lg:py-8">
+      <datalist id="delivery-store-suggestions">{storeSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
+      <datalist id="delivery-pickup-addresses">{pickupAddressSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
+      <datalist id="delivery-jobsite-addresses">{jobsiteAddressSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
       <div className="mx-auto max-w-6xl">
         <header className="relative overflow-hidden rounded-[30px] bg-[#0e2341] px-5 py-6 text-white shadow-[0_22px_60px_rgba(14,35,65,0.22)] sm:px-8 sm:py-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_12%,rgba(243,203,114,0.34),transparent_25%),linear-gradient(115deg,transparent_0%,transparent_62%,rgba(255,255,255,0.05)_62%,rgba(255,255,255,0.05)_63%,transparent_63%)]" />
@@ -225,10 +295,10 @@ export function DeliveryEstimator() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-200">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
-                Delivery desk
+                Manager · AI Tools
               </div>
               <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em] sm:text-5xl">Move it to the jobsite.</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">Plan the route and load, then send the request to the owner delivery desk. Final courier pricing comes from the selected provider.</p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">Plan the route and load, request a live provider quote when eligible, then track the delivery through completion in the Manager queue.</p>
             </div>
             <div className="flex items-center gap-3 rounded-2xl border border-white/12 bg-white/8 px-4 py-3 backdrop-blur-sm">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400 text-[#0e2341]"><PinIcon /></span>
@@ -256,11 +326,12 @@ export function DeliveryEstimator() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                     Store name
-                    <input value={storeName} onChange={(event) => setStoreName(event.target.value)} placeholder="Home Depot, Lowe’s, local supplier" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+                    <input value={storeName} onChange={(event) => updateStoreName(event.target.value)} list="delivery-store-suggestions" autoComplete="organization" placeholder="Home Depot, Lowe’s, local supplier" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+                    {storeName.trim() ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeName)}`} target="_blank" rel="noreferrer" className="text-xs font-normal text-sky-700 underline underline-offset-4">Find this store address</a> : <span className="text-xs font-normal text-slate-400">Choosing a saved store fills its last pickup address.</span>}
                   </label>
                   <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                     Pickup address <span className="font-normal text-slate-400">(for live quote)</span>
-                    <input value={pickupAddress} onChange={(event) => { setPickupAddress(event.target.value); resetLiveQuote() }} placeholder="Street, city, state, ZIP" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+                    <input value={pickupAddress} onChange={(event) => { setPickupAddress(event.target.value); resetLiveQuote() }} list="delivery-pickup-addresses" autoComplete="street-address" placeholder="Street, city, state, ZIP" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
                   </label>
                   <label className="grid gap-1.5 text-sm font-semibold text-slate-700 sm:col-span-2">
                     Pickup coordinates
@@ -276,7 +347,7 @@ export function DeliveryEstimator() {
                   </label>
                   <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                     Jobsite address <span className="font-normal text-slate-400">(for live quote)</span>
-                    <input value={jobsiteAddress} onChange={(event) => { setJobsiteAddress(event.target.value); resetLiveQuote() }} placeholder="Street, city, state, ZIP" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+                    <input value={jobsiteAddress} onChange={(event) => { setJobsiteAddress(event.target.value); resetLiveQuote() }} list="delivery-jobsite-addresses" autoComplete="street-address" placeholder="Street, city, state, ZIP" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
                   </label>
                   <div className="sm:col-span-2">
                     <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
@@ -313,13 +384,29 @@ export function DeliveryEstimator() {
                   </button>
                 ))}
               </div>
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-950">Courier contacts and schedule</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Uber needs a contact at pickup and drop-off. These details are saved only with this Manager delivery request.</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-700">Pickup contact<input value={pickupContactName} onChange={(event) => setPickupContactName(event.target.value)} autoComplete="name" placeholder="Person at the store" className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal" /></label>
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-700">Pickup phone<input value={pickupPhone} onChange={(event) => setPickupPhone(event.target.value)} type="tel" autoComplete="tel" placeholder="(516) 555-0123" className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal" /></label>
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-700">Jobsite contact<input value={dropoffContactName} onChange={(event) => setDropoffContactName(event.target.value)} autoComplete="name" placeholder="Person receiving it" className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal" /></label>
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-700">Jobsite phone<input value={dropoffPhone} onChange={(event) => setDropoffPhone(event.target.value)} type="tel" autoComplete="tel" placeholder="(516) 555-0123" className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal" /></label>
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-700 sm:col-span-2">What is being delivered?<input value={itemDescription} onChange={(event) => setItemDescription(event.target.value)} placeholder="Example: two boxes of electrical fittings" className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal" /></label>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-white p-1 ring-1 ring-slate-200">
+                  <button type="button" onClick={() => setDeliveryTiming("asap")} aria-pressed={deliveryTiming === "asap"} className={`min-h-10 rounded-lg text-xs font-semibold ${deliveryTiming === "asap" ? "bg-[#10233f] text-white" : "text-slate-600"}`}>As soon as possible</button>
+                  <button type="button" onClick={() => setDeliveryTiming("later")} aria-pressed={deliveryTiming === "later"} className={`min-h-10 rounded-lg text-xs font-semibold ${deliveryTiming === "later" ? "bg-[#10233f] text-white" : "text-slate-600"}`}>Schedule for later</button>
+                </div>
+                {deliveryTiming === "later" ? <label className="mt-3 grid gap-1.5 text-xs font-semibold text-slate-700">Requested pickup time<input type="datetime-local" value={scheduledPickupLocal} onChange={(event) => setScheduledPickupLocal(event.target.value)} aria-invalid={!timingReady} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal" /><span className={timingReady ? "font-normal text-slate-500" : "font-normal text-rose-600"}>Choose a time at least 10 minutes from now.</span></label> : null}
+              </div>
               <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div><p className="text-sm font-semibold text-slate-950">Uber Direct live price</p><p className="mt-1 text-xs text-slate-600">Uses the two full addresses above. Requesting a quote does not create or charge for a delivery.</p></div>
                   <button type="button" onClick={requestLiveQuote} disabled={!readyForLiveQuote || liveQuoteState === "loading"} className="min-h-11 rounded-xl bg-[#10233f] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45">{liveQuoteState === "loading" ? "Checking Uber…" : "Get live Uber price"}</button>
                 </div>
                 {liveQuote ? <div role="status" className="mt-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-emerald-800"><strong>{currency.format(liveQuote.total)}</strong> live provider fee · {liveQuote.pickupMinutes !== null ? `${liveQuote.pickupMinutes} min pickup` : "Pickup time shown after dispatch"} · no AvantiaBuild markup</div> : null}
-                {liveQuoteMessage ? <div role="alert" className="mt-3 rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm text-rose-700">{liveQuoteMessage}{liveQuoteNeedsLogin ? <Link href="/login?next=/delivery" className="ml-2 font-bold underline underline-offset-4">Sign in</Link> : null}</div> : null}
+                {liveQuoteMessage ? <div role="alert" className="mt-3 rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm text-rose-700">{liveQuoteMessage}</div> : null}
               </div>
             </div>
 
@@ -387,7 +474,13 @@ export function DeliveryEstimator() {
                 <button type="button" onClick={saveRequest} disabled={!readyToSave || isPending} className="mt-4 flex min-h-14 w-full items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-5 text-base font-semibold text-[#0e2341] shadow-[0_16px_32px_rgba(220,168,69,0.2)] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45">
                   {isPending ? "Saving…" : "Save delivery request"}
                 </button>
-                {savedReference ? <div role="status" className="mt-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-center text-sm text-emerald-200"><p>Saved as <strong>{savedReference}</strong></p>{saveMessage ? <p className="mt-1 text-xs text-emerald-100/80">{saveMessage}</p> : null}{needsLogin ? <Link href="/login?next=/delivery" className="mt-2 inline-block font-bold underline underline-offset-4">Sign in</Link> : null}</div> : null}</> : null}
+                {savedReference ? <div role="status" className="mt-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-center text-sm text-emerald-200"><p>Saved as <strong>{savedReference}</strong></p>{saveMessage ? <p className="mt-1 text-xs text-emerald-100/80">{saveMessage}</p> : null}</div> : saveMessage ? <p role="alert" className="mt-3 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-center text-sm text-rose-100">{saveMessage}</p> : null}
+                {savedTaskId && liveQuote && savedFingerprint !== draftFingerprint ? <p className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-xs text-amber-100">The delivery details changed. Save the request again before scheduling Uber.</p> : null}
+                {savedTaskId && liveQuote && savedFingerprint === draftFingerprint ? <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4">
+                  <label className="flex items-start gap-3 text-xs leading-5 text-amber-50"><input type="checkbox" checked={scheduleConfirmed} onChange={(event) => setScheduleConfirmed(event.target.checked)} className="mt-1 h-4 w-4" /><span>I confirm the addresses, contacts, package, live Uber price, and pickup timing. Scheduling can create a charge with Uber Direct.</span></label>
+                  <button type="button" onClick={scheduleDelivery} disabled={!scheduleConfirmed || scheduleState === "loading" || scheduleState === "scheduled"} className="mt-3 flex min-h-12 w-full items-center justify-center rounded-xl bg-white px-4 text-sm font-bold text-[#10233f] disabled:opacity-50">{scheduleState === "loading" ? "Scheduling…" : scheduleState === "scheduled" ? "Delivery scheduled" : deliveryTiming === "later" ? "Schedule Uber delivery" : "Request Uber pickup"}</button>
+                  {scheduleMessage ? <p role={scheduleState === "error" ? "alert" : "status"} className={`mt-2 text-xs ${scheduleState === "error" ? "text-rose-200" : "text-emerald-200"}`}>{scheduleMessage}</p> : null}
+                </div> : null}</> : null}
               </>
             ) : (
               <div className="mt-5 rounded-[22px] border border-dashed border-white/16 bg-white/5 px-5 py-10 text-center">
@@ -402,7 +495,7 @@ export function DeliveryEstimator() {
         </div>
 
         <section className="mt-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-          <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-700">Courier connections</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Best providers for AvantiaBuild</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Uber Direct is connected for urgent packages up to 50 lb. Curri, Roadie, and GoShare remain the better paths for pickup trucks, vans, and bulky construction materials.</p></div><Link href="/owner/delivery-requests" className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold">Owner request desk</Link></div>
+          <div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-700">Courier connections</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Provider setup and dispatch options</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Uber Direct is connected for urgent packages up to 50 lb. Curri, Roadie, and GoShare remain the better paths for pickup trucks, vans, and bulky construction materials.</p></div>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {DELIVERY_PARTNERS.map((partner) => (
               <article key={partner.name} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">

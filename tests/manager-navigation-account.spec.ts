@@ -17,6 +17,8 @@ test("customer navigation exposes one clean manager entry and My Account", async
   expect(header).not.toContain('href: "/admin/traffic"');
   expect(header).not.toContain('href: "/admin/users"');
   expect(header).not.toContain('href: "/admin/vendors"');
+  expect(header).not.toContain('href: "/delivery"');
+  expect(header).not.toContain('label: "Jobsite Delivery"');
   expect(drawer).toContain("My Account");
   expect(drawer).not.toContain(">›</span>");
 });

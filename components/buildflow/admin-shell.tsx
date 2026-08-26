@@ -53,7 +53,7 @@ function navigationLinks(access: ManagerAccess) {
       { href: "/admin/supplier-quotes", label: "Supplier Quote Storage", icon: Archive },
       { href: "/admin/quote-comparison", label: "Quote Comparison", icon: Columns3 },
     ] : []),
-    ...(access.aiTools ? [{ href: "/admin/ai-tools", label: "AI Tools — Coming Soon", icon: Sparkles }] : []),
+    ...(access.aiTools ? [{ href: "/admin/ai-tools", label: "AI Tools", icon: Sparkles }] : []),
     ...(access.owner ? [{ href: "/admin/payments", label: "Payments", icon: CreditCard }] : []),
   ];
 }
