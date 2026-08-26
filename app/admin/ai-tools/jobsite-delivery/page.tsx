@@ -5,7 +5,6 @@ import { DeliveryEstimator } from "@/components/buildflow/delivery-estimator";
 import { DeliveryRequestQueue } from "@/components/buildflow/delivery-request-queue";
 import { requireManagerPortalProfile } from "@/lib/auth";
 import { loadDeliveryRequests } from "@/lib/delivery-requests";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
   title: "Jobsite Delivery | Avantia Build Manager",
@@ -13,10 +12,10 @@ export const metadata: Metadata = {
 };
 
 export default async function ManagerJobsiteDeliveryPage() {
-  const { access, profile, user } = await requireManagerPortalProfile();
+  const { access, profile, supabase, user } = await requireManagerPortalProfile();
   if (!access.aiTools) redirect("/");
 
-  const requests = await loadDeliveryRequests(createAdminClient());
+  const requests = await loadDeliveryRequests(supabase);
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#f5f8fc_0%,#eaf1fa_48%,#f8fafc_100%)]">

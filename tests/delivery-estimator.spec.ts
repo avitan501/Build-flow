@@ -37,6 +37,8 @@ test("jobsite delivery is Manager-only and wired into AI Tools", async () => {
   expect(aiTools).toContain('href: "/admin/ai-tools/jobsite-delivery"')
   expect(managerDashboard).toContain('label: "Jobsite Delivery"')
   expect(page).toContain("requireManagerPortalProfile")
+  expect(page).toContain("loadDeliveryRequests(supabase)")
+  expect(page).not.toContain("createAdminClient")
   expect(actions).toContain("requireManagerPortalProfile")
   expect(actions).toContain('status: z.enum(["new", "quoted", "dispatched", "completed", "cancelled"])')
   expect(actions).toContain('pickupCoordinates: z.string().trim().max(100)')
