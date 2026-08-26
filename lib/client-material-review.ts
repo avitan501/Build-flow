@@ -64,17 +64,15 @@ function normalizedReviewReasons(item: ReviewableMaterialItem) {
     : []
   const normalized = stored.flatMap((reason) => {
     if (/^quantity is missing$/i.test(reason)) return []
-    if (/^(?:sales? unit|selling unit|unit) is missing$/i.test(reason)) return usableUnit(item.unit) ? [] : ["Confirm sales unit"]
+    if (/^(?:confirm\s+)?(?:sales? unit|selling unit|unit)(?:\s+is missing)?$/i.test(reason)) return []
     return [reason]
   })
-  if (!usableUnit(item.unit) && !normalized.some((reason) => /\bunit\b/i.test(reason))) normalized.unshift("Confirm sales unit")
   return unique(normalized).slice(0, 5)
 }
 
 export function materialReviewStatus(item: ReviewableMaterialItem): MaterialReviewStatus {
   const stored = text(item.metadata?.review_status) as MaterialReviewStatus
   const reasons = normalizedReviewReasons(item)
-  if (stored === "missing" && reasons.length && reasons.every((reason) => /^confirm sales unit$/i.test(reason))) return "check"
   if (KNOWN_STATUSES.has(stored)) return reasons.length || stored === "ready" ? stored : "ready"
   return item.metadata?.needs_review === true ? "check" : "ready"
 }

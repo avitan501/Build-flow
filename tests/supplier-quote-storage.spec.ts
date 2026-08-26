@@ -315,8 +315,13 @@ test("organized rows use safe order defaults without showing false missing error
   expect(materialQuantity(item)).toBe(1)
   expect(materialSalesUnit(item)).toBe("sheets")
   expect(suggestedSalesUnits(item)).toEqual(["sheets", "pieces"])
-  expect(materialReviewReasons(item)).toEqual(["Confirm sales unit"])
-  expect(materialReviewStatus(item)).toBe("check")
+  expect(materialReviewReasons(item)).toEqual([])
+  expect(materialReviewStatus(item)).toBe("ready")
+
+  const waterHeater = { ...item, id: "water-heater", name: "Rheem XE38S06ST45U1 electric water heater", department: "Plumbing" }
+  expect(materialSalesUnit(waterHeater)).toBe("each")
+  expect(materialReviewReasons(waterHeater)).toEqual([])
+  expect(materialReviewStatus(waterHeater)).toBe("ready")
 })
 
 test("supplier detection matches the directory or keeps the name read from the invoice", async () => {
