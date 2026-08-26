@@ -25,6 +25,15 @@ export type SavedDeliveryRequest = {
     total: number;
     serviceFee: number;
   };
+  providerQuote?: {
+    provider: "Uber Direct";
+    quoteId: string;
+    total: number;
+    currency: string;
+    pickupMinutes: number | null;
+    durationMinutes: number | null;
+    expiresAt: string;
+  };
   status: "new" | "quoted" | "dispatched" | "completed" | "cancelled";
   createdAt: string;
 };

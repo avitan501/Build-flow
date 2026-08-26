@@ -29,10 +29,10 @@ export const DELIVERY_PARTNERS = [
   {
     name: "Uber Direct",
     bestFor: "Small, urgent items that fit normal courier vehicles",
-    vehicles: "Courier vehicle depends on the market and approved account",
+    vehicles: "Production account supports packages up to 50 lb that fit in a normal courier vehicle",
     integration: "API creates a live quote first, then creates and tracks the delivery with that quote ID.",
-    applyUrl: "https://merchants.ubereats.com/us/en/services/uber-direct/",
+    applyUrl: "https://direct.uber.com/",
     docsUrl: "https://developer.uber.com/docs/deliveries/get-started",
-    recommendation: "Use after confirming material-size limits",
+    recommendation: "Connected for live production quotes",
   },
 ] as const;

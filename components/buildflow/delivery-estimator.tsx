@@ -19,6 +19,16 @@ const currency = new Intl.NumberFormat("en-US", {
   currency: "USD",
 })
 
+type LiveUberQuote = {
+  quoteId: string
+  total: number
+  currency: string
+  durationMinutes: number | null
+  pickupMinutes: number | null
+  dropoffEta: string | null
+  expiresAt: string
+}
+
 function PinIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -48,12 +58,17 @@ export function DeliveryEstimator() {
   const [jobsiteName, setJobsiteName] = useState("")
   const [jobsiteAddress, setJobsiteAddress] = useState("")
   const [jobsiteCoordinates, setJobsiteCoordinates] = useState("")
+  const [weightPounds, setWeightPounds] = useState("20")
   const [vehicle, setVehicle] = useState<DeliveryVehicle>("small")
   const [speed, setSpeed] = useState<DeliverySpeed>("rush")
   const [locationState, setLocationState] = useState<"idle" | "loading" | "error">("idle")
   const [savedReference, setSavedReference] = useState("")
   const [saveMessage, setSaveMessage] = useState("")
   const [needsLogin, setNeedsLogin] = useState(false)
+  const [liveQuote, setLiveQuote] = useState<LiveUberQuote | null>(null)
+  const [liveQuoteState, setLiveQuoteState] = useState<"idle" | "loading" | "error">("idle")
+  const [liveQuoteMessage, setLiveQuoteMessage] = useState("")
+  const [liveQuoteNeedsLogin, setLiveQuoteNeedsLogin] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const origin = useMemo(() => parseCoordinatePair(pickupCoordinates), [pickupCoordinates])
@@ -65,7 +80,55 @@ export function DeliveryEstimator() {
 
   const pickupInvalid = pickupCoordinates.length > 0 && !origin
   const jobsiteInvalid = jobsiteCoordinates.length > 0 && !destination
+  const parsedWeight = Number(weightPounds)
+  const uberPackageEligible = (vehicle === "small" || vehicle === "car") && Number.isFinite(parsedWeight) && parsedWeight > 0 && parsedWeight <= 50
+  const readyForLiveQuote = pickupAddress.trim().length >= 8 && jobsiteAddress.trim().length >= 8 && uberPackageEligible
   const readyToSave = Boolean(storeName.trim() && estimate)
+
+  function resetLiveQuote() {
+    setLiveQuote(null)
+    setLiveQuoteMessage("")
+    setLiveQuoteNeedsLogin(false)
+    setLiveQuoteState("idle")
+  }
+
+  async function requestLiveQuote() {
+    if (!readyForLiveQuote) {
+      setLiveQuoteState("error")
+      setLiveQuoteMessage("Enter both complete addresses and use a small item or car load up to 50 lb.")
+      return
+    }
+
+    setLiveQuoteState("loading")
+    setLiveQuoteMessage("")
+    setLiveQuoteNeedsLogin(false)
+    try {
+      const response = await fetch("/api/delivery/uber/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pickupAddress: pickupAddress.trim(),
+          dropoffAddress: jobsiteAddress.trim(),
+          weightPounds: parsedWeight,
+          vehicle,
+        }),
+      })
+      const payload = await response.json() as { ok?: boolean; error?: string; code?: string; quote?: LiveUberQuote }
+      if (!response.ok || !payload.ok || !payload.quote) {
+        setLiveQuote(null)
+        setLiveQuoteNeedsLogin(response.status === 401 || payload.code === "sign_in_required")
+        setLiveQuoteMessage(payload.error || "Uber could not return a live quote right now.")
+        setLiveQuoteState("error")
+        return
+      }
+      setLiveQuote(payload.quote)
+      setLiveQuoteState("idle")
+    } catch {
+      setLiveQuote(null)
+      setLiveQuoteMessage("Uber could not return a live quote right now.")
+      setLiveQuoteState("error")
+    }
+  }
 
   function useCurrentLocation() {
     if (!navigator.geolocation) {
@@ -100,6 +163,17 @@ export function DeliveryEstimator() {
       vehicle,
       speed,
       estimate,
+      ...(liveQuote ? {
+        providerQuote: {
+          provider: "Uber Direct" as const,
+          quoteId: liveQuote.quoteId,
+          total: liveQuote.total,
+          currency: liveQuote.currency,
+          pickupMinutes: liveQuote.pickupMinutes,
+          durationMinutes: liveQuote.durationMinutes,
+          expiresAt: liveQuote.expiresAt,
+        },
+      } : {}),
       createdAt: new Date().toISOString(),
     }
 
@@ -125,9 +199,10 @@ export function DeliveryEstimator() {
         speed,
         estimate: {
           estimatedRoadMiles: estimate.estimatedRoadMiles,
-          total: estimate.total,
-          serviceFee: estimate.serviceFee,
+          total: liveQuote?.total ?? estimate.total,
+          serviceFee: liveQuote ? 0 : estimate.serviceFee,
         },
+        providerQuote: request.providerQuote,
       })
       if (result.ok) {
         setSavedReference(result.reference)
@@ -172,7 +247,7 @@ export function DeliveryEstimator() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700">01 · Route</p>
                 <h2 className="mt-1 text-xl font-semibold tracking-tight">Where is it going?</h2>
               </div>
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Instant estimate</span>
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Live + planning</span>
             </div>
 
             <div className="mt-6 flex gap-3">
@@ -185,7 +260,7 @@ export function DeliveryEstimator() {
                   </label>
                   <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                     Pickup address <span className="font-normal text-slate-400">(for live quote)</span>
-                    <input value={pickupAddress} onChange={(event) => setPickupAddress(event.target.value)} placeholder="Street, city, state, ZIP" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+                    <input value={pickupAddress} onChange={(event) => { setPickupAddress(event.target.value); resetLiveQuote() }} placeholder="Street, city, state, ZIP" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
                   </label>
                   <label className="grid gap-1.5 text-sm font-semibold text-slate-700 sm:col-span-2">
                     Pickup coordinates
@@ -201,7 +276,7 @@ export function DeliveryEstimator() {
                   </label>
                   <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                     Jobsite address <span className="font-normal text-slate-400">(for live quote)</span>
-                    <input value={jobsiteAddress} onChange={(event) => setJobsiteAddress(event.target.value)} placeholder="Street, city, state, ZIP" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+                    <input value={jobsiteAddress} onChange={(event) => { setJobsiteAddress(event.target.value); resetLiveQuote() }} placeholder="Street, city, state, ZIP" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
                   </label>
                   <div className="sm:col-span-2">
                     <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
@@ -222,9 +297,14 @@ export function DeliveryEstimator() {
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700">02 · Item size</p>
               <h2 className="mt-1 text-xl font-semibold tracking-tight">What should we send?</h2>
+              <label className="mt-4 grid max-w-xs gap-1.5 text-sm font-semibold text-slate-700">
+                Package weight (lb)
+                <input type="number" min="1" max="50" step="1" value={weightPounds} onChange={(event) => { setWeightPounds(event.target.value); resetLiveQuote() }} className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+                <span className={`text-xs font-normal ${Number.isFinite(parsedWeight) && parsedWeight > 0 && parsedWeight <= 50 ? "text-slate-500" : "text-rose-600"}`}>Uber Direct packages must be 50 lb or less and fit in a normal vehicle.</span>
+              </label>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 {(Object.entries(DELIVERY_VEHICLES) as [DeliveryVehicle, (typeof DELIVERY_VEHICLES)[DeliveryVehicle]][]).map(([key, option]) => (
-                  <button key={key} type="button" onClick={() => setVehicle(key)} aria-pressed={vehicle === key} className={`rounded-2xl border p-4 text-left transition active:scale-[0.99] ${vehicle === key ? "border-[#0e2341] bg-[#0e2341] text-white shadow-[0_12px_28px_rgba(14,35,65,0.18)]" : "border-slate-200 bg-slate-50 text-slate-950 hover:border-slate-300 hover:bg-white"}`}>
+                  <button key={key} type="button" onClick={() => { setVehicle(key); resetLiveQuote() }} aria-pressed={vehicle === key} className={`rounded-2xl border p-4 text-left transition active:scale-[0.99] ${vehicle === key ? "border-[#0e2341] bg-[#0e2341] text-white shadow-[0_12px_28px_rgba(14,35,65,0.18)]" : "border-slate-200 bg-slate-50 text-slate-950 hover:border-slate-300 hover:bg-white"}`}>
                     <span className="flex items-center justify-between gap-3">
                       <span className="text-sm font-semibold">{option.label}</span>
                       <span className={`text-xs font-semibold ${vehicle === key ? "text-amber-300" : "text-slate-500"}`}>from {currency.format(option.minimum)}</span>
@@ -232,6 +312,14 @@ export function DeliveryEstimator() {
                     <span className={`mt-1 block text-xs leading-5 ${vehicle === key ? "text-slate-300" : "text-slate-500"}`}>{option.description}</span>
                   </button>
                 ))}
+              </div>
+              <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div><p className="text-sm font-semibold text-slate-950">Uber Direct live price</p><p className="mt-1 text-xs text-slate-600">Uses the two full addresses above. Requesting a quote does not create or charge for a delivery.</p></div>
+                  <button type="button" onClick={requestLiveQuote} disabled={!readyForLiveQuote || liveQuoteState === "loading"} className="min-h-11 rounded-xl bg-[#10233f] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45">{liveQuoteState === "loading" ? "Checking Uber…" : "Get live Uber price"}</button>
+                </div>
+                {liveQuote ? <div role="status" className="mt-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-emerald-800"><strong>{currency.format(liveQuote.total)}</strong> live provider fee · {liveQuote.pickupMinutes !== null ? `${liveQuote.pickupMinutes} min pickup` : "Pickup time shown after dispatch"} · no AvantiaBuild markup</div> : null}
+                {liveQuoteMessage ? <div role="alert" className="mt-3 rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm text-rose-700">{liveQuoteMessage}{liveQuoteNeedsLogin ? <Link href="/login?next=/delivery" className="ml-2 font-bold underline underline-offset-4">Sign in</Link> : null}</div> : null}
               </div>
             </div>
 
@@ -254,40 +342,44 @@ export function DeliveryEstimator() {
           <aside className="rounded-[28px] border border-[#1b365d] bg-[#0e2341] p-5 text-white shadow-[0_22px_54px_rgba(14,35,65,0.2)] lg:sticky lg:top-20 sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-300">Your estimate</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-300">{liveQuote ? "Live provider quote" : "Your estimate"}</p>
                 <h2 className="mt-1 text-xl font-semibold">Complete price</h2>
               </div>
-              <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1 text-xs text-slate-300">USD</span>
+              <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1 text-xs text-slate-300">{liveQuote ? "Uber Direct" : "USD"}</span>
             </div>
 
-            {estimate ? (
+            {estimate || liveQuote ? (
               <>
-                <div className="mt-5 grid grid-cols-2 gap-2">
-                  <div className="rounded-2xl border border-white/10 bg-white/7 p-3">
-                    <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Distance</p>
-                    <p className="mt-1 text-2xl font-semibold tracking-tight">{estimate.estimatedRoadMiles} <span className="text-sm font-normal text-slate-400">mi</span></p>
-                    <p className="mt-1 text-[10px] text-slate-500">Road distance estimate</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/7 p-3">
-                    <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Pickup</p>
-                    <p className="mt-1 text-sm font-semibold text-amber-200">{DELIVERY_SPEEDS[speed].eta}</p>
-                    <p className="mt-2 text-[10px] text-slate-500">Subject to driver availability</p>
-                  </div>
-                </div>
+                {liveQuote ? <div className="mt-5 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4"><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-emerald-100">Uber Direct production quote</p><span className="rounded-full bg-emerald-200/15 px-2.5 py-1 text-[10px] font-bold text-emerald-100">0% markup</span></div><div className="mt-3 grid grid-cols-2 gap-2 text-xs text-emerald-50/80"><p>Pickup: <strong className="text-white">{liveQuote.pickupMinutes !== null ? `${liveQuote.pickupMinutes} min` : "Pending"}</strong></p><p>Trip: <strong className="text-white">{liveQuote.durationMinutes !== null ? `${liveQuote.durationMinutes} min` : "Pending"}</strong></p></div><p className="mt-3 text-[10px] text-emerald-50/60">Quote expires {new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(liveQuote.expiresAt))}. Saving it does not dispatch a courier.</p></div> : null}
 
-                <dl className="mt-5 space-y-3 border-y border-white/10 py-5 text-sm">
-                  <div className="flex justify-between gap-4"><dt className="text-slate-400">Base · {DELIVERY_VEHICLES[vehicle].label}</dt><dd>{currency.format(estimate.baseCharge)}</dd></div>
-                  <div className="flex justify-between gap-4"><dt className="text-slate-400">Mileage · {estimate.estimatedRoadMiles} mi</dt><dd>{currency.format(estimate.mileageCharge)}</dd></div>
-                  <div className="flex justify-between gap-4"><dt className="text-slate-400">{DELIVERY_SPEEDS[speed].label} priority</dt><dd>{currency.format(estimate.priorityCharge)}</dd></div>
-                  <div className="flex justify-between gap-4"><dt className="text-slate-400">Coordination fee</dt><dd>{currency.format(estimate.serviceFee)}</dd></div>
-                </dl>
+                {estimate ? <>
+                  <div className="mt-5 grid grid-cols-2 gap-2">
+                    <div className="rounded-2xl border border-white/10 bg-white/7 p-3">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Distance</p>
+                      <p className="mt-1 text-2xl font-semibold tracking-tight">{estimate.estimatedRoadMiles} <span className="text-sm font-normal text-slate-400">mi</span></p>
+                      <p className="mt-1 text-[10px] text-slate-500">Road distance estimate</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/7 p-3">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Pickup</p>
+                      <p className="mt-1 text-sm font-semibold text-amber-200">{liveQuote?.pickupMinutes !== null && liveQuote?.pickupMinutes !== undefined ? `${liveQuote.pickupMinutes} min` : DELIVERY_SPEEDS[speed].eta}</p>
+                      <p className="mt-2 text-[10px] text-slate-500">Subject to courier availability</p>
+                    </div>
+                  </div>
+
+                  {!liveQuote ? <dl className="mt-5 space-y-3 border-y border-white/10 py-5 text-sm">
+                    <div className="flex justify-between gap-4"><dt className="text-slate-400">Base · {DELIVERY_VEHICLES[vehicle].label}</dt><dd>{currency.format(estimate.baseCharge)}</dd></div>
+                    <div className="flex justify-between gap-4"><dt className="text-slate-400">Mileage · {estimate.estimatedRoadMiles} mi</dt><dd>{currency.format(estimate.mileageCharge)}</dd></div>
+                    <div className="flex justify-between gap-4"><dt className="text-slate-400">{DELIVERY_SPEEDS[speed].label} priority</dt><dd>{currency.format(estimate.priorityCharge)}</dd></div>
+                    <div className="flex justify-between gap-4"><dt className="text-slate-400">Coordination fee</dt><dd>{currency.format(estimate.serviceFee)}</dd></div>
+                  </dl> : <p className="mt-4 text-xs text-slate-400">The live Uber fee replaces the website planning formula. AvantiaBuild adds no delivery markup.</p>}
+                </> : <p className="mt-4 text-xs leading-5 text-slate-400">Add route coordinates if you also want the mileage comparison and to save this quote to the owner delivery desk.</p>}
 
                 <div className="flex items-end justify-between gap-4 py-5">
-                  <div><p className="text-xs text-slate-400">Estimated total</p><p className="mt-1 text-xs text-slate-500">Before tolls or waiting time</p></div>
-                  <p className="text-4xl font-semibold tracking-[-0.05em] text-amber-300">{currency.format(estimate.total)}</p>
+                  <div><p className="text-xs text-slate-400">{liveQuote ? "Uber delivery fee" : "Estimated total"}</p><p className="mt-1 text-xs text-slate-500">{liveQuote ? "No AvantiaBuild markup" : "Before tolls or waiting time"}</p></div>
+                  <p className="text-4xl font-semibold tracking-[-0.05em] text-amber-300">{currency.format(liveQuote?.total ?? estimate?.total ?? 0)}</p>
                 </div>
 
-                <label className="grid gap-1.5 text-xs font-semibold text-slate-300">
+                {estimate ? <><label className="grid gap-1.5 text-xs font-semibold text-slate-300">
                   Store pickup / order number <span className="font-normal text-slate-500">(optional)</span>
                   <input value={orderNumber} onChange={(event) => setOrderNumber(event.target.value)} placeholder="Order # or pickup code" className="min-h-12 rounded-2xl border border-white/12 bg-white/8 px-4 text-base font-normal text-white outline-none placeholder:text-slate-500 focus:border-amber-300 focus:ring-4 focus:ring-amber-300/10" />
                 </label>
@@ -295,26 +387,26 @@ export function DeliveryEstimator() {
                 <button type="button" onClick={saveRequest} disabled={!readyToSave || isPending} className="mt-4 flex min-h-14 w-full items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-5 text-base font-semibold text-[#0e2341] shadow-[0_16px_32px_rgba(220,168,69,0.2)] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45">
                   {isPending ? "Saving…" : "Save delivery request"}
                 </button>
-                {savedReference ? <div role="status" className="mt-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-center text-sm text-emerald-200"><p>Saved as <strong>{savedReference}</strong></p>{saveMessage ? <p className="mt-1 text-xs text-emerald-100/80">{saveMessage}</p> : null}{needsLogin ? <Link href="/login?next=/delivery" className="mt-2 inline-block font-bold underline underline-offset-4">Sign in</Link> : null}</div> : null}
+                {savedReference ? <div role="status" className="mt-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-center text-sm text-emerald-200"><p>Saved as <strong>{savedReference}</strong></p>{saveMessage ? <p className="mt-1 text-xs text-emerald-100/80">{saveMessage}</p> : null}{needsLogin ? <Link href="/login?next=/delivery" className="mt-2 inline-block font-bold underline underline-offset-4">Sign in</Link> : null}</div> : null}</> : null}
               </>
             ) : (
               <div className="mt-5 rounded-[22px] border border-dashed border-white/16 bg-white/5 px-5 py-10 text-center">
                 <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white/8 text-amber-300"><PinIcon /></span>
-                <p className="mt-4 text-sm font-semibold">Add both coordinates</p>
-                <p className="mt-1 text-xs leading-5 text-slate-400">Your distance and full price will appear here instantly.</p>
+                <p className="mt-4 text-sm font-semibold">Add addresses for a live price</p>
+                <p className="mt-1 text-xs leading-5 text-slate-400">Use both full addresses for Uber, or add coordinates for the planning estimate.</p>
               </div>
             )}
 
-            <p className="mt-4 text-[10px] leading-4 text-slate-500">Planning estimate only—not a Curri, Roadie, GoShare, or Uber quote. Final price, vehicle availability, tolls, waiting time, and item limits come from the selected courier before dispatch.</p>
+            <p className="mt-4 text-[10px] leading-4 text-slate-500">{liveQuote ? "Live Uber Direct quote. The amount can change after it expires or if the route, package, waiting time, or delivery details change. No courier is dispatched until a delivery is separately confirmed." : "Planning estimate only. Final price, vehicle availability, tolls, waiting time, and item limits come from the selected courier before dispatch."}</p>
           </aside>
         </div>
 
         <section className="mt-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-          <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-700">Courier connections</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Best providers for AvantiaBuild</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Apply to Curri first, keep Roadie as the fast backup, and use GoShare for bulky loads. Uber Direct is better for smaller urgent items after its size rules are confirmed.</p></div><Link href="/owner/delivery-requests" className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold">Owner request desk</Link></div>
+          <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-700">Courier connections</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Best providers for AvantiaBuild</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Uber Direct is connected for urgent packages up to 50 lb. Curri, Roadie, and GoShare remain the better paths for pickup trucks, vans, and bulky construction materials.</p></div><Link href="/owner/delivery-requests" className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold">Owner request desk</Link></div>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {DELIVERY_PARTNERS.map((partner) => (
               <article key={partner.name} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold">{partner.name}</h3><p className="mt-1 text-xs font-bold text-sky-700">{partner.recommendation}</p></div><span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600 ring-1 ring-slate-200">Live quote after approval</span></div>
+                <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold">{partner.name}</h3><p className="mt-1 text-xs font-bold text-sky-700">{partner.recommendation}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${partner.name === "Uber Direct" ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-white text-slate-600 ring-slate-200"}`}>{partner.name === "Uber Direct" ? "Connected · live" : "Live quote after approval"}</span></div>
                 <p className="mt-3 text-sm font-medium text-slate-800">{partner.bestFor}</p><p className="mt-2 text-xs leading-5 text-slate-500">{partner.vehicles}</p><p className="mt-2 text-xs leading-5 text-slate-500">{partner.integration}</p>
                 <div className="mt-4 flex gap-2"><a href={partner.applyUrl} target="_blank" rel="noreferrer" className="rounded-xl bg-[#10233f] px-3 py-2 text-xs font-bold text-white">Apply / contact</a><a href={partner.docsUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold">API details</a></div>
               </article>

@@ -22,6 +22,15 @@ const requestSchema = z.object({
     total: z.number().nonnegative().max(100000),
     serviceFee: z.number().nonnegative().max(10000),
   }),
+  providerQuote: z.object({
+    provider: z.literal("Uber Direct"),
+    quoteId: z.string().trim().min(3).max(200),
+    total: z.number().nonnegative().max(100000),
+    currency: z.string().trim().length(3),
+    pickupMinutes: z.number().nonnegative().max(1440).nullable(),
+    durationMinutes: z.number().nonnegative().max(1440).nullable(),
+    expiresAt: z.iso.datetime(),
+  }).optional(),
 });
 
 export type DeliveryRequestInput = z.infer<typeof requestSchema>;
