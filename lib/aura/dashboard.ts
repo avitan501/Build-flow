@@ -92,6 +92,7 @@ export function normalizeAuraCommunications(rows: unknown[] | null | undefined):
       ...row,
       next_steps: jsonArray<string>(row.next_steps),
       media: jsonArray<{ url?: string; type?: string; duration?: number }>(row.media),
+      links: jsonArray<AuraCommunicationLink>(row.links),
     };
   });
 }

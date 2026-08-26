@@ -9,7 +9,6 @@ import { syncRecentTwilioWhatsAppMessages } from "@/lib/aura/twilio-whatsapp"
 import { COMMUNICATION_LOG_PREFIX, parseCommunicationLog } from "@/lib/manager-command-center"
 import { listInboxThreads } from "@/lib/whatsapp-draft-inbox"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { loadAuraCommunicationLinks } from "@/lib/aura/email-links"
 import type { ShopQualificationSettings, SupplierRoutingOption } from "@/lib/shop-qualification"
 
 type ManagerAuraData = {
@@ -79,11 +78,9 @@ export default async function CommunicationsPage({
   const leads = (leadsResult.data ?? []) as AuraLeadRecipient[]
   const suppliers = (supplierSnapshot?.settings?.suppliers ?? []).filter((supplier): supplier is SupplierRoutingOption => Boolean(supplier?.id && supplier?.name))
   const communications = normalizeAuraCommunications(aura?.communications ?? [])
-  const emailLinks = await loadAuraCommunicationLinks(communications.filter((item) => item.channel === "email").map((item) => item.id))
-  const communicationsWithLinks = communications.map((item) => ({ ...item, links: emailLinks.filter((link) => link.communication_id === item.id) }))
   const liveAura = aura?.communications && aura.contacts && aura.connections
     ? {
-        communications: communicationsWithLinks,
+        communications,
         contacts: aura.contacts,
         customers,
         leads,
