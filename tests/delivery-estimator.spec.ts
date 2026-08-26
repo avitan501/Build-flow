@@ -19,7 +19,7 @@ test("delivery planning math remains deterministic and itemized", () => {
 })
 
 test("jobsite delivery is Manager-only and wired into AI Tools", async () => {
-  const [header, shopNavigation, aiTools, managerDashboard, page, actions, estimator, quoteApi, scheduleApi, uberDirect, quoteFunction] = await Promise.all([
+  const [header, shopNavigation, aiTools, managerDashboard, page, actions, estimator, autocomplete, locationApi, quoteApi, scheduleApi, uberDirect, quoteFunction] = await Promise.all([
     readFile(path.join(root, "components/buildflow/mobile-client-header.tsx"), "utf8"),
     readFile(path.join(root, "lib/shop-navigation.ts"), "utf8"),
     readFile(path.join(root, "app/admin/ai-tools/page.tsx"), "utf8"),
@@ -27,6 +27,8 @@ test("jobsite delivery is Manager-only and wired into AI Tools", async () => {
     readFile(path.join(root, "app/admin/ai-tools/jobsite-delivery/page.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/ai-tools/jobsite-delivery/actions.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/delivery-estimator.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/location-autocomplete.tsx"), "utf8"),
+    readFile(path.join(root, "app/api/location/search/route.ts"), "utf8"),
     readFile(path.join(root, "app/api/delivery/uber/quote/route.ts"), "utf8"),
     readFile(path.join(root, "app/api/delivery/uber/schedule/route.ts"), "utf8"),
     readFile(path.join(root, "lib/uber-direct.ts"), "utf8"),
@@ -45,9 +47,13 @@ test("jobsite delivery is Manager-only and wired into AI Tools", async () => {
   expect(actions).toContain('jobsiteCoordinates: z.string().trim().max(100)')
   expect(estimator).toContain('fetch("/api/delivery/uber/quote"')
   expect(estimator).toContain("Saved to the Manager delivery queue.")
-  expect(estimator).toContain('autoComplete="street-address"')
-  expect(estimator).toContain("delivery-store-suggestions")
-  expect(estimator).toContain("Find this store address")
+  expect(estimator).toContain("LocationAutocomplete")
+  expect(estimator).toContain("Open store search in Maps")
+  expect(estimator).toContain("address_undeliverable")
+  expect(autocomplete).toContain('/api/location/search?q=')
+  expect(autocomplete).toContain('aria-autocomplete="list"')
+  expect(locationApi).toContain("searchLocations")
+  expect(locationApi).toContain("managerCapabilities")
   expect(estimator).toContain("Schedule Uber delivery")
   expect(estimator).toContain("Scheduling can create a charge with Uber Direct")
   expect(quoteApi).toContain("managerCapabilities")
@@ -60,6 +66,7 @@ test("jobsite delivery is Manager-only and wired into AI Tools", async () => {
   expect(uberDirect).toContain('get_uber_direct_credentials')
   expect(uberDirect).toContain('/delivery_quotes`')
   expect(uberDirect).toContain('/deliveries`')
+  expect(uberDirect).toContain("address_undeliverable")
   expect(quoteFunction).toContain("managerAuthorized")
   expect(quoteFunction).toContain('code: "manager_access_required"')
 })

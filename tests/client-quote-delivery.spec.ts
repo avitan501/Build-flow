@@ -46,9 +46,9 @@ test("client quote email is branded and excludes internal pricing", async () => 
     expect(body.subject).toContain("ABQ-TEST");
     expect(String(body.html)).toContain("avantia-build-lockup-share.png");
     expect(String(body.html)).toContain("(516) 908-8319");
-    expect(String(body.html)).toContain("processing fee of up to 3%");
+    expect(String(body.html)).toContain("3% processing fee applies");
     expect(String(body.html)).not.toContain("Valid through");
-    expect(String(body.text)).toContain("processing fee of up to 3%");
+    expect(String(body.text)).toContain("3% processing fee applies");
     expect(String(body.text)).not.toContain("2026-09-12");
     expect(String(body.html)).not.toMatch(/supplier cost|private profit|markup/i);
     expect(body.attachments).toEqual([{ filename: "ABQ-TEST.pdf", content: "JVBERi0xLjQK" }]);

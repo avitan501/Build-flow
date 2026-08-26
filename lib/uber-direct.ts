@@ -80,8 +80,10 @@ export async function quoteUberDirect(input: { pickupAddress: string; dropoffAdd
   });
   const quote = await response.json().catch(() => null) as Record<string, unknown> | null;
   if (!response.ok) {
-    const detail = [quote?.code, quote?.error, quote?.message].filter((value): value is string => typeof value === "string").join(" ").toLowerCase();
+    const providerCode = [quote?.code, quote?.error].find((value): value is string => typeof value === "string")?.toLowerCase() || "";
+    const detail = [providerCode, quote?.message].filter((value): value is string => typeof value === "string").join(" ").toLowerCase();
     if (detail.includes("tax_form_required")) throw new UberDirectError("tax_form_required", "Uber requires the business tax form before live quotes.");
+    if (detail.includes("address_undeliverable")) throw new UberDirectError("address_undeliverable", "Uber Direct does not serve this exact route. Try a closer pickup location or another courier.");
     throw new UberDirectError("provider_error", "Uber could not quote this route right now.");
   }
   if (!quote?.id || !Number.isFinite(quote.fee) || typeof quote.expires !== "string") throw new UberDirectError("incomplete_quote", "Uber returned an incomplete quote.");

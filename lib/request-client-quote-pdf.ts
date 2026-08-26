@@ -25,6 +25,7 @@ export type RequestClientQuotePdfInput = {
   lines: RequestClientQuoteLine[]
   deliveryCharge: number
   salesTaxRate: number
+  taxableDelivery: boolean
   terms: string
   ach?: {
     bankName: string
@@ -76,7 +77,7 @@ export async function generateRequestClientQuotePdf(input: RequestClientQuotePdf
   const logoBytes = await readFile(path.join(process.cwd(), "public/images/avantia/avantia-build-lockup-share.png"))
   const logo = await pdf.embedPng(logoBytes)
   const subtotal = input.lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0)
-  const salesTax = (subtotal + input.deliveryCharge) * input.salesTaxRate / 100
+  const salesTax = (subtotal + (input.taxableDelivery ? input.deliveryCharge : 0)) * input.salesTaxRate / 100
   const total = subtotal + input.deliveryCharge + salesTax
 
   function addPage() {

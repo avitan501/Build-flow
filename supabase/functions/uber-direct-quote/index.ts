@@ -127,14 +127,20 @@ Deno.serve(async (request) => {
     );
     const quote = await quoteResponse.json().catch(() => null) as Record<string, unknown> | null;
     if (!quoteResponse.ok) {
-      const detail = [quote?.code, quote?.error, quote?.message]
+      const providerCode = [quote?.code, quote?.error]
+        .find((value): value is string => typeof value === "string")
+        ?.slice(0, 100) || "provider_error";
+      const detail = [providerCode, quote?.message]
         .filter((value): value is string => typeof value === "string")
         .join(" ")
         .toLowerCase();
       if (detail.includes("tax_form_required")) {
         return json({ ok: false, code: "tax_form_required", error: "Uber requires the business tax form before live quotes." }, 503);
       }
-      return json({ ok: false, code: "provider_error", error: "Uber could not quote this route right now." }, 502);
+      if (detail.includes("address_undeliverable")) {
+        return json({ ok: false, code: "address_undeliverable", providerCode, error: "Uber Direct does not serve this exact route. Try a closer pickup location or another courier." }, 422);
+      }
+      return json({ ok: false, code: "provider_error", providerCode, error: "Uber could not quote this route right now." }, 502);
     }
 
     if (!quote?.id || !Number.isFinite(quote.fee) || typeof quote.expires !== "string") {

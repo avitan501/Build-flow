@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react"
 
 import { saveDeliveryRequestAction } from "@/app/admin/ai-tools/jobsite-delivery/actions"
+import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
 import { DELIVERY_PARTNERS } from "@/lib/delivery-partners"
 import {
   calculateDeliveryEstimate,
@@ -111,10 +112,6 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
   const readyForLiveQuote = pickupAddress.trim().length >= 8 && jobsiteAddress.trim().length >= 8 && uberPackageEligible && timingReady
   const readyToSave = Boolean(storeName.trim() && pickupAddress.trim() && jobsiteAddress.trim() && (estimate || liveQuote) && timingReady)
   const draftFingerprint = JSON.stringify([storeName, pickupAddress, pickupCoordinates, jobsiteName, jobsiteAddress, jobsiteCoordinates, pickupContactName, pickupPhone, dropoffContactName, dropoffPhone, itemDescription, weightPounds, vehicle, speed, deliveryTiming, scheduledPickupLocal, liveQuote?.quoteId || ""])
-  const storeSuggestions = useMemo(() => Array.from(new Set(deliveryHistory.map((item) => item.storeName).filter(Boolean))), [deliveryHistory])
-  const pickupAddressSuggestions = useMemo(() => Array.from(new Set(deliveryHistory.map((item) => item.pickupAddress).filter(Boolean))), [deliveryHistory])
-  const jobsiteAddressSuggestions = useMemo(() => Array.from(new Set(deliveryHistory.map((item) => item.jobsiteAddress).filter(Boolean))), [deliveryHistory])
-
   function updateStoreName(value: string) {
     setStoreName(value)
     const match = deliveryHistory.find((item) => item.storeName.trim().toLowerCase() === value.trim().toLowerCase())
@@ -151,10 +148,12 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
           scheduledPickupAt: deliveryTiming === "later" ? new Date(scheduledPickupLocal).toISOString() : null,
         }),
       })
-      const payload = await response.json() as { ok?: boolean; error?: string; code?: string; quote?: LiveUberQuote }
+      const payload = await response.json() as { ok?: boolean; error?: string; code?: string; providerCode?: string; quote?: LiveUberQuote }
       if (!response.ok || !payload.ok || !payload.quote) {
         setLiveQuote(null)
-        setLiveQuoteMessage(payload.error || "Uber could not return a live quote right now.")
+        setLiveQuoteMessage(payload.code === "address_undeliverable" || payload.providerCode === "address_undeliverable"
+          ? "Uber Direct does not serve this exact route. The address-based planning estimate is still available; try a closer pickup location or another courier."
+          : payload.error || "Uber could not return a live quote right now.")
         setLiveQuoteState("error")
         return
       }
@@ -286,9 +285,6 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#f5f8fc_0%,#eaf1fa_48%,#f8fafc_100%)] px-4 pb-28 pt-4 text-slate-950 sm:px-6 sm:pb-12 lg:px-8 lg:py-8">
-      <datalist id="delivery-store-suggestions">{storeSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
-      <datalist id="delivery-pickup-addresses">{pickupAddressSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
-      <datalist id="delivery-jobsite-addresses">{jobsiteAddressSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
       <div className="mx-auto max-w-6xl">
         <header className="relative overflow-hidden rounded-[30px] bg-[#0e2341] px-5 py-6 text-white shadow-[0_22px_60px_rgba(14,35,65,0.22)] sm:px-8 sm:py-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_12%,rgba(243,203,114,0.34),transparent_25%),linear-gradient(115deg,transparent_0%,transparent_62%,rgba(255,255,255,0.05)_62%,rgba(255,255,255,0.05)_63%,transparent_63%)]" />
@@ -325,15 +321,31 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
               <RouteLine />
               <div className="grid min-w-0 flex-1 gap-5">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
-                    Store name
-                    <input value={storeName} onChange={(event) => updateStoreName(event.target.value)} list="delivery-store-suggestions" autoComplete="organization" placeholder="Home Depot, Lowe’s, local supplier" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
-                    {storeName.trim() ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeName)}`} target="_blank" rel="noreferrer" className="text-xs font-normal text-sky-700 underline underline-offset-4">Find this store address</a> : <span className="text-xs font-normal text-slate-400">Choosing a saved store fills its last pickup address.</span>}
-                  </label>
-                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
-                    Pickup address <span className="font-normal text-slate-400">(for live quote)</span>
-                    <input value={pickupAddress} onChange={(event) => { setPickupAddress(event.target.value); resetLiveQuote() }} list="delivery-pickup-addresses" autoComplete="street-address" placeholder="Street, city, state, ZIP" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
-                  </label>
+                  <LocationAutocomplete
+                    label="Store name"
+                    value={storeName}
+                    onChange={updateStoreName}
+                    onSelect={(suggestion) => {
+                      setStoreName(suggestion.name || storeName)
+                      setPickupAddress(suggestion.label)
+                      setPickupCoordinates(`${suggestion.latitude.toFixed(6)}, ${suggestion.longitude.toFixed(6)}`)
+                      resetLiveQuote()
+                    }}
+                    mode="store"
+                    placeholder="Home Depot, Lowe’s, local supplier"
+                    hint={storeName.trim() ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeName)}`} target="_blank" rel="noreferrer" className="text-xs font-normal text-sky-700 underline underline-offset-4">Open store search in Maps</a> : <span className="text-xs font-normal text-slate-400">Type a store and city to fill its pickup address.</span>}
+                  />
+                  <LocationAutocomplete
+                    label={<>Pickup address <span className="font-normal text-slate-400">(for live quote)</span></>}
+                    value={pickupAddress}
+                    onChange={(value) => { setPickupAddress(value); resetLiveQuote() }}
+                    onSelect={(suggestion) => {
+                      setPickupAddress(suggestion.label)
+                      setPickupCoordinates(`${suggestion.latitude.toFixed(6)}, ${suggestion.longitude.toFixed(6)}`)
+                      resetLiveQuote()
+                    }}
+                    placeholder="Street, city, state, ZIP"
+                  />
                   <label className="grid gap-1.5 text-sm font-semibold text-slate-700 sm:col-span-2">
                     Pickup coordinates
                     <input value={pickupCoordinates} onChange={(event) => setPickupCoordinates(event.target.value)} placeholder="40.741895, -73.989308" inputMode="decimal" aria-invalid={pickupInvalid} className={`min-h-12 rounded-2xl border bg-slate-50 px-4 font-mono text-sm font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:bg-white focus:ring-4 ${pickupInvalid ? "border-rose-300 focus:border-rose-400 focus:ring-rose-100" : "border-slate-200 focus:border-amber-400 focus:ring-amber-100"}`} />
@@ -346,10 +358,17 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
                     Jobsite name <span className="font-normal text-slate-400">(optional)</span>
                     <input value={jobsiteName} onChange={(event) => setJobsiteName(event.target.value)} placeholder="Smith renovation" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
                   </label>
-                  <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
-                    Jobsite address <span className="font-normal text-slate-400">(for live quote)</span>
-                    <input value={jobsiteAddress} onChange={(event) => { setJobsiteAddress(event.target.value); resetLiveQuote() }} list="delivery-jobsite-addresses" autoComplete="street-address" placeholder="Street, city, state, ZIP" className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
-                  </label>
+                  <LocationAutocomplete
+                    label={<>Jobsite address <span className="font-normal text-slate-400">(for live quote)</span></>}
+                    value={jobsiteAddress}
+                    onChange={(value) => { setJobsiteAddress(value); resetLiveQuote() }}
+                    onSelect={(suggestion) => {
+                      setJobsiteAddress(suggestion.label)
+                      setJobsiteCoordinates(`${suggestion.latitude.toFixed(6)}, ${suggestion.longitude.toFixed(6)}`)
+                      resetLiveQuote()
+                    }}
+                    placeholder="Street, city, state, ZIP"
+                  />
                   <div className="sm:col-span-2">
                     <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
                       Jobsite coordinates
@@ -406,6 +425,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
                   <div><p className="text-sm font-semibold text-slate-950">Uber Direct live price</p><p className="mt-1 text-xs text-slate-600">Uses the two full addresses above. Requesting a quote does not create or charge for a delivery.</p></div>
                   <button type="button" onClick={requestLiveQuote} disabled={!readyForLiveQuote || liveQuoteState === "loading"} className="min-h-11 rounded-xl bg-[#10233f] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45">{liveQuoteState === "loading" ? "Checking Uber…" : "Get live Uber price"}</button>
                 </div>
+                {!readyForLiveQuote ? <p className="mt-2 text-xs text-slate-600">Enter both addresses, choose Small item or Car load, keep weight at 50 lb or less, and use a valid pickup time.</p> : null}
                 {liveQuote ? <div role="status" className="mt-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-emerald-800"><strong>{currency.format(liveQuote.total)}</strong> live provider fee · {liveQuote.pickupMinutes !== null ? `${liveQuote.pickupMinutes} min pickup` : "Pickup time shown after dispatch"} · no AvantiaBuild markup</div> : null}
                 {liveQuoteMessage ? <div role="alert" className="mt-3 rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm text-rose-700">{liveQuoteMessage}</div> : null}
               </div>

@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof UberDirectError) {
       return NextResponse.json(
-        { ok: false, code: error.code, error: error.message },
+        { ok: false, code: error.code, providerCode: error.code, error: error.message },
         { status: error.code === "tax_form_required" ? 503 : 502, headers: { "Cache-Control": "no-store, max-age=0" } },
       );
     }

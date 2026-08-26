@@ -1,4 +1,4 @@
-export const CREDIT_CARD_PROCESSING_TERM = "Credit card payments may be subject to a processing fee of up to 3%, not to exceed Avantia's actual processing cost. Any applicable credit-card total will be disclosed before payment, unless different payment terms are agreed in writing."
+export const CREDIT_CARD_PROCESSING_TERM = "A 3% processing fee applies to credit card payments."
 
 export const DEFAULT_PROPOSAL_TERMS = [
   "Prices may change until the order is approved and processed.",
@@ -9,6 +9,6 @@ export const DEFAULT_PROPOSAL_TERMS = [
 
 export function includeCreditCardProcessingTerm(terms: string) {
   const cleanTerms = terms.trim()
-  if (/credit[- ]card payments may be subject to a processing fee of up to 3%/i.test(cleanTerms)) return cleanTerms
+  if (/3% processing fee applies to credit card payments/i.test(cleanTerms)) return cleanTerms
   return [cleanTerms, CREDIT_CARD_PROCESSING_TERM].filter(Boolean).join(" ")
 }

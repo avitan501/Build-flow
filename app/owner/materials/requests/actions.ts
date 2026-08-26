@@ -21,6 +21,7 @@ export type RequestClientQuoteInput = {
   lines: RequestClientQuoteLine[]
   deliveryCharge: number
   salesTaxRate: number
+  taxableDelivery?: boolean
   terms: string
   ach?: { bankName: string; accountOwner: string; routingNumber: string; accountNumber: string }
 }
@@ -281,6 +282,7 @@ async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
     lines,
     deliveryCharge: Math.round(deliveryCharge * 100) / 100,
     salesTaxRate: Math.round(salesTaxRate * 1000) / 1000,
+    taxableDelivery: input.taxableDelivery !== false,
     terms: String(input.terms || "").trim().slice(0, 4000),
     ach: input.ach ? {
       bankName: String(input.ach.bankName || "").trim().slice(0, 120),
