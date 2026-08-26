@@ -89,9 +89,10 @@ function matchConfidence(query: string, title: string, source: string): "exact" 
   return matched / tokens.length >= 0.7 ? "exact" : "likely"
 }
 
-export function productSearchLinks(queryValue: string): ProductSearchLink[] {
+export function productSearchLinks(queryValue: string, zipCodeValue = ""): ProductSearchLink[] {
   const query = clean(queryValue, 240)
-  const encoded = encodeURIComponent(query)
+  const zipCode = clean(zipCodeValue, 12)
+  const encoded = encodeURIComponent([query, zipCode && `near ${zipCode}`].filter(Boolean).join(" "))
   return [
     { label: "Google Shopping", url: `https://www.google.com/search?tbm=shop&q=${encoded}` },
     { label: "Home Depot", url: `https://www.homedepot.com/s/${encoded}` },
@@ -148,12 +149,12 @@ const cachedExaSearch = unstable_cache(runExaSearch, ["exa-catalog-search-v3"], 
 
 export async function searchCatalogWithExa(input: ExaCatalogSearchInput) {
   const query = clean(input.query, 240)
-  const fallbackLinks = productSearchLinks(query)
+  const zipCode = clean(input.zipCode, 12)
+  const fallbackLinks = productSearchLinks(query, zipCode)
   if (!query) return { ok: false as const, code: "invalid" as const, error: "Enter a product or material to search for.", fallbackLinks }
   if (!process.env.EXA_API_KEY) return { ok: false as const, code: "not_configured" as const, error: "Live price search is not connected. Use the retailer links below.", fallbackLinks }
 
   const department = clean(input.department, 100)
-  const zipCode = clean(input.zipCode, 12)
   const domains = (input.domains ?? []).map((domain) => clean(domain, 120)).filter(Boolean).slice(0, 5)
   const excludeDomains = (input.excludeDomains ?? []).map((domain) => clean(domain, 120)).filter(Boolean).slice(0, 12)
   try {

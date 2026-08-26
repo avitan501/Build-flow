@@ -88,6 +88,8 @@ For each actual requested material, return one row with a concise construction i
 
 Do not invent missing information. Copy the shortest exact text fragment supporting each row into sourceText. Combine obvious wrapped lines that describe the same item, but do not combine different products. Use common concise English construction names while preserving printed brands, models, and specifications.
 
+For order-entry convenience, when an actual material row has no printed quantity, use quantity 1 as the default instead of marking quantity missing. When the sales unit is absent, use the most ordinary purchasable unit for that material (for example sheets for drywall or plywood, boxes for screws, rolls for tape, bags for cement or mortar, and each for a fixture). Do not use these order-entry defaults to invent plan measurements, dimensions, thicknesses, coverage, or takeoff totals.
+
 Never ask for or mark a quantity or sales unit missing when it is already printed in the supporting source text. Recognize quantity-first, item-first, abbreviated, bulleted, and table formats. These all mean the same thing: "14 squares siding", "Siding: 14 squares", "14 sq siding", "| 14 | squares | siding |", and "| siding | 14 | squares |". Likewise, recognize singular and plural construction units such as box/boxes, roll/rolls, sheet/sheets, pail/pails, and case/cases.
 
 Treat department labels such as "Siding list", "Framing materials", "Electrical takeoff", or a standalone department heading as headings, never as material rows.
@@ -114,6 +116,19 @@ function json(body: unknown, status = 200) {
 
 function clean(value: unknown, max: number) {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max)
+}
+
+function inferredSalesUnit(nameValue: unknown, departmentValue: unknown) {
+  const value = `${clean(nameValue, 300)} ${clean(departmentValue, 120)}`.toLowerCase()
+  if (/\b(?:screws?|nails?|fasteners?|anchors?)\b/.test(value)) return "boxes"
+  if (/\b(?:drywall|sheetrock|gypsum|greenboard|blueboard|cement\s+board|wonderboard|plywood|osb|panel)\b/.test(value)) return "sheets"
+  if (/\b(?:tape|house\s*wrap|membrane|underlayment)\b/.test(value)) return "rolls"
+  if (/\b(?:joint\s+compound|mud|paint|primer|sealer)\b/.test(value)) return "buckets"
+  if (/\b(?:cement|concrete|mortar|thinset|grout|sand)\b/.test(value)) return "bags"
+  if (/\b(?:flooring|tile|shingle)\b/.test(value)) return "boxes"
+  if (/\bsiding\b/.test(value)) return "squares"
+  if (/\b(?:lumber|stud|joist|pipe|conduit|rebar|trim|molding)\b/.test(value)) return "pieces"
+  return "each"
 }
 
 function encodeBase64(bytes: Uint8Array) {
@@ -234,10 +249,12 @@ Deno.serve(async (request: Request) => {
     const rows = items.map((item) => {
       const sourceText = clean(item.sourceText, 1200)
       const detected = detectExplicitQuantityUnit(sourceText)
-      const quantity = Number.isFinite(item.quantity) && Number(item.quantity) > 0 ? Number(item.quantity) : detected?.quantity
-      const normalizedUnit = clean(item.unit, 60) || detected?.unit || ""
-      const missingQuantity = !Number.isFinite(quantity) || Number(quantity) <= 0
-      const missingUnit = !normalizedUnit
+      const extractedQuantity = Number.isFinite(item.quantity) && Number(item.quantity) > 0 ? Number(item.quantity) : detected?.quantity
+      const quantityWasDefaulted = !Number.isFinite(extractedQuantity) || Number(extractedQuantity) <= 0
+      const quantity = quantityWasDefaulted ? 1 : Number(extractedQuantity)
+      const extractedUnit = clean(item.unit, 60) || detected?.unit || ""
+      const unitWasDefaulted = !extractedUnit
+      const normalizedUnit = extractedUnit || inferredSalesUnit(item.name, item.department)
       const proposedDimensions = clean(item.dimensions, 300)
       const proposedThickness = clean(item.thickness, 160)
       const thickness = verifiedThickness(proposedThickness, typedSource || sourceText)
@@ -246,10 +263,12 @@ Deno.serve(async (request: Request) => {
       const fastenerDimensions = recognizedFastenerDimensions(item.name, [sourceText, proposedDimensions, details].filter(Boolean).join(" "))
       const dimensions = fastenerDimensions || proposedDimensions
       const reviewReasons = removeResolvedFastenerReasons(removeResolvedQuantityUnitReasons(originalReviewReasons, detected), fastenerDimensions)
+        .filter((reason) => !quantityWasDefaulted || !/\bquantity\b/i.test(reason))
+        .filter((reason) => !unitWasDefaulted || !/\b(?:sales?\s+unit|selling\s+unit|unit\s+(?:is\s+)?missing)\b/i.test(reason))
       const missingThickness = materialRequiresThickness(item.name) && !thickness
       const allReviewReasonsResolved = Boolean((detected || fastenerDimensions) && originalReviewReasons.length && reviewReasons.length === 0)
       const aiReviewStatus = allReviewReasonsResolved && item.reviewStatus !== "ready" ? "ready" : item.reviewStatus
-      const reviewStatus = missingQuantity || missingUnit || missingThickness ? "missing" : aiReviewStatus === "ready" && item.needsReview && !allReviewReasonsResolved ? "check" : aiReviewStatus
+      const reviewStatus = missingThickness ? "missing" : reviewReasons.length ? (aiReviewStatus === "missing" ? "missing" : "check") : "ready"
       return {
         request_id: source.request_id,
         project_id: source.project_id,
@@ -257,8 +276,8 @@ Deno.serve(async (request: Request) => {
         name: clean(item.name, 300) || "Material requiring review",
         department: clean(item.department, 120) || source.department || "Others",
         item_type: "material",
-        quantity: missingQuantity ? 1 : Number(quantity),
-        unit: normalizedUnit || (missingQuantity ? "quantity required" : "unspecified"),
+        quantity,
+        unit: normalizedUnit,
         unit_price: 0,
         qualification_status: reviewStatus === "ready" ? "not_required" : "pending",
         answers: [],
@@ -269,13 +288,13 @@ Deno.serve(async (request: Request) => {
           source_item_id: source.id,
           dimensions,
           thickness,
-          request_details: [details, missingQuantity && "Quantity was not provided."].filter(Boolean).join(" · "),
+          request_details: details,
           source_text: sourceText,
+          quantity_defaulted: quantityWasDefaulted,
+          unit_defaulted: unitWasDefaulted,
           review_status: reviewStatus,
           review_reasons: [
             ...reviewReasons,
-            ...(missingQuantity && !reviewReasons.some((reason) => /quantity/i.test(reason)) ? ["Quantity is missing"] : []),
-            ...(missingUnit && !reviewReasons.some((reason) => /unit/i.test(reason)) ? ["Sales unit is missing"] : []),
             ...(missingThickness && !reviewReasons.some((reason) => /thickness/i.test(reason)) ? ["Thickness is missing"] : []),
           ].slice(0, 5),
           needs_review: reviewStatus !== "ready",

@@ -27,6 +27,10 @@ function legacyAnswers(value: unknown): LegacyAnswer[] {
   return Array.isArray(value) ? value.filter((answer): answer is LegacyAnswer => Boolean(answer) && typeof answer === "object") : []
 }
 
+function zipCodeFromAddress(address: string | null | undefined) {
+  return address?.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || "11516"
+}
+
 export default async function OwnerMaterialRequestPage({ params }: { params: Promise<{ requestId: string }> }) {
   const { requestId } = await params
   const { supabase } = await requireStaffProfile("customers")
@@ -101,7 +105,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
           <details open={currentStage === "received"} className={`order-2 ${workflowStepCardClass}`}>
             <RequestWorkflowStepHeader requestId={request.id} step={2} title="Organize request" detail={organizedItems.length ? `${organizedItems.length} organized item${organizedItems.length === 1 ? "" : "s"}` : "Create a clean material list"} status={step2Complete ? "complete" : "active"} icon="organize" />
             <div className="border-t border-slate-200 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm text-slate-500">Create a structured copy without changing the original request.</p>{organizationCompletedLabel ? <p className="mt-1 text-xs font-semibold text-slate-400">Last review: {organizationCompletedLabel} ET</p> : null}</div>{organizationStatus !== "processing" ? <OrganizeMaterialListButton requestId={request.id} refresh={organizedItems.length > 0} /> : null}</div>
-            {organizedItems.length ? <div className="mt-4 border-t border-slate-200 pt-3"><h3 className="text-sm font-bold">Confirmed material list</h3><OrganizedMaterialList requestId={request.id} items={organizedItems} /></div> : <div className={`mt-4 rounded-lg px-4 py-3 text-sm font-semibold ${organizationStatus === "failed" ? "bg-rose-50 text-rose-800" : organizationStatus === "plan_requires_takeoff" ? "bg-amber-50 text-amber-800" : "bg-sky-50 text-sky-800"}`}>{organizationStatus === "processing" ? "The material list is being organized." : organizationStatus === "failed" ? "Automatic organization needs another attempt." : organizationStatus === "plan_requires_takeoff" ? "This appears to be a plan and requires a takeoff before materials can be listed." : "The original request is saved. Select Organize request to create the material chart."}</div>}
+            {organizedItems.length ? <div className="mt-4 border-t border-slate-200 pt-3"><h3 className="text-sm font-bold">Confirmed material list</h3><OrganizedMaterialList requestId={request.id} items={organizedItems} defaultZipCode={zipCodeFromAddress(request.projects?.address)} /></div> : <div className={`mt-4 rounded-lg px-4 py-3 text-sm font-semibold ${organizationStatus === "failed" ? "bg-rose-50 text-rose-800" : organizationStatus === "plan_requires_takeoff" ? "bg-amber-50 text-amber-800" : "bg-sky-50 text-sky-800"}`}>{organizationStatus === "processing" ? "The material list is being organized." : organizationStatus === "failed" ? "Automatic organization needs another attempt." : organizationStatus === "plan_requires_takeoff" ? "This appears to be a plan and requires a takeoff before materials can be listed." : "The original request is saved. Select Organize request to create the material chart."}</div>}
             </div>
           </details>
           <details open={currentStage === "received" && organizedItems.length === 0} className={`order-1 ${workflowStepCardClass}`}>

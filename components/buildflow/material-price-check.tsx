@@ -1,7 +1,7 @@
 "use client"
 
 import { ExternalLink, LoaderCircle, MapPin, Phone, Route, Search, ShoppingCart, Sparkles, Store, UsersRound, X } from "lucide-react"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import type { ExaCatalogSearchResult, ProductCallResult, ProductSalesContact, ProductSearchLink } from "@/lib/exa-catalog-search"
 
@@ -15,9 +15,10 @@ function uniqueByDomain<T extends { domain: string }>(items: T[]) {
   return [...new Map(items.map((item) => [item.domain, item])).values()]
 }
 
-export function MaterialPriceCheck({ requestId, query, department, onClose }: { requestId: string; query: string; department: string; onClose: () => void }) {
-  const [itemQuery, setItemQuery] = useState(query)
-  const [zipCode, setZipCode] = useState("11516")
+export function MaterialPriceCheck({ requestId, query, department, defaultZipCode = "11516", onClose }: { requestId: string; query: string; department: string; defaultZipCode?: string; onClose: () => void }) {
+  const itemQuery = query.trim()
+  const [zipCode, setZipCode] = useState(/^\d{5}(?:-\d{4})?$/.test(defaultZipCode) ? defaultZipCode : "11516")
+  const [editingZip, setEditingZip] = useState(false)
   const [buyNow, setBuyNow] = useState<ExaCatalogSearchResult[]>([])
   const [callForPrice, setCallForPrice] = useState<ProductCallResult[]>([])
   const [salesContacts, setSalesContacts] = useState<ProductSalesContact[]>([])
@@ -27,6 +28,7 @@ export function MaterialPriceCheck({ requestId, query, department, onClose }: { 
   const [pending, setPending] = useState(false)
   const [morePending, setMorePending] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const startedSearch = useRef(false)
 
   const excludedDomains = useMemo(() => [...new Set([
     ...buyNow.map((result) => result.domain),
@@ -74,6 +76,12 @@ export function MaterialPriceCheck({ requestId, query, department, onClose }: { 
     }
   }, [department, excludedDomains, itemQuery, zipCode])
 
+  useEffect(() => {
+    if (startedSearch.current) return
+    startedSearch.current = true
+    void search(false)
+  }, [search])
+
   const totalResults = buyNow.length + callForPrice.length + salesContacts.length
 
   function openSupplierRouting() {
@@ -89,10 +97,10 @@ export function MaterialPriceCheck({ requestId, query, department, onClose }: { 
   return <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
     <div className="border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4">
       <div className="flex items-start justify-between gap-3"><div><p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.12em] text-[#0066cc]"><Sparkles className="h-3.5 w-3.5" />Item sourcing</p><h3 className="mt-1 text-sm font-bold text-slate-950">Find this item</h3></div><button type="button" onClick={onClose} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white" aria-label="Close item search"><X className="h-4 w-4" /></button></div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_7.5rem_auto]">
-        <label className="grid gap-1 text-[10px] font-bold uppercase text-slate-500">Item number or description<input value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder="Model, SKU, size, or material" className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium normal-case text-slate-950" /></label>
-        <label className="grid gap-1 text-[10px] font-bold uppercase text-slate-500">Delivery ZIP<span className="relative"><MapPin className="pointer-events-none absolute left-2.5 top-3 h-3.5 w-3.5 text-slate-400" /><input value={zipCode} onChange={(event) => setZipCode(event.target.value.replace(/[^0-9-]/g, "").slice(0, 10))} inputMode="numeric" className="h-10 w-full rounded-md border border-slate-300 bg-white pl-8 pr-2 text-sm font-medium normal-case text-slate-950" /></span></label>
-        <button type="button" onClick={() => void search(false)} disabled={pending} className="inline-flex h-10 items-center justify-center gap-2 self-end rounded-md bg-[#0071e3] px-4 text-xs font-bold text-white disabled:opacity-50">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}{pending ? "Searching..." : "Find item"}</button>
+      <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
+        <p className="text-[10px] font-bold uppercase tracking-[.08em] text-slate-500">Searching the catalog for</p>
+        <p className="mt-1 text-sm font-bold leading-5 text-slate-950">{itemQuery}</p>
+        {!editingZip ? <div className="mt-2 flex flex-wrap items-center gap-2"><span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-emerald-50 px-3 text-xs font-bold text-emerald-800"><MapPin className="h-3.5 w-3.5" />Delivery ZIP {zipCode}</span><button type="button" onClick={() => setEditingZip(true)} className="min-h-8 rounded-md border border-slate-300 px-3 text-xs font-bold text-slate-700">Change ZIP</button>{pending ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#0066cc]"><LoaderCircle className="h-3.5 w-3.5 animate-spin" />Searching nearby suppliers…</span> : null}</div> : <div className="mt-2 flex flex-wrap items-end gap-2"><label className="grid gap-1 text-[10px] font-bold uppercase text-slate-500">Delivery ZIP<span className="relative block w-36"><MapPin className="pointer-events-none absolute left-2.5 top-3 h-3.5 w-3.5 text-slate-400" /><input autoFocus value={zipCode} onChange={(event) => setZipCode(event.target.value.replace(/[^0-9-]/g, "").slice(0, 10))} inputMode="numeric" className="h-10 w-full rounded-md border border-slate-300 bg-white pl-8 pr-2 text-sm font-medium normal-case text-slate-950" /></span></label><button type="button" onClick={() => { setEditingZip(false); void search(false) }} disabled={pending} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#17304f] px-4 text-xs font-bold text-white disabled:opacity-50"><Search className="h-4 w-4" />Search this ZIP</button></div>}
       </div>
     </div>
 
@@ -107,6 +115,6 @@ export function MaterialPriceCheck({ requestId, query, department, onClose }: { 
       </div> : null}
 
       <div className="mt-4 flex flex-wrap gap-2">{totalResults ? <button type="button" onClick={() => void search(true)} disabled={morePending} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-[#0071e3] bg-white px-3 text-xs font-bold text-[#0066cc] disabled:opacity-50">{morePending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}{morePending ? "Searching more..." : "Check more suppliers"}</button> : null}<button type="button" onClick={openSupplierRouting} className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-slate-950 px-3 text-xs font-bold text-white"><Route className="h-3.5 w-3.5" />Add suppliers</button>{!totalResults && links.map((link) => <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700"><Search className="h-3.5 w-3.5" />{link.label}</a>)}</div>
-    </div> : <div className="flex items-center gap-2 px-3 py-3 text-xs text-slate-500 sm:px-4"><Search className="h-3.5 w-3.5" />Change the item or ZIP, then select Find item.</div>}
+    </div> : <div className="flex items-center gap-2 px-3 py-3 text-xs text-slate-500 sm:px-4"><LoaderCircle className="h-3.5 w-3.5 animate-spin" />Starting the catalog search near ZIP {zipCode}.</div>}
   </div>
 }

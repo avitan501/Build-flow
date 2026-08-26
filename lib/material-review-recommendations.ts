@@ -1,6 +1,6 @@
-import { materialReviewReasons, type ReviewableMaterialItem } from "@/lib/client-material-review"
+import { materialQuantity, materialReviewReasons, materialSalesUnit, suggestedSalesUnits, type ReviewableMaterialItem } from "@/lib/client-material-review"
 
-export type RecommendationField = "quantity" | "dimensions" | "thickness" | "productType" | "screwLength"
+export type RecommendationField = "quantity" | "unit" | "dimensions" | "thickness" | "productType" | "screwLength"
 
 export type RecommendationOption = {
   value: string
@@ -23,9 +23,11 @@ function option(value: string, confidence: number): RecommendationOption {
 }
 
 function quantityChoices(item: ReviewableMaterialItem) {
-  const quantity = String(item.quantity)
-  const nearby = [1, 5, 10, 12, 15, 20, 25, 50, 100, 220]
-    .filter((value) => value !== item.quantity)
+  const currentQuantity = materialQuantity(item)
+  const quantity = String(currentQuantity)
+  const nearby = [1, 2, 5, 10]
+    .filter((value) => value !== currentQuantity)
+    .slice(0, 3)
     .map((value) => option(String(value), 0))
   return {
     field: "quantity" as const,
@@ -47,6 +49,11 @@ export function materialReviewRecommendation(item: ReviewableMaterialItem): Mate
   const isDrywallScrew = /\b(?:(?:drywall|sheetrock)\s+)?screws?\b/.test(name)
   const isSheetMaterial = isDrywallBoard || isCementBoard || /\b(?:plywood|osb)\b/.test(name)
   const choices: MaterialReviewRecommendation["choices"] = [quantityChoices(item)]
+  const unitNeedsConfirmation = !item.unit || /^(?:unspecified|quantity required|unknown|n\/a)$/i.test(item.unit.trim()) || reasons.some((reason) => /\bunit\b/i.test(reason))
+  if (unitNeedsConfirmation) {
+    const units = suggestedSalesUnits(item)
+    choices.push({ field: "unit", label: "Sales unit", options: units.map((value, index) => option(value, index === 0 ? 80 : index === 1 ? 15 : 5)), recommended: materialSalesUnit(item) })
+  }
 
   if (isDrywallBoard) {
     const typeOptions = /\b(?:greenboard|moisture)\b/.test(name)
@@ -101,11 +108,11 @@ export function materialReviewRecommendation(item: ReviewableMaterialItem): Mate
     || (/\b(?:type|grade)\b/i.test(reason) && hasChoice(choices, "productType"))
     || (/\b(?:screw\s+)?length\b/i.test(reason) && (hasChoice(choices, "screwLength") || hasChoice(choices, "dimensions")))
     || (/\b(?:size|dimensions?|width)\b/i.test(reason) && hasChoice(choices, "dimensions"))
-    || (/\bunit\b/i.test(reason) && Boolean(item.unit))
+    || (/\bunit\b/i.test(reason) && hasChoice(choices, "unit"))
   )
 
   return {
-    label: isSheetMaterial || isDrywallScrew ? "AI suggestions" : "Confirm quantity",
+    label: isSheetMaterial || isDrywallScrew || unitNeedsConfirmation ? "Confirm order details" : "Confirm quantity",
     choices,
     resolvesAllReasons,
   }

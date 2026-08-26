@@ -6,7 +6,7 @@ import { parseSupplierQuoteText } from "../lib/supplier-quote-parser"
 import { normalizeSupplierQuoteAiPayload } from "../lib/supplier-quote-ai"
 import { detectSupplierMatch, inferSupplierName } from "../lib/supplier-quote-supplier"
 import { preferredRequestMaterialSources, requestMaterialChartCsv, toRequestMaterialChartRow } from "../lib/request-material-chart"
-import { materialReviewReasons, materialReviewStatus, materialReviewSummary } from "../lib/client-material-review"
+import { materialQuantity, materialReviewReasons, materialReviewStatus, materialReviewSummary, materialSalesUnit, suggestedSalesUnits } from "../lib/client-material-review"
 
 const root = process.cwd()
 
@@ -160,7 +160,11 @@ test("client material lists are organized securely in the background", async () 
   expect(aiFunction).toContain("review_reasons: [")
   expect(aiFunction).toContain("Only check and missing rows require employee review")
   expect(aiFunction).toContain('qualification_status: reviewStatus === "ready" ? "not_required" : "pending"')
-  expect(aiFunction).toContain('unit: normalizedUnit || (missingQuantity ? "quantity required" : "unspecified")')
+  expect(aiFunction).toContain("const quantity = quantityWasDefaulted ? 1")
+  expect(aiFunction).toContain("inferredSalesUnit(item.name, item.department)")
+  expect(aiFunction).toContain("unit: normalizedUnit")
+  expect(aiFunction).not.toContain('["Quantity is missing"]')
+  expect(aiFunction).not.toContain('["Sales unit is missing"]')
   expect(aiFunction).not.toContain('unit: clean(item.unit, 60) || "each"')
   expect(aiFunction).toContain("Never calculate perimeter, corners, or opening trim from siding squares alone")
   expect(aiFunction).toContain("detectExplicitQuantityUnit(sourceText)")
@@ -196,11 +200,14 @@ test("client material lists are organized securely in the background", async () 
   expect(organizedList).toContain("Copy list")
   expect(reviewEditor).toContain("recommendation.choices.map")
   expect(reviewEditor).toContain("<select")
-  expect(reviewEditor).toContain("option.confidence")
+  expect(reviewEditor).not.toContain("option.confidence")
   expect(reviewEditor).not.toContain("<textarea")
   expect(reviewEditor).not.toContain('type="number"')
   expect(priceCheck).toContain("Item sourcing")
-  expect(priceCheck).toContain("Item number or description")
+  expect(priceCheck).toContain("startedSearch")
+  expect(priceCheck).toContain("Change ZIP")
+  expect(priceCheck).toContain("defaultZipCode")
+  expect(priceCheck).toContain("Searching the catalog for")
   expect(priceCheck).toContain("Delivery ZIP")
   expect(priceCheck).toContain("Buy directly")
   expect(priceCheck).toContain("Call for price")
@@ -273,6 +280,22 @@ test("material review status clearly separates ready, check, and missing rows", 
   expect(materialReviewReasons(check)).toEqual(["Confirm lumber grade"])
   expect(materialReviewStatus(missing)).toBe("missing")
   expect(materialReviewSummary([ready, check, missing])).toEqual({ ready: 1, check: 1, missing: 1 })
+})
+
+test("organized rows use safe order defaults without showing false missing errors", () => {
+  const item = {
+    id: "item-defaulted",
+    name: "Regular drywall board",
+    department: "Sheet rock",
+    quantity: 0,
+    unit: "unspecified",
+    metadata: { review_status: "missing", review_reasons: ["Quantity is missing", "Sales unit is missing"] },
+  }
+  expect(materialQuantity(item)).toBe(1)
+  expect(materialSalesUnit(item)).toBe("sheets")
+  expect(suggestedSalesUnits(item)).toEqual(["sheets", "pieces"])
+  expect(materialReviewReasons(item)).toEqual(["Confirm sales unit"])
+  expect(materialReviewStatus(item)).toBe("check")
 })
 
 test("supplier detection matches the directory or keeps the name read from the invoice", async () => {

@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   try {
     const { supabase } = await requireStaffProfile("quotes")
     const body = await request.json() as { query?: unknown; department?: unknown; zipCode?: unknown; domains?: unknown; excludeDomains?: unknown }
-    const fallbackLinks = (await searchCatalogWithExa({ query: String(body.query ?? "") })).fallbackLinks
+    const fallbackLinks = (await searchCatalogWithExa({ query: String(body.query ?? ""), zipCode: String(body.zipCode ?? "11516") })).fallbackLinks
     const result = await searchCatalogWithExa({
       query: String(body.query ?? ""),
       department: String(body.department ?? ""),

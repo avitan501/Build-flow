@@ -31,6 +31,25 @@ test("keeps the extracted quantity available when no dependable product recommen
   expect(recommendation.resolvesAllReasons).toBe(false)
 })
 
+test("defaults an absent quantity to one and offers only sensible sales units", () => {
+  const recommendation = materialReviewRecommendation({
+    ...base,
+    name: "Sheetrock screws",
+    quantity: 0,
+    unit: "unspecified",
+    metadata: { review_status: "missing", review_reasons: ["Quantity is missing", "Sales unit is missing"] },
+  })
+  expect(recommendation.choices.find((choice) => choice.field === "quantity")).toMatchObject({
+    recommended: "1",
+    options: [{ value: "1", confidence: 100 }, { value: "2", confidence: 0 }, { value: "5", confidence: 0 }, { value: "10", confidence: 0 }],
+  })
+  expect(recommendation.choices.find((choice) => choice.field === "unit")).toMatchObject({
+    recommended: "boxes",
+    options: [{ value: "boxes", confidence: 80 }, { value: "packs", confidence: 15 }, { value: "pieces", confidence: 5 }],
+  })
+  expect(recommendation.resolvesAllReasons).toBe(true)
+})
+
 test("offers material-specific controls for WonderBoard and drywall screws", () => {
   const wonderBoard = materialReviewRecommendation({ ...base, name: "WonderBoard cement backerboard" })
   expect(wonderBoard.choices).toEqual(expect.arrayContaining([
