@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { ManagerCreateClientRequest } from "@/components/buildflow/manager-create-client-request"
+import { MaterialRequestStatusControl } from "@/components/buildflow/material-request-status-control"
 import { requireStaffProfile } from "@/lib/auth"
 import { MATERIAL_DEPARTMENTS } from "@/lib/material-questionnaires"
 
@@ -37,6 +38,22 @@ export default async function MaterialRequestsInboxPage({
   const profileMap = new Map((customerProfiles ?? []).map((profile) => [profile.id, profile]))
   const customerOptions = (customerProfiles ?? []).filter((profile) => profile.role === "client" && profile.is_active).map((profile) => ({ id: profile.id, name: profile.full_name?.trim() || profile.email || "Customer", email: profile.email }))
   const departments = Array.from(new Set([...(categories ?? []).map((category) => category.department_key), ...MATERIAL_DEPARTMENTS]))
+  const activeRequests = requests.filter((request) => request.status !== "closed")
+  const closedRequests = requests.filter((request) => request.status === "closed")
+  const statusLabels: Record<string, string> = { draft: "Draft", submitted: "New", in_review: "In progress", quoted: "Quote sent", closed: "Closed" }
+
+  function requestCard(request: InboxRequest) {
+    const profile = profileMap.get(request.owner_id)
+    return <article key={request.id} className={`grid gap-4 rounded-[20px] border bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,.05)] sm:grid-cols-[minmax(0,1fr)_13rem] sm:items-center ${created === request.id ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200"}`}>
+      <Link href={`/owner/materials/requests/${request.id}`} className="min-w-0 rounded-lg outline-none transition hover:text-[#0066cc] focus-visible:ring-2 focus-visible:ring-[#0066cc] focus-visible:ring-offset-4">
+        <div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">{request.title}</h2><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase text-slate-600">{statusLabels[request.status] || request.status.replaceAll("_", " ")}</span></div>
+        <p className="mt-1 text-sm text-slate-600">{request.projects?.name === "Material Requests" ? "Direct material request" : request.projects?.name || "Direct material request"}{request.projects?.name !== "Material Requests" && request.projects?.address ? ` · ${request.projects.address}` : ""}</p>
+        <p className="mt-2 text-xs text-slate-500">{profile?.full_name || profile?.email || "Client"} · {new Date(request.created_at).toLocaleString()}</p>
+        <div className="mt-3 flex flex-wrap gap-2">{request.material_questionnaire_responses.length ? request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{response.category_name_snapshot}</span>) : <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700">Direct quote request</span>}</div>
+      </Link>
+      <MaterialRequestStatusControl requestId={request.id} status={request.status} />
+    </article>
+  }
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 pb-28 pt-5 text-slate-950 sm:px-8">
@@ -49,24 +66,13 @@ export default async function MaterialRequestsInboxPage({
             <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Material requests</h1>
             <p className="mt-2 text-sm text-slate-600">Client questionnaire answers, project details, and uploaded plans.</p>
           </div>
-          <div className="flex flex-wrap gap-2"><Link href="/admin/settings/material-order-questions" className="inline-flex min-h-11 items-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold">Manage questions</Link><ManagerCreateClientRequest customers={customerOptions} departments={departments} /></div>
+          <ManagerCreateClientRequest customers={customerOptions} departments={departments} />
         </div>
         <div className="mt-7 grid gap-3">
-          {requests.map((request) => {
-            const profile = profileMap.get(request.owner_id)
-            return (
-              <Link key={request.id} href={`/owner/materials/requests/${request.id}`} className={`grid gap-4 rounded-[20px] border bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,.05)] transition hover:border-sky-300 sm:grid-cols-[1fr_auto] sm:items-center ${created === request.id ? "border-emerald-400 ring-2 ring-emerald-100" : "border-slate-200"}`}>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">{request.title}</h2><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase text-slate-600">{request.status.replaceAll("_", " ")}</span></div>
-                  <p className="mt-1 text-sm text-slate-600">{request.projects?.name === "Material Requests" ? "Direct material request" : request.projects?.name || "Direct material request"}{request.projects?.name !== "Material Requests" && request.projects?.address ? ` · ${request.projects.address}` : ""}</p>
-                  <p className="mt-2 text-xs text-slate-500">{profile?.full_name || profile?.email || "Client"} · {new Date(request.created_at).toLocaleString()}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">{request.material_questionnaire_responses.length ? request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{response.category_name_snapshot}</span>) : <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700">Direct quote request</span>}</div>
-              </Link>
-            )
-          })}
+          {activeRequests.map(requestCard)}
           {requests.length === 0 ? <div className="rounded-[20px] border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No customer requests have been submitted yet.</div> : null}
         </div>
+        {closedRequests.length ? <details className="group mt-6 overflow-hidden rounded-[20px] border border-slate-200 bg-white"><summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-4 text-sm font-bold text-slate-700"><span>Closed requests</span><span className="text-xs text-slate-500">{closedRequests.length} · <span className="group-open:hidden">Show</span><span className="hidden group-open:inline">Hide</span></span></summary><div className="grid gap-3 border-t border-slate-200 bg-slate-50 p-3 sm:p-4">{closedRequests.map(requestCard)}</div></details> : null}
       </div>
     </main>
   )

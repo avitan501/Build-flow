@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises"
+import { access, readFile } from "node:fs/promises"
 import path from "node:path"
 
 import { expect, test } from "@playwright/test"
@@ -26,8 +26,8 @@ test("direct checkout removes project selection and preserves manager request de
   expect(ownerDetail).not.toContain("createAdminClient")
 })
 
-test("manager can create a structured request on behalf of a client", async () => {
-  const [component, actions, apiRoute, requestMigration, customerPage, inboxPage, clientFunction] = await Promise.all([
+test("manager can create and manage a structured request on behalf of a client", async () => {
+  const [component, actions, apiRoute, requestMigration, customerPage, inboxPage, clientFunction, requestActions, statusControl, catalogAdmin] = await Promise.all([
     readFile(path.join(root, "components/buildflow/manager-create-client-request.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/users/actions.ts"), "utf8"),
     readFile(path.join(root, "app/api/admin/client-requests/route.ts"), "utf8"),
@@ -35,6 +35,9 @@ test("manager can create a structured request on behalf of a client", async () =
     readFile(path.join(root, "app/admin/users/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/page.tsx"), "utf8"),
     readFile(path.join(root, "supabase/functions/create-manager-client/index.ts"), "utf8"),
+    readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/material-request-status-control.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/owner-materials-admin-shell.tsx"), "utf8"),
   ])
 
   expect(component).toContain("Create request for a client")
@@ -83,6 +86,17 @@ test("manager can create a structured request on behalf of a client", async () =
   expect(customerPage.match(/<ManagerCreateClientRequest/g)).toHaveLength(1)
   expect(inboxPage).toContain("ManagerCreateClientRequest")
   expect(inboxPage).toContain("Client request created successfully")
+  expect(inboxPage).toContain("MaterialRequestStatusControl")
+  expect(inboxPage).toContain("Closed requests")
+  expect(inboxPage).not.toContain("/admin/settings/material-order-questions")
+  expect(catalogAdmin).not.toContain("/admin/settings/material-order-questions")
+  expect(requestActions).toContain("updateMaterialRequestStatusAction")
+  expect(requestActions).toContain('manager_action: "request_status"')
+  expect(requestActions).toContain('.update({ status }).eq("id", requestId).select("id")')
+  expect(statusControl).toContain("Close this material request?")
+  expect(statusControl).toContain("Reopen")
+  expect(statusControl).toContain("Quote sent")
+  await expect(access(path.join(root, "app/admin/settings/material-order-questions/page.tsx"))).rejects.toThrow()
 })
 
 test("manager request endpoint rejects unsafe or invalid submissions before database access", async ({ request }) => {

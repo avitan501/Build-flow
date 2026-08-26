@@ -9,6 +9,9 @@ import { generateRequestClientQuotePdf, type RequestClientQuoteLine } from "@/li
 type ReplyResult = { ok: true; providerId: string | null } | { ok: false; error: string }
 type QuoteResult = { ok: true; providerId: string | null; pdfBase64?: string; fileName?: string } | { ok: false; error: string }
 type DeliveryScheduleResult = { ok: true } | { ok: false; error: string }
+export type MaterialRequestStatus = "submitted" | "in_review" | "quoted" | "closed"
+
+const MATERIAL_REQUEST_STATUSES = new Set<MaterialRequestStatus>(["submitted", "in_review", "quoted", "closed"])
 
 export type RequestClientQuoteInput = {
   requestId: string
@@ -34,6 +37,46 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ])
+
+export async function updateMaterialRequestStatusAction(input: { requestId: string; status: MaterialRequestStatus }) {
+  const requestId = String(input.requestId || "").trim()
+  const status = String(input.status || "") as MaterialRequestStatus
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !MATERIAL_REQUEST_STATUSES.has(status)) return { ok: false as const, error: "Choose a valid request status." }
+
+  const { supabase } = await requireStaffProfile("customers")
+  const { data: request } = await supabase
+    .from("quote_requests")
+    .select("id,owner_id,project_id,status")
+    .eq("id", requestId)
+    .maybeSingle<{ id: string; owner_id: string; project_id: string; status: string }>()
+  if (!request) return { ok: false as const, error: "Request not found." }
+  if (request.status === status) return { ok: true as const }
+
+  const { data: updated, error: updateError } = await supabase.from("quote_requests").update({ status }).eq("id", requestId).select("id").maybeSingle<{ id: string }>()
+  if (updateError || !updated) return { ok: false as const, error: "The request status could not be changed." }
+
+  const labels: Record<MaterialRequestStatus, string> = { submitted: "New", in_review: "In progress", quoted: "Quote sent", closed: "Closed" }
+  const { error: eventError } = await supabase.from("project_events").insert({
+    project_id: request.project_id,
+    owner_id: request.owner_id,
+    event_type: "status_changed",
+    source: "admin",
+    title: `Material request marked ${labels[status]}`,
+    description: `Manager changed the request from ${request.status.replaceAll("_", " ")} to ${labels[status].toLowerCase()}.`,
+    metadata: { quote_request_id: request.id, manager_action: "request_status", previous_status: request.status, request_status: status },
+  })
+  if (eventError) {
+    await supabase.from("quote_requests").update({ status: request.status }).eq("id", requestId)
+    return { ok: false as const, error: "The status was not changed because its history could not be saved." }
+  }
+
+  revalidatePath("/owner/materials/requests")
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  revalidatePath("/admin/build-map")
+  revalidatePath("/admin/users")
+  revalidatePath("/admin/supplier-quotes")
+  return { ok: true as const }
+}
 
 export async function organizeClientMaterialRequestAction(formData: FormData) {
   const requestId = String(formData.get("requestId") || "").trim()

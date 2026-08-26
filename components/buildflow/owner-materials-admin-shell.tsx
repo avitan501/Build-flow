@@ -864,9 +864,6 @@ export function OwnerMaterialsAdminShell({
               <Link href="/owner/materials/requests" className={`rounded-lg bg-[#0071e3] px-4 py-3 text-sm font-semibold text-white ${buttonFocusClass}`}>
                 Customer Requests
               </Link>
-              <Link href="/admin/settings/material-order-questions" className={`rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 ${buttonFocusClass}`}>
-                Department Questions
-              </Link>
             </div>
           </div>
 
