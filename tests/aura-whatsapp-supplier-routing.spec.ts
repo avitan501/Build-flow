@@ -37,13 +37,15 @@ test("manager communications can reach customers, leads, and suppliers", async (
   expect(workspace).toContain("ExpandableMessage")
 })
 
-test("manager communications support removable photos and phone-number history", async () => {
+test("manager communications support file attachments and phone-number history", async () => {
   const [workspace, actions] = await Promise.all([
     readFile(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/aura/actions.ts"), "utf8"),
   ])
 
-  expect(workspace).toContain('aria-label="Remove photo"')
+  expect(workspace).toContain('aria-label="Remove attachment"')
+  expect(workspace).toContain("Add attachment")
+  expect(workspace).toContain("Q U O supports up to 5 MB")
   expect(workspace).toContain("Search chats")
   expect(workspace).toContain("activeConversation.messages.map")
   expect(workspace).toContain("prepared.quoWebUrl")
@@ -51,6 +53,8 @@ test("manager communications support removable photos and phone-number history",
   expect(workspace).toContain("window.setInterval(refresh, 10_000)")
   expect(actions).toContain('quoWebUrl: "https://my.quo.com/inbox"')
   expect(actions).toContain("attachmentUrl: signed.data.signedUrl")
+  expect(actions).toContain("prepareQuoAttachmentMessageAction")
+  expect(actions).toContain("5 * 1024 * 1024")
 })
 
 test("WhatsApp failures explain Sandbox and reply-window requirements", async () => {

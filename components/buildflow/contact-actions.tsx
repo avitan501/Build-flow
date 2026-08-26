@@ -1,11 +1,11 @@
 "use client"
 
-import { ChevronDown, ImagePlus, LoaderCircle, Mail, MessageCircle, Phone, Play, Send, Smartphone, Video, X } from "lucide-react"
+import { ChevronDown, LoaderCircle, Mail, MessageCircle, Paperclip, Phone, Play, Send, Smartphone, Video, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
-import { prepareQuoPhotoMessageAction, sendAuraMessageAction, sendAuraVideoAction } from "@/app/owner/aura/actions"
+import { prepareQuoAttachmentMessageAction, sendAuraMessageAction, sendAuraVideoAction } from "@/app/owner/aura/actions"
 import { normalizeAuraPhone } from "@/lib/aura/identity"
 import { auraShareVideos, buildAuraShareVideoCaption, type AuraShareVideoId } from "@/lib/aura/share-videos"
 
@@ -50,7 +50,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
   const [template, setTemplate] = useState<TemplateKey>("welcome")
   const [message, setMessage] = useState("")
   const [subject, setSubject] = useState("")
-  const [photo, setPhoto] = useState<File | null>(null)
+  const [attachment, setAttachment] = useState<File | null>(null)
   const [feedback, setFeedback] = useState("")
   const [videoMenuOpen, setVideoMenuOpen] = useState(false)
   const [selectedVideoId, setSelectedVideoId] = useState<AuraShareVideoId | null>(null)
@@ -62,7 +62,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     setChannel(null)
     setMessage("")
     setSubject("")
-    setPhoto(null)
+    setAttachment(null)
     setFeedback("")
   }
 
@@ -92,14 +92,23 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     if (!channel) return
     setFeedback("")
     startTransition(async () => {
-      if (channel === "sms" && photo) {
+      if (channel === "sms" && attachment) {
         const formData = new FormData()
         formData.set("phone", normalizedPhone)
         formData.set("message", message)
-        formData.set("photo", photo)
-        const result = await prepareQuoPhotoMessageAction(formData)
+        formData.set("attachment", attachment)
+        const result = await prepareQuoAttachmentMessageAction(formData)
         if (!result.ok) { setFeedback(result.error); return }
-        window.location.href = result.deepLink
+        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+          window.location.href = result.deepLink
+        } else {
+          await navigator.clipboard?.writeText(message).catch(() => undefined)
+          window.open(result.quoWebUrl, "_blank", "noopener,noreferrer")
+          window.open(result.attachmentUrl, "_blank", "noopener,noreferrer")
+          setFeedback("Q U O opened. The message was copied; attach the prepared file from the second tab.")
+          setAttachment(null)
+          return
+        }
         resetComposer()
         return
       }
@@ -146,11 +155,11 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
           <fieldset><legend className="text-xs font-semibold">Channel</legend><div className="mt-1 grid grid-cols-3 gap-1">{([['sms', 'Text', Smartphone], ['whatsapp', 'WhatsApp', MessageCircle], ['email', 'Email', Mail]] as const).map(([value, label, Icon]) => <button key={value} type="button" disabled={value === "email" ? !email : !normalizedPhone} onClick={() => setChannel(value)} className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-semibold disabled:opacity-30 ${channel === value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-300 bg-white"}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}</div></fieldset>
           {channel === "email" ? <label className="grid gap-1 text-xs font-semibold">Subject<input value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={200} placeholder="Message from Avantia Build" className="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label> : null}
           <label className="grid gap-1 text-xs font-semibold">Exact message preview<textarea autoFocus value={message} onChange={(event) => { setMessage(event.target.value); setTemplate("custom") }} maxLength={1600} rows={7} className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-5" /></label>
-          {channel === "sms" ? <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold"><ImagePlus className="h-4 w-4" />{photo ? photo.name : "Add photo"}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] || null)} /></label> : null}
-          {channel === "sms" && photo ? <p className="text-xs text-slate-500">The Q U O app opens with the photo attached. Review it and press Send.</p> : null}
+          {channel === "sms" ? <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold"><Paperclip className="h-4 w-4" />{attachment ? attachment.name : "Add attachment"}<input type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.mp4,.mov" className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] || null)} /></label> : null}
+          {channel === "sms" && attachment ? <p className="text-xs text-slate-500">The Q U O app opens with the file ready. Review it and press Send. Maximum 5 MB.</p> : null}
           {feedback ? <p role="alert" className="text-sm font-semibold text-rose-700">{feedback}</p> : null}
         </div>
-        <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3"><button type="button" onClick={close} disabled={pending} className="min-h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold">Cancel</button><button type="button" onClick={send} disabled={pending || !message.trim()} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{channel === "sms" && photo ? "Open Q U O" : "Send"}</button></footer>
+        <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3"><button type="button" onClick={close} disabled={pending} className="min-h-10 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold">Cancel</button><button type="button" onClick={send} disabled={pending || !message.trim()} className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{channel === "sms" && attachment ? "Open Q U O with file" : "Send"}</button></footer>
       </section>
     </div>, document.body) : null}
 

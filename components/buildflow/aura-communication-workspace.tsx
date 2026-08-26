@@ -1,10 +1,10 @@
 "use client";
 
-import { ArrowDownLeft, ArrowUpRight, CheckCheck, CircleAlert, Clock3, ImagePlus, Mail, MessageCircle, Phone, Search, Send, Smartphone, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CheckCheck, CircleAlert, Clock3, Mail, MessageCircle, Paperclip, Phone, Search, Send, Smartphone, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
-import { prepareQuoPhotoMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions";
+import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions";
 import { InlineCommunicationReply } from "@/components/buildflow/inline-communication-reply";
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard";
 import { customersForIdentity, normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identity";
@@ -132,12 +132,12 @@ export function AuraCommunicationWorkspace({
   const [manualDestination, setManualDestination] = useState(false);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
-  const [photo, setPhoto] = useState<File | null>(null);
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [historyView, setHistoryView] = useState<"timeline" | "number">("timeline");
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
-  const photoInputRef = useRef<HTMLInputElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const refresh = () => {
@@ -221,12 +221,12 @@ export function AuraCommunicationWorkspace({
     const messageChannel = channel;
     setFeedback(null);
     startTransition(async () => {
-      if (messageChannel === "sms" && photo) {
+      if (messageChannel === "sms" && attachment) {
         const formData = new FormData();
         formData.set("phone", recipient);
         formData.set("message", message);
-        formData.set("photo", photo);
-        const prepared = await prepareQuoPhotoMessageAction(formData);
+        formData.set("attachment", attachment);
+        const prepared = await prepareQuoAttachmentMessageAction(formData);
         if (!prepared.ok) { setFeedback({ tone: "error", text: prepared.error }); return; }
         const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         if (mobile) {
@@ -235,10 +235,10 @@ export function AuraCommunicationWorkspace({
           await navigator.clipboard?.writeText(message).catch(() => undefined);
           window.open(prepared.quoWebUrl, "_blank", "noopener,noreferrer");
           window.open(prepared.attachmentUrl, "_blank", "noopener,noreferrer");
-          setFeedback({ tone: "success", text: "Q U O opened in a new tab. The message was copied; attach the prepared image from the second tab." });
+          setFeedback({ tone: "success", text: "Q U O opened in a new tab. The message was copied; attach the prepared file from the second tab." });
         }
-        setPhoto(null);
-        if (photoInputRef.current) photoInputRef.current.value = "";
+        setAttachment(null);
+        if (attachmentInputRef.current) attachmentInputRef.current.value = "";
         return;
       }
       const result = await sendAuraMessageAction({ channel: messageChannel, recipient, subject, message });
@@ -315,14 +315,14 @@ export function AuraCommunicationWorkspace({
             {channel === "call" ? <a href={normalizedPhone ? quoCallHref(normalizedPhone) : undefined} aria-disabled={!normalizedPhone} className={`inline-flex min-h-11 self-end items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold ${normalizedPhone ? "bg-emerald-600 text-white" : "pointer-events-none bg-slate-200 text-slate-400"}`}><Phone className="h-4 w-4" />Call with Q U O</a> : null}
             {channel === "email" ? <label className="grid gap-1.5 text-xs font-semibold md:col-span-2">Subject<input value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={200} placeholder="Message from Avantia Build" className="min-h-11 rounded-md border border-slate-300 px-3 text-sm font-normal" /></label> : null}
             {channel !== "call" ? <label className="grid gap-1.5 text-xs font-semibold md:col-span-2">Message<textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1600} rows={4} placeholder="Write the message here" className="rounded-md border border-slate-300 p-3 text-sm font-normal leading-6" /></label> : null}
-            {channel === "sms" ? <div className="flex min-w-0 gap-2 md:col-span-2"><label className="inline-flex min-h-10 min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold"><ImagePlus className="h-4 w-4 shrink-0" /><span className="truncate">{photo ? photo.name : "Add photo"}</span><input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] || null)} /></label>{photo ? <button type="button" onClick={() => { setPhoto(null); if (photoInputRef.current) photoInputRef.current.value = ""; }} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-rose-200 bg-rose-50 text-rose-700" aria-label="Remove attached photo"><X className="h-4 w-4" /></button> : null}</div> : null}
-            {channel === "sms" && photo ? <p className="text-xs text-slate-500 md:col-span-2">On mobile, Q U O opens with the image. On a computer, Q U O and the prepared image open in separate tabs so you can attach it.</p> : null}
+            {channel === "sms" ? <div className="flex min-w-0 gap-2 md:col-span-2"><label className="inline-flex min-h-10 min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-300 px-3 text-sm font-semibold"><Paperclip className="h-4 w-4 shrink-0" /><span className="truncate">{attachment ? attachment.name : "Add attachment"}</span><input ref={attachmentInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.mp4,.mov" className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] || null)} /></label>{attachment ? <button type="button" onClick={() => { setAttachment(null); if (attachmentInputRef.current) attachmentInputRef.current.value = ""; }} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-rose-200 bg-rose-50 text-rose-700" aria-label="Remove attachment"><X className="h-4 w-4" /></button> : null}</div> : null}
+            {channel === "sms" && attachment ? <p className="text-xs text-slate-500 md:col-span-2">Q U O supports common files up to 5 MB. On mobile, the message opens with the file ready. On a computer, Q U O and the prepared file open in separate tabs.</p> : null}
             {channel === "whatsapp" ? <p className="rounded-md border border-sky-200 bg-sky-50 p-2.5 text-xs leading-5 text-sky-900 md:col-span-2">Messages use the connected Avantia WhatsApp number. Incoming replies appear automatically in this conversation.</p> : null}
             {channel !== "email" && recipient ? <p className={`text-xs font-semibold md:col-span-2 ${normalizedPhone ? "text-emerald-700" : "text-rose-700"}`}>{normalizedPhone ? `Sending to ${normalizedPhone}` : "Enter a complete US number or an explicit international number."}</p> : null}
           </div>
           {!selectedChannelReady ? <p className="mt-3 text-sm font-semibold text-amber-700">This channel needs its API credentials. Open Phone connections above and press Connect WhatsApp & Text.</p> : null}
           {feedback ? <p className={`mt-3 text-sm font-semibold ${feedback.tone === "success" ? "text-emerald-700" : "text-rose-700"}`} role="status">{feedback.text}</p> : null}
-          {channel !== "call" ? <div className="mt-4 flex justify-end"><button type="button" onClick={sendMessage} disabled={pending || !selectedChannelReady || !recipient.trim() || !message.trim()} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Sending..." : channel === "sms" && photo ? "Open Q U O with photo" : channel === "sms" ? "Send text" : channel === "whatsapp" ? "Send WhatsApp" : "Send email"}</button></div> : null}
+          {channel !== "call" ? <div className="mt-4 flex justify-end"><button type="button" onClick={sendMessage} disabled={pending || !selectedChannelReady || !recipient.trim() || !message.trim()} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Sending..." : channel === "sms" && attachment ? "Open Q U O with file" : channel === "sms" ? "Send text" : channel === "whatsapp" ? "Send WhatsApp" : "Send email"}</button></div> : null}
         </section>
 
         <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="aura-history-heading">

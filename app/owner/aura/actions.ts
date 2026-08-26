@@ -27,7 +27,7 @@ function requireUuid(value: FormDataEntryValue | null) {
 }
 
 export type SendAuraMessageResult = { ok: true } | { ok: false; error: string };
-export type PrepareQuoPhotoResult = { ok: true; deepLink: string; attachmentUrl: string; quoWebUrl: string } | { ok: false; error: string };
+export type PrepareQuoAttachmentResult = { ok: true; deepLink: string; attachmentUrl: string; quoWebUrl: string } | { ok: false; error: string };
 export type SendAuraVideoResult = { ok: true; title: string } | { ok: false; error: string };
 
 type BrokerResult = { ok?: boolean; error?: string; id?: string };
@@ -149,24 +149,52 @@ export async function activateAuraTwoChatChannelAction(channel: "voice" | "whats
   return { ok: true };
 }
 
-export async function prepareQuoPhotoMessageAction(formData: FormData): Promise<PrepareQuoPhotoResult> {
+const QUO_ATTACHMENT_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "image/jpeg",
+  "image/png",
+  "image/tiff",
+  "image/webp",
+  "text/csv",
+  "text/plain",
+  "video/mp4",
+  "video/quicktime",
+]);
+
+const QUO_ATTACHMENT_EXTENSIONS = new Set([
+  "csv", "doc", "docx", "gif", "heic", "heif", "jpeg", "jpg", "mov", "mp4", "pdf", "png", "ppt", "pptx", "tif", "tiff", "txt", "webp", "xls", "xlsx",
+]);
+
+export async function prepareQuoAttachmentMessageAction(formData: FormData): Promise<PrepareQuoAttachmentResult> {
   const { supabase, user, access } = await requireManagerPortalProfile();
   if (!access.customers) return { ok: false, error: "Customer communication access is required." };
   const phone = normalizeAuraPhone(String(formData.get("phone") || ""));
   const message = String(formData.get("message") || "").trim().slice(0, 1600);
-  const photo = formData.get("photo");
+  const attachment = formData.get("attachment");
   if (!phone || !message) return { ok: false, error: "Enter a valid phone number and message." };
-  if (!(photo instanceof File) || photo.size === 0) return { ok: false, error: "Choose a photo." };
-  if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(photo.type)) return { ok: false, error: "Use a JPG, PNG, or WEBP photo." };
-  if (photo.size > 600 * 1024) return { ok: false, error: "Keep Q U O photos under 600 KB for reliable carrier delivery." };
-  const extension = photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg";
+  if (!(attachment instanceof File) || attachment.size === 0) return { ok: false, error: "Choose a file." };
+  if (attachment.size > 5 * 1024 * 1024) return { ok: false, error: "Keep Q U O attachments under 5 MB." };
+  const originalExtension = attachment.name.split(".").pop()?.toLowerCase() || "";
+  if (!QUO_ATTACHMENT_EXTENSIONS.has(originalExtension) || (attachment.type && attachment.type !== "application/octet-stream" && !QUO_ATTACHMENT_TYPES.has(attachment.type))) {
+    return { ok: false, error: "Attach a common image, PDF, document, spreadsheet, presentation, text, or video file." };
+  }
+  const extension = originalExtension.replace(/[^a-z0-9]/g, "");
   const path = `${user.id}/communications/${crypto.randomUUID()}.${extension}`;
-  const upload = await supabase.storage.from("project-uploads").upload(path, photo, { contentType: photo.type, upsert: false });
-  if (upload.error) return { ok: false, error: "The photo could not be prepared." };
-  const signed = await supabase.storage.from("project-uploads").createSignedUrl(path, 60 * 60);
+  const upload = await supabase.storage.from("project-uploads").upload(path, attachment, { contentType: attachment.type || "application/octet-stream", upsert: false });
+  if (upload.error) return { ok: false, error: "The attachment could not be prepared." };
+  const signed = await supabase.storage.from("project-uploads").createSignedUrl(path, 24 * 60 * 60);
   if (signed.error || !signed.data?.signedUrl) {
     await supabase.storage.from("project-uploads").remove([path]);
-    return { ok: false, error: "The photo link could not be prepared." };
+    return { ok: false, error: "The attachment link could not be prepared." };
   }
   const params = new URLSearchParams({ number: phone, from: "+15169088319", text: message, attachments: signed.data.signedUrl });
   return {

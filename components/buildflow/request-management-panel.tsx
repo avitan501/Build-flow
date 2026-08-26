@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
+import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
 import { previewRequestClientQuoteAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
@@ -142,13 +143,35 @@ export function RequestManagementPanel({
     })
   }
 
-  function openClientText() {
-    const phone = client.phone.replace(/\D/g, "")
-    if (!phone) return
-    const separator = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? "&" : "?"
-    window.location.href = `sms:${phone}${separator}body=${encodeURIComponent(clientMessage)}`
-    setFeedbackError(false)
-    setFeedback("The text message is ready in your messaging app. Review it and tap Send.")
+  function sendClientText() {
+    startTransition(async () => {
+      setFeedback("")
+      if (!attachment) {
+        const result = await sendAuraMessageAction({ channel: "sms", recipient: client.phone, message: clientMessage })
+        setFeedbackError(!result.ok)
+        setFeedback(result.ok ? `Text sent directly to ${client.phone} from Q U O.` : result.error)
+        return
+      }
+      const formData = new FormData()
+      formData.set("phone", client.phone)
+      formData.set("message", clientMessage)
+      formData.set("attachment", attachment)
+      const prepared = await prepareQuoAttachmentMessageAction(formData)
+      if (!prepared.ok) {
+        setFeedbackError(true)
+        setFeedback(prepared.error)
+        return
+      }
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        window.location.href = prepared.deepLink
+      } else {
+        await navigator.clipboard?.writeText(clientMessage).catch(() => undefined)
+        window.open(prepared.quoWebUrl, "_blank", "noopener,noreferrer")
+        window.open(prepared.attachmentUrl, "_blank", "noopener,noreferrer")
+      }
+      setFeedbackError(false)
+      setFeedback("Q U O is ready with the message and file. Review it and press Send.")
+    })
   }
 
   const quoteSubtotal = quoteLines.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), 0)
@@ -190,6 +213,30 @@ export function RequestManagementPanel({
       link.click()
       URL.revokeObjectURL(url)
       setQuoteFeedback("Estimate PDF downloaded for review.")
+    })
+  }
+
+  function textQuote() {
+    setQuoteFeedback("")
+    startTransition(async () => {
+      const result = await previewRequestClientQuoteAction(quoteInput())
+      if (!result.ok || !result.pdfBase64 || !result.fileName) return setQuoteFeedback(result.ok ? "The PDF could not be prepared." : result.error)
+      const bytes = Uint8Array.from(atob(result.pdfBase64), (character) => character.charCodeAt(0))
+      const file = new File([bytes], result.fileName, { type: "application/pdf" })
+      const formData = new FormData()
+      formData.set("phone", client.phone)
+      formData.set("message", quoteMessage.trim() || `Hello ${firstName}, your Avantia Build estimate is attached.`)
+      formData.set("attachment", file)
+      const prepared = await prepareQuoAttachmentMessageAction(formData)
+      if (!prepared.ok) return setQuoteFeedback(prepared.error)
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        window.location.href = prepared.deepLink
+      } else {
+        await navigator.clipboard?.writeText(quoteMessage).catch(() => undefined)
+        window.open(prepared.quoWebUrl, "_blank", "noopener,noreferrer")
+        window.open(prepared.attachmentUrl, "_blank", "noopener,noreferrer")
+      }
+      setQuoteFeedback("The estimate and message are ready in Q U O. Review them and press Send.")
     })
   }
 
@@ -260,10 +307,11 @@ export function RequestManagementPanel({
               <button type="button" onClick={() => setDeliveryMethod("text")} disabled={!client.phone} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold ${deliveryMethod === "text" ? "bg-white text-slate-950 shadow-sm" : "text-slate-600"} disabled:opacity-40`}><MessageSquareText className="h-4 w-4" />Text</button>
             </div>
 
-            {deliveryMethod === "email" ? <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 text-sm font-semibold text-slate-700"><Paperclip className="h-4 w-4" /><span className="min-w-0 flex-1 truncate">{attachment?.name || "Attach quote or order (optional)"}</span><input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.xlsx" onChange={(event) => setAttachment(event.target.files?.[0] || null)} className="sr-only" /></label> : attachment ? <p className="mt-3 text-xs font-medium text-amber-700">Attachments can only be sent by email.</p> : null}
+            <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 text-sm font-semibold text-slate-700"><Paperclip className="h-4 w-4" /><span className="min-w-0 flex-1 truncate">{attachment?.name || "Attach quote, order, photo, or file (optional)"}</span><input type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.mp4,.mov" onChange={(event) => setAttachment(event.target.files?.[0] || null)} className="sr-only" /></label>
+            {deliveryMethod === "text" && attachment ? <p className="mt-2 text-xs font-medium text-slate-600">Q U O supports common files up to 5 MB. Review the prepared message in Q U O and press Send.</p> : null}
 
             <div className="mt-3 flex flex-wrap gap-2">
-              {deliveryMethod === "email" ? <button type="button" onClick={sendClientEmail} disabled={pending || !client.email} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50"><Send className="h-4 w-4" />{pending ? "Sending..." : "Send email reply"}</button> : <button type="button" onClick={openClientText} disabled={!client.phone} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50"><MessageSquareText className="h-4 w-4" />Open text message</button>}
+              {deliveryMethod === "email" ? <button type="button" onClick={sendClientEmail} disabled={pending || !client.email} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50"><Send className="h-4 w-4" />{pending ? "Sending..." : "Send email reply"}</button> : <button type="button" onClick={sendClientText} disabled={pending || !client.phone} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50"><MessageSquareText className="h-4 w-4" />{pending ? "Preparing..." : attachment ? "Open Q U O with file" : "Send text"}</button>}
               {client.phone ? <a href={`tel:${client.phone}`} className={actionClass}><Phone className="h-4 w-4" />Call</a> : null}
             </div>
             <button type="button" onClick={() => setQuoteOpen(true)} className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#0071e3] bg-sky-50 px-4 text-sm font-bold text-[#0066cc]"><FileText className="h-4 w-4" />Create and send estimate</button>
@@ -275,7 +323,7 @@ export function RequestManagementPanel({
 
       {quoteOpen && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[150] grid place-items-center overflow-y-auto bg-slate-950/55 p-2 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="request-quote-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !pending) setQuoteOpen(false) }}>
         <section className="flex max-h-[96dvh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
-          <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#0066cc]">Avantia Build estimate</p><h2 id="request-quote-title" className="mt-0.5 text-xl font-bold">Create client quote</h2><p className="mt-0.5 text-xs text-slate-500">Review the PDF, then email it as an attachment.</p></div><button type="button" onClick={() => setQuoteOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200" aria-label="Close"><X className="h-4 w-4" /></button></header>
+          <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#0066cc]">Avantia Build estimate</p><h2 id="request-quote-title" className="mt-0.5 text-xl font-bold">Create client quote</h2><p className="mt-0.5 text-xs text-slate-500">Review the PDF, then send it by email or text.</p></div><button type="button" onClick={() => setQuoteOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200" aria-label="Close"><X className="h-4 w-4" /></button></header>
           <div className="overflow-y-auto p-4">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <label className="grid gap-1 text-xs font-bold">Estimate code<input value={quoteNumber} onChange={(event) => setQuoteNumber(event.target.value)} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
@@ -317,7 +365,7 @@ export function RequestManagementPanel({
             </div>
             {quoteFeedback ? <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold" role="status">{quoteFeedback}</p> : null}
           </div>
-          <footer className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-4 py-3"><button type="button" onClick={downloadQuote} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Working..." : "Send estimate"}</button></footer>
+          <footer className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-4 py-3"><button type="button" onClick={downloadQuote} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={textQuote} disabled={pending || !client.phone || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#0071e3] bg-white px-4 text-sm font-bold text-[#0066cc] disabled:opacity-40"><MessageSquareText className="h-4 w-4" />Text estimate</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Working..." : "Email estimate"}</button></footer>
         </section>
       </div>, document.body) : null}
     </div>
