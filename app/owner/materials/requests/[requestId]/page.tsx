@@ -4,7 +4,7 @@ import { CustomerRequestStatus } from "@/components/buildflow/customer-request-s
 import { OrganizeMaterialListButton } from "@/components/buildflow/organize-material-list-button"
 import { OrganizedMaterialList } from "@/components/buildflow/organized-material-list"
 import { RequestManagementPanel, type RequestComparisonSummary } from "@/components/buildflow/request-management-panel"
-import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
+import { RequestWorkflowStepHeader } from "@/components/buildflow/request-workflow-step-header"
 import { requireStaffProfile } from "@/lib/auth"
 import { contactEmailForDisplay } from "@/lib/auth-phone"
 import { normalizeMaterialCatalogDepartment } from "@/lib/material-catalog"
@@ -20,6 +20,8 @@ type RequestItem = { id: string; name: string; department: string; item_type: st
 type LegacyAnswer = { questionId?: string; label?: string; value?: string; question?: string; answer?: string }
 type SupplierPackage = { id: string; department: string; supplier_id: string | null; status: string }
 type ComparisonRecord = Pick<QuoteComparisonRecord, "id" | "request_id" | "title" | "status" | "client_quote_status" | "quote_number" | "updated_at">
+
+const workflowStepCardClass = "group relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)]"
 
 function legacyAnswers(value: unknown): LegacyAnswer[] {
   return Array.isArray(value) ? value.filter((answer): answer is LegacyAnswer => Boolean(answer) && typeof answer === "object") : []
@@ -96,13 +98,13 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
         </header>
         <CustomerRequestStatus requestId={request.id} status={request.status} currentStage={currentStage} updatedAt={request.updated_at} assignedTo="Carlos" />
         <div className="mt-3 grid gap-2">
-          <details open={currentStage === "received"} className={`order-2 ${workflowStepCardClass()}`}>
+          <details open={currentStage === "received"} className={`order-2 ${workflowStepCardClass}`}>
             <RequestWorkflowStepHeader requestId={request.id} step={2} title="Organize request" detail={organizedItems.length ? `${organizedItems.length} organized item${organizedItems.length === 1 ? "" : "s"}` : "Create a clean material list"} status={step2Complete ? "complete" : "active"} icon="organize" />
             <div className="border-t border-slate-200 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm text-slate-500">Create a structured copy without changing the original request.</p>{organizationCompletedLabel ? <p className="mt-1 text-xs font-semibold text-slate-400">Last review: {organizationCompletedLabel} ET</p> : null}</div>{organizationStatus !== "processing" ? <OrganizeMaterialListButton requestId={request.id} refresh={organizedItems.length > 0} /> : null}</div>
             {organizedItems.length ? <div className="mt-4 border-t border-slate-200 pt-3"><h3 className="text-sm font-bold">Confirmed material list</h3><OrganizedMaterialList requestId={request.id} items={organizedItems} /></div> : <div className={`mt-4 rounded-lg px-4 py-3 text-sm font-semibold ${organizationStatus === "failed" ? "bg-rose-50 text-rose-800" : organizationStatus === "plan_requires_takeoff" ? "bg-amber-50 text-amber-800" : "bg-sky-50 text-sky-800"}`}>{organizationStatus === "processing" ? "The material list is being organized." : organizationStatus === "failed" ? "Automatic organization needs another attempt." : organizationStatus === "plan_requires_takeoff" ? "This appears to be a plan and requires a takeoff before materials can be listed." : "The original request is saved. Select Organize request to create the material chart."}</div>}
             </div>
           </details>
-          <details open={currentStage === "received" && organizedItems.length === 0} className={`order-1 ${workflowStepCardClass()}`}>
+          <details open={currentStage === "received" && organizedItems.length === 0} className={`order-1 ${workflowStepCardClass}`}>
             <RequestWorkflowStepHeader requestId={request.id} step={1} title="Review client list" detail={`${originalItems.length} item${originalItems.length === 1 ? "" : "s"} · ${signedFiles.length} file${signedFiles.length === 1 ? "" : "s"}`} status={step1Complete ? "complete" : "active"} icon="review" />
             <div className="border-t border-slate-200 p-4"><p className="text-sm text-slate-500">The customer’s original notes, selections, and files remain unchanged.</p>
             <div className="mt-4 divide-y divide-slate-100">
