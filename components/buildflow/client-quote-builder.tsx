@@ -26,6 +26,7 @@ import {
   type QuoteComparisonItemRecord,
   type QuoteComparisonRecord,
 } from "@/lib/quote-comparison";
+import { CREDIT_CARD_PROCESSING_TERM } from "@/lib/proposal-terms";
 
 export type QuoteClientOption = {
   id: string;
@@ -44,12 +45,6 @@ function nonNegativeNumber(value: string) {
 
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
-}
-
-function defaultExpiration() {
-  const date = new Date();
-  date.setDate(date.getDate() + 30);
-  return date.toISOString().slice(0, 10);
 }
 
 function statusLabel(status: QuoteComparisonRecord["client_quote_status"]) {
@@ -80,7 +75,6 @@ export function ClientQuoteBuilder({
   const [pending, startTransition] = useTransition();
   const [selectedClientId, setSelectedClientId] = useState(comparison.client_id || "");
   const [quoteNumber, setQuoteNumber] = useState(comparison.quote_number);
-  const [expiresOn, setExpiresOn] = useState(comparison.expires_on || defaultExpiration());
   const [clientMessage, setClientMessage] = useState(comparison.client_message);
   const [clientDeliveryCharge, setClientDeliveryCharge] = useState(String(comparison.client_delivery_charge || ""));
   const [bulkMarkup, setBulkMarkup] = useState("");
@@ -177,7 +171,7 @@ export function ClientQuoteBuilder({
       comparisonId: comparison.id,
       clientId: selectedClientId,
       quoteNumber,
-      expiresOn: expiresOn || null,
+      expiresOn: null,
       clientMessage,
       clientDeliveryCharge: nonNegativeNumber(clientDeliveryCharge),
       items: draftItems.map((item) => ({
@@ -257,7 +251,7 @@ export function ClientQuoteBuilder({
         </div>
       </div>
 
-      <div className="grid gap-4 border-b border-slate-200 bg-slate-50/70 p-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-[minmax(15rem,1.4fr)_minmax(10rem,.7fr)_minmax(10rem,.7fr)_minmax(10rem,.7fr)]">
+      <div className="grid gap-4 border-b border-slate-200 bg-slate-50/70 p-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-[minmax(15rem,1.4fr)_minmax(10rem,.7fr)_minmax(10rem,.7fr)]">
         <label className="grid gap-1.5 text-xs font-bold text-slate-600">
           Client
           <span className="relative">
@@ -269,7 +263,6 @@ export function ClientQuoteBuilder({
           </span>
         </label>
         <label className="grid gap-1.5 text-xs font-bold text-slate-600">Quote number<input value={quoteNumber} onChange={(event) => setQuoteNumber(event.target.value.toUpperCase())} className="min-h-12 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold uppercase" /></label>
-        <label className="grid gap-1.5 text-xs font-bold text-slate-600">Valid through<input type="date" value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} className="min-h-12 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold" /></label>
         <label className="grid gap-1.5 text-xs font-bold text-slate-600">Client delivery charge<input type="number" min="0" step="0.01" value={clientDeliveryCharge} onChange={(event) => setClientDeliveryCharge(event.target.value)} placeholder="$0.00" className="min-h-12 rounded-lg border border-slate-300 bg-white px-3 text-right text-sm font-semibold tabular-nums" /></label>
       </div>
 
@@ -332,11 +325,12 @@ export function ClientQuoteBuilder({
           <div className="my-8 w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-7"><div><p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#0066cc]">Client view</p><h3 id="client-preview-title" className="mt-1 text-lg font-bold">Branded quote preview</h3></div><button type="button" onClick={() => setShowPreview(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200" aria-label="Close quote preview"><X className="h-4 w-4" /></button></div>
             <div className="p-5 sm:p-8">
-              <div className="flex flex-col gap-5 border-b border-slate-200 pb-6 sm:flex-row sm:items-start sm:justify-between"><AvantiaBuildLockup /><div className="sm:text-right"><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#0066cc]">Material quote</p><p className="mt-1 text-lg font-bold">{quoteNumber}</p><p className="mt-1 text-xs text-slate-500">Valid through {expiresOn || "not specified"}</p></div></div>
+              <div className="flex flex-col gap-5 border-b border-slate-200 pb-6 sm:flex-row sm:items-start sm:justify-between"><AvantiaBuildLockup /><div className="sm:text-right"><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#0066cc]">Material quote</p><p className="mt-1 text-lg font-bold">{quoteNumber}</p></div></div>
               <div className="grid gap-4 border-b border-slate-200 py-6 sm:grid-cols-2"><div><p className="text-xs font-bold uppercase text-slate-400">Prepared for</p><p className="mt-1 text-lg font-bold">{selectedClient.name}</p><p className="text-sm text-slate-600">{selectedClient.companyName || selectedClient.email}</p></div><div><p className="text-xs font-bold uppercase text-slate-400">Job location</p><p className="mt-1 text-sm font-semibold">{comparison.job_address || "No delivery address"}</p></div></div>
               <div className="divide-y divide-slate-100">{summary.lines.map((line) => <div key={line.itemId} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 py-4"><div><p className="text-sm font-bold">{line.description}</p><p className="mt-1 text-xs text-slate-500">{line.quantity.toLocaleString()} {line.unit}{line.specification ? ` · ${line.specification}` : ""} · {formatComparisonMoney(line.clientUnitPrice ?? 0)} each</p></div><p className="text-sm font-bold tabular-nums">{formatComparisonMoney(line.clientLineTotal)}</p></div>)}</div>
               <div className="ml-auto mt-5 max-w-xs border-t-2 border-slate-950 pt-4"><div className="flex justify-between gap-8 text-sm text-slate-600"><span>Materials</span><span className="tabular-nums">{formatComparisonMoney(summary.clientMaterialSubtotal)}</span></div>{summary.clientDeliveryCharge > 0 ? <div className="mt-2 flex justify-between gap-8 text-sm text-slate-600"><span>Delivery</span><span className="tabular-nums">{formatComparisonMoney(summary.clientDeliveryCharge)}</span></div> : null}<div className="mt-3 flex justify-between gap-8 text-lg font-bold"><span>Quote total</span><span className="tabular-nums">{formatComparisonMoney(summary.clientTotal)}</span></div></div>
               {clientMessage ? <p className="mt-6 rounded-lg bg-slate-50 p-4 text-sm leading-6 text-slate-600">{clientMessage}</p> : null}
+              <div className="mt-6 border-t border-slate-200 pt-5"><p className="text-xs font-bold uppercase tracking-[0.1em] text-slate-500">Terms &amp; conditions</p><p className="mt-2 text-xs leading-5 text-slate-600">{CREDIT_CARD_PROCESSING_TERM}</p></div>
               <div className="mt-7 flex flex-col gap-3 border-t border-slate-200 pt-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between"><span>Avantia Build · (516) 908-8319 · office@build.avantiap.com</span><span className="inline-flex items-center gap-1 font-bold text-[#0066cc]">build.avantiap.com <ArrowRight className="h-3.5 w-3.5" /></span></div>
             </div>
             <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-7"><span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500"><FileText className="h-4 w-4" /> PDF attached when sent</span><button type="button" onClick={() => setShowPreview(false)} className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white">Done</button></div>

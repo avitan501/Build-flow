@@ -4,6 +4,7 @@ import path from "node:path";
 import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from "pdf-lib";
 
 import type { ClientQuoteSummary, QuoteComparisonRecord } from "@/lib/quote-comparison";
+import { CREDIT_CARD_PROCESSING_TERM } from "@/lib/proposal-terms";
 
 export type ClientQuotePdfInput = {
   comparison: QuoteComparisonRecord;
@@ -88,8 +89,7 @@ export async function generateClientQuotePdf(input: ClientQuotePdfInput) {
 
   page.drawRectangle({ x: 42, y: 590, width: 528, height: 40, color: soft, borderColor: border, borderWidth: 1 });
   page.drawText(`Issued: ${dateLabel(input.createdAt)}`, { x: 54, y: 606, size: 9, font: regular, color: slate });
-  page.drawText(`Valid through: ${dateLabel(input.comparison.expires_on)}`, { x: 220, y: 606, size: 9, font: regular, color: slate });
-  page.drawText(`Department: ${clean(input.comparison.department || "General materials")}`, { x: 405, y: 606, size: 9, font: regular, color: slate });
+  page.drawText(`Department: ${clean(input.comparison.department || "General materials")}`, { x: 320, y: 606, size: 9, font: regular, color: slate });
 
   let y = 556;
 
@@ -123,7 +123,7 @@ export async function generateClientQuotePdf(input: ClientQuotePdfInput) {
     y -= rowHeight;
   }
 
-  if (y < 180) {
+  if (y < 290) {
     page = addPage();
     y = 650;
   }
@@ -140,8 +140,15 @@ export async function generateClientQuotePdf(input: ClientQuotePdfInput) {
   page.drawText("Quote total", { x: totalsX, y: y - 10, size: 12, font: bold, color: navy });
   rightText(page, bold, money(input.summary.clientTotal), 560, y - 10, 12, navy);
 
+  const termsY = y - 55;
+  page.drawText("Terms & conditions", { x: 42, y: termsY, size: 9, font: bold, color: blue });
+  const termLines = wrap(regular, CREDIT_CARD_PROCESSING_TERM, 8.5, 510).slice(0, 4);
+  termLines.forEach((line, index) => {
+    page.drawText(line, { x: 42, y: termsY - 15 - index * 12, size: 8.5, font: regular, color: slate });
+  });
+
   if (input.comparison.client_message.trim()) {
-    const noteY = Math.max(95, y - 58);
+    const noteY = termsY - 28 - termLines.length * 12;
     page.drawText("Notes", { x: 42, y: noteY, size: 9, font: bold, color: blue });
     wrap(regular, input.comparison.client_message, 8.5, 510).slice(0, 4).forEach((line, index) => {
       page.drawText(line, { x: 42, y: noteY - 15 - index * 12, size: 8.5, font: regular, color: slate });

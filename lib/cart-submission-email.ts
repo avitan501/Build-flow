@@ -1,6 +1,7 @@
 import type { ProfileRecord } from "@/lib/auth"
 import type { ProjectRecord } from "@/lib/projects"
 import type { ShopCartItemDetails, ShopCustomCartItem } from "@/lib/shop-cart"
+import { CREDIT_CARD_PROCESSING_TERM } from "@/lib/proposal-terms"
 
 type QuoteItemForEmail = {
   name: string
@@ -509,21 +510,19 @@ export async function sendClientQuoteEmail(input: ClientQuoteEmailInput): Promis
   if (!apiKey) return { status: "not_configured" }
 
   const subject = `Avantia Build material quote ${input.quoteNumber}`
-  const expiration = input.expiresOn
-    ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${input.expiresOn}T12:00:00`))
-    : "Not specified"
   const itemText = input.items.map((item) => `${item.quantity} ${item.unit} - ${item.description}${item.specification ? ` (${item.specification})` : ""}: ${money(item.lineTotal)}`)
   const text = [
     `Hi ${input.recipientName},`,
     "",
     `Your Avantia Build material quote ${input.quoteNumber} is ready.`,
     `Job location: ${input.jobAddress || "Not provided"}`,
-    `Valid through: ${expiration}`,
     "",
     "Materials:",
     ...itemText,
     ...(input.deliveryCharge > 0 ? [`Delivery: ${money(input.deliveryCharge)}`] : []),
     `Total: ${money(input.total)}`,
+    "",
+    `Terms & conditions: ${CREDIT_CARD_PROCESSING_TERM}`,
     ...(input.message.trim() ? ["", input.message.trim()] : []),
     "",
     "The full branded quote is attached as a PDF.",
@@ -543,10 +542,7 @@ export async function sendClientQuoteEmail(input: ClientQuoteEmailInput): Promis
           <p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Material quote</p>
           <h1 style="margin:0;font-size:25px;line-height:1.25;color:#071126">Your quote is ready</h1>
           <p style="margin:12px 0;color:#475569">Hi ${escapeHtml(input.recipientName)}, we prepared quote <strong>${escapeHtml(input.quoteNumber)}</strong> for your material request.</p>
-          <div style="margin:20px 0;padding:15px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc">
-            <strong>Job location:</strong> ${escapeHtml(input.jobAddress || "Not provided")}<br />
-            <strong>Valid through:</strong> ${escapeHtml(expiration)}
-          </div>
+          <div style="margin:20px 0;padding:15px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc"><strong>Job location:</strong> ${escapeHtml(input.jobAddress || "Not provided")}</div>
           <table role="presentation" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:13px">
             <thead><tr style="background:#071126;color:#ffffff;text-align:left"><th>Material</th><th>Qty</th><th style="text-align:right">Price</th></tr></thead>
             <tbody>${input.items.map((item) => `<tr><td style="border-bottom:1px solid #e5eaf1"><strong>${escapeHtml(item.description)}</strong>${item.specification ? `<br /><span style="color:#64748b">${escapeHtml(item.specification)}</span>` : ""}</td><td style="border-bottom:1px solid #e5eaf1">${item.quantity} ${escapeHtml(item.unit)}</td><td style="border-bottom:1px solid #e5eaf1;text-align:right">${money(item.lineTotal)}</td></tr>`).join("")}</tbody>
@@ -556,6 +552,7 @@ export async function sendClientQuoteEmail(input: ClientQuoteEmailInput): Promis
             <div style="margin-top:5px;font-size:19px;font-weight:700;color:#071126">Total: ${money(input.total)}</div>
           </div>
           ${input.message.trim() ? `<p style="margin:22px 0 0;white-space:pre-wrap;color:#475569">${escapeHtml(input.message.trim())}</p>` : ""}
+          <div style="margin:22px 0 0;padding-top:16px;border-top:1px solid #e5eaf1;color:#475569;font-size:13px"><strong style="color:#071126">Terms &amp; conditions</strong><br />${escapeHtml(CREDIT_CARD_PROCESSING_TERM)}</div>
           <p style="margin:22px 0 0;color:#475569">The complete Avantia Build quote is attached as a PDF. Reply to this email with any questions or requested changes.</p>
         </div>
         <div style="padding:18px 22px;border-top:1px solid #e5eaf1;background:#f8fafc;color:#475569;font-size:13px;line-height:1.65">

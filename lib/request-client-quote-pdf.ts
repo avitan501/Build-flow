@@ -5,6 +5,8 @@ import path from "node:path"
 
 import { PDFDocument, type PDFFont, type PDFPage, rgb, StandardFonts } from "pdf-lib"
 
+import { includeCreditCardProcessingTerm } from "@/lib/proposal-terms"
+
 export type RequestClientQuoteLine = {
   description: string
   quantity: number
@@ -109,8 +111,7 @@ export async function generateRequestClientQuotePdf(input: RequestClientQuotePdf
   drawInfoBox(page, 320, "Ship To", input.shipTo)
   page.drawRectangle({ x: 40, y: 565, width: 532, height: 28, color: soft, borderColor: border, borderWidth: 1 })
   page.drawText(`Date: ${clean(input.issueDate)}`, { x: 50, y: 576, size: 8.5, font: regular, color: slate })
-  page.drawText(`Valid through: ${clean(input.expiresOn)}`, { x: 190, y: 576, size: 8.5, font: regular, color: slate })
-  page.drawText(`Request: ${clean(input.requestTitle).slice(0, 42)}`, { x: 360, y: 576, size: 8.5, font: regular, color: slate })
+  page.drawText(`Request: ${clean(input.requestTitle).slice(0, 64)}`, { x: 230, y: 576, size: 8.5, font: regular, color: slate })
 
   let y = 530
   drawTableHeader(page, y)
@@ -150,7 +151,7 @@ export async function generateRequestClientQuotePdf(input: RequestClientQuotePdf
 
   const termsY = Math.min(y - 48, 160)
   page.drawText("Terms & conditions", { x: 40, y: termsY, size: 9, font: bold, color: blue })
-  wrap(regular, input.terms, 7.6, 330).slice(0, 7).forEach((line, index) => page.drawText(line, { x: 40, y: termsY - 13 - index * 10, size: 7.6, font: regular, color: slate }))
+  wrap(regular, includeCreditCardProcessingTerm(input.terms), 7.6, 330).slice(0, 7).forEach((line, index) => page.drawText(line, { x: 40, y: termsY - 13 - index * 10, size: 7.6, font: regular, color: slate }))
   if (input.ach && (input.ach.bankName || input.ach.accountOwner || input.ach.routingNumber || input.ach.accountNumber)) {
     page.drawText("ACH payment information", { x: 392, y: termsY, size: 9, font: bold, color: blue })
     const achLines = [

@@ -176,10 +176,11 @@ test("Sheet Rock uses compact configurable products and expandable images", asyn
 })
 
 test("request estimate PDF has the branded estimate structure and does not persist ACH values", async () => {
-  const [panel, actions, pdf] = await Promise.all([
+  const [panel, actions, pdf, proposalTerms] = await Promise.all([
     readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8"),
     readFile(path.join(root, "lib/request-client-quote-pdf.ts"), "utf8"),
+    readFile(path.join(root, "lib/proposal-terms.ts"), "utf8"),
   ])
   expect(panel).toContain("Create client quote")
   expect(panel).toContain("Include ACH payment information")
@@ -194,5 +195,10 @@ test("request estimate PDF has the branded estimate structure and does not persi
   expect(pdf).toContain('"Quantity"')
   expect(pdf).toContain('"Unit price"')
   expect(pdf).toContain('"Terms & conditions"')
+  expect(pdf).not.toContain("Valid through")
+  expect(panel).not.toContain("This estimate expires after 30 days")
+  expect(panel).not.toContain("Valid through")
+  expect(proposalTerms).toContain("processing fee of up to 3%")
+  expect(proposalTerms).toContain("different payment terms are agreed in writing")
   expect(pdf).toContain('"ACH payment information"')
 })

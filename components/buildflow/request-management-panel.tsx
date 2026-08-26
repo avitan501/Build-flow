@@ -9,6 +9,7 @@ import { createPortal } from "react-dom"
 import { previewRequestClientQuoteAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
+import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms"
 
 type PackageRoute = { id: string; department: string; supplier_id: string | null; status: string }
 type QuoteLine = { key: string; description: string; quantity: number; unit: string; unitPrice: number }
@@ -73,13 +74,12 @@ export function RequestManagementPanel({
   const [quoteOpen, setQuoteOpen] = useState(false)
   const [quoteNumber, setQuoteNumber] = useState(() => `AVA-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${requestId.slice(0, 4).toUpperCase()}`)
   const [issueDate] = useState(() => new Date().toLocaleDateString("en-US"))
-  const [expiresOn, setExpiresOn] = useState(() => new Date(Date.now() + 30 * 86400000).toLocaleDateString("en-US"))
   const [clientAddress, setClientAddress] = useState("")
   const [shipTo, setShipTo] = useState(projectAddress)
   const [quoteLines, setQuoteLines] = useState<QuoteLine[]>(() => requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
   const [deliveryCharge, setDeliveryCharge] = useState(0)
   const [salesTaxRate, setSalesTaxRate] = useState(8.875)
-  const [quoteTerms, setQuoteTerms] = useState("Prices may change until the order is approved and processed. This estimate expires after 30 days. All sales are final unless stated otherwise. Delivery, taxes, and freight are included only when shown above.")
+  const [quoteTerms, setQuoteTerms] = useState(DEFAULT_PROPOSAL_TERMS)
   const [quoteMessage, setQuoteMessage] = useState("Please review the attached Avantia Build estimate. Reply with any questions or approval.")
   const [includeAch, setIncludeAch] = useState(false)
   const [ach, setAch] = useState({ bankName: "", accountOwner: "", routingNumber: "", accountNumber: "" })
@@ -157,7 +157,7 @@ export function RequestManagementPanel({
       requestId,
       quoteNumber,
       issueDate,
-      expiresOn,
+      expiresOn: "",
       clientAddress,
       shipTo,
       message: quoteMessage,
@@ -273,10 +273,9 @@ export function RequestManagementPanel({
         <section className="flex max-h-[96dvh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
           <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#0066cc]">Avantia Build estimate</p><h2 id="request-quote-title" className="mt-0.5 text-xl font-bold">Create client quote</h2><p className="mt-0.5 text-xs text-slate-500">Review the PDF, then email it as an attachment.</p></div><button type="button" onClick={() => setQuoteOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200" aria-label="Close"><X className="h-4 w-4" /></button></header>
           <div className="overflow-y-auto p-4">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <label className="grid gap-1 text-xs font-bold">Estimate code<input value={quoteNumber} onChange={(event) => setQuoteNumber(event.target.value)} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
               <label className="grid gap-1 text-xs font-bold">Date<input value={issueDate} disabled className="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-normal" /></label>
-              <label className="grid gap-1 text-xs font-bold">Valid through<input value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
               <label className="grid gap-1 text-xs font-bold">Client<input value={client.name} disabled className="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-normal" /></label>
               <label className="grid gap-1 text-xs font-bold sm:col-span-2">Customer address<textarea value={clientAddress} onChange={(event) => setClientAddress(event.target.value)} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
               <label className="grid gap-1 text-xs font-bold sm:col-span-2">Ship to<textarea value={shipTo} onChange={(event) => setShipTo(event.target.value)} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
