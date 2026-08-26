@@ -107,7 +107,9 @@ export async function createUberDirectDelivery(input: {
   dropoffName: string;
   dropoffPhone: string;
   itemDescription: string;
-  weightPounds: number;
+  packageQuantity: number;
+  weightPerPackage: number;
+  vehicle: "small" | "car" | "pickup" | "van";
   scheduledPickupAt: string | null;
 }) {
   const account = await context();
@@ -123,7 +125,13 @@ export async function createUberDirectDelivery(input: {
       dropoff_name: input.dropoffName,
       dropoff_address: input.dropoffAddress,
       dropoff_phone_number: input.dropoffPhone,
-      manifest_items: [{ name: input.itemDescription, quantity: 1, size: "small", price: 0, weight: Math.round(input.weightPounds * 453.592) }],
+      manifest_items: [{
+        name: input.itemDescription,
+        quantity: input.packageQuantity,
+        size: input.vehicle === "small" ? "small" : input.vehicle === "car" ? "medium" : input.vehicle === "pickup" ? "large" : "xlarge",
+        price: 0,
+        weight: Math.round(input.weightPerPackage * 453.592),
+      }],
       ...(readyAt ? { pickup_ready_dt: readyAt.toISOString(), pickup_deadline_dt: new Date(readyAt.getTime() + 60 * 60 * 1000).toISOString() } : {}),
     }),
     cache: "no-store",

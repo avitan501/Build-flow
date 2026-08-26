@@ -23,6 +23,8 @@ export type SavedDeliveryRequest = {
   dropoffContactName?: string;
   dropoffPhone?: string;
   itemDescription?: string;
+  packageQuantity?: number;
+  weightPerPackage?: number;
   weightPounds?: number;
   scheduledPickupAt?: string | null;
   vehicle: string;

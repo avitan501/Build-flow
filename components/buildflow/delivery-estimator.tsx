@@ -80,7 +80,8 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
   const [itemDescription, setItemDescription] = useState("")
   const [deliveryTiming, setDeliveryTiming] = useState<"asap" | "later">("asap")
   const [scheduledPickupLocal, setScheduledPickupLocal] = useState("")
-  const [weightPounds, setWeightPounds] = useState("20")
+  const [packageQuantity, setPackageQuantity] = useState("1")
+  const [weightPerPackage, setWeightPerPackage] = useState("20")
   const [vehicle, setVehicle] = useState<DeliveryVehicle>("small")
   const [speed, setSpeed] = useState<DeliverySpeed>("rush")
   const [locationState, setLocationState] = useState<"idle" | "loading" | "error">("idle")
@@ -89,6 +90,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
   const [savedFingerprint, setSavedFingerprint] = useState("")
   const [saveMessage, setSaveMessage] = useState("")
   const [liveQuote, setLiveQuote] = useState<LiveUberQuote | null>(null)
+  const [liveQuoteReceivedAt, setLiveQuoteReceivedAt] = useState("")
   const [liveQuoteState, setLiveQuoteState] = useState<"idle" | "loading" | "error">("idle")
   const [liveQuoteMessage, setLiveQuoteMessage] = useState("")
   const [scheduleConfirmed, setScheduleConfirmed] = useState(false)
@@ -105,13 +107,24 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
 
   const pickupInvalid = pickupCoordinates.length > 0 && !origin
   const jobsiteInvalid = jobsiteCoordinates.length > 0 && !destination
-  const parsedWeight = Number(weightPounds)
-  const uberPackageEligible = (vehicle === "small" || vehicle === "car") && Number.isFinite(parsedWeight) && parsedWeight > 0 && parsedWeight <= 50
+  const parsedPackageQuantity = Number(packageQuantity)
+  const parsedWeightPerPackage = Number(weightPerPackage)
+  const totalWeightPounds = parsedPackageQuantity * parsedWeightPerPackage
+  const packageQuantityValid = Number.isInteger(parsedPackageQuantity) && parsedPackageQuantity >= 1 && parsedPackageQuantity <= 20
+  const weightPerPackageValid = Number.isFinite(parsedWeightPerPackage) && parsedWeightPerPackage > 0 && parsedWeightPerPackage <= 50
   const scheduledPickupMs = scheduledPickupLocal ? new Date(scheduledPickupLocal).getTime() : Number.NaN
   const timingReady = deliveryTiming === "asap" || (Number.isFinite(scheduledPickupMs) && scheduledPickupMs > Date.now() + 60 * 60 * 1000 && scheduledPickupMs < Date.now() + 30 * 24 * 60 * 60 * 1000)
-  const readyForLiveQuote = pickupAddress.trim().length >= 8 && jobsiteAddress.trim().length >= 8 && uberPackageEligible && timingReady
-  const readyToSave = Boolean(storeName.trim() && pickupAddress.trim() && jobsiteAddress.trim() && (estimate || liveQuote) && timingReady)
-  const draftFingerprint = JSON.stringify([storeName, pickupAddress, pickupCoordinates, jobsiteName, jobsiteAddress, jobsiteCoordinates, pickupContactName, pickupPhone, dropoffContactName, dropoffPhone, itemDescription, weightPounds, vehicle, speed, deliveryTiming, scheduledPickupLocal, liveQuote?.quoteId || ""])
+  const quoteRequirements = [
+    { label: "Pickup address", ready: pickupAddress.trim().length >= 8 },
+    { label: "Jobsite address", ready: jobsiteAddress.trim().length >= 8 },
+    { label: "1–20 boxes", ready: packageQuantityValid },
+    { label: "50 lb or less per box", ready: weightPerPackageValid },
+    { label: deliveryTiming === "asap" ? "ASAP pickup" : "Valid scheduled time", ready: timingReady },
+  ]
+  const readyForLiveQuote = quoteRequirements.every((item) => item.ready)
+  const effectiveStoreName = storeName.trim() || pickupAddress.split(",")[0]?.trim() || "Pickup location"
+  const readyToSave = Boolean(pickupAddress.trim() && jobsiteAddress.trim() && (estimate || liveQuote) && timingReady && packageQuantityValid && weightPerPackageValid)
+  const draftFingerprint = JSON.stringify([storeName, pickupAddress, pickupCoordinates, jobsiteName, jobsiteAddress, jobsiteCoordinates, pickupContactName, pickupPhone, dropoffContactName, dropoffPhone, itemDescription, packageQuantity, weightPerPackage, vehicle, speed, deliveryTiming, scheduledPickupLocal, liveQuote?.quoteId || ""])
   function updateStoreName(value: string) {
     setStoreName(value)
     const match = deliveryHistory.find((item) => item.storeName.trim().toLowerCase() === value.trim().toLowerCase())
@@ -123,6 +136,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
 
   function resetLiveQuote() {
     setLiveQuote(null)
+    setLiveQuoteReceivedAt("")
     setLiveQuoteMessage("")
     setLiveQuoteState("idle")
   }
@@ -130,7 +144,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
   async function requestLiveQuote() {
     if (!readyForLiveQuote) {
       setLiveQuoteState("error")
-      setLiveQuoteMessage("Enter both complete addresses and use a small item or car load up to 50 lb.")
+      setLiveQuoteMessage(`Complete: ${quoteRequirements.filter((item) => !item.ready).map((item) => item.label).join(", ")}.`)
       return
     }
 
@@ -143,7 +157,8 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
         body: JSON.stringify({
           pickupAddress: pickupAddress.trim(),
           dropoffAddress: jobsiteAddress.trim(),
-          weightPounds: parsedWeight,
+          packageQuantity: parsedPackageQuantity,
+          weightPerPackage: parsedWeightPerPackage,
           vehicle,
           scheduledPickupAt: deliveryTiming === "later" ? new Date(scheduledPickupLocal).toISOString() : null,
         }),
@@ -151,6 +166,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
       const payload = await response.json() as { ok?: boolean; error?: string; code?: string; providerCode?: string; quote?: LiveUberQuote }
       if (!response.ok || !payload.ok || !payload.quote) {
         setLiveQuote(null)
+        setLiveQuoteReceivedAt("")
         setLiveQuoteMessage(payload.code === "address_undeliverable" || payload.providerCode === "address_undeliverable"
           ? "Uber Direct does not serve this exact route. The address-based planning estimate is still available; try a closer pickup location or another courier."
           : payload.error || "Uber could not return a live quote right now.")
@@ -158,9 +174,11 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
         return
       }
       setLiveQuote(payload.quote)
+      setLiveQuoteReceivedAt(new Date().toISOString())
       setLiveQuoteState("idle")
     } catch {
       setLiveQuote(null)
+      setLiveQuoteReceivedAt("")
       setLiveQuoteMessage("Uber could not return a live quote right now.")
       setLiveQuoteState("error")
     }
@@ -190,7 +208,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
       ? new Date(scheduledPickupLocal).toISOString()
       : null
     const request = {
-      storeName: storeName.trim(),
+      storeName: effectiveStoreName,
       orderNumber: orderNumber.trim(),
       pickupAddress: pickupAddress.trim(),
       pickupCoordinates,
@@ -202,7 +220,9 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
       dropoffContactName: dropoffContactName.trim(),
       dropoffPhone: dropoffPhone.trim(),
       itemDescription: itemDescription.trim(),
-      weightPounds: parsedWeight,
+      packageQuantity: parsedPackageQuantity,
+      weightPerPackage: parsedWeightPerPackage,
+      weightPounds: totalWeightPounds,
       scheduledPickupAt,
       vehicle,
       speed,
@@ -237,6 +257,8 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
         dropoffContactName: request.dropoffContactName,
         dropoffPhone: request.dropoffPhone,
         itemDescription: request.itemDescription,
+        packageQuantity: request.packageQuantity,
+        weightPerPackage: request.weightPerPackage,
         weightPounds: request.weightPounds,
         scheduledPickupAt: request.scheduledPickupAt,
         vehicle,
@@ -388,22 +410,31 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700">02 · Item size</p>
               <h2 className="mt-1 text-xl font-semibold tracking-tight">What should we send?</h2>
-              <label className="mt-4 grid max-w-xs gap-1.5 text-sm font-semibold text-slate-700">
-                Package weight (lb)
-                <input type="number" min="1" max="50" step="1" value={weightPounds} onChange={(event) => { setWeightPounds(event.target.value); resetLiveQuote() }} className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
-                <span className={`text-xs font-normal ${Number.isFinite(parsedWeight) && parsedWeight > 0 && parsedWeight <= 50 ? "text-slate-500" : "text-rose-600"}`}>Uber Direct packages must be 50 lb or less and fit in a normal vehicle.</span>
-              </label>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                  Number of boxes
+                  <input type="number" min="1" max="20" step="1" value={packageQuantity} onChange={(event) => { const value = event.target.value; setPackageQuantity(value); if (Number(value) > 1 && vehicle === "small") setVehicle("car"); resetLiveQuote() }} className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+                  <span className={`text-xs font-normal ${packageQuantityValid ? "text-slate-500" : "text-rose-600"}`}>Enter the total number of separate boxes or packages.</span>
+                </label>
+                <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                  Weight of each box (lb)
+                  <input type="number" min="0.1" max="50" step="0.1" value={weightPerPackage} onChange={(event) => { setWeightPerPackage(event.target.value); resetLiveQuote() }} className="min-h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-normal text-slate-950 outline-none focus:border-amber-400 focus:bg-white focus:ring-4 focus:ring-amber-100" />
+                  <span className={`text-xs font-normal ${weightPerPackageValid ? "text-slate-500" : "text-rose-600"}`}>The 50 lb limit applies to each box—not all boxes combined.</span>
+                </label>
+              </div>
+              {packageQuantityValid && weightPerPackageValid ? <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"><strong>{parsedPackageQuantity} {parsedPackageQuantity === 1 ? "box" : "boxes"} × {parsedWeightPerPackage.toLocaleString()} lb</strong> = {totalWeightPounds.toLocaleString()} lb total load. Each box is within the 50 lb limit.</div> : null}
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 {(Object.entries(DELIVERY_VEHICLES) as [DeliveryVehicle, (typeof DELIVERY_VEHICLES)[DeliveryVehicle]][]).map(([key, option]) => (
                   <button key={key} type="button" onClick={() => { setVehicle(key); resetLiveQuote() }} aria-pressed={vehicle === key} className={`rounded-2xl border p-4 text-left transition active:scale-[0.99] ${vehicle === key ? "border-[#0e2341] bg-[#0e2341] text-white shadow-[0_12px_28px_rgba(14,35,65,0.18)]" : "border-slate-200 bg-slate-50 text-slate-950 hover:border-slate-300 hover:bg-white"}`}>
                     <span className="flex items-center justify-between gap-3">
                       <span className="text-sm font-semibold">{option.label}</span>
-                      <span className={`text-xs font-semibold ${vehicle === key ? "text-amber-300" : "text-slate-500"}`}>from {currency.format(option.minimum)}</span>
+                      <span className={`text-xs font-semibold ${vehicle === key ? "text-amber-300" : "text-slate-500"}`}>planning from {currency.format(option.minimum)}</span>
                     </span>
                     <span className={`mt-1 block text-xs leading-5 ${vehicle === key ? "text-slate-300" : "text-slate-500"}`}>{option.description}</span>
                   </button>
                 ))}
               </div>
+              <p className="mt-2 text-xs leading-5 text-slate-500">Choose the load space you expect to need. Uber Direct receives the box manifest at confirmation and assigns the available courier vehicle; the live quote does not promise a specific vehicle.</p>
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm font-semibold text-slate-950">Courier contacts and schedule</p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">Uber needs a contact at pickup and drop-off. These details are saved only with this Manager delivery request.</p>
@@ -422,11 +453,11 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
               </div>
               <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div><p className="text-sm font-semibold text-slate-950">Uber Direct live price</p><p className="mt-1 text-xs text-slate-600">Uses the two full addresses above. Requesting a quote does not create or charge for a delivery.</p></div>
-                  <button type="button" onClick={requestLiveQuote} disabled={!readyForLiveQuote || liveQuoteState === "loading"} className="min-h-11 rounded-xl bg-[#10233f] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45">{liveQuoteState === "loading" ? "Checking Uber…" : "Get live Uber price"}</button>
+                  <div><p className="text-sm font-semibold text-slate-950">Live route price from Uber Direct</p><p className="mt-1 text-xs text-slate-600">Uber prices the addresses and pickup window. Your complete box count, per-box weight, and load size are sent in the manifest when you confirm the delivery.</p></div>
+                  <button type="button" onClick={requestLiveQuote} disabled={liveQuoteState === "loading"} className="min-h-11 rounded-xl bg-[#10233f] px-4 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-70">{liveQuoteState === "loading" ? "Checking Uber…" : "Get live Uber price"}</button>
                 </div>
-                {!readyForLiveQuote ? <p className="mt-2 text-xs text-slate-600">Enter both addresses, choose Small item or Car load, keep weight at 50 lb or less, and use a valid pickup time.</p> : null}
-                {liveQuote ? <div role="status" className="mt-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-emerald-800"><strong>{currency.format(liveQuote.total)}</strong> live provider fee · {liveQuote.pickupMinutes !== null ? `${liveQuote.pickupMinutes} min pickup` : "Pickup time shown after dispatch"} · no AvantiaBuild markup</div> : null}
+                <div className="mt-3 flex flex-wrap gap-2">{quoteRequirements.map((item) => <span key={item.label} className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${item.ready ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>{item.ready ? "✓" : "Needs"} {item.label}</span>)}</div>
+                {liveQuote ? <div role="status" className="mt-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-emerald-800"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{currency.format(liveQuote.total)} live Uber route fee</strong><span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">Live now</span></div><p className="mt-1 text-xs">{liveQuote.pickupMinutes !== null ? `${liveQuote.pickupMinutes} min pickup` : "Pickup time shown after dispatch"} · {parsedPackageQuantity} × {parsedWeightPerPackage.toLocaleString()} lb box{parsedPackageQuantity === 1 ? "" : "es"}</p><p className="mt-1 text-[10px] text-emerald-700">Uber quote {liveQuote.quoteId.slice(-10)} · received {liveQuoteReceivedAt ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" }).format(new Date(liveQuoteReceivedAt)) : "now"} · expires {new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(liveQuote.expiresAt))}</p></div> : null}
                 {liveQuoteMessage ? <div role="alert" className="mt-3 rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm text-rose-700">{liveQuoteMessage}</div> : null}
               </div>
             </div>
@@ -493,7 +524,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
                 </label>
 
                 <button type="button" onClick={saveRequest} disabled={!readyToSave || isPending} className="mt-4 flex min-h-14 w-full items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#f3cb72_0%,#dca845_100%)] px-5 text-base font-semibold text-[#0e2341] shadow-[0_16px_32px_rgba(220,168,69,0.2)] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45">
-                  {isPending ? "Saving…" : "Save delivery request"}
+                  {isPending ? "Saving…" : liveQuote ? "Save and continue to order" : "Save delivery request"}
                 </button>
                 {savedReference ? <div role="status" className="mt-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-center text-sm text-emerald-200"><p>Saved as <strong>{savedReference}</strong></p>{saveMessage ? <p className="mt-1 text-xs text-emerald-100/80">{saveMessage}</p> : null}</div> : saveMessage ? <p role="alert" className="mt-3 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-center text-sm text-rose-100">{saveMessage}</p> : null}
                 {savedTaskId && liveQuote && savedFingerprint !== draftFingerprint ? <p className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-xs text-amber-100">The delivery details changed. Save the request again before scheduling Uber.</p> : null}
@@ -516,7 +547,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
         </div>
 
         <section className="mt-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-          <div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-700">Courier connections</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Provider setup and dispatch options</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Uber Direct is connected for urgent packages up to 50 lb. Curri, Roadie, and GoShare remain the better paths for pickup trucks, vans, and bulky construction materials.</p></div>
+          <div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-700">Courier connections</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Provider setup and dispatch options</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Uber Direct is connected for urgent boxes up to 50 lb each. Multiple boxes are supported as one load. Curri, Roadie, and GoShare remain better paths when a specific pickup truck, cargo van, or bulky-material service must be guaranteed.</p></div>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {DELIVERY_PARTNERS.map((partner) => (
               <article key={partner.name} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">

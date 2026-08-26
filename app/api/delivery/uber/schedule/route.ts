@@ -76,7 +76,11 @@ export async function POST(request: Request) {
       dropoffName: deliveryRequest.dropoffContactName,
       dropoffPhone,
       itemDescription: deliveryRequest.itemDescription,
-      weightPounds: deliveryRequest.weightPounds || 20,
+      packageQuantity: deliveryRequest.packageQuantity || 1,
+      weightPerPackage: deliveryRequest.weightPerPackage || deliveryRequest.weightPounds || 20,
+      vehicle: (["small", "car", "pickup", "van"] as const).includes(deliveryRequest.vehicle as "small" | "car" | "pickup" | "van")
+        ? deliveryRequest.vehicle as "small" | "car" | "pickup" | "van"
+        : "small",
       scheduledPickupAt,
     });
 

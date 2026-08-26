@@ -10,8 +10,9 @@ export const preferredRegion = "iad1";
 const quoteSchema = z.object({
   pickupAddress: z.string().trim().min(8).max(300),
   dropoffAddress: z.string().trim().min(8).max(300),
-  weightPounds: z.number().positive().max(50),
-  vehicle: z.enum(["small", "car"]),
+  packageQuantity: z.number().int().positive().max(20),
+  weightPerPackage: z.number().positive().max(50),
+  vehicle: z.enum(["small", "car", "pickup", "van"]),
   scheduledPickupAt: z.string().datetime().nullable().optional(),
 });
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
 
     const parsed = quoteSchema.safeParse(await request.json());
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, code: "invalid_quote", error: "Enter both complete addresses and a package weight up to 50 lb." }, { status: 400 });
+      return NextResponse.json({ ok: false, code: "invalid_quote", error: "Enter both complete addresses, 1–20 boxes, and a weight up to 50 lb per box." }, { status: 400 });
     }
 
     if (parsed.data.scheduledPickupAt) {

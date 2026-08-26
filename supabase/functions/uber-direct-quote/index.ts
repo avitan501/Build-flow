@@ -71,16 +71,18 @@ Deno.serve(async (request) => {
     const body = await request.json().catch(() => null) as Record<string, unknown> | null;
     const pickupAddress = typeof body?.pickupAddress === "string" ? body.pickupAddress.trim() : "";
     const dropoffAddress = typeof body?.dropoffAddress === "string" ? body.dropoffAddress.trim() : "";
-    const weightPounds = Number(body?.weightPounds);
+    const packageQuantity = Number(body?.packageQuantity);
+    const weightPerPackage = Number(body?.weightPerPackage);
     const vehicle = body?.vehicle;
     const scheduledPickupAt = typeof body?.scheduledPickupAt === "string" ? body.scheduledPickupAt : null;
     if (
       pickupAddress.length < 8 || pickupAddress.length > 300 ||
       dropoffAddress.length < 8 || dropoffAddress.length > 300 ||
-      !Number.isFinite(weightPounds) || weightPounds <= 0 || weightPounds > 50 ||
-      (vehicle !== "small" && vehicle !== "car")
+      !Number.isInteger(packageQuantity) || packageQuantity <= 0 || packageQuantity > 20 ||
+      !Number.isFinite(weightPerPackage) || weightPerPackage <= 0 || weightPerPackage > 50 ||
+      !["small", "car", "pickup", "van"].includes(String(vehicle))
     ) {
-      return json({ ok: false, code: "invalid_quote", error: "Enter both complete addresses and a package weight up to 50 lb." }, 400);
+      return json({ ok: false, code: "invalid_quote", error: "Enter both complete addresses, 1–20 boxes, and a weight up to 50 lb per box." }, 400);
     }
     const readyAt = scheduledPickupAt ? new Date(scheduledPickupAt) : null;
     if (readyAt && (
