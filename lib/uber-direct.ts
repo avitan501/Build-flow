@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createAdminClient } from "@/lib/supabase/admin";
+
 type UberTokenResponse = {
   access_token?: string;
   expires_in?: number;
@@ -39,16 +41,48 @@ export class UberDirectError extends Error {
 
 let tokenCache: { accessToken: string; expiresAt: number } | null = null;
 
-function uberConfiguration() {
+type UberConfiguration = {
+  customerId: string;
+  clientId: string;
+  clientSecret: string;
+};
+
+let configurationCache: { value: UberConfiguration; expiresAt: number } | null = null;
+
+async function uberConfiguration(): Promise<UberConfiguration> {
   const customerId = process.env.UBER_DIRECT_CUSTOMER_ID?.trim();
   const clientId = process.env.UBER_DIRECT_CLIENT_ID?.trim();
   const clientSecret = process.env.UBER_DIRECT_CLIENT_SECRET?.trim();
 
-  if (!customerId || !clientId || !clientSecret) {
+  if (customerId && clientId && clientSecret) {
+    return { customerId, clientId, clientSecret };
+  }
+
+  const now = Date.now();
+  if (configurationCache && configurationCache.expiresAt > now) {
+    return configurationCache.value;
+  }
+
+  const { data, error } = await createAdminClient()
+    .rpc("get_uber_direct_credentials")
+    .single();
+  const row = data as {
+    customer_id?: string | null;
+    client_id?: string | null;
+    client_secret?: string | null;
+  } | null;
+
+  if (error || !row?.customer_id || !row.client_id || !row.client_secret) {
     throw new UberDirectError("Uber Direct live pricing is not connected yet.", 503, "not_configured");
   }
 
-  return { customerId, clientId, clientSecret };
+  const value = {
+    customerId: row.customer_id.trim(),
+    clientId: row.client_id.trim(),
+    clientSecret: row.client_secret.trim(),
+  };
+  configurationCache = { value, expiresAt: now + 5 * 60 * 1000 };
+  return value;
 }
 
 async function responsePayload(response: Response) {
@@ -66,7 +100,7 @@ async function getUberAccessToken() {
   const now = Date.now();
   if (tokenCache && tokenCache.expiresAt > now + 5 * 60 * 1000) return tokenCache.accessToken;
 
-  const { clientId, clientSecret } = uberConfiguration();
+  const { clientId, clientSecret } = await uberConfiguration();
   const form = new URLSearchParams({
     client_id: clientId,
     client_secret: clientSecret,
@@ -101,7 +135,7 @@ export async function createUberDirectQuote({
   pickupAddress: string;
   dropoffAddress: string;
 }): Promise<UberDirectQuote> {
-  const { customerId } = uberConfiguration();
+  const { customerId } = await uberConfiguration();
   const accessToken = await getUberAccessToken();
   const response = await fetch(`https://api.uber.com/v1/customers/${encodeURIComponent(customerId)}/delivery_quotes`, {
     method: "POST",
