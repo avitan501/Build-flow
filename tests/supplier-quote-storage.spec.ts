@@ -6,7 +6,8 @@ import { parseSupplierQuoteText } from "../lib/supplier-quote-parser"
 import { normalizeSupplierQuoteAiPayload } from "../lib/supplier-quote-ai"
 import { detectSupplierMatch, inferSupplierName } from "../lib/supplier-quote-supplier"
 import { preferredRequestMaterialSources, requestMaterialChartCsv, toRequestMaterialChartRow } from "../lib/request-material-chart"
-import { materialQuantity, materialReviewReasons, materialReviewStatus, materialReviewSummary, materialSalesUnit, suggestedSalesUnits } from "../lib/client-material-review"
+import { catalogMatchScore } from "../lib/catalog-match-score"
+import { cleanMaterialRequestDetails, materialQuantity, materialReviewReasons, materialReviewStatus, materialReviewSummary, materialSalesUnit, materialSearchQuery, suggestedSalesUnits } from "../lib/client-material-review"
 
 const root = process.cwd()
 
@@ -127,6 +128,22 @@ test("client request chart keeps quantity, item, and details in stable columns",
   expect(preferredRequestMaterialSources([original, organized])).toEqual([organized])
 })
 
+test("catalog search removes obsolete quantity notes and scores specification matches", () => {
+  const item = {
+    id: "heater-1",
+    name: "Electric Water Heater",
+    department: "Plumbing",
+    quantity: 1,
+    unit: "each",
+    metadata: { request_details: "Short · Rheem XE38S06ST45U1 Performance; 38 Gal.; 4500-Watt Elements · Quantity was not provided." },
+  }
+  const query = materialSearchQuery(item)
+  expect(query).not.toContain("Quantity was not provided")
+  expect(cleanMaterialRequestDetails(item.metadata.request_details)).toBe("Short · Rheem XE38S06ST45U1 Performance; 38 Gal.; 4500-Watt Elements")
+  expect(catalogMatchScore(query, "Rheem Performance 38 Gal. Short 4500-Watt Electric Water Heater — XE38S06ST45U1")).toBeGreaterThanOrEqual(90)
+  expect(catalogMatchScore(query, "Rheem 50 Gal. Tall Electric Water Heater")).toBeLessThan(90)
+})
+
 test("client material lists are organized securely in the background", async () => {
   const [requestAction, publicIntake, aiFunction, ownerPage, ownerActions, organizerButton, organizedList, reviewEditor, priceCheck, supplierDraft, priceRoute, messagingBroker] = await Promise.all([
     readFile(path.join(root, "app/request-quote/actions.ts"), "utf8"),
@@ -209,7 +226,7 @@ test("client material lists are organized securely in the background", async () 
   expect(priceCheck).toContain("defaultZipCode")
   expect(priceCheck).toContain("Searching the catalog for")
   expect(priceCheck).toContain("Delivery ZIP")
-  expect(priceCheck).toContain("Buy directly")
+  expect(priceCheck).toContain("Prices & store options")
   expect(priceCheck).toContain("Call for price")
   expect(priceCheck).toContain("Sales contacts")
   expect(priceCheck).toContain("fallbackLinks")
@@ -217,9 +234,13 @@ test("client material lists are organized securely in the background", async () 
   expect(priceCheck).toContain("Add suppliers")
   expect(priceCheck).toContain('document.getElementById("supplier-routing")')
   expect(priceRoute).toContain('action: "price_research"')
+  expect(priceRoute).toContain("mergeByUrl(brokerResults, exaResults)")
+  expect(priceRoute).toContain("catalogMatchScore")
   expect(messagingBroker).toContain('type: "web_search_preview"')
   expect(messagingBroker).toContain('required: ["buyNow", "callForPrice", "salesContacts"]')
-  expect(priceCheck).toContain("matchConfidence")
+  expect(priceCheck).toContain("3 - buyNow.length")
+  expect(priceCheck).toContain("% match")
+  expect(priceCheck).toContain("Price not confirmed")
   expect(ownerActions).toContain("organizeClientMaterialRequestAction")
   expect(ownerActions).toContain("updateOrganizedMaterialItemAction")
   expect(ownerActions).toContain("scheduleRequestDeliveryAction")
@@ -349,7 +370,7 @@ test("catalog Exa search is staff-only, cached, and keeps results out of the cat
   expect(search).toContain("unstable_cache")
   expect(search).toContain("revalidate: 3_600")
   expect(search).toContain('type: "deep-lite"')
-  expect(search).toContain("numResults: 12")
+  expect(search).toContain("numResults: 18")
   expect(search).toContain("excludeDomains")
   expect(search).toContain("Google Shopping")
   expect(catalog).toContain("Prepare catalog item")

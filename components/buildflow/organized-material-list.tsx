@@ -5,7 +5,7 @@ import { useState } from "react"
 
 import { MaterialReviewEditor } from "@/components/buildflow/material-review-editor"
 import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
-import { materialQuantity, materialReviewReasons, materialReviewStatus, materialReviewSummary, materialSalesUnit, materialSearchQuery, type ReviewableMaterialItem } from "@/lib/client-material-review"
+import { cleanMaterialRequestDetails, materialQuantity, materialReviewReasons, materialReviewStatus, materialReviewSummary, materialSalesUnit, materialSearchQuery, type ReviewableMaterialItem } from "@/lib/client-material-review"
 
 const STATUS_STYLE = {
   ready: { label: "Ready", badge: "bg-emerald-100 text-emerald-800" },
@@ -18,7 +18,7 @@ function details(item: ReviewableMaterialItem) {
   const thickness = typeof item.metadata?.thickness === "string" ? item.metadata.thickness : ""
   const productType = typeof item.metadata?.product_type === "string" ? item.metadata.product_type : ""
   const screwLength = typeof item.metadata?.screw_length === "string" ? item.metadata.screw_length : ""
-  const requestDetails = typeof item.metadata?.request_details === "string" ? item.metadata.request_details : ""
+  const requestDetails = cleanMaterialRequestDetails(item.metadata?.request_details)
   return [productType, dimensions, thickness, screwLength && `Length: ${screwLength}`, requestDetails].filter(Boolean).join(" · ") || "Details not specified"
 }
 

@@ -2,6 +2,8 @@ import "server-only"
 
 import { unstable_cache } from "next/cache"
 
+import { catalogMatchScore } from "@/lib/catalog-match-score"
+
 export type ExaCatalogSearchInput = {
   query: string
   department?: string
@@ -19,6 +21,7 @@ export type ExaCatalogSearchResult = {
   priceText: string | null
   publishedDate: string | null
   matchConfidence: "exact" | "likely"
+  matchScore: number
 }
 
 export type ProductCallResult = {
@@ -28,6 +31,7 @@ export type ProductCallResult = {
   snippet: string
   phone: string | null
   matchConfidence: "exact" | "likely"
+  matchScore: number
 }
 
 export type ProductSalesContact = {
@@ -81,14 +85,6 @@ function isSearchPage(value: string) {
   }
 }
 
-function matchConfidence(query: string, title: string, source: string): "exact" | "likely" {
-  const tokens = [...new Set(query.toLowerCase().match(/[a-z0-9]+/g) ?? [])].filter((token) => token.length > 1)
-  if (!tokens.length) return "likely"
-  const haystack = `${title} ${source}`.toLowerCase()
-  const matched = tokens.filter((token) => haystack.includes(token)).length
-  return matched / tokens.length >= 0.7 ? "exact" : "likely"
-}
-
 export function productSearchLinks(queryValue: string, zipCodeValue = ""): ProductSearchLink[] {
   const query = clean(queryValue, 240)
   const zipCode = clean(zipCodeValue, 12)
@@ -110,7 +106,7 @@ async function runExaSearch(query: string, department: string, zipCode: string, 
     body: JSON.stringify({
       query: `${query}${category}${location}. Find the exact purchasable construction product from multiple suppliers. Return direct product detail pages with a current displayed price, model, size, and package quantity. Exclude search, category, article, and installation-service pages.`,
       type: "deep-lite",
-      numResults: 12,
+      numResults: 18,
       contents: { highlights: { query: "current product price model size package quantity availability", maxCharacters: 1800 }, maxAgeHours: 0 },
       ...(domains.length ? { includeDomains: domains } : {}),
       ...(excludeDomains.length ? { excludeDomains } : {}),
@@ -131,6 +127,7 @@ async function runExaSearch(query: string, department: string, zipCode: string, 
     if (!priceText) return []
     let domain = ""
     try { domain = new URL(url).hostname.replace(/^www\./, "") } catch { /* validated above */ }
+    const matchScore = catalogMatchScore(query, title, source)
     return [{
       title,
       url,
@@ -139,13 +136,14 @@ async function runExaSearch(query: string, department: string, zipCode: string, 
       imageUrl: exactUrl(clean(result.image, 2000)) || null,
       priceText,
       publishedDate: clean(result.publishedDate, 40) || null,
-      matchConfidence: matchConfidence(query, title, source),
+      matchConfidence: matchScore >= 85 ? "exact" as const : "likely" as const,
+      matchScore,
     }]
   })
   return { ok: true as const, results, checkedAt: new Date().toISOString() }
 }
 
-const cachedExaSearch = unstable_cache(runExaSearch, ["exa-catalog-search-v3"], { revalidate: 3_600 })
+const cachedExaSearch = unstable_cache(runExaSearch, ["exa-catalog-search-v4"], { revalidate: 3_600 })
 
 export async function searchCatalogWithExa(input: ExaCatalogSearchInput) {
   const query = clean(input.query, 240)

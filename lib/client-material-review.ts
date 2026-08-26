@@ -85,6 +85,14 @@ export function materialReviewReasons(item: ReviewableMaterialItem) {
   return materialReviewStatus(item) === "ready" ? [] : ["Confirm the product details before requesting supplier pricing."]
 }
 
+export function cleanMaterialRequestDetails(value: unknown) {
+  return text(value)
+    .replace(/(?:^|\s*[·|;-]\s*)quantity was not provided\.?/gi, " ")
+    .replace(/\s*[·|;-]\s*$/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 export function materialSearchQuery(item: ReviewableMaterialItem) {
   return [
     item.name,
@@ -92,7 +100,7 @@ export function materialSearchQuery(item: ReviewableMaterialItem) {
     text(item.metadata?.thickness),
     text(item.metadata?.product_type),
     text(item.metadata?.screw_length),
-    text(item.metadata?.request_details),
+    cleanMaterialRequestDetails(item.metadata?.request_details),
   ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 240)
 }
 
