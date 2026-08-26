@@ -32,6 +32,7 @@ import {
   parseDashboardAiHistory,
 } from "@/lib/manager-command-center";
 import { managerPipelineStage, type ManagerPipelineStage } from "@/lib/manager-dashboard";
+import { SYSTEM_GOAL_STATUS_PREFIX } from "@/lib/manager-goal-status";
 
 const QUO_INBOX_URL = "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
 const WHATSAPP_URL = "https://web.whatsapp.com/";
@@ -162,9 +163,10 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
   const todaySummary = todaySummaryRow ? parseDailyWorkSummary(todaySummaryRow) : null;
   const todayTasks: ManagerTodayTask[] = goals
     .filter((goal) => goal.details?.startsWith(TODAY_TASK_PREFIX))
+    .filter((goal) => goal.status !== "archived")
     .filter((goal) => goal.status === "open" || newYorkDate.format(new Date(goal.created_at)) === todayKey)
     .sort((a, b) => Number(a.status === "completed") - Number(b.status === "completed") || b.created_at.localeCompare(a.created_at))
-    .map(({ id, title, status, created_at }) => ({ id, title, status, created_at }));
+    .map(({ id, title, status, created_at }) => ({ id, title, status: status === "completed" ? "completed" as const : "open" as const, created_at }));
   const regularGoals = goals.filter((goal) => ![
     WEBSITE_FIX_NOTE_PREFIX,
     DAILY_WORK_SUMMARY_PREFIX,
@@ -172,6 +174,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
     EMPLOYEE_ACTIVITY_PREFIX,
     COMMUNICATION_LOG_PREFIX,
     TODAY_TASK_PREFIX,
+    SYSTEM_GOAL_STATUS_PREFIX,
   ].some((prefix) => goal.details?.startsWith(prefix)));
   const managerSections = [
     { title: "Customers", icon: Users, links: access.customers ? [{ href: "/admin/users", label: "Customer Directory" }, { href: "/owner/materials/requests", label: "Client Requests" }] : [] },

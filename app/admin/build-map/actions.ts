@@ -10,6 +10,7 @@ import {
   serializeDashboardAiHistory,
   type DashboardAiHistoryItem,
 } from "@/lib/manager-command-center"
+import { SYSTEM_GOAL_STATUS_PREFIX } from "@/lib/manager-goal-status"
 
 type SearchResult =
   | { ok: true; answer: string; history: DashboardAiHistoryItem[] }
@@ -88,7 +89,7 @@ export async function searchManagerDashboardAction(formData: FormData): Promise<
     access.customers ? supabase.from("profiles").select("id,full_name,company_name,approval_status").eq("role", "client").eq("is_active", true).limit(100) : Promise.resolve({ data: [] }),
     access.suppliers ? supabase.from("supplier_quotes").select("id,supplier_name,client_name_snapshot,department,status,quote_number,updated_at").order("updated_at", { ascending: false }).limit(80) : Promise.resolve({ data: [] }),
   ])
-  const goals = (goalsResult.data ?? []).filter((goal) => !String(goal.details || "").startsWith(DASHBOARD_AI_HISTORY_PREFIX))
+  const goals = (goalsResult.data ?? []).filter((goal) => ![DASHBOARD_AI_HISTORY_PREFIX, SYSTEM_GOAL_STATUS_PREFIX].some((prefix) => String(goal.details || "").startsWith(prefix)))
   const collections = [
     { label: "Requests", rows: (requestsResult.data ?? []) as Array<Record<string, unknown>> },
     { label: "Clients", rows: (clientsResult.data ?? []) as Array<Record<string, unknown>> },

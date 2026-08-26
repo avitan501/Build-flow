@@ -1,5 +1,7 @@
 import {
+  Archive,
   ArrowRight,
+  ChevronDown,
   CircleDollarSign,
   PhoneCall,
   Target,
@@ -14,6 +16,7 @@ import { AffiliateCallList } from "@/components/buildflow/affiliate-call-list";
 import { ClientTargetCallGuide } from "@/components/buildflow/client-target-call-guide";
 import { AddOutreachLead, ClientLanguageSelect, OutreachLeadList, type OutreachLeadRecord } from "@/components/buildflow/client-target-outreach";
 import { AddManagerGoal, CustomManagerGoals, type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
+import { ManagerGoalStatusSelect } from "@/components/buildflow/manager-goal-status-select";
 import { DAILY_WORK_SUMMARY_PREFIX } from "@/lib/daily-work-summary";
 import { SUPPLIER_PARTNER_NOTES_PREFIX } from "@/lib/supplier-partners/store";
 import type {
@@ -25,6 +28,7 @@ import type {
   AffiliateTrackerSettings,
 } from "@/lib/affiliate-tracker";
 import { requireAdminProfile, requireManagerPortalProfile } from "@/lib/auth";
+import { fixedGoalKey as parseFixedGoalKey, type CarlosFixedGoalKey, type ManagerGoalStatus } from "@/lib/manager-goal-status";
 
 type ClientTarget = {
   id: string;
@@ -40,17 +44,18 @@ function clientName(client: ClientTarget) {
 }
 
 function GoalNumber({ children }: { children: number | string }) {
-  return <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">{children}</span>;
+  return <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-950 text-xs font-bold text-white">{children}</span>;
 }
 
-function GoalDisclosure({ id, number, eyebrow, title, description, children }: { id?: string; number: number; eyebrow: string; title: string; description?: string; children: ReactNode }) {
+function GoalDisclosure({ id, number, eyebrow, title, description, status = "open", fixedKey, children }: { id?: string; number: number; eyebrow: string; title: string; description?: string; status?: ManagerGoalStatus; fixedKey: CarlosFixedGoalKey; children: ReactNode }) {
   return <details id={id} className="group scroll-mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-    <summary className="flex min-h-20 cursor-pointer list-none items-center gap-3 p-4 sm:p-5">
+    <summary className="flex min-h-14 cursor-pointer list-none items-center gap-2.5 px-3 py-2">
       <GoalNumber>{number}</GoalNumber>
-      <div className="min-w-0 flex-1"><p className="text-[11px] font-semibold uppercase text-[#0066cc]">{eyebrow}</p><h3 className="mt-0.5 text-base font-semibold sm:text-lg">{title}</h3>{description ? <p className="mt-1 line-clamp-1 text-xs text-slate-500 sm:text-sm">{description}</p> : null}</div>
-      <span className="shrink-0 text-xs font-semibold text-[#0066cc] group-open:hidden">Open</span><span className="hidden shrink-0 text-xs font-semibold text-slate-500 group-open:inline">Close</span>
+      <div className="min-w-0 flex-1"><p className="truncate text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">{eyebrow}</p><h3 className="truncate text-sm font-semibold">{title}</h3>{description ? <p className="truncate text-[10px] text-slate-500">{description}</p> : null}</div>
+      <ManagerGoalStatusSelect fixedKey={fixedKey} status={status} />
+      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true" />
     </summary>
-    <div className="border-t border-slate-200 p-4 sm:p-5">{children}</div>
+    <div className="border-t border-slate-200 p-3 sm:p-4">{children}</div>
   </details>;
 }
 
@@ -62,7 +67,7 @@ function PersonHeader({ assignee, description }: { assignee: "david" | "carlos";
   </header>;
 }
 
-async function OwnerAffiliateGoal() {
+async function OwnerAffiliateGoal({ status }: { status: ManagerGoalStatus }) {
   const { supabase } = await requireAdminProfile();
   const [programResult, checklistResult, activityResult, attachmentResult, integrationResult, settingsResult] = await Promise.all([
     supabase.from("affiliate_programs").select("*").order("priority").order("supplier_name").returns<AffiliateProgram[]>(),
@@ -77,17 +82,17 @@ async function OwnerAffiliateGoal() {
     ...attachment,
     signed_url: (await supabase.storage.from("affiliate-confirmations").createSignedUrl(attachment.file_path, 1800)).data?.signedUrl ?? null,
   })));
-  return <GoalDisclosure id="supplier-affiliate-program" number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 construction-focused targets · Direct call routes first."><div className="grid gap-4"><AffiliateCallList programs={programResult.data ?? []} /><AffiliateProgramTracker programs={programResult.data ?? []} checklist={checklistResult.data ?? []} activities={activityResult.data ?? []} attachments={signedAttachments} integrations={integrationResult.data ?? []} settings={settingsResult.data} hideHeading /></div></GoalDisclosure>;
+  return <GoalDisclosure id="supplier-affiliate-program" fixedKey="supplier-affiliate-program" status={status} number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 construction-focused targets · Direct call routes first."><div className="grid gap-4"><AffiliateCallList programs={programResult.data ?? []} /><AffiliateProgramTracker programs={programResult.data ?? []} checklist={checklistResult.data ?? []} activities={activityResult.data ?? []} attachments={signedAttachments} integrations={integrationResult.data ?? []} settings={settingsResult.data} hideHeading /></div></GoalDisclosure>;
 }
 
-function AbcSupplyDemoGoal() {
-  return <GoalDisclosure id="abc-supply-demo" number={5} eyebrow="Supplier pricing" title="ABC Supply Demo" description="Live product search and account pricing.">
+function AbcSupplyDemoGoal({ status }: { status: ManagerGoalStatus }) {
+  return <GoalDisclosure id="abc-supply-demo" fixedKey="abc-supply-demo" status={status} number={5} eyebrow="Supplier pricing" title="ABC Supply Demo" description="Live product search and account pricing.">
     <Link href="/admin/abc" className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#0071e3] px-5 text-sm font-semibold text-white">Open ABC Supply Demo<ArrowRight className="h-4 w-4" /></Link>
   </GoalDisclosure>;
 }
 
-function ClientTargetGoal({ clients, leads, canManageClients }: { clients: ClientTarget[]; leads: OutreachLeadRecord[]; canManageClients: boolean }) {
-  return <GoalDisclosure id="client-target" number={1} eyebrow="Outreach" title="Client Target" description="Leads to contact and active clients in one place.">
+function ClientTargetGoal({ clients, leads, canManageClients, status }: { clients: ClientTarget[]; leads: OutreachLeadRecord[]; canManageClients: boolean; status: ManagerGoalStatus }) {
+  return <GoalDisclosure id="client-target" fixedKey="client-target" status={status} number={1} eyebrow="Outreach" title="Client Target" description="Leads to contact and active clients in one place.">
     <div className="flex flex-wrap gap-2">{canManageClients ? <><AddOutreachLead /><AddTargetClient /></> : null}<ClientTargetCallGuide /></div>
     <div className="mt-4 grid gap-4 lg:grid-cols-2">
       <OutreachLeadList leads={leads} />
@@ -96,15 +101,15 @@ function ClientTargetGoal({ clients, leads, canManageClients }: { clients: Clien
   </GoalDisclosure>;
 }
 
-function SupplierPricingGoal() {
-  return <GoalDisclosure id="call-suppliers" number={2} eyebrow="Purchasing" title="Call Supplier" description="Find what each supplier sells cheaper than anyone else.">
+function SupplierPricingGoal({ status }: { status: ManagerGoalStatus }) {
+  return <GoalDisclosure id="call-suppliers" fixedKey="call-suppliers" status={status} number={2} eyebrow="Purchasing" title="Call Supplier" description="Find what each supplier sells cheaper than anyone else.">
     <div className="grid gap-3 text-sm text-slate-600"><p className="flex gap-2"><CircleDollarSign className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />Ask each supplier for their strongest-priced items, delivery minimum, lead time, and quote expiration.</p><p className="flex gap-2"><Target className="mt-0.5 h-4 w-4 shrink-0 text-[#0066cc]" />Enter the prices in the catalog and keep the best suppliers per department.</p></div>
     <div className="mt-4 flex flex-wrap gap-2"><Link href="/owner/partnerships" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white">Show supplier partnerships<ArrowRight className="h-4 w-4" /></Link><Link href="/admin/vendors" className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white">Supplier Directory<ArrowRight className="h-4 w-4" /></Link><Link href="/admin/catalog" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold">Enter catalog prices</Link><Link href="/owner/delivery-requests" className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold">Delivery requests</Link></div>
   </GoalDisclosure>;
 }
 
-function SupplierPartnershipGoal() {
-  return <GoalDisclosure id="supplier-partnerships" number={4} eyebrow="Supplier relationships" title="Supplier Partnership" description="Show contacts, outreach drafts, follow-ups, and partnership progress.">
+function SupplierPartnershipGoal({ status }: { status: ManagerGoalStatus }) {
+  return <GoalDisclosure id="supplier-partnerships" fixedKey="supplier-partnerships" status={status} number={4} eyebrow="Supplier relationships" title="Supplier Partnership" description="Show contacts, outreach drafts, follow-ups, and partnership progress.">
     <p className="text-sm leading-6 text-slate-600">Open Carlos&apos;s supplier workspace to contact researched companies and track every next step.</p>
     <Link href="/owner/partnerships" className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white">Open Supplier Partnerships<ArrowRight className="h-4 w-4" /></Link>
   </GoalDisclosure>;
@@ -121,15 +126,32 @@ export async function CarlosGoalsWorkspace({ embedded = false }: { embedded?: bo
   const clients = clientResult.error ? [] : clientResult.data ?? [];
   const goals = goalResult.error ? [] : goalResult.data ?? [];
   const leads = leadResult.error ? [] : leadResult.data ?? [];
+  const fixedStatuses = new Map<CarlosFixedGoalKey, ManagerGoalStatus>();
+  for (const goal of goals) {
+    const key = parseFixedGoalKey(goal.details);
+    if (key) fixedStatuses.set(key, goal.status);
+  }
+  const statusFor = (key: CarlosFixedGoalKey) => fixedStatuses.get(key) ?? "open";
   const regularGoals = goals.filter((goal) =>
     !goal.details?.startsWith(DAILY_WORK_SUMMARY_PREFIX) &&
-    !goal.details?.startsWith(SUPPLIER_PARTNER_NOTES_PREFIX)
+    !goal.details?.startsWith(SUPPLIER_PARTNER_NOTES_PREFIX) &&
+    !parseFixedGoalKey(goal.details)
   ).filter((goal) => goal.assignee === "carlos");
+  const fixedGoals: Array<{ key: CarlosFixedGoalKey; content: ReactNode }> = [
+    { key: "client-target", content: <ClientTargetGoal clients={clients} leads={leads} canManageClients={access.customers} status={statusFor("client-target")} /> },
+    { key: "call-suppliers", content: <SupplierPricingGoal status={statusFor("call-suppliers")} /> },
+    { key: "supplier-affiliate-program", content: access.owner ? <OwnerAffiliateGoal status={statusFor("supplier-affiliate-program")} /> : <GoalDisclosure id="supplier-affiliate-program" fixedKey="supplier-affiliate-program" status={statusFor("supplier-affiliate-program")} number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 construction-focused targets with direct call routes first."><AffiliateCallList /></GoalDisclosure> },
+    { key: "supplier-partnerships", content: <SupplierPartnershipGoal status={statusFor("supplier-partnerships")} /> },
+    ...(access.owner ? [{ key: "abc-supply-demo" as const, content: <AbcSupplyDemoGoal status={statusFor("abc-supply-demo")} /> }] : []),
+  ];
+  const activeFixedGoals = fixedGoals.filter((goal) => statusFor(goal.key) !== "archived");
+  const archivedFixedGoals = fixedGoals.filter((goal) => statusFor(goal.key) === "archived");
 
   const goalsWorkspace = <>
     {embedded ? <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-semibold text-slate-950">Carlos&apos;s priorities</h3><p className="mt-0.5 text-xs text-slate-500">Open any goal below. It stays on this dashboard.</p></div><AddManagerGoal assignee="carlos" /></div> : null}
     <CustomManagerGoals goals={regularGoals} />
-    <div className="mt-4 grid gap-3 sm:gap-4"><ClientTargetGoal clients={clients} leads={leads} canManageClients={access.customers} /><SupplierPricingGoal />{access.owner ? <OwnerAffiliateGoal /> : <GoalDisclosure id="supplier-affiliate-program" number={3} eyebrow="Supplier program" title="Supplier Affiliate Program" description="50 construction-focused targets with direct call routes first."><AffiliateCallList /></GoalDisclosure>}<SupplierPartnershipGoal />{access.owner ? <AbcSupplyDemoGoal /> : null}</div>
+    <div className="mt-3 grid gap-2">{activeFixedGoals.map((goal) => <div key={goal.key}>{goal.content}</div>)}</div>
+    {archivedFixedGoals.length ? <details className="group mt-3 overflow-hidden rounded-md border border-slate-200 bg-slate-50"><summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-xs font-semibold text-slate-600"><Archive className="h-3.5 w-3.5" /><span className="flex-1">Archived priority goals</span><span>{archivedFixedGoals.length}</span><ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" /></summary><div className="grid gap-2 border-t border-slate-200 p-2">{archivedFixedGoals.map((goal) => <div key={goal.key}>{goal.content}</div>)}</div></details> : null}
   </>;
 
   if (embedded) return <div className="p-3 sm:p-4">{goalsWorkspace}</div>;

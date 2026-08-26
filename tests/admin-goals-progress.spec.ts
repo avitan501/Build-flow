@@ -29,7 +29,7 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   ]);
 
   expect(page).toContain("await requireManagerPortalProfile()");
-  expect(page).toContain("async function OwnerAffiliateGoal()");
+  expect(page).toContain("async function OwnerAffiliateGoal({ status }");
   expect(page).toContain("const { supabase } = await requireAdminProfile()");
   expect(page).toContain("Carlos Goals");
   expect(page).toContain("Client Target");
@@ -42,12 +42,12 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain('href="/admin/abc"');
   expect(page).toContain('PersonHeader assignee="carlos"');
   expect(page).toContain("<AffiliateProgramTracker");
-  expect(page).toContain("access.owner ? <OwnerAffiliateGoal />");
+  expect(page).toContain("access.owner ? <OwnerAffiliateGoal status=");
   expect(page).toContain('supabase.from("affiliate_programs")');
   expect(page).toContain("<AddTargetClient />");
   expect(page).toContain("<ClientTargetCallGuide />");
   expect(page).toContain('title="Supplier Affiliate Program"');
-  expect(page).toContain('<GoalDisclosure id="supplier-affiliate-program" number={3}');
+  expect(page).toContain('<GoalDisclosure id="supplier-affiliate-program" fixedKey="supplier-affiliate-program"');
   expect(page).toContain('supabase.from("manager_goals")');
   expect(page).toContain("<AddManagerGoal");
   expect(page).not.toContain('PersonHeader assignee="david"');
@@ -63,22 +63,31 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(actions.match(/if \(!access\.owner\).*\.eq\("assignee", "carlos"\)/g)?.length).toBe(2);
 });
 
-test("manager goals are persistent and protected for manager users", async () => {
-  const [component, actions, migration] = await Promise.all([
+test("manager goals are persistent, status-aware, archivable, and protected for manager users", async () => {
+  const [component, statusSelect, actions, migration, archiveMigration] = await Promise.all([
     readFile(path.join(root, "components/buildflow/manager-goals.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/manager-goal-status-select.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/goals-progress/goal-actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817140952_create_manager_goals.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260826221441_add_archived_manager_goal_status.sql"), "utf8"),
   ]);
 
   expect(component).toContain("Add a goal");
-  expect(component).toContain("setManagerGoalCompletedAction");
+  expect(component).toContain("Archived goals");
+  expect(component).toContain("ManagerGoalStatusSelect");
   expect(component).toContain("deleteManagerGoalAction");
-  expect(actions.match(/requireManagerPortalProfile\(\)/g)?.length).toBe(4);
+  expect(statusSelect).toContain('label: "In progress"');
+  expect(statusSelect).toContain('label: "Done"');
+  expect(statusSelect).toContain('label: "Archived"');
+  expect(actions).toContain("setManagerGoalStatusAction");
+  expect(actions).toContain("setFixedManagerGoalStatusAction");
+  expect(actions.match(/requireManagerPortalProfile\(\)/g)?.length).toBe(5);
   expect(migration).toContain("create table if not exists public.manager_goals");
   expect(migration).toContain("alter table public.manager_goals enable row level security");
   expect(migration).toContain("role in ('admin', 'staff')");
   expect(migration).toContain("approval_status = 'approved'");
   expect(migration).toContain("created_by = (select auth.uid())");
+  expect(archiveMigration).toContain("status in ('open', 'completed', 'archived')");
 });
 
 test("outreach leads remain separate from clients and store relationship level and language", async () => {
@@ -157,7 +166,8 @@ test("Goals and lists use collapsed disclosures to keep the page compact", async
   expect(page).toContain("<details");
   expect(page).toContain("Clients in the system");
   expect(leads).toContain('<details className="group');
-  expect(goals).toContain("goals.map((goal) => <details");
+  expect(goals).toContain("activeGoals.map(goalRow)");
+  expect(goals).toContain("min-h-14");
 });
 
 test("affiliate tracker is persistent, owner-only, filterable, and setup-gated", async () => {

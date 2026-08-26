@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireManagerPortalProfile } from "@/lib/auth";
+import { CARLOS_FIXED_GOALS, SYSTEM_GOAL_STATUS_PREFIX, type CarlosFixedGoalKey, type ManagerGoalStatus } from "@/lib/manager-goal-status";
 
 type GoalResult = { ok: true } | { ok: false; error: string };
 const WEBSITE_FIX_NOTE_PREFIX = "website_fix_note:";
@@ -65,14 +66,35 @@ export async function createWebsiteFixNoteAction(input: { kind: string; note: st
 }
 
 export async function setManagerGoalCompletedAction(input: { id: string; completed: boolean }): Promise<GoalResult> {
+  return setManagerGoalStatusAction({ id: input.id, status: input.completed ? "completed" : "open" });
+}
+
+export async function setManagerGoalStatusAction(input: { id: string; status: ManagerGoalStatus }): Promise<GoalResult> {
   const { supabase, access } = await requireManagerPortalProfile();
+  if (!/^[0-9a-f-]{36}$/i.test(input.id) || !["open", "completed", "archived"].includes(input.status)) return { ok: false, error: "Choose a valid goal status." };
   let update = supabase
     .from("manager_goals")
-    .update({ status: input.completed ? "completed" : "open" })
+    .update({ status: input.status })
     .eq("id", input.id);
   if (!access.owner) update = update.eq("assignee", "carlos");
   const { error } = await update;
   if (error) return { ok: false, error: "The goal status could not be updated." };
+
+  refreshGoals();
+  return { ok: true };
+}
+
+export async function setFixedManagerGoalStatusAction(input: { key: CarlosFixedGoalKey; status: ManagerGoalStatus }): Promise<GoalResult> {
+  const { supabase, user } = await requireManagerPortalProfile();
+  if (!(input.key in CARLOS_FIXED_GOALS) || !["open", "completed", "archived"].includes(input.status)) return { ok: false, error: "Choose a valid goal status." };
+  const details = `${SYSTEM_GOAL_STATUS_PREFIX}${input.key}`;
+  const { data: existing, error: findError } = await supabase.from("manager_goals").select("id").eq("assignee", "carlos").eq("details", details).limit(1).maybeSingle<{ id: string }>();
+  if (findError) return { ok: false, error: "The goal status could not be loaded." };
+
+  const result = existing
+    ? await supabase.from("manager_goals").update({ status: input.status }).eq("id", existing.id).eq("assignee", "carlos")
+    : await supabase.from("manager_goals").insert({ assignee: "carlos", title: CARLOS_FIXED_GOALS[input.key], details, status: input.status, created_by: user.id });
+  if (result.error) return { ok: false, error: "The goal status could not be updated." };
 
   refreshGoals();
   return { ok: true };
