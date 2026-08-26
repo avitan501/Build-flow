@@ -17,6 +17,7 @@ import { requireOwnerAccess } from "@/lib/owner-access";
 import { requireManagerPortalProfile } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url";
+import { addAuraCommunicationLinks } from "@/lib/aura/email-links";
 
 function requireUuid(value: FormDataEntryValue | null) {
   const id = typeof value === "string" ? value.trim() : "";
@@ -61,6 +62,10 @@ export async function sendAuraMessageAction(input: {
   recipient: string;
   subject?: string;
   message: string;
+  supplierId?: string;
+  supplierName?: string;
+  materialRequestId?: string;
+  materialRequestTitle?: string;
 }): Promise<SendAuraMessageResult> {
   const { supabase, access } = await requireManagerPortalProfile();
   if (!access.customers) return { ok: false, error: "Customer communication access is required." };
@@ -101,10 +106,23 @@ export async function sendAuraMessageAction(input: {
         });
       }
     } else if (channel === "email") {
+      const requestReference = input.materialRequestId && /^[0-9a-f-]{36}$/i.test(input.materialRequestId) ? `[AVB-${input.materialRequestId.slice(0, 8).toUpperCase()}] ` : "";
+      const emailSubject = `${requestReference}${input.subject || ""}`.trim();
+      let providerId: string | null = null;
       try {
-        await invokeMessagingBroker(supabase, { action: "send_email", to: email, subject: input.subject || "", message });
+        providerId = (await invokeMessagingBroker(supabase, { action: "send_email", to: email, subject: emailSubject, message })).id || null;
       } catch {
-        await sendAuraEmail(email!, input.subject || "", message);
+        providerId = (await sendAuraEmail(email!, emailSubject, message)).id;
+      }
+      if (providerId) {
+        const admin = createAdminClient();
+        const { data: communication } = await admin.from("aura_communications").select("id").eq("channel", "email").eq("external_activity_id", providerId).maybeSingle<{ id: string }>();
+        if (communication?.id) {
+          await addAuraCommunicationLinks(communication.id ? [communication.id] : [], [
+            ...(input.supplierId ? [{ entity_type: "supplier" as const, entity_id: input.supplierId, entity_label: input.supplierName || email!, link_source: "manual" as const, confidence: 1 }] : []),
+            ...(input.materialRequestId ? [{ entity_type: "material_request" as const, entity_id: input.materialRequestId, entity_label: input.materialRequestTitle || "Material request", link_source: "manual" as const, confidence: 1 }] : []),
+          ]);
+        }
       }
     } else {
       return { ok: false, error: "Choose SMS, WhatsApp, or email." };

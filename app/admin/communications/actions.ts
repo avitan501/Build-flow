@@ -6,6 +6,7 @@ import { requireManagerPortalProfile } from "@/lib/auth"
 import { normalizeAuraEmail, normalizeAuraPhone } from "@/lib/aura/communications"
 import { serializeCommunicationLog, type CommunicationLog } from "@/lib/manager-command-center"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { addAuraCommunicationLinks, type AuraEmailEntityType } from "@/lib/aura/email-links"
 
 type ContactKind = "customer" | "lead" | "supplier"
 type Result = { ok: true } | { ok: false; error: string }
@@ -92,6 +93,53 @@ export async function linkCommunicationContactAction(input: {
   const updated = await communicationQuery
   if (updated.error) return { ok: false as const, error: "The conversation could not be assigned." }
 
+  const { data: emailCommunications } = await admin.from("aura_communications").select("id").eq("channel", "email").ilike("counterparty_email", conversationEmail || input.email || "")
+  await addAuraCommunicationLinks((emailCommunications ?? []).map((item) => item.id), [{ entity_type: input.kind === "customer" ? "client" : input.kind, entity_id: input.sourceId, entity_label: input.name, link_source: "manual", confidence: 1 }], undefined)
+
   revalidatePath("/admin/communications")
   return { ok: true as const }
+}
+
+export async function linkEmailConversationAction(input: { conversationEmail: string; entityType: AuraEmailEntityType; entityId: string }): Promise<Result> {
+  const { user, access } = await requireManagerPortalProfile()
+  const email = normalizeAuraEmail(input.conversationEmail)
+  if (!access.customers || !email) return { ok: false, error: "Choose a valid email conversation." }
+  if (!new Set<AuraEmailEntityType>(["client", "lead", "supplier", "material_request"]).has(input.entityType) || !/^[A-Za-z0-9_-]{1,160}$/.test(input.entityId)) return { ok: false, error: "Choose what this email belongs to." }
+  const admin = createAdminClient()
+  let label = "Linked record"
+  if (input.entityType === "client") {
+    const { data } = await admin.from("profiles").select("id,full_name,company_name,email").eq("id", input.entityId).eq("role", "client").maybeSingle()
+    if (!data) return { ok: false, error: "That client could not be found." }
+    label = data.full_name || data.company_name || data.email || "Client"
+  } else if (input.entityType === "material_request") {
+    const { data } = await admin.from("quote_requests").select("id,title").eq("id", input.entityId).maybeSingle()
+    if (!data) return { ok: false, error: "That material request could not be found." }
+    label = data.title
+  } else if (input.entityType === "lead") {
+    const { data } = await admin.from("manager_outreach_leads").select("id,full_name,company_name,email").eq("id", input.entityId).maybeSingle()
+    if (!data) return { ok: false, error: "That lead could not be found." }
+    label = data.full_name || data.company_name || data.email || "Lead"
+  } else {
+    const { data } = await admin.from("workflow_manager_settings").select("state").eq("id", "singleton").maybeSingle<{ state: { qualificationSettings?: { suppliers?: Array<{ id: string; name: string }> } } }>()
+    const supplier = data?.state?.qualificationSettings?.suppliers?.find((item) => item.id === input.entityId)
+    if (!supplier) return { ok: false, error: "That supplier could not be found." }
+    label = supplier.name
+  }
+  const { data: rows, error } = await admin.from("aura_communications").select("id").eq("channel", "email").ilike("counterparty_email", email)
+  if (error || !rows?.length) return { ok: false, error: "No email messages were found in this conversation." }
+  await addAuraCommunicationLinks(rows.map((row) => row.id), [{ entity_type: input.entityType, entity_id: input.entityId, entity_label: label, link_source: "manual", confidence: 1 }], user.id)
+  revalidatePath("/admin/communications")
+  revalidatePath("/admin/vendors")
+  if (input.entityType === "material_request") revalidatePath(`/owner/materials/requests/${input.entityId}`)
+  return { ok: true }
+}
+
+export async function markEmailConversationReadAction(input: { conversationEmail: string }): Promise<Result> {
+  const { access } = await requireManagerPortalProfile()
+  const email = normalizeAuraEmail(input.conversationEmail)
+  if (!access.customers || !email) return { ok: false, error: "Choose a valid email conversation." }
+  const { error } = await createAdminClient().from("aura_communications").update({ read_at: new Date().toISOString() }).eq("channel", "email").eq("direction", "incoming").ilike("counterparty_email", email).is("read_at", null)
+  if (error) return { ok: false, error: "The email could not be marked as read." }
+  revalidatePath("/admin/communications")
+  return { ok: true }
 }

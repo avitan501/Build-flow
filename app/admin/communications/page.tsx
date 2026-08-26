@@ -9,6 +9,7 @@ import { syncRecentTwilioWhatsAppMessages } from "@/lib/aura/twilio-whatsapp"
 import { COMMUNICATION_LOG_PREFIX, parseCommunicationLog } from "@/lib/manager-command-center"
 import { listInboxThreads } from "@/lib/whatsapp-draft-inbox"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { loadAuraCommunicationLinks } from "@/lib/aura/email-links"
 import type { ShopQualificationSettings, SupplierRoutingOption } from "@/lib/shop-qualification"
 
 type ManagerAuraData = {
@@ -57,10 +58,11 @@ export default async function CommunicationsPage({
   const initialChannelFilter = ["all", "call", "sms", "whatsapp", "email"].includes(requestedChannel || "") ? requestedChannel! : "all"
   const { supabase, access } = await requireManagerPortalProfile()
   if (access.customers) await syncRecentTwilioWhatsAppMessages().catch(() => null)
-  const [clientsResult, leadsResult, suppliersResult, logsResult, threads, aura] = await Promise.all([
+  const [clientsResult, leadsResult, suppliersResult, requestsResult, logsResult, threads, aura] = await Promise.all([
     access.customers ? supabase.from("profiles").select("id,full_name,email,phone,company_name").eq("role", "client").eq("is_active", true).order("full_name").limit(500) : Promise.resolve({ data: [] }),
     access.customers ? supabase.from("manager_outreach_leads").select("id,full_name,company_name,email,phone").neq("status", "archived").order("full_name").limit(500).returns<AuraLeadRecipient[]>() : Promise.resolve({ data: [] }),
     access.suppliers ? supabase.rpc("staff_load_supplier_directory_snapshot") : Promise.resolve({ data: null }),
+    access.customers ? supabase.from("quote_requests").select("id,title,status").neq("status", "draft").order("updated_at", { ascending: false }).limit(150) : Promise.resolve({ data: [] }),
     supabase.from("manager_goals").select("details,updated_at").like("details", `${COMMUNICATION_LOG_PREFIX}%`).order("updated_at", { ascending: false }).limit(100),
     listInboxThreads().catch(() => []),
     access.customers
@@ -76,9 +78,12 @@ export default async function CommunicationsPage({
   const supplierSnapshot = suppliersResult.data as { settings?: ShopQualificationSettings } | null
   const leads = (leadsResult.data ?? []) as AuraLeadRecipient[]
   const suppliers = (supplierSnapshot?.settings?.suppliers ?? []).filter((supplier): supplier is SupplierRoutingOption => Boolean(supplier?.id && supplier?.name))
+  const communications = normalizeAuraCommunications(aura?.communications ?? [])
+  const emailLinks = await loadAuraCommunicationLinks(communications.filter((item) => item.channel === "email").map((item) => item.id))
+  const communicationsWithLinks = communications.map((item) => ({ ...item, links: emailLinks.filter((link) => link.communication_id === item.id) }))
   const liveAura = aura?.communications && aura.contacts && aura.connections
     ? {
-        communications: normalizeAuraCommunications(aura.communications),
+        communications: communicationsWithLinks,
         contacts: aura.contacts,
         customers,
         leads,
@@ -87,5 +92,5 @@ export default async function CommunicationsPage({
       }
     : null
 
-  return <main className="min-h-screen bg-[#f5f5f7] px-2 py-2 text-slate-950 sm:px-4 sm:py-4 lg:px-6"><div className="mx-auto max-w-[96rem]">{liveAura ? <UnifiedCommunicationInbox communications={liveAura.communications} contacts={liveAura.contacts} customers={liveAura.customers} leads={liveAura.leads} suppliers={liveAura.suppliers} connections={liveAura.connections} initialChannelFilter={initialChannelFilter} initialQuery={(requestedSearch || "").slice(0, 160)} /> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Live phone connections are temporarily unavailable.</p>}<details className="mt-3 rounded-lg border border-slate-200 bg-white p-3"><summary className="cursor-pointer text-xs font-semibold text-slate-600">Manual communication log</summary><div className="mt-4"><CommunicationCenter clients={clients} logs={logs} threads={threads} /></div></details></div></main>
+  return <main className="min-h-screen bg-[#f5f5f7] px-2 py-2 text-slate-950 sm:px-4 sm:py-4 lg:px-6"><div className="mx-auto max-w-[96rem]">{liveAura ? <UnifiedCommunicationInbox communications={liveAura.communications} contacts={liveAura.contacts} customers={liveAura.customers} leads={liveAura.leads} suppliers={liveAura.suppliers} materialRequests={(requestsResult.data ?? []).map((request) => ({ id: request.id, title: request.title, status: request.status }))} connections={liveAura.connections} initialChannelFilter={initialChannelFilter} initialQuery={(requestedSearch || "").slice(0, 160)} /> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Live phone connections are temporarily unavailable.</p>}<details className="mt-3 rounded-lg border border-slate-200 bg-white p-3"><summary className="cursor-pointer text-xs font-semibold text-slate-600">Manual communication log</summary><div className="mt-4"><CommunicationCenter clients={clients} logs={logs} threads={threads} /></div></details></div></main>
 }

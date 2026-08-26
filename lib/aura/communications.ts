@@ -20,6 +20,9 @@ type CommunicationInput = {
   status?: string | null;
   media?: Array<{ url?: string; type?: string; duration?: number }>;
   occurredAt?: string;
+  mailboxAddress?: string | null;
+  messageId?: string | null;
+  inReplyTo?: string | null;
 };
 
 async function contactForIdentity(phone: string | null, email: string | null) {
@@ -38,7 +41,7 @@ export async function storeAuraCommunication(input: CommunicationInput) {
   const counterpartyEmail = input.counterpartyEmail ? normalizeAuraEmail(input.counterpartyEmail) : null;
   const contactId = await contactForIdentity(counterpartyPhone, counterpartyEmail);
   const occurredAt = input.occurredAt || new Date().toISOString();
-  const { error } = await supabase.from("aura_communications").upsert(
+  const { data, error } = await supabase.from("aura_communications").upsert(
     {
       provider: input.provider,
       channel: input.channel,
@@ -54,10 +57,14 @@ export async function storeAuraCommunication(input: CommunicationInput) {
       status: input.status || null,
       occurred_at: occurredAt,
       last_event_at: occurredAt,
+      mailbox_address: input.mailboxAddress ? normalizeAuraEmail(input.mailboxAddress) : null,
+      message_id: input.messageId?.trim().slice(0, 500) || null,
+      in_reply_to: input.inReplyTo?.trim().slice(0, 500) || null,
     },
     { onConflict: "provider,external_activity_id" },
-  );
+  ).select("id").single<{ id: string }>();
   if (error) throw new Error(`Unable to save Aura communication: ${error.message}`);
+  return data.id;
 }
 
 export async function updateAuraCommunicationStatus(

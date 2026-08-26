@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Plus, RefreshCw, Search, StickyNote, Trash2, X } from "lucide-react"
+import { Check, Mail, Plus, RefreshCw, Search, StickyNote, Trash2, X } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useRef, useState, useTransition } from "react"
 import { deleteSupplierDirectoryEntryAction, loadSupplierDirectoryAction, saveSupplierDirectoryEntryAction, saveSupplierRoutingProductsAction } from "@/app/admin/vendors/actions"
@@ -1296,6 +1296,7 @@ export function SupplierRoutingManager({
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <QuoCallButton phone={selectedSupplier.phone || selectedSupplier.whatsapp || null} supplierName={selectedSupplier.name} />
+                        {selectedSupplier.email ? <Link href={`/admin/communications?channel=email&q=${encodeURIComponent(selectedSupplier.email)}`} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 text-sm font-semibold text-sky-800"><Mail className="h-4 w-4" />Emails</Link> : null}
                         <SupplierQuoteRequestDialog
                           supplierId={selectedSupplier.id}
                           supplierName={selectedSupplier.name}

@@ -2,6 +2,8 @@ import type { ProfileRecord } from "@/lib/auth"
 import type { ProjectRecord } from "@/lib/projects"
 import type { ShopCartItemDetails, ShopCustomCartItem } from "@/lib/shop-cart"
 import { CREDIT_CARD_PROCESSING_TERM } from "@/lib/proposal-terms"
+import { storeAuraCommunication } from "@/lib/aura/communications"
+import { addAuraCommunicationLinks } from "@/lib/aura/email-links"
 
 type QuoteItemForEmail = {
   name: string
@@ -582,7 +584,7 @@ export async function sendClientQuoteEmail(input: ClientQuoteEmailInput): Promis
 export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmailInput): Promise<EmailDeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY
   const from = DEFAULT_FROM
-  const subject = `Avantia Build request: ${input.requestTitle}`
+  const subject = `[AVB-${input.requestId.slice(0, 8).toUpperCase()}] Avantia Build request: ${input.requestTitle}`
   const text = [
     input.message.trim(),
     "",
@@ -613,7 +615,25 @@ export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmail
       idempotencyKey: `avantia-manager-reply-${input.requestId}-${crypto.randomUUID()}`,
       attachments: input.attachment ? [input.attachment] : undefined,
     })
-    if (directResult.status === "sent") return directResult
+    if (directResult.status === "sent") {
+      try {
+        const communicationId = await storeAuraCommunication({
+          provider: "manual",
+          channel: "email",
+          externalActivityId: directResult.providerId || `email-out-${crypto.randomUUID()}`,
+          direction: "outgoing",
+          counterpartyEmail: input.recipientEmail,
+          subject,
+          body: input.message,
+          status: "sent",
+          mailboxAddress: COMPANY_EMAIL,
+        })
+        await addAuraCommunicationLinks([communicationId], [{ entity_type: "material_request", entity_id: input.requestId, entity_label: input.requestTitle, link_source: "manual", confidence: 1 }])
+      } catch {
+        // Email delivery succeeded; inbox indexing can be recovered from the provider webhook.
+      }
+      return directResult
+    }
     if (input.attachment) return directResult
   }
 

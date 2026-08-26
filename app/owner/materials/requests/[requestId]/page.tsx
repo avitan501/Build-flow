@@ -13,6 +13,8 @@ import { quoteRequestStatusLabel, type QuoteRequestStatus } from "@/lib/quote-re
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import { analyzeQuoteComparison, type QuoteComparisonBidRecord, type QuoteComparisonItemRecord, type QuoteComparisonRecord } from "@/lib/quote-comparison"
 import { managerPipelineStage } from "@/lib/manager-dashboard"
+import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 type RequestDetails = { id: string; project_id: string; owner_id: string; title: string; status: QuoteRequestStatus; manager_assignee: string; created_at: string; updated_at: string; submitted_at: string | null; projects: { name: string; address: string | null } | null }
 type Attachment = { id: string; material_response_id: string | null; file_name: string; file_path: string; file_type: string | null }
@@ -92,6 +94,12 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
   })
   const step1Complete = workflowOverrides.get(1) ?? true
   const step2Complete = workflowOverrides.get(2) ?? organizedItems.length > 0
+  const admin = createAdminClient()
+  const { data: requestEmailLinks } = await admin.from("aura_communication_links").select("communication_id").eq("entity_type", "material_request").eq("entity_id", request.id)
+  const linkedEmailIds = (requestEmailLinks ?? []).map((link) => link.communication_id)
+  const { data: linkedEmails } = linkedEmailIds.length
+    ? await admin.from("aura_communications").select("id,direction,counterparty_email,subject,body,occurred_at,status").in("id", linkedEmailIds).eq("channel", "email").order("occurred_at", { ascending: false }).returns<RelatedEmailItem[]>()
+    : { data: [] as RelatedEmailItem[] }
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-3 pb-28 pt-4 text-slate-950 sm:px-6">
@@ -127,6 +135,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
             </div>
           </details>
         </div>
+        <RelatedEmailTimeline emails={linkedEmails ?? []} />
         <div className="mt-2"><RequestManagementPanel requestId={request.id} requestTitle={request.title} client={{ name: profile?.full_name || "Client", email: clientEmail, phone: profile?.phone || "" }} departments={departments} suppliers={suppliers} packages={packages ?? []} requestItems={departmentItems.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, unit: item.unit, reviewReasons: Array.isArray(item.metadata?.review_reasons) ? item.metadata.review_reasons.filter((reason): reason is string => typeof reason === "string" && Boolean(reason.trim())) : [] }))} projectAddress={request.projects?.address || ""} currentStage={currentStage} comparisons={comparisonSummaries} clientReplyCompleted={clientReplyCompleted} step3CompletedOverride={workflowOverrides.get(3) ?? null} step4CompletedOverride={workflowOverrides.get(4) ?? null} /></div>
         {clientActions.length ? <section className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-5"><h2 className="text-lg font-bold text-slate-950">Activity history</h2><div className="mt-3 divide-y divide-amber-200">{clientActions.map((event) => <article key={event.id} className="py-3 first:pt-0 last:pb-0"><div className="flex flex-wrap items-start justify-between gap-2"><h3 className="text-sm font-bold text-slate-900">{event.title}</h3><time className="text-xs text-slate-500">{new Date(event.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>{event.description ? <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{event.description}</p> : null}</article>)}</div></section> : null}
       </div>

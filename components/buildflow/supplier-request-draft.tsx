@@ -88,7 +88,7 @@ export function SupplierRequestDraft({
             nextResults.push({ supplierId: supplier.id, supplierName: supplier.name, requestId: null, channel, ok: false, error: "Text and WhatsApp messages must be under 1,600 characters. Shorten the item list or use email." })
             continue
           }
-          const result = await sendAuraMessageAction({ channel, recipient, subject, message: previewMessage })
+          const result = await sendAuraMessageAction({ channel, recipient, subject, message: previewMessage, supplierId: supplier.id, supplierName: supplier.name, materialRequestId: requestId, materialRequestTitle: requestTitle })
           nextResults.push({ supplierId: supplier.id, supplierName: supplier.name, requestId: null, channel, ok: result.ok, error: result.ok ? null : result.error })
         }
       }

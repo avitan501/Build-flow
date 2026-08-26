@@ -6,6 +6,7 @@ import { canSendAuraEmail, canSendAuraQuoText } from "@/lib/aura/communications"
 import { canUseTwilioWhatsApp } from "@/lib/aura/twilio-whatsapp";
 import { canSendAuraWhatsApp } from "@/lib/aura/whatsapp";
 import type { AuraCustomerIdentity } from "@/lib/aura/identity";
+import type { AuraCommunicationLink } from "@/lib/aura/email-links";
 
 export type AuraIntakeRow = {
   id: string;
@@ -66,6 +67,11 @@ export type AuraCommunicationRow = {
   status: string | null;
   duration_seconds: number | null;
   occurred_at: string;
+  mailbox_address?: string | null;
+  message_id?: string | null;
+  in_reply_to?: string | null;
+  read_at?: string | null;
+  links?: AuraCommunicationLink[];
 };
 
 function jsonArray<T>(value: unknown): T[] {
@@ -117,7 +123,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
       .limit(30),
     supabase
       .from("aura_communications")
-      .select("id, contact_id, provider, channel, direction, counterparty_phone, counterparty_email, subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at")
+      .select("id, contact_id, provider, channel, direction, counterparty_phone, counterparty_email, subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at, mailbox_address, message_id, in_reply_to, read_at")
       .order("occurred_at", { ascending: false })
       .limit(500),
     supabase

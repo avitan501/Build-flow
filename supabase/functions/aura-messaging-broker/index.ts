@@ -186,6 +186,8 @@ async function handleResendWebhook(req: Request) {
       from?: string;
       subject?: string;
       attachments?: Array<{ filename?: string; content_type?: string }>;
+      to?: string[];
+      message_id?: string;
     };
   };
   try { event = JSON.parse(rawBody); } catch { return json({ error: "Invalid JSON" }, 400); }
@@ -196,22 +198,56 @@ async function handleResendWebhook(req: Request) {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!response.ok) return json({ error: "Unable to retrieve received email" }, 502);
-  const email = await response.json() as { text?: string | null; html?: string | null };
+  const email = await response.json() as { text?: string | null; html?: string | null; to?: string[]; message_id?: string | null; headers?: Record<string, string> };
   const attachments = event.data.attachments || [];
   const attachmentNames = attachments.map((item) => item.filename).filter(Boolean);
   const body = (email.text?.trim() || (email.html ? stripEmailHtml(email.html) : "")).slice(0, 20_000);
-  await storeCommunication({
+  const counterpartyEmail = emailAddress(event.data.from);
+  const messageId = email.message_id || email.headers?.["message-id"] || event.data.message_id || null;
+  const inReplyTo = email.headers?.["in-reply-to"] || null;
+  const communicationId = await storeCommunication({
     provider: "manual",
     channel: "email",
     externalId: event.data.email_id,
     direction: "incoming",
-    counterpartyEmail: emailAddress(event.data.from),
+    counterpartyEmail,
     subject: event.data.subject || null,
     body: [body, attachmentNames.length ? `Attachments: ${attachmentNames.join(", ")}` : ""].filter(Boolean).join("\n\n"),
     status: "received",
     media: attachments.map((item) => ({ type: item.content_type })),
     occurredAt: event.data.created_at || event.created_at,
+    mailboxAddress: event.data.to?.[0] || email.to?.[0] || null,
+    messageId,
+    inReplyTo,
   });
+  if (counterpartyEmail) {
+    await sql`
+      insert into public.aura_communication_links (communication_id, entity_type, entity_id, entity_label, link_source, confidence)
+      select ${communicationId}::uuid, 'client', profile.id::text,
+        coalesce(nullif(profile.full_name, ''), nullif(profile.company_name, ''), profile.email, 'Client'), 'automatic', 1
+      from public.profiles as profile
+      where profile.role = 'client' and lower(profile.email) = lower(${counterpartyEmail})
+      on conflict (communication_id, entity_type, entity_id) do nothing
+    `;
+    await sql`
+      insert into public.aura_communication_links (communication_id, entity_type, entity_id, entity_label, link_source, confidence)
+      select ${communicationId}::uuid, 'supplier', supplier ->> 'id', coalesce(supplier ->> 'name', ${counterpartyEmail}), 'automatic', 1
+      from public.workflow_manager_settings as setting,
+        lateral jsonb_array_elements(coalesce(setting.state #> '{qualificationSettings,suppliers}', '[]'::jsonb)) as supplier
+      where setting.id = 'singleton'
+        and lower(coalesce(supplier ->> 'email', '')) = lower(${counterpartyEmail})
+        and coalesce(supplier ->> 'id', '') <> ''
+      on conflict (communication_id, entity_type, entity_id) do nothing
+    `;
+  }
+  const requestPrefix = event.data.subject?.match(/\[AVB-([0-9A-F]{8})\]/i)?.[1]?.toLowerCase();
+  if (requestPrefix) await sql`
+    insert into public.aura_communication_links (communication_id, entity_type, entity_id, entity_label, link_source, confidence)
+    select ${communicationId}::uuid, 'material_request', request.id::text, request.title, 'automatic', 1
+    from public.quote_requests as request
+    where left(lower(request.id::text), 8) = ${requestPrefix}
+    on conflict (communication_id, entity_type, entity_id) do nothing
+  `;
   return json({ ok: true });
 }
 
@@ -286,22 +322,27 @@ async function storeCommunication(input: {
   nextSteps?: string[];
   durationSeconds?: number | null;
   occurredAt?: string | null;
+  mailboxAddress?: string | null;
+  messageId?: string | null;
+  inReplyTo?: string | null;
 }) {
   const now = input.occurredAt && !Number.isNaN(Date.parse(input.occurredAt))
     ? new Date(input.occurredAt).toISOString()
     : new Date().toISOString();
   const linkedContact = await contactId(input.counterpartyPhone || null, input.counterpartyEmail || null);
-  await sql`
+  const rows = await sql<{ id: string }[]>`
     insert into public.aura_communications (
       provider, channel, external_activity_id, contact_id, direction,
       counterparty_phone, counterparty_email, business_phone, subject, body, summary, transcript,
-      next_steps, status, media, duration_seconds, occurred_at, last_event_at
+      next_steps, status, media, duration_seconds, occurred_at, last_event_at,
+      mailbox_address, message_id, in_reply_to
     ) values (
       ${input.provider}, ${input.channel}, ${input.externalId}, ${linkedContact}, ${input.direction},
       ${input.counterpartyPhone || null}, ${input.counterpartyEmail || null}, ${input.businessPhone || null},
       ${input.subject || null}, ${input.body}, ${input.summary || null}, ${input.transcript || null},
       ${sql.json(input.nextSteps || [])}, ${input.status},
-      ${sql.json(input.media || [])}, ${input.durationSeconds ?? null}, ${now}, ${now}
+      ${sql.json(input.media || [])}, ${input.durationSeconds ?? null}, ${now}, ${now},
+      ${input.mailboxAddress || null}, ${input.messageId || null}, ${input.inReplyTo || null}
     )
     on conflict (provider, external_activity_id) do update set
       status = excluded.status,
@@ -313,7 +354,9 @@ async function storeCommunication(input: {
       duration_seconds = coalesce(excluded.duration_seconds, public.aura_communications.duration_seconds),
       last_event_at = excluded.last_event_at,
       updated_at = now()
+    returning id
   `;
+  return rows[0].id;
 }
 
 type TwoChatCallPayload = {
@@ -1136,7 +1179,8 @@ Deno.serve(async (req: Request) => {
       const [communications, contacts, sms, smsReceive] = await Promise.all([
         sql`
           select id, contact_id, provider, channel, direction, counterparty_phone, counterparty_email,
-            subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at
+            subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at,
+            mailbox_address, message_id, in_reply_to, read_at
           from public.aura_communications
           order by occurred_at desc
           limit 500
