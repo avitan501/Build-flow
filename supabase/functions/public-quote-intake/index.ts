@@ -413,8 +413,14 @@ Deno.serve(async (request) => {
     }
     if (profile) {
       clientId = profile.id
-      const { error } = await supabase.from("profiles").update({ ...(submittedName ? { full_name: submittedName } : {}), phone: phone || null, company_name: payload.company || null }).eq("id", clientId)
-      if (error) throw new Error("profile_update_failed")
+      const profileUpdates: Record<string, string> = {}
+      if (submittedName) profileUpdates.full_name = submittedName
+      if (phone) profileUpdates.phone = phone
+      if (payload.company) profileUpdates.company_name = payload.company
+      if (Object.keys(profileUpdates).length) {
+        const { error } = await supabase.from("profiles").update(profileUpdates).eq("id", clientId)
+        if (error) throw new Error("profile_update_failed")
+      }
     } else {
       const { data, error } = await supabase.auth.admin.createUser({
         email: accountEmail,
