@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getSessionWithProfile } from "@/lib/auth";
 import { managerCapabilities } from "@/lib/owner-identity";
+import { quoteUberDirect, UberDirectError } from "@/lib/uber-direct";
 
 export const runtime = "nodejs";
 export const preferredRegion = "iad1";
@@ -12,6 +13,7 @@ const quoteSchema = z.object({
   dropoffAddress: z.string().trim().min(8).max(300),
   weightPounds: z.number().positive().max(50),
   vehicle: z.enum(["small", "car"]),
+  scheduledPickupAt: z.string().datetime().nullable().optional(),
 });
 
 export async function POST(request: Request) {
@@ -35,18 +37,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, code: "invalid_quote", error: "Enter both complete addresses and a package weight up to 50 lb." }, { status: 400 });
     }
 
-    const { data, error } = await supabase.functions.invoke("uber-direct-quote", {
-      body: parsed.data,
-    });
-    if (error || !data?.ok || !data.quote) {
-      return NextResponse.json(
-        { ok: false, code: data?.code || "provider_error", error: data?.error || "Uber could not return a live quote right now." },
-        { status: 502, headers: { "Cache-Control": "no-store, max-age=0" } },
-      );
+    if (parsed.data.scheduledPickupAt) {
+      const scheduledTime = new Date(parsed.data.scheduledPickupAt).getTime();
+      if (scheduledTime < Date.now() + 60 * 60 * 1000 || scheduledTime > Date.now() + 30 * 24 * 60 * 60 * 1000) {
+        return NextResponse.json({ ok: false, code: "invalid_schedule", error: "Choose a scheduled pickup between 1 hour and 30 days from now." }, { status: 400 });
+      }
     }
 
-    return NextResponse.json(data, { headers: { "Cache-Control": "no-store, max-age=0" } });
-  } catch {
+    const quote = await quoteUberDirect(parsed.data);
+    return NextResponse.json(
+      { ok: true, provider: "Uber Direct", quote },
+      { headers: { "Cache-Control": "no-store, max-age=0" } },
+    );
+  } catch (error) {
+    if (error instanceof UberDirectError) {
+      return NextResponse.json(
+        { ok: false, code: error.code, error: error.message },
+        { status: error.code === "tax_form_required" ? 503 : 502, headers: { "Cache-Control": "no-store, max-age=0" } },
+      );
+    }
     return NextResponse.json({ ok: false, code: "quote_failed", error: "Uber could not return a live quote right now." }, { status: 502, headers: { "Cache-Control": "no-store, max-age=0" } });
   }
 }

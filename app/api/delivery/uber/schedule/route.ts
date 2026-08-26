@@ -5,6 +5,7 @@ import { getSessionWithProfile } from "@/lib/auth";
 import { DELIVERY_NOTES_PREFIX, DELIVERY_TASK_PREFIX, parseDeliveryRequest } from "@/lib/delivery-requests";
 import { managerCapabilities } from "@/lib/owner-identity";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createUberDirectDelivery, UberDirectError } from "@/lib/uber-direct";
 
 export const runtime = "nodejs";
 export const preferredRegion = "iad1";
@@ -57,35 +58,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Add valid pickup and jobsite contacts, US phone numbers, and an item description." }, { status: 400 });
     }
 
-    const scheduledPickupAt = deliveryRequest.scheduledPickupAt && new Date(deliveryRequest.scheduledPickupAt).getTime() > Date.now() + 10 * 60 * 1000
-      ? deliveryRequest.scheduledPickupAt
-      : null;
-    const { data, error } = await supabase.functions.invoke("uber-direct-quote", {
-      body: {
-        action: "create",
-        quoteId: deliveryRequest.providerQuote.quoteId,
-        pickupAddress: deliveryRequest.pickupAddress,
-        pickupName: deliveryRequest.pickupContactName,
-        pickupPhone,
-        dropoffAddress: deliveryRequest.jobsiteAddress,
-        dropoffName: deliveryRequest.dropoffContactName,
-        dropoffPhone,
-        itemDescription: deliveryRequest.itemDescription,
-        weightPounds: deliveryRequest.weightPounds || 20,
-        scheduledPickupAt,
-      },
-    });
-    if (error || !data?.ok || !data.delivery?.deliveryId) {
-      return NextResponse.json({ ok: false, error: data?.error || "Uber could not schedule this delivery." }, { status: 502 });
+    const scheduledTime = deliveryRequest.scheduledPickupAt ? new Date(deliveryRequest.scheduledPickupAt).getTime() : null;
+    if (scheduledTime !== null && (
+      !Number.isFinite(scheduledTime) ||
+      scheduledTime < Date.now() + 60 * 60 * 1000 ||
+      scheduledTime > Date.now() + 30 * 24 * 60 * 60 * 1000
+    )) {
+      return NextResponse.json({ ok: false, error: "Choose a scheduled pickup between 1 hour and 30 days from now, then get a new live quote." }, { status: 400 });
     }
+    const scheduledPickupAt = scheduledTime === null ? null : deliveryRequest.scheduledPickupAt || null;
+    const delivery = await createUberDirectDelivery({
+      quoteId: deliveryRequest.providerQuote.quoteId,
+      pickupAddress: deliveryRequest.pickupAddress,
+      pickupName: deliveryRequest.pickupContactName,
+      pickupPhone,
+      dropoffAddress: deliveryRequest.jobsiteAddress,
+      dropoffName: deliveryRequest.dropoffContactName,
+      dropoffPhone,
+      itemDescription: deliveryRequest.itemDescription,
+      weightPounds: deliveryRequest.weightPounds || 20,
+      scheduledPickupAt,
+    });
 
     const providerDelivery = {
       provider: "Uber Direct" as const,
-      deliveryId: String(data.delivery.deliveryId),
-      trackingUrl: typeof data.delivery.trackingUrl === "string" ? data.delivery.trackingUrl : null,
-      status: typeof data.delivery.status === "string" ? data.delivery.status : "pending",
-      fee: Number.isFinite(data.delivery.fee) ? Number(data.delivery.fee) : null,
-      currency: typeof data.delivery.currency === "string" ? data.delivery.currency : deliveryRequest.providerQuote.currency,
+      deliveryId: delivery.deliveryId,
+      trackingUrl: delivery.trackingUrl,
+      status: delivery.status,
+      fee: delivery.fee,
+      currency: delivery.currency || deliveryRequest.providerQuote.currency,
       createdAt: new Date().toISOString(),
     };
     const { error: updateError } = await admin.from("aura_tasks").update({
@@ -95,7 +96,10 @@ export async function POST(request: Request) {
     if (updateError) return NextResponse.json({ ok: false, error: "Uber accepted the delivery, but Avantia could not save its tracking record. Contact the owner immediately." }, { status: 500 });
 
     return NextResponse.json({ ok: true, delivery: providerDelivery }, { headers: { "Cache-Control": "no-store, max-age=0" } });
-  } catch {
+  } catch (error) {
+    if (error instanceof UberDirectError) {
+      return NextResponse.json({ ok: false, code: error.code, error: error.message }, { status: 502 });
+    }
     return NextResponse.json({ ok: false, error: "Uber could not schedule this delivery." }, { status: 502 });
   }
 }

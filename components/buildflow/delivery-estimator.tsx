@@ -106,10 +106,10 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
   const jobsiteInvalid = jobsiteCoordinates.length > 0 && !destination
   const parsedWeight = Number(weightPounds)
   const uberPackageEligible = (vehicle === "small" || vehicle === "car") && Number.isFinite(parsedWeight) && parsedWeight > 0 && parsedWeight <= 50
-  const readyForLiveQuote = pickupAddress.trim().length >= 8 && jobsiteAddress.trim().length >= 8 && uberPackageEligible
   const scheduledPickupMs = scheduledPickupLocal ? new Date(scheduledPickupLocal).getTime() : Number.NaN
-  const timingReady = deliveryTiming === "asap" || (Number.isFinite(scheduledPickupMs) && scheduledPickupMs > Date.now() + 10 * 60 * 1000)
-  const readyToSave = Boolean(storeName.trim() && estimate && timingReady)
+  const timingReady = deliveryTiming === "asap" || (Number.isFinite(scheduledPickupMs) && scheduledPickupMs > Date.now() + 60 * 60 * 1000 && scheduledPickupMs < Date.now() + 30 * 24 * 60 * 60 * 1000)
+  const readyForLiveQuote = pickupAddress.trim().length >= 8 && jobsiteAddress.trim().length >= 8 && uberPackageEligible && timingReady
+  const readyToSave = Boolean(storeName.trim() && pickupAddress.trim() && jobsiteAddress.trim() && (estimate || liveQuote) && timingReady)
   const draftFingerprint = JSON.stringify([storeName, pickupAddress, pickupCoordinates, jobsiteName, jobsiteAddress, jobsiteCoordinates, pickupContactName, pickupPhone, dropoffContactName, dropoffPhone, itemDescription, weightPounds, vehicle, speed, deliveryTiming, scheduledPickupLocal, liveQuote?.quoteId || ""])
   const storeSuggestions = useMemo(() => Array.from(new Set(deliveryHistory.map((item) => item.storeName).filter(Boolean))), [deliveryHistory])
   const pickupAddressSuggestions = useMemo(() => Array.from(new Set(deliveryHistory.map((item) => item.pickupAddress).filter(Boolean))), [deliveryHistory])
@@ -148,6 +148,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
           dropoffAddress: jobsiteAddress.trim(),
           weightPounds: parsedWeight,
           vehicle,
+          scheduledPickupAt: deliveryTiming === "later" ? new Date(scheduledPickupLocal).toISOString() : null,
         }),
       })
       const payload = await response.json() as { ok?: boolean; error?: string; code?: string; quote?: LiveUberQuote }
@@ -184,7 +185,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
   }
 
   function saveRequest() {
-    if (!readyToSave || !estimate) return
+    if (!readyToSave || (!estimate && !liveQuote)) return
 
     const scheduledPickupAt = deliveryTiming === "later" && scheduledPickupLocal
       ? new Date(scheduledPickupLocal).toISOString()
@@ -242,9 +243,9 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
         vehicle,
         speed,
         estimate: {
-          estimatedRoadMiles: estimate.estimatedRoadMiles,
-          total: liveQuote?.total ?? estimate.total,
-          serviceFee: liveQuote ? 0 : estimate.serviceFee,
+          estimatedRoadMiles: estimate?.estimatedRoadMiles || 0,
+          total: liveQuote?.total ?? estimate?.total ?? 0,
+          serviceFee: liveQuote ? 0 : estimate?.serviceFee || 0,
         },
         providerQuote: request.providerQuote,
       })
@@ -395,10 +396,10 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
                   <label className="grid gap-1.5 text-xs font-semibold text-slate-700 sm:col-span-2">What is being delivered?<input value={itemDescription} onChange={(event) => setItemDescription(event.target.value)} placeholder="Example: two boxes of electrical fittings" className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal" /></label>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-white p-1 ring-1 ring-slate-200">
-                  <button type="button" onClick={() => setDeliveryTiming("asap")} aria-pressed={deliveryTiming === "asap"} className={`min-h-10 rounded-lg text-xs font-semibold ${deliveryTiming === "asap" ? "bg-[#10233f] text-white" : "text-slate-600"}`}>As soon as possible</button>
-                  <button type="button" onClick={() => setDeliveryTiming("later")} aria-pressed={deliveryTiming === "later"} className={`min-h-10 rounded-lg text-xs font-semibold ${deliveryTiming === "later" ? "bg-[#10233f] text-white" : "text-slate-600"}`}>Schedule for later</button>
+                  <button type="button" onClick={() => { setDeliveryTiming("asap"); resetLiveQuote() }} aria-pressed={deliveryTiming === "asap"} className={`min-h-10 rounded-lg text-xs font-semibold ${deliveryTiming === "asap" ? "bg-[#10233f] text-white" : "text-slate-600"}`}>As soon as possible</button>
+                  <button type="button" onClick={() => { setDeliveryTiming("later"); resetLiveQuote() }} aria-pressed={deliveryTiming === "later"} className={`min-h-10 rounded-lg text-xs font-semibold ${deliveryTiming === "later" ? "bg-[#10233f] text-white" : "text-slate-600"}`}>Schedule for later</button>
                 </div>
-                {deliveryTiming === "later" ? <label className="mt-3 grid gap-1.5 text-xs font-semibold text-slate-700">Requested pickup time<input type="datetime-local" value={scheduledPickupLocal} onChange={(event) => setScheduledPickupLocal(event.target.value)} aria-invalid={!timingReady} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal" /><span className={timingReady ? "font-normal text-slate-500" : "font-normal text-rose-600"}>Choose a time at least 10 minutes from now.</span></label> : null}
+                {deliveryTiming === "later" ? <label className="mt-3 grid gap-1.5 text-xs font-semibold text-slate-700">Requested pickup time<input type="datetime-local" value={scheduledPickupLocal} onChange={(event) => { setScheduledPickupLocal(event.target.value); resetLiveQuote() }} aria-invalid={!timingReady} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal" /><span className={timingReady ? "font-normal text-slate-500" : "font-normal text-rose-600"}>Choose a time between 1 hour and 30 days from now.</span></label> : null}
               </div>
               <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -466,7 +467,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
                   <p className="text-4xl font-semibold tracking-[-0.05em] text-amber-300">{currency.format(liveQuote?.total ?? estimate?.total ?? 0)}</p>
                 </div>
 
-                {estimate ? <><label className="grid gap-1.5 text-xs font-semibold text-slate-300">
+                {estimate || liveQuote ? <><label className="grid gap-1.5 text-xs font-semibold text-slate-300">
                   Store pickup / order number <span className="font-normal text-slate-500">(optional)</span>
                   <input value={orderNumber} onChange={(event) => setOrderNumber(event.target.value)} placeholder="Order # or pickup code" className="min-h-12 rounded-2xl border border-white/12 bg-white/8 px-4 text-base font-normal text-white outline-none placeholder:text-slate-500 focus:border-amber-300 focus:ring-4 focus:ring-amber-300/10" />
                 </label>

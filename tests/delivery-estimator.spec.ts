@@ -19,7 +19,7 @@ test("delivery planning math remains deterministic and itemized", () => {
 })
 
 test("jobsite delivery is Manager-only and wired into AI Tools", async () => {
-  const [header, shopNavigation, aiTools, managerDashboard, page, actions, estimator, quoteApi, scheduleApi, quoteFunction] = await Promise.all([
+  const [header, shopNavigation, aiTools, managerDashboard, page, actions, estimator, quoteApi, scheduleApi, uberDirect, quoteFunction] = await Promise.all([
     readFile(path.join(root, "components/buildflow/mobile-client-header.tsx"), "utf8"),
     readFile(path.join(root, "lib/shop-navigation.ts"), "utf8"),
     readFile(path.join(root, "app/admin/ai-tools/page.tsx"), "utf8"),
@@ -29,6 +29,7 @@ test("jobsite delivery is Manager-only and wired into AI Tools", async () => {
     readFile(path.join(root, "components/buildflow/delivery-estimator.tsx"), "utf8"),
     readFile(path.join(root, "app/api/delivery/uber/quote/route.ts"), "utf8"),
     readFile(path.join(root, "app/api/delivery/uber/schedule/route.ts"), "utf8"),
+    readFile(path.join(root, "lib/uber-direct.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/uber-direct-quote/index.ts"), "utf8"),
   ])
   expect(header).not.toContain('href: "/delivery"')
@@ -49,11 +50,14 @@ test("jobsite delivery is Manager-only and wired into AI Tools", async () => {
   expect(quoteApi).toContain("access.aiTools")
   expect(scheduleApi).toContain("managerCapabilities")
   expect(scheduleApi).toContain('confirmed: z.literal(true)')
-  expect(scheduleApi).toContain('action: "create"')
+  expect(scheduleApi).toContain("createUberDirectDelivery")
   expect(scheduleApi).toContain("already has an Uber delivery")
+  expect(quoteApi).toContain("quoteUberDirect")
+  expect(uberDirect).toContain('get_uber_direct_credentials')
+  expect(uberDirect).toContain('/delivery_quotes`')
+  expect(uberDirect).toContain('/deliveries`')
   expect(quoteFunction).toContain("managerAuthorized")
   expect(quoteFunction).toContain('code: "manager_access_required"')
-  expect(quoteFunction).toContain('`https://api.uber.com/v1/customers/${encodeURIComponent(credentials.customer_id)}/deliveries`')
 })
 
 test("legacy public delivery URL forwards into the protected Manager tool", async ({ page }) => {
