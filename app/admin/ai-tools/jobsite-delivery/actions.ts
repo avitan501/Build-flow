@@ -10,11 +10,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const requestSchema = z.object({
   storeName: z.string().trim().min(2).max(160),
   orderNumber: z.string().trim().max(160),
-  pickupAddress: z.string().trim().max(300),
-  pickupCoordinates: z.string().trim().min(3).max(100),
+  pickupAddress: z.string().trim().min(8).max(300),
+  pickupCoordinates: z.string().trim().max(100),
   jobsiteName: z.string().trim().max(160),
-  jobsiteAddress: z.string().trim().max(300),
-  jobsiteCoordinates: z.string().trim().min(3).max(100),
+  jobsiteAddress: z.string().trim().min(8).max(300),
+  jobsiteCoordinates: z.string().trim().max(100),
   pickupContactName: z.string().trim().max(160),
   pickupPhone: z.string().trim().max(40),
   dropoffContactName: z.string().trim().max(160),
@@ -44,7 +44,7 @@ export type DeliveryRequestInput = z.infer<typeof requestSchema>;
 
 export async function saveDeliveryRequestAction(input: DeliveryRequestInput) {
   const parsed = requestSchema.safeParse(input);
-  if (!parsed.success) return { ok: false as const, error: "Please complete the store and both route coordinates." };
+  if (!parsed.success) return { ok: false as const, error: "Please complete the store, both addresses, and package details." };
 
   const { user, profile, access } = await requireManagerPortalProfile();
   if (!access.aiTools) return { ok: false as const, error: "AI Tools access is required." };

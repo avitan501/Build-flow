@@ -39,6 +39,8 @@ test("jobsite delivery is Manager-only and wired into AI Tools", async () => {
   expect(page).toContain("requireManagerPortalProfile")
   expect(actions).toContain("requireManagerPortalProfile")
   expect(actions).toContain('status: z.enum(["new", "quoted", "dispatched", "completed", "cancelled"])')
+  expect(actions).toContain('pickupCoordinates: z.string().trim().max(100)')
+  expect(actions).toContain('jobsiteCoordinates: z.string().trim().max(100)')
   expect(estimator).toContain('fetch("/api/delivery/uber/quote"')
   expect(estimator).toContain("Saved to the Manager delivery queue.")
   expect(estimator).toContain('autoComplete="street-address"')
