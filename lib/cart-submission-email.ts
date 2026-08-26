@@ -877,7 +877,8 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
 
   const to = DEFAULT_TO
   const from = DEFAULT_FROM
-  const fullName = `${input.firstName} ${input.lastName}`.trim()
+  const fullName = `${input.firstName} ${input.lastName}`.trim() || input.company || input.email.split("@")[0] || input.phone || "Client"
+  const greetingName = input.firstName || "there"
   const address = [input.street, input.city, input.state, input.zip].filter(Boolean).join(", ")
   const departmentText = input.departments.join(", ") || "Not specified"
   const beatQuote = input.requestKind === "beat_quote"
@@ -950,7 +951,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
   })
 
   const clientText = [
-    `Hi ${input.firstName},`,
+    `Hi ${greetingName},`,
     "",
     beatQuote ? "We received the store quote you want us to beat." : "We received your Avantia Build quote request.",
     `Reference: ${input.referenceId}`,
@@ -977,7 +978,7 @@ export async function sendQuoteIntakeEmail(input: QuoteIntakeEmailInput) {
         html: renderCustomerEmailShell(`
           <p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p>
           <h1 style="margin:0;font-size:25px;line-height:1.25;color:#071126">Your request is in.</h1>
-          <p style="margin:12px 0;color:#475569">Hi ${escapeHtml(input.firstName)}, we will review your details and contact you within 24 hours.</p>
+          <p style="margin:12px 0;color:#475569">Hi ${escapeHtml(greetingName)}, we will review your details and contact you within 24 hours.</p>
           <div style="margin:20px 0;padding:15px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc">
             <strong>Reference:</strong> ${escapeHtml(input.referenceId)}
             ${input.projectName ? `<br /><strong>Project:</strong> ${escapeHtml(input.projectName)}` : ""}

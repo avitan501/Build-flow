@@ -18,7 +18,7 @@ test("preferred reply methods persist in normal and fallback request storage", a
   expect(fallback).toContain("contact_methods: contactMethods.length")
 })
 
-test("public requests require email or phone instead of requiring both", async () => {
+test("public requests accept one name and require both contacts only when name is omitted", async () => {
   const [form, action, emailDelivery, fallback] = await Promise.all([
     readFile(path.join(root, "components/buildflow/quote-request-form.tsx"), "utf8"),
     readFile(path.join(root, "app/request-quote/actions.ts"), "utf8"),
@@ -28,11 +28,13 @@ test("public requests require email or phone instead of requiring both", async (
 
   expect(form).not.toContain('name="email" required')
   expect(form).not.toContain('name="phone" required')
-  expect(form).toContain("Email or phone — enter at least one.")
-  expect(action).toContain("if (!email && !phone)")
+  expect(form).toContain("Use one name and email or phone. With no name, enter both.")
+  expect(form).not.toContain('name="fullName" required')
+  expect(action).toContain("if (!fullNameInput && (!email || !phone))")
+  expect(action).not.toContain("including first and last name")
   expect(action).toContain("phoneLoginEmailForPhone")
   expect(emailDelivery).toContain("sendClient: Boolean(input.email)")
-  expect(fallback).toContain("Boolean(email || phone)")
+  expect(fallback).toContain("name ? Boolean(email || phone) : Boolean(email && phone)")
   expect(fallback).toContain("phone-login.buildflow.local")
 })
 
@@ -44,12 +46,13 @@ test("quote request is a compact contact and material workflow", async ({ page }
   await expect(page.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/")
   await expect(page.getByTestId("quote-request-form")).toBeVisible()
   await expect(page.getByText("BLDR", { exact: false })).toHaveCount(0)
-  await expect(page.getByLabel("Full name")).toBeVisible()
+  await expect(page.getByLabel("Name", { exact: true })).toBeVisible()
+  await expect(page.getByLabel("Name", { exact: true })).toHaveAttribute("placeholder", "Name (optional)")
   await expect(page.getByLabel("First name")).toHaveCount(0)
   await expect(page.getByLabel("Last name")).toHaveCount(0)
   await expect(page.getByRole("textbox", { name: "Email", exact: true })).not.toHaveAttribute("required", "")
   await expect(page.getByLabel("Phone", { exact: true })).not.toHaveAttribute("required", "")
-  await expect(page.getByText("Email or phone — enter at least one.")).toBeVisible()
+  await expect(page.getByText("Use one name and email or phone. With no name, enter both.")).toBeVisible()
   await expect(page.getByLabel("Company", { exact: true })).toHaveAttribute("placeholder", "Company (optional)")
   await expect(page.getByLabel(/Project name/)).toHaveCount(0)
   await expect(page.getByText(/I am a/)).toHaveCount(0)
@@ -135,7 +138,7 @@ test("beat a quote is a dedicated upload request", async ({ page }) => {
 
 test("plan over the storage limit stays on the form and shows a useful error", async ({ page }) => {
   await page.goto("/request-quote")
-  await page.getByLabel("Full name").fill("Large Plan Test Client")
+  await page.getByLabel("Name", { exact: true }).fill("Large Plan Test Client")
   await page.getByRole("textbox", { name: "Email" }).fill("client@example.com")
   await page.getByLabel("What do you need?").fill("Please quote the attached construction plan.")
   await page.getByLabel(/Attach a plan or material list/).setInputFiles({
@@ -152,4 +155,27 @@ test("plan over the storage limit stays on the form and shows a useful error", a
 
   await form.locator('button[aria-label="Remove file"]').click()
   await expect(form.getByRole("alert")).toHaveCount(0)
+})
+
+test("missing contact details stay inline without clearing the request", async ({ page }) => {
+  await page.goto("/request-quote")
+  await page.getByRole("textbox", { name: "Email", exact: true }).fill("client@example.com")
+  await page.getByLabel("What do you need?").fill("Please price 20 sheets of drywall.")
+  await page.getByRole("button", { name: "Send request" }).click()
+
+  await expect(page).toHaveURL(/\/request-quote$/)
+  await expect(page.getByTestId("quote-request-form").getByText("Enter a name, or enter both email and phone.", { exact: true })).toBeVisible()
+  await expect(page.getByRole("textbox", { name: "Email", exact: true })).toHaveValue("client@example.com")
+  await expect(page.getByLabel("What do you need?")).toHaveValue("Please price 20 sheets of drywall.")
+})
+
+test("one-word name is accepted by validation and missing contact stays inline", async ({ page }) => {
+  await page.goto("/request-quote")
+  await page.getByLabel("Name", { exact: true }).fill("Carlos")
+  await page.getByLabel("What do you need?").fill("Please price framing lumber.")
+  await page.getByRole("button", { name: "Send request" }).click()
+
+  await expect(page.getByTestId("quote-request-form").getByText("Enter an email address or phone number.", { exact: true })).toBeVisible()
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Carlos")
+  await expect(page.getByLabel("What do you need?")).toHaveValue("Please price framing lumber.")
 })

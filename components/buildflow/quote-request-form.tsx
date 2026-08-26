@@ -24,6 +24,7 @@ export function QuoteRequestForm({ mode = "request", defaultDepartment, defaultM
   const [state, formAction, pending] = useActionState(submitQuoteRequestFormAction, initialState)
   const [uploadPending, startUploadTransition] = useTransition()
   const [fileError, setFileError] = useState("")
+  const [formError, setFormError] = useState("")
   const [uploading, setUploading] = useState(false)
   const [selectedFileName, setSelectedFileName] = useState("")
   const attachmentRef = useRef<HTMLInputElement>(null)
@@ -67,6 +68,41 @@ export function QuoteRequestForm({ mode = "request", defaultDepartment, defaultM
     setFileError("")
   }
 
+  function validateRequest(file: File | undefined, submission: FormData) {
+    const name = String(submission.get("fullName") || "").trim()
+    const email = String(submission.get("email") || "").trim()
+    const phone = String(submission.get("phone") || "").trim()
+    const details = String(submission.get("details") || "")
+
+    if (!name && (!email || !phone)) {
+      setFormError("Enter a name, or enter both email and phone.")
+      return false
+    }
+    if (name && !email && !phone) {
+      setFormError("Enter an email address or phone number.")
+      return false
+    }
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+      setFormError("Enter a valid email address.")
+      return false
+    }
+    if (phone && phone.replace(/\D/g, "").length < 7) {
+      setFormError("Enter a valid phone number.")
+      return false
+    }
+    if (beatQuote && !file) {
+      setFormError("Attach the store quote you want us to beat.")
+      return false
+    }
+    if (!beatQuote && details.trim().length < 3 && !file) {
+      setFormError("Tell us what you need or attach a plan or material list.")
+      return false
+    }
+
+    setFormError("")
+    return true
+  }
+
   if (state.status === "success") {
     return <section className="border-y border-emerald-200 bg-emerald-50 px-5 py-9 text-center sm:rounded-lg sm:border" role="status">
       <CheckCircle2 className="mx-auto h-9 w-9 text-emerald-700" />
@@ -82,6 +118,11 @@ export function QuoteRequestForm({ mode = "request", defaultDepartment, defaultM
     action={formAction}
     onSubmit={(event) => {
       const file = attachmentRef.current?.files?.[0]
+      const submission = new FormData(event.currentTarget)
+      if (!validateRequest(file, submission)) {
+        event.preventDefault()
+        return
+      }
       if (!validateAttachment(file)) {
         event.preventDefault()
         return
@@ -89,7 +130,6 @@ export function QuoteRequestForm({ mode = "request", defaultDepartment, defaultM
       if (!file || file.size <= directAttachmentSize) return
 
       event.preventDefault()
-      const submission = new FormData(event.currentTarget)
       submission.delete("attachment")
       setFileError("")
       setUploading(true)
@@ -115,11 +155,11 @@ export function QuoteRequestForm({ mode = "request", defaultDepartment, defaultM
     {defaultDepartment ? <input type="hidden" name="departments" value={defaultDepartment} /> : null}
 
     <div className="grid grid-cols-2 gap-2">
-      <label><span className="sr-only">Full name</span><input aria-label="Full name" name="fullName" required autoComplete="name" placeholder="Full name" className={inputClass} /></label>
+      <label><span className="sr-only">Name</span><input aria-label="Name" name="fullName" onChange={() => setFormError("")} autoComplete="name" placeholder="Name (optional)" className={inputClass} /></label>
       <label><span className="sr-only">Company</span><input aria-label="Company" name="company" autoComplete="organization" placeholder="Company (optional)" className={inputClass} /></label>
-      <label><span className="sr-only">Email</span><input aria-label="Email" name="email" type="email" autoComplete="email" placeholder="Email" className={inputClass} /></label>
-      <label><span className="sr-only">Phone</span><input aria-label="Phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="Phone" className={inputClass} /></label>
-      <p className="col-span-2 text-xs font-medium text-slate-500">Email or phone — enter at least one.</p>
+      <label><span className="sr-only">Email</span><input aria-label="Email" name="email" type="email" onChange={() => setFormError("")} autoComplete="email" placeholder="Email" className={inputClass} /></label>
+      <label><span className="sr-only">Phone</span><input aria-label="Phone" name="phone" type="tel" onChange={() => setFormError("")} inputMode="tel" autoComplete="tel" placeholder="Phone" className={inputClass} /></label>
+      <p className="col-span-2 text-xs font-medium text-slate-500">Use one name and email or phone. With no name, enter both.</p>
     </div>
 
     <label className="mt-4 block">
@@ -143,6 +183,7 @@ export function QuoteRequestForm({ mode = "request", defaultDepartment, defaultM
     </fieldset>
 
     {fileError ? <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800" role="alert"><p>{fileError}</p><button type="button" onClick={removeAttachment} className="mt-2 min-h-9 rounded-md border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-800">Remove file</button></div> : null}
+    {formError ? <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800" role="alert">{formError}</p> : null}
     {uploading ? <p className="mt-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-900" role="status">Uploading...</p> : null}
     {state.status === "error" ? <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800" role="alert">{state.message}</p> : null}
 

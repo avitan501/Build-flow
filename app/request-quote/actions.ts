@@ -84,11 +84,11 @@ async function saveWithSupabaseFunction(payload: QuoteIntakePayload) {
 
 async function findClientByContact(supabase: ReturnType<typeof createAdminClient>, email: string, phone: string) {
   if (email) {
-    const { data } = await supabase.from("profiles").select("id,email").ilike("email", email).limit(1).maybeSingle<{ id: string; email: string }>()
+    const { data } = await supabase.from("profiles").select("id,email,full_name").ilike("email", email).limit(1).maybeSingle<{ id: string; email: string; full_name: string | null }>()
     if (data) return data
   }
   if (phone) {
-    const { data } = await supabase.from("profiles").select("id,email").eq("phone", phone).limit(1).maybeSingle<{ id: string; email: string }>()
+    const { data } = await supabase.from("profiles").select("id,email,full_name").eq("phone", phone).limit(1).maybeSingle<{ id: string; email: string; full_name: string | null }>()
     if (data) return data
   }
   return null
@@ -133,8 +133,8 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
   const allowedContactMethods = new Set(["WhatsApp", "Text", "Call", "Email"])
   const contactMethods = formData.getAll("contactMethods").map((value) => String(value).trim()).filter((value) => allowedContactMethods.has(value)).slice(0, 4)
 
-  if (!firstName || !lastName) return error("Enter your full name, including first and last name.")
-  if (!email && !phone) return error("Enter an email address or phone number.")
+  if (!fullNameInput && (!email || !phone)) return error("Enter a name, or enter both email and phone.")
+  if (fullNameInput && !email && !phone) return error("Enter an email address or phone number.")
   if (email && !/^\S+@\S+\.\S+$/.test(email)) return error("Enter a valid email address.")
   if (phone && phone.replace(/\D/g, "").length < 7) return error("Enter a valid phone number.")
   const accountEmail = email || phoneLoginEmailForPhone(phone)
@@ -167,7 +167,7 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
   if (requestKind === "beat_quote" && !attachment) return error("Attach the store quote you want us to beat.")
 
   const referenceId = `AB-${randomUUID().slice(0, 8).toUpperCase()}`
-  const fullName = `${firstName} ${lastName}`
+  const fullName = fullNameInput || company || email.split("@")[0] || phone || "Client"
   const address = addressInput || [street, city, state, zip].filter(Boolean).join(", ")
   const intakePayload: QuoteIntakePayload = {
     requestKind,
@@ -202,11 +202,12 @@ export async function submitQuoteRequestFormAction(_previousState: QuoteRequestF
 
     if (existingClient) {
       clientId = existingClient.id
-      const { error: profileError } = await supabase.from("profiles").update({
-        full_name: fullName,
-        phone,
-        company_name: company || null,
-      }).eq("id", clientId)
+      const profileUpdates: Record<string, string> = {
+        full_name: fullNameInput || existingClient.full_name || fullName,
+      }
+      if (phone) profileUpdates.phone = phone
+      if (company) profileUpdates.company_name = company
+      const { error: profileError } = await supabase.from("profiles").update(profileUpdates).eq("id", clientId)
       if (profileError) throw new Error("profile_update_failed")
     } else {
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({

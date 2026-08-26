@@ -8,6 +8,7 @@ import { generateRequestClientQuotePdf, type RequestClientQuoteLine } from "@/li
 
 type ReplyResult = { ok: true; providerId: string | null } | { ok: false; error: string }
 type QuoteResult = { ok: true; providerId: string | null; pdfBase64?: string; fileName?: string } | { ok: false; error: string }
+type DeliveryScheduleResult = { ok: true } | { ok: false; error: string }
 
 export type RequestClientQuoteInput = {
   requestId: string
@@ -206,6 +207,45 @@ export async function sendClientReplyAction(formData: FormData): Promise<ReplyRe
   }
   if (directResult.status === "skipped") return { ok: false, error: "Email was not sent." }
   return { ok: false, error: deliveryError }
+}
+
+export async function scheduleRequestDeliveryAction(input: { requestId: string; date: string; time: string; address: string }): Promise<DeliveryScheduleResult> {
+  const requestId = String(input.requestId || "").trim()
+  const date = String(input.date || "").trim()
+  const time = String(input.time || "").trim()
+  const address = String(input.address || "").trim().slice(0, 500)
+  if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false, error: "This request could not be identified." }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00`))) return { ok: false, error: "Choose a delivery date." }
+  const [deliveryHour, deliveryMinute] = time.split(":").map(Number)
+  if (!/^\d{2}:\d{2}$/.test(time) || !Number.isInteger(deliveryHour) || deliveryHour < 0 || deliveryHour > 23 || !Number.isInteger(deliveryMinute) || deliveryMinute < 0 || deliveryMinute > 59) return { ok: false, error: "Choose a delivery time." }
+  if (!address) return { ok: false, error: "Enter the delivery address." }
+
+  const { supabase } = await requireStaffProfile("customers")
+  const { data: request } = await supabase
+    .from("quote_requests")
+    .select("id,title,owner_id,project_id")
+    .eq("id", requestId)
+    .maybeSingle<{ id: string; title: string; owner_id: string; project_id: string }>()
+  if (!request) return { ok: false, error: "Request not found." }
+
+  const { error } = await supabase.from("project_events").insert({
+    project_id: request.project_id,
+    owner_id: request.owner_id,
+    event_type: "status_changed",
+    source: "admin",
+    title: "Delivery scheduled",
+    description: `${date} at ${time} · ${address}`,
+    metadata: {
+      quote_request_id: request.id,
+      client_action: "delivery_scheduled",
+      delivery_date: date,
+      delivery_time: time,
+      delivery_address: address,
+    },
+  })
+  if (error) return { ok: false, error: "The delivery schedule could not be saved. Please try again." }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true }
 }
 
 async function prepareRequestClientQuote(input: RequestClientQuoteInput) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { ExternalLink, LoaderCircle, MapPin, Phone, Search, ShoppingCart, Sparkles, Store, UsersRound, X } from "lucide-react"
+import { ExternalLink, LoaderCircle, MapPin, Phone, Route, Search, ShoppingCart, Sparkles, Store, UsersRound, X } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 
 import type { ExaCatalogSearchResult, ProductCallResult, ProductSalesContact, ProductSearchLink } from "@/lib/exa-catalog-search"
@@ -15,7 +15,7 @@ function uniqueByDomain<T extends { domain: string }>(items: T[]) {
   return [...new Map(items.map((item) => [item.domain, item])).values()]
 }
 
-export function MaterialPriceCheck({ query, department, onClose }: { query: string; department: string; onClose: () => void }) {
+export function MaterialPriceCheck({ requestId, query, department, onClose }: { requestId: string; query: string; department: string; onClose: () => void }) {
   const [itemQuery, setItemQuery] = useState(query)
   const [zipCode, setZipCode] = useState("11516")
   const [buyNow, setBuyNow] = useState<ExaCatalogSearchResult[]>([])
@@ -76,6 +76,16 @@ export function MaterialPriceCheck({ query, department, onClose }: { query: stri
 
   const totalResults = buyNow.length + callForPrice.length + salesContacts.length
 
+  function openSupplierRouting() {
+    const routing = document.getElementById("supplier-routing") as HTMLDetailsElement | null
+    if (!routing) {
+      window.location.href = `/owner/materials/requests/${requestId}#supplier-routing`
+      return
+    }
+    routing.open = true
+    routing.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
   return <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
     <div className="border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4">
       <div className="flex items-start justify-between gap-3"><div><p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.12em] text-[#0066cc]"><Sparkles className="h-3.5 w-3.5" />Item sourcing</p><h3 className="mt-1 text-sm font-bold text-slate-950">Find this item</h3></div><button type="button" onClick={onClose} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white" aria-label="Close item search"><X className="h-4 w-4" /></button></div>
@@ -96,7 +106,7 @@ export function MaterialPriceCheck({ query, department, onClose }: { query: stri
         <section className="min-w-0" aria-labelledby="sales-contact-heading"><div className="mb-2 flex items-center gap-2"><UsersRound className="h-4 w-4 text-violet-600" /><h4 id="sales-contact-heading" className="text-xs font-bold">Sales contacts</h4><span className="ml-auto text-[10px] font-bold text-slate-400">{salesContacts.length}</span></div><div className="grid gap-2">{salesContacts.slice(0, 3).map((contact, index) => <div key={`${contact.domain}-${index}`} className="rounded-md border border-slate-200 p-2.5"><div className="flex items-start gap-2"><span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded bg-violet-50 text-[10px] font-bold text-violet-700">{index + 1}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{contact.contactName || contact.company}</p><p className="truncate text-[10px] text-slate-500">{contact.contactName ? `${contact.role} · ${contact.company}` : contact.role}</p></div></div><div className="mt-2 flex flex-wrap gap-1.5">{contact.phone ? <a href={`tel:${contact.phone}`} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-slate-300 px-2 text-[10px] font-bold"><Phone className="h-3 w-3" />Call</a> : null}{contact.email ? <a href={`mailto:${contact.email}`} className="inline-flex min-h-8 items-center rounded-md border border-slate-300 px-2 text-[10px] font-bold">Email</a> : null}<a href={contact.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1 rounded-md border border-slate-300 px-2 text-[10px] font-bold"><ExternalLink className="h-3 w-3" />Official page</a></div></div>)}</div>{!salesContacts.length ? <p className="rounded-md bg-slate-50 p-3 text-xs text-slate-500">No public sales contact found.</p> : null}</section>
       </div> : null}
 
-      <div className="mt-4 flex flex-wrap gap-2">{totalResults ? <button type="button" onClick={() => void search(true)} disabled={morePending} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-[#0071e3] bg-white px-3 text-xs font-bold text-[#0066cc] disabled:opacity-50">{morePending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}{morePending ? "Searching more..." : "Find more sources"}</button> : null}{!totalResults && links.map((link) => <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700"><Search className="h-3.5 w-3.5" />{link.label}</a>)}</div>
+      <div className="mt-4 flex flex-wrap gap-2">{totalResults ? <button type="button" onClick={() => void search(true)} disabled={morePending} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-[#0071e3] bg-white px-3 text-xs font-bold text-[#0066cc] disabled:opacity-50">{morePending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}{morePending ? "Searching more..." : "Check more suppliers"}</button> : null}<button type="button" onClick={openSupplierRouting} className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-slate-950 px-3 text-xs font-bold text-white"><Route className="h-3.5 w-3.5" />Add suppliers</button>{!totalResults && links.map((link) => <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700"><Search className="h-3.5 w-3.5" />{link.label}</a>)}</div>
     </div> : <div className="flex items-center gap-2 px-3 py-3 text-xs text-slate-500 sm:px-4"><Search className="h-3.5 w-3.5" />Change the item or ZIP, then select Find item.</div>}
   </div>
 }
