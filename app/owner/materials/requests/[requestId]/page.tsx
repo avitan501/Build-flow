@@ -1,11 +1,10 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ChevronDown, ClipboardList, Sparkles } from "lucide-react"
-
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status"
 import { OrganizeMaterialListButton } from "@/components/buildflow/organize-material-list-button"
 import { OrganizedMaterialList } from "@/components/buildflow/organized-material-list"
 import { RequestManagementPanel, type RequestComparisonSummary } from "@/components/buildflow/request-management-panel"
+import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
 import { requireStaffProfile } from "@/lib/auth"
 import { contactEmailForDisplay } from "@/lib/auth-phone"
 import { normalizeMaterialCatalogDepartment } from "@/lib/material-catalog"
@@ -42,6 +41,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
   if (requestError) throw new Error(`Could not load this material request: ${requestError.message}`)
   if (!request) notFound()
   const clientActions = (clientActionEvents ?? []).filter((event) => typeof event.metadata?.client_action === "string")
+  const clientReplyCompleted = clientActions.some((event) => ["email_reply", "estimate_sent"].includes(String(event.metadata.client_action)))
 
   const [{ data: profile }, answersResult] = await Promise.all([
     supabase.from("profiles").select("full_name,email,phone").eq("id", request.owner_id).maybeSingle<{ full_name: string | null; email: string | null; phone: string | null }>(),
@@ -87,14 +87,14 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
         </header>
         <CustomerRequestStatus requestId={request.id} status={request.status} currentStage={currentStage} updatedAt={request.updated_at} assignedTo="Carlos" />
         <div className="mt-3 grid gap-2">
-          <details open={currentStage === "received"} className="group order-2 overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 py-3"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-blue-700"><Sparkles className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block text-[10px] font-bold uppercase tracking-[.12em] text-blue-700">Step 2</span><span className="block font-bold">Organize with AI</span><span className="block truncate text-xs font-medium text-slate-500">{organizedItems.length ? `${organizedItems.length} organized item${organizedItems.length === 1 ? "" : "s"}` : "Create a clean material list"}</span></span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" /></summary>
+          <details open={currentStage === "received"} className={`order-2 ${workflowStepCardClass(organizedItems.length ? "complete" : "active")}`}>
+            <RequestWorkflowStepHeader step={2} title="Organize with AI" detail={organizedItems.length ? `${organizedItems.length} organized item${organizedItems.length === 1 ? "" : "s"}` : "Create a clean material list"} status={organizedItems.length ? "complete" : "active"} icon="organize" />
             <div className="border-t border-slate-200 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm text-slate-500">Create a structured copy without changing the original request.</p>{organizationCompletedLabel ? <p className="mt-1 text-xs font-semibold text-slate-400">Last AI review: {organizationCompletedLabel} ET</p> : null}</div>{organizationStatus !== "processing" ? <OrganizeMaterialListButton requestId={request.id} refresh={organizedItems.length > 0} /> : null}</div>
             {organizedItems.length ? <div className="mt-4 border-t border-slate-200 pt-3"><h3 className="text-sm font-bold">Confirmed material list</h3><OrganizedMaterialList requestId={request.id} items={organizedItems} /></div> : <div className={`mt-4 rounded-lg px-4 py-3 text-sm font-semibold ${organizationStatus === "failed" ? "bg-rose-50 text-rose-800" : organizationStatus === "plan_requires_takeoff" ? "bg-amber-50 text-amber-800" : "bg-sky-50 text-sky-800"}`}>{organizationStatus === "processing" ? "AI is organizing this material list." : organizationStatus === "failed" ? "Automatic organization needs another attempt." : organizationStatus === "plan_requires_takeoff" ? "This appears to be a plan and requires a takeoff before materials can be listed." : "The original request is saved. Select Organize with AI to create the material chart."}</div>}
             </div>
           </details>
-          <details open={currentStage === "received" && organizedItems.length === 0} className="group order-1 overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 py-3"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-amber-200 bg-amber-50 text-amber-700"><ClipboardList className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block text-[10px] font-bold uppercase tracking-[.12em] text-amber-700">Step 1</span><span className="block font-bold">Review client list</span><span className="block truncate text-xs font-medium text-slate-500">{originalItems.length} item{originalItems.length === 1 ? "" : "s"} · {signedFiles.length} file{signedFiles.length === 1 ? "" : "s"}</span></span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" /></summary>
+          <details open={currentStage === "received" && organizedItems.length === 0} className={`order-1 ${workflowStepCardClass("complete")}`}>
+            <RequestWorkflowStepHeader step={1} title="Review client list" detail={`${originalItems.length} item${originalItems.length === 1 ? "" : "s"} · ${signedFiles.length} file${signedFiles.length === 1 ? "" : "s"}`} status="complete" icon="review" />
             <div className="border-t border-slate-200 p-4"><p className="text-sm text-slate-500">The customer’s original notes, selections, and files remain unchanged.</p>
             <div className="mt-4 divide-y divide-slate-100">
               {originalItems.length ? originalItems.map((item) => {
@@ -112,7 +112,7 @@ export default async function OwnerMaterialRequestPage({ params }: { params: Pro
             </div>
           </details>
         </div>
-        <div className="mt-2"><RequestManagementPanel requestId={request.id} requestTitle={request.title} client={{ name: profile?.full_name || "Client", email: clientEmail, phone: profile?.phone || "" }} departments={departments} suppliers={suppliers} packages={packages ?? []} requestItems={departmentItems.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, unit: item.unit, reviewReasons: Array.isArray(item.metadata?.review_reasons) ? item.metadata.review_reasons.filter((reason): reason is string => typeof reason === "string" && Boolean(reason.trim())) : [] }))} projectAddress={request.projects?.address || ""} currentStage={currentStage} comparisons={comparisonSummaries} /></div>
+        <div className="mt-2"><RequestManagementPanel requestId={request.id} requestTitle={request.title} client={{ name: profile?.full_name || "Client", email: clientEmail, phone: profile?.phone || "" }} departments={departments} suppliers={suppliers} packages={packages ?? []} requestItems={departmentItems.map((item) => ({ id: item.id, name: item.name, quantity: item.quantity, unit: item.unit, reviewReasons: Array.isArray(item.metadata?.review_reasons) ? item.metadata.review_reasons.filter((reason): reason is string => typeof reason === "string" && Boolean(reason.trim())) : [] }))} projectAddress={request.projects?.address || ""} currentStage={currentStage} comparisons={comparisonSummaries} clientReplyCompleted={clientReplyCompleted} /></div>
         {clientActions.length ? <section className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-5"><h2 className="text-lg font-bold text-slate-950">Activity history</h2><div className="mt-3 divide-y divide-amber-200">{clientActions.map((event) => <article key={event.id} className="py-3 first:pt-0 last:pb-0"><div className="flex flex-wrap items-start justify-between gap-2"><h3 className="text-sm font-bold text-slate-900">{event.title}</h3><time className="text-xs text-slate-500">{new Date(event.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time></div>{event.description ? <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{event.description}</p> : null}</article>)}</div></section> : null}
       </div>
     </main>

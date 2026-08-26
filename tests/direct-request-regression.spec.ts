@@ -112,7 +112,7 @@ test("manager reply composer supports templates attachments email and text", asy
   expect(panel).toContain("REPLY_BLOCKS")
   expect(panel).toContain("Ask for missing details")
   expect(panel).toContain("To finish pricing, please confirm:")
-  expect(panel).toContain("Step 4")
+  expect(panel).toContain("step={4}")
   expect(panel).toContain('open={currentStage === "approval" || currentStage === "delivery"}')
   expect(panel).not.toContain("lg:grid-cols-2")
   expect(panel).toContain("Good morning")

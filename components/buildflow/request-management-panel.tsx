@@ -1,6 +1,6 @@
 "use client"
 
-import { BadgeDollarSign, CalendarClock, ChevronDown, Download, ExternalLink, FileText, Mail, MessageSquareText, Paperclip, Phone, Plus, Route, Send, Trash2, X } from "lucide-react"
+import { CalendarClock, ChevronDown, Download, ExternalLink, FileText, Mail, MessageSquareText, Paperclip, Phone, Plus, Route, Send, Trash2, X } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition } from "react"
@@ -9,6 +9,7 @@ import { createPortal } from "react-dom"
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
 import { previewRequestClientQuoteAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
+import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
 import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms"
@@ -38,6 +39,14 @@ function deliveryTimeLabel(value: string) {
   return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
 }
 
+function deliveryWindowEndTime(startTime: string, durationHours: number) {
+  if (!/^\d{2}:\d{2}$/.test(startTime) || !Number.isFinite(durationHours)) return ""
+  const [hours, minutes] = startTime.split(":").map(Number)
+  const endMinutes = hours * 60 + minutes + Math.round(durationHours * 60)
+  if (endMinutes >= 24 * 60) return ""
+  return `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`
+}
+
 export function RequestManagementPanel({
   requestId,
   requestTitle,
@@ -49,6 +58,7 @@ export function RequestManagementPanel({
   projectAddress,
   currentStage,
   comparisons,
+  clientReplyCompleted,
 }: {
   requestId: string
   requestTitle: string
@@ -60,6 +70,7 @@ export function RequestManagementPanel({
   projectAddress: string
   currentStage: ManagerPipelineStage
   comparisons: RequestComparisonSummary[]
+  clientReplyCompleted: boolean
 }) {
   const router = useRouter()
   const [supplierIds, setSupplierIds] = useState<string[]>([])
@@ -71,8 +82,10 @@ export function RequestManagementPanel({
   const [feedback, setFeedback] = useState("")
   const [feedbackError, setFeedbackError] = useState(false)
   const [deliveryDate, setDeliveryDate] = useState("")
-  const [deliveryTime, setDeliveryTime] = useState("")
+  const [deliveryWindowStart, setDeliveryWindowStart] = useState("")
+  const [deliveryWindowHours, setDeliveryWindowHours] = useState("2")
   const [deliveryAddress, setDeliveryAddress] = useState(projectAddress)
+  const [clientReplyDone, setClientReplyDone] = useState(clientReplyCompleted)
   const [quoteOpen, setQuoteOpen] = useState(false)
   const [quoteNumber, setQuoteNumber] = useState(() => `AVA-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${requestId.slice(0, 4).toUpperCase()}`)
   const [issueDate] = useState(() => new Date().toLocaleDateString("en-US"))
@@ -94,6 +107,9 @@ export function RequestManagementPanel({
 
   const firstName = client.name.trim().split(/\s+/)[0] || "there"
   const missingQuestions = useMemo(() => requestItems.flatMap((item) => item.reviewReasons.map((reason) => `${item.name}: ${reason}`)), [requestItems])
+  const deliveryWindowHoursNumber = Number(deliveryWindowHours)
+  const deliveryWindowEnd = useMemo(() => deliveryWindowEndTime(deliveryWindowStart, deliveryWindowHoursNumber), [deliveryWindowHoursNumber, deliveryWindowStart])
+  const deliveryWindowReady = Boolean(deliveryDate && deliveryWindowStart && deliveryWindowEnd && deliveryAddress.trim() && deliveryWindowHoursNumber >= 0.5 && deliveryWindowHoursNumber <= 12)
   const clientMessage = useMemo(() => {
     const greetingText = greeting === "hello" ? `Hello ${client.name || "there"},` : greeting === "morning" ? `Good morning ${firstName},` : greeting === "afternoon" ? `Good afternoon ${firstName},` : `Hi ${firstName},`
     const selectedText = REPLY_BLOCKS.filter((block) => block.id === replyBlock).flatMap((block) => {
@@ -101,13 +117,13 @@ export function RequestManagementPanel({
       if (block.id === "delivery") return [
         block.text,
         ...(deliveryDate ? [`Date: ${deliveryDateLabel(deliveryDate)}`] : []),
-        ...(deliveryTime ? [`Time: ${deliveryTimeLabel(deliveryTime)}`] : []),
+        ...(deliveryWindowStart && deliveryWindowEnd ? [`Delivery window: Between ${deliveryTimeLabel(deliveryWindowStart)} and ${deliveryTimeLabel(deliveryWindowEnd)} (${deliveryWindowHoursNumber.toLocaleString()} hour${deliveryWindowHoursNumber === 1 ? "" : "s"})`] : []),
         ...(deliveryAddress.trim() ? [`Address: ${deliveryAddress.trim()}`] : []),
       ]
       return [block.text]
     })
     return [greetingText, "", ...selectedText, ...(replyNote.trim() ? [replyNote.trim()] : []), "", `Request: ${requestTitle}`, "", "Thank you,", "Avantia Build"].join("\n")
-  }, [client.name, deliveryAddress, deliveryDate, deliveryTime, firstName, greeting, missingQuestions, replyBlock, replyNote, requestTitle])
+  }, [client.name, deliveryAddress, deliveryDate, deliveryWindowEnd, deliveryWindowHoursNumber, deliveryWindowStart, firstName, greeting, missingQuestions, replyBlock, replyNote, requestTitle])
 
   function toggleSupplier(supplierId: string) {
     setSupplierIds((current) => current.includes(supplierId) ? current.filter((id) => id !== supplierId) : [...current, supplierId])
@@ -123,7 +139,7 @@ export function RequestManagementPanel({
   function saveDeliverySchedule() {
     startTransition(async () => {
       setFeedback("")
-      const result = await scheduleRequestDeliveryAction({ requestId, date: deliveryDate, time: deliveryTime, address: deliveryAddress })
+      const result = await scheduleRequestDeliveryAction({ requestId, date: deliveryDate, startTime: deliveryWindowStart, durationHours: deliveryWindowHoursNumber, address: deliveryAddress })
       setFeedbackError(!result.ok)
       setFeedback(result.ok ? "Delivery schedule saved. The client message is ready to send." : result.error)
       if (result.ok) setReplyBlock("delivery")
@@ -140,6 +156,7 @@ export function RequestManagementPanel({
       const result = await sendClientReplyAction(formData)
       setFeedbackError(!result.ok)
       setFeedback(result.ok ? `Email sent directly to ${client.email}.` : result.error)
+      if (result.ok) setClientReplyDone(true)
     })
   }
 
@@ -150,6 +167,7 @@ export function RequestManagementPanel({
         const result = await sendAuraMessageAction({ channel: "sms", recipient: client.phone, message: clientMessage })
         setFeedbackError(!result.ok)
         setFeedback(result.ok ? `Text sent directly to ${client.phone} from Q U O.` : result.error)
+        if (result.ok) setClientReplyDone(true)
         return
       }
       const formData = new FormData()
@@ -245,18 +263,22 @@ export function RequestManagementPanel({
     startTransition(async () => {
       const result = await sendRequestClientQuoteAction(quoteInput())
       setQuoteFeedback(result.ok ? `Estimate emailed to ${client.email}.` : result.error)
-      if (result.ok) setFeedback(`Estimate ${quoteNumber} emailed to ${client.email}.`)
+      if (result.ok) {
+        setFeedback(`Estimate ${quoteNumber} emailed to ${client.email}.`)
+        setClientReplyDone(true)
+      }
     })
   }
 
+  const supplierQuoteCount = comparisons.reduce((total, comparison) => total + comparison.bids.length, 0)
+  const pricingComplete = supplierQuoteCount > 0
+  const pricingStatus = pricingComplete ? "complete" : currentStage === "pricing" ? "active" : "upcoming"
+  const replyStatus = clientReplyDone ? "complete" : currentStage === "approval" || currentStage === "delivery" || pricingComplete ? "active" : "upcoming"
+
   return (
     <div className="grid gap-2">
-      <details open={currentStage === "pricing"} className="group overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 py-3">
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-sky-200 bg-sky-50 text-sky-700"><BadgeDollarSign className="h-5 w-5" /></span>
-          <span className="min-w-0 flex-1"><span className="block text-[10px] font-bold uppercase tracking-[.12em] text-sky-700">Step 3</span><span className="block font-bold">Get supplier pricing</span><span className="block truncate text-xs font-medium text-slate-500">{comparisons.some((comparison) => comparison.bids.length) ? `${comparisons.reduce((total, comparison) => total + comparison.bids.length, 0)} supplier quote${comparisons.reduce((total, comparison) => total + comparison.bids.length, 0) === 1 ? "" : "s"} received` : packages.length ? `${packages.length} supplier request${packages.length === 1 ? "" : "s"} sent` : "No supplier prices received yet"}</span></span>
-          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" />
-        </summary>
+      <details open={currentStage === "pricing"} className={workflowStepCardClass(pricingStatus)}>
+        <RequestWorkflowStepHeader step={3} title="Get supplier pricing" detail={pricingComplete ? `${supplierQuoteCount} supplier quote${supplierQuoteCount === 1 ? "" : "s"} received` : packages.length ? `${packages.length} supplier request${packages.length === 1 ? "" : "s"} sent` : "No supplier prices received yet"} status={pricingStatus} icon="pricing" />
         <div className="border-t border-slate-200 p-4">
           {comparisons.length ? <div className="mb-3 grid gap-2">{comparisons.map((comparison) => <article key={comparison.id} className="rounded-md border border-slate-200 bg-slate-50 p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-bold">{comparison.title}</h3><p className="mt-0.5 text-xs text-slate-500">{comparison.bids.length ? `${comparison.bids.length} supplier response${comparison.bids.length === 1 ? "" : "s"}` : "Waiting for supplier response"}</p></div><Link href={`/admin/quote-comparison/${comparison.id}`} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-[#0066cc]">Compare <ExternalLink className="h-3.5 w-3.5" /></Link></div>{comparison.bids.length ? <div className="mt-2 divide-y divide-slate-200 border-t border-slate-200">{comparison.bids.map((bid) => <div key={bid.id} className="flex items-center justify-between gap-3 py-2 text-xs"><span className="min-w-0 truncate font-semibold">{bid.supplierName}{bid.recommended ? " · Best match" : ""}</span><span className="shrink-0 text-right"><strong className="block text-sm tabular-nums">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(bid.landedTotal)}</strong><span className="text-slate-500">{bid.pricedItemCount}/{bid.itemCount} items</span></span></div>)}</div> : null}</article>)}</div> : <p className="mb-3 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">Supplier answers and prices will appear here after a quote is linked to this request.</p>}
 
@@ -278,19 +300,26 @@ export function RequestManagementPanel({
         </div>
       </details>
 
-      <details open={currentStage === "approval" || currentStage === "delivery"} className="group overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 py-3"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-violet-200 bg-violet-50 text-violet-700"><MessageSquareText className="h-5 w-5" /></span><span className="min-w-0 flex-1"><span className="block text-[10px] font-bold uppercase tracking-[.12em] text-violet-700">Step 4</span><span className="block font-bold">Reply to client</span><span className="block truncate text-xs font-medium text-slate-500">Questions, pricing, estimate, or approval</span></span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" /></summary>
+      <details open={currentStage === "approval" || currentStage === "delivery"} className={workflowStepCardClass(replyStatus)}>
+        <RequestWorkflowStepHeader step={4} title="Reply to client" detail={clientReplyDone ? "Client reply sent" : "Questions, pricing, estimate, delivery, or approval"} status={replyStatus} icon="reply" />
         <div className="border-t border-slate-200 p-4">
           <div>
             {missingQuestions.length ? <p className="mt-1 text-xs font-semibold text-amber-700">{missingQuestions.length} missing details can be added to the reply automatically.</p> : null}
 
             <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50">
               <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold"><span className="inline-flex items-center gap-2"><CalendarClock className="h-4 w-4 text-emerald-700" />Schedule delivery</span><ChevronDown className="h-4 w-4 text-slate-400" /></summary>
-              <div className="grid gap-2 border-t border-slate-200 p-3 sm:grid-cols-2">
+              <div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-3">
                 <label className="grid gap-1 text-xs font-bold text-slate-600">Date<input type="date" min={new Date().toISOString().slice(0, 10)} value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
-                <label className="grid gap-1 text-xs font-bold text-slate-600">Time<input type="time" value={deliveryTime} onChange={(event) => setDeliveryTime(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
-                <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">Delivery address<input value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} placeholder="Jobsite delivery address" className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950" /></label>
-                <button type="button" onClick={saveDeliverySchedule} disabled={pending} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2"><CalendarClock className="h-4 w-4" />{pending ? "Saving..." : "Save and prepare client message"}</button>
+                <label className="grid gap-1 text-xs font-bold text-slate-600">Window starts<input type="time" value={deliveryWindowStart} onChange={(event) => setDeliveryWindowStart(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
+                <label className="grid gap-1 text-xs font-bold text-slate-600">Window length (hours)<input type="number" min="0.5" max="12" step="0.5" value={deliveryWindowHours} onChange={(event) => setDeliveryWindowHours(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
+                <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2 lg:col-span-3">Delivery address<input value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} placeholder="Jobsite delivery address" className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950" /></label>
+                <div className={`rounded-xl border px-4 py-3 sm:col-span-2 lg:col-span-3 ${deliveryWindowReady ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+                  <p className="text-[10px] font-black uppercase tracking-[.12em] text-slate-500">Client will see</p>
+                  <p className="mt-1 text-sm font-black text-slate-950">{deliveryWindowStart && deliveryWindowEnd ? `Between ${deliveryTimeLabel(deliveryWindowStart)} and ${deliveryTimeLabel(deliveryWindowEnd)}` : "Choose a start time and window length"}</p>
+                  <p className="mt-1 text-xs text-slate-600">The end time is calculated automatically from the duration. The reply will show a window, not one exact arrival time.</p>
+                  {deliveryWindowStart && !deliveryWindowEnd ? <p className="mt-1 text-xs font-bold text-rose-700">Choose a shorter window that ends before midnight.</p> : null}
+                </div>
+                <button type="button" onClick={saveDeliverySchedule} disabled={pending || !deliveryWindowReady} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-45 sm:col-span-2 lg:col-span-3"><CalendarClock className="h-4 w-4" />{pending ? "Saving..." : "Save window and prepare client message"}</button>
               </div>
             </details>
 

@@ -210,15 +210,20 @@ export async function sendClientReplyAction(formData: FormData): Promise<ReplyRe
   return { ok: false, error: deliveryError }
 }
 
-export async function scheduleRequestDeliveryAction(input: { requestId: string; date: string; time: string; address: string }): Promise<DeliveryScheduleResult> {
+export async function scheduleRequestDeliveryAction(input: { requestId: string; date: string; startTime: string; durationHours: number; address: string }): Promise<DeliveryScheduleResult> {
   const requestId = String(input.requestId || "").trim()
   const date = String(input.date || "").trim()
-  const time = String(input.time || "").trim()
+  const startTime = String(input.startTime || "").trim()
+  const durationHours = Number(input.durationHours)
   const address = String(input.address || "").trim().slice(0, 500)
   if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false, error: "This request could not be identified." }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00`))) return { ok: false, error: "Choose a delivery date." }
-  const [deliveryHour, deliveryMinute] = time.split(":").map(Number)
-  if (!/^\d{2}:\d{2}$/.test(time) || !Number.isInteger(deliveryHour) || deliveryHour < 0 || deliveryHour > 23 || !Number.isInteger(deliveryMinute) || deliveryMinute < 0 || deliveryMinute > 59) return { ok: false, error: "Choose a delivery time." }
+  const [deliveryHour, deliveryMinute] = startTime.split(":").map(Number)
+  if (!/^\d{2}:\d{2}$/.test(startTime) || !Number.isInteger(deliveryHour) || deliveryHour < 0 || deliveryHour > 23 || !Number.isInteger(deliveryMinute) || deliveryMinute < 0 || deliveryMinute > 59) return { ok: false, error: "Choose when the delivery window starts." }
+  if (!Number.isFinite(durationHours) || durationHours < 0.5 || durationHours > 12 || !Number.isInteger(durationHours * 2)) return { ok: false, error: "Choose a delivery window from 30 minutes to 12 hours, in half-hour increments." }
+  const windowEndMinutes = deliveryHour * 60 + deliveryMinute + durationHours * 60
+  if (windowEndMinutes >= 24 * 60) return { ok: false, error: "Choose a delivery window that ends before midnight." }
+  const endTime = `${String(Math.floor(windowEndMinutes / 60)).padStart(2, "0")}:${String(windowEndMinutes % 60).padStart(2, "0")}`
   if (!address) return { ok: false, error: "Enter the delivery address." }
 
   const { supabase } = await requireStaffProfile("customers")
@@ -235,12 +240,15 @@ export async function scheduleRequestDeliveryAction(input: { requestId: string; 
     event_type: "status_changed",
     source: "admin",
     title: "Delivery scheduled",
-    description: `${date} at ${time} · ${address}`,
+    description: `${date} between ${startTime} and ${endTime} (${durationHours} hour${durationHours === 1 ? "" : "s"}) · ${address}`,
     metadata: {
       quote_request_id: request.id,
       client_action: "delivery_scheduled",
       delivery_date: date,
-      delivery_time: time,
+      delivery_time: startTime,
+      delivery_window_start: startTime,
+      delivery_window_end: endTime,
+      delivery_window_hours: durationHours,
       delivery_address: address,
     },
   })
