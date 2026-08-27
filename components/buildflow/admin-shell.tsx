@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Files,
   LayoutDashboard,
   Menu,
   MessageCircle,
@@ -45,7 +44,6 @@ function navigationLinks(access: ManagerAccess) {
     ...(access.suppliers ? [
       { href: "/admin/vendors", label: "Supplier Directory", icon: Store },
       { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },
-      { href: "/admin/documents", label: "Documents", icon: Files },
     ] : []),
   ];
 }
@@ -60,9 +58,6 @@ function isActive(pathname: string, href: string) {
   }
   if (href === "/admin/vendors") {
     return pathname.startsWith("/admin/vendors") || pathname.startsWith("/admin/supplier-approvals") || pathname.startsWith("/admin/supplier-requests");
-  }
-  if (href === "/admin/documents") {
-    return pathname.startsWith("/admin/documents") || pathname.startsWith("/admin/supplier-quotes");
   }
   if (href === "/admin/goals-progress") {
     return pathname === href || pathname.startsWith("/admin/goals-progress/beat-your-quote-flyer");

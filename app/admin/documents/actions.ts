@@ -5,7 +5,7 @@ import { createHash } from "node:crypto"
 import { revalidatePath } from "next/cache"
 
 import { requireStaffProfile } from "@/lib/auth"
-import { extractManagerDocument } from "@/lib/manager-document-intelligence"
+import { extractManagerDocument, type ManagerDocumentAiInvoker } from "@/lib/manager-document-intelligence"
 import { MANAGER_DOCUMENT_BUCKET, type ManagerDocumentItemRecord, type ManagerDocumentRecord } from "@/lib/manager-documents"
 import { normalizeMaterialCatalogDepartment, type CatalogSupplier } from "@/lib/material-catalog"
 import { detectSupplierMatch, inferSupplierName } from "@/lib/supplier-quote-supplier"
@@ -15,6 +15,30 @@ type Result<T> = { ok: true; data: T; message: string } | { ok: false; error: st
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const ALLOWED_TYPES = new Set(["application/pdf", "text/csv", "text/plain", "image/jpeg", "image/png", "image/webp"])
 const MAX_FILE_SIZE = 25 * 1024 * 1024
+const INTAKE_DEPARTMENT = "Test"
+
+type StaffSupabase = Awaited<ReturnType<typeof requireStaffProfile>>["supabase"]
+
+function managerDocumentAiInvoker(supabase: StaffSupabase): ManagerDocumentAiInvoker {
+  return async (input) => {
+    const { data, error } = await supabase.functions.invoke("manager-document-ocr", { body: input })
+    if (error) throw error
+    return data
+  }
+}
+
+async function runDocumentExtraction(supabase: StaffSupabase, file: File, rawText: string) {
+  try {
+    const edgeResult = await extractManagerDocument(file, rawText, managerDocumentAiInvoker(supabase))
+    if (edgeResult) return edgeResult
+  } catch (error) {
+    console.error("Protected document AI service unavailable", error)
+  }
+  try { return await extractManagerDocument(file, rawText) } catch (error) {
+    console.error("Document AI server fallback unavailable", error)
+    return null
+  }
+}
 
 function clean(value: unknown, max: number) { return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max) }
 function cleanFileName(value: string) { return value.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").slice(-180) || "document" }
@@ -40,8 +64,14 @@ export async function uploadManagerDocumentAction(formData: FormData): Promise<R
 
   const bytes = Buffer.from(await file.arrayBuffer())
   const sourceSha256 = createHash("sha256").update(bytes).digest("hex")
-  const duplicate = await supabase.from("manager_documents").select("id").eq("source_sha256", sourceSha256).neq("status", "archived").order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string }>()
-  if (duplicate.data) return { ok: true, data: { documentId: duplicate.data.id }, message: "This exact document is already in Documents. Opened the saved copy instead of creating a duplicate." }
+  const duplicate = await supabase.from("manager_documents").select("id,status").eq("source_sha256", sourceSha256).neq("status", "archived").order("created_at", { ascending: false }).limit(1).maybeSingle<{ id: string; status: string }>()
+  if (duplicate.data) {
+    if (duplicate.data.status === "error") {
+      const retry = await retryManagerDocumentExtractionAction(duplicate.data.id, true)
+      return { ok: true, data: { documentId: duplicate.data.id }, message: retry.ok ? "The saved original was re-read with AI. Opened the refreshed review." : "The original is safe in Documents. Open it and use Re-read with AI." }
+    }
+    return { ok: true, data: { documentId: duplicate.data.id }, message: "This exact document is already in Documents. Opened the saved copy instead of creating a duplicate." }
+  }
 
   const documentId = crypto.randomUUID()
   const filePath = `${user.id}/${documentId}/${cleanFileName(file.name)}`
@@ -55,7 +85,7 @@ export async function uploadManagerDocumentAction(formData: FormData): Promise<R
   const sourceLabel = clean(formData.get("sourceLabel"), 200) || "Website upload"
   const sourceReference = clean(formData.get("sourceReference"), 500)
   const sourceGroupId = clean(formData.get("sourceGroupId"), 200)
-  const department = normalizeMaterialCatalogDepartment(clean(formData.get("department"), 120))
+  const department = INTAKE_DEPARTMENT
   const { error: insertError } = await supabase.from("manager_documents").insert({
     id: documentId, status: "processing", title: file.name.replace(/\.[^.]+$/, "").slice(0, 240), department,
     storage_bucket: MANAGER_DOCUMENT_BUCKET, file_name: file.name.slice(0, 255), file_path: filePath, mime_type: file.type,
@@ -74,7 +104,7 @@ export async function uploadManagerDocumentAction(formData: FormData): Promise<R
   let rawText = ""
   try {
     rawText = await readableText(file, String(formData.get("browserOcrText") ?? ""))
-    extraction = await extractManagerDocument(file, rawText)
+    extraction = await runDocumentExtraction(supabase, file, rawText)
   } catch (error) { console.error("Manager document AI extraction failed", error) }
 
   if (!extraction) {
@@ -90,7 +120,8 @@ export async function uploadManagerDocumentAction(formData: FormData): Promise<R
   const { error: updateError } = await supabase.from("manager_documents").update({
     document_type: extraction.documentType, status: "needs_review", title: extraction.title || file.name.replace(/\.[^.]+$/, "").slice(0, 240),
     party_name: extraction.partyName, document_number: extraction.documentNumber, document_date: extraction.documentDate || null,
-    due_date: extraction.dueDate || null, expires_on: extraction.expiresOn || null, department: extraction.department || department,
+    due_date: extraction.dueDate || null, expires_on: extraction.expiresOn || null, department,
+    suggested_department: normalizeMaterialCatalogDepartment(extraction.department),
     currency: extraction.currency, subtotal: extraction.subtotal, discount: extraction.discount, delivery_charge: extraction.deliveryCharge,
     tax_amount: extraction.taxAmount, tax_percent: extraction.taxPercent, total: extraction.total, raw_text: rawText,
     classification_confidence: extraction.classificationConfidence, extraction_note: extractionNote,
@@ -115,8 +146,9 @@ export async function uploadManagerDocumentAction(formData: FormData): Promise<R
 export async function approveManagerDocumentAction(documentId: string): Promise<Result<{ approved: true }>> {
   const { supabase, user } = await requireStaffProfile("suppliers")
   if (!UUID_PATTERN.test(documentId)) return { ok: false, error: "Invalid document." }
-  const { data: document } = await supabase.from("manager_documents").select("id,status,warnings").eq("id", documentId).maybeSingle<{ id: string; status: string; warnings: string[] }>()
+  const { data: document } = await supabase.from("manager_documents").select("id,status,warnings,department").eq("id", documentId).maybeSingle<{ id: string; status: string; warnings: string[]; department: string }>()
   if (!document) return { ok: false, error: "Document not found." }
+  if (document.department === INTAKE_DEPARTMENT) return { ok: false, error: "Choose and save the correct department before approving this document." }
   const { data: items } = await supabase.from("manager_document_items").select("validation_status").eq("document_id", documentId).eq("selected", true).returns<Array<{ validation_status: string }>>()
   if ((document.warnings ?? []).length || (items ?? []).some((item) => item.validation_status !== "valid")) return { ok: false, error: "Clear the warning and review flags before approving this document." }
   const now = new Date().toISOString()
@@ -226,7 +258,7 @@ export async function retryManagerDocumentExtractionAction(documentId: string, r
   if (downloadError || !blob) return { ok: false, error: "The saved original could not be opened." }
   const file = new File([blob], document.file_name, { type: document.mime_type })
   let extraction
-  try { extraction = await extractManagerDocument(file, document.raw_text) } catch (error) { console.error("Document retry failed", error); extraction = null }
+  try { extraction = await runDocumentExtraction(supabase, file, document.raw_text) } catch (error) { console.error("Document retry failed", error); extraction = null }
   if (!extraction) return { ok: false, error: "AI could not finish reading it yet. The original is still safe." }
   const { error: deleteError } = await supabase.from("manager_document_items").delete().eq("document_id", documentId)
   if (deleteError) return { ok: false, error: "The current review could not be preserved for replacement." }
@@ -238,7 +270,7 @@ export async function retryManagerDocumentExtractionAction(documentId: string, r
       return { ok: false, error: "The new AI reading could not replace the lines. The previous review was restored." }
     }
   }
-  const { error: updateError } = await supabase.from("manager_documents").update({ document_type: extraction.documentType, status: "needs_review", title: extraction.title || document.title, party_name: extraction.partyName, document_number: extraction.documentNumber, document_date: extraction.documentDate || null, due_date: extraction.dueDate || null, expires_on: extraction.expiresOn || null, department: extraction.department, currency: extraction.currency, subtotal: extraction.subtotal, discount: extraction.discount, delivery_charge: extraction.deliveryCharge, tax_amount: extraction.taxAmount, tax_percent: extraction.taxPercent, total: extraction.total, classification_confidence: extraction.classificationConfidence, extraction_note: `${extraction.items.length} lines found on the latest AI read. Review before approval.`, evidence: extraction.evidence, warnings: extraction.warnings, suggested_actions: extraction.suggestedActions, approved_by: null, approved_at: null, updated_by: user.id }).eq("id", documentId)
+  const { error: updateError } = await supabase.from("manager_documents").update({ document_type: extraction.documentType, status: "needs_review", title: extraction.title || document.title, party_name: extraction.partyName, document_number: extraction.documentNumber, document_date: extraction.documentDate || null, due_date: extraction.dueDate || null, expires_on: extraction.expiresOn || null, department: document.department || INTAKE_DEPARTMENT, suggested_department: normalizeMaterialCatalogDepartment(extraction.department), currency: extraction.currency, subtotal: extraction.subtotal, discount: extraction.discount, delivery_charge: extraction.deliveryCharge, tax_amount: extraction.taxAmount, tax_percent: extraction.taxPercent, total: extraction.total, classification_confidence: extraction.classificationConfidence, extraction_note: `${extraction.items.length} lines found on the latest AI read. Review before approval.`, evidence: extraction.evidence, warnings: extraction.warnings, suggested_actions: extraction.suggestedActions, approved_by: null, approved_at: null, updated_by: user.id }).eq("id", documentId)
   if (updateError) {
     await supabase.from("manager_document_items").delete().eq("document_id", documentId)
     if (previousItems?.length) await supabase.from("manager_document_items").insert(previousItems.map((item) => ({ document_id: documentId, line_number: item.line_number, item_code: item.item_code, description: item.description, specification: item.specification, quantity: item.quantity, unit: item.unit, unit_price: item.unit_price, line_total: item.line_total, source_page: item.source_page, source_text: item.source_text, confidence: item.confidence, validation_status: item.validation_status, selected: item.selected })))

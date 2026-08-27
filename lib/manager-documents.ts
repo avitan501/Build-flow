@@ -27,6 +27,7 @@ export type ManagerDocumentRecord = {
   due_date: string | null
   expires_on: string | null
   department: string
+  suggested_department: string
   currency: string
   subtotal: number | null
   discount: number

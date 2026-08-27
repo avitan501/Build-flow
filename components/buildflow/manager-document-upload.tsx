@@ -1,13 +1,13 @@
 "use client"
 
-import { FileUp, LoaderCircle, ShieldCheck, X } from "lucide-react"
+import { FileUp, LoaderCircle, ShieldCheck, Sparkles, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
 import { uploadManagerDocumentAction } from "@/app/admin/documents/actions"
 import { extractImageTextInBrowser } from "@/lib/browser-document-extraction"
 
-export function ManagerDocumentUpload({ departments, initialDepartment = "Others", initialIntent = "", initiallyOpen = false }: { departments: string[]; initialDepartment?: string; initialIntent?: string; initiallyOpen?: boolean }) {
+export function ManagerDocumentUpload({ initialIntent = "", initiallyOpen = false }: { initialIntent?: string; initiallyOpen?: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(initiallyOpen)
   const [fileName, setFileName] = useState("")
@@ -39,7 +39,8 @@ export function ManagerDocumentUpload({ departments, initialDepartment = "Others
       <input type="hidden" name="intent" value={initialIntent} />
       <input type="hidden" name="sourceChannel" value="website_upload" />
       <input type="hidden" name="sourceLabel" value="Website upload" />
-      <label className="grid gap-1.5 text-sm font-semibold">Starting department<select name="department" defaultValue={initialDepartment} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm">{departments.map((department) => <option key={department}>{department}</option>)}</select></label>
+      <input type="hidden" name="department" value="Test" />
+      <div className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-950"><Sparkles className="h-4 w-4 shrink-0" />AI suggests the department. The document stays in Test until review.</div>
       <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-900"><ShieldCheck className="h-4 w-4 shrink-0" />Private original · no automatic posting</div>
       <label className="sm:col-span-2"><span className="flex min-h-28 cursor-pointer items-center justify-center gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm font-semibold text-slate-700 hover:border-[#0071e3] hover:bg-sky-50"><FileUp className="h-5 w-5 text-[#0071e3]" />{fileName || "Choose PDF, CSV, TXT, or image · 25 MB maximum"}</span><input name="documentFile" type="file" required accept=".pdf,.csv,.txt,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,text/plain,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")} /></label>
       {error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 sm:col-span-2">{error}</p> : null}

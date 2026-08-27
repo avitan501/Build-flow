@@ -8,17 +8,20 @@ import { documentArithmeticWarnings, documentLineValidationStatus } from "../lib
 const root = process.cwd()
 
 test("document center preserves originals and gates every destination behind review", async () => {
-  const [migration, approvalMigration, sourceMigration, indexMigration, actions, page, review, upload, shell, documents] = await Promise.all([
+  const [migration, approvalMigration, sourceMigration, indexMigration, departmentMigration, actions, page, review, upload, shell, toolsPage, documents, edgeFunction] = await Promise.all([
     readFile(path.join(root, "supabase/migrations/20260827143000_create_manager_document_center.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260827144500_restrict_document_financial_approval.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260827151000_add_document_sources_and_staff_approval.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260827152500_index_manager_document_relationships.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260827182029_add_manager_document_department_suggestion.sql"), "utf8"),
     readFile(path.join(root, "app/admin/documents/actions.ts"), "utf8"),
     readFile(path.join(root, "app/admin/documents/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/manager-document-review.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/manager-document-upload.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/ai-tools/page.tsx"), "utf8"),
     readFile(path.join(root, "lib/manager-documents.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/manager-document-ocr/index.ts"), "utf8"),
   ])
   expect(migration).toContain("create table if not exists public.manager_documents")
   expect(migration).toContain("create table if not exists public.manager_document_items")
@@ -34,14 +37,20 @@ test("document center preserves originals and gates every destination behind rev
   expect(sourceMigration).toContain("client_invoice")
   expect(indexMigration).toContain("manager_documents_project_id_idx")
   expect(indexMigration).toContain("manager_document_events_created_by_idx")
-  expect(actions.indexOf(`.from(MANAGER_DOCUMENT_BUCKET).upload`)).toBeLessThan(actions.indexOf("extractManagerDocument(file"))
+  expect(departmentMigration).toContain("suggested_department")
+  expect(departmentMigration).toContain("set department = 'Test'")
+  expect(actions.indexOf(`.from(MANAGER_DOCUMENT_BUCKET).upload`)).toBeLessThan(actions.indexOf("extraction = await runDocumentExtraction"))
   expect(actions).toContain("sourceSha256")
   expect(actions).toContain("This exact document is already in Documents")
+  expect(actions).toContain("The saved original was re-read with AI")
   expect(actions).toContain('status: "processing"')
   expect(actions).toContain("Nothing was sent to another part of Avantia")
   expect(actions).toContain("Approve the reviewed document before sending it to supplier pricing")
   expect(actions).toContain('requireStaffProfile("suppliers")')
   expect(actions).toContain("source_channel: sourceChannel")
+  expect(actions).toContain('functions.invoke("manager-document-ocr"')
+  expect(actions).toContain('const INTAKE_DEPARTMENT = "Test"')
+  expect(actions).toContain("suggested_department")
   expect(actions).toContain("quantity × unit price")
   expect(page).toContain("One private inbox")
   expect(page).toContain("The original remains here even after information is routed")
@@ -55,9 +64,14 @@ test("document center preserves originals and gates every destination behind rev
   expect(review).toContain("Choose destination")
   expect(upload).toContain("Upload once")
   expect(upload).toContain("no automatic posting")
-  expect(shell).toContain('href: "/admin/documents"')
-  expect(shell).toContain('label: "Documents"')
+  expect(upload).not.toContain("Starting department")
+  expect(upload).toContain('name="department" value="Test"')
+  expect(shell).not.toContain('href: "/admin/documents"')
+  expect(toolsPage).toContain('href: "/admin/documents"')
+  expect(toolsPage).toContain("Manager Tools")
   expect(documents).toContain("Client invoice · outgoing")
+  expect(edgeFunction).toContain("openai_supplier_quote_api_key")
+  expect(edgeFunction).toContain("can_manage_suppliers")
 })
 
 test("document intelligence keeps evidence and catches line and total mismatches", () => {

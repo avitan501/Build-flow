@@ -42,6 +42,14 @@ export type ManagerDocumentExtraction = {
   notes: string
 }
 
+export type ManagerDocumentAiInvoker = (input: {
+  action: "extract"
+  fileName: string
+  mimeType: string
+  fileBase64: string
+  extractedText: string
+}) => Promise<unknown>
+
 type OpenAIResponse = { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }
 const DOCUMENT_TYPES = new Set<string>(managerDocumentTypes)
 
@@ -130,7 +138,18 @@ Extract the sender/vendor/customer as partyName, document number and dates, mate
 
 For every important field and each line, return the printed source text, page, confidence, and selected=true. Confidence measures whether the value is clearly supported by the document, not whether it seems plausible. Suggest actions, but never approve, route, post, or create financial records. A person must review before any destination changes.`
 
-export async function extractManagerDocument(file: File, extractedText = "") {
+export async function extractManagerDocument(file: File, extractedText = "", invoke?: ManagerDocumentAiInvoker) {
+  if (invoke) {
+    const response = await invoke({
+      action: "extract",
+      fileName: file.name,
+      mimeType: file.type || "application/octet-stream",
+      fileBase64: Buffer.from(await file.arrayBuffer()).toString("base64"),
+      extractedText: extractedText.slice(0, 180_000),
+    })
+    const payload = response && typeof response === "object" && "result" in response ? (response as { result: unknown }).result : null
+    return payload ? normalizeManagerDocumentExtraction(payload) : null
+  }
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return null
   const content: Array<Record<string, unknown>> = [{ type: "input_text", text: PROMPT }]

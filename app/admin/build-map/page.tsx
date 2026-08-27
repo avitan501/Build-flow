@@ -347,10 +347,13 @@ export default async function AdminDashboardPage({
     ...(access.aiTools
       ? [
           {
-            title: "AI Tools",
+            title: "Manager Tools",
             icon: Sparkles,
             links: [
-              { href: "/admin/ai-tools", label: "All AI Tools" },
+              { href: "/admin/ai-tools", label: "All Manager Tools" },
+              ...(access.suppliers
+                ? [{ href: "/admin/documents", label: "Documents" }]
+                : []),
               {
                 href: "/admin/ai-tools/jobsite-delivery",
                 label: "Jobsite Delivery",
