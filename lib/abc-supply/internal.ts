@@ -282,31 +282,24 @@ export async function searchAbcInternalBranches(state: string) {
 
 export async function searchAbcInternalItems(query: string, branchNumber: string) {
   const itemNumberSearch = /^[A-Za-z0-9._/-]+$/.test(query) && /\d/.test(query);
+  const filters = itemNumberSearch
+    ? [
+      { key: "itemNumber", condition: "contains", values: [query], joinCondition: "and" },
+      { key: "branchNumber", condition: "equals", values: [branchNumber], joinCondition: null },
+    ]
+    : [{ key: "branchNumber", condition: "equals", values: [branchNumber], joinCondition: null }];
   const payload = await abcRequest("/api/product/v1/search/items?familyItems=false", {
     method: "POST",
     body: JSON.stringify({
-      filters: [
-        {
-          key: itemNumberSearch ? "itemNumber" : "itemDescription",
-          condition: "contains",
-          values: [query],
-          joinCondition: "and",
-        },
-        {
-          key: "branchNumber",
-          condition: "equals",
-          values: [branchNumber],
-          joinCondition: null,
-        },
-      ],
-      // The branchNumber filter already limits the response to items offered by
-      // this branch. ABC warns that embedding branch availability can
-      // materially slow this endpoint, so only request dimensional variations.
-      embed: ["variations"],
+      filters,
       pagination: { itemsPerPage: 12, pageNumber: 1 },
     }),
   });
-  return parseAbcCatalogItems(payload, branchNumber, true);
+  const items = parseAbcCatalogItems(payload, branchNumber, true);
+  if (itemNumberSearch) return items;
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = items.filter((item) => terms.every((term) => `${item.itemDescription} ${item.familyName}`.toLowerCase().includes(term)));
+  return matches.length ? matches : items;
 }
 
 export async function priceAbcInternalItems(request: {
