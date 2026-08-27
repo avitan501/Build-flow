@@ -2,7 +2,6 @@ import { ArrowLeft, Bot, Check, CheckCircle2, ClipboardList, Clock3, Phone, Rota
 import Link from "next/link";
 
 import { requireOwnerAccess } from "@/lib/owner-access";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 import { cancelAuraIntakeAction, confirmAuraIntakeAction, reviewTrustedSmsIntakeAction } from "../aura/actions";
 
@@ -48,19 +47,18 @@ function StructuredPreview({ proposal }: { proposal: IntakeProposal }) {
 }
 
 export default async function AiInboxPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
-  await requireOwnerAccess("/owner/ai-inbox");
+  const { supabase } = await requireOwnerAccess("/owner/ai-inbox");
   const requestedView = (await searchParams).view;
   const view = requestedView === "done" ? "done" : requestedView === "cancelled" ? "cancelled" : "waiting";
-  const admin = createAdminClient();
   const [{ data: rows, error }, { data: clients }] = await Promise.all([
-    admin.from("aura_intakes").select("id,message_text,proposal,status,ai_model,created_at,updated_at").eq("source", "sms").eq("sender_phone", "+13475675077").order("created_at", { ascending: false }).limit(100),
-    admin.from("profiles").select("id,full_name,company_name,email").eq("role", "client").eq("is_active", true).order("full_name").limit(500),
+    supabase.from("aura_intakes").select("id,message_text,proposal,status,ai_model,created_at,updated_at").eq("source", "sms").eq("sender_phone", "+13475675077").order("created_at", { ascending: false }).limit(100),
+    supabase.from("profiles").select("id,full_name,company_name,email").eq("role", "client").eq("is_active", true).order("full_name").limit(500),
   ]);
   if (error) throw new Error(`Unable to load AI Inbox: ${error.message}`);
   const intakes = (rows || []) as IntakeRow[];
   const clientRows = (clients || []) as ClientRow[];
   const intakeIds = intakes.map((item) => item.id);
-  const { data: auditData } = intakeIds.length ? await admin.from("aura_audit_log").select("id,intake_id,action,details,created_at").in("intake_id", intakeIds).order("created_at", { ascending: false }).limit(80) : { data: [] };
+  const { data: auditData } = intakeIds.length ? await supabase.from("aura_audit_log").select("id,intake_id,action,details,created_at").in("intake_id", intakeIds).order("created_at", { ascending: false }).limit(80) : { data: [] };
   const activity = (auditData || []) as AuditRow[];
   const intakeById = new Map(intakes.map((item) => [item.id, item]));
   const waiting = intakes.filter((item) => ["pending", "needs_follow_up", "failed"].includes(item.status));
