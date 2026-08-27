@@ -5,6 +5,8 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock3,
+  Images,
+  Link2,
   Phone,
   RotateCcw,
   X,
@@ -21,7 +23,8 @@ import {
 
 type RequestItem = { name?: string; quantity?: number; unit?: string };
 type IntakeProposal = {
-  recordType?: "contact" | "client" | "lead" | "task" | "material_request";
+  recordType?:
+    "contact" | "client" | "lead" | "supplier" | "task" | "material_request";
   summary?: string;
   contact?: {
     fullName?: string | null;
@@ -34,6 +37,14 @@ type IntakeProposal = {
     title?: string;
     description?: string | null;
     location?: string | null;
+  } | null;
+  supplier?: {
+    name?: string | null;
+    contactName?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
+    notes?: string | null;
   } | null;
   tasks?: Array<{
     title?: string;
@@ -66,6 +77,10 @@ type IntakeRow = {
   ai_model: string | null;
   created_at: string;
   updated_at: string;
+  raw_payload: {
+    media?: Array<{ url?: string; type?: string; name?: string }>;
+    messageParts?: Array<{ text?: string | null; media?: unknown[] }>;
+  } | null;
 };
 type ClientRow = {
   id: string;
@@ -85,14 +100,17 @@ const labels = {
   contact: "Contact",
   client: "Contact",
   lead: "Lead",
+  supplier: "Supplier",
   task: "Task / To-do",
   material_request: "Material request",
 } as const;
 const activityLabels: Record<string, string> = {
   sms_command_received: "Phone instruction received",
+  sms_message_joined: "Follow-up joined to instruction",
   ai_review_completed: "AI check completed",
   intake_confirmed: "Approved and added",
   material_request_confirmed: "Material request created",
+  supplier_confirmed: "Supplier added",
   intake_cancelled: "Instruction skipped",
 };
 
@@ -178,6 +196,23 @@ function StructuredPreview({ proposal }: { proposal: IntakeProposal }) {
       </div>
     );
   }
+  if (proposal.recordType === "supplier" && proposal.supplier) {
+    return (
+      <div className="mt-4 grid gap-2 rounded-md border border-slate-200 bg-white p-4 text-sm">
+        <strong>{proposal.supplier.name || "New supplier"}</strong>
+        <span className="text-slate-600">
+          {[
+            proposal.supplier.contactName,
+            proposal.supplier.phone,
+            proposal.supplier.email,
+            proposal.supplier.address,
+          ]
+            .filter(Boolean)
+            .join(" · ") || "Supplier details were not included"}
+        </span>
+      </div>
+    );
+  }
   return (
     <div className="mt-4 divide-y divide-slate-100 rounded-md border border-slate-200 bg-white">
       {proposal.tasks?.map((task, index) => (
@@ -215,7 +250,9 @@ export default async function AiInboxPage({
   const [{ data: rows, error }, { data: clients }] = await Promise.all([
     supabase
       .from("aura_intakes")
-      .select("id,message_text,proposal,status,ai_model,created_at,updated_at")
+      .select(
+        "id,message_text,proposal,status,ai_model,created_at,updated_at,raw_payload",
+      )
       .eq("source", "sms")
       .eq("sender_phone", "+13475675077")
       .order("created_at", { ascending: false })
@@ -271,9 +308,9 @@ export default async function AiInboxPage({
                 AI Inbox
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">
-                Text naturally from your trusted phone. AI organizes the
-                instruction here; nothing is added to Avantia until you approve
-                it.
+                Text naturally or send a screenshot from your trusted phone. AI
+                can join a follow-up message, read the image, and organize one
+                instruction for your approval.
               </p>
             </div>
             <div className="grid min-w-52 grid-cols-3 gap-px self-end overflow-hidden rounded-md bg-white/15">
@@ -437,6 +474,21 @@ export default async function AiInboxPage({
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
                         {intake.message_text || "No message text"}
                       </p>
+                      {intake.raw_payload?.media?.length ? (
+                        <p className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-semibold text-sky-800">
+                          <Images className="h-3.5 w-3.5" />
+                          {intake.raw_payload.media.length} screenshot
+                          {intake.raw_payload.media.length === 1 ? "" : "s"}{" "}
+                          read by AI
+                        </p>
+                      ) : null}
+                      {(intake.raw_payload?.messageParts?.length || 0) > 1 ? (
+                        <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-900">
+                          <Link2 className="h-3.5 w-3.5" />
+                          {intake.raw_payload!.messageParts!.length} phone
+                          messages combined
+                        </p>
+                      ) : null}
                       <p className="mt-4 text-[11px] text-slate-400">
                         AI check:{" "}
                         {intake.ai_model === "fallback"
@@ -478,7 +530,7 @@ export default async function AiInboxPage({
                       ) : null}
                       {completedRequestId ? (
                         <Link
-                          href={`/owner/materials/requests?request=${completedRequestId}`}
+                          href={`/owner/materials/requests/${completedRequestId}`}
                           className="mt-4 inline-flex text-sm font-semibold text-[#0875b7] hover:underline"
                         >
                           Open created material request →

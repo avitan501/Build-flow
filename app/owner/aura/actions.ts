@@ -509,7 +509,81 @@ export async function confirmAuraIntakeAction(formData: FormData) {
   if (!["pending", "needs_follow_up"].includes(intake.status))
     throw new Error("This instruction is no longer waiting for approval.");
 
-  if (intake.proposal.recordType === "material_request") {
+  if (intake.proposal.recordType === "supplier") {
+    const supplier = intake.proposal.supplier as {
+      name?: unknown;
+      contactName?: unknown;
+      phone?: unknown;
+      email?: unknown;
+      address?: unknown;
+      notes?: unknown;
+    } | null;
+    const name =
+      typeof supplier?.name === "string"
+        ? supplier.name.trim().slice(0, 160)
+        : "";
+    if (!name)
+      throw new Error(
+        "Run the AI check again or add the supplier name before approval.",
+      );
+    const phone =
+      typeof supplier?.phone === "string"
+        ? supplier.phone.trim().slice(0, 80)
+        : "";
+    const email =
+      typeof supplier?.email === "string"
+        ? supplier.email.trim().toLowerCase().slice(0, 320)
+        : "";
+    const supplierId = `ai-phone-${intakeId}`;
+    const { data: saved, error: supplierError } = await supabase.rpc(
+      "staff_upsert_supplier_directory_entry",
+      {
+        p_supplier: {
+          id: supplierId,
+          name,
+          contactLabel: "Phone intake",
+          contactName:
+            typeof supplier?.contactName === "string"
+              ? supplier.contactName.trim().slice(0, 160)
+              : "",
+          phone,
+          whatsapp: phone,
+          email,
+          address:
+            typeof supplier?.address === "string"
+              ? supplier.address.trim().slice(0, 500)
+              : "",
+          notes: [
+            typeof supplier?.notes === "string" ? supplier.notes.trim() : "",
+            intake.message_text
+              ? `Added from owner phone instruction: ${intake.message_text.slice(0, 1200)}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join("\n")
+            .slice(0, 4000),
+          trustLevel: "not-reviewed",
+          preferredDeliveryMethod: email ? "email" : phone ? "phone" : "manual",
+          catalogDepartments: [],
+          catalogEnabledDepartments: [],
+        },
+        p_create: false,
+      },
+    );
+    const savedId =
+      saved &&
+      typeof saved === "object" &&
+      typeof (saved as { id?: unknown }).id === "string"
+        ? (saved as { id: string }).id
+        : supplierId;
+    if (supplierError)
+      throw new Error(`Unable to add supplier: ${supplierError.message}`);
+    await invokeMessagingBroker(supabase, {
+      action: "finalize_trusted_sms_supplier",
+      intakeId,
+      supplierId: savedId,
+    });
+  } else if (intake.proposal.recordType === "material_request") {
     const customerId = requireUuid(formData.get("customerId"));
     const request = intake.proposal.request as {
       title?: unknown;
@@ -658,14 +732,12 @@ export async function reviewTrustedSmsIntakeAction(formData: FormData) {
     .in("status", ["pending", "needs_follow_up", "failed"]);
   if (updateError)
     throw new Error(`AI review could not be saved: ${updateError.message}`);
-  await admin
-    .from("aura_audit_log")
-    .insert({
-      intake_id: intakeId,
-      actor_user_id: user.id,
-      action: "ai_review_completed",
-      details: { model, status },
-    });
+  await admin.from("aura_audit_log").insert({
+    intake_id: intakeId,
+    actor_user_id: user.id,
+    action: "ai_review_completed",
+    details: { model, status },
+  });
   revalidatePath("/owner/ai-inbox");
   revalidatePath("/owner/aura");
 }
