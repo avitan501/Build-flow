@@ -2,10 +2,18 @@ import { ArrowLeft, CheckCircle2, ExternalLink, ShieldCheck } from "lucide-react
 import Link from "next/link";
 
 import { AbcSupplyPricing } from "@/components/buildflow/abc-supply-pricing";
+import { callAbcBridge } from "@/lib/abc-supply/bridge";
 import { requireAdminProfile } from "@/lib/auth";
 
 export default async function ManagerAbcPricingPage() {
   await requireAdminProfile();
+  let customerConnected = false;
+  try {
+    const status = await callAbcBridge({ action: "connectionStatus" });
+    customerConnected = Boolean(status?.connection && typeof status.connection === "object" && (status.connection as { connected?: boolean }).connected);
+  } catch {
+    // The catalog demo remains available; pricing stays safely locked.
+  }
 
   const demoSteps = [
     { href: "/account/abc", label: "Customer connection", external: true },
@@ -34,7 +42,7 @@ export default async function ManagerAbcPricingPage() {
         <Link href="/account/abc" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white">Open customer flow<ExternalLink className="h-4 w-4" /></Link>
       </section>
 
-      <section className="mt-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">ABC Supply sandbox</h2><p className="mt-1 text-sm text-slate-500">Source System ID 798 · certification test data</p></div><span className="rounded-md bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">Not production pricing</span></div><div className="mt-5"><AbcSupplyPricing /></div></section>
+      <section className="mt-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">{customerConnected ? "Connected ABC account" : "ABC Supply sandbox"}</h2><p className="mt-1 text-sm text-slate-500">{customerConnected ? "Customer-authorized Ship-To, branches, products, and pricing" : "Source System ID 798 · catalog certification data"}</p></div><span className={`rounded-md px-3 py-2 text-xs font-semibold ${customerConnected ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}>{customerConnected ? "Private pricing enabled" : "Private pricing locked"}</span></div><div className="mt-5"><AbcSupplyPricing connectionMode={customerConnected ? "connected-user" : "automatic"} /></div></section>
 
       <section id="demo-notes" className="mt-5 scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <h2 className="text-lg font-semibold">Demo script</h2>

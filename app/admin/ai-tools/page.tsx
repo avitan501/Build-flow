@@ -14,7 +14,7 @@ export default async function AdminAiToolsPage() {
     { href: "/admin/ai-tools/estimate-converter", title: "Beat Estimate Converter", description: "Remove company and client identity and prepare an Avantia proposal request.", icon: FilePenLine },
     { href: "/admin/ai-tools/material-list", title: "Material List Organizer", description: "Turn field notes and supplier lists into editable rows and CSV.", icon: ListTree },
     { href: "/admin/ai-tools/order-test", title: "Department Order Test", description: "Check Quick Order or plan upload without creating a fake request.", icon: Activity },
-    { href: "/admin/ai-tools/locate-cheap-item", title: "Locate Cheap Item", description: "Research supplier categories, compare sourced prices, and prepare a reviewed pricing request.", icon: SearchCheck, badge: "Coming Soon" },
+    { href: "/admin/ai-tools/locate-cheap-item", title: "Locate Cheap Item", description: "Search live public product pages and compare source-backed prices.", icon: SearchCheck, badge: "Live beta" },
     { href: "/shop/wood-floor/flooring-calculator", title: "Wood Floor Calculator", description: "Room takeoff, waste allowance, and marked-plan workflow.", icon: Calculator },
     ...(access.owner ? [{ href: "/admin/abc", title: "ABC Private Pricing", description: "Check owner-only ABC account pricing.", icon: Store }] : []),
     ...(access.traffic ? [{ href: "/admin/traffic", title: "Website Traffic", description: "Review production visitors and traffic status.", icon: BarChart3 }] : []),

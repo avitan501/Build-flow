@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 type AbcAccount = {
   name: string;
@@ -225,6 +226,10 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (connectionMode !== "connected-user") {
+      setError("Connect the customer's myABCsupply account before requesting private pricing.");
+      return;
+    }
     setLoading(true);
     setError("");
     setResult(null);
@@ -317,10 +322,12 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
           <input type="hidden" name="lengthUom" value={selectedVariation.split("|")[1] || ""} />
         </label> : null}
         <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"><span className="font-semibold">ABC Supply remains the seller</span></div>
-        <button disabled={loading || !selectedUom} type="submit" className="min-h-12 rounded-2xl bg-[#0071e3] px-5 font-semibold text-white hover:bg-[#0077ed] disabled:opacity-50">{loading ? "Checking ABC price…" : "Get private ABC price"}</button>
+        {connectionMode === "connected-user"
+          ? <button disabled={loading || !selectedUom} type="submit" className="min-h-12 rounded-2xl bg-[#0071e3] px-5 font-semibold text-white hover:bg-[#0077ed] disabled:opacity-50">{loading ? "Checking ABC price…" : "Get private ABC price"}</button>
+          : <div className="sm:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950"><p className="font-semibold">Private pricing needs the customer connection.</p><p>The Sandbox catalog can show products, units, and authorized branches. ABC returns a customer-specific price only after the customer connects myABCsupply.</p><Link href="/account/abc" className="mt-3 inline-flex min-h-10 items-center rounded-full bg-slate-950 px-4 text-xs font-semibold text-white">Connect myABCsupply</Link></div>}
       </form> : null}
 
-      {error ? <div id="abc-status" className="scroll-mt-24 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950"><p className="font-semibold">ABC needs attention</p><p>{error}</p><button type="button" onClick={() => { setError(""); setAccountsLoading(true); setReloadKey((value) => value + 1); }} className="mt-3 rounded-full border border-amber-300 bg-white px-4 py-2 text-xs font-semibold text-amber-950">Retry ABC connection</button></div> : null}
+      {error ? <div id="abc-status" className="scroll-mt-24 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950"><p className="font-semibold">ABC needs attention</p><p>{error}</p><button type="button" onClick={() => { setError(""); setAccountsLoading(true); setReloadKey((value) => value + 1); }} className="mt-3 rounded-full border border-amber-300 bg-white px-4 py-2 text-xs font-semibold text-amber-950">Reload ABC data</button></div> : null}
 
       <p className="text-xs leading-5 text-slate-500">Products shown are offered by the selected branch. Availability is not a stock count.</p>
 
