@@ -146,10 +146,12 @@ export async function uploadManagerDocumentAction(formData: FormData): Promise<R
 export async function approveManagerDocumentAction(documentId: string): Promise<Result<{ approved: true }>> {
   const { supabase, user } = await requireStaffProfile("suppliers")
   if (!UUID_PATTERN.test(documentId)) return { ok: false, error: "Invalid document." }
-  const { data: document } = await supabase.from("manager_documents").select("id,status,warnings,department").eq("id", documentId).maybeSingle<{ id: string; status: string; warnings: string[]; department: string }>()
+  const { data: document } = await supabase.from("manager_documents").select("id,status,warnings,department,document_type").eq("id", documentId).maybeSingle<{ id: string; status: string; warnings: string[]; department: string; document_type: ManagerDocumentRecord["document_type"] }>()
   if (!document) return { ok: false, error: "Document not found." }
   if (document.department === INTAKE_DEPARTMENT) return { ok: false, error: "Choose and save the correct department before approving this document." }
   const { data: items } = await supabase.from("manager_document_items").select("validation_status").eq("document_id", documentId).eq("selected", true).returns<Array<{ validation_status: string }>>()
+  const requiresItem = ["supplier_quote", "supplier_invoice", "receipt", "catalog_price_list", "purchase_order"].includes(document.document_type)
+  if (requiresItem && !(items ?? []).length) return { ok: false, error: "Select at least one dependable supplier item before approving this document." }
   if ((document.warnings ?? []).length || (items ?? []).some((item) => item.validation_status !== "valid")) return { ok: false, error: "Clear the warning and review flags before approving this document." }
   const now = new Date().toISOString()
   const { error } = await supabase.from("manager_documents").update({ status: "ready", approved_by: user.id, approved_at: now, updated_by: user.id }).eq("id", documentId)
