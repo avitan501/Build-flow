@@ -14,7 +14,7 @@ export default async function ManagerAbcPricingPage() {
     { href: "#product-search", label: "Product search" },
     { href: "#unit-quantity", label: "Unit & quantity" },
     { href: "#availability-price", label: "Availability & price" },
-    { href: "#demo-notes", label: "Support plan" },
+    { href: "#demo-notes", label: "Demo script" },
   ];
 
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-8 lg:px-10 lg:py-9">

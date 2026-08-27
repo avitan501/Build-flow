@@ -31,7 +31,7 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain("await requireManagerPortalProfile()");
   expect(page).toContain("async function OwnerAffiliateGoal({ status }");
   expect(page).toContain("const { supabase } = await requireAdminProfile()");
-  expect(page).toContain("Carlos Goals");
+  expect(page).toContain("Task To Do");
   expect(page).toContain("Client Target");
   expect(page).toContain("<AddOutreachLead />");
   expect(page).toContain("<OutreachLeadList");
@@ -40,15 +40,18 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain('title="Supplier Partnership"');
   expect(page).toContain("ABC Supply Demo");
   expect(page).toContain('href="/admin/abc"');
-  expect(page).toContain('PersonHeader assignee="carlos"');
+  expect(page).toContain("<PersonHeader");
+  expect(page).toContain('assignee="carlos"');
   expect(page).toContain("<AffiliateProgramTracker");
-  expect(page).toContain("access.owner ? <OwnerAffiliateGoal status=");
-  expect(page).toContain('supabase.from("affiliate_programs")');
+  expect(page).toContain("content: access.owner ? (");
+  expect(page).toContain("<OwnerAffiliateGoal status=");
+  expect(page).toContain('.from("affiliate_programs")');
   expect(page).toContain("<AddTargetClient />");
   expect(page).toContain("<ClientTargetCallGuide />");
   expect(page).toContain('title="Supplier Affiliate Program"');
-  expect(page).toContain('<GoalDisclosure id="supplier-affiliate-program" fixedKey="supplier-affiliate-program"');
-  expect(page).toContain('supabase.from("manager_goals")');
+  expect(page).toContain('id="supplier-affiliate-program"');
+  expect(page).toContain('fixedKey="supplier-affiliate-program"');
+  expect(page).toContain('.from("manager_goals")');
   expect(page).toContain("<AddManagerGoal");
   expect(page).not.toContain('PersonHeader assignee="david"');
   expect(page).toContain('.eq("assignee", "carlos")');
@@ -64,11 +67,12 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
 });
 
 test("ABC task provides a policy-correct certification menu and stable bridge", async () => {
-  const [goals, demo, pricing, bridge] = await Promise.all([
+  const [goals, demo, pricing, bridge, callback] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/abc/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/abc-supply-pricing.tsx"), "utf8"),
     readFile(path.join(root, "lib/abc-supply/bridge.ts"), "utf8"),
+    readFile(path.join(root, "app/api/integrations/abc/callback/route.ts"), "utf8"),
   ]);
 
   for (const label of ["Customer connection", "Ship-To", "Authorized branch", "Product search", "Unit & quantity", "Availability & price", "Demo script"]) {
@@ -82,6 +86,10 @@ test("ABC task provides a policy-correct certification menu and stable bridge", 
   expect(pricing).toContain('id="availability-price"');
   expect(pricing).not.toContain("Estimated total");
   expect(bridge).toContain("build-flow-wfl3-git-codex-abc-7d0632");
+  expect(bridge).toContain("getAbcBridgeCallbackUrl");
+  expect(callback).toContain("getAbcBridgeCallbackUrl(callbackParams)");
+  expect(callback).toContain('["error", "error_description", "code", "state"]');
+  expect(callback).not.toContain("requireSignedInProfile");
 });
 
 test("manager goals are persistent, status-aware, archivable, and protected for manager users", async () => {
@@ -125,7 +133,7 @@ test("outreach leads remain separate from clients and store relationship level a
     readFile(path.join(root, "supabase/migrations/20260817183000_allow_owner_manage_outreach_leads.sql"), "utf8"),
   ]);
 
-  expect(page).toContain('supabase.from("manager_outreach_leads")');
+  expect(page).toContain('.from("manager_outreach_leads")');
   expect(component).toContain("Add an outreach lead");
   expect(component).toContain("A lead stays separate from active clients and orders.");
   expect(component).toContain("Relationship level");

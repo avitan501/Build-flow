@@ -7,6 +7,15 @@ import { createClient } from "@/lib/supabase/server";
 const ABC_BRIDGE_URL = process.env.ABC_BRIDGE_URL
   || "https://build-flow-wfl3-git-codex-abc-7d0632-avitanneto-1804s-projects.vercel.app/api/integrations/abc/bridge";
 
+export function getAbcBridgeCallbackUrl(searchParams: URLSearchParams) {
+  const callbackUrl = new URL(ABC_BRIDGE_URL);
+  if (callbackUrl.protocol !== "https:") throw new Error("ABC bridge must use HTTPS.");
+  if (!/\/bridge\/?$/.test(callbackUrl.pathname)) throw new Error("ABC bridge callback is not configured.");
+  callbackUrl.pathname = callbackUrl.pathname.replace(/\/bridge\/?$/, "/callback");
+  callbackUrl.search = searchParams.toString();
+  return callbackUrl;
+}
+
 export async function callAbcBridge(body: Record<string, unknown>) {
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
