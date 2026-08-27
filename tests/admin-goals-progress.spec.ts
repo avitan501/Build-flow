@@ -214,6 +214,7 @@ test("affiliate tracker is persistent, owner-only, filterable, and setup-gated",
   expect(component).toContain("Open affiliate link");
   expect(component).toContain("Save verified Amazon link");
   expect(component).toContain("Record Impact approval");
+  expect(component).toContain("<ProgramDrawer key={selected.id}");
   expect(component).toContain('rel="sponsored noopener noreferrer"');
   expect(component).toContain("Setup checklist");
   expect(actions).toContain("await requireAdminProfile()");

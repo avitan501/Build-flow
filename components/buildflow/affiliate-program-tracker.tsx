@@ -129,7 +129,7 @@ export function AffiliateProgramTracker({ programs, checklist, activities, attac
       <p className="px-4 py-2 text-xs text-slate-500">Showing {filtered.length} of {programs.length}. Swipe the desktop chart horizontally; tap any row for the complete record.</p>
     </>}
     {message ? <div className={`border-t px-4 py-3 text-sm font-semibold ${/failed|could not|required|complete every|invalid/i.test(message) ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{message}</div> : null}
-    {selected ? <ProgramDrawer program={selected} checklist={checklist.filter((item) => item.program_id === selected.id)} activities={activities.filter((item) => item.program_id === selected.id)} attachments={attachments.filter((item) => item.program_id === selected.id)} close={() => setSelectedId(null)} run={run} pending={isPending} /> : null}
+    {selected ? <ProgramDrawer key={selected.id} program={selected} checklist={checklist.filter((item) => item.program_id === selected.id)} activities={activities.filter((item) => item.program_id === selected.id)} attachments={attachments.filter((item) => item.program_id === selected.id)} close={() => setSelectedId(null)} run={run} pending={isPending} /> : null}
   </section>;
 }
 
