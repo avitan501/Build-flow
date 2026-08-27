@@ -10,11 +10,13 @@ import {
 import { extractSupplierQuoteWithAi, type SupplierQuoteAiMetadata } from "@/lib/supplier-quote-ai"
 import { parseSupplierQuoteText } from "@/lib/supplier-quote-parser"
 import { inferSupplierName } from "@/lib/supplier-quote-supplier"
+import { MATERIAL_CATALOG_CATEGORIES, normalizeMaterialCatalogDepartment } from "@/lib/material-catalog"
 
 export type MaterialCatalogPdfExtraction = {
   items: ImportedCatalogItem[]
   metadata: SupplierQuoteAiMetadata
   detectedSupplierName: string
+  category: string
 }
 
 const EMPTY_METADATA: SupplierQuoteAiMetadata = {
@@ -46,16 +48,21 @@ export async function extractMaterialCatalogItemsFromPdf(file: File, fallbackCat
     } catch (error) {
       console.error("Catalog PDF AI extraction failed", error)
     }
+    const metadata = aiResult?.metadata ?? EMPTY_METADATA
+    const detectedCategory = metadata.department ? normalizeMaterialCatalogDepartment(metadata.department) : ""
+    const category = (MATERIAL_CATALOG_CATEGORIES as readonly string[]).includes(detectedCategory)
+      ? detectedCategory
+      : fallbackCategory
     const supplierItems = aiResult?.items.length ? aiResult.items : textQuoteItems
     const items = supplierItems.length
-      ? supplierRowsToCatalogItems(supplierItems, fallbackCategory)
-      : parseMaterialComparisonText(text, fallbackCategory)
+      ? supplierRowsToCatalogItems(supplierItems, category)
+      : parseMaterialComparisonText(text, category)
     if (!items.length) throw new Error("The PDF opened, but no dependable product rows were found. Use a supplier quote, invoice, price list, or catalog PDF with readable product names.")
-    const metadata = aiResult?.metadata ?? EMPTY_METADATA
     return {
       items,
       metadata,
       detectedSupplierName: metadata.supplierName || inferSupplierName(text),
+      category,
     }
   } finally { await parser.destroy() }
 }

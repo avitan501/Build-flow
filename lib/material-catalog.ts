@@ -88,6 +88,9 @@ export type CatalogSupplier = {
 }
 
 const DEPARTMENT_ALIASES: Record<string, MaterialCatalogCategory> = {
+  lumber: "Framing",
+  "lumber & building materials": "Framing",
+  "lumber and building materials": "Framing",
   "door and molding": "Door & Molding",
   "doors and molding": "Door & Molding",
   "door & molding": "Door & Molding",
