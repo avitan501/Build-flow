@@ -197,19 +197,20 @@ function StructuredPreview({ proposal }: { proposal: IntakeProposal }) {
     );
   }
   if (proposal.recordType === "supplier" && proposal.supplier) {
+    const supplierDetails = [
+      proposal.supplier.contactName,
+      proposal.supplier.phone,
+      proposal.supplier.email,
+      proposal.supplier.address,
+    ]
+      .filter(Boolean)
+      .join(" · ");
     return (
       <div className="mt-4 grid gap-2 rounded-md border border-slate-200 bg-white p-4 text-sm">
         <strong>{proposal.supplier.name || "New supplier"}</strong>
-        <span className="text-slate-600">
-          {[
-            proposal.supplier.contactName,
-            proposal.supplier.phone,
-            proposal.supplier.email,
-            proposal.supplier.address,
-          ]
-            .filter(Boolean)
-            .join(" · ") || "Supplier details were not included"}
-        </span>
+        {supplierDetails ? (
+          <span className="text-slate-600">{supplierDetails}</span>
+        ) : null}
       </div>
     );
   }

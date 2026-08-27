@@ -80,4 +80,5 @@ test("Task To Do contains the owner AI intake and the dashboard no longer duplic
   expect(goals).toContain('href="/owner/ai-inbox"');
   expect(dashboard).not.toContain('label: "AI Phone Inbox"');
   expect(inbox).toContain('href="/admin/goals-progress"');
+  expect(inbox).not.toContain("Supplier details were not included");
 });
