@@ -66,7 +66,7 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
   const [shipToNumber, setShipToNumber] = useState("");
   const [branchNumber, setBranchNumber] = useState("");
   const [newYorkBranches, setNewYorkBranches] = useState<AbcBranch[]>([]);
-  const [query, setQuery] = useState("roof shingles");
+  const [query, setQuery] = useState("Roofing");
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [items, setItems] = useState<AbcCatalogItem[]>([]);
@@ -190,25 +190,37 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
     setHasSearched(true);
     setError("");
     setResult(null);
-    const response = await fetch(`/api/integrations/abc/catalog?mode=${connectionMode}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, shipToNumber, branchNumber }),
-    }).catch(() => null);
-    const payload = response ? await response.json().catch(() => null) as { items?: AbcCatalogItem[]; error?: string } | null : null;
-    if (!response || !response.ok) {
-      setError(payload?.error || "Could not search the ABC catalog.");
-      setItems([]);
-    } else {
-      const nextItems = Array.isArray(payload?.items) ? payload.items : [];
-      setItems(nextItems);
-      if (nextItems[0]) chooseItem(nextItems[0]);
-      else {
-        setSelectedItemNumber("");
-        setSelectedUom("");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 55_000);
+    try {
+      const response = await fetch(`/api/integrations/abc/catalog?mode=${connectionMode}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, shipToNumber, branchNumber }),
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => null) as { items?: AbcCatalogItem[]; error?: string } | null;
+      if (!response.ok) {
+        setError(payload?.error || "Could not search the ABC catalog.");
+        setItems([]);
+      } else {
+        const nextItems = Array.isArray(payload?.items) ? payload.items : [];
+        setItems(nextItems);
+        if (nextItems[0]) chooseItem(nextItems[0]);
+        else {
+          setSelectedItemNumber("");
+          setSelectedUom("");
+        }
       }
+    } catch (searchError) {
+      setItems([]);
+      setError(searchError instanceof DOMException && searchError.name === "AbortError"
+        ? "ABC product search took too long. Try an exact ABC item number or try again."
+        : "Could not reach the ABC catalog.");
+    } finally {
+      window.clearTimeout(timeout);
+      setSearching(false);
     }
-    setSearching(false);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -271,7 +283,7 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
         </div>
       </form>
 
-      {!searching && hasSearched && items.length === 0 ? <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">ABC returned no products for this search at the selected branch. Try a broader product description or another authorized branch.</p> : null}
+      {!searching && hasSearched && !error && items.length === 0 ? <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">ABC returned no products for this search at the selected branch. Try a broader product description or another authorized branch.</p> : null}
 
       {items.length ? <section className="space-y-3" aria-label="ABC product results">
         <div className="flex items-end justify-between gap-3"><div><h3 className="font-semibold text-slate-950">Products</h3><p className="text-sm text-slate-500">{items.length} result{items.length === 1 ? "" : "s"}</p></div></div>

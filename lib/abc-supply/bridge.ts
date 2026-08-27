@@ -12,7 +12,7 @@ export async function callAbcBridge(body: Record<string, unknown>) {
   const response = await fetch(ABC_BRIDGE_URL, {
     method: "POST",
     cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(50_000),
     headers: {
       Authorization: `Bearer ${session.access_token}`,
       Accept: "application/json",

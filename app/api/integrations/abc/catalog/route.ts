@@ -5,6 +5,7 @@ import { requireAdminProfile, requireSignedInProfile } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const preferredRegion = "iad1";
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const connectedUser = new URL(request.url).searchParams.get("mode") === "connected-user";
