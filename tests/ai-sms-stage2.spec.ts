@@ -55,6 +55,9 @@ test("phone AI stays concise and never fills optional details with guesses", () 
   expect(broker).toContain("Keep the summary to one short factual sentence");
   expect(broker).toContain("do not repeat the original message");
   expect(broker).toContain("do not ask for optional details");
+  expect(broker).toContain("A supplier name or company name alone is enough");
+  expect(broker).toContain("Carlos always means Avantia's employee Carlos");
+  expect(broker).toContain('recordType === "supplier" && supplier?.name');
   expect(broker).toContain("max_output_tokens: 900");
   expect(broker).toContain("candidate.summary.trim().slice(0, 180)");
 });
