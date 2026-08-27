@@ -67,18 +67,24 @@ export async function searchAbcUserAccounts(userId: string) {
 
 export async function searchAbcUserItems(userId: string, query: string, branchNumber: string) {
   const itemNumberSearch = /^[A-Za-z0-9._/-]+$/.test(query) && /\d/.test(query);
+  const filters = itemNumberSearch
+    ? [
+      { key: "itemNumber", condition: "contains", values: [query], joinCondition: "and" },
+      { key: "branchNumber", condition: "equals", values: [branchNumber], joinCondition: null },
+    ]
+    : [{ key: "branchNumber", condition: "equals", values: [branchNumber], joinCondition: null }];
   const payload = await abcUserRequest(userId, "/api/product/v1/search/items?familyItems=false", {
     method: "POST",
     body: JSON.stringify({
-      filters: [
-        { key: itemNumberSearch ? "itemNumber" : "itemDescription", condition: "contains", values: [query], joinCondition: "and" },
-        { key: "branchNumber", condition: "equals", values: [branchNumber], joinCondition: null },
-      ],
-      embed: ["variations"],
+      filters,
       pagination: { itemsPerPage: 12, pageNumber: 1 },
     }),
   });
-  return parseAbcCatalogItems(payload, branchNumber, true);
+  const items = parseAbcCatalogItems(payload, branchNumber, true);
+  if (itemNumberSearch) return items;
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = items.filter((item) => terms.every((term) => `${item.itemDescription} ${item.familyName}`.toLowerCase().includes(term)));
+  return matches.length ? matches : items;
 }
 
 export async function priceAbcUserItems(userId: string, request: Record<string, unknown>) {
