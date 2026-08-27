@@ -362,8 +362,16 @@ export async function confirmAuraIntakeAction(formData: FormData) {
 }
 
 export async function reviewTrustedSmsIntakeAction(formData: FormData) {
-  const { user } = await requireOwnerAccess("/owner/ai-inbox");
+  const { user, supabase } = await requireOwnerAccess("/owner/ai-inbox");
   const intakeId = requireUuid(formData.get("intakeId"));
+  try {
+    await invokeMessagingBroker(supabase, { action: "review_trusted_sms_intake", intakeId });
+    revalidatePath("/owner/ai-inbox");
+    revalidatePath("/owner/aura");
+    return;
+  } catch {
+    // Keep the website-side AI path as a safe fallback when the broker is temporarily unavailable.
+  }
   const admin = createAdminClient();
   const { data: intake, error: readError } = await admin.from("aura_intakes").select("message_text,status,source,sender_phone").eq("id", intakeId).maybeSingle<{ message_text: string | null; status: string; source: string; sender_phone: string }>();
   if (readError || !intake) throw new Error(`Unable to load AI Inbox item: ${readError?.message || "Not found"}`);
