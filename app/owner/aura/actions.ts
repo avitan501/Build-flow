@@ -18,6 +18,7 @@ import { requireManagerPortalProfile } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url";
 import { addAuraCommunicationLinks } from "@/lib/aura/email-links";
+import { extractAuraProposal } from "@/lib/aura/intake";
 
 function requireUuid(value: FormDataEntryValue | null) {
   const id = typeof value === "string" ? value.trim() : "";
@@ -361,9 +362,17 @@ export async function confirmAuraIntakeAction(formData: FormData) {
 }
 
 export async function reviewTrustedSmsIntakeAction(formData: FormData) {
-  const { supabase } = await requireOwnerAccess("/owner/ai-inbox");
+  const { user } = await requireOwnerAccess("/owner/ai-inbox");
   const intakeId = requireUuid(formData.get("intakeId"));
-  await invokeMessagingBroker(supabase, { action: "review_trusted_sms_intake", intakeId });
+  const admin = createAdminClient();
+  const { data: intake, error: readError } = await admin.from("aura_intakes").select("message_text,status,source,sender_phone").eq("id", intakeId).maybeSingle<{ message_text: string | null; status: string; source: string; sender_phone: string }>();
+  if (readError || !intake) throw new Error(`Unable to load AI Inbox item: ${readError?.message || "Not found"}`);
+  if (intake.source !== "sms" || intake.sender_phone !== "+13475675077" || !intake.message_text || !["pending", "needs_follow_up", "failed"].includes(intake.status)) throw new Error("This phone instruction cannot be reviewed.");
+  const { proposal, model } = await extractAuraProposal(intake.message_text);
+  const status = proposal.needsFollowUp ? "needs_follow_up" : "pending";
+  const { error: updateError } = await admin.from("aura_intakes").update({ proposal, ai_model: model, status, error_message: null }).eq("id", intakeId).in("status", ["pending", "needs_follow_up", "failed"]);
+  if (updateError) throw new Error(`AI review could not be saved: ${updateError.message}`);
+  await admin.from("aura_audit_log").insert({ intake_id: intakeId, actor_user_id: user.id, action: "ai_review_completed", details: { model, status } });
   revalidatePath("/owner/ai-inbox");
   revalidatePath("/owner/aura");
 }

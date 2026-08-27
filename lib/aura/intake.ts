@@ -11,7 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const optionalText = z.string().max(500).nullable();
 
 export const auraProposalSchema = z.object({
-  recordType: z.enum(["client", "lead", "task", "material_request"]).optional(),
+  recordType: z.enum(["contact", "client", "lead", "task", "material_request"]).optional(),
   summary: z.string().min(1).max(400),
   contact: z
     .object({
@@ -39,6 +39,17 @@ export const auraProposalSchema = z.object({
       }),
     )
     .max(10),
+  request: z
+    .object({
+      title: z.string().min(1).max(180),
+      department: z.string().min(1).max(100),
+      customerName: optionalText,
+      projectAddress: optionalText,
+      notes: z.string().max(2000).nullable(),
+      items: z.array(z.object({ name: z.string().min(1).max(300), quantity: z.number().positive().max(1_000_000), unit: z.string().min(1).max(40) })).min(1).max(50),
+    })
+    .nullable()
+    .optional(),
   missingInformation: z.array(z.string().min(1).max(160)).max(8),
   needsFollowUp: z.boolean(),
 });
@@ -86,6 +97,16 @@ function normalizeProposal(proposal: AuraProposal): AuraProposal {
       dueAt: normalizeDueAt(task.dueAt),
       priority: task.priority,
     })),
+    request: proposal.request
+      ? {
+          title: proposal.request.title.trim(),
+          department: proposal.request.department.trim() || "Unassigned",
+          customerName: compact(proposal.request.customerName),
+          projectAddress: compact(proposal.request.projectAddress),
+          notes: compact(proposal.request.notes),
+          items: proposal.request.items.map((item) => ({ name: item.name.trim(), quantity: item.quantity, unit: item.unit.trim() || "each" })),
+        }
+      : null,
     missingInformation: proposal.missingInformation.map((item) => item.trim()).filter(Boolean),
   };
 }
@@ -106,8 +127,8 @@ Rules:
 - A contact is a person or company the owner may need to reach.
 - A lead is a possible job, customer opportunity, or sales opportunity.
 - A task is a concrete follow-up action for the owner.
-- Classify the primary record as client, lead, task, or material_request.
-- A material_request is a customer or supplier shopping list, quote request, order request, or request to source construction materials. Represent it as a lead plus a concrete task for Carlos so it is never lost.
+- Classify the primary record as contact, lead, task, or material_request. Preserve an explicit add contact, add lead, add task/add todo, or add request command. Without a command, infer the safest type and use task when uncertain.
+- A material_request is a customer or supplier shopping list, quote request, order request, or request to source construction materials. Extract every requested material into request.items. Use quantity 1 and unit each only when omitted. Do not turn a material request into a generic task.
 - Operational follow-up tasks are assigned to Carlos; start the task notes with "Assigned to Carlos." when appropriate.
 - A single message may contain a contact, a lead, multiple tasks, or any combination.
 - Resolve relative dates using the supplied current time and time zone. Return dueAt as an ISO 8601 timestamp with an offset, or null when no reliable deadline exists.
@@ -158,7 +179,7 @@ export async function transcribeAuraAudio(audio: Uint8Array) {
 }
 
 export function buildAuraPreview(proposal: AuraProposal, code: string) {
-  const typeLabel = proposal.recordType === "material_request" ? "Material request" : proposal.recordType === "client" ? "Client/contact" : proposal.recordType === "lead" ? "Lead" : "Carlos task";
+  const typeLabel = proposal.recordType === "material_request" ? "Material request" : proposal.recordType === "client" || proposal.recordType === "contact" ? "Client/contact" : proposal.recordType === "lead" ? "Lead" : "Carlos task";
   const lines = ["Aura understood:", `Type: ${typeLabel}`, proposal.summary];
 
   if (proposal.contact) {
@@ -172,6 +193,9 @@ export function buildAuraPreview(proposal: AuraProposal, code: string) {
   }
   for (const task of proposal.tasks) {
     lines.push(`Task: ${task.title}${task.dueAt ? ` · ${new Date(task.dueAt).toLocaleString("en-US", { timeZone: process.env.AURA_TIME_ZONE || "America/New_York" })}` : ""}`);
+  }
+  if (proposal.request) {
+    for (const item of proposal.request.items) lines.push(`Material: ${item.quantity} ${item.unit} · ${item.name}`);
   }
   if (proposal.missingInformation.length > 0) {
     lines.push(`Missing: ${proposal.missingInformation.join("; ")}`);
