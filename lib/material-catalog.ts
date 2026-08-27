@@ -124,8 +124,9 @@ export function normalizeMaterialCatalogDepartment(value: string | null | undefi
   const trimmed = String(value ?? "").trim().replace(/\s+/g, " ")
   if (!trimmed) return "Others"
   const normalized = trimmed.toLowerCase()
-  const known = MATERIAL_CATALOG_CATEGORIES.find((category) => category.toLowerCase() === normalized)
-  return known ?? DEPARTMENT_ALIASES[normalized] ?? trimmed
+  const categoryName = normalized.replace(/\s*\/\s*materials$/, "")
+  const known = MATERIAL_CATALOG_CATEGORIES.find((category) => category.toLowerCase() === categoryName)
+  return known ?? DEPARTMENT_ALIASES[categoryName] ?? trimmed
 }
 
 export function materialCatalogDepartmentOptions(...sources: Array<Iterable<string>>) {
