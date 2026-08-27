@@ -63,6 +63,26 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(actions.match(/if \(!access\.owner\).*\.eq\("assignee", "carlos"\)/g)?.length).toBe(2);
 });
 
+test("ABC task provides a policy-correct certification menu and stable bridge", async () => {
+  const [goals, demo, pricing, bridge] = await Promise.all([
+    readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/abc/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/abc-supply-pricing.tsx"), "utf8"),
+    readFile(path.join(root, "lib/abc-supply/bridge.ts"), "utf8"),
+  ]);
+
+  for (const label of ["Customer connection", "Ship-To", "Authorized branch", "Product search", "Unit & quantity", "Availability & price", "Demo script"]) {
+    expect(goals).toContain(label);
+  }
+  expect(demo).toContain('aria-label="ABC demo menu"');
+  expect(demo).toContain("ABC Supply remains the seller");
+  expect(demo).toContain("API ordering is not presented in this demo");
+  expect(pricing).toContain('id="unit-quantity"');
+  expect(pricing).toContain('id="availability-price"');
+  expect(pricing).not.toContain("Estimated total");
+  expect(bridge).toContain("build-flow-wfl3-git-codex-abc-7d0632");
+});
+
 test("manager goals are persistent, status-aware, archivable, and protected for manager users", async () => {
   const [component, statusSelect, actions, migration, archiveMigration] = await Promise.all([
     readFile(path.join(root, "components/buildflow/manager-goals.tsx"), "utf8"),

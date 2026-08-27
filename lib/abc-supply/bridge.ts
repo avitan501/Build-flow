@@ -2,7 +2,10 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 
-const ABC_BRIDGE_URL = "https://build-flow-wfl3.vercel.app/api/integrations/abc/bridge";
+// Keep ABC isolated from unrelated Build Flow preview promotions. The branch
+// alias only advances when the dedicated ABC bridge branch is deployed.
+const ABC_BRIDGE_URL = process.env.ABC_BRIDGE_URL
+  || "https://build-flow-wfl3-git-codex-abc-7d0632-avitanneto-1804s-projects.vercel.app/api/integrations/abc/bridge";
 
 export async function callAbcBridge(body: Record<string, unknown>) {
   const supabase = await createClient();

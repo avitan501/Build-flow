@@ -233,6 +233,16 @@ async function OwnerAffiliateGoal({ status }: { status: ManagerGoalStatus }) {
 }
 
 function AbcSupplyDemoGoal({ status }: { status: ManagerGoalStatus }) {
+  const steps = [
+    ["Customer connection", "/account/abc"],
+    ["Ship-To", "/admin/abc#ship-to"],
+    ["Authorized branch", "/admin/abc#branch"],
+    ["Product search", "/admin/abc#product-search"],
+    ["Unit & quantity", "/admin/abc#unit-quantity"],
+    ["Availability & price", "/admin/abc#availability-price"],
+    ["Demo script", "/admin/abc#demo-notes"],
+  ] as const;
+
   return (
     <GoalDisclosure
       id="abc-supply-demo"
@@ -241,15 +251,16 @@ function AbcSupplyDemoGoal({ status }: { status: ManagerGoalStatus }) {
       number={5}
       eyebrow="Supplier pricing"
       title="ABC Supply Demo"
-      description="Live product search and account pricing."
+      description="ABC certification workflow and private customer pricing."
     >
-      <Link
-        href="/admin/abc"
-        className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#0071e3] px-5 text-sm font-semibold text-white"
-      >
-        Open ABC Supply Demo
-        <ArrowRight className="h-4 w-4" />
-      </Link>
+      <div className="grid gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm"><div><p className="font-semibold text-slate-950">Pre-production review</p><p className="mt-0.5 text-slate-600">Thursday, September 3 · 2:30 PM ET</p></div><span className="rounded-md bg-white px-3 py-2 text-xs font-semibold text-[#0066cc]">In progress</span></div>
+        <nav aria-label="ABC demo sections" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {steps.map(([label, href], index) => <Link key={href} href={href} className="flex min-h-11 items-center justify-between rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:border-sky-300 hover:text-[#0066cc]"><span>{index + 1}. {label}</span><ArrowRight className="h-4 w-4" /></Link>)}
+        </nav>
+        <div className="flex flex-wrap gap-2 text-xs"><span className="rounded-md bg-emerald-50 px-3 py-2 font-semibold text-emerald-800">Website workflow built</span><span className="rounded-md bg-amber-50 px-3 py-2 font-semibold text-amber-900">NY sandbox branch: ABC action needed</span></div>
+        <Link href="/admin/abc" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-md bg-[#0071e3] px-5 text-sm font-semibold text-white">Open full demo<ArrowRight className="h-4 w-4" /></Link>
+      </div>
     </GoalDisclosure>
   );
 }
