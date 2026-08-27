@@ -159,29 +159,6 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
 
   const quoteId = crypto.randomUUID()
   const filePath = `${user.id}/${quoteId}/${cleanFileName(file.name)}`
-  let extraction
-  try {
-    const browserOcrText = String(formData.get("browserOcrText") ?? "").slice(0, 250000)
-    extraction = await extractSupplierQuoteFile(file, browserOcrText, supplierQuoteAiInvoker(supabase))
-  } catch (error) {
-    console.error("Supplier quote extraction failed", error)
-    extraction = {
-      text: "",
-      items: [],
-      metadata: { supplierName: "", quoteNumber: "", quoteDate: "", expiresOn: "", department: "", deliveryCharge: 0, taxPercent: 0, subtotal: null, total: null },
-      extractionNote: "The original document was saved, but automatic extraction failed. Add the items manually.",
-    }
-  }
-
-
-  if (supplierSelection === "auto") {
-    const { data: supplierRows, error: supplierError } = await supabase.rpc("staff_load_catalog_suppliers")
-    if (supplierError) return { ok: false, error: "The invoice was read, but the Supplier Directory could not be checked." }
-    const match = detectSupplierMatch(Array.isArray(supplierRows) ? supplierRows as CatalogSupplier[] : [], extraction.metadata.supplierName, extraction.text)
-    supplierId = match?.id ?? ""
-    supplierName = match?.name || extraction.metadata.supplierName || inferSupplierName(extraction.text) || "Supplier needs review"
-  }
-
   const { error: storageError } = await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).upload(filePath, file, {
     contentType: file.type,
     upsert: false,
@@ -213,32 +190,28 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
     }
   }
 
-  const quoteNumber = clean(formData.get("quoteNumber"), 100) || extraction.metadata.quoteNumber
-  const quoteDate = clean(formData.get("quoteDate"), 10) || extraction.metadata.quoteDate
+  const manualQuoteNumber = clean(formData.get("quoteNumber"), 100)
+  const manualQuoteDate = clean(formData.get("quoteDate"), 10)
   const { error: quoteError } = await supabase.from("supplier_quotes").insert({
     id: quoteId,
     client_id: client?.id ?? null,
     client_name_snapshot: clientName,
     comparison_id: comparisonId,
     supplier_id: supplierId || null,
-    supplier_name: supplierName,
-    quote_number: quoteNumber,
+    supplier_name: supplierName || "Supplier detection pending",
+    quote_number: manualQuoteNumber,
     department,
-    quote_date: /^\d{4}-\d{2}-\d{2}$/.test(quoteDate) ? quoteDate : null,
-    expires_on: extraction.metadata.expiresOn || null,
+    quote_date: /^\d{4}-\d{2}-\d{2}$/.test(manualQuoteDate) ? manualQuoteDate : null,
+    expires_on: null,
     file_name: file.name.slice(0, 255),
     file_path: filePath,
     mime_type: file.type,
     file_size: file.size,
-    raw_text: extraction.text,
-    extraction_note: extraction.extractionNote,
-    delivery_charge: extraction.metadata.deliveryCharge,
-    tax_percent: extraction.metadata.taxPercent,
-    notes: supplierSelection === "auto" && !supplierId
-      ? "Supplier was read from the invoice but did not match the Supplier Directory. Confirm the supplier before routing."
-      : extraction.metadata.supplierName && extraction.metadata.supplierName.toLowerCase() !== supplierName.toLowerCase()
-      ? `Document supplier detected as ${extraction.metadata.supplierName}. Confirm the selected Supplier Directory record.`
-      : "",
+    raw_text: "",
+    extraction_note: "Original document saved privately. AI extraction is in progress.",
+    delivery_charge: 0,
+    tax_percent: 0,
+    notes: "",
     created_by: user.id,
     updated_by: user.id,
   })
@@ -248,6 +221,55 @@ export async function uploadSupplierQuoteAction(formData: FormData): Promise<Act
     console.error("Supplier quote record creation failed", quoteError)
     return { ok: false, error: "The document uploaded, but its quote record could not be created." }
   }
+
+  let extraction
+  try {
+    const browserOcrText = String(formData.get("browserOcrText") ?? "").slice(0, 250000)
+    extraction = await extractSupplierQuoteFile(file, browserOcrText, supplierQuoteAiInvoker(supabase))
+  } catch (error) {
+    console.error("Supplier quote extraction failed", error)
+    extraction = {
+      text: "",
+      items: [],
+      metadata: { supplierName: "", quoteNumber: "", quoteDate: "", expiresOn: "", department: "", deliveryCharge: 0, taxPercent: 0, subtotal: null, total: null },
+      extractionNote: "The original document was saved privately. AI could not confirm dependable rows yet; use Re-read with AI. Nothing was added to the catalog.",
+    }
+  }
+
+  let supplierDirectoryNote = ""
+  if (supplierSelection === "auto") {
+    const { data: supplierRows, error: supplierError } = await supabase.rpc("staff_load_catalog_suppliers")
+    if (supplierError) {
+      console.error("Supplier Directory lookup failed", supplierError)
+      supplierDirectoryNote = "The supplier directory could not be checked automatically. Confirm the supplier during review."
+    } else {
+      const match = detectSupplierMatch(Array.isArray(supplierRows) ? supplierRows as CatalogSupplier[] : [], extraction.metadata.supplierName, extraction.text)
+      supplierId = match?.id ?? ""
+      supplierName = match?.name || extraction.metadata.supplierName || inferSupplierName(extraction.text) || "Supplier needs review"
+    }
+  }
+
+  const quoteNumber = manualQuoteNumber || extraction.metadata.quoteNumber
+  const quoteDate = manualQuoteDate || extraction.metadata.quoteDate
+  const reviewNote = supplierDirectoryNote || (supplierSelection === "auto" && !supplierId
+    ? "Supplier was read from the document but did not match the Supplier Directory. Confirm the supplier before routing."
+    : extraction.metadata.supplierName && extraction.metadata.supplierName.toLowerCase() !== supplierName.toLowerCase()
+      ? `Document supplier detected as ${extraction.metadata.supplierName}. Confirm the selected Supplier Directory record.`
+      : "")
+  const { error: quoteUpdateError } = await supabase.from("supplier_quotes").update({
+    supplier_id: supplierId || null,
+    supplier_name: supplierName || extraction.metadata.supplierName || "Supplier needs review",
+    quote_number: quoteNumber,
+    quote_date: /^\d{4}-\d{2}-\d{2}$/.test(quoteDate) ? quoteDate : null,
+    expires_on: extraction.metadata.expiresOn || null,
+    raw_text: extraction.text,
+    extraction_note: extraction.extractionNote,
+    delivery_charge: extraction.metadata.deliveryCharge,
+    tax_percent: extraction.metadata.taxPercent,
+    notes: reviewNote,
+    updated_by: user.id,
+  }).eq("id", quoteId)
+  if (quoteUpdateError) console.error("Supplier quote extraction update failed", quoteUpdateError)
 
   if (extraction.items.length) {
     const { error: itemError } = await supabase.from("supplier_quote_items").insert(extraction.items.map((item, index) => ({

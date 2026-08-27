@@ -44,6 +44,10 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(uploadForm).toContain("Attach to a client request")
   expect(uploadForm).toContain("Choose request / case")
   expect(uploadForm).toContain("initialRequestId")
+  expect(uploadForm).toContain("initialDepartment")
+  expect(uploadForm).toContain("initiallyOpen")
+  expect(uploadForm).toContain("Original PDF stays private")
+  expect(uploadForm).toContain("AI fills vendor, date, and prices")
   expect(uploadForm).toContain("Detect from invoice")
   expect(uploadForm).toContain("extractImageTextInBrowser")
   expect(uploadForm).not.toContain("Scanned-image OCR is waiting for AI activation.")
@@ -101,6 +105,11 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(clientMigration).toContain("supplier_quotes_client_updated_idx")
   expect(page).toContain('"supplier-quote-ocr"')
   expect(actions).toContain("supplierQuoteAiInvoker")
+  expect(actions.indexOf(`.from(SUPPLIER_QUOTE_BUCKET).upload`)).toBeLessThan(actions.indexOf("extractSupplierQuoteFile(file"))
+  expect(actions).toContain("Original document saved privately. AI extraction is in progress.")
+  const extraction = await readFile(path.join(root, "lib/supplier-quote-extraction.ts"), "utf8")
+  expect(extraction).toContain("Supplier quote direct AI fallback")
+  expect(extraction).not.toContain("Add the items manually")
 })
 
 test("client request chart keeps quantity, item, and details in stable columns", () => {

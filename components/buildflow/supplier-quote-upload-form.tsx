@@ -8,7 +8,7 @@ import { uploadSupplierQuoteAction } from "@/app/admin/supplier-quotes/actions"
 import { extractImageTextInBrowser } from "@/lib/browser-document-extraction"
 import type { SupplierQuoteClient, SupplierQuoteRequestOption, SupplierQuoteSupplier } from "@/lib/supplier-quotes"
 
-export function SupplierQuoteUploadForm({ clients, requests, suppliers, departments, enabled, aiEnabled, initialRequestId = "" }: {
+export function SupplierQuoteUploadForm({ clients, requests, suppliers, departments, enabled, aiEnabled, initialRequestId = "", initialDepartment = "Others", initiallyOpen = false }: {
   clients: SupplierQuoteClient[]
   requests: SupplierQuoteRequestOption[]
   suppliers: SupplierQuoteSupplier[]
@@ -16,11 +16,13 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
   enabled: boolean
   aiEnabled: boolean
   initialRequestId?: string
+  initialDepartment?: string
+  initiallyOpen?: boolean
 }) {
   const initialRequest = requests.find((request) => request.id === initialRequestId)
   const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
-  const [open, setOpen] = useState(Boolean(initialRequest))
+  const [open, setOpen] = useState(Boolean(initialRequest) || initiallyOpen)
   const [fileName, setFileName] = useState("")
   const [linkMode, setLinkMode] = useState<"unlinked" | "request">(initialRequest ? "request" : "unlinked")
   const [clientSelection, setClientSelection] = useState(initialRequest?.clientId ?? "")
@@ -72,7 +74,7 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
   return (
     <section id="supplier-quote-upload" className="w-full scroll-mt-6 border border-slate-200 bg-white shadow-sm sm:max-w-2xl" aria-labelledby="supplier-quote-upload-title">
       <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-4 sm:px-5">
-        <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0071e3]">New quote</p><h2 id="supplier-quote-upload-title" className="mt-1 text-lg font-bold">Upload and extract</h2></div>
+        <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0071e3]">AI supplier intake</p><h2 id="supplier-quote-upload-title" className="mt-1 text-lg font-bold">Upload once. Review before saving.</h2></div>
         <button type="button" onClick={() => setOpen(false)} aria-label="Close upload form" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600"><X className="h-4 w-4" /></button>
       </div>
       <form ref={formRef} action={submit} className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
@@ -88,7 +90,7 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
           <select name="supplierId" required value={supplierId} onChange={(event) => setSupplierId(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="auto">Detect from invoice</option>{suppliers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select>
         </label>
         <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Department
-          <select name="department" defaultValue="Others" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm">{departments.map((department) => <option key={department}>{department}</option>)}</select>
+          <select name="department" defaultValue={initialDepartment} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm">{departments.map((department) => <option key={department}>{department}</option>)}</select>
         </label>
         <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Quote number <span className="font-normal text-slate-400">Optional</span><input name="quoteNumber" className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm" placeholder="Q-1048" /></label>
         <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Quote date <input name="quoteDate" type="date" className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm" /></label>
@@ -97,7 +99,11 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
           <input name="quoteFile" type="file" required accept=".pdf,.csv,.txt,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,text/plain,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")} />
         </label>
         {error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 sm:col-span-2">{error}</p> : null}
-        <p className="text-xs font-medium text-slate-500 sm:col-span-2">Supplier, quote details, and material rows are read from the document. Review the results before routing.</p>
+        <div className="grid gap-2 rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 sm:col-span-2 sm:grid-cols-3" aria-label="Safe supplier quote import steps">
+          <p className="text-xs font-semibold text-emerald-950"><span className="mr-1.5 text-emerald-700">1</span>Original PDF stays private</p>
+          <p className="text-xs font-semibold text-emerald-950"><span className="mr-1.5 text-emerald-700">2</span>AI fills vendor, date, and prices</p>
+          <p className="text-xs font-semibold text-emerald-950"><span className="mr-1.5 text-emerald-700">3</span>You approve before catalog changes</p>
+        </div>
         {extractionStatus ? <p role="status" className="text-xs font-semibold text-[#0071e3] sm:col-span-2">{extractionStatus}</p> : null}
         <div className="flex justify-end sm:col-span-2"><button type="submit" disabled={pending || !fileName || (linkMode === "request" && (!clientSelection || !requestId))} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-bold text-white disabled:opacity-40">{pending ? <><LoaderCircle className="h-4 w-4 animate-spin" /> Reading document…</> : <>Upload and extract <FileUp className="h-4 w-4" /></>}</button></div>
       </form>

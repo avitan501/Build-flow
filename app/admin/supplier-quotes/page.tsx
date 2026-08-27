@@ -20,7 +20,7 @@ function QuoteRows({ quotes, unlinked = false }: { quotes: SupplierQuoteRecord[]
 }
 
 export default async function SupplierQuotesPage({ searchParams }: {
-  searchParams: Promise<{ supplier?: string; client?: string; date?: string; request?: string }>
+  searchParams: Promise<{ supplier?: string; client?: string; date?: string; request?: string; department?: string; from?: string }>
 }) {
   const filters = await searchParams
   const supplierFilter = filters.supplier?.trim() || ""
@@ -66,6 +66,10 @@ export default async function SupplierQuotesPage({ searchParams }: {
   const requestItemsByRequestId = new Map([...requestItemSourcesByRequestId].map(([requestId, sources]) => [requestId, preferredRequestMaterialSources(sources).map(toRequestMaterialChartRow)]))
   const requestedRequestId = filters.request?.trim() || ""
   const initialRequestId = openRequests.some((request) => request.id === requestedRequestId) ? requestedRequestId : ""
+  const departmentOptions = materialCatalogDepartmentOptions()
+  const requestedDepartment = filters.department?.trim() || ""
+  const initialDepartment = departmentOptions.find((department) => department === requestedDepartment) ?? "Others"
+  const openedFromCatalog = filters.from === "catalog"
   const clientById = new Map(clients.map((client) => [client.id, client]))
   const comparisonByRequestId = new Map<string, RequestComparisonRow>()
   for (const comparison of comparisonsResult.data ?? []) {
@@ -96,7 +100,7 @@ export default async function SupplierQuotesPage({ searchParams }: {
       <div className="mx-auto max-w-7xl">
         <header className="flex flex-col gap-5 border-b border-slate-200 pb-6 xl:flex-row xl:items-end xl:justify-between">
           <div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0071e3]">Manager Portal</p><h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Supplier Quote Storage</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">One private place for supplier documents, extracted materials, current pricing, and the next action.</p></div>
-          <SupplierQuoteUploadForm key={initialRequestId || "new-quote"} clients={clients} requests={openRequests} suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name, catalogDepartments: supplier.catalogDepartments }))} departments={materialCatalogDepartmentOptions()} enabled={enabled} aiEnabled={Boolean(ocrStatus.data?.ok && ocrStatus.data.configured)} initialRequestId={initialRequestId} />
+          <SupplierQuoteUploadForm key={`${initialRequestId || "new-quote"}-${initialDepartment}-${openedFromCatalog}`} clients={clients} requests={openRequests} suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name, catalogDepartments: supplier.catalogDepartments }))} departments={departmentOptions} enabled={enabled} aiEnabled={Boolean(ocrStatus.data?.ok && ocrStatus.data.configured)} initialRequestId={initialRequestId} initialDepartment={initialDepartment} initiallyOpen={openedFromCatalog} />
         </header>
 
         {!enabled ? <div className="mt-5 border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Supplier Quote Storage is waiting for its database update.</div> : null}

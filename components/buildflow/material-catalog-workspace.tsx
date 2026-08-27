@@ -9,7 +9,6 @@ import { createPortal } from "react-dom"
 
 import {
   deleteMaterialCatalogItemAction,
-  importMaterialCatalogPdfAction,
   saveCatalogDepartmentSuppliersAction,
   saveMaterialCatalogItemAction,
   saveMaterialCatalogPricesAction,
@@ -416,26 +415,6 @@ export function MaterialCatalogWorkspace({
     })
   }
 
-  function importPdf(file: File | null) {
-    if (!file) return
-    const formData = new FormData()
-    formData.set("catalogPdf", file)
-    formData.set("category", selectedCategory)
-    startTransition(async () => {
-      const result = await importMaterialCatalogPdfAction(formData)
-      if (!result.ok) return setError(result.error)
-      setSelectedCategory(result.data.category)
-      if (result.data.supplierId) {
-        setCatalogSupplierIds((current) => ({
-          ...current,
-          [result.data.category]: [...new Set([...(current[result.data.category] ?? []), result.data.supplierId])],
-        }))
-      }
-      setNotice(result.message)
-      router.refresh()
-    })
-  }
-
   function prepareExaResult(result: import("@/lib/exa-catalog-search").ExaCatalogSearchResult) {
     const draft = emptyEditor(selectedCategory)
     setEditor({
@@ -458,9 +437,9 @@ export function MaterialCatalogWorkspace({
             <p className="mt-1 text-sm text-slate-600">Edit one category at a time. Only suppliers you add become price columns.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold hover:border-sky-400">
-              <FileUp className="h-4 w-4" />Import PDF<input type="file" accept="application/pdf,.pdf" className="sr-only" disabled={pending} onChange={(event) => { importPdf(event.target.files?.[0] ?? null); event.currentTarget.value = "" }} />
-            </label>
+            <button type="button" onClick={() => router.push(`/admin/documents?intent=catalog&department=${encodeURIComponent(selectedCategory)}&upload=1#document-upload`)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold transition hover:border-sky-400 hover:bg-sky-50">
+              <FileUp className="h-4 w-4 text-[#0071e3]" />Upload document
+            </button>
             <button type="button" onClick={openCatalogSuppliers} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold hover:border-sky-400"><Store className="h-4 w-4" />Add supplier</button>
             <button type="button" onClick={() => setEditor(emptyEditor(selectedCategory))} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Add item</button>
           </div>

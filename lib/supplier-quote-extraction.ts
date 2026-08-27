@@ -39,6 +39,13 @@ export async function extractSupplierQuoteFile(file: File, suppliedOcrText = "",
   } catch (error) {
     console.error("Supplier quote AI extraction failed", error)
   }
+  if (!aiResult && invoke) {
+    try {
+      aiResult = await extractSupplierQuoteWithAi(file, text)
+    } catch (error) {
+      console.error("Supplier quote direct AI fallback failed", error)
+    }
+  }
 
   const items = aiResult?.items.length ? aiResult.items : parsedItems
   const extractionNote = aiResult?.items.length
@@ -46,8 +53,8 @@ export async function extractSupplierQuoteFile(file: File, suppliedOcrText = "",
     : items.length
       ? `${items.length} possible line item${items.length === 1 ? "" : "s"} extracted from document text. AI was unavailable or did not improve the result; review quantities and prices.`
       : text
-        ? "The document text was saved, but no dependable item rows were found. Add the items manually."
-        : "The original document was saved, but OCR could not identify dependable item rows. Add the items manually."
+        ? "The original document and its text were saved. AI could not confirm dependable rows yet; use Re-read with AI. Nothing was added to the catalog."
+        : "The original document was saved. AI could not confirm dependable rows yet; use Re-read with AI. Nothing was added to the catalog."
   return {
     text: text.slice(0, 250000),
     items,
