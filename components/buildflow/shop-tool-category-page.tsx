@@ -168,33 +168,15 @@ function DepartmentUploadActions({
   projects: ProjectRecord[]
   selectedProjectId?: string
 }) {
-  const actions = department === "Framing" ? [
-    {
-      id: "framing-upload-framer-list",
-      label: "Upload framer list",
-      description: "PDF, photo, CSV, or spreadsheet with framing quantities",
-      accept: ".csv,.xls,.xlsx,.pdf,image/png,image/jpeg,image/webp",
-    },
-    {
-      id: "framing-upload-blue-print",
-      label: "Upload blueprint",
-      description: "Construction plan or framing blueprint for takeoff review",
-      accept: ".pdf,image/png,image/jpeg,image/webp",
-    },
-  ] : [
-    {
-      id: "kitchen-upload-kitchen-plan",
-      label: "Upload kitchen plan",
-      description: "Kitchen plan, cabinet layout, PDF, or image",
-      accept: ".pdf,image/png,image/jpeg,image/webp",
-    },
-    {
-      id: "kitchen-upload-design-spec",
-      label: "Upload design spec",
-      description: "Cabinet, finish, hardware, appliance, CSV, or spreadsheet specification",
-      accept: ".csv,.xls,.xlsx,.pdf,image/png,image/jpeg,image/webp",
-    },
-  ]
+  const action = department === "Framing" ? {
+    id: "framing-upload-plan-or-list",
+    label: "Upload plan or material list",
+    description: "Blueprint, framer list, photo, PDF, CSV, or spreadsheet",
+  } : {
+    id: "kitchen-upload-plan-or-spec",
+    label: "Upload plan or design spec",
+    description: "Kitchen plan, cabinet layout, photo, PDF, CSV, or spreadsheet",
+  }
 
   const icon = (
     <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -206,22 +188,21 @@ function DepartmentUploadActions({
   )
 
   return (
-    <section className="grid gap-3 sm:grid-cols-2 sm:gap-4">
-      {actions.map((action) => (
-        <ManagerItemVisibility key={action.id} itemId={action.id}>
-          <PlanRequestUploadCard
-            requestId={action.id}
-            category={department}
-            questionnaireDepartment={questionnaireDepartment}
-            label={action.label}
-            description={action.description}
-            accept={action.accept}
-            icon={icon}
-            projects={projects}
-            selectedProjectId={selectedProjectId}
-          />
-        </ManagerItemVisibility>
-      ))}
+    <section className="max-w-xl">
+      <ManagerItemVisibility itemId={action.id}>
+        <PlanRequestUploadCard
+          requestId={action.id}
+          category={department}
+          questionnaireDepartment={questionnaireDepartment}
+          label={action.label}
+          description={action.description}
+          accept=".csv,.xls,.xlsx,.pdf,image/png,image/jpeg,image/webp"
+          icon={icon}
+          projects={projects}
+          selectedProjectId={selectedProjectId}
+          compact
+        />
+      </ManagerItemVisibility>
     </section>
   )
 }

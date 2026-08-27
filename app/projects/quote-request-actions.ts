@@ -376,6 +376,7 @@ export async function saveMaterialQuestionnaireResponseAction(input: {
   responseId: string
   answers: Record<string, MaterialAnswerValue>
   complete: boolean
+  deferSubmit?: boolean
 }): Promise<ActionResult<{ notification: { owner: RequestNotificationStatus; client: RequestNotificationStatus } }>> {
   const session = await currentUser()
   if (!session) return { ok: false, error: "Your session expired. Please sign in again.", authRequired: true }
@@ -425,7 +426,7 @@ export async function saveMaterialQuestionnaireResponseAction(input: {
     completed_at: input.complete ? new Date().toISOString() : null,
   }).eq("id", response.id)
   if (responseError) return { ok: false, error: "Answers saved, but completion status could not be updated." }
-  const notification = input.complete
+  const notification = input.complete && !input.deferSubmit
     ? await finalizeNewProjectRequest(session, input.projectId, input.requestId)
     : { owner: "skipped" as const, client: "skipped" as const }
   revalidatePath(`/projects/${input.projectId}`)
@@ -440,6 +441,7 @@ export async function saveQuoteItemAnswersAction(input: {
   itemId: string
   answers: QuoteRequestAnswer[]
   skipped?: boolean
+  deferSubmit?: boolean
 }): Promise<ActionResult<{ notification: { owner: RequestNotificationStatus; client: RequestNotificationStatus } }>> {
   const session = await currentUser()
   if (!session) return { ok: false, error: "Your session expired. Please sign in again.", authRequired: true }
@@ -453,10 +455,30 @@ export async function saveQuoteItemAnswersAction(input: {
     .eq("owner_id", session.user.id)
 
   if (error) return { ok: false, error: "Could not save the answers." }
-  const notification = input.skipped
+  const notification = input.skipped || input.deferSubmit
     ? { owner: "skipped" as const, client: "skipped" as const }
     : await finalizeNewProjectRequest(session, input.projectId, input.requestId)
   revalidatePath(`/projects/${input.projectId}`)
+  revalidatePath(`/projects/${input.projectId}/requests/${input.requestId}`)
+  revalidatePath("/owner/materials/requests")
+  return { ok: true, data: { notification } }
+}
+
+export async function submitMaterialRequestDraftAction(input: { projectId: string; requestId: string }): Promise<ActionResult<{ notification: { owner: RequestNotificationStatus; client: RequestNotificationStatus } }>> {
+  const session = await currentUser()
+  if (!session) return { ok: false, error: "Your session expired. Please sign in again.", authRequired: true }
+
+  const [{ data: request }, { data: items }, { data: responses }] = await Promise.all([
+    session.supabase.from("quote_requests").select("id").eq("id", input.requestId).eq("project_id", input.projectId).eq("owner_id", session.user.id).eq("status", "draft").maybeSingle<{ id: string }>(),
+    session.supabase.from("quote_request_items").select("id").eq("request_id", input.requestId).eq("project_id", input.projectId).eq("owner_id", session.user.id),
+    session.supabase.from("material_questionnaire_responses").select("status,category_name_snapshot").eq("request_id", input.requestId).eq("project_id", input.projectId).eq("owner_id", session.user.id).returns<Array<{ status: string; category_name_snapshot: string }>>(),
+  ])
+  if (!request) return { ok: false, error: "This draft request is no longer available." }
+  if (!items?.length) return { ok: false, error: "Add at least one item before sending the request." }
+  const incomplete = (responses ?? []).find((response) => response.status !== "complete")
+  if (incomplete) return { ok: false, error: `Finish the ${incomplete.category_name_snapshot} details before sending.` }
+
+  const notification = await finalizeNewProjectRequest(session, input.projectId, input.requestId)
   revalidatePath(`/projects/${input.projectId}/requests/${input.requestId}`)
   revalidatePath("/owner/materials/requests")
   return { ok: true, data: { notification } }

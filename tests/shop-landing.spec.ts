@@ -749,14 +749,20 @@ test("framing supports repeatable lumber order rows", async ({ page }) => {
   if ((page.viewportSize()?.width ?? 0) >= 1024) {
     await expect(page.getByTestId("flooring-order-summary").getByText("100%", { exact: true })).toBeVisible()
   }
-  await page.getByLabel("Douglas Fir").check()
-  await page.getByLabel("Pressure Treated").check()
+  const lumberType = page.getByRole("radiogroup", { name: "Lumber type for item 1" })
+  await expect(lumberType.getByRole("radio", { name: "Regular lumber" })).toHaveAttribute("aria-checked", "true")
+  await lumberType.getByRole("radio", { name: "Douglas Fir" }).click()
+  await expect(lumberType.getByRole("radio", { name: "Douglas Fir" })).toHaveAttribute("aria-checked", "true")
+  await expect(lumberType.getByRole("radio", { name: "Regular lumber" })).toHaveAttribute("aria-checked", "false")
+  await lumberType.getByRole("radio", { name: "Pressure treated" }).click()
+  await expect(lumberType.getByRole("radio", { name: "Pressure treated" })).toHaveAttribute("aria-checked", "true")
+  await expect(lumberType.getByRole("radio", { name: "Douglas Fir" })).toHaveAttribute("aria-checked", "false")
   await page.getByRole("button", { name: "Add Another Item" }).click()
   await expect(page.getByLabel("Lumber size")).toHaveCount(2)
   await expect(page.getByRole("button", { name: "Remove lumber item 2" })).toBeEnabled()
   await expect(page.getByLabel("Lumber size").first().locator("option")).toHaveCount(7)
   await expect(page.getByLabel("Length").first().locator("option")).toHaveCount(5)
-  await expect(page.getByText("Upload blueprint or shopping list", { exact: true })).toHaveCount(0)
+  await expect(page.getByText("Upload plan or material list", { exact: true })).toBeVisible()
 
   const widths = await page.evaluate(() => ({ clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }))
   expect(widths.scrollWidth).toBe(widths.clientWidth)

@@ -1,7 +1,7 @@
 "use client"
 
 import { Check, ChevronLeft, ChevronRight, FileUp, Pencil, Plus, Trash2, X, ZoomIn } from "lucide-react"
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
 import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-provider"
@@ -64,8 +64,12 @@ function LumberItemList({ question, value, onChange, disabled }: {
     onChange({ items: next })
   }
 
-  function toggleItem(index: number, field: "douglasFir" | "pressureTreated") {
-    onChange({ items: items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: !item[field] } : item) })
+  function setLumberType(index: number, type: "regular" | "douglasFir" | "pressureTreated") {
+    onChange({ items: items.map((item, itemIndex) => itemIndex === index ? {
+      ...item,
+      douglasFir: type === "douglasFir",
+      pressureTreated: type === "pressureTreated",
+    } : item) })
   }
 
   return (
@@ -80,9 +84,15 @@ function LumberItemList({ question, value, onChange, disabled }: {
           <label className="grid gap-1 text-xs font-semibold text-slate-600">Quantity<input disabled={disabled} type="number" min="1" inputMode="numeric" value={item.quantity || ""} placeholder="0" onChange={(event) => updateItem(index, "quantity", event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
           <button type="button" disabled={disabled || items.length === 1} onClick={() => onChange({ items: items.filter((_, itemIndex) => itemIndex !== index) })} className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-500 disabled:opacity-30" aria-label={`Remove ${moldingMode ? "molding" : cableMode ? "cable" : "lumber"} item ${index + 1}`}><Trash2 className="h-4 w-4" /></button>
           </div>
-          {!moldingMode && !cableMode ? <div className="flex flex-wrap gap-2">
-            <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700"><input type="checkbox" checked={Boolean(item.douglasFir)} onChange={() => toggleItem(index, "douglasFir")} className="h-4 w-4 accent-[#0071e3]" />Douglas Fir</label>
-            <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700"><input type="checkbox" checked={Boolean(item.pressureTreated)} onChange={() => toggleItem(index, "pressureTreated")} className="h-4 w-4 accent-[#0071e3]" />Pressure Treated</label>
+          {!moldingMode && !cableMode ? <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label={`Lumber type for item ${index + 1}`}>
+            {([
+              ["regular", "Regular lumber"],
+              ["douglasFir", "Douglas Fir"],
+              ["pressureTreated", "Pressure treated"],
+            ] as const).map(([type, label]) => {
+              const active = type === "regular" ? !item.douglasFir && !item.pressureTreated : Boolean(item[type])
+              return <button key={type} type="button" role="radio" aria-checked={active} disabled={disabled} onClick={() => setLumberType(index, type)} className={`min-h-11 rounded-lg border px-2 py-2 text-xs font-semibold leading-4 transition ${active ? "border-[#0071e3] bg-sky-50 text-slate-950 shadow-[inset_0_0_0_1px_#0071e3]" : "border-slate-300 bg-white text-slate-600 hover:border-slate-500"}`}>{label}</button>
+            })}
           </div> : moldingMode ? <p className="text-xs text-slate-500">Enter a catalog code above or attach a molding photo below.</p> : null}
         </div>
       ))}
@@ -255,6 +265,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
   const [errorQuestionId, setErrorQuestionId] = useState<string | null>(null)
   const [productImagePreview, setProductImagePreview] = useState<MaterialQuestion | null>(null)
   const [isPending, startTransition] = useTransition()
+  const reviewAnchorRef = useRef<HTMLDivElement | null>(null)
   const visibleQuestions = useMemo(() => snapshot.questions.filter((question) => isQuestionVisible(question, answers)), [answers, snapshot.questions])
   const current = visibleQuestions[Math.min(step, Math.max(visibleQuestions.length - 1, 0))]
   const progress = visibleQuestions.length ? ((Math.min(step, visibleQuestions.length - 1) + 1) / visibleQuestions.length) * 100 : 100
@@ -281,6 +292,12 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
     questions: visibleQuestions.filter((question) => configuratorGroupFor(question) === group.id),
   })).filter((group) => group.questions.length > 0)
   const usesRightAlignedProductImages = configurator
+
+  useEffect(() => {
+    if (!reviewing) return
+    const frame = window.requestAnimationFrame(() => reviewAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }))
+    return () => window.cancelAnimationFrame(frame)
+  }, [reviewing])
 
   function productImageButton(question: MaterialQuestion, compactImage = false, denseImage = false) {
     if (!question.configuration.imageUrl) return null
@@ -468,7 +485,7 @@ export function MaterialQuestionnaireWizard({ snapshot, initialAnswers = {}, dis
 
       <div className={`${embedded ? "" : "max-h-[62vh] overflow-y-auto"} ${configurator ? "p-0" : compact ? "px-4 py-4 sm:px-5" : "px-5 py-6 sm:px-7"}`}>
         {reviewing ? (
-          <div className={configurator ? "px-4 py-5 sm:px-6" : ""}>
+          <div ref={reviewAnchorRef} className={`${configurator ? "mx-auto my-4 max-w-2xl rounded-[20px] border border-slate-200 bg-white px-4 py-5 shadow-[0_18px_50px_rgba(15,23,42,0.12)] sm:px-6" : ""}`}>
             <div className="mb-5"><h3 className="text-xl font-bold text-slate-950">Review Your Request</h3><p className="mt-1 text-sm text-slate-600">Check the details before choosing a project.</p></div>
             <div className="grid gap-5">
               {reviewQuestionGroups.map((group) => (

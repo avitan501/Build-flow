@@ -222,6 +222,7 @@ export function formatMaterialAnswer(question: MaterialQuestion, value: Material
     if (value.items?.length) parts.push(value.items.map((item) => [
       `${item.size || item.code || "Item"} x ${item.length} - ${item.quantity}`,
       item.code ? `${question.configuration.itemMode === "cable" ? "cable" : "code"} ${item.code}` : "",
+      question.configuration.itemMode === "lumber" && !item.douglasFir && !item.pressureTreated ? "Regular lumber" : "",
       item.douglasFir ? "Douglas Fir" : "",
       item.pressureTreated ? "Pressure Treated" : "",
     ].filter(Boolean).join(", ")).join("; "))

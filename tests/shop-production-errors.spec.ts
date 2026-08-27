@@ -21,10 +21,8 @@ test("thinset calculator returns a usable bag estimate", async ({ page }) => {
 })
 
 for (const upload of [
-  { route: "/shop/framing", label: "Upload framer list" },
-  { route: "/shop/framing", label: "Upload blueprint" },
-  { route: "/shop/kitchen", label: "Upload kitchen plan" },
-  { route: "/shop/kitchen", label: "Upload design spec" },
+  { route: "/shop/framing", label: "Upload plan or material list" },
+  { route: "/shop/kitchen", label: "Upload plan or design spec" },
 ]) {
   test(`${upload.label} exposes a real submission action after file selection`, async ({ page }) => {
     await page.goto(upload.route, { waitUntil: "networkidle" })

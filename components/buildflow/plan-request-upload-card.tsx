@@ -16,9 +16,10 @@ type PlanRequestUploadCardProps = {
   icon: ReactNode
   projects?: ProjectRecord[]
   selectedProjectId?: string
+  compact?: boolean
 }
 
-export function PlanRequestUploadCard({ requestId, label, description, category, questionnaireDepartment, accept, icon, projects = [], selectedProjectId = "" }: PlanRequestUploadCardProps) {
+export function PlanRequestUploadCard({ requestId, label, description, category, questionnaireDepartment, accept, icon, projects = [], selectedProjectId = "", compact = false }: PlanRequestUploadCardProps) {
   const [file, setFile] = useState<File | null>(null)
   const [projectId, setProjectId] = useState(selectedProjectId || projects[0]?.id || "")
   const [completed, setCompleted] = useState(false)
@@ -33,15 +34,15 @@ export function PlanRequestUploadCard({ requestId, label, description, category,
   const questions = getQualificationSettingForPlanRequest(requestId, label, category).questions
 
   return (
-    <article className="flex min-h-[164px] touch-manipulation flex-col justify-between rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+    <article className={`touch-manipulation rounded-[18px] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] ${compact ? "p-3 sm:p-4" : "flex min-h-[164px] flex-col justify-between p-4"}`}>
       <div className="flex items-start justify-between gap-3">
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">{icon}</span>
+        <span className={`inline-flex shrink-0 items-center justify-center bg-slate-950 text-white ${compact ? "h-10 w-10 rounded-xl [&>svg]:h-5 [&>svg]:w-5" : "h-12 w-12 rounded-2xl"}`}>{icon}</span>
         {file ? <span className="max-w-[55%] truncate rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{file.name}</span> : null}
       </div>
-      <div className="mt-4">
+      <div className={compact ? "mt-3" : "mt-4"}>
         <h3 className="text-base font-bold leading-5 text-slate-950">{label}</h3>
         <p className="mt-1 text-xs font-medium leading-5 text-slate-500">{description}</p>
-        <div className="mt-3 grid gap-2">
+        <div className={`${compact ? "mt-2" : "mt-3"} grid gap-2`}>
           <label className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700">
             <input aria-label={label} type="file" accept={accept} className="sr-only" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setCompleted(false) }} />
             {file ? "Change File" : "Choose File"}

@@ -11,6 +11,7 @@ import {
   saveMaterialQuestionnaireResponseAction,
   saveQuoteAttachmentRecordAction,
   saveQuoteItemAnswersAction,
+  submitMaterialRequestDraftAction,
 } from "@/app/projects/quote-request-actions"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import { MaterialQuestionnaireWizard } from "@/components/buildflow/material-questionnaire-wizard"
@@ -34,6 +35,7 @@ type AddToProjectButtonProps = {
   onAdded?: () => void
   autoOpen?: boolean
   projectId?: string
+  deferSubmit?: boolean
 }
 
 type Options = {
@@ -48,7 +50,20 @@ function PlusIcon() {
   )
 }
 
-export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Request Item", file = null, questions: questionOverride, details, questionnaireDepartment, materialAnswers, onAdded, autoOpen = false, projectId }: AddToProjectButtonProps) {
+const CONTINUE_DEPARTMENTS = [
+  ["Framing", "/shop/framing"],
+  ["Electrical", "/shop/electrical"],
+  ["Sheet Rock", "/shop/sheet-rock"],
+  ["Tile", "/shop/tile-work"],
+  ["Flooring", "/shop/wood-floor"],
+  ["Door & Molding", "/shop/door-and-molding"],
+  ["Roofing", "/shop/roofing"],
+  ["Siding", "/shop/siding"],
+  ["Windows", "/shop/window"],
+  ["Kitchen", "/shop/kitchen"],
+] as const
+
+export function AddToProjectButton({ product, quantity = 1, className = "", compact = false, label = "Request Item", file = null, questions: questionOverride, details, questionnaireDepartment, materialAnswers, onAdded, autoOpen = false, projectId, deferSubmit = true }: AddToProjectButtonProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -59,6 +74,8 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
   const [error, setError] = useState<string | null>(null)
   const [questionnaireCompleted, setQuestionnaireCompleted] = useState(false)
   const [authRequired, setAuthRequired] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [showDepartments, setShowDepartments] = useState(false)
   const autoOpened = useRef(false)
   const [isPending, startTransition] = useTransition()
   const qualification = useMemo(() => getQualificationSettingForProduct(product), [product])
@@ -87,6 +104,8 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
     setCreated(null)
     setQuestionnaireCompleted(false)
     setAuthRequired(false)
+    setSubmitted(false)
+    setShowDepartments(false)
     const result = await getAddToProjectOptionsAction()
     if (!result.ok) {
       if (result.authRequired) {
@@ -109,8 +128,8 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
     setError(null)
     startTransition(async () => {
       const result = await addCatalogItemToProjectAction({
-        projectId,
-        requestId: undefined,
+        projectId: projectId || searchParams.get("project") || undefined,
+        requestId: searchParams.get("request") || undefined,
         requestTitle: `${product.category} request`,
         product: {
           id: product.id,
@@ -155,6 +174,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
           responseId: result.data.materialResponse.id,
           answers: materialAnswers,
           complete: true,
+          deferSubmit,
         })
         if (!answersResult.ok) {
           setError(answersResult.error)
@@ -165,7 +185,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
         onAdded?.()
       }
       if (!result.data.materialResponse && questions.length === 0) {
-        const finishResult = await saveQuoteItemAnswersAction({ ...result.data, answers: [] })
+        const finishResult = await saveQuoteItemAnswersAction({ ...result.data, answers: [], deferSubmit })
         if (!finishResult.ok) {
           setError(finishResult.error)
           setCreated(result.data)
@@ -187,6 +207,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
       responseId: created.materialResponse.id,
       answers: nextAnswers,
       complete,
+      deferSubmit,
     })
     if (result.ok) {
       router.refresh()
@@ -228,7 +249,7 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
       .map((question) => ({ questionId: question.id, label: question.label, value: answers[question.id]?.trim() || "" }))
       .filter((answer) => answer.value)
     startTransition(async () => {
-      const result = await saveQuoteItemAnswersAction({ ...created, answers: formatted, skipped })
+      const result = await saveQuoteItemAnswersAction({ ...created, answers: formatted, skipped, deferSubmit })
       if (!result.ok) {
         setError(result.error)
         return
@@ -247,6 +268,18 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
       return
     }
     finishAnswers(false)
+  }
+
+  function submitRequest() {
+    if (!created) return
+    setError(null)
+    startTransition(async () => {
+      const result = await submitMaterialRequestDraftAction({ projectId: created.projectId, requestId: created.requestId })
+      if (!result.ok) return setError(result.error)
+      setSubmitted(true)
+      setShowDepartments(false)
+      router.refresh()
+    })
   }
 
   const buttonClass = compact
@@ -314,10 +347,17 @@ export function AddToProjectButton({ product, quantity = 1, className = "", comp
 
               {created && questionnaireCompleted ? (
                 <div className="grid gap-4">
-                  <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
-                    {`Your ${product.category} request was created. Someone from Avantia Build will get back to you within 24 hours.`}
+                  <div className={`rounded-[18px] border px-4 py-3 text-sm font-semibold ${submitted ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-sky-200 bg-sky-50 text-sky-950"}`}>
+                    {submitted ? "Your request was sent to Avantia Build." : `${product.category} was saved to this request. Review it, add another department, or send it now.`}
                   </div>
-                  <Link href={`/projects/${created.projectId}/requests/${created.requestId}`} className="text-center text-sm font-semibold text-[#0066cc]">View request</Link>
+                  {!submitted ? <>
+                    <Link href={`/projects/${created.projectId}/requests/${created.requestId}`} className="inline-flex min-h-12 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white">Review request</Link>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => setShowDepartments((value) => !value)} className="min-h-11 rounded-full border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700">{showDepartments ? "Hide departments" : "Add department"}</button>
+                      <button type="button" disabled={isPending} onClick={submitRequest} className="min-h-11 rounded-full bg-[#0071e3] px-3 text-sm font-semibold text-white disabled:opacity-50">{isPending ? "Sending…" : "Send request"}</button>
+                    </div>
+                    {showDepartments ? <div className="rounded-[18px] border border-slate-200 bg-slate-50 p-3"><p className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Add to this same request</p><div className="grid grid-cols-2 gap-2">{CONTINUE_DEPARTMENTS.map(([name, href]) => <Link key={href} href={`${href}?project=${encodeURIComponent(created.projectId)}&request=${encodeURIComponent(created.requestId)}`} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-center text-xs font-semibold text-slate-700 hover:border-sky-300 hover:text-[#0066cc]">{name}</Link>)}</div></div> : null}
+                  </> : <Link href={`/projects/${created.projectId}/requests/${created.requestId}`} className="text-center text-sm font-semibold text-[#0066cc]">View sent request</Link>}
                 </div>
               ) : null}
 
