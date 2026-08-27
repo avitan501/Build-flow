@@ -424,6 +424,12 @@ export function MaterialCatalogWorkspace({
     startTransition(async () => {
       const result = await importMaterialCatalogPdfAction(formData)
       if (!result.ok) return setError(result.error)
+      if (result.data.supplierId) {
+        setCatalogSupplierIds((current) => ({
+          ...current,
+          [selectedCategory]: [...new Set([...(current[selectedCategory] ?? []), result.data.supplierId])],
+        }))
+      }
       setNotice(result.message)
       router.refresh()
     })

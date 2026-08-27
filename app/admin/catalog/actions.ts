@@ -13,6 +13,7 @@ import {
   type CatalogSupplier,
 } from "@/lib/material-catalog"
 import { extractMaterialCatalogItemsFromPdf } from "@/lib/material-catalog-pdf"
+import { detectSupplierMatch } from "@/lib/supplier-quote-supplier"
 
 type ActionResult<T = undefined> = T extends undefined
   ? { ok: true; message: string } | { ok: false; error: string }
@@ -74,6 +75,15 @@ const LOWES_SNAPSHOT = {
 
 function clean(value: unknown, max: number) {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max)
+}
+
+function importedSupplierId(name: string) {
+  const slug = name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 120)
+  return `pdf-${slug || "supplier"}-${crypto.randomUUID().slice(0, 8)}`
+}
+
+function quoteDateTime(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00.000Z` : null
 }
 
 function validRetailProductUrl(supplierId: string, value: string) {
@@ -359,7 +369,14 @@ export async function saveCatalogDepartmentSuppliersAction(
   }
 }
 
-export async function importMaterialCatalogPdfAction(formData: FormData): Promise<ActionResult<{ imported: number; skipped: number }>> {
+export async function importMaterialCatalogPdfAction(formData: FormData): Promise<ActionResult<{
+  imported: number
+  matched: number
+  prices: number
+  supplierId: string
+  supplierName: string
+  quoteDate: string
+}>> {
   const { supabase, user } = await managerContext()
   const value = formData.get("catalogPdf")
   const category = clean(formData.get("category"), 100)
@@ -373,16 +390,22 @@ export async function importMaterialCatalogPdfAction(formData: FormData): Promis
     return { ok: false, error: error instanceof Error ? error.message : "The PDF could not be read." }
   }
 
-  const { data: existing } = await supabase.from("material_catalog_items").select("category,name,item_code")
-  const existingNames = new Set((existing ?? []).map((item) => `${item.category.toLowerCase()}::${item.name.toLowerCase()}`))
+  const { items, metadata, detectedSupplierName } = extracted
+  const { data: existing, error: existingError } = await supabase
+    .from("material_catalog_items")
+    .select("id,category,name,item_code,package_quantity,comparison_quantity")
+    .returns<Array<{ id: string; category: string; name: string; item_code: string; package_quantity: number; comparison_quantity: number }>>()
+  if (existingError) return { ok: false, error: "The PDF was read, but the existing catalog could not be checked." }
+  const itemKey = (itemCategory: string, itemName: string) => `${itemCategory.toLowerCase()}::${itemName.toLowerCase()}`
+  const existingByName = new Map((existing ?? []).map((item) => [itemKey(item.category, item.name), item]))
   const existingCodes = new Set((existing ?? []).map((item) => String(item.item_code).toUpperCase()))
-  const rows = extracted.filter((item) => !existingNames.has(`${item.category.toLowerCase()}::${item.name.toLowerCase()}`))
+  const newItems = items.filter((item) => !existingByName.has(itemKey(item.category, item.name)))
   const now = new Date().toISOString()
-  const insertRows = rows.map((item, index) => {
+  const insertRows = newItems.map((item, index) => {
     let itemCode = item.itemCode
     let suffix = 1
-    while (existingCodes.has(itemCode)) itemCode = `${item.itemCode}-${suffix++}`
-    existingCodes.add(itemCode)
+    while (existingCodes.has(itemCode.toUpperCase())) itemCode = `${item.itemCode}-${suffix++}`
+    existingCodes.add(itemCode.toUpperCase())
     return {
       category: item.category,
       item_code: itemCode,
@@ -398,13 +421,116 @@ export async function importMaterialCatalogPdfAction(formData: FormData): Promis
   })
 
   if (insertRows.length) {
-    const { error } = await supabase.from("material_catalog_items").insert(insertRows)
-    if (error) return { ok: false, error: "The PDF was read, but its items could not be imported." }
+    const { data: inserted, error } = await supabase
+      .from("material_catalog_items")
+      .insert(insertRows)
+      .select("id,category,name,item_code,package_quantity,comparison_quantity")
+      .returns<Array<{ id: string; category: string; name: string; item_code: string; package_quantity: number; comparison_quantity: number }>>()
+    if (error || !inserted) return { ok: false, error: "The PDF was read, but its items could not be imported." }
+    for (const item of inserted) existingByName.set(itemKey(item.category, item.name), item)
   }
+
+  const pricedItems = items.filter((item) => item.unitPrice !== null)
+  let supplier: CatalogSupplier | null = null
+  if (pricedItems.length && detectedSupplierName) {
+    const { data: supplierData, error: supplierError } = await supabase.rpc("staff_load_catalog_suppliers")
+    if (supplierError) return { ok: false, error: "The items were imported, but the Supplier Directory could not be checked for their prices." }
+    const suppliers = Array.isArray(supplierData) ? supplierData as CatalogSupplier[] : []
+    supplier = detectSupplierMatch(suppliers, detectedSupplierName, detectedSupplierName)
+
+    if (!supplier && metadata.supplierName) {
+      const candidate: CatalogSupplier & Record<string, unknown> = {
+        id: importedSupplierId(metadata.supplierName),
+        name: clean(metadata.supplierName, 160),
+        email: "",
+        phone: "",
+        whatsapp: "",
+        portalUrl: "",
+        materials: category,
+        trustLevel: "first-time",
+        catalogDepartments: [category],
+        catalogEnabledDepartments: [category],
+        contactLabel: "Imported supplier quote",
+        contactName: "",
+        preferredDeliveryMethod: "manual",
+        deliveryNotes: "",
+        notes: `Created from imported PDF ${clean(value.name, 180)}. Review contact details before sending a request.`,
+        address: "",
+      }
+      const { data: created, error: createError } = await supabase.rpc("staff_upsert_supplier_directory_entry", {
+        p_supplier: candidate,
+        p_create: true,
+      })
+      if (createError || !created) return { ok: false, error: "The items were imported, but the detected supplier could not be added for pricing." }
+      supplier = created as CatalogSupplier
+    } else if (supplier) {
+      const catalogDepartments = [...new Set([...(supplier.catalogDepartments ?? []), category])]
+      const catalogEnabledDepartments = [...new Set([...(supplier.catalogEnabledDepartments ?? []), category])]
+      if (catalogDepartments.length !== (supplier.catalogDepartments ?? []).length || catalogEnabledDepartments.length !== (supplier.catalogEnabledDepartments ?? []).length) {
+        const { data: updated, error: updateError } = await supabase.rpc("staff_upsert_supplier_directory_entry", {
+          p_supplier: { ...supplier, catalogDepartments, catalogEnabledDepartments },
+          p_create: false,
+        })
+        if (updateError || !updated) return { ok: false, error: "The items were imported, but the supplier could not be added to this catalog category." }
+        supplier = updated as CatalogSupplier
+      }
+    }
+  }
+
+  let savedPrices = 0
+  if (supplier && pricedItems.length) {
+    const observedAt = quoteDateTime(metadata.quoteDate)
+    const expiresAt = quoteDateTime(metadata.expiresOn)
+    const priceRows = pricedItems.flatMap((item) => {
+      const catalogItem = existingByName.get(itemKey(item.category, item.name))
+      if (!catalogItem || item.unitPrice === null) return []
+      const packageQuantity = Number(catalogItem.package_quantity) || 1
+      const comparisonQuantity = Number(catalogItem.comparison_quantity) || 1
+      return [{
+        item_id: catalogItem.id,
+        supplier_id: supplier.id,
+        supplier_name_snapshot: clean(supplier.name, 300),
+        supplier_sku: clean(item.supplierSku, 120),
+        unit_price: Math.round(item.unitPrice * 10_000) / 10_000,
+        availability: "available",
+        notes: clean(`Imported from ${metadata.quoteNumber ? `quote ${metadata.quoteNumber}` : value.name}${metadata.quoteDate ? ` dated ${metadata.quoteDate}` : ""}.`, 1000),
+        price_type: "supplier_quote",
+        verification_status: "supplier_quote",
+        delivery_price: null,
+        minimum_order: 1,
+        comparison_price: Math.round(((item.unitPrice / packageQuantity) * comparisonQuantity) * 10_000) / 10_000,
+        verified_at: observedAt ?? now,
+        expires_at: expiresAt,
+        price_observed_at: observedAt,
+        updated_by: user.id,
+        updated_at: now,
+      }]
+    })
+    if (priceRows.length) {
+      const { error: priceError } = await supabase.from("material_catalog_supplier_prices").upsert(priceRows, { onConflict: "item_id,supplier_id" })
+      if (priceError) return { ok: false, error: "The items were imported, but their supplier prices could not be saved." }
+      savedPrices = priceRows.length
+    }
+  }
+
+  const matched = items.length - insertRows.length
+  const priceMessage = savedPrices
+    ? ` ${savedPrices} price${savedPrices === 1 ? "" : "s"} saved for ${supplier?.name}${metadata.quoteDate ? ` from ${metadata.quoteDate}` : ""}.`
+    : pricedItems.length && !supplier
+      ? ` Prices were found, but ${detectedSupplierName || "the supplier"} needs to be confirmed in the Supplier Directory.`
+      : " No dependable supplier prices were found in the PDF."
   revalidatePath("/admin/catalog")
+  revalidatePath("/admin/vendors")
   return {
     ok: true,
-    data: { imported: insertRows.length, skipped: extracted.length - insertRows.length },
-    message: `${insertRows.length} item${insertRows.length === 1 ? "" : "s"} imported; ${extracted.length - insertRows.length} duplicate${extracted.length - insertRows.length === 1 ? "" : "s"} skipped.`,
+    data: {
+      imported: insertRows.length,
+      matched,
+      prices: savedPrices,
+      supplierId: supplier?.id ?? "",
+      supplierName: supplier?.name ?? detectedSupplierName,
+      quoteDate: metadata.quoteDate,
+    },
+    message: `${insertRows.length} new item${insertRows.length === 1 ? "" : "s"} imported; ${matched} existing item${matched === 1 ? "" : "s"} matched.${priceMessage}`,
   }
 }

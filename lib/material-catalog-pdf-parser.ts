@@ -14,6 +14,9 @@ export type ImportedCatalogItem = {
   defaultQuantity: number
   unit: string
   sortOrder: number
+  supplierSku: string
+  unitPrice: number | null
+  lineTotal: number | null
 }
 
 const CATEGORY_PREFIX: Record<MaterialCatalogCategory, string> = {
@@ -66,7 +69,16 @@ function categoryPrefix(category: string) {
   return category.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() || "MAT"
 }
 
-function generatedItem(category: string, index: number, name: string, quantity: number, unit: string): ImportedCatalogItem {
+function generatedItem(
+  category: string,
+  index: number,
+  name: string,
+  quantity: number,
+  unit: string,
+  supplierSku = "",
+  unitPrice: number | null = null,
+  lineTotal: number | null = null,
+): ImportedCatalogItem {
   return {
     category,
     itemCode: `${categoryPrefix(category)}-${String(index).padStart(3, "0")}`,
@@ -74,13 +86,25 @@ function generatedItem(category: string, index: number, name: string, quantity: 
     defaultQuantity: quantity,
     unit: normalizeUnit(unit),
     sortOrder: index * 10,
+    supplierSku,
+    unitPrice,
+    lineTotal,
   }
 }
 
 export function supplierRowsToCatalogItems(rows: ExtractedSupplierQuoteItem[], category: string) {
   return rows.slice(0, 500).map((row, index) => {
     const name = cleanName([row.itemCode, row.description, row.specification].filter(Boolean).join(" · "))
-    return generatedItem(category, index + 1, name, row.quantity || 1, row.unit || "each")
+    return generatedItem(
+      category,
+      index + 1,
+      name,
+      row.quantity || 1,
+      row.unit || "each",
+      row.itemCode,
+      row.unitPrice,
+      row.lineTotal,
+    )
   }).filter((item) => usableName(item.name))
 }
 

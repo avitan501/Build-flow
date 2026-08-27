@@ -5,10 +5,31 @@ import { Buffer } from "node:buffer"
 import {
   parseMaterialComparisonText,
   supplierRowsToCatalogItems,
+  type ImportedCatalogItem,
 } from "@/lib/material-catalog-pdf-parser"
-import { extractSupplierQuoteWithAi } from "@/lib/supplier-quote-ai"
+import { extractSupplierQuoteWithAi, type SupplierQuoteAiMetadata } from "@/lib/supplier-quote-ai"
+import { parseSupplierQuoteText } from "@/lib/supplier-quote-parser"
+import { inferSupplierName } from "@/lib/supplier-quote-supplier"
 
-export async function extractMaterialCatalogItemsFromPdf(file: File, fallbackCategory: string) {
+export type MaterialCatalogPdfExtraction = {
+  items: ImportedCatalogItem[]
+  metadata: SupplierQuoteAiMetadata
+  detectedSupplierName: string
+}
+
+const EMPTY_METADATA: SupplierQuoteAiMetadata = {
+  supplierName: "",
+  quoteNumber: "",
+  quoteDate: "",
+  expiresOn: "",
+  department: "",
+  deliveryCharge: 0,
+  taxPercent: 0,
+  subtotal: null,
+  total: null,
+}
+
+export async function extractMaterialCatalogItemsFromPdf(file: File, fallbackCategory: string): Promise<MaterialCatalogPdfExtraction> {
   if (file.type && file.type !== "application/pdf") throw new Error("Choose a PDF file.")
   if (file.size <= 0 || file.size > 25 * 1024 * 1024) throw new Error("Choose a PDF under 25 MB.")
   await import("@napi-rs/canvas")
@@ -18,16 +39,23 @@ export async function extractMaterialCatalogItemsFromPdf(file: File, fallbackCat
   try {
     const result = await parser.getText()
     const text = (result.pages ?? []).map((page: { text?: string }) => page.text ?? "").join("\n")
-    let items = parseMaterialComparisonText(text, fallbackCategory)
-    if (!items.length) {
-      try {
-        const aiResult = await extractSupplierQuoteWithAi(file, text)
-        items = supplierRowsToCatalogItems(aiResult?.items ?? [], fallbackCategory)
-      } catch (error) {
-        console.error("Catalog PDF AI fallback failed", error)
-      }
+    const textQuoteItems = parseSupplierQuoteText(text)
+    let aiResult = null
+    try {
+      aiResult = await extractSupplierQuoteWithAi(file, text)
+    } catch (error) {
+      console.error("Catalog PDF AI extraction failed", error)
     }
+    const supplierItems = aiResult?.items.length ? aiResult.items : textQuoteItems
+    const items = supplierItems.length
+      ? supplierRowsToCatalogItems(supplierItems, fallbackCategory)
+      : parseMaterialComparisonText(text, fallbackCategory)
     if (!items.length) throw new Error("The PDF opened, but no dependable product rows were found. Use a supplier quote, invoice, price list, or catalog PDF with readable product names.")
-    return items
+    const metadata = aiResult?.metadata ?? EMPTY_METADATA
+    return {
+      items,
+      metadata,
+      detectedSupplierName: metadata.supplierName || inferSupplierName(text),
+    }
   } finally { await parser.destroy() }
 }

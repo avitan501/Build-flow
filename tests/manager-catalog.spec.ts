@@ -3,7 +3,7 @@ import path from "node:path"
 
 import { expect, test } from "@playwright/test"
 
-import { parseMaterialComparisonText } from "../lib/material-catalog-pdf-parser"
+import { parseMaterialComparisonText, supplierRowsToCatalogItems } from "../lib/material-catalog-pdf-parser"
 
 const root = process.cwd()
 
@@ -111,6 +111,10 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(workspace).not.toContain("Sample quantity")
   expect(workspace).toContain("price per {item.unit}")
   expect(actions).toContain("extractMaterialCatalogItemsFromPdf")
+  expect(actions).toContain('upsert(priceRows, { onConflict: "item_id,supplier_id" })')
+  expect(actions).toContain("detectSupplierMatch")
+  expect(actions).toContain("staff_upsert_supplier_directory_entry")
+  expect(actions).toContain("price_observed_at: observedAt")
   expect(actions).toContain("deleteMaterialCatalogItemAction")
   expect(actions).toContain('review_status: "discontinued"')
   expect(actions).not.toContain('.delete({ count: "exact" })')
@@ -184,6 +188,26 @@ test("catalog PDF parser accepts comparison lists and normal supplier quote layo
   expect(supplierQuote).toHaveLength(2)
   expect(supplierQuote[0]).toMatchObject({ category: "Sheet Rock", defaultQuantity: 12, unit: "sheets" })
   expect(supplierQuote[1]).toMatchObject({ category: "Sheet Rock", defaultQuantity: 25, unit: "each" })
+})
+
+test("catalog PDF mapping preserves supplier SKU, unit price, and line total", () => {
+  const items = supplierRowsToCatalogItems([{
+    itemCode: "DHA-RNG-30",
+    description: "GE 30 in. Free-Standing Gas Range",
+    specification: "Stainless steel",
+    quantity: 2,
+    unit: "each",
+    unitPrice: 649.5,
+    lineTotal: 1299,
+  }], "Appliances")
+
+  expect(items).toEqual([expect.objectContaining({
+    category: "Appliances",
+    supplierSku: "DHA-RNG-30",
+    defaultQuantity: 2,
+    unitPrice: 649.5,
+    lineTotal: 1299,
+  })])
 })
 
 test("Sheet Rock uses compact configurable products and expandable images", async ({ page }) => {
