@@ -3,7 +3,7 @@ import "server-only"
 import { Buffer } from "node:buffer"
 
 import { managerDocumentTypes, type ManagerDocumentEvidence, type ManagerDocumentType } from "@/lib/manager-documents"
-import { documentArithmeticWarnings, documentLineValidationStatus } from "@/lib/manager-document-validation"
+import { documentArithmeticWarnings, documentLineValidationStatus, isManagerDocumentChargeLine } from "@/lib/manager-document-validation"
 
 type RawDocumentItem = {
   itemCode: string
@@ -89,7 +89,7 @@ export function normalizeManagerDocumentExtraction(value: unknown): ManagerDocum
       sourceText: clean(item.sourceText, 1000), confidence: confidence(item.confidence),
     }
     return { ...normalized, validationStatus: documentLineValidationStatus(normalized) }
-  }).filter((item) => item.description && !/^(subtotal|tax|delivery|freight|discount|total)$/i.test(item.description)).slice(0, 500)
+  }).filter((item) => item.description && !isManagerDocumentChargeLine(item.description)).slice(0, 500)
 
   const subtotal = numberOrNull(metadata.subtotal)
   const discount = numberOrNull(metadata.discount) ?? 0
@@ -134,7 +134,7 @@ const documentSchema = {
 
 const PROMPT = `Classify and extract this business document for Avantia Build. The type must be one of the schema values. supplier_invoice means a bill received from a vendor; client_invoice means an outgoing invoice Avantia sends to a customer. Never combine those two directions. Read visual layout, scans, photos, handwriting, strike-throughs, and handwritten corrections. Never invent unreadable or missing values. Whenever handwriting changes or appears to change a printed value, always add a warning identifying the printed and handwritten values so a person must confirm it. If unclear, leave the value empty/null and add a warning.
 
-Extract the sender/vendor/customer as partyName, document number and dates, material/service rows, subtotal, discount, delivery/freight, tax amount, tax percent, and total. Dates must be YYYY-MM-DD or empty. Preserve SKU/model, dimensions, grade, color, and pack size. Do not turn headings or totals into line items.
+Extract the sender/vendor/customer as partyName, document number and dates, material/service rows, subtotal, discount, delivery/freight, tax amount, tax percent, and total. Dates must be YYYY-MM-DD or empty. Preserve SKU/model, dimensions, grade, color, and pack size. Delivery fees, shipping, freight, sales tax, discounts, payments, balances, subtotals, and totals belong only in metadata and must never become item rows. When flooring is priced by total square footage, use sq ft as the unit and keep cartons/units and sq. ft. per unit in the specification.
 
 For every important field and each line, return the printed source text, page, confidence, and selected=true. Confidence measures whether the value is clearly supported by the document, not whether it seems plausible. Suggest actions, but never approve, route, post, or create financial records. A person must review before any destination changes.`
 

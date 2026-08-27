@@ -53,7 +53,7 @@ const documentSchema = {
 
 const prompt = `Classify and extract this business document for Avantia Build. supplier_invoice is a bill received from a vendor; client_invoice is an outgoing invoice Avantia sends to a customer. Never combine those directions. Read the visual layout, scans, photos, handwriting, strike-throughs, and handwritten corrections. Never invent unreadable or missing values. If handwriting changes or may change a printed value, add a warning identifying both values so a person must confirm it.
 
-Extract the vendor/customer, document number and dates, material or service rows, subtotal, discount, delivery/freight, tax amount, tax percent, total, and the most likely Avantia material department. Dates must be YYYY-MM-DD or empty. Preserve SKU/model, dimensions, grade, color, and pack size. Do not turn headings or totals into line items.
+Extract the vendor/customer, document number and dates, material or service rows, subtotal, discount, delivery/freight, tax amount, tax percent, total, and the most likely Avantia material department. Dates must be YYYY-MM-DD or empty. Preserve SKU/model, dimensions, grade, color, and pack size. Delivery fees, shipping, freight, sales tax, discounts, payments, balances, subtotals, and totals belong only in metadata and must never become item rows. When flooring is priced by total square footage, use sq ft as the unit and keep cartons/units and sq. ft. per unit in the specification.
 
 For every important field and line, return source text, page, confidence, and selected=true. Confidence means clearly supported by the document. Suggest actions, but never approve, route, post, or create a financial record.`;
 

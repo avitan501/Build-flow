@@ -3,7 +3,7 @@ import path from "node:path"
 
 import { expect, test } from "@playwright/test"
 
-import { documentArithmeticWarnings, documentLineValidationStatus } from "../lib/manager-document-validation"
+import { documentArithmeticWarnings, documentLineValidationStatus, isManagerDocumentChargeLine } from "../lib/manager-document-validation"
 
 const root = process.cwd()
 
@@ -80,4 +80,11 @@ test("document intelligence keeps evidence and catches line and total mismatches
   const warnings = documentArithmeticWarnings({ items: [item], subtotal: 200, discount: 0, deliveryCharge: 10, taxAmount: 17, total: 250 })
   expect(warnings).toContain("One or more line totals do not equal quantity × unit price.")
   expect(warnings.some((warning) => warning.includes("printed total"))).toBeTruthy()
+})
+
+test("document intelligence keeps charges and tax out of product rows", () => {
+  for (const charge of ["Delivery Fee", "Shipping Charge", "Freight", "Sales Tax", "Grand Total", "Balance Due", "Payments/Credits"]) {
+    expect(isManagerDocumentChargeLine(charge)).toBeTruthy()
+  }
+  expect(isManagerDocumentChargeLine("White Oak flooring")).toBeFalsy()
 })

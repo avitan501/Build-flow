@@ -8,6 +8,12 @@ export type DocumentValidationItem = {
   confidence: number
 }
 
+const NON_ITEM_LINE_PATTERN = /^(?:subtotal|sales tax|tax|delivery(?: fee| charge)?|shipping(?: fee| charge)?|freight(?: fee| charge)?|discount|grand total|total|balance due|payments?\/?credits?)$/i
+
+export function isManagerDocumentChargeLine(description: string) {
+  return NON_ITEM_LINE_PATTERN.test(description.trim())
+}
+
 export function documentLineValidationStatus(item: DocumentValidationItem): "valid" | "needs_review" | "mismatch" {
   const expected = item.quantity !== null && item.unitPrice !== null ? Math.round(item.quantity * item.unitPrice * 100) / 100 : null
   if (expected !== null && item.lineTotal !== null && Math.abs(expected - item.lineTotal) > MONEY_TOLERANCE) return "mismatch"
