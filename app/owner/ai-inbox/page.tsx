@@ -30,7 +30,13 @@ const activityLabels: Record<string, string> = {
 };
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: process.env.AURA_TIME_ZONE || "America/New_York" }).format(new Date(value));
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Unknown time";
+    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }).format(date);
+  } catch {
+    return "Unknown time";
+  }
 }
 
 function StructuredPreview({ proposal }: { proposal: IntakeProposal }) {
@@ -54,7 +60,7 @@ export default async function AiInboxPage({ searchParams }: { searchParams: Prom
     supabase.from("aura_intakes").select("id,message_text,proposal,status,ai_model,created_at,updated_at").eq("source", "sms").eq("sender_phone", "+13475675077").order("created_at", { ascending: false }).limit(100),
     supabase.from("profiles").select("id,full_name,company_name,email").eq("role", "client").eq("is_active", true).order("full_name").limit(500),
   ]);
-  if (error) throw new Error(`Unable to load AI Inbox: ${error.message}`);
+  if (error) console.error("ai_inbox_intakes_load_failed", { code: error.code });
   const intakes = (rows || []) as IntakeRow[];
   const clientRows = (clients || []) as ClientRow[];
   const intakeIds = intakes.map((item) => item.id);
