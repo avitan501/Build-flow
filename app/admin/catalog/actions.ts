@@ -362,11 +362,13 @@ export async function saveCatalogDepartmentSuppliersAction(
 export async function importMaterialCatalogPdfAction(formData: FormData): Promise<ActionResult<{ imported: number; skipped: number }>> {
   const { supabase, user } = await managerContext()
   const value = formData.get("catalogPdf")
+  const category = clean(formData.get("category"), 100)
   if (!(value instanceof File) || value.size === 0) return { ok: false, error: "Choose a material comparison PDF." }
+  if (!await validCategory(supabase, category)) return { ok: false, error: "Choose the catalog category for this PDF." }
 
   let extracted
   try {
-    extracted = await extractMaterialCatalogItemsFromPdf(value)
+    extracted = await extractMaterialCatalogItemsFromPdf(value, category)
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "The PDF could not be read." }
   }

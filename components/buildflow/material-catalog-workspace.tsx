@@ -420,6 +420,7 @@ export function MaterialCatalogWorkspace({
     if (!file) return
     const formData = new FormData()
     formData.set("catalogPdf", file)
+    formData.set("category", selectedCategory)
     startTransition(async () => {
       const result = await importMaterialCatalogPdfAction(formData)
       if (!result.ok) return setError(result.error)

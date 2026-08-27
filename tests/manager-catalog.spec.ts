@@ -3,6 +3,8 @@ import path from "node:path"
 
 import { expect, test } from "@playwright/test"
 
+import { parseMaterialComparisonText } from "../lib/material-catalog-pdf-parser"
+
 const root = process.cwd()
 
 test("manager navigation is compact and keeps communication shortcuts at the bottom", async () => {
@@ -163,7 +165,25 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(qualityHelpers).toContain("priceCheckedDateLabel")
   expect(workspace).toContain("priceCheckedDateLabel(saved)")
   expect(parser).toContain("parseMaterialComparisonText")
-  expect(parser).toContain("No quantity, unit, and material rows were found")
+  expect(parser).toContain("The PDF opened, but no dependable product rows were found")
+})
+
+test("catalog PDF parser accepts comparison lists and normal supplier quote layouts", () => {
+  const comparison = parseMaterialComparisonText([
+    "1. Appliances",
+    "2 pcs Rheem XE38S06ST45U1 38 Gal. electric water heater",
+  ].join("\n"), "Appliances")
+  expect(comparison).toEqual([
+    expect.objectContaining({ category: "Appliances", defaultQuantity: 2, unit: "each", name: expect.stringContaining("Rheem") }),
+  ])
+
+  const supplierQuote = parseMaterialComparisonText([
+    "ABC-204 12 sheets 1/2 in drywall 4 x 8 $14.50 $174.00",
+    "2 x 4 x 10 framing lumber 25 pcs 7.25 181.25",
+  ].join("\n"), "Sheet Rock")
+  expect(supplierQuote).toHaveLength(2)
+  expect(supplierQuote[0]).toMatchObject({ category: "Sheet Rock", defaultQuantity: 12, unit: "sheets" })
+  expect(supplierQuote[1]).toMatchObject({ category: "Sheet Rock", defaultQuantity: 25, unit: "each" })
 })
 
 test("Sheet Rock uses compact configurable products and expandable images", async ({ page }) => {
