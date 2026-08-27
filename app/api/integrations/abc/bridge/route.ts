@@ -18,6 +18,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const preferredRegion = "iad1";
+export const maxDuration = 60;
 
 type PricingInput = {
   shipToNumber: string;

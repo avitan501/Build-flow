@@ -186,7 +186,7 @@ export function parseAbcBranches(payload: unknown) {
   });
 }
 
-export function parseAbcCatalogItems(payload: unknown, selectedBranch: string): AbcCatalogItem[] {
+export function parseAbcCatalogItems(payload: unknown, selectedBranch: string, branchFiltered = false): AbcCatalogItem[] {
   if (!payload || typeof payload !== "object") throw new Error("ABC returned an unexpected product-search response.");
   const items = (payload as { items?: unknown }).items;
   if (!Array.isArray(items)) throw new Error("ABC returned an unexpected product-search response.");
@@ -212,7 +212,7 @@ export function parseAbcCatalogItems(payload: unknown, selectedBranch: string): 
     const uoms = [...uomsByCode.values()]
       .sort((a, b) => Number(b.description.toLowerCase() === "stocking") - Number(a.description.toLowerCase() === "stocking"));
     const branches = Array.isArray(item.branches) ? item.branches : [];
-    const availableAtSelectedBranch = branches.some((entryBranch) => {
+    const availableAtSelectedBranch = branchFiltered || branches.some((entryBranch) => {
       if (!entryBranch || typeof entryBranch !== "object") return false;
       const branch = entryBranch as Record<string, unknown>;
       return String(branch.number || branch.branchNumber || "") === selectedBranch;
@@ -282,7 +282,7 @@ export async function searchAbcInternalBranches(state: string) {
 
 export async function searchAbcInternalItems(query: string, branchNumber: string) {
   const itemNumberSearch = /^[A-Za-z0-9._/-]+$/.test(query) && /\d/.test(query);
-  const payload = await abcRequest("/api/product/v1/search/items", {
+  const payload = await abcRequest("/api/product/v1/search/items?familyItems=false", {
     method: "POST",
     body: JSON.stringify({
       filters: [
@@ -299,11 +299,14 @@ export async function searchAbcInternalItems(query: string, branchNumber: string
           joinCondition: null,
         },
       ],
-      embed: ["branches", "variations"],
-      pagination: { itemsPerPage: 24, pageNumber: 1 },
+      // The branchNumber filter already limits the response to items offered by
+      // this branch. ABC warns that embedding branch availability can
+      // materially slow this endpoint, so only request dimensional variations.
+      embed: ["variations"],
+      pagination: { itemsPerPage: 12, pageNumber: 1 },
     }),
   });
-  return parseAbcCatalogItems(payload, branchNumber);
+  return parseAbcCatalogItems(payload, branchNumber, true);
 }
 
 export async function priceAbcInternalItems(request: {
