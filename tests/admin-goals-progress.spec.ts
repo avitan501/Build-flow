@@ -76,6 +76,7 @@ test("ABC task provides a policy-correct certification menu and stable bridge", 
   }
   expect(demo).toContain('aria-label="ABC demo menu"');
   expect(demo).toContain("ABC Supply remains the seller");
+  expect(demo).toContain("TPA private pricing requires");
   expect(demo).toContain("API ordering is not presented in this demo");
   expect(pricing).toContain('id="unit-quantity"');
   expect(pricing).toContain('id="availability-price"');

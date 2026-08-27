@@ -258,7 +258,7 @@ function AbcSupplyDemoGoal({ status }: { status: ManagerGoalStatus }) {
         <nav aria-label="ABC demo sections" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {steps.map(([label, href], index) => <Link key={href} href={href} className="flex min-h-11 items-center justify-between rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:border-sky-300 hover:text-[#0066cc]"><span>{index + 1}. {label}</span><ArrowRight className="h-4 w-4" /></Link>)}
         </nav>
-        <div className="flex flex-wrap gap-2 text-xs"><span className="rounded-md bg-emerald-50 px-3 py-2 font-semibold text-emerald-800">Website workflow built</span><span className="rounded-md bg-amber-50 px-3 py-2 font-semibold text-amber-900">NY sandbox branch: ABC action needed</span></div>
+        <div className="flex flex-wrap gap-2 text-xs"><span className="rounded-md bg-emerald-50 px-3 py-2 font-semibold text-emerald-800">Catalog workflow ready</span><span className="rounded-md bg-amber-50 px-3 py-2 font-semibold text-amber-900">ABC action: Sandbox user sign-in + NY branch</span></div>
         <Link href="/admin/abc" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-md bg-[#0071e3] px-5 text-sm font-semibold text-white">Open full demo<ArrowRight className="h-4 w-4" /></Link>
       </div>
     </GoalDisclosure>

@@ -46,7 +46,7 @@ export default async function ManagerAbcPricingPage() {
           <li className="rounded-md bg-slate-50 p-3"><strong className="text-slate-950">5. Availability</strong><span className="mt-1 block">“Available means the branch offers the item; it is not a stock count.”</span></li>
           <li className="rounded-md bg-slate-50 p-3"><strong className="text-slate-950">6. Support</strong><span className="mt-1 block">“We show clear ABC errors and do not display guessed prices.”</span></li>
         </ol>
-        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950"><strong>ABC-controlled setup:</strong> Sandbox accounts and the branches authorized for them come from ABC. A New York public branch cannot be added by AvantiaBuild unless ABC links it to the test Ship-To. API ordering is not presented in this demo, so no Sandbox order is submitted.</div>
+        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950"><strong>ABC-controlled setup:</strong> Complete Customer connection before the review; TPA private pricing requires that customer&apos;s OAuth token. If ABC&apos;s Sandbox sign-in says the page timed out, API Support must confirm the test-user assignment. Sandbox accounts and authorized branches also come from ABC, so AvantiaBuild cannot add a New York branch locally. API ordering is not presented in this demo, so no Sandbox order is submitted.</div>
       </section>
     </div>
   </main>;
