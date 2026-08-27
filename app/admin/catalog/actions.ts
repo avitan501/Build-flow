@@ -373,6 +373,7 @@ export async function importMaterialCatalogPdfAction(formData: FormData): Promis
   imported: number
   matched: number
   prices: number
+  category: string
   supplierId: string
   supplierName: string
   quoteDate: string
@@ -390,7 +391,7 @@ export async function importMaterialCatalogPdfAction(formData: FormData): Promis
     return { ok: false, error: error instanceof Error ? error.message : "The PDF could not be read." }
   }
 
-  const { items, metadata, detectedSupplierName } = extracted
+  const { items, metadata, detectedSupplierName, category: importCategory } = extracted
   const { data: existing, error: existingError } = await supabase
     .from("material_catalog_items")
     .select("id,category,name,item_code,package_quantity,comparison_quantity")
@@ -446,10 +447,10 @@ export async function importMaterialCatalogPdfAction(formData: FormData): Promis
         phone: "",
         whatsapp: "",
         portalUrl: "",
-        materials: category,
+        materials: importCategory,
         trustLevel: "first-time",
-        catalogDepartments: [category],
-        catalogEnabledDepartments: [category],
+        catalogDepartments: [importCategory],
+        catalogEnabledDepartments: [importCategory],
         contactLabel: "Imported supplier quote",
         contactName: "",
         preferredDeliveryMethod: "manual",
@@ -464,8 +465,8 @@ export async function importMaterialCatalogPdfAction(formData: FormData): Promis
       if (createError || !created) return { ok: false, error: "The items were imported, but the detected supplier could not be added for pricing." }
       supplier = created as CatalogSupplier
     } else if (supplier) {
-      const catalogDepartments = [...new Set([...(supplier.catalogDepartments ?? []), category])]
-      const catalogEnabledDepartments = [...new Set([...(supplier.catalogEnabledDepartments ?? []), category])]
+      const catalogDepartments = [...new Set([...(supplier.catalogDepartments ?? []), importCategory])]
+      const catalogEnabledDepartments = [...new Set([...(supplier.catalogEnabledDepartments ?? []), importCategory])]
       if (catalogDepartments.length !== (supplier.catalogDepartments ?? []).length || catalogEnabledDepartments.length !== (supplier.catalogEnabledDepartments ?? []).length) {
         const { data: updated, error: updateError } = await supabase.rpc("staff_upsert_supplier_directory_entry", {
           p_supplier: { ...supplier, catalogDepartments, catalogEnabledDepartments },
@@ -527,10 +528,11 @@ export async function importMaterialCatalogPdfAction(formData: FormData): Promis
       imported: insertRows.length,
       matched,
       prices: savedPrices,
+      category: importCategory,
       supplierId: supplier?.id ?? "",
       supplierName: supplier?.name ?? detectedSupplierName,
       quoteDate: metadata.quoteDate,
     },
-    message: `${insertRows.length} new item${insertRows.length === 1 ? "" : "s"} imported; ${matched} existing item${matched === 1 ? "" : "s"} matched.${priceMessage}`,
+    message: `${insertRows.length} new item${insertRows.length === 1 ? "" : "s"} imported into ${importCategory}; ${matched} existing item${matched === 1 ? "" : "s"} matched.${priceMessage}`,
   }
 }

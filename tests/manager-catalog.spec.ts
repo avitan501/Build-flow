@@ -3,6 +3,7 @@ import path from "node:path"
 
 import { expect, test } from "@playwright/test"
 
+import { normalizeMaterialCatalogDepartment } from "../lib/material-catalog"
 import { parseMaterialComparisonText, supplierRowsToCatalogItems } from "../lib/material-catalog-pdf-parser"
 
 const root = process.cwd()
@@ -208,6 +209,11 @@ test("catalog PDF mapping preserves supplier SKU, unit price, and line total", (
     unitPrice: 649.5,
     lineTotal: 1299,
   })])
+})
+
+test("supplier quote department aliases keep lumber out of Appliances", () => {
+  expect(normalizeMaterialCatalogDepartment("Lumber")).toBe("Framing")
+  expect(normalizeMaterialCatalogDepartment("Lumber & Building Materials")).toBe("Framing")
 })
 
 test("Sheet Rock uses compact configurable products and expandable images", async ({ page }) => {

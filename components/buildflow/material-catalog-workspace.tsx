@@ -424,10 +424,11 @@ export function MaterialCatalogWorkspace({
     startTransition(async () => {
       const result = await importMaterialCatalogPdfAction(formData)
       if (!result.ok) return setError(result.error)
+      setSelectedCategory(result.data.category)
       if (result.data.supplierId) {
         setCatalogSupplierIds((current) => ({
           ...current,
-          [selectedCategory]: [...new Set([...(current[selectedCategory] ?? []), result.data.supplierId])],
+          [result.data.category]: [...new Set([...(current[result.data.category] ?? []), result.data.supplierId])],
         }))
       }
       setNotice(result.message)
