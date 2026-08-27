@@ -14,7 +14,7 @@ async function abcUserRequest(userId: string, path: string, init: RequestInit) {
     return fetch(`${getAbcSupplyConfig().apiBaseUrl}${path}`, {
       ...init,
       cache: "no-store",
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(45_000),
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Content-Type": "application/json", ...init.headers },
     });
   }
