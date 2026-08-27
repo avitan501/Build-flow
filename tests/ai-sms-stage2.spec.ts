@@ -45,3 +45,36 @@ test("material request details do not require a Vercel service-role key to open"
   expect(page).not.toContain("createAdminClient");
   expect(page).toContain('.from("aura_communication_links")');
 });
+
+test("phone AI stays concise and never fills optional details with guesses", () => {
+  const broker = readFileSync(
+    path.join(root, "supabase/functions/aura-messaging-broker/index.ts"),
+    "utf8",
+  );
+
+  expect(broker).toContain("Keep the summary to one short factual sentence");
+  expect(broker).toContain("do not repeat the original message");
+  expect(broker).toContain("do not ask for optional details");
+  expect(broker).toContain("max_output_tokens: 900");
+  expect(broker).toContain("candidate.summary.trim().slice(0, 180)");
+});
+
+test("Task To Do contains the owner AI intake and the dashboard no longer duplicates it", () => {
+  const goals = readFileSync(
+    path.join(root, "app/admin/goals-progress/page.tsx"),
+    "utf8",
+  );
+  const dashboard = readFileSync(
+    path.join(root, "app/admin/build-map/page.tsx"),
+    "utf8",
+  );
+  const inbox = readFileSync(
+    path.join(root, "app/owner/ai-inbox/page.tsx"),
+    "utf8",
+  );
+
+  expect(goals).toContain("Task To Do");
+  expect(goals).toContain('href="/owner/ai-inbox"');
+  expect(dashboard).not.toContain('label: "AI Phone Inbox"');
+  expect(inbox).toContain('href="/admin/goals-progress"');
+});

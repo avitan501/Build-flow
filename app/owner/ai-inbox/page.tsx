@@ -295,17 +295,17 @@ export default async function AiInboxPage({
           <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[1fr_auto]">
             <div>
               <Link
-                href="/admin/build-map"
+                href="/admin/goals-progress"
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
-                Manager tools
+                Task To Do
               </Link>
               <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.22em] text-[#f2b84b]">
                 Phone instruction desk
               </p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-                AI Inbox
+                Task To Do Inbox
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200">
                 Text naturally or send a screenshot from your trusted phone. AI
@@ -338,7 +338,7 @@ export default async function AiInboxPage({
             <Phone className="mr-2 inline h-3.5 w-3.5" />
             Write naturally, or guide AI with: <code>add lead ...</code> ·{" "}
             <code>add contact ...</code> · <code>add request ...</code> ·{" "}
-            <code>add task ...</code>
+            <code>add task ...</code> · <code>add supplier ...</code>
           </div>
         </header>
 
@@ -478,7 +478,9 @@ export default async function AiInboxPage({
                         <p className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-semibold text-sky-800">
                           <Images className="h-3.5 w-3.5" />
                           {intake.raw_payload.media.length} screenshot
-                          {intake.raw_payload.media.length === 1 ? "" : "s"}{" "}
+                          {intake.raw_payload.media.length === 1
+                            ? ""
+                            : "s"}{" "}
                           read by AI
                         </p>
                       ) : null}
