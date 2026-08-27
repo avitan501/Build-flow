@@ -43,6 +43,9 @@ export default async function AuraOwnerPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
+              <Link href="/owner/ai-inbox" className="rounded-md bg-[#f3b43f] px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-[#ffc75c]">
+                Open AI Inbox · {intakes.length}
+              </Link>
               <Link href="/" className="rounded-md border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/15">
                 Back to website
               </Link>

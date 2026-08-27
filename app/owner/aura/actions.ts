@@ -304,14 +304,67 @@ export async function configureAuraProviderAction(formData: FormData): Promise<S
 }
 
 export async function confirmAuraIntakeAction(formData: FormData) {
-  const { user } = await requireOwnerAccess("/owner/aura");
+  const { user, supabase } = await requireOwnerAccess("/owner/ai-inbox");
   const intakeId = requireUuid(formData.get("intakeId"));
-  const supabase = createAdminClient();
-  const { error } = await supabase.rpc("confirm_aura_intake", {
+  const admin = createAdminClient();
+  const { data: intake, error: readError } = await admin
+    .from("aura_intakes")
+    .select("status,proposal,message_text")
+    .eq("id", intakeId)
+    .maybeSingle<{ status: string; proposal: Record<string, unknown>; message_text: string | null }>();
+  if (readError || !intake) throw new Error(`Unable to load AI Inbox item: ${readError?.message || "Not found"}`);
+  if (!["pending", "needs_follow_up"].includes(intake.status)) throw new Error("This instruction is no longer waiting for approval.");
+
+  if (intake.proposal.recordType === "material_request") {
+    const customerId = requireUuid(formData.get("customerId"));
+    const request = intake.proposal.request as { title?: unknown; department?: unknown; notes?: unknown; projectAddress?: unknown; items?: unknown } | null;
+    const lines = Array.isArray(request?.items) ? request.items.flatMap((value) => {
+      if (!value || typeof value !== "object") return [];
+      const item = value as { name?: unknown; quantity?: unknown; unit?: unknown };
+      const name = typeof item.name === "string" ? item.name.trim().slice(0, 300) : "";
+      const quantity = typeof item.quantity === "number" && Number.isFinite(item.quantity) && item.quantity > 0 ? item.quantity : 1;
+      if (!name) return [];
+      return [{ name, quantity, unit: typeof item.unit === "string" && item.unit.trim() ? item.unit.trim().slice(0, 40) : "each" }];
+    }) : [];
+    if (!lines.length) throw new Error("Run AI check again so the request has at least one material item.");
+    const requestTitle = typeof request?.title === "string" && request.title.trim() ? request.title.trim().slice(0, 180) : "Material request from phone";
+    const department = typeof request?.department === "string" && request.department.trim() ? request.department.trim().slice(0, 100) : "Unassigned";
+    const notes = [typeof request?.notes === "string" ? request.notes.trim() : "", typeof request?.projectAddress === "string" && request.projectAddress.trim() ? `Project address: ${request.projectAddress.trim()}` : "", intake.message_text ? `Original phone instruction: ${intake.message_text.slice(0, 1600)}` : ""].filter(Boolean).join("\n").slice(0, 4000);
+    const { data: claimed, error: claimError } = await admin.from("aura_intakes").update({ status: "failed", error_message: "Creating approved material request" }).eq("id", intakeId).in("status", ["pending", "needs_follow_up"]).select("id").maybeSingle<{ id: string }>();
+    if (claimError || !claimed) throw new Error("This instruction is already being processed or was approved in another window.");
+    const { data: requestId, error: requestError } = await supabase.rpc("staff_create_client_request", {
+      p_customer_id: customerId,
+      p_department: department,
+      p_title: requestTitle,
+      p_lines: lines,
+      p_notes: notes,
+    });
+    if (requestError || typeof requestId !== "string") {
+      await admin.from("aura_intakes").update({ status: "needs_follow_up", error_message: requestError?.message || "Material request could not be created" }).eq("id", intakeId).eq("status", "failed");
+      throw new Error(`Unable to create material request: ${requestError?.message || "No request ID returned"}`);
+    }
+    const proposal = { ...intake.proposal, result: { entityType: "material_request", id: requestId } };
+    const { error: updateError } = await admin.from("aura_intakes").update({ status: "confirmed", confirmed_at: new Date().toISOString(), confirmed_by: user.id, error_message: null, proposal }).eq("id", intakeId).eq("status", "failed");
+    if (updateError) throw new Error(`Request was created, but the AI Inbox could not be updated: ${updateError.message}`);
+    await admin.from("aura_audit_log").insert({ intake_id: intakeId, actor_user_id: user.id, action: "material_request_confirmed", details: { requestId, customerId } });
+  } else {
+    const { data, error } = await admin.rpc("confirm_aura_intake", {
     p_intake_id: intakeId,
     p_actor_user_id: user.id,
   });
-  if (error) throw new Error(`Unable to confirm Aura intake: ${error.message}`);
+    if (error) throw new Error(`Unable to confirm Aura intake: ${error.message}`);
+    await admin.from("aura_intakes").update({ proposal: { ...intake.proposal, result: { entityType: intake.proposal.recordType || "task", ...(data && typeof data === "object" ? data : {}) } } }).eq("id", intakeId);
+  }
+  revalidatePath("/owner/aura");
+  revalidatePath("/owner/ai-inbox");
+  revalidatePath("/owner/materials/requests");
+}
+
+export async function reviewTrustedSmsIntakeAction(formData: FormData) {
+  const { supabase } = await requireOwnerAccess("/owner/ai-inbox");
+  const intakeId = requireUuid(formData.get("intakeId"));
+  await invokeMessagingBroker(supabase, { action: "review_trusted_sms_intake", intakeId });
+  revalidatePath("/owner/ai-inbox");
   revalidatePath("/owner/aura");
 }
 
@@ -336,4 +389,5 @@ export async function cancelAuraIntakeAction(formData: FormData) {
     details: { source: "owner_dashboard" },
   });
   revalidatePath("/owner/aura");
+  revalidatePath("/owner/ai-inbox");
 }

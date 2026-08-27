@@ -180,6 +180,7 @@ export default async function AdminDashboardPage({ searchParams }: { searchParam
     { title: "Customers", icon: Users, links: access.customers ? [{ href: "/admin/users", label: "Customer Directory" }, { href: "/owner/materials/requests", label: "Client Requests" }] : [] },
     { title: "Messages & Calls", icon: PhoneCall, links: [
       ...(access.communications ? [{ href: "/admin/communications", label: "Messages" }] : []),
+      ...(access.owner ? [{ href: "/owner/ai-inbox", label: "AI Phone Inbox" }] : []),
       { href: QUO_INBOX_URL, label: "Calls & Messages" },
       { href: WHATSAPP_URL, label: "WhatsApp" },
       { href: "/admin/daily-summary", label: "Daily Work Summary" },
