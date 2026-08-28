@@ -15,10 +15,15 @@ test("communications offers guarded per-contact AI modes and fast contact tags",
   expect(actions).toContain("staff_upsert_supplier_directory_entry")
 })
 
-test("incoming client SMS automation is rate-limited and blocks sensitive auto replies", async () => {
+test("incoming client SMS automation keeps conversational context and blocks sensitive auto replies", async () => {
   const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
   expect(broker).toContain("processCustomerSmsAutomation")
-  expect(broker).toContain("interval '6 hours'")
+  expect(broker).toContain("smsConversationContext")
+  expect(broker).toContain("Conversation (oldest to newest)")
+  expect(broker).toContain("Never say information is missing when it is clearly present earlier")
+  expect(broker).not.toContain("interval '6 hours'")
+  expect(broker).toContain('result.autoSafe;')
+  expect(broker).toContain("stop|unsubscribe|end|quit")
   expect(broker).toContain("forbiddenAuto")
   expect(broker).toContain("phone === TRUSTED_SMS_COMMAND_PHONE")
   expect(broker).toContain("likelyMaterialList")

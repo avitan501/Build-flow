@@ -30,7 +30,7 @@ test("AI keeps the sender phone as fallback and extracts later names and address
 
   expect(broker).toContain("explicitly identifies their personal or company name")
   expect(broker).toContain("complete street address")
-  expect(broker).toContain("a clear construction-material list written by the Customer is itself a material request")
+  expect(broker).toContain("A clear construction-material list written by the Customer is a material request")
   expect(broker).toContain("extractReviewMaterialLines")
   expect(broker).toContain('unitAliases')
   expect(broker).toContain("dimensionalMaterial")
