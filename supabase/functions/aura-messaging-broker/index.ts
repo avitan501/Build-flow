@@ -3248,19 +3248,20 @@ Deno.serve(async (req: Request) => {
       if (!message) return json({ error: "That incoming text could not be found." }, 404);
       const context = await smsConversationContext(message.counterparty_phone);
       const { result, model } = await analyzeCustomerSms(context.replyText || `Customer: ${message.body}`, message.sms_ai_style || "professional", false, message.body);
+      const latestIsMaterialRequest = likelyMaterialList(message.body) || extractReviewMaterialLines([message.body]).length > 0;
       await sql`
         insert into public.aura_sms_reply_drafts (communication_id, contact_id, counterparty_phone, reply_text, decision, safety_reason, ai_model)
         values (${message.id}::uuid, ${message.contact_id}, ${message.counterparty_phone}, ${result.reply}, 'draft', ${result.safetyReason}, ${model})
         on conflict (communication_id) do update set reply_text = excluded.reply_text, decision = 'draft', safety_reason = excluded.safety_reason, ai_model = excluded.ai_model, updated_at = now()
       `;
-      if (result.isMaterialRequest && result.request) {
+      if (latestIsMaterialRequest && result.isMaterialRequest && result.request) {
         await sql`
           insert into public.aura_sms_request_drafts (communication_id, contact_id, sender_phone, customer_name, title, department, items, original_message)
           values (${message.id}::uuid, ${message.contact_id}, ${message.counterparty_phone}, ${message.full_name || message.counterparty_phone}, ${result.request.title}, ${result.request.department}, ${sql.json(result.request.items)}, ${message.body.slice(0, 4000)})
           on conflict (communication_id) do update set title = excluded.title, department = excluded.department, items = excluded.items, updated_at = now()
         `;
       }
-      return json({ ok: true, reply: result.reply, safetyReason: result.safetyReason, requestDetected: result.isMaterialRequest });
+      return json({ ok: true, reply: result.reply, safetyReason: result.safetyReason, requestDetected: latestIsMaterialRequest && result.isMaterialRequest });
     }
     if (input.action === "status") {
       const [twoChat, twoChatApi, sms, smsReceive] = await Promise.all([
