@@ -14,6 +14,7 @@ test("manager WhatsApp shortcut opens the internal filtered communication log", 
 
   expect(shell).toContain("/admin/communications?channel=whatsapp")
   expect(page).toContain("initialChannelFilter")
+  expect(page).toContain('requestedChannel === "email-list"')
   expect(workspace).toContain("useState(initialChannelFilter)")
   expect(workspace).toContain("useState(initialQuery)")
 })
@@ -35,6 +36,7 @@ test("manager communications can reach customers, leads, and suppliers", async (
   expect(workspace).toContain("Unified communications inbox")
   expect(workspace).toContain("Suppliers / Vendors")
   expect(workspace).toContain("ExpandableMessage")
+  expect(workspace).toContain("Link email to…")
 })
 
 test("manager communications support file attachments and phone-number history", async () => {
@@ -93,6 +95,6 @@ test("owner ADD WhatsApp commands require AI review and confirmation", async () 
   expect(command).toContain("confirmAuraIntakeByCode")
   expect(command).toContain("cancelAuraIntakeByCode")
   expect(command).toContain("/^add")
-  expect(intake).toContain('z.enum(["client", "lead", "task", "material_request"])')
+  expect(intake).toContain('z.enum(["contact", "client", "lead", "task", "material_request"])')
   expect(intake).toContain("Reply CONFIRM")
 })

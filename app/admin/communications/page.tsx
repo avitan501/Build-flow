@@ -70,7 +70,7 @@ export default async function CommunicationsPage({
   const initialChannelFilter = ["all", "call", "sms", "whatsapp", "email"].includes(requestedChannel || "") ? requestedChannel! : "all"
   const { supabase, access } = await requireManagerPortalProfile()
   if (access.customers) await syncRecentTwilioWhatsAppMessages().catch(() => null)
-  if (initialChannelFilter === "email") {
+  if (requestedChannel === "email-list") {
     const emailAura = access.customers ? await loadManagerAura(supabase) : null
     return <EmailInboxView communications={normalizeAuraCommunications(emailAura?.communications ?? [])} />
   }
