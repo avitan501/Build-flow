@@ -141,6 +141,7 @@ test("Learn More opens the cinematic nine-story Avantia experience", async ({ pa
   await expect(page.getByText("Special & custom items", { exact: true })).toBeAttached();
   const videos = page.locator('main video');
   await expect(videos).toHaveCount(10);
+  await expect(page.getByRole("button", { name: /background video/ })).toBeVisible();
   for (const [file, caption] of [
     ["01-contractor-request", "request"],
     ["02-contractor-crew-moving", "crew"],
@@ -158,6 +159,9 @@ test("Learn More opens the cinematic nine-story Avantia experience", async ({ pa
   await expect(page.getByRole("link", { name: /Send a material request/ })).toHaveAttribute("href", "/shop");
   await expect(page.getByRole("link", { name: /Text \(516\) 908-8319/ })).toHaveAttribute("href", "tel:+15169088319");
   await expect(page.getByRole("main").getByRole("link", { name: "office@build.avantiap.com" })).toHaveAttribute("href", "mailto:office@build.avantiap.com");
+
+  await page.getByRole("button", { name: "Play How many calls for one job?" }).click();
+  await expect.poll(async () => page.locator("main video").evaluateAll((items) => items.filter((item) => !item.paused).length)).toBeLessThanOrEqual(1);
 
   const overflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflows).toBe(false);
