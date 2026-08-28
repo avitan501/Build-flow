@@ -406,9 +406,30 @@ export async function addManagerDocumentItemsToCatalogAction(documentId: string)
       updated_by: user.id, updated_at: now,
     }]
   })
-  const { error: priceError } = await supabase.from("material_catalog_supplier_prices").upsert(prices, { onConflict: "item_id,supplier_id" })
+  let { error: priceError } = await supabase.from("material_catalog_supplier_prices").upsert(prices, { onConflict: "item_id,supplier_id" })
+  let usedCompatibilitySave = false
   if (priceError) {
     console.error("Reviewed document catalog price save failed", {
+      code: priceError.code,
+      message: priceError.message,
+      documentId,
+      supplierId: supplier.id,
+      priceCount: prices.length,
+    })
+    // Older production schemas can accept catalog prices before the dedicated
+    // document-source columns are available. The source, quote number, and date
+    // are already retained in notes, so save the dependable price fields instead
+    // of leaving a reviewed import half-finished.
+    const compatiblePrices = prices.map(({ source_document_id, source_file_name, source_quote_number, source_document_date, ...price }) => {
+      void source_document_id; void source_file_name; void source_quote_number; void source_document_date
+      return price
+    })
+    const fallback = await supabase.from("material_catalog_supplier_prices").upsert(compatiblePrices, { onConflict: "item_id,supplier_id" })
+    priceError = fallback.error
+    usedCompatibilitySave = !fallback.error
+  }
+  if (priceError) {
+    console.error("Reviewed document compatible catalog price save failed", {
       code: priceError.code,
       message: priceError.message,
       documentId,
@@ -420,5 +441,5 @@ export async function addManagerDocumentItemsToCatalogAction(documentId: string)
   await supabase.from("manager_documents").update({ status: "routed", supplier_id: supplier.id, updated_by: user.id }).eq("id", documentId)
   await supabase.from("manager_document_events").insert({ document_id: documentId, event_type: "routed", summary: `${prices.length} selected price${prices.length === 1 ? "" : "s"} added to the catalog.`, details: { destination: "catalog", supplier_id: supplier.id, created_item_count: createdCount, price_count: prices.length }, created_by: user.id })
   revalidatePath(`/admin/documents/${documentId}`); revalidatePath("/admin/documents"); revalidatePath("/admin/catalog"); revalidatePath("/admin/vendors")
-  return { ok: true, data: { itemCount: items.length, priceCount: prices.length, supplierName: supplier.name }, message: `${prices.length} selected price${prices.length === 1 ? "" : "s"} added for ${supplier.name}. Source and date were saved.` }
+  return { ok: true, data: { itemCount: items.length, priceCount: prices.length, supplierName: supplier.name }, message: `${prices.length} selected price${prices.length === 1 ? "" : "s"} added for ${supplier.name}. Source and date were saved${usedCompatibilitySave ? " in the price note" : ""}.` }
 }
