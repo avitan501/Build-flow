@@ -14,6 +14,23 @@ type Result = { ok: true } | { ok: false; error: string }
 type SmsAiMode = "off" | "draft" | "auto_safe"
 type SmsAiStyle = "professional" | "friendly" | "brief"
 
+export type SmsRequestProposal = {
+  communicationId: string
+  phone: string
+  customerName: string
+  customerAddress: string
+  title: string
+  department: string
+  items: Array<{ name: string; quantity: number; unit: string }>
+  sourceCommunicationIds: string[]
+  sourceMessages: string[]
+  existingRequestId: string | null
+  existingRequestTitle: string | null
+  kind: "create" | "update"
+  reviewNote: string
+  aiModel: string
+}
+
 export async function saveSmsAutomationAction(input: { phone: string; mode: SmsAiMode; style: SmsAiStyle; autoCreateRequestDrafts: boolean }) {
   const { supabase, access } = await requireManagerPortalProfile()
   if (!access.customers) return { ok: false as const, error: "Customer communication access is required." }
@@ -32,6 +49,59 @@ export async function generateSmsReplyAction(input: { communicationId: string })
   const { data, error } = await supabase.functions.invoke<{ ok?: boolean; reply?: string; safetyReason?: string; requestDetected?: boolean; error?: string }>("aura-messaging-broker", { body: { action: "generate_sms_reply", communicationId: input.communicationId } })
   if (error || !data?.ok || !data.reply) return { ok: false as const, error: data?.error || "AI could not prepare a reply right now." }
   return { ok: true as const, reply: data.reply, safetyReason: data.safetyReason || "Review before sending.", requestDetected: Boolean(data.requestDetected) }
+}
+
+export async function reviewSmsRequestAction(input: { communicationId: string }) {
+  const { supabase, access } = await requireManagerPortalProfile()
+  if (!access.customers || !/^[0-9a-f-]{36}$/i.test(input.communicationId)) return { ok: false as const, error: "Choose an incoming text message." }
+  const { data, error } = await supabase.functions.invoke<{ ok?: boolean; proposal?: SmsRequestProposal; error?: string }>("aura-messaging-broker", { body: { action: "review_sms_request", communicationId: input.communicationId } })
+  if (error || !data?.ok || !data.proposal) return { ok: false as const, error: data?.error || "AI could not review this conversation right now." }
+  return { ok: true as const, proposal: data.proposal }
+}
+
+export async function createSmsMaterialRequestAction(input: {
+  communicationId: string
+  phone: string
+  customerName: string
+  customerAddress: string
+  title: string
+  department: string
+  items: Array<{ name: string; quantity: number; unit: string }>
+  sourceCommunicationIds: string[]
+}) {
+  const phone = normalizeAuraPhone(input.phone)
+  const customerName = String(input.customerName || "").trim().replace(/\s+/g, " ").slice(0, 160) || phone
+  const customerAddress = String(input.customerAddress || "").trim().replace(/\s+/g, " ").slice(0, 500)
+  const title = String(input.title || "").trim().replace(/\s+/g, " ").slice(0, 180)
+  const department = String(input.department || "Unassigned").trim().replace(/\s+/g, " ").slice(0, 100) || "Unassigned"
+  const items = Array.isArray(input.items) ? input.items.slice(0, 50).flatMap((item) => {
+    const name = String(item?.name || "").trim().replace(/\s+/g, " ").slice(0, 300)
+    const quantity = Number(item?.quantity)
+    const unit = String(item?.unit || "each").trim().replace(/\s+/g, " ").slice(0, 40) || "each"
+    return name ? [{ name, quantity: Number.isFinite(quantity) && quantity > 0 ? Math.min(quantity, 1_000_000) : 1, unit }] : []
+  }) : []
+  const sourceCommunicationIds = [...new Set([input.communicationId, ...(input.sourceCommunicationIds || [])])].filter((id) => /^[0-9a-f-]{36}$/i.test(id)).slice(0, 20)
+  if (!phone || !title || !items.length || !sourceCommunicationIds.length) return { ok: false as const, error: "Add a request title and at least one material item." }
+
+  const tagged = await quickTagPhoneContactAction({ phone, kind: "customer", name: customerName || phone })
+  if (!tagged.ok) return tagged
+  const { supabase, access } = await requireManagerPortalProfile()
+  if (!access.customers) return { ok: false as const, error: "Customer access is required." }
+  const notes = [`Created from SMS after manager review.`, `Customer phone: ${phone}`, customerAddress ? `Job address: ${customerAddress}` : "", `Source messages: ${sourceCommunicationIds.length}`].filter(Boolean).join("\n")
+  const { data: requestId, error } = await supabase.rpc("staff_create_client_request", { p_customer_id: tagged.sourceId, p_department: department, p_title: title, p_lines: items, p_notes: notes.slice(0, 4000) })
+  if (error || typeof requestId !== "string") return { ok: false as const, error: "The material request could not be created." }
+  const request = await supabase.from("quote_requests").update({ manager_assignee: "carlos" }).eq("id", requestId).select("project_id").maybeSingle<{ project_id: string }>()
+  if (request.error || !request.data) return { ok: false as const, error: "The request was created, but Carlos could not be assigned." }
+  if (customerAddress) {
+    const addressUpdate = await supabase.from("projects").update({ address: customerAddress }).eq("id", request.data.project_id)
+    if (addressUpdate.error) return { ok: false as const, error: "The request was created, but the address could not be saved." }
+  }
+  const linked = await supabase.functions.invoke<{ ok?: boolean; error?: string }>("aura-messaging-broker", { body: { action: "link_sms_material_request", requestId, phone, customerName, communicationIds: sourceCommunicationIds } })
+  if (linked.error || !linked.data?.ok) return { ok: false as const, error: linked.data?.error || "The request was created, but the conversation link needs attention.", requestId }
+  revalidatePath("/admin/communications")
+  revalidatePath("/owner/materials/requests")
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const, requestId }
 }
 
 export async function quickTagPhoneContactAction(input: { phone: string; kind: ContactKind; name?: string }) {
