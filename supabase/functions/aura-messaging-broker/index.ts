@@ -1250,12 +1250,13 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
   }
   if (!needsAiReply) return;
   const shouldAuto = contact?.sms_ai_mode === "auto_safe" && result.autoSafe;
-  await sql`
+  const replyDrafts = await sql<{ id: string }[]>`
     insert into public.aura_sms_reply_drafts (communication_id, contact_id, counterparty_phone, reply_text, decision, safety_reason, ai_model)
     values (${communicationId}::uuid, ${contact?.id || null}, ${phone}, ${result.reply}, ${shouldAuto ? "auto_sent" : result.autoSafe ? "draft" : "blocked"}, ${result.safetyReason}, ${model})
     on conflict (communication_id) do nothing
+    returning id
   `;
-  if (shouldAuto) await sendQuoSms(phone, result.reply);
+  if (shouldAuto && replyDrafts[0]?.id) await sendQuoSms(phone, result.reply);
 }
 
 async function handleQuoWebhook(req: Request) {
@@ -1424,15 +1425,16 @@ async function handleQuoWebhook(req: Request) {
       from public.aura_contacts where id = ${linkedContact}::uuid limit 1
     ` : [];
     if (stored[0]?.id) {
-      try {
-        await processCustomerSmsAutomation(stored[0].id, counterpartyPhone, body, contactRows[0] || null);
-      } catch (automationError) {
-        await sql`
-          update public.aura_webhook_events
-          set error_message = ${`SMS automation: ${automationError instanceof Error ? automationError.message : "failed"}`.slice(0, 500)}
-          where provider = 'quo' and external_event_id = ${eventId}
-        `;
-      }
+      EdgeRuntime.waitUntil(
+        processCustomerSmsAutomation(stored[0].id, counterpartyPhone, body, contactRows[0] || null)
+          .catch(async (automationError) => {
+            await sql`
+              update public.aura_webhook_events
+              set error_message = ${`SMS automation: ${automationError instanceof Error ? automationError.message : "failed"}`.slice(0, 500)}
+              where provider = 'quo' and external_event_id = ${eventId}
+            `;
+          }),
+      );
     }
   }
   if (

@@ -24,6 +24,8 @@ test("incoming client SMS automation keeps conversational context and blocks sen
   expect(broker).toContain("A brief acknowledgement that Avantia received or can see a Customer material list may be autoSafe")
   expect(broker).not.toContain("interval '6 hours'")
   expect(broker).toContain('result.autoSafe;')
+  expect(broker).toContain("EdgeRuntime.waitUntil(")
+  expect(broker).toContain("if (shouldAuto && replyDrafts[0]?.id)")
   expect(broker).toContain("stop|unsubscribe|end|quit")
   expect(broker).toContain("forbiddenAuto")
   expect(broker).toContain("phone === TRUSTED_SMS_COMMAND_PHONE")
