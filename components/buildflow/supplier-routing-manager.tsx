@@ -53,6 +53,7 @@ import {
 
 type ManagerPanel = "services" | "departments" | "suppliers"
 type DepartmentItemKind = "product" | "file-upload"
+type SupplierDirectoryGroup = "trial" | "verified"
 type SupplierRoutingManagerProps = {
   catalogProducts?: ShopCatalogProduct[]
   initialSettings?: ShopQualificationSettings | null
@@ -209,6 +210,7 @@ export function SupplierRoutingManager({
   const [trialSearch, setTrialSearch] = useState("")
   const [supplierDirectorySearch, setSupplierDirectorySearch] = useState("")
   const [supplierDirectorySort, setSupplierDirectorySort] = useState<"saved" | "alphabetical">("saved")
+  const [supplierDirectoryGroup, setSupplierDirectoryGroup] = useState<SupplierDirectoryGroup>("verified")
   const [trialCatalogStatus, setTrialCatalogStatus] = useState("")
   const [supplierDraftNotesOpen, setSupplierDraftNotesOpen] = useState(false)
   const [supplierNotesOpen, setSupplierNotesOpen] = useState<Record<string, boolean>>({})
@@ -272,10 +274,16 @@ export function SupplierRoutingManager({
       : assignmentTargets.find((target) => target.id === selectedTargetId) ?? assignmentTargets[0] ?? SERVICE_ASSIGNMENT_TARGETS[0]
   const selectedSetting = useMemo(() => selectedSettingFor(settings, selectedTarget.id, assignmentTargets), [assignmentTargets, selectedTarget.id, settings])
   const selectedSupplier = settings.suppliers.find((supplier) => supplier.id === selectedSupplierId) ?? settings.suppliers[0] ?? null
+  const trialSuppliers = useMemo(() => settings.suppliers.filter((supplier) => !["verified", "trusted", "preferred"].includes(supplier.trustLevel ?? "not-reviewed")), [settings.suppliers])
+  const verifiedSuppliers = useMemo(() => settings.suppliers.filter((supplier) => ["verified", "trusted", "preferred"].includes(supplier.trustLevel ?? "not-reviewed")), [settings.suppliers])
+  const groupedDirectorySuppliers = useMemo(
+    () => supplierDirectoryGroup === "verified" ? verifiedSuppliers : trialSuppliers,
+    [supplierDirectoryGroup, trialSuppliers, verifiedSuppliers],
+  )
   const filteredDirectorySuppliers = useMemo(() => {
-    const matching = settings.suppliers.filter((supplier) => supplierMatchesDirectorySearch(supplier, supplierDirectorySearch))
+    const matching = groupedDirectorySuppliers.filter((supplier) => supplierMatchesDirectorySearch(supplier, supplierDirectorySearch))
     return supplierDirectorySort === "alphabetical" ? [...matching].sort((left, right) => left.name.localeCompare(right.name)) : matching
-  }, [settings.suppliers, supplierDirectorySearch, supplierDirectorySort])
+  }, [groupedDirectorySuppliers, supplierDirectorySearch, supplierDirectorySort])
   const selectedSupplierMatchesSearch = !supplierDirectorySearch.trim()
     || filteredDirectorySuppliers.some((supplier) => supplier.id === selectedSupplier?.id)
   const existingVendorIdentities = useMemo(
@@ -499,7 +507,7 @@ export function SupplierRoutingManager({
 
   function addTrialVendor(entry: TrialVendorEntry) {
     if (supplierDirty) {
-      setTrialCatalogStatus("Save the current supplier changes before adding a trial vendor.")
+      setTrialCatalogStatus("Save the current supplier changes before adding a trial supplier.")
       return
     }
     if (supplierSavePending || directorySaveState === "saving") return
@@ -537,9 +545,9 @@ export function SupplierRoutingManager({
         setSelectedSupplierId(result.supplier.id)
         setSupplierDirty(false)
         setDirectorySaveState("saved")
-        setTrialCatalogStatus(`${result.supplier.name} was added as a first-time trial vendor.`)
+        setTrialCatalogStatus(`${result.supplier.name} was added as a first-time trial supplier.`)
       } catch {
-        setTrialCatalogStatus("The server could not add this trial vendor. Please try again.")
+        setTrialCatalogStatus("The server could not add this trial supplier. Please try again.")
       }
     })
   }
@@ -1220,6 +1228,10 @@ export function SupplierRoutingManager({
                   <p className="text-sm font-semibold text-slate-700">Supplier directory</p>
                   <button type="button" onClick={refreshSupplierDirectory} disabled={supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${supplierSavePending ? "animate-spin" : ""}`} />Refresh</button>
                 </div>
+                <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1" aria-label="Supplier directory groups">
+                  <button type="button" onClick={() => { setSupplierDirectoryGroup("verified"); setSupplierDirectorySearch("") }} aria-pressed={supplierDirectoryGroup === "verified"} className={`min-h-10 rounded-md px-3 text-sm font-bold ${supplierDirectoryGroup === "verified" ? "bg-emerald-700 text-white shadow-sm" : "text-slate-600 hover:bg-white"}`}>Verified Suppliers <span className="ml-1 opacity-75">{verifiedSuppliers.length}</span></button>
+                  <button type="button" onClick={() => { setSupplierDirectoryGroup("trial"); setSupplierDirectorySearch("") }} aria-pressed={supplierDirectoryGroup === "trial"} className={`min-h-10 rounded-md px-3 text-sm font-bold ${supplierDirectoryGroup === "trial" ? "bg-amber-600 text-white shadow-sm" : "text-slate-600 hover:bg-white"}`}>Trial Suppliers <span className="ml-1 opacity-75">{trialSuppliers.length}</span></button>
+                </div>
                 <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
                 <label className="relative block">
                   <span className="sr-only">Search active suppliers</span>
@@ -1228,7 +1240,7 @@ export function SupplierRoutingManager({
                     type="search"
                     value={supplierDirectorySearch}
                     onChange={(event) => updateSupplierDirectorySearch(event.target.value)}
-                    placeholder="Search vendor, supplier, or salesperson"
+                    placeholder={`Search ${supplierDirectoryGroup} suppliers`}
                     className="min-h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-10 text-sm font-medium outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                   />
                   {supplierDirectorySearch ? <button type="button" onClick={() => updateSupplierDirectorySearch("")} aria-label="Clear supplier search" className="absolute right-1.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900"><X className="h-4 w-4" /></button> : null}
@@ -1236,11 +1248,11 @@ export function SupplierRoutingManager({
                 <label><span className="sr-only">Supplier order</span><select value={supplierDirectorySort} onChange={(event) => setSupplierDirectorySort(event.target.value as "saved" | "alphabetical")} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold"><option value="saved">Saved order</option><option value="alphabetical">A–Z</option></select></label>
                 </div>
                 <p className="mb-3 text-xs font-semibold text-slate-500">
-                  {supplierDirectorySearch.trim() ? `${filteredDirectorySuppliers.length} of ${settings.suppliers.length} active vendors` : `${settings.suppliers.length} active vendor${settings.suppliers.length === 1 ? "" : "s"}`}
+                  {supplierDirectorySearch.trim() ? `${filteredDirectorySuppliers.length} of ${groupedDirectorySuppliers.length} ${supplierDirectoryGroup} suppliers` : `${groupedDirectorySuppliers.length} ${supplierDirectoryGroup} supplier${groupedDirectorySuppliers.length === 1 ? "" : "s"}`}
                 </p>
                 <div className="grid gap-2">
                   {settings.suppliers.length === 0 ? <div className="rounded-[18px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center"><p className="text-sm font-semibold text-slate-800">No suppliers in the directory</p><p className="mt-1 text-xs leading-5 text-slate-500">Add your first supplier below. Sent request history remains separate.</p></div> : null}
-                  {settings.suppliers.length > 0 && filteredDirectorySuppliers.length === 0 ? <div className="rounded-[18px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center"><p className="text-sm font-semibold text-slate-800">No matching vendors</p><p className="mt-1 text-xs leading-5 text-slate-500">Try another company, salesperson, phone, email, material, or department.</p></div> : null}
+                  {settings.suppliers.length > 0 && filteredDirectorySuppliers.length === 0 ? <div className="rounded-[18px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center"><p className="text-sm font-semibold text-slate-800">No matching suppliers</p><p className="mt-1 text-xs leading-5 text-slate-500">Try another company, salesperson, phone, email, material, or department.</p></div> : null}
                   {filteredDirectorySuppliers.map((supplier) => (
                     <button
                       key={supplier.id}
@@ -1260,14 +1272,15 @@ export function SupplierRoutingManager({
                     type="button"
                     onClick={() => {
                       setSupplierFormError("")
+                      setSupplierDraft((draft) => ({ ...draft, trustLevel: supplierDirectoryGroup === "verified" ? "verified" : "first-time" }))
                       setSupplierAddOpen(true)
                     }}
-                    className="flex min-h-14 items-center gap-3 rounded-[18px] border border-dashed border-sky-300 bg-sky-50 px-4 py-3 text-left text-sky-800 transition hover:border-sky-500 hover:bg-sky-100"
+                    className={`flex min-h-14 items-center gap-3 rounded-[18px] border border-dashed px-4 py-3 text-left transition ${supplierDirectoryGroup === "verified" ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:border-emerald-500 hover:bg-emerald-100" : "border-sky-300 bg-sky-50 text-sky-800 hover:border-sky-500 hover:bg-sky-100"}`}
                   >
                     <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm"><Plus className="h-4 w-4" /></span>
-                    <span><span className="block text-sm font-semibold">Add supplier</span><span className="mt-0.5 block text-xs text-sky-700">Create a new directory entry</span></span>
+                    <span><span className="block text-sm font-semibold">Add {supplierDirectoryGroup} supplier</span><span className="mt-0.5 block text-xs opacity-80">{supplierDirectoryGroup === "verified" ? "Create a supplier you already work with" : "Create a new supplier lead"}</span></span>
                   </button>
-                  <button
+                  {supplierDirectoryGroup === "trial" ? <button
                     type="button"
                     onClick={() => {
                       setTrialCatalogStatus("")
@@ -1276,8 +1289,8 @@ export function SupplierRoutingManager({
                     className="flex min-h-14 items-center gap-3 rounded-[18px] border border-slate-300 bg-white px-4 py-3 text-left text-slate-900 transition hover:border-emerald-400 hover:bg-emerald-50"
                   >
                     <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800"><Search className="h-4 w-4" /></span>
-                    <span><span className="block text-sm font-semibold">Add trial vendors</span><span className="mt-0.5 block text-xs text-slate-600">Open the reusable {TRIAL_VENDOR_ENTRY_COUNT}-entry source catalog</span></span>
-                  </button>
+                    <span><span className="block text-sm font-semibold">Add Trial Suppliers</span><span className="mt-0.5 block text-xs text-slate-600">Open the reusable {TRIAL_VENDOR_ENTRY_COUNT}-entry supplier-lead catalog</span></span>
+                  </button> : null}
                 </div>
               </section>
 
@@ -1304,7 +1317,7 @@ export function SupplierRoutingManager({
                           directoryReady={!supplierDirty && !supplierSavePending && directorySaveState !== "saving" && directorySaveState !== "error"}
                           directoryStatus={supplierDirty ? "Save supplier changes before sending a quote." : supplierSavePending ? "Saving supplier changes..." : directorySaveState === "saving" ? "Saving the latest supplier changes..." : directorySaveError || undefined}
                         />
-                        {selectedSupplier.trustLevel === "first-time" ? <button type="button" onClick={() => keepSupplier(selectedSupplier)} disabled={supplierDirty || supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-50"><Check className="h-4 w-4" />Keep vendor</button> : null}
+                        {selectedSupplier.trustLevel === "first-time" ? <button type="button" onClick={() => keepSupplier(selectedSupplier)} disabled={supplierDirty || supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-50"><Check className="h-4 w-4" />Verify supplier</button> : null}
                         <button type="button" onClick={() => removeSupplier(selectedSupplier.id)} disabled={supplierSavePending || directorySaveState === "saving"} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 disabled:cursor-wait disabled:opacity-50"><Trash2 className="h-4 w-4" />{supplierSavePending ? "Working..." : "Delete supplier"}</button>
                         <button type="button" onClick={() => setSupplierProfileOpen(false)} disabled={supplierSavePending} aria-label="Close supplier profile" className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-600"><X className="h-5 w-5" /></button>
                       </div>
@@ -1446,25 +1459,25 @@ export function SupplierRoutingManager({
                   <section className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-[22px] bg-white shadow-[0_28px_80px_rgba(15,23,42,0.35)]">
                     <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
                       <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700">Trial vendor catalog</p>
-                        <h2 id="trial-vendor-catalog-title" className="mt-1 text-xl font-bold text-slate-950">Choose a trial vendor</h2>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700">Trial supplier catalog</p>
+                        <h2 id="trial-vendor-catalog-title" className="mt-1 text-xl font-bold text-slate-950">Choose a trial supplier</h2>
                         <p className="mt-1 text-sm text-slate-500">{TRIAL_VENDOR_ENTRY_COUNT} department entries · {TRIAL_VENDOR_UNIQUE_COUNT} unique material suppliers · 9 departments</p>
                       </div>
-                      <button type="button" onClick={() => setTrialCatalogOpen(false)} disabled={supplierSavePending} aria-label="Close trial vendor catalog" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40"><X className="h-5 w-5" /></button>
+                      <button type="button" onClick={() => setTrialCatalogOpen(false)} disabled={supplierSavePending} aria-label="Close trial supplier catalog" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40"><X className="h-5 w-5" /></button>
                     </header>
 
                     <div className="shrink-0 border-b border-slate-200 p-4 sm:px-6">
                       <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950">
-                        <strong>Source catalog, not active vendors.</strong> Only companies shown in Supplier directory are active. Deleted trial vendors are hidden from this list and cannot return from an old browser request.
+                        <strong>Supplier leads, not verified suppliers.</strong> Adding a company places it in Trial Suppliers. Deleted trial suppliers stay hidden and cannot return from an old browser request.
                       </div>
                       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_15rem]">
                         <label className="relative block">
                           <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                          <span className="sr-only">Search trial vendors</span>
+                          <span className="sr-only">Search trial suppliers</span>
                           <input value={trialSearch} onChange={(event) => setTrialSearch(event.target.value)} placeholder="Search supplier, materials, or location" className="min-h-11 w-full rounded-lg border border-slate-300 pl-10 pr-4 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100" />
                         </label>
                         <label>
-                          <span className="sr-only">Filter trial vendors by department</span>
+                          <span className="sr-only">Filter trial suppliers by department</span>
                           <select value={trialDepartment} onChange={(event) => setTrialDepartment(event.target.value)} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium">
                             <option>All departments</option>
                             {TRIAL_VENDOR_DEPARTMENTS.map((department) => <option key={department}>{department}</option>)}

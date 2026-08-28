@@ -43,7 +43,7 @@ test("manager navigation is compact and keeps communication shortcuts at the bot
 })
 
 test("manager catalog is protected, seeded, editable, and supplier based", async () => {
-  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, allDepartmentRetailers, verifiedRetailProducts, curatedProducts, qualityMigration, coreCurationMigration, qualityHelpers, parser] = await Promise.all([
+  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, allDepartmentRetailers, verifiedRetailProducts, curatedProducts, qualityMigration, coreCurationMigration, flyerMigration, qualityHelpers, parser] = await Promise.all([
     readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/catalog/actions.ts"), "utf8"),
@@ -58,6 +58,7 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
     readFile(path.join(root, "supabase/migrations/20260816223000_curate_common_catalog_products.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817001500_add_catalog_quality_and_price_history.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817013000_curate_core_catalog_materials.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260828191647_replace_tile_with_jobsite_flyer_materials.sql"), "utf8"),
     readFile(path.join(root, "lib/material-catalog-quality.ts"), "utf8"),
     readFile(path.join(root, "lib/material-catalog-pdf.ts"), "utf8"),
   ])
@@ -103,6 +104,11 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(workspace).toContain("three lowest comparable supplier prices")
   expect(workspace).toContain("source_document_id")
   expect(page).toContain("source_document_date")
+  expect(page).toContain("material_catalog_item_departments")
+  expect(workspace).toContain("Check ZIP price")
+  expect(workspace).toContain("<MaterialPriceCheck")
+  expect(workspace).toContain('price?.product_url ? <a')
+  expect(workspace).toContain('"Not available"')
   expect(workspace).not.toContain("Valley Stream #1216")
   expect(workspace).not.toContain("snapshotLabel")
   expect(workspace).not.toContain('<option value="unknown">Unknown</option><option value="available">Available</option><option value="not_available">N/A</option></select>\n                      {draft.productUrl')
@@ -171,6 +177,15 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(coreCurationMigration).toContain("5/8 in. CDX plywood sheathing, 4 x 8 ft.")
   expect(coreCurationMigration).toContain("flat flush hollow-core slab door")
   expect(coreCurationMigration).not.toContain("delete from public.material_catalog_items")
+  expect(flyerMigration).toContain("create table if not exists public.material_catalog_item_departments")
+  expect(flyerMigration).toContain("set status = 'inactive'")
+  expect(flyerMigration).toContain("delete from public.material_catalog_item_departments")
+  expect(flyerMigration).toContain("'TIL-018','Galvanized Metal Lath'")
+  expect(flyerMigration).toContain("'TIL-042','Exterior Pavers & Stone'")
+  expect(flyerMigration).toContain("https://www.homedepot.com/p/USG-Durock")
+  expect(flyerMigration).toContain("https://www.lowes.com/pd/James-Hardie-HardieBacker")
+  expect(flyerMigration).not.toContain("https://www.homedepot.com/s/")
+  expect(flyerMigration).not.toContain("https://www.lowes.com/search")
   expect(qualityHelpers).toContain("catalogItemMatchesReview")
   expect(qualityHelpers).toContain("normalizedComparisonPrice")
   expect(qualityHelpers).toContain("priceCheckedDateLabel")

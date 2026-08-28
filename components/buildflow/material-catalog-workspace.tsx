@@ -1,6 +1,6 @@
 "use client"
 
-import { AlertTriangle, Archive, Check, ChevronLeft, ChevronRight, ExternalLink, EyeOff, FileUp, ImageIcon, PackagePlus, Pencil, Plus, Save, Search, Store, X } from "lucide-react"
+import { AlertTriangle, Archive, Check, ChevronLeft, ChevronRight, ExternalLink, EyeOff, FileUp, ImageIcon, MapPin, PackagePlus, Pencil, Plus, Save, Search, Store, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -14,6 +14,7 @@ import {
   saveMaterialCatalogPricesAction,
 } from "@/app/admin/catalog/actions"
 import { ExaCatalogResearch } from "@/components/buildflow/exa-catalog-research"
+import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
 import {
   MATERIAL_CATALOG_CATEGORIES,
   hasRoutableSupplierTrust,
@@ -150,6 +151,7 @@ export function MaterialCatalogWorkspace({
   const [priceColumnWidth, setPriceColumnWidth] = useState(88)
   const [editor, setEditor] = useState<EditorDraft | null>(null)
   const [priceEditor, setPriceEditor] = useState<{ item: MaterialCatalogItem; supplier: CatalogSupplier } | null>(null)
+  const [priceCheckItem, setPriceCheckItem] = useState<MaterialCatalogItem | null>(null)
   const [notice, setNotice] = useState("")
   const [error, setError] = useState("")
   const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(new Set())
@@ -169,14 +171,14 @@ export function MaterialCatalogWorkspace({
 
   const categories = useMemo(() => materialCatalogDepartmentOptions(departments, initialItems.map((item) => item.category)), [departments, initialItems])
   const categoryItems = useMemo(() => initialItems.filter((item) => {
-    if (item.category !== selectedCategory) return false
+    if (!(item.departments ?? [item.category]).includes(selectedCategory)) return false
     if (!showInactive && item.status === "inactive") return false
     if (!catalogItemMatchesReview(item, initialPrices, reviewFilter)) return false
     const needle = itemSearch.trim().toLowerCase()
     return !needle || `${item.item_code} ${item.name} ${item.description} ${item.measurement} ${item.thickness} ${item.unit}`.toLowerCase().includes(needle)
   }), [initialItems, initialPrices, itemSearch, reviewFilter, selectedCategory, showInactive])
   const categoryQuality = useMemo(() => {
-    const items = initialItems.filter((item) => item.category === selectedCategory && item.status === "active")
+    const items = initialItems.filter((item) => (item.departments ?? [item.category]).includes(selectedCategory) && item.status === "active")
     return {
       total: items.length,
       missingPrice: items.filter((item) => catalogItemMatchesReview(item, initialPrices, "missing_price")).length,
@@ -457,7 +459,7 @@ export function MaterialCatalogWorkspace({
 
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Catalog category">
           {categories.map((category) => {
-            const count = initialItems.filter((item) => item.category === category && item.status === "active").length
+            const count = initialItems.filter((item) => (item.departments ?? [item.category]).includes(category) && item.status === "active").length
             return <button key={category} type="button" role="tab" aria-selected={selectedCategory === category} onClick={() => setSelectedCategory(category)} className={`min-h-9 shrink-0 rounded-lg border px-3 text-xs font-bold ${selectedCategory === category ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-700"}`}>{category} <span className="ml-1 opacity-70">{count}</span></button>
           })}
         </div>
@@ -495,7 +497,7 @@ export function MaterialCatalogWorkspace({
           <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-3"><div><h2 className="text-sm font-bold">Best verified prices</h2><p className="mt-0.5 text-xs text-slate-500">Home Depot and Lowe’s are market references. The three lowest comparable supplier prices are shown for each item.</p></div><button type="button" onClick={() => setShowAllSupplierColumns((current) => !current)} className="min-h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700">{showAllSupplierColumns ? "Hide price editor" : "Manage all supplier prices"}</button></header>
           <div className="divide-y divide-slate-200">{categoryItems.map((item) => {
             const cheapest = bestSupplierPrices(item)
-            return <article key={`best-${item.id}`} className="grid gap-3 p-3 lg:grid-cols-[minmax(14rem,1.2fr)_minmax(12rem,.8fr)_minmax(18rem,1.4fr)] lg:items-center"><div className="min-w-0"><p className="font-bold text-slate-950">{item.name}</p><p className="mt-0.5 text-[11px] text-slate-500">{item.item_code} · compare per {item.comparison_unit}</p></div><div className="flex gap-2">{retailReferences.map((supplier) => { const price = initialPriceMap.get(cellKey(item.id, supplier.id)); return <button key={supplier.id} type="button" onClick={() => setPriceEditor({ item, supplier })} className="min-w-0 flex-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-left"><span className="block truncate text-[10px] font-bold text-slate-500">{supplier.name}</span><span className="mt-0.5 block text-sm font-bold tabular-nums">{price && normalizedComparisonPrice(item, price) !== null ? `$${normalizedComparisonPrice(item, price)!.toFixed(2)}` : "—"}</span></button> })}</div><div className="grid gap-1 sm:grid-cols-3">{cheapest.map((price, index) => <button key={price.supplier_id} type="button" onClick={() => { const supplier = suppliers.find((entry) => entry.id === price.supplier_id); if (supplier) setPriceEditor({ item, supplier }) }} className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-2 text-left"><span className="block text-[9px] font-bold uppercase tracking-wide text-emerald-700">#{index + 1} lowest</span><span className="mt-0.5 block truncate text-xs font-bold text-slate-950">{price.supplier_name_snapshot}</span><span className="block text-sm font-bold tabular-nums text-emerald-800">${normalizedComparisonPrice(item, price)!.toFixed(2)}</span><span className="block truncate text-[9px] text-slate-500">{price.source_document_date || priceCheckedDateLabel(price) || "Verified source"}</span></button>)}{Array.from({ length: 3 - cheapest.length }).map((_, index) => <div key={`empty-${index}`} className="rounded-md border border-dashed border-slate-200 px-2 py-2 text-xs font-semibold text-slate-400">No verified price</div>)}</div></article>
+            return <article key={`best-${item.id}`} className="grid gap-3 p-3 lg:grid-cols-[minmax(14rem,1.2fr)_minmax(12rem,.8fr)_minmax(18rem,1.4fr)] lg:items-center"><div className="min-w-0"><p className="font-bold text-slate-950">{item.name}</p><p className="mt-0.5 text-[11px] text-slate-500">{item.item_code} · compare per {item.comparison_unit}</p><button type="button" onClick={() => setPriceCheckItem(item)} className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 text-[11px] font-bold text-[#0066cc]"><MapPin className="h-3.5 w-3.5" />Check ZIP price</button></div><div className="flex gap-2">{retailReferences.map((supplier) => { const price = initialPriceMap.get(cellKey(item.id, supplier.id)); const label = price && normalizedComparisonPrice(item, price) !== null ? `$${normalizedComparisonPrice(item, price)!.toFixed(2)}` : "Not available"; return price?.product_url ? <a key={supplier.id} href={price.product_url} target="_blank" rel="noreferrer" aria-label={`Open exact ${item.name} at ${supplier.name}`} className="min-w-0 flex-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-left hover:border-sky-300"><span className="block truncate text-[10px] font-bold text-slate-500">{supplier.name}</span><span className="mt-0.5 flex items-center justify-between gap-1 text-sm font-bold tabular-nums"><span>{label}</span><ExternalLink className="h-3.5 w-3.5 text-[#0066cc]" /></span></a> : <button key={supplier.id} type="button" onClick={() => setPriceEditor({ item, supplier })} className="min-w-0 flex-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-left"><span className="block truncate text-[10px] font-bold text-slate-500">{supplier.name}</span><span className="mt-0.5 block text-sm font-bold text-slate-500">{label}</span></button> })}</div><div className="grid gap-1 sm:grid-cols-3">{cheapest.map((price, index) => <button key={price.supplier_id} type="button" onClick={() => { const supplier = suppliers.find((entry) => entry.id === price.supplier_id); if (supplier) setPriceEditor({ item, supplier }) }} className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-2 text-left"><span className="block text-[9px] font-bold uppercase tracking-wide text-emerald-700">#{index + 1} lowest</span><span className="mt-0.5 block truncate text-xs font-bold text-slate-950">{price.supplier_name_snapshot}</span><span className="block text-sm font-bold tabular-nums text-emerald-800">${normalizedComparisonPrice(item, price)!.toFixed(2)}</span><span className="block truncate text-[9px] text-slate-500">{price.source_document_date || priceCheckedDateLabel(price) || "Verified source"}</span></button>)}{Array.from({ length: 3 - cheapest.length }).map((_, index) => <div key={`empty-${index}`} className="rounded-md border border-dashed border-slate-200 px-2 py-2 text-xs font-semibold text-slate-400">No verified price</div>)}</div></article>
           })}</div>
         </section>
 
@@ -644,6 +646,8 @@ export function MaterialCatalogWorkspace({
           <footer className="flex justify-end border-t border-slate-200 bg-slate-50 px-4 py-3"><button type="button" onClick={() => setPriceEditor(null)} className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white">Apply details</button></footer>
         </section>
       </div>, document.body) : null}
+
+      {priceCheckItem && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[165] overflow-y-auto bg-slate-950/55 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label={`Check ZIP price for ${priceCheckItem.name}`} onMouseDown={(event) => { if (event.currentTarget === event.target) setPriceCheckItem(null) }}><div className="mx-auto max-w-5xl rounded-xl bg-[#f5f5f7] p-1 shadow-2xl"><MaterialPriceCheck query={[priceCheckItem.brand, priceCheckItem.name, priceCheckItem.measurement, priceCheckItem.manufacturer_model_number].filter(Boolean).join(" · ")} department={selectedCategory} defaultZipCode="11516" onClose={() => setPriceCheckItem(null)} /></div></div>, document.body) : null}
     </main>
   )
 }

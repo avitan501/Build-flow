@@ -27,7 +27,7 @@ function matchBadge(score: number) {
   }
 }
 
-export function MaterialPriceCheck({ requestId, query, department, defaultZipCode = "11516", onClose }: { requestId: string; query: string; department: string; defaultZipCode?: string; onClose: () => void }) {
+export function MaterialPriceCheck({ requestId, query, department, defaultZipCode = "11516", onClose }: { requestId?: string; query: string; department: string; defaultZipCode?: string; onClose: () => void }) {
   const itemQuery = query.trim()
   const [zipCode, setZipCode] = useState(/^\d{5}(?:-\d{4})?$/.test(defaultZipCode) ? defaultZipCode : "11516")
   const [editingZip, setEditingZip] = useState(false)
@@ -101,6 +101,10 @@ export function MaterialPriceCheck({ requestId, query, department, defaultZipCod
   const totalOptions = totalResults + storeSearches.length
 
   function openSupplierRouting() {
+    if (!requestId) {
+      window.location.href = "/admin/vendors"
+      return
+    }
     const routing = document.getElementById("supplier-routing") as HTMLDetailsElement | null
     if (!routing) {
       window.location.href = `/owner/materials/requests/${requestId}#supplier-routing`

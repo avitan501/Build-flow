@@ -49,6 +49,7 @@ export type MaterialCatalogItem = {
   sort_order: number
   created_at: string
   updated_at: string
+  departments?: string[]
 }
 
 export type MaterialCatalogSupplierPrice = {
