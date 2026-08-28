@@ -2,8 +2,6 @@ import type { ProfileRecord } from "@/lib/auth"
 import type { ProjectRecord } from "@/lib/projects"
 import type { ShopCartItemDetails, ShopCustomCartItem } from "@/lib/shop-cart"
 import { CREDIT_CARD_PROCESSING_TERM } from "@/lib/proposal-terms"
-import { storeAuraCommunication } from "@/lib/aura/communications"
-import { addAuraCommunicationLinks } from "@/lib/aura/email-links"
 
 type QuoteItemForEmail = {
   name: string
@@ -617,6 +615,10 @@ export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmail
     })
     if (directResult.status === "sent") {
       try {
+        const [{ storeAuraCommunication }, { addAuraCommunicationLinks }] = await Promise.all([
+          import("@/lib/aura/communications"),
+          import("@/lib/aura/email-links"),
+        ])
         const communicationId = await storeAuraCommunication({
           provider: "manual",
           channel: "email",
