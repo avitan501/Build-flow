@@ -43,7 +43,7 @@ test("manager navigation is compact and keeps communication shortcuts at the bot
 })
 
 test("manager catalog is protected, seeded, editable, and supplier based", async () => {
-  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, allDepartmentRetailers, verifiedRetailProducts, curatedProducts, qualityMigration, coreCurationMigration, flyerMigration, qualityHelpers, parser] = await Promise.all([
+  const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, allDepartmentRetailers, verifiedRetailProducts, curatedProducts, qualityMigration, coreCurationMigration, flyerMigration, grantMigration, qualityHelpers, parser] = await Promise.all([
     readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/catalog/actions.ts"), "utf8"),
@@ -59,6 +59,7 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
     readFile(path.join(root, "supabase/migrations/20260817001500_add_catalog_quality_and_price_history.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260817013000_curate_core_catalog_materials.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260828191647_replace_tile_with_jobsite_flyer_materials.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260828193200_tighten_catalog_department_grants.sql"), "utf8"),
     readFile(path.join(root, "lib/material-catalog-quality.ts"), "utf8"),
     readFile(path.join(root, "lib/material-catalog-pdf.ts"), "utf8"),
   ])
@@ -186,6 +187,8 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(flyerMigration).toContain("https://www.lowes.com/pd/James-Hardie-HardieBacker")
   expect(flyerMigration).not.toContain("https://www.homedepot.com/s/")
   expect(flyerMigration).not.toContain("https://www.lowes.com/search")
+  expect(grantMigration).toContain("revoke all on public.material_catalog_item_departments from authenticated")
+  expect(grantMigration).toContain("grant select, insert, update, delete")
   expect(qualityHelpers).toContain("catalogItemMatchesReview")
   expect(qualityHelpers).toContain("normalizedComparisonPrice")
   expect(qualityHelpers).toContain("priceCheckedDateLabel")
