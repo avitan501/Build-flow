@@ -71,6 +71,10 @@ export type MaterialCatalogSupplierPrice = {
   retail_store_name: string | null
   retail_zip_code: string | null
   price_observed_at: string | null
+  source_document_id?: string | null
+  source_file_name?: string | null
+  source_quote_number?: string | null
+  source_document_date?: string | null
   updated_at: string
 }
 

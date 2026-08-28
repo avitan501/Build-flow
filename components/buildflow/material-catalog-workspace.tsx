@@ -144,6 +144,7 @@ export function MaterialCatalogWorkspace({
   const [catalogSupplierDraftIds, setCatalogSupplierDraftIds] = useState<string[]>([])
   const [catalogSupplierIds, setCatalogSupplierIds] = useState<Record<string, string[]>>(() => initialCatalogSupplierIds(suppliers))
   const [showInactive, setShowInactive] = useState(false)
+  const [showAllSupplierColumns, setShowAllSupplierColumns] = useState(false)
   const [reviewFilter, setReviewFilter] = useState<CatalogReviewFilter>("all")
   const [itemColumnWidth, setItemColumnWidth] = useState(280)
   const [priceColumnWidth, setPriceColumnWidth] = useState(88)
@@ -215,6 +216,13 @@ export function MaterialCatalogWorkspace({
     ?? visibleSuppliers.find((supplier) => supplier.id === "home-depot-retail-catalog")
     ?? visibleSuppliers[0]
     ?? null
+  const retailReferences = useMemo(() => ["home-depot-retail-catalog", "lowes-retail-catalog"].map((id) => suppliers.find((supplier) => supplier.id === id)).filter((supplier): supplier is CatalogSupplier => Boolean(supplier)), [suppliers])
+  function bestSupplierPrices(item: MaterialCatalogItem) {
+    return initialPrices
+      .filter((price) => price.item_id === item.id && !RETAIL_CATALOG_SUPPLIER_IDS.has(price.supplier_id) && price.availability !== "not_available" && !["stale", "unavailable", "possible_match", "unverified"].includes(price.verification_status) && normalizedComparisonPrice(item, price) !== null && (!price.expires_at || new Date(price.expires_at).getTime() >= Date.now()))
+      .sort((left, right) => normalizedComparisonPrice(item, left)! - normalizedComparisonPrice(item, right)!)
+      .slice(0, 3)
+  }
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -483,7 +491,15 @@ export function MaterialCatalogWorkspace({
         {notice ? <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900" role="status">{notice}</p> : null}
         {error ? <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800" role="alert">{error}</p> : null}
 
-        <section className="mt-3 overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm md:hidden" aria-label={`${selectedCategory} mobile supplier pricing`}>
+        <section className="mt-3 overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm" aria-label={`${selectedCategory} best verified prices`}>
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-3"><div><h2 className="text-sm font-bold">Best verified prices</h2><p className="mt-0.5 text-xs text-slate-500">Home Depot and Lowe’s are market references. The three lowest comparable supplier prices are shown for each item.</p></div><button type="button" onClick={() => setShowAllSupplierColumns((current) => !current)} className="min-h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700">{showAllSupplierColumns ? "Hide price editor" : "Manage all supplier prices"}</button></header>
+          <div className="divide-y divide-slate-200">{categoryItems.map((item) => {
+            const cheapest = bestSupplierPrices(item)
+            return <article key={`best-${item.id}`} className="grid gap-3 p-3 lg:grid-cols-[minmax(14rem,1.2fr)_minmax(12rem,.8fr)_minmax(18rem,1.4fr)] lg:items-center"><div className="min-w-0"><p className="font-bold text-slate-950">{item.name}</p><p className="mt-0.5 text-[11px] text-slate-500">{item.item_code} · compare per {item.comparison_unit}</p></div><div className="flex gap-2">{retailReferences.map((supplier) => { const price = initialPriceMap.get(cellKey(item.id, supplier.id)); return <button key={supplier.id} type="button" onClick={() => setPriceEditor({ item, supplier })} className="min-w-0 flex-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-left"><span className="block truncate text-[10px] font-bold text-slate-500">{supplier.name}</span><span className="mt-0.5 block text-sm font-bold tabular-nums">{price && normalizedComparisonPrice(item, price) !== null ? `$${normalizedComparisonPrice(item, price)!.toFixed(2)}` : "—"}</span></button> })}</div><div className="grid gap-1 sm:grid-cols-3">{cheapest.map((price, index) => <button key={price.supplier_id} type="button" onClick={() => { const supplier = suppliers.find((entry) => entry.id === price.supplier_id); if (supplier) setPriceEditor({ item, supplier }) }} className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-2 text-left"><span className="block text-[9px] font-bold uppercase tracking-wide text-emerald-700">#{index + 1} lowest</span><span className="mt-0.5 block truncate text-xs font-bold text-slate-950">{price.supplier_name_snapshot}</span><span className="block text-sm font-bold tabular-nums text-emerald-800">${normalizedComparisonPrice(item, price)!.toFixed(2)}</span><span className="block truncate text-[9px] text-slate-500">{price.source_document_date || priceCheckedDateLabel(price) || "Verified source"}</span></button>)}{Array.from({ length: 3 - cheapest.length }).map((_, index) => <div key={`empty-${index}`} className="rounded-md border border-dashed border-slate-200 px-2 py-2 text-xs font-semibold text-slate-400">No verified price</div>)}</div></article>
+          })}</div>
+        </section>
+
+        {showAllSupplierColumns ? <><section className="mt-3 overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm md:hidden" aria-label={`${selectedCategory} mobile supplier pricing`}>
           <header className="border-b border-slate-200 bg-slate-50 p-3">
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => moveMobileSupplier(-1)} disabled={visibleSuppliers.length < 2} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-35" aria-label="Previous supplier"><ChevronLeft className="h-4 w-4" /></button>
@@ -561,7 +577,7 @@ export function MaterialCatalogWorkspace({
             </tbody>
           </table>
           {!categoryItems.length ? <div className="grid min-h-48 place-items-center p-8 text-center"><div><PackagePlus className="mx-auto h-8 w-8 text-slate-300" /><p className="mt-3 font-bold">No matching items</p><button type="button" onClick={() => setEditor(emptyEditor(selectedCategory))} className="mt-2 text-sm font-semibold text-[#0066cc]">Add the first item</button></div></div> : null}
-        </section>
+        </section></> : null}
       </div>
 
       {catalogSupplierOpen && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[155] grid place-items-center overflow-y-auto bg-slate-950/50 p-3" role="dialog" aria-modal="true" aria-labelledby="catalog-supplier-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !pending) setCatalogSupplierOpen(false) }}>
@@ -621,6 +637,7 @@ export function MaterialCatalogWorkspace({
               <label className="grid gap-1 text-xs font-bold">Confidence<select value={draft.verificationStatus} disabled={isRetailCatalogSupplier(priceEditor.supplier)} onChange={(event) => updatePrice(priceEditor.item.id, priceEditor.supplier.id, { verificationStatus: event.target.value as PriceDraft["verificationStatus"] })} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal disabled:bg-slate-100"><option value="supplier_quote">Supplier quote</option><option value="recently_verified">Recently verified</option><option value="possible_match">Possible match</option><option value="unverified">Unverified</option><option value="stale">Stale</option><option value="unavailable">Unavailable</option></select></label>
               <label className="grid gap-1 text-xs font-bold sm:col-span-2">Supplier SKU<input value={draft.supplierSku} onChange={(event) => updatePrice(priceEditor.item.id, priceEditor.supplier.id, { supplierSku: event.target.value })} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
               <label className="grid gap-1 text-xs font-bold sm:col-span-2">Notes<textarea value={draft.notes} onChange={(event) => updatePrice(priceEditor.item.id, priceEditor.supplier.id, { notes: event.target.value })} rows={2} placeholder="Quote number, pack size, pickup or delivery terms" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
+              {initialPriceMap.get(cellKey(priceEditor.item.id, priceEditor.supplier.id))?.source_document_id ? <div className="sm:col-span-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-950"><p className="font-bold">Original source saved</p><p className="mt-1">{initialPriceMap.get(cellKey(priceEditor.item.id, priceEditor.supplier.id))?.source_file_name}{initialPriceMap.get(cellKey(priceEditor.item.id, priceEditor.supplier.id))?.source_quote_number ? ` · Quote ${initialPriceMap.get(cellKey(priceEditor.item.id, priceEditor.supplier.id))?.source_quote_number}` : ""}{initialPriceMap.get(cellKey(priceEditor.item.id, priceEditor.supplier.id))?.source_document_date ? ` · ${initialPriceMap.get(cellKey(priceEditor.item.id, priceEditor.supplier.id))?.source_document_date}` : ""}</p><Link href={`/admin/documents/${initialPriceMap.get(cellKey(priceEditor.item.id, priceEditor.supplier.id))?.source_document_id}`} className="mt-2 inline-flex font-bold text-[#0066cc]">Open source document</Link></div> : null}
               <p className="sm:col-span-2 text-xs text-slate-500">Prices are normalized to {priceEditor.item.comparison_quantity} {priceEditor.item.comparison_unit}. Save prices after closing this window.</p>
             </div>
           })()}

@@ -12,8 +12,56 @@ type DeliveryScheduleResult = { ok: true } | { ok: false; error: string }
 export type MaterialRequestStatus = "submitted" | "in_review" | "quoted" | "closed"
 export type MaterialRequestAssignee = "carlos" | "david"
 
+export type RequestSupplierPlanInput = {
+  requestId: string
+  managerNotes: string
+  suppliers: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean }>
+}
+
 const MATERIAL_REQUEST_STATUSES = new Set<MaterialRequestStatus>(["submitted", "in_review", "quoted", "closed"])
 const MATERIAL_REQUEST_ASSIGNEES = new Set<MaterialRequestAssignee>(["carlos", "david"])
+
+export async function saveRequestSupplierPlanAction(input: RequestSupplierPlanInput) {
+  const requestId = String(input.requestId || "").trim()
+  const managerNotes = String(input.managerNotes || "").trim().slice(0, 5000)
+  if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false as const, error: "Request not found." }
+  if (!Array.isArray(input.suppliers) || input.suppliers.length > 250) return { ok: false as const, error: "Choose fewer suppliers." }
+
+  const { supabase, user } = await requireStaffProfile("customers")
+  const [{ data: request }, { data: supplierData }] = await Promise.all([
+    supabase.from("quote_requests").select("id").eq("id", requestId).maybeSingle<{ id: string }>(),
+    supabase.rpc("staff_load_catalog_suppliers"),
+  ])
+  if (!request) return { ok: false as const, error: "Request not found." }
+  const directory = Array.isArray(supplierData) ? supplierData as Array<{ id?: string; name?: string }> : []
+  const supplierById = new Map(directory.filter((entry) => entry?.id && entry?.name).map((entry) => [String(entry.id), String(entry.name)]))
+  const rows = input.suppliers
+    .map((entry) => ({ supplierId: String(entry.supplierId || "").trim(), isRecommended: Boolean(entry.isRecommended), shouldContact: Boolean(entry.shouldContact) }))
+    .filter((entry, index, all) => supplierById.has(entry.supplierId) && all.findIndex((candidate) => candidate.supplierId === entry.supplierId) === index)
+
+  const notesResult = await supabase.from("quote_requests").update({ manager_notes: managerNotes }).eq("id", requestId)
+  if (notesResult.error) return { ok: false as const, error: "The request notes could not be saved." }
+  const selectedIds = rows.map((row) => row.supplierId)
+  let removeQuery = supabase.from("quote_request_supplier_recommendations").delete().eq("request_id", requestId)
+  if (selectedIds.length) removeQuery = removeQuery.not("supplier_id", "in", `(${selectedIds.map((id) => `"${id.replaceAll('"', '')}"`).join(",")})`)
+  const removeResult = await removeQuery
+  if (removeResult.error) return { ok: false as const, error: "The supplier plan could not be updated." }
+  if (rows.length) {
+    const result = await supabase.from("quote_request_supplier_recommendations").upsert(rows.map((row) => ({
+      request_id: requestId,
+      supplier_id: row.supplierId,
+      supplier_name_snapshot: supplierById.get(row.supplierId)!,
+      is_recommended: row.isRecommended || row.shouldContact,
+      should_contact: row.shouldContact,
+      updated_by: user.id,
+      created_by: user.id,
+      updated_at: new Date().toISOString(),
+    })), { onConflict: "request_id,supplier_id" })
+    if (result.error) return { ok: false as const, error: "The supplier choices could not be saved." }
+  }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const }
+}
 
 export async function updateSmsRequestDraftAction(formData: FormData) {
   const id = String(formData.get("draftId") || "").trim()

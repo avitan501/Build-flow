@@ -42,6 +42,8 @@ async function runDocumentExtraction(supabase: StaffSupabase, file: File, rawTex
 
 function clean(value: unknown, max: number) { return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max) }
 function cleanFileName(value: string) { return value.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").slice(-180) || "document" }
+function importedSupplierId(name: string) { const slug = name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 120); return `document-${slug || "supplier"}-${crypto.randomUUID().slice(0, 8)}` }
+function catalogItemKey(value: string) { return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() }
 
 async function readableText(file: File, browserOcrText: string) {
   if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
@@ -320,4 +322,86 @@ export async function routeManagerDocumentToSupplierPricingAction(documentId: st
   await supabase.from("manager_document_events").insert({ document_id: documentId, event_type: "routed", summary: "Approved rows sent to supplier pricing.", details: { supplier_quote_id: quoteId }, created_by: user.id })
   revalidatePath("/admin/documents"); revalidatePath("/admin/supplier-quotes")
   return { ok: true, data: { quoteId }, message: "Reviewed rows are ready in supplier pricing." }
+}
+
+export async function addManagerDocumentItemsToCatalogAction(documentId: string): Promise<Result<{ itemCount: number; priceCount: number; supplierName: string }>> {
+  const { supabase, user } = await requireStaffProfile("suppliers")
+  if (!UUID_PATTERN.test(documentId)) return { ok: false, error: "Invalid document." }
+  const [{ data: document }, { data: selectedItems }, { data: supplierRows }] = await Promise.all([
+    supabase.from("manager_documents").select("*").eq("id", documentId).maybeSingle<ManagerDocumentRecord>(),
+    supabase.from("manager_document_items").select("*").eq("document_id", documentId).eq("selected", true).order("line_number").returns<ManagerDocumentItemRecord[]>(),
+    supabase.rpc("staff_load_catalog_suppliers"),
+  ])
+  if (!document) return { ok: false, error: "Document not found." }
+  if (!["ready", "routed"].includes(document.status)) return { ok: false, error: "Save and approve the reviewed document first." }
+  const items = (selectedItems ?? []).filter((item) => item.validation_status === "valid" && item.description.trim())
+  if (!items.length) return { ok: false, error: "Select at least one reviewed product row." }
+  const pricedItems = items.filter((item) => item.unit_price !== null)
+  if (!pricedItems.length) return { ok: false, error: "The selected rows do not have reviewed unit prices." }
+  const department = normalizeMaterialCatalogDepartment(document.department)
+  const suppliers = Array.isArray(supplierRows) ? supplierRows as CatalogSupplier[] : []
+  const detectedName = document.party_name || inferSupplierName(document.raw_text)
+  if (!detectedName) return { ok: false, error: "Confirm the vendor name before adding these prices." }
+  const matchedSupplier = detectSupplierMatch(suppliers, detectedName, document.raw_text || detectedName)
+  let supplier: CatalogSupplier | null = matchedSupplier ? suppliers.find((entry) => entry.id === matchedSupplier.id) ?? null : null
+  if (!supplier) {
+    const candidate: CatalogSupplier & Record<string, unknown> = {
+      id: importedSupplierId(detectedName), name: clean(detectedName, 160), email: "", phone: "", whatsapp: "", portalUrl: "",
+      materials: department, trustLevel: "first-time", catalogDepartments: [department], catalogEnabledDepartments: [department],
+      contactLabel: "Imported document", contactName: "", preferredDeliveryMethod: "manual", deliveryNotes: "",
+      notes: `Created from reviewed document ${clean(document.file_name, 180)}. Confirm contact details before outreach.`, address: "",
+    }
+    const { data, error } = await supabase.rpc("staff_upsert_supplier_directory_entry", { p_supplier: candidate, p_create: true })
+    if (error || !data) return { ok: false, error: "The vendor could not be added to Supplier Directory." }
+    supplier = data as CatalogSupplier
+  } else {
+    const catalogDepartments = [...new Set([...(supplier.catalogDepartments ?? []), department])]
+    const catalogEnabledDepartments = [...new Set([...(supplier.catalogEnabledDepartments ?? []), department])]
+    const { data, error } = await supabase.rpc("staff_upsert_supplier_directory_entry", { p_supplier: { ...supplier, catalogDepartments, catalogEnabledDepartments }, p_create: false })
+    if (error || !data) return { ok: false, error: "The vendor could not be enabled for this catalog department." }
+    supplier = data as CatalogSupplier
+  }
+
+  const { data: existingRows, error: existingError } = await supabase.from("material_catalog_items").select("id,name,item_code,package_quantity,comparison_quantity").eq("category", department).returns<Array<{ id: string; name: string; item_code: string; package_quantity: number; comparison_quantity: number }>>()
+  if (existingError) return { ok: false, error: "The existing catalog could not be checked." }
+  const byCode = new Map((existingRows ?? []).filter((row) => row.item_code).map((row) => [catalogItemKey(row.item_code), row]))
+  const byName = new Map((existingRows ?? []).map((row) => [catalogItemKey(row.name), row]))
+  const catalogRows = new Map<string, { id: string; package_quantity: number; comparison_quantity: number }>()
+  const now = new Date().toISOString()
+  let createdCount = 0
+  for (const item of items) {
+    const existing = (item.item_code ? byCode.get(catalogItemKey(item.item_code)) : null) ?? byName.get(catalogItemKey(item.description))
+    if (existing) { catalogRows.set(item.id, existing); continue }
+    const code = clean(item.item_code, 80) || `DOC-${document.id.slice(0, 6).toUpperCase()}-${item.line_number}`
+    const { data, error } = await supabase.from("material_catalog_items").insert({
+      category: department, item_code: code, name: clean(item.description, 240), description: clean(item.specification, 1000),
+      package_quantity: 1, package_unit: clean(item.unit, 60) || "each", comparison_quantity: 1, comparison_unit: clean(item.unit, 60) || "each",
+      review_status: "needs_review", quality_notes: `Imported from reviewed source ${clean(document.file_name, 180)}.`, default_quantity: 1,
+      unit: clean(item.unit, 60) || "each", status: "active", source: `Manager document: ${clean(document.file_name, 180)}`, created_by: user.id, updated_by: user.id,
+    }).select("id,package_quantity,comparison_quantity").single<{ id: string; package_quantity: number; comparison_quantity: number }>()
+    if (error || !data) return { ok: false, error: `Could not add ${item.description} to the catalog.` }
+    catalogRows.set(item.id, data); createdCount += 1
+  }
+  const observedAt = document.document_date ? `${document.document_date}T12:00:00.000Z` : now
+  const expiresAt = document.expires_on ? `${document.expires_on}T23:59:59.999Z` : null
+  const prices = pricedItems.flatMap((item) => {
+    const catalogItem = catalogRows.get(item.id)
+    if (!catalogItem || item.unit_price === null) return []
+    return [{
+      item_id: catalogItem.id, supplier_id: supplier!.id, supplier_name_snapshot: clean(supplier!.name, 300), supplier_sku: clean(item.item_code, 120),
+      unit_price: Math.round(item.unit_price * 10000) / 10000, availability: "available", product_url: null,
+      notes: clean(`Source: ${document.file_name}${document.document_number ? ` · ${document.document_number}` : ""}${document.document_date ? ` · ${document.document_date}` : ""}.`, 1000),
+      price_type: "supplier_quote", verification_status: "supplier_quote", delivery_price: null, minimum_order: 1,
+      comparison_price: Math.round(((item.unit_price / (catalogItem.package_quantity || 1)) * (catalogItem.comparison_quantity || 1)) * 10000) / 10000,
+      verified_at: observedAt, expires_at: expiresAt, price_observed_at: observedAt,
+      source_document_id: document.id, source_file_name: document.file_name, source_quote_number: document.document_number || null, source_document_date: document.document_date,
+      updated_by: user.id, updated_at: now,
+    }]
+  })
+  const { error: priceError } = await supabase.from("material_catalog_supplier_prices").upsert(prices, { onConflict: "item_id,supplier_id" })
+  if (priceError) return { ok: false, error: "The items were added, but their supplier prices could not be saved." }
+  await supabase.from("manager_documents").update({ status: "routed", supplier_id: supplier.id, updated_by: user.id }).eq("id", documentId)
+  await supabase.from("manager_document_events").insert({ document_id: documentId, event_type: "routed", summary: `${prices.length} selected price${prices.length === 1 ? "" : "s"} added to the catalog.`, details: { destination: "catalog", supplier_id: supplier.id, created_item_count: createdCount, price_count: prices.length }, created_by: user.id })
+  revalidatePath(`/admin/documents/${documentId}`); revalidatePath("/admin/documents"); revalidatePath("/admin/catalog"); revalidatePath("/admin/vendors")
+  return { ok: true, data: { itemCount: items.length, priceCount: prices.length, supplierName: supplier.name }, message: `${prices.length} selected price${prices.length === 1 ? "" : "s"} added for ${supplier.name}. Source and date were saved.` }
 }

@@ -39,6 +39,7 @@ type RequestDetails = {
   title: string;
   status: QuoteRequestStatus;
   manager_assignee: string;
+  manager_notes: string;
   created_at: string;
   updated_at: string;
   submitted_at: string | null;
@@ -117,11 +118,12 @@ export default async function OwnerMaterialRequestPage({
     { data: packages },
     { data: clientActionEvents },
     { data: comparisons },
+    { data: supplierRecommendations },
   ] = await Promise.all([
     supabase
       .from("quote_requests")
       .select(
-        "id,project_id,owner_id,title,status,manager_assignee,created_at,updated_at,submitted_at,projects(name,address)",
+        "id,project_id,owner_id,title,status,manager_assignee,manager_notes,created_at,updated_at,submitted_at,projects(name,address)",
       )
       .eq("id", requestId)
       .maybeSingle<RequestDetails>(),
@@ -182,6 +184,11 @@ export default async function OwnerMaterialRequestPage({
       .eq("request_id", requestId)
       .order("updated_at", { ascending: false })
       .returns<ComparisonRecord[]>(),
+    supabase
+      .from("quote_request_supplier_recommendations")
+      .select("supplier_id,is_recommended,should_contact")
+      .eq("request_id", requestId)
+      .returns<Array<{ supplier_id: string; is_recommended: boolean; should_contact: boolean }>>(),
   ]);
   if (requestError)
     throw new Error(
@@ -690,6 +697,8 @@ export default async function OwnerMaterialRequestPage({
             clientReplyCompleted={clientReplyCompleted}
             step3CompletedOverride={workflowOverrides.get(3) ?? null}
             step4CompletedOverride={workflowOverrides.get(4) ?? null}
+            initialManagerNotes={request.manager_notes || ""}
+            initialSupplierRecommendations={(supplierRecommendations ?? []).map((entry) => ({ supplierId: entry.supplier_id, isRecommended: entry.is_recommended, shouldContact: entry.should_contact }))}
           />
         </div>
         {clientActions.length ? (
