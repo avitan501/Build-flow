@@ -484,6 +484,14 @@
   font-weight: 850;
   letter-spacing: 0.06em;
   box-shadow: 0 1rem 3rem #0008;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+.mobileActionHidden {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(0.75rem);
 }
 .reveal {
   animation: rise linear both;
