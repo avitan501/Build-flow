@@ -57,7 +57,13 @@ export async function GET() {
   try {
     const { response, result } = await invokeNotificationService(session, { action: "status" });
     if (!response) return NextResponse.json(result, { status: 401 });
-    return NextResponse.json(result, { status: response.status });
+    if (!response.ok) return NextResponse.json(result, { status: response.status });
+    const { data: activity } = await session.supabase
+      .from("aura_audit_log")
+      .select("id,intake_id,action,created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    return NextResponse.json({ ...result, activity: activity ?? [] }, { status: response.status });
   } catch (cause) {
     console.error("manager_push_status_failed", cause);
     return NextResponse.json({ error: "Notifications are not ready yet." }, { status: 503 });

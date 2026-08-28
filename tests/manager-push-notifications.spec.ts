@@ -23,6 +23,7 @@ test("manager push notifications stay private and cover business events", async 
   expect(api).toContain("sameOrigin");
   expect(api).toContain('action: z.literal("subscribe")');
   expect(api).toContain("functions/v1/manager-web-push");
+  expect(api).toContain('.from("aura_audit_log")');
   expect(api).not.toContain("createAdminClient");
   expect(edgeFunction).toContain("get_manager_web_push_private_key");
   expect(edgeFunction).toContain("managerUser(request)");
@@ -40,6 +41,8 @@ test("manager push notifications stay private and cover business events", async 
   expect(control).toContain("Send test notification");
   expect(center).toContain('fetch("/api/manager-notifications"');
   expect(center).toContain("Notifications & activity");
+  expect(center).toContain("Phone AI activity");
+  expect(center).toContain('href="/owner/ai-inbox"');
   expect(center).toContain('event.href.startsWith("/")');
   expect(serviceWorker).toContain('self.addEventListener("push"');
   expect(serviceWorker).toContain('self.addEventListener("notificationclick"');

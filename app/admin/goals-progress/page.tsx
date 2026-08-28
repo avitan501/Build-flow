@@ -27,6 +27,7 @@ import {
   type ManagerGoalRecord,
 } from "@/components/buildflow/manager-goals";
 import { ManagerGoalStatusSelect } from "@/components/buildflow/manager-goal-status-select";
+import { ManagerNotificationCenter } from "@/components/buildflow/manager-notification-center";
 import { DAILY_WORK_SUMMARY_PREFIX } from "@/lib/daily-work-summary";
 import { SUPPLIER_PARTNER_NOTES_PREFIX } from "@/lib/supplier-partners/store";
 import type {
@@ -324,13 +325,16 @@ function AiTaskInbox() {
             request.
           </p>
         </div>
-        <Link
-          href="/owner/ai-inbox"
-          className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-xs font-semibold text-white"
-        >
-          Review inbox
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <ManagerNotificationCenter />
+          <Link
+            href="/owner/ai-inbox"
+            className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-xs font-semibold text-white"
+          >
+            Review inbox
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </div>
     </section>
   );
