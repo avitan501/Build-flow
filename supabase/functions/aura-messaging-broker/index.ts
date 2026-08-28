@@ -1112,7 +1112,10 @@ async function smsConversationContext(phone: string) {
 
 function accurateAttachmentReply(message: string, reply: string) {
   if (/\[Attachment included(?::[^\]]+)?\]/i.test(message)) return reply;
-  if (!/\b(?:see|view|received|got|opened)\b.{0,32}\b(?:photo|image|attachment|file)\b/i.test(reply)) return reply;
+  const asksAboutAttachment = /\b(?:photo|image|attachment|file|picture)\b/i.test(message) &&
+    /\b(?:sent|send|attach|attached|upload|uploaded|did you|get|got|receive|received|see|view|open|opened)\b/i.test(message);
+  const replyClaimsAttachment = /\b(?:see|view|received|got|opened)\b.{0,32}\b(?:photo|image|attachment|file|picture)\b/i.test(reply);
+  if (!asksAboutAttachment && !replyClaimsAttachment) return reply;
   if (/[\u0590-\u05ff]/.test(message)) return "לא מופיע כאן קובץ מצורף. אפשר לשלוח אותו שוב, ומנהל יבדוק אותו.";
   if (/\b(?:foto|imagen|archivo|adjunto|envi[eé])\b/i.test(message)) return "No aparece un archivo adjunto aquí. Envíalo de nuevo y un gerente lo revisará.";
   return "I don't see an attachment here yet. Please resend it, and a manager will review it.";
