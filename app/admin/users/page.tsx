@@ -202,9 +202,8 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 pb-28 pt-6 text-slate-950 sm:px-8 sm:pb-12">
       <div className="mx-auto max-w-7xl">
-        <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-6">
-          <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager</p><h1 className="mt-2 text-3xl font-bold sm:text-4xl">{pageTitle}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{pageDescription}</p></div>
-          <div className="flex flex-wrap items-center gap-2"><AddTargetClient /><AddOutreachLead /><ManagerCreateClientRequest customers={managerCustomers} departments={departments} initialCustomerId={params.customer || ""} /></div>
+        <header className="border-b border-slate-200 pb-6">
+          <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">CRM</p><h1 className="mt-2 text-3xl font-bold sm:text-4xl">{pageTitle}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{pageDescription}</p></div>
         </header>
 
         <nav className="mt-4 grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-white p-1" aria-label="Customers, leads, and requests views">
@@ -221,6 +220,11 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           <select name="sort" defaultValue={sort} aria-label="Directory order" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="newest">Newest added</option><option value="oldest">Oldest added</option><option value="alphabetical">A–Z</option></select>
           <button type="submit" className="min-h-11 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white">Apply</button>
         </form>
+
+        <div className="mt-4 flex min-h-11 items-center justify-between gap-3">
+          <h2 className="text-sm font-bold text-slate-900">{view === "customers" ? "Customers" : view === "leads" ? "Leads" : "Requests"}</h2>
+          {view === "customers" ? <AddTargetClient compact /> : view === "leads" ? <AddOutreachLead compact /> : <ManagerCreateClientRequest customers={managerCustomers} departments={departments} initialCustomerId={params.customer || ""} compact />}
+        </div>
 
         {view === "customers" ? (
           <section className="mt-4 grid gap-3" aria-label="Customer accounts">

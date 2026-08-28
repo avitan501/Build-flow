@@ -40,7 +40,7 @@ type ManagerAccess = {
 
 function navigationLinks(access: ManagerAccess) {
   return [
-    ...(access.customers ? [{ href: "/admin/users", label: "Customer Directory", icon: Users }] : []),
+    ...(access.customers ? [{ href: "/admin/users", label: "CRM", icon: Users }] : []),
     ...(access.suppliers ? [
       { href: "/admin/vendors", label: "Supplier Directory", icon: Store },
       { href: "/admin/catalog", label: "Material Catalog", icon: PackageOpen },

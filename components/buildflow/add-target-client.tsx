@@ -8,7 +8,7 @@ import { createTargetClientAction, type ManagerNewClientInput } from "@/app/admi
 
 const EMPTY_CLIENT: ManagerNewClientInput = { fullName: "", email: "", phone: "", companyName: "", preferredLanguage: "en" };
 
-export function AddTargetClient() {
+export function AddTargetClient({ compact = false }: { compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [client, setClient] = useState<ManagerNewClientInput>(EMPTY_CLIENT);
   const [error, setError] = useState<string | null>(null);
@@ -36,9 +36,9 @@ export function AddTargetClient() {
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#0071e3] px-3 text-sm font-semibold text-white hover:bg-[#0066cc]">
+      <button type="button" onClick={() => setOpen(true)} aria-label="Add client" title="Add client" className={compact ? "inline-flex h-9 w-9 items-center justify-center rounded-md bg-[#0071e3] text-white hover:bg-[#0066cc]" : "inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#0071e3] px-3 text-sm font-semibold text-white hover:bg-[#0066cc]"}>
         <Plus className="h-4 w-4" aria-hidden="true" />
-        Add client
+        {compact ? null : "Add client"}
       </button>
       {open && typeof document !== "undefined" ? createPortal(
         <div className="fixed inset-0 z-[150] grid place-items-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="add-target-client-title" onMouseDown={(event) => { if (event.currentTarget === event.target) close(); }}>
@@ -57,7 +57,7 @@ export function AddTargetClient() {
               <label className="grid gap-1.5 text-sm font-semibold">Email<input type="email" value={client.email} onChange={(event) => setClient((current) => ({ ...current, email: event.target.value }))} autoComplete="email" className="min-h-11 rounded-md border border-slate-300 px-3 font-normal" /></label>
               <label className="grid gap-1.5 text-sm font-semibold">Phone<input type="tel" value={client.phone} onChange={(event) => setClient((current) => ({ ...current, phone: event.target.value }))} autoComplete="tel" className="min-h-11 rounded-md border border-slate-300 px-3 font-normal" /></label>
               <label className="grid gap-1.5 text-sm font-semibold">Company <span className="font-normal text-slate-400">optional</span><input value={client.companyName} onChange={(event) => setClient((current) => ({ ...current, companyName: event.target.value }))} autoComplete="organization" className="min-h-11 rounded-md border border-slate-300 px-3 font-normal" /></label>
-              <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">Preferred language<select value={client.preferredLanguage} onChange={(event) => setClient((current) => ({ ...current, preferredLanguage: event.target.value as "en" | "es" }))} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal"><option value="en">English</option><option value="es">Spanish</option></select></label>
+              <label className="grid gap-1.5 text-sm font-semibold sm:col-span-2">Preferred language<select value={client.preferredLanguage} onChange={(event) => setClient((current) => ({ ...current, preferredLanguage: event.target.value as "en" | "es" }))} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal"><option value="en">EN</option><option value="es">ES</option></select></label>
               {error ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700 sm:col-span-2">{error}</p> : null}
             </div>
             <footer className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-4">

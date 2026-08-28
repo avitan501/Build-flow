@@ -44,19 +44,24 @@ test("dashboard AI uses authorized server data and keeps the API key private", a
   expect(action).toContain("liveSearchFallback")
 })
 
-test("customer and lead records expose compact Q U O, email, and WhatsApp actions", async () => {
+test("customer and lead records expose one compact contact menu", async () => {
   const [actions, customers, leads] = await Promise.all([
     readFile(path.join(root, "components/buildflow/contact-actions.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/users/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/client-target-outreach.tsx"), "utf8"),
   ])
-  expect(actions).toContain("Call with Q U O")
+  expect(actions).toContain(">Call</a>")
   expect(actions).toContain("Q U O text")
-  expect(actions).toContain("Send message")
+  expect(actions).toContain("Send a Message")
+  expect(actions).toContain("Send WhatsApp")
+  expect(actions).toContain("Send a Video")
+  expect(actions).toContain('title="Contact"')
   expect(actions).toContain("Add attachment")
   expect(actions).toContain("prepareQuoAttachmentMessageAction")
   expect(customers).toContain("<ContactActions")
   expect(leads).toContain("<ContactActions")
+  expect(leads).toContain('<option value="en">EN</option>')
+  expect(leads).toContain('<option value="es">ES</option>')
 })
 
 test("approved staff use a compact manager workspace without owner-only controls", async () => {

@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronDown, LoaderCircle, Mail, MessageCircle, Paperclip, Phone, Play, Send, Smartphone, Video, X } from "lucide-react"
+import { ChevronDown, ContactRound, LoaderCircle, Mail, MessageCircle, Paperclip, Phone, Play, Send, Smartphone, Video, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { createPortal } from "react-dom"
@@ -52,6 +52,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
   const [subject, setSubject] = useState("")
   const [attachment, setAttachment] = useState<File | null>(null)
   const [feedback, setFeedback] = useState("")
+  const [contactMenuOpen, setContactMenuOpen] = useState(false)
   const [videoMenuOpen, setVideoMenuOpen] = useState(false)
   const [selectedVideoId, setSelectedVideoId] = useState<AuraShareVideoId | null>(null)
   const [videoFeedback, setVideoFeedback] = useState("")
@@ -71,8 +72,12 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     resetComposer()
   }
 
-  function openComposer() {
-    const initialChannel: Channel = normalizedPhone ? "sms" : "email"
+  function openComposer(preferredChannel?: Channel) {
+    const initialChannel: Channel = preferredChannel === "whatsapp" && normalizedPhone
+      ? "whatsapp"
+      : normalizedPhone ? "sms" : "email"
+    setContactMenuOpen(false)
+    setVideoMenuOpen(false)
     setChannel(initialChannel)
     setTemplate("welcome")
     setMessage(templateMessage("welcome", name, senderName))
@@ -136,14 +141,16 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
 
   return <>
     <div className="relative flex flex-wrap items-center gap-1" aria-label={`Contact ${name}`}>
-      <a href={normalizedPhone ? callHref(normalizedPhone) : undefined} aria-disabled={!normalizedPhone} title="Call with Q U O" aria-label={`Call ${name} with Q U O`} className={`${buttonClass} w-9 ${normalizedPhone ? "" : "pointer-events-none opacity-30"}`}><Phone className="h-4 w-4" /></a>
-      <button type="button" disabled={!normalizedPhone && !email} onClick={openComposer} className={`${buttonClass} gap-2 px-3 text-xs font-semibold`}><Send className="h-3.5 w-3.5" />Send message<ChevronDown className="h-3.5 w-3.5" /></button>
-      <div className="relative">
-        <button type="button" disabled={!normalizedPhone || pending} onClick={() => setVideoMenuOpen((open) => !open)} aria-expanded={videoMenuOpen} className={`${buttonClass} gap-2 px-3 text-xs font-semibold`}><Video className="h-3.5 w-3.5" />Send video<ChevronDown className="h-3.5 w-3.5" /></button>
-        {videoMenuOpen ? <div className="absolute right-0 top-11 z-40 w-[min(19rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
-          {auraShareVideos.map((video) => <button key={video.id} type="button" onClick={() => { setSelectedVideoId(video.id); setVideoMenuOpen(false); setVideoFeedback("") }} className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left hover:bg-slate-50"><span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white"><Play className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-slate-900">{video.title}</span><span className="mt-0.5 block text-[11px] text-slate-500">{video.durationLabel}</span></span></button>)}
-        </div> : null}
-      </div>
+      <button type="button" disabled={!normalizedPhone && !email} onClick={() => { setContactMenuOpen((open) => !open); setVideoMenuOpen(false) }} aria-expanded={contactMenuOpen} aria-haspopup="menu" aria-label={`Contact ${name}`} title="Contact" className={`${buttonClass} w-10 gap-0.5 text-[#0066cc]`}><ContactRound className="h-4 w-4" /><ChevronDown className="h-3 w-3" /></button>
+      {contactMenuOpen ? <div role="menu" className="absolute right-0 top-11 z-40 w-52 overflow-hidden rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+        <a href={normalizedPhone ? callHref(normalizedPhone) : undefined} aria-disabled={!normalizedPhone} onClick={() => setContactMenuOpen(false)} className={`flex min-h-10 items-center gap-3 rounded-md px-3 text-sm font-semibold hover:bg-slate-50 ${normalizedPhone ? "text-slate-800" : "pointer-events-none opacity-35"}`}><Phone className="h-4 w-4 text-[#0066cc]" />Call</a>
+        <button type="button" disabled={!normalizedPhone && !email} onClick={() => openComposer()} className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-35"><Send className="h-4 w-4 text-[#0066cc]" />Send a Message</button>
+        <button type="button" disabled={!normalizedPhone} onClick={() => openComposer("whatsapp")} className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-35"><MessageCircle className="h-4 w-4 text-emerald-600" />Send WhatsApp</button>
+        <button type="button" disabled={!normalizedPhone || pending} onClick={() => { setContactMenuOpen(false); setVideoMenuOpen(true) }} className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-35"><Video className="h-4 w-4 text-[#0066cc]" />Send a Video</button>
+      </div> : null}
+      {videoMenuOpen ? <div className="absolute right-0 top-11 z-40 w-[min(19rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+        {auraShareVideos.map((video) => <button key={video.id} type="button" onClick={() => { setSelectedVideoId(video.id); setVideoMenuOpen(false); setVideoFeedback("") }} className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left hover:bg-slate-50"><span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white"><Play className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block text-xs font-bold text-slate-900">{video.title}</span><span className="mt-0.5 block text-[11px] text-slate-500">{video.durationLabel}</span></span></button>)}
+      </div> : null}
       {videoFeedback ? <p role="status" className={`basis-full pt-1 text-xs font-semibold ${videoFeedback.includes("was sent") ? "text-emerald-700" : "text-rose-700"}`}>{videoFeedback}</p> : null}
     </div>
 
