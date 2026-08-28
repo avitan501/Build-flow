@@ -23,6 +23,12 @@ test("Locate Cheap Item is manager-only and uses live sourced research", async (
   expect(component).toContain("No email or order is sent");
   expect(component).toContain("matchScore");
   expect(component).toContain('target="_blank"');
+  expect(component).toContain("Verified public contacts");
+  expect(component).toContain("Pricing request draft");
+  expect(component).toContain("Nothing has been sent");
+  expect(component).toContain("salesContacts");
+  expect(component).toContain("callForPrice");
+  expect(component).toContain("New house construction");
 });
 
 test("Locate Cheap Item validates and limits product research", async () => {
