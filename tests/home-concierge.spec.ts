@@ -286,6 +286,9 @@ test("Learn More opens the cinematic nine-story Avantia experience", async ({
   ).toBeVisible();
   const stickyRequest = page.getByTestId("cinematic-mobile-action");
   await expect(stickyRequest).toHaveAttribute("aria-hidden", "true");
+  if ((page.viewportSize()?.width ?? 1024) < 800) {
+    await expect(page.locator('nav[aria-label*="mobile" i]')).toHaveCount(0);
+  }
   for (const [file, caption] of [
     ["01-contractor-request", "request"],
     ["02-contractor-crew-moving", "crew"],
