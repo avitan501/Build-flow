@@ -9,11 +9,11 @@ test("communications offers guarded per-contact AI modes and fast contact tags",
     readFile(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/communications/actions.ts"), "utf8"),
   ])
-  for (const label of ["AI off", "AI drafts", "Auto when safe", "AI answer", "Add contact as", "Or link to an existing person"]) expect(workspace).toContain(label)
+  for (const label of ["AI off", "AI drafts", "Auto when safe", "AI answer", "Save this number", "Link to an existing person instead"]) expect(workspace).toContain(label)
   expect(workspace).toContain("messageCanStartMaterialRequest")
   expect(workspace).toContain("Review material request")
   expect(workspace).not.toContain('!outgoing && item.channel === "sms" ? <button')
-  expect(workspace).toContain("h-[calc(100dvh-5.5rem)]")
+  expect(workspace).toContain("h-full min-h-0")
   expect(workspace).toContain("initialCommunicationForQuery")
   expect(workspace).toContain("initialConversationKey(initialCommunication, contacts)")
   for (const kind of ["customer", "lead", "supplier"]) expect(actions).toContain(`"${kind}"`)

@@ -618,8 +618,8 @@ export async function CarlosGoalsWorkspace({
   const goalsWorkspace = (
     <>
       {embedded ? (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs leading-5 text-slate-500">Focus appears first. Open any item for details.</p>
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div><h3 className="text-sm font-semibold text-slate-950">Tasks</h3><p className="mt-0.5 text-[11px] leading-4 text-slate-500">Open only the item you want to review or update.</p></div>
           <AddManagerGoal assignee="carlos" />
         </div>
       ) : null}
@@ -628,7 +628,7 @@ export async function CarlosGoalsWorkspace({
       <section className="mt-4" aria-labelledby="carlos-work-areas">
         <div className="mb-2">
           <h3 id="carlos-work-areas" className="text-xs font-bold uppercase tracking-[.12em] text-slate-700">Work areas</h3>
-          <p className="mt-0.5 text-xs text-slate-500">Open one area to see its instructions, contacts, and next actions.</p>
+          <p className="mt-0.5 text-xs text-slate-500">These are ongoing responsibilities, not extra daily tasks. Open one for its instructions and contacts.</p>
         </div>
         <div className="grid gap-2">
         {activeFixedGoals.map((goal) => (
@@ -663,9 +663,7 @@ export async function CarlosGoalsWorkspace({
           <p className="text-[11px] font-semibold uppercase text-[#0066cc]">
             Manager Portal
           </p>
-          <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">
-            Carlos Tasks
-          </h1>
+          <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Carlos Focus</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
             Focus, active tasks, phone intake, and supplier work areas in one place.
           </p>

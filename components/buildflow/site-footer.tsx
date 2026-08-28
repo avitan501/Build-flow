@@ -14,7 +14,7 @@ const HIDDEN_PATHS = new Set(["/login", "/signup", "/reset-password"])
 export function SiteFooter() {
   const pathname = usePathname()
 
-  if (pathname && HIDDEN_PATHS.has(pathname)) return null
+  if (pathname && (HIDDEN_PATHS.has(pathname) || pathname.startsWith("/admin"))) return null
 
   return (
     <ShopTranslationBoundary><footer className="border-t border-slate-200 bg-[#eef3f8] px-4 pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-6 sm:pt-6">

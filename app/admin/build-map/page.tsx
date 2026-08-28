@@ -31,9 +31,7 @@ import {
 } from "@/lib/daily-work-summary";
 import { requireManagerPortalProfile } from "@/lib/auth";
 import {
-  COMMUNICATION_LOG_PREFIX,
   DASHBOARD_AI_HISTORY_PREFIX,
-  EMPLOYEE_ACTIVITY_PREFIX,
   TODAY_TASK_PREFIX,
   parseDashboardAiHistory,
 } from "@/lib/manager-command-center";
@@ -41,12 +39,10 @@ import {
   managerPipelineStage,
   type ManagerPipelineStage,
 } from "@/lib/manager-dashboard";
-import { SYSTEM_GOAL_STATUS_PREFIX } from "@/lib/manager-goal-status";
 
 const QUO_INBOX_URL =
   "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
 const WHATSAPP_URL = "https://web.whatsapp.com/";
-const WEBSITE_FIX_NOTE_PREFIX = "website_fix_note:";
 
 type RequestRow = {
   id: string;
@@ -133,42 +129,6 @@ function formatUpdated(value: string) {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
-}
-
-function GoalDisclosure({
-  assignee,
-  goals,
-  priorityCount,
-  children,
-}: {
-  assignee: "carlos" | "david";
-  goals: ManagerGoalRecord[];
-  priorityCount: number;
-  children: React.ReactNode;
-}) {
-  const name = assignee === "carlos" ? "Tasks & work areas" : "David Tasks";
-  const openGoals = goals.filter((goal) => goal.status === "open").length;
-  return (
-    <details className="group border-t border-slate-200 first:border-t-0">
-      <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 py-3">
-        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white">
-          <UserRound className="h-4 w-4" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <strong className="block text-sm font-semibold">{name}</strong>
-          <span className="mt-0.5 block text-xs text-slate-500">
-            {priorityCount} priorities
-            {openGoals ? ` · ${openGoals} custom open` : ""}
-          </span>
-        </span>
-        <ChevronDown
-          className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180"
-          aria-hidden="true"
-        />
-      </summary>
-      <div className="border-t border-slate-100 bg-slate-50/60">{children}</div>
-    </details>
-  );
 }
 
 export default async function AdminDashboardPage({
@@ -294,18 +254,6 @@ export default async function AdminDashboardPage({
         status === "completed" ? ("completed" as const) : ("open" as const),
       created_at,
     }));
-  const regularGoals = goals.filter(
-    (goal) =>
-      ![
-        WEBSITE_FIX_NOTE_PREFIX,
-        DAILY_WORK_SUMMARY_PREFIX,
-        DASHBOARD_AI_HISTORY_PREFIX,
-        EMPLOYEE_ACTIVITY_PREFIX,
-        COMMUNICATION_LOG_PREFIX,
-        TODAY_TASK_PREFIX,
-        SYSTEM_GOAL_STATUS_PREFIX,
-      ].some((prefix) => goal.details?.startsWith(prefix)),
-  );
   const managerSections = [
     {
       title: "Customers",
@@ -537,21 +485,14 @@ export default async function AdminDashboardPage({
         </section>
 
         <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <header className="border-b border-slate-200 px-4 py-3">
-            <h2 id="targets-heading" className="font-semibold">
-              Carlos Tasks
-            </h2>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Focus, active tasks, and work areas in one clear list
-            </p>
+          <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white"><UserRound className="h-4 w-4" /></span>
+            <div className="min-w-0">
+              <h2 id="targets-heading" className="font-semibold">Carlos Focus</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Tomorrow&apos;s focus first, then active tasks and work areas.</p>
+            </div>
           </header>
-          <GoalDisclosure
-            assignee="carlos"
-            priorityCount={access.owner ? 5 : 4}
-            goals={regularGoals.filter((goal) => goal.assignee === "carlos")}
-          >
-            <CarlosGoalsWorkspace embedded />
-          </GoalDisclosure>
+          <CarlosGoalsWorkspace embedded />
         </section>
 
         <details className="group mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
