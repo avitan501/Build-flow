@@ -31,7 +31,7 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain("await requireManagerPortalProfile()");
   expect(page).toContain("async function OwnerAffiliateGoal({ status }");
   expect(page).toContain("const { supabase } = await requireAdminProfile()");
-  expect(page).toContain("Task To Do");
+  expect(page).toContain("Carlos Tasks");
   expect(page).toContain("Client Target");
   expect(page).toContain("<AddOutreachLead />");
   expect(page).toContain("<OutreachLeadList");
@@ -217,7 +217,8 @@ test("Goals and lists use collapsed disclosures to keep the page compact", async
   expect(page).toContain("<details");
   expect(page).toContain("Clients in the system");
   expect(leads).toContain('<details className="group');
-  expect(goals).toContain("activeGoals.map(goalRow)");
+  expect(goals).toContain("focusGoals.map(goalRow)");
+  expect(goals).toContain("otherGoals.map(goalRow)");
   expect(goals).toContain("grid-cols-[2rem_minmax(0,1fr)_auto]");
   expect(goals).toContain("min-h-16");
 });

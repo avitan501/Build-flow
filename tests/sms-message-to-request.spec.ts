@@ -2,7 +2,16 @@ import { expect, test } from "@playwright/test"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 
+import { looksLikeMaterialRequestMessage } from "@/lib/aura/material-request-detection"
+
 const root = process.cwd()
+
+test("request review appears only on a meaningful material message", () => {
+  expect(looksLikeMaterialRequestMessage("sms", "incoming", "Yes")).toBe(false)
+  expect(looksLikeMaterialRequestMessage("sms", "incoming", "Asap")).toBe(false)
+  expect(looksLikeMaterialRequestMessage("sms", "incoming", "Can you confirm a delivery?")).toBe(false)
+  expect(looksLikeMaterialRequestMessage("sms", "incoming", "Need 20 sheets drywall\n10 buckets joint compound")).toBe(true)
+})
 
 test("each incoming SMS can be reviewed and converted into a Carlos request", async () => {
   const [workspace, actions, broker] = await Promise.all([
@@ -11,7 +20,7 @@ test("each incoming SMS can be reviewed and converted into a Carlos request", as
     readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
   ])
 
-  expect(workspace).toContain("Review as request")
+  expect(workspace).toContain("Review material request")
   expect(workspace).toContain("messageCanStartMaterialRequest")
   expect(workspace).toContain("Review new request")
   expect(workspace).toContain("Nothing is created until you confirm")

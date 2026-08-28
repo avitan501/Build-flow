@@ -155,7 +155,7 @@ function GoalDisclosure({
           <UserRound className="h-4 w-4" />
         </span>
         <span className="min-w-0 flex-1">
-          <strong className="block text-sm font-semibold">{name} goals</strong>
+          <strong className="block text-sm font-semibold">{name} Tasks</strong>
           <span className="mt-0.5 block text-xs text-slate-500">
             {priorityCount} priorities
             {openGoals ? ` · ${openGoals} custom open` : ""}
@@ -273,7 +273,9 @@ export default async function AdminDashboardPage({
     ? parseDailyWorkSummary(todaySummaryRow)
     : null;
   const focusTasks: ManagerTodayTask[] = goals
-    .filter((goal) => goal.is_focus || goal.details?.startsWith(TODAY_TASK_PREFIX))
+    .filter(
+      (goal) => goal.is_focus || goal.details?.startsWith(TODAY_TASK_PREFIX),
+    )
     .filter((goal) => goal.status !== "archived")
     .filter(
       (goal) =>
@@ -537,10 +539,10 @@ export default async function AdminDashboardPage({
         <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white">
           <header className="border-b border-slate-200 px-4 py-3">
             <h2 id="targets-heading" className="font-semibold">
-              Task To Do
+              Carlos Tasks
             </h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              Phone instructions, tasks, and Carlos&apos;s work areas
+              Focus, active tasks, and work areas in one clear list
             </p>
           </header>
           <GoalDisclosure

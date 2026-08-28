@@ -28,7 +28,7 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).not.toContain('className={`h-2.5 w-2.5 shrink-0 rounded-full');
   expect(page).toContain("client_quote_status");
   expect(page).toContain('id="targets-heading" className="font-semibold">');
-  expect(page).toContain("Task To Do");
+  expect(page).toContain("Carlos Tasks");
   expect(page).toContain("<GoalDisclosure");
   expect(page).toContain('assignee="carlos"');
   expect(page).toContain("priorityCount={access.owner ? 5 : 4}");
@@ -37,7 +37,7 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).not.toContain('href="/admin/goals-progress#abc-supply-demo"');
   expect(goalsPage).toContain('title="ABC Supply Demo"');
   expect(goalsPage).toContain('title="Supplier Partnership"');
-  expect(page).toContain("Phone instructions, tasks, and Carlos&apos;s work areas");
+  expect(page).toContain("Focus, active tasks, and work areas in one clear list");
   expect(page).toContain('assignee="carlos"');
   expect(page).not.toContain('assignee="david"');
   expect(page).toContain("Manager tools");

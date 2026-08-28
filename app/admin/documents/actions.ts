@@ -383,8 +383,21 @@ export async function addManagerDocumentItemsToCatalogAction(documentId: string)
       unit: clean(item.unit, 60) || "each", status: "active", source: `Manager document: ${clean(document.file_name, 180)}`, created_by: user.id, updated_by: user.id,
     }).select("id,package_quantity,comparison_quantity").single<{ id: string; package_quantity: number; comparison_quantity: number }>()
     if (error || !data) {
+      // A previous or simultaneous attempt may already have created this row.
+      // Recover that safe row and continue the price/source import instead of
+      // leaving an approved document in a misleading half-failed state.
+      const recovered = await supabase.from("material_catalog_items")
+        .select("id,package_quantity,comparison_quantity")
+        .eq("category", department)
+        .eq("name", clean(item.description, 240))
+        .maybeSingle<{ id: string; package_quantity: number; comparison_quantity: number }>()
+      if (recovered.data) {
+        byName.set(catalogItemKey(item.description), { ...recovered.data, category: department, name: item.description, item_code: code })
+        catalogRows.set(item.id, recovered.data)
+        continue
+      }
       console.error("Reviewed document catalog item creation failed", { code: error?.code, message: error?.message, department, lineNumber: item.line_number })
-      return { ok: false, error: `Could not add ${item.description} to the catalog. The reviewed document and source are still safe.` }
+      return { ok: false, error: `The catalog could not save “${item.description}.” Nothing was lost; reload and try this destination again.` }
     }
     usedCodes.add(catalogItemKey(code))
     byName.set(catalogItemKey(item.description), { ...data, category: department, name: item.description, item_code: code })

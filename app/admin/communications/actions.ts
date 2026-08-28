@@ -112,9 +112,10 @@ export async function quickTagPhoneContactAction(input: { phone: string; kind: C
   const name = input.name?.trim().slice(0, 160) || phone
   let sourceId = ""
   if (input.kind === "customer") {
-    const existing = await supabase.from("profiles").select("id").eq("role", "client").eq("phone", phone).limit(1).maybeSingle<{ id: string }>()
+    const existing = await createAdminClient().from("profiles").select("id,phone").eq("role", "client").not("phone", "is", null).limit(1000).returns<Array<{ id: string; phone: string | null }>>()
     if (existing.error) return { ok: false as const, error: "The customer directory could not be checked." }
-    if (existing.data?.id) sourceId = existing.data.id
+    const matchedCustomer = (existing.data ?? []).find((customer) => normalizeAuraPhone(customer.phone || "") === phone)
+    if (matchedCustomer?.id) sourceId = matchedCustomer.id
     else {
       const created = await supabase.functions.invoke<{ ok?: boolean; customerId?: string }>("create-manager-client", { body: { fullName: name, email: phoneLoginEmailForPhone(phone), phone, companyName: null } })
       if (created.error || !created.data?.ok || !created.data.customerId) return { ok: false as const, error: "The customer could not be added." }

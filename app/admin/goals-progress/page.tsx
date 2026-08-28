@@ -94,22 +94,25 @@ function GoalDisclosure({
       id={id}
       className="group scroll-mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
     >
-      <summary className="grid min-h-16 cursor-pointer list-none grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-2.5">
-        <span className="row-span-2"><GoalNumber>{number}</GoalNumber></span>
+      <summary className="grid min-h-16 cursor-pointer list-none grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5">
+        <span>
+          <GoalNumber>{number}</GoalNumber>
+        </span>
         <div className="min-w-0 flex-1">
           <p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">
             {eyebrow}
           </p>
           <h3 className="text-sm font-semibold leading-5">{title}</h3>
           {description ? (
-            <p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-slate-500">{description}</p>
+            <p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-slate-500">
+              {description}
+            </p>
           ) : null}
         </div>
-        <ChevronDown
-          className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180"
-          aria-hidden="true"
-        />
-        <div className="col-start-2 mt-1 w-fit"><ManagerGoalStatusSelect fixedKey={fixedKey} status={status} /></div>
+        <span className="flex shrink-0 items-center gap-1">
+          <ManagerGoalStatusSelect fixedKey={fixedKey} status={status} />
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true" />
+        </span>
       </summary>
       <div className="border-t border-slate-200 p-3 sm:p-4">{children}</div>
     </details>
@@ -254,12 +257,51 @@ function AbcSupplyDemoGoal({ status }: { status: ManagerGoalStatus }) {
       description="ABC certification workflow and private customer pricing."
     >
       <div className="grid gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm"><div><p className="font-semibold text-slate-950">Pre-production review</p><p className="mt-0.5 text-slate-600">Thursday, September 3 · 2:30 PM ET</p></div><span className="rounded-md bg-white px-3 py-2 text-xs font-semibold text-[#0066cc]">In progress</span></div>
-        <nav aria-label="ABC demo sections" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {steps.map(([label, href], index) => <Link key={href} href={href} className="flex min-h-11 items-center justify-between rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:border-sky-300 hover:text-[#0066cc]"><span>{index + 1}. {label}</span><ArrowRight className="h-4 w-4" /></Link>)}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm">
+          <div>
+            <p className="font-semibold text-slate-950">
+              Pre-production review
+            </p>
+            <p className="mt-0.5 text-slate-600">
+              Thursday, September 3 · 2:30 PM ET
+            </p>
+          </div>
+          <span className="rounded-md bg-white px-3 py-2 text-xs font-semibold text-[#0066cc]">
+            In progress
+          </span>
+        </div>
+        <nav
+          aria-label="ABC demo sections"
+          className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          {steps.map(([label, href], index) => (
+            <Link
+              key={href}
+              href={href}
+              className="flex min-h-11 items-center justify-between rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:border-sky-300 hover:text-[#0066cc]"
+            >
+              <span>
+                {index + 1}. {label}
+              </span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          ))}
         </nav>
-        <div className="flex flex-wrap gap-2 text-xs"><span className="rounded-md bg-emerald-50 px-3 py-2 font-semibold text-emerald-800">Catalog workflow ready</span><span className="rounded-md bg-amber-50 px-3 py-2 font-semibold text-amber-900">ABC action: Sandbox user sign-in + NY branch</span></div>
-        <Link href="/admin/abc" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-md bg-[#0071e3] px-5 text-sm font-semibold text-white">Open full demo<ArrowRight className="h-4 w-4" /></Link>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="rounded-md bg-emerald-50 px-3 py-2 font-semibold text-emerald-800">
+            Catalog workflow ready
+          </span>
+          <span className="rounded-md bg-amber-50 px-3 py-2 font-semibold text-amber-900">
+            ABC action: Sandbox user sign-in + NY branch
+          </span>
+        </div>
+        <Link
+          href="/admin/abc"
+          className="inline-flex min-h-11 w-fit items-center gap-2 rounded-md bg-[#0071e3] px-5 text-sm font-semibold text-white"
+        >
+          Open full demo
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
     </GoalDisclosure>
   );
@@ -578,21 +620,27 @@ export async function CarlosGoalsWorkspace({
       {embedded ? (
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-slate-950">Carlos work</h3>
+            <h3 className="text-sm font-semibold text-slate-950">Carlos&apos;s task list</h3>
             <p className="mt-0.5 text-xs text-slate-500">
-              Focus first, then open the work area you need.
+              Start with Focus, then open a work area.
             </p>
           </div>
           <AddManagerGoal assignee="carlos" />
         </div>
       ) : null}
-      {access.owner ? <AiTaskInbox /> : null}
       <CustomManagerGoals goals={regularGoals} />
-      <div className="mt-3 grid gap-2">
+      {access.owner ? <AiTaskInbox /> : null}
+      <section className="mt-4" aria-labelledby="carlos-work-areas">
+        <div className="mb-2">
+          <h3 id="carlos-work-areas" className="text-xs font-bold uppercase tracking-[.12em] text-slate-700">Work areas</h3>
+          <p className="mt-0.5 text-xs text-slate-500">Open one area to see its instructions, contacts, and next actions.</p>
+        </div>
+        <div className="grid gap-2">
         {activeFixedGoals.map((goal) => (
           <div key={goal.key}>{goal.content}</div>
         ))}
-      </div>
+        </div>
+      </section>
       {archivedFixedGoals.length ? (
         <details className="group mt-3 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
           <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-xs font-semibold text-slate-600">
@@ -621,11 +669,10 @@ export async function CarlosGoalsWorkspace({
             Manager Portal
           </p>
           <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">
-            Task To Do
+            Carlos Tasks
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Phone instructions, daily tasks, client outreach, supplier calls,
-            and follow-up work in one workspace.
+            Focus, active tasks, phone intake, and supplier work areas in one place.
           </p>
         </header>
 

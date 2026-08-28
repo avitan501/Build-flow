@@ -43,7 +43,7 @@ test("My Account remains personal and saves notification preferences", async () 
   expect(actions).toContain("notification_sms");
 });
 
-test("ABC pricing and payments are owner-protected manager tools", async () => {
+test("ABC manager demo and payments are owner-protected while customers connect their own ABC account", async () => {
   const [abcPage, legacyPage, accountsApi, pricingApi, paymentsPage, stripeSetup, stripePortal] = await Promise.all([
     readFile(path.join(root, "app/admin/abc/page.tsx"), "utf8"),
     readFile(path.join(root, "app/account/abc/page.tsx"), "utf8"),
@@ -55,9 +55,13 @@ test("ABC pricing and payments are owner-protected manager tools", async () => {
   ]);
 
   expect(abcPage).toContain("requireAdminProfile");
-  expect(legacyPage).toContain('redirect("/admin/abc")');
+  expect(legacyPage).toContain("requireSignedInProfile");
+  expect(legacyPage).toContain("Connect myABCsupply");
+  expect(legacyPage).toContain('connectionMode="connected-user"');
   expect(accountsApi).toContain("requireAdminProfile");
+  expect(accountsApi).toContain("requireSignedInProfile");
   expect(pricingApi).toContain("requireAdminProfile");
+  expect(pricingApi).toContain("requireSignedInProfile");
   expect(paymentsPage).toContain("requireAdminProfile");
   expect(stripeSetup).toContain("requireAdminProfile");
   expect(stripePortal).toContain("requireAdminProfile");
