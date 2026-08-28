@@ -21,6 +21,7 @@ test("incoming client SMS automation keeps conversational context and blocks sen
   expect(broker).toContain("smsConversationContext")
   expect(broker).toContain("Conversation (oldest to newest)")
   expect(broker).toContain("Never say information is missing when it is clearly present earlier")
+  expect(broker).toContain("A brief acknowledgement that Avantia received or can see a Customer material list may be autoSafe")
   expect(broker).not.toContain("interval '6 hours'")
   expect(broker).toContain('result.autoSafe;')
   expect(broker).toContain("stop|unsubscribe|end|quit")
