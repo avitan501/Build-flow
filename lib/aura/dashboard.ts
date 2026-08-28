@@ -28,6 +28,9 @@ export type AuraContactRow = {
   email: string | null;
   company: string | null;
   notes: string | null;
+  sms_ai_mode?: "off" | "draft" | "auto_safe";
+  sms_ai_style?: "professional" | "friendly" | "brief";
+  auto_create_request_drafts?: boolean;
   created_at: string;
 };
 
@@ -107,7 +110,7 @@ export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: 
       .limit(20),
     supabase
       .from("aura_contacts")
-      .select("id, full_name, normalized_phone, email, company, notes, created_at")
+      .select("id, full_name, normalized_phone, email, company, notes, sms_ai_mode, sms_ai_style, auto_create_request_drafts, created_at")
       .order("created_at", { ascending: false })
       .limit(20),
     supabase

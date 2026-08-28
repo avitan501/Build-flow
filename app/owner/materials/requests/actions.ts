@@ -15,6 +15,38 @@ export type MaterialRequestAssignee = "carlos" | "david"
 const MATERIAL_REQUEST_STATUSES = new Set<MaterialRequestStatus>(["submitted", "in_review", "quoted", "closed"])
 const MATERIAL_REQUEST_ASSIGNEES = new Set<MaterialRequestAssignee>(["carlos", "david"])
 
+export async function updateSmsRequestDraftAction(formData: FormData) {
+  const id = String(formData.get("draftId") || "").trim()
+  const intent = String(formData.get("intent") || "save")
+  const customerName = String(formData.get("customerName") || "").trim().replace(/\s+/g, " ").slice(0, 160)
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Text request draft not found.")
+  const { supabase } = await requireStaffProfile("customers")
+  if (intent === "dismiss") {
+    const { error } = await supabase.from("aura_sms_request_drafts").update({ status: "dismissed" }).eq("id", id).eq("status", "new")
+    if (error) throw new Error("The text request could not be dismissed.")
+  } else {
+    if (!customerName) throw new Error("Enter a customer name or keep the phone number.")
+    const { error } = await supabase.from("aura_sms_request_drafts").update({ customer_name: customerName }).eq("id", id).eq("status", "new")
+    if (error) throw new Error("The customer name could not be saved.")
+  }
+  revalidatePath("/owner/materials/requests")
+}
+
+export async function convertSmsRequestDraftAction(formData: FormData) {
+  const id = String(formData.get("draftId") || "").trim()
+  const customerId = String(formData.get("customerId") || "").trim()
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !/^[0-9a-f-]{36}$/i.test(customerId)) throw new Error("Choose a customer for this text request.")
+  const { supabase } = await requireStaffProfile("customers")
+  const { data: draft } = await supabase.from("aura_sms_request_drafts").select("id,title,department,items,original_message,status").eq("id", id).eq("status", "new").maybeSingle<{ id: string; title: string; department: string; items: Array<{ name: string; quantity: number; unit: string }>; original_message: string | null; status: string }>()
+  if (!draft || !Array.isArray(draft.items) || !draft.items.length) throw new Error("This text request is no longer waiting for review.")
+  const { data: requestId, error } = await supabase.rpc("staff_create_client_request", { p_customer_id: customerId, p_department: draft.department, p_title: draft.title, p_lines: draft.items, p_notes: `Original client text: ${draft.original_message || ""}`.slice(0, 4000) })
+  if (error || typeof requestId !== "string") throw new Error("The material request could not be created.")
+  const completed = await supabase.from("aura_sms_request_drafts").update({ status: "converted", created_request_id: requestId }).eq("id", id).eq("status", "new")
+  if (completed.error) throw new Error("The request was created, but the text draft could not be closed.")
+  revalidatePath("/owner/materials/requests")
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+}
+
 export type RequestClientQuoteInput = {
   requestId: string
   quoteNumber: string

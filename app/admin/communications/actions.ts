@@ -4,12 +4,92 @@ import { revalidatePath } from "next/cache"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { normalizeAuraEmail, normalizeAuraPhone } from "@/lib/aura/communications"
+import { phoneLoginEmailForPhone } from "@/lib/auth-phone"
 import { serializeCommunicationLog, type CommunicationLog } from "@/lib/manager-command-center"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { addAuraCommunicationLinks, type AuraEmailEntityType } from "@/lib/aura/email-links"
 
 type ContactKind = "customer" | "lead" | "supplier"
 type Result = { ok: true } | { ok: false; error: string }
+type SmsAiMode = "off" | "draft" | "auto_safe"
+type SmsAiStyle = "professional" | "friendly" | "brief"
+
+async function ensureAuraPhoneContact(phoneInput: string) {
+  const phone = normalizeAuraPhone(phoneInput)
+  if (!phone) return { ok: false as const, error: "Choose a conversation with a valid phone number." }
+  const admin = createAdminClient()
+  const existing = await admin.from("aura_contacts").select("id").eq("normalized_phone", phone).maybeSingle<{ id: string }>()
+  if (existing.error) return { ok: false as const, error: "The contact settings could not be loaded." }
+  if (existing.data) return { ok: true as const, id: existing.data.id, phone }
+  const created = await admin.from("aura_contacts").insert({ full_name: phone, normalized_phone: phone, notes: "Created from Communications" }).select("id").single<{ id: string }>()
+  if (created.error || !created.data) return { ok: false as const, error: "The contact settings could not be created." }
+  await admin.from("aura_communications").update({ contact_id: created.data.id }).eq("counterparty_phone", phone)
+  return { ok: true as const, id: created.data.id, phone }
+}
+
+export async function saveSmsAutomationAction(input: { phone: string; mode: SmsAiMode; style: SmsAiStyle; autoCreateRequestDrafts: boolean }) {
+  const { access } = await requireManagerPortalProfile()
+  if (!access.customers) return { ok: false as const, error: "Customer communication access is required." }
+  if (!new Set<SmsAiMode>(["off", "draft", "auto_safe"]).has(input.mode) || !new Set<SmsAiStyle>(["professional", "friendly", "brief"]).has(input.style)) return { ok: false as const, error: "Choose valid AI settings." }
+  const contact = await ensureAuraPhoneContact(input.phone)
+  if (!contact.ok) return contact
+  const { error } = await createAdminClient().from("aura_contacts").update({ sms_ai_mode: input.mode, sms_ai_style: input.style, auto_create_request_drafts: Boolean(input.autoCreateRequestDrafts) }).eq("id", contact.id)
+  if (error) return { ok: false as const, error: "The AI reply settings could not be saved." }
+  revalidatePath("/admin/communications")
+  return { ok: true as const }
+}
+
+export async function generateSmsReplyAction(input: { communicationId: string }) {
+  const { supabase, access } = await requireManagerPortalProfile()
+  if (!access.customers || !/^[0-9a-f-]{36}$/i.test(input.communicationId)) return { ok: false as const, error: "Choose an incoming text message." }
+  const { data, error } = await supabase.functions.invoke<{ ok?: boolean; reply?: string; safetyReason?: string; requestDetected?: boolean; error?: string }>("aura-messaging-broker", { body: { action: "generate_sms_reply", communicationId: input.communicationId } })
+  if (error || !data?.ok || !data.reply) return { ok: false as const, error: data?.error || "AI could not prepare a reply right now." }
+  return { ok: true as const, reply: data.reply, safetyReason: data.safetyReason || "Review before sending.", requestDetected: Boolean(data.requestDetected) }
+}
+
+export async function quickTagPhoneContactAction(input: { phone: string; kind: ContactKind; name?: string }) {
+  const { supabase, user, access } = await requireManagerPortalProfile()
+  if (!access.customers) return { ok: false as const, error: "Customer communication access is required." }
+  const phone = normalizeAuraPhone(input.phone)
+  if (!phone || !new Set<ContactKind>(["customer", "lead", "supplier"]).has(input.kind)) return { ok: false as const, error: "Choose a valid phone conversation and tag." }
+  const name = input.name?.trim().slice(0, 160) || phone
+  let sourceId = ""
+  if (input.kind === "customer") {
+    const existing = await supabase.from("profiles").select("id").eq("role", "client").eq("phone", phone).limit(1).maybeSingle<{ id: string }>()
+    if (existing.error) return { ok: false as const, error: "The customer directory could not be checked." }
+    if (existing.data?.id) sourceId = existing.data.id
+    else {
+      const created = await supabase.functions.invoke<{ ok?: boolean; customerId?: string }>("create-manager-client", { body: { fullName: name, email: phoneLoginEmailForPhone(phone), phone, companyName: null } })
+      if (created.error || !created.data?.ok || !created.data.customerId) return { ok: false as const, error: "The customer could not be added." }
+      sourceId = created.data.customerId
+    }
+  } else if (input.kind === "lead") {
+    const existing = await supabase.from("manager_outreach_leads").select("id").eq("phone", phone).limit(1).maybeSingle<{ id: string }>()
+    if (existing.error) return { ok: false as const, error: "The lead directory could not be checked." }
+    if (existing.data?.id) sourceId = existing.data.id
+    else {
+      const created = await supabase.from("manager_outreach_leads").insert({ full_name: name, phone, status: "new", notes: "Added from Communications", created_by: user.id }).select("id").single<{ id: string }>()
+      if (created.error || !created.data) return { ok: false as const, error: "The lead could not be added." }
+      sourceId = created.data.id
+    }
+  } else {
+    if (!access.suppliers) return { ok: false as const, error: "Supplier access is required." }
+    const snapshot = await supabase.rpc("staff_load_supplier_directory_snapshot")
+    const suppliers = ((snapshot.data as { settings?: { suppliers?: Array<{ id: string; phone?: string; whatsapp?: string }> } } | null)?.settings?.suppliers || [])
+    const existing = suppliers.find((supplier) => normalizeAuraPhone(supplier.phone || supplier.whatsapp || "") === phone)
+    sourceId = existing?.id || `sms-${phone.replace(/\D/g, "").slice(-10)}`
+    if (!existing) {
+      const saved = await supabase.rpc("staff_upsert_supplier_directory_entry", { p_supplier: { id: sourceId, name, phone, whatsapp: phone, email: "", contactLabel: "Supplier contact", contactName: "", trustLevel: "not-reviewed", catalogDepartments: [], catalogEnabledDepartments: [], portalUrl: "", deliveryNotes: "", notes: "Added from Communications", address: "", materials: "" }, p_create: true })
+      if (saved.error) return { ok: false as const, error: "The supplier could not be added." }
+    }
+  }
+  const linked = await linkCommunicationContactAction({ kind: input.kind, sourceId, name, phone, conversationPhone: phone })
+  if (!linked.ok) return linked
+  revalidatePath("/admin/users")
+  revalidatePath("/admin/vendors")
+  revalidatePath("/admin/goals-progress")
+  return { ok: true as const, sourceId }
+}
 
 export async function saveCommunicationLogAction(input: {
   clientId: string
