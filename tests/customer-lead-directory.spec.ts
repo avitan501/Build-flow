@@ -6,10 +6,11 @@ import { expect, test } from "@playwright/test"
 const root = process.cwd()
 
 test("customer directory connects customers, leads, requests, and Aura conversations", async () => {
-  const [page, leads, conversation] = await Promise.all([
+  const [page, leads, conversation, createCustomer] = await Promise.all([
     readFile(path.join(root, "app/admin/users/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/client-target-outreach.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/contact-conversation.tsx"), "utf8"),
+    readFile(path.join(root, "supabase/functions/create-manager-client/index.ts"), "utf8"),
   ])
 
   expect(page).toContain('params.view === "leads"')
@@ -20,12 +21,19 @@ test("customer directory connects customers, leads, requests, and Aura conversat
   expect(page).toContain("<OutreachLeadDirectory")
   expect(page).toContain("<AddTargetClient compact />")
   expect(page).toContain("<AddOutreachLead compact />")
+  expect(page).toContain("compact iconOnly")
+  expect(page).toContain('customer.approval_status === "pending" ? "Unverified"')
   expect(page).toContain(">CRM</p>")
   expect(page).not.toContain('/admin/users?view=projects')
   expect(leads).toContain("export function OutreachLeadDirectory")
   expect(leads).toContain("conversations[lead.id]")
+  expect(leads).toContain('max-w-[70%]')
+  expect(leads).toContain('title="Edit lead"')
+  expect(leads).toContain('aria-label={`Remove ${lead.full_name}`}')
   expect(conversation).toContain("No calls or messages yet.")
   expect(conversation).toContain("View earlier messages")
+  expect(createCustomer).toContain('approval_status: "pending"')
+  expect(createCustomer).toContain("is_active: true")
 })
 
 test("one-to-one composer provides approved editable templates and channel choice", async () => {

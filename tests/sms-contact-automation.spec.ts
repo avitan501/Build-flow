@@ -16,6 +16,7 @@ test("communications offers guarded per-contact AI modes and fast contact tags",
   expect(workspace).toContain("h-full min-h-0")
   expect(workspace).toContain("initialCommunicationForQuery")
   expect(workspace).toContain("initialConversationKey(initialCommunication, contacts)")
+  expect(workspace).toContain('href="/admin/ai-tools/sms-replies"')
   for (const kind of ["customer", "lead", "supplier"]) expect(actions).toContain(`"${kind}"`)
   expect(actions).toContain("phoneLoginEmailForPhone")
   expect(actions).toContain("staff_upsert_supplier_directory_entry")
@@ -75,10 +76,12 @@ test("manager tools contains one global AI reply preferences page", async () => 
 })
 
 test("material lists from texts enter a review queue before becoming requests", async () => {
-  const [migration, page, actions] = await Promise.all([
+  const [migration, page, actions, communicationActions, createCustomer] = await Promise.all([
     readFile(path.join(root, "supabase/migrations/20260827233210_add_sms_contact_automation.sql"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8"),
+    readFile(path.join(root, "app/admin/communications/actions.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/create-manager-client/index.ts"), "utf8"),
   ])
   expect(migration).toContain("create table if not exists public.aura_sms_request_drafts")
   expect(migration).toContain("enable row level security")
@@ -86,4 +89,7 @@ test("material lists from texts enter a review queue before becoming requests", 
   expect(page).toContain("customer_name")
   expect(actions).toContain("staff_create_client_request")
   expect(actions).toContain('status: "converted"')
+  expect(communicationActions).toContain('quickTagPhoneContactAction({ phone, kind: "customer"')
+  expect(communicationActions).toContain('rpc("staff_create_client_request"')
+  expect(createCustomer).toContain('approval_status: "pending"')
 })

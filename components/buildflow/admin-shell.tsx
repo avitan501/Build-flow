@@ -3,13 +3,11 @@
 import {
   LayoutDashboard,
   Menu,
-  MessageCircle,
   PhoneCall,
   PackageOpen,
   Store,
   UserRound,
   Users,
-  Video,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -18,12 +16,6 @@ import { useState, type ReactNode } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { EmployeeActivityReporter } from "@/components/buildflow/employee-activity-reporter";
-
-const CARLOS_MEETING_URL = "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Avantia%20Build%20meeting%20with%20Carlos&details=Avantia%20Build%20manager%20meeting&add=buildavantiap%40gmail.com";
-const communicationLinks = [
-  { href: CARLOS_MEETING_URL, label: "Schedule a Google Meet with Carlos", shortLabel: "Meet", icon: Video },
-  { href: "/admin/communications?channel=whatsapp", label: "View all WhatsApp conversations", shortLabel: "WhatsApp", icon: MessageCircle },
-] as const;
 
 type ManagerAccess = {
   owner: boolean;
@@ -71,11 +63,8 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="border-b border-slate-100 px-6 pb-5 pt-7">
-        <Link href={homeHref} onClick={onNavigate} aria-label="Avantia Build manager portal">
+        <Link href="/" onClick={onNavigate} aria-label="Open the Avantia Build customer website">
           <AvantiaBuildLockup />
-        </Link>
-        <Link href="/" onClick={onNavigate} className="mt-4 flex min-h-10 items-center text-sm font-semibold text-[#0066cc] hover:text-[#004f9e]">
-          Customer Website
         </Link>
       </div>
 
@@ -96,20 +85,8 @@ function ManagerNavigation({ pathname, access, onNavigate }: { pathname: string;
       <div className="border-t border-slate-100 px-5 pb-5 pt-3">
         {access.communications ? <Link href="/admin/communications" onClick={onNavigate} className={`mb-2 flex min-h-11 items-center gap-3 rounded-md px-2 text-sm font-semibold ${isActive(pathname, "/admin/communications") ? "bg-sky-50 text-[#0066cc]" : "text-slate-800 hover:bg-slate-50"}`}>
           <PhoneCall className="h-4 w-4 shrink-0" />
-          <span className="min-w-0 flex-1">Messages &amp; Calls</span>
+          <span className="min-w-0 flex-1">Communications</span>
         </Link> : null}
-        <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Quick Access</p>
-        <div className="grid grid-cols-2 gap-1" aria-label="Communication shortcuts">
-          {communicationLinks.map((link) => {
-            const Icon = link.icon;
-            const external = link.href.startsWith("https://");
-            const active = !external && isActive(pathname, link.href);
-            const className = `flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 px-1 py-2 text-center text-[10px] font-semibold leading-3 hover:text-[#0066cc] ${active ? "text-[#0066cc]" : "text-slate-700"}`;
-            const content = <><Icon className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="w-full truncate">{link.shortLabel}</span></>;
-            if (external) return <Link key={link.href} href={link.href} onClick={onNavigate} target="_blank" rel="noopener noreferrer" aria-label={link.label} title={link.label} className={className}>{content}</Link>;
-            return <Link key={link.href} href={link.href} onClick={onNavigate} aria-label={link.label} title={link.label} className={className}>{content}</Link>;
-          })}
-        </div>
         <Link href="/account" onClick={onNavigate} className="flex min-h-12 items-center gap-3 border-t border-slate-100 px-1 text-sm font-semibold text-slate-800 hover:text-[#0066cc]">
           <UserRound className="h-4 w-4" />
           My Account
@@ -140,7 +117,7 @@ export function AdminShell({ children, access }: { children: ReactNode; access: 
           >
             <Menu className="h-5 w-5" />
           </button>
-          <div className="min-w-0"><AvantiaBuildLockup compact /></div>
+          <Link href="/" aria-label="Open the Avantia Build customer website" className="min-w-0"><AvantiaBuildLockup compact /></Link>
           <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{access.owner ? "Owner" : "Manager"}</span>
         </header>
         {children}

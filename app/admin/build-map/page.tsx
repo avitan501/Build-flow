@@ -43,6 +43,7 @@ import {
 const QUO_INBOX_URL =
   "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
 const WHATSAPP_URL = "https://web.whatsapp.com/";
+const CARLOS_MEETING_URL = "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Avantia%20Build%20meeting%20with%20Carlos&details=Avantia%20Build%20manager%20meeting&add=buildavantiap%40gmail.com";
 
 type RequestRow = {
   id: string;
@@ -274,6 +275,7 @@ export default async function AdminDashboardPage({
           : []),
         { href: QUO_INBOX_URL, label: "Calls & Messages" },
         { href: WHATSAPP_URL, label: "WhatsApp" },
+        { href: CARLOS_MEETING_URL, label: "Google Meet" },
         { href: "/admin/daily-summary", label: "Daily Work Summary" },
       ],
     },

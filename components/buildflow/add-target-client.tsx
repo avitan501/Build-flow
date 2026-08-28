@@ -46,8 +46,8 @@ export function AddTargetClient({ compact = false }: { compact?: boolean }) {
             <header className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
               <div>
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-sky-50 text-[#0066cc]"><UserPlus className="h-4 w-4" /></span>
-                <h2 id="add-target-client-title" className="mt-3 text-xl font-semibold">Add a target client</h2>
-                <p className="mt-1 text-sm text-slate-500">This client is saved in the Customer Directory.</p>
+                <h2 id="add-target-client-title" className="mt-3 text-xl font-semibold">Add a customer</h2>
+                <p className="mt-1 text-sm text-slate-500">The customer is saved as unverified until a manager approves the account.</p>
               </div>
               <button type="button" onClick={close} aria-label="Close" className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-500"><X className="h-5 w-5" /></button>
             </header>

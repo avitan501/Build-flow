@@ -54,11 +54,12 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain("todaySummary?.checkInAt");
   expect(page).toContain("Supplier Quote Storage");
   expect(page).toContain("Quote Comparison");
+  expect(page).toContain('{ href: CARLOS_MEETING_URL, label: "Google Meet" }');
   expect(shell).toContain('<span className="min-w-0 flex-1">Manager Dashboard</span>');
   expect(shell).toContain('{ href: "/admin/users", label: "CRM"');
   expect(shell).toContain('const homeHref = "/admin/build-map"');
-  expect(shell).toContain('<span className="min-w-0 flex-1">Messages &amp; Calls</span>');
-  expect(shell.indexOf("Messages &amp; Calls")).toBeGreaterThan(shell.indexOf("</nav>"));
+  expect(shell).toContain('<span className="min-w-0 flex-1">Communications</span>');
+  expect(shell.indexOf("Communications")).toBeGreaterThan(shell.indexOf("</nav>"));
   expect(shell).not.toContain('label: "Aura Communications"');
   expect(shell).not.toContain('label: "Manager Settings"');
   expect(shell).toContain("EmployeeActivityReporter");

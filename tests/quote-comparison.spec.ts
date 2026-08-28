@@ -146,13 +146,12 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
 
   expect(navigation).not.toContain('{ href: "/admin/quote-comparison", label: "Quote Comparison"');
   expect(navigation).toContain('...(access.suppliers ? [');
-  expect(navigation).toContain('Messages &amp; Calls');
-  expect(navigation).toContain('label: "Schedule a Google Meet with Carlos"');
-  expect(navigation).toContain('label: "View all WhatsApp conversations"');
+  expect(navigation).toContain('>Communications</span>');
+  expect(navigation).not.toContain('Schedule a Google Meet with Carlos');
+  expect(navigation).not.toContain('View all WhatsApp conversations');
   expect(navigation).toContain('href="/admin/communications"');
-  expect(navigation.indexOf("communicationLinks.map")).toBeGreaterThan(navigation.indexOf("</nav>"));
+  expect(navigation.indexOf("Communications")).toBeGreaterThan(navigation.indexOf("</nav>"));
   expect(navigation).not.toContain('link.href === "/admin/traffic" ||');
-  expect(navigation).toContain('target="_blank" rel="noopener noreferrer"');
   expect(migration).toContain("alter table public.quote_comparisons enable row level security");
   expect(migration).toContain("private.has_staff_capability('suppliers')");
   expect(migration).toContain("created_by = (select auth.uid())");

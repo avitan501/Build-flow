@@ -20,11 +20,13 @@ export function ManagerCreateClientRequest({
   departments,
   initialCustomerId = "",
   compact = false,
+  iconOnly = false,
 }: {
   customers: CustomerOption[]
   departments: string[]
   initialCustomerId?: string
   compact?: boolean
+  iconOnly?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [clientSelection, setClientSelection] = useState(initialCustomerId || (customers.length ? "" : "new"))
@@ -84,8 +86,8 @@ export function ManagerCreateClientRequest({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} aria-label="Add new request" className={compact ? "inline-flex min-h-9 items-center gap-1.5 rounded-md bg-[#0071e3] px-3 text-xs font-semibold text-white" : "inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white shadow-sm"}>
-        <Plus className="h-4 w-4" />{compact ? "Add New" : "Create request for client"}
+      <button type="button" onClick={() => setOpen(true)} aria-label="Add new request" title="Add new request" className={iconOnly ? "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#0071e3] text-white hover:bg-[#0066cc]" : compact ? "inline-flex min-h-9 items-center gap-1.5 rounded-md bg-[#0071e3] px-3 text-xs font-semibold text-white" : "inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white shadow-sm"}>
+        <Plus className="h-4 w-4" />{iconOnly ? null : compact ? "Add New" : "Create request for client"}
       </button>
 
       {open && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[140] grid place-items-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-labelledby="manager-client-request-title" onMouseDown={(event) => { if (event.currentTarget === event.target) close() }}>

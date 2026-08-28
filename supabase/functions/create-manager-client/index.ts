@@ -86,7 +86,7 @@ Deno.serve(async (request) => {
     phone,
     company_name: companyName,
     role: "client",
-    approval_status: "approved",
+    approval_status: "pending",
     is_active: true,
   }, { onConflict: "id" })
   if (profileError) {

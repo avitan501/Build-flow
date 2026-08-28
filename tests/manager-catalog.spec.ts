@@ -8,7 +8,7 @@ import { parseMaterialComparisonText, supplierRowsToCatalogItems } from "../lib/
 
 const root = process.cwd()
 
-test("manager navigation is compact and keeps communication shortcuts at the bottom", async () => {
+test("manager navigation is compact and keeps one communication center at the bottom", async () => {
   const [shell, aiTools] = await Promise.all([
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/ai-tools/page.tsx"), "utf8"),
@@ -20,7 +20,7 @@ test("manager navigation is compact and keeps communication shortcuts at the bot
   expect(shell).not.toContain('label: "Website Traffic"')
   expect(shell).not.toContain('label: "AI Tools"')
   expect(shell).toContain("Manager Dashboard")
-  expect(shell).toContain('Messages &amp; Calls')
+  expect(shell).toContain('>Communications</span>')
   expect(shell).not.toContain('label: "Directories & Catalog"')
   expect(shell).not.toContain('label: "Supplier Pricing"')
   expect(shell).not.toContain('href: "/admin/abc"')
@@ -28,18 +28,17 @@ test("manager navigation is compact and keeps communication shortcuts at the bot
   expect(aiTools).toContain('href: "/admin/traffic"')
   expect(shell).not.toContain('href: "/admin/payments"')
   expect(shell).not.toContain('label: "Manager Settings"')
-  expect(shell).toContain("Customer Website")
-  expect(shell).toContain("Quick Access")
+  expect(shell).not.toContain("Customer Website")
+  expect(shell).not.toContain("Quick Access")
+  expect(shell).toContain('href="/" onClick={onNavigate} aria-label="Open the Avantia Build customer website"')
   expect(shell).not.toContain('<span className="min-w-0 flex-1 text-left">More</span>')
   expect(shell).not.toContain('shortLabel: "Messages"')
-  expect(shell).toContain('shortLabel: "Meet"')
-  expect(shell).toContain('shortLabel: "WhatsApp"')
-  expect(shell).toContain('grid grid-cols-2 gap-1')
-  expect(shell).toContain('const CARLOS_MEETING_URL = "https://calendar.google.com/calendar/render?action=TEMPLATE')
-  expect(shell).toContain('add=buildavantiap%40gmail.com')
-  expect(shell).toContain('label: "Schedule a Google Meet with Carlos"')
-  expect(shell).toContain('/admin/communications?channel=whatsapp')
-  expect(shell.lastIndexOf("communicationLinks.map")).toBeGreaterThan(shell.indexOf("</nav>"))
+  expect(shell).not.toContain('shortLabel: "Meet"')
+  expect(shell).not.toContain('shortLabel: "WhatsApp"')
+  expect(shell).not.toContain("CARLOS_MEETING_URL")
+  expect(shell).not.toContain('/admin/communications?channel=whatsapp')
+  expect(aiTools).toContain('title: "Google Meet"')
+  expect(aiTools).toContain('add=buildavantiap%40gmail.com')
 })
 
 test("manager catalog is protected, seeded, editable, and supplier based", async () => {

@@ -14,8 +14,9 @@ test("Goals and Client Target stay in the dashboard instead of manager navigatio
   expect(shell).not.toContain("sharedMoreLinks");
   expect(shell).not.toContain('label: "Directories & Catalog"');
   expect(shell).not.toContain('label: "Supplier Pricing"');
-  expect(shell).toContain("Customer Website");
-  expect(shell).toContain("Quick Access");
+  expect(shell).not.toContain("Customer Website");
+  expect(shell).not.toContain("Quick Access");
+  expect(shell).toContain('>Communications</span>');
   expect(shell).not.toContain('label: "Tasks"');
   expect(shell).not.toContain('label: "Quotes & Orders"');
   expect(shell).not.toContain('label: "Tasks & Daily Summary"');
