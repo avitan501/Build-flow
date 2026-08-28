@@ -2,8 +2,8 @@ import { ConciergeVideoLibrary } from "@/components/buildflow/concierge-video-li
 import { pageMetadata } from "@/lib/site-metadata";
 
 export const metadata = pageMetadata({
-  title: "How Avantia Construction Concierge Works",
-  description: "Seven short videos show how Avantia handles takeoffs, supplier comparison, ordering, and jobsite delivery coordination.",
+  title: "Learn About Avantia Build | Your Construction Materials Concierge",
+  description: "See how Avantia Build helps contractors, designers, clients, and suppliers organize construction-material requests, pricing, orders, and jobsite deliveries.",
   path: "/how-it-works",
 });
 

@@ -161,18 +161,30 @@ test("Order Materials opens the full responsive service and department hub", asy
   expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
 });
 
-test("Learn More provides seven distinct shareable service videos", async ({ page }) => {
+test("Learn More opens the cinematic nine-story Avantia experience", async ({ page }) => {
   await page.goto("/how-it-works");
 
-  await expect(page.getByRole("heading", { name: "Seven ways Avantia keeps material purchasing off your plate." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Everything your project needs/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /One job.*Too many calls/ })).toBeAttached();
   const videos = page.locator('main video');
-  await expect(videos).toHaveCount(7);
-  for (const slug of ["crew-downtime", "ai-takeoff", "supplier-comparison", "personal-shopper", "order-control", "delivery-coordination", "nationwide-sourcing"]) {
-    await expect(page.locator(`source[src="/videos/marketing/${slug}.mp4"]`)).toHaveCount(1);
-    await expect(page.locator(`track[src="/videos/marketing/${slug}.vtt"]`)).toHaveCount(1);
+  await expect(videos).toHaveCount(10);
+  for (const [file, caption] of [
+    ["01-contractor-request", "request"],
+    ["02-contractor-crew-moving", "crew"],
+    ["03-supplier-partner-network", "suppliers"],
+    ["04-supplier-send-products", "products"],
+    ["05-designer-order-coordination", "designer-order"],
+    ["06-designer-materials-desk", "designer-desk"],
+    ["07-many-calls-one-job", "calls"],
+    ["08-material-actual-cost", "cost"],
+    ["09-job-gets-busy", "busy"],
+  ]) {
+    await expect(page.locator(`source[src="/videos/avantia-story/${file}.mp4"]`)).toHaveCount(1);
+    await expect(page.locator(`track[src="/videos/avantia-story/${caption}.vtt"]`)).toHaveCount(1);
   }
-  await page.getByRole("button", { name: "Ver página en español" }).click();
-  await expect(page.getByRole("heading", { name: "Siete maneras en que Avantia simplifica la compra de materiales." })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Send a material request/ })).toHaveAttribute("href", "/shop");
+  await expect(page.getByRole("link", { name: /Text \(516\) 908-8319/ })).toHaveAttribute("href", "tel:+15169088319");
+  await expect(page.getByRole("main").getByRole("link", { name: "office@build.avantiap.com" })).toHaveAttribute("href", "mailto:office@build.avantiap.com");
 
   const overflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflows).toBe(false);
