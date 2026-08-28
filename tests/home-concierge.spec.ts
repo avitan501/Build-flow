@@ -163,6 +163,9 @@ test("Learn More opens the cinematic nine-story Avantia experience", async ({ pa
   await page.getByRole("button", { name: "Play How many calls for one job?" }).click();
   await expect.poll(async () => page.locator("main video").evaluateAll((items) => items.filter((item) => !item.paused).length)).toBeLessThanOrEqual(1);
 
+  const cinematicWidth = await page.getByRole("main").evaluate((main) => main.getBoundingClientRect().width);
+  expect(cinematicWidth).toBeCloseTo(page.viewportSize()?.width ?? cinematicWidth, 0);
+
   const overflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflows).toBe(false);
 });
