@@ -27,7 +27,7 @@ test("incoming client SMS automation keeps conversational context and blocks sen
   expect(broker).toContain("smsConversationContext")
   expect(broker).toContain("Conversation (oldest to newest)")
   expect(broker).toContain("Never say information is missing when it is clearly present earlier")
-  expect(broker).toContain("A brief acknowledgement that Avantia received or can see a Customer material list may be autoSafe")
+  expect(broker).toContain("a transparent non-committal reply to a pricing, order-status, or delivery follow-up")
   expect(broker).not.toContain("interval '6 hours'")
   expect(broker).toContain('result.autoSafe;')
   expect(broker).toContain("EdgeRuntime.waitUntil(")
@@ -44,10 +44,34 @@ test("incoming client SMS automation keeps conversational context and blocks sen
   expect(broker).toContain("asksAboutAttachment")
   expect(broker).toContain("customerOnlyTranscript")
   expect(broker).toContain("I have your material list")
-  expect(broker).toContain("A manager still needs to confirm availability and delivery details")
+  expect(broker).toContain("A manager will confirm availability and delivery details")
   expect(broker).toContain('model: "local-context-fallback"')
+  expect(broker).toContain("loadSmsAiSettings")
+  expect(broker).toContain("autoAcknowledgeFollowUps")
+  expect(broker).toContain("autoAskDeliveryDetails")
+  expect(broker).toContain("send_failed")
+  expect(broker).toContain("latestRows[0].id !== communicationId")
+  expect(broker).toContain("I do not have a confirmed update in this chat yet")
+  expect(broker).toContain("Please send the delivery address and requested date or time window")
   expect(broker).toContain("latestIsMaterialRequest")
   expect(broker).toContain("requestDetected: latestIsMaterialRequest && result.isMaterialRequest")
+})
+
+test("manager tools contains one global AI reply preferences page", async () => {
+  const [tools, page, actions, migration] = await Promise.all([
+    readFile(path.join(root, "app/admin/ai-tools/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/ai-tools/sms-replies/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/ai-tools/sms-replies/actions.ts"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260828141158_create_sms_ai_reply_preferences.sql"), "utf8"),
+  ])
+  expect(tools).toContain("AI Reply Settings")
+  expect(tools).toContain("/admin/ai-tools/sms-replies")
+  expect(page).toContain("What AI may handle automatically")
+  expect(page).toContain("Always requires human confirmation")
+  expect(actions).toContain("requireManagerPortalProfile")
+  expect(actions).toContain("updated_by: user.id")
+  expect(migration).toContain("enable row level security")
+  expect(migration).toContain("private.is_admin_or_staff")
 })
 
 test("material lists from texts enter a review queue before becoming requests", async () => {

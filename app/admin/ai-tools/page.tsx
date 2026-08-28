@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Activity, BarChart3, Calculator, FilePenLine, Files, ListTree, MapPinned, PanelsTopLeft, SearchCheck, Store } from "lucide-react"
+import { Activity, BarChart3, Bot, Calculator, FilePenLine, Files, ListTree, MapPinned, PanelsTopLeft, SearchCheck, Store } from "lucide-react"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 
@@ -10,6 +10,7 @@ export default async function AdminAiToolsPage() {
 
   const tools = [
     { href: "https://build-flow-wfl3-1fe6nc1cr-avitanneto-1804s-projects.vercel.app", title: "New Homepage Preview", description: "View the saved homepage concept without changing the current public homepage.", icon: PanelsTopLeft, badge: "Preview" },
+    ...(access.customers ? [{ href: "/admin/ai-tools/sms-replies", title: "AI Reply Settings", description: "Set the default voice, safe automatic replies, and material-request review behavior for customer texts.", icon: Bot }] : []),
     ...(access.suppliers ? [{ href: "/admin/documents", title: "Documents", description: "Upload once, let AI prepare the details, then review and choose the correct destination.", icon: Files }] : []),
     { href: "/admin/ai-tools/jobsite-delivery", title: "Jobsite Delivery", description: "Plan routes and loads, estimate delivery cost, and manage every request through completion.", icon: MapPinned },
     { href: "/admin/ai-tools/estimate-converter", title: "Beat Estimate Converter", description: "Remove company and client identity and prepare an Avantia proposal request.", icon: FilePenLine },
