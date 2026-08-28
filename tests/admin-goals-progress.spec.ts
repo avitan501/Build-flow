@@ -204,7 +204,7 @@ test("affiliate tracker is persistent, owner-only, filterable, and setup-gated",
   const actions = await readFile(path.join(root, "app/admin/goals-progress/affiliate-actions.ts"), "utf8");
   const migration = await readFile(path.join(root, "supabase/migrations/20260816193932_create_affiliate_program_tracker.sql"), "utf8");
 
-  expect(component).toContain("Supplier Affiliate Program");
+  expect(component).toContain("Top 10 Supplier Programs");
   expect(component).toContain("Search supplier");
   expect(component).toContain("Lowe’s Developer/API Onboarding");
   expect(component).toContain("Brand approvals are separate");
@@ -214,6 +214,9 @@ test("affiliate tracker is persistent, owner-only, filterable, and setup-gated",
   expect(component).toContain("Open affiliate link");
   expect(component).toContain("Save verified Amazon link");
   expect(component).toContain("Record Impact approval");
+  expect(component).toContain("Apply verified Aug 28 audit");
+  expect(component).toContain("Top 10 Supplier Programs");
+  expect(component).toContain("TOP_SUPPLIER_NAMES");
   expect(component).toContain("<ProgramDrawer key={selected.id}");
   expect(component).toContain('rel="sponsored noopener noreferrer"');
   expect(component).toContain("Setup checklist");
@@ -222,6 +225,9 @@ test("affiliate tracker is persistent, owner-only, filterable, and setup-gated",
   expect(actions).toContain("affiliate_test_url: affiliateTestUrl.value");
   expect(actions).toContain("recordAmazonAffiliateLinkAction");
   expect(actions).toContain("recordImpactMarketplaceApprovalAction");
+  expect(actions).toContain("recordTopTenSupplierAuditAction");
+  expect(actions).toContain("The Home Depot Affiliate Team confirmed receipt");
+  expect(actions).toContain("Re-certification demo scheduled for September 3, 2026");
   expect(actions).toContain("each retailer still requires a separate brand application and approval");
   expect(actions).toContain("Complete every setup checklist item");
   expect(migration).toContain("prevent_incomplete_affiliate_setup");
@@ -232,7 +238,7 @@ test("affiliate tracker is persistent, owner-only, filterable, and setup-gated",
   expect(migration).toContain("'Developer/API Integration','In Progress'");
 });
 
-test("Carlos has a call-ready list of 50 relevant affiliate targets with honest contact routes", async () => {
+test("Carlos has a focused top-10 supplier call list while the full research list stays preserved", async () => {
   const [page, component, data] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/affiliate-call-list.tsx"), "utf8"),
@@ -240,11 +246,14 @@ test("Carlos has a call-ready list of 50 relevant affiliate targets with honest 
   ]);
 
   expect(page).toContain("<AffiliateCallList />");
-  expect(page).toContain("50 construction-focused targets with direct call routes first.");
-  expect(component).toContain("50 construction-focused targets");
+  expect(page).toContain("Top 10 priority suppliers with current status and next action.");
+  expect(component).toContain("Top 10 supplier priorities");
   expect(component).toContain("Direct business");
   expect(component).toContain("Network managed");
-  expect(component).toContain("Only public business numbers are shown");
+  expect(component).toContain("Only public business contacts are shown");
+  expect(component).toContain("TOP_AFFILIATE_CALL_TARGETS");
+  expect(data).toContain("export const TOP_AFFILIATE_CALL_TARGETS");
+  expect((data.match(/trackerName:/g) ?? []).length).toBe(10);
   expect((data.match(/\btarget\(/g) ?? []).length).toBe(50);
 
   const companies = [...data.matchAll(/target\(\d+, "([^"]+)"/g)].map((match) => match[1]);

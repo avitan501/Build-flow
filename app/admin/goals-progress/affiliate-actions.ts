@@ -47,6 +47,7 @@ export async function updateAffiliateProgramAction(input: {
     application_requirements: clean(input.requirements, 5000),
     program_restrictions: clean(input.restrictions, 5000),
     affiliate_test_url: affiliateTestUrl.value,
+    last_verified_date: new Date().toISOString().slice(0, 10),
     updated_at: new Date().toISOString(),
   }).eq("id", input.id);
   if (error) return { ok: false, error: "Could not save this supplier." };
@@ -129,6 +130,133 @@ export async function recordImpactMarketplaceApprovalAction(): Promise<Result> {
   return { ok: true };
 }
 
+const TOP_TEN_AUDIT_DATE = "2026-08-28";
+const TOP_TEN_AUDIT: Array<{
+  supplierName: string;
+  status: AffiliateStatus;
+  nextAction: string;
+  auditNote: string;
+  fields: Record<string, unknown>;
+}> = [
+  {
+    supplierName: "ABC Supply API / Integration Partnership",
+    status: "In Progress",
+    nextAction: "Attend the ABC re-certification demo on September 3, 2026 at 1:30 PM Central and demonstrate the authorized Ship-To, New York branch, catalog search, unit, quantity, availability, and private price workflow.",
+    auditNote: "Verified 2026-08-28: Sandy scheduled the new ABC pre-production review for 2026-09-03 at 1:30 PM Central. Production access is not approved yet.",
+    fields: { api_status: "In Progress - re-certification demo scheduled", last_contact_date: "2026-08-26", next_follow_up_date: "2026-09-03" },
+  },
+  {
+    supplierName: "Lowe's Creator",
+    status: "In Progress",
+    nextAction: "Follow up on the website-publisher path and the pending Lowe's Developer Hub business-owner review; do not claim live pricing until production API access is approved.",
+    auditNote: "Verified 2026-08-28: website-only Creator follow-up was sent on 2026-08-23. No Lowe's approval or human reply was found.",
+    fields: { api_status: "In Progress - Developer Hub review pending", last_contact_date: "2026-08-23", next_follow_up_date: "2026-09-01" },
+  },
+  {
+    supplierName: "Home Depot",
+    status: "Applied",
+    nextAction: "Wait for The Home Depot's Impact review. If no decision arrives, follow up after September 10, 2026; do not mark Approved until a separate approval notice arrives.",
+    auditNote: "Verified 2026-08-28: The Home Depot Affiliate Team confirmed receipt of AvantiaBuild's application through Impact on 2026-08-27. The application is under review, not approved.",
+    fields: { application_date: "2026-08-27", application_email: "avitanneto@gmail.com", confirmation_received: true, last_contact_date: "2026-08-27", next_follow_up_date: "2026-09-10" },
+  },
+  {
+    supplierName: "Amazon Associates",
+    status: "In Progress",
+    nextAction: "Complete U.S. tax and payment setup, publish relevant disclosed Amazon links, and generate 3 qualifying purchases within 180 days for Amazon's final review.",
+    auditNote: "Verified 2026-08-28: StoreID avantiabuild2-20 and the live SiteStripe link are active. Final account review still depends on 3 qualifying purchases within 180 days.",
+    fields: { last_contact_date: "2026-08-17", next_follow_up_date: "2026-09-07" },
+  },
+  {
+    supplierName: "Walmart Affiliate Program",
+    status: "Applied",
+    nextAction: "Wait for Walmart's website affiliate review and email the affiliate team only if no decision arrives after August 31, 2026.",
+    auditNote: "Verified 2026-08-28: Walmart confirmed receipt on 2026-08-17 and said the website affiliate application is under review. No approval email was found.",
+    fields: { application_date: "2026-08-17", application_email: "avitanneto@gmail.com", confirmation_received: true, last_contact_date: "2026-08-17", next_follow_up_date: "2026-08-31" },
+  },
+  {
+    supplierName: "Ferguson Home",
+    status: "In Progress",
+    nextAction: "Find Ferguson Home in Impact or request a direct campaign invitation from the Ferguson affiliate team; follow up once after September 1 if there is still no reply.",
+    auditNote: "Verified 2026-08-28: the direct Impact-application-path email was sent on 2026-08-24. No incoming response or brand approval was found.",
+    fields: { last_contact_date: "2026-08-24", next_follow_up_date: "2026-09-01" },
+  },
+  {
+    supplierName: "Builders FirstSource / myBLDR (Trade Account)",
+    status: "In Progress",
+    nextAction: "Call Builders FirstSource, reference case 00714195, and request a human commercial-sales or partnerships contact for Long Island trade purchasing, data access, and referrals.",
+    auditNote: "Verified 2026-08-28: the latest response, case 00714195 on 2026-08-25, was an automated acknowledgment. No human partnership decision was found.",
+    fields: { last_contact_date: "2026-08-25", next_follow_up_date: "2026-09-01" },
+  },
+  {
+    supplierName: "Ace Hardware",
+    status: "In Progress",
+    nextAction: "Open Ace Hardware in the approved Impact Marketplace account and submit the separate Ace brand application.",
+    auditNote: "Verified 2026-08-28: Impact publisher access is approved, but no separate Ace Hardware application or approval was found.",
+    fields: { last_contact_date: "2026-08-16", next_follow_up_date: "2026-08-31" },
+  },
+  {
+    supplierName: "Acme Tools",
+    status: "In Progress",
+    nextAction: "Open Acme Tools in the approved Impact Marketplace account and submit the separate brand application after checking its current content requirements.",
+    auditNote: "Verified 2026-08-28: AvantiaBuild emailed Acme on 2026-08-23 about Impact requirements. No reply, brand application receipt, or approval was found.",
+    fields: { last_contact_date: "2026-08-23", next_follow_up_date: "2026-08-31" },
+  },
+  {
+    supplierName: "The RTA Store",
+    status: "Not Applied",
+    nextAction: "Open The RTA Store in Impact or use its partner page and submit the separate cabinet brand application.",
+    auditNote: "Verified 2026-08-28: no current brand application or approval was found. Impact publisher approval does not approve The RTA Store automatically.",
+    fields: { last_contact_date: "2026-08-16", next_follow_up_date: "2026-08-31" },
+  },
+];
+
+export async function recordTopTenSupplierAuditAction(): Promise<Result> {
+  const { supabase } = await requireAdminProfile();
+  const names = TOP_TEN_AUDIT.map((item) => item.supplierName);
+  const { data: programs, error: findError } = await supabase
+    .from("affiliate_programs")
+    .select("id,supplier_name,notes")
+    .in("supplier_name", names)
+    .returns<Array<{ id: string; supplier_name: string; notes: string | null }>>();
+  if (findError || !programs || programs.length !== names.length) return { ok: false, error: "The complete top 10 supplier list could not be loaded." };
+
+  const byName = new Map(programs.map((program) => [program.supplier_name, program]));
+  for (const audit of TOP_TEN_AUDIT) {
+    const program = byName.get(audit.supplierName);
+    if (!program) return { ok: false, error: `${audit.supplierName} was not found.` };
+    const currentNotes = program.notes?.trim() ?? "";
+    const notes = currentNotes.includes(audit.auditNote) ? currentNotes : `${currentNotes}\n\n${audit.auditNote}`.trim();
+    const { error } = await supabase.from("affiliate_programs").update({
+      affiliate_status: audit.status,
+      next_action: audit.nextAction,
+      notes,
+      last_verified_date: TOP_TEN_AUDIT_DATE,
+      updated_at: new Date().toISOString(),
+      ...audit.fields,
+    }).eq("id", program.id);
+    if (error) return { ok: false, error: `Could not update ${audit.supplierName}.` };
+  }
+
+  const { error: abcError } = await supabase.from("affiliate_integrations").update({
+    status: "In Progress",
+    current_stage: "Re-certification demo scheduled for September 3, 2026 at 1:30 PM Central",
+    next_action: "Demonstrate the complete ABC sandbox workflow and confirm the authorized New York Ship-To and branch configuration.",
+    updated_at: new Date().toISOString(),
+  }).ilike("supplier_name", "ABC Supply%");
+  if (abcError) return { ok: false, error: "Supplier programs were updated, but the ABC integration record could not be saved." };
+
+  const { error: lowesError } = await supabase.from("affiliate_integrations").update({
+    status: "In Progress",
+    current_stage: "Developer Hub business-owner review pending",
+    next_action: "Wait for Lowe's API onboarding review and provide production credentials only through Vercel environment variables after approval.",
+    updated_at: new Date().toISOString(),
+  }).ilike("supplier_name", "Lowe's%");
+  if (lowesError) return { ok: false, error: "Supplier programs were updated, but the Lowe's integration record could not be saved." };
+
+  revalidatePath(PAGE);
+  return { ok: true };
+}
+
 export async function changeAffiliateStatusAction(input: {
   id: string;
   status: string;
@@ -163,7 +291,7 @@ export async function changeAffiliateStatusAction(input: {
     return { ok: false, error: "Approval date and approved commission are required." };
   }
 
-  const update: Record<string, unknown> = { affiliate_status: input.status, updated_at: new Date().toISOString() };
+  const update: Record<string, unknown> = { affiliate_status: input.status, last_verified_date: new Date().toISOString().slice(0, 10), updated_at: new Date().toISOString() };
   if (input.status === "Applied") Object.assign(update, {
     application_date: input.applicationDate,
     application_email: clean(input.applicationEmail, 254),
