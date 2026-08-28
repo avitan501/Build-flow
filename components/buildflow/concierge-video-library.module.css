@@ -40,7 +40,7 @@
 .heroContent {
   width: min(100%, 92rem);
   margin: 0 auto;
-  padding: 9rem 1.25rem 7rem;
+  padding: 9rem 1.25rem 11.5rem;
 }
 .eyebrow {
   text-transform: uppercase;
@@ -134,7 +134,7 @@
   position: absolute;
   bottom: 1.4rem;
   left: 50%;
-  display: flex;
+  display: none;
   transform: translateX(-50%);
   align-items: center;
   gap: 0.5rem;
@@ -502,7 +502,10 @@
 }
 @media (min-width: 800px) {
   .heroContent {
-    padding-inline: 3rem;
+    padding: 9rem 3rem 7rem;
+  }
+  .scrollCue {
+    display: flex;
   }
   .sectionGrid {
     grid-template-columns: minmax(0, 0.8fr) minmax(25rem, 1.2fr);
