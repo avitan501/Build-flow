@@ -319,10 +319,10 @@ function AiTaskInbox() {
           <p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">
             Phone task intake
           </p>
-          <h3 className="text-sm font-semibold text-slate-950">Phone intake</h3>
+          <h3 className="text-sm font-semibold text-slate-950">Phone messages</h3>
           <p className="mt-0.5 text-xs text-slate-600">
-            Review phone messages before saving a task, contact, supplier, or
-            request.
+            Review only messages that need an action. Nothing is saved until
+            you confirm it.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -331,7 +331,7 @@ function AiTaskInbox() {
             href="/owner/ai-inbox"
             className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-xs font-semibold text-white"
           >
-            Review inbox
+            Review phone inbox
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -623,7 +623,7 @@ export async function CarlosGoalsWorkspace({
     <>
       {embedded ? (
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div><h3 className="text-sm font-semibold text-slate-950">Tasks</h3><p className="mt-0.5 text-[11px] leading-4 text-slate-500">Open only the item you want to review or update.</p></div>
+          <div><h3 className="text-sm font-semibold text-slate-950">Carlos work</h3><p className="mt-0.5 text-[11px] leading-4 text-slate-500">Focus first, then one-time tasks, phone messages, and ongoing work areas.</p></div>
           <AddManagerGoal assignee="carlos" />
         </div>
       ) : null}
@@ -631,8 +631,8 @@ export async function CarlosGoalsWorkspace({
       {access.owner ? <AiTaskInbox /> : null}
       <section className="mt-4" aria-labelledby="carlos-work-areas">
         <div className="mb-2">
-          <h3 id="carlos-work-areas" className="text-xs font-bold uppercase tracking-[.12em] text-slate-700">Work areas</h3>
-          <p className="mt-0.5 text-xs text-slate-500">These are ongoing responsibilities, not extra daily tasks. Open one for its instructions and contacts.</p>
+          <h3 id="carlos-work-areas" className="text-xs font-bold uppercase tracking-[.12em] text-slate-700">Ongoing work areas</h3>
+          <p className="mt-0.5 text-xs text-slate-500">Reference sections, not extra tasks. Open one only when Carlos is working in that area.</p>
         </div>
         <div className="grid gap-2">
         {activeFixedGoals.map((goal) => (

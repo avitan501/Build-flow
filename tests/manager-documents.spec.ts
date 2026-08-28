@@ -62,6 +62,7 @@ test("document center preserves originals and gates every destination behind rev
   expect(review).toContain("Use suggested:")
   expect(review).toContain("selectedProductCount")
   expect(review).toContain("lowest reviewed price is kept")
+  expect(review).toContain("Catalog pricing is saved")
   expect(actions).toContain("addManagerDocumentItemsToCatalogAction")
   expect(actions).toContain("usedCodes")
   expect(actions).toContain("DOC-${document.id.slice(0, 8).toUpperCase()}")

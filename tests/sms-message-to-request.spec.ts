@@ -10,6 +10,8 @@ test("request review appears only on a meaningful material message", () => {
   expect(looksLikeMaterialRequestMessage("sms", "incoming", "Yes")).toBe(false)
   expect(looksLikeMaterialRequestMessage("sms", "incoming", "Asap")).toBe(false)
   expect(looksLikeMaterialRequestMessage("sms", "incoming", "Can you confirm a delivery?")).toBe(false)
+  expect(looksLikeMaterialRequestMessage("sms", "incoming", "Can you confirm the delivery time?")).toBe(false)
+  expect(looksLikeMaterialRequestMessage("sms", "incoming", "Need it tomorrow")).toBe(false)
   expect(looksLikeMaterialRequestMessage("sms", "incoming", "Need 20 sheets drywall\n10 buckets joint compound")).toBe(true)
 })
 
@@ -21,6 +23,7 @@ test("each incoming SMS can be reviewed and converted into a Carlos request", as
   ])
 
   expect(workspace).toContain("Review material request")
+  expect(workspace).toContain("Save this number")
   expect(workspace).toContain("messageCanStartMaterialRequest")
   expect(workspace).toContain("Review new request")
   expect(workspace).toContain("Nothing is created until you confirm")

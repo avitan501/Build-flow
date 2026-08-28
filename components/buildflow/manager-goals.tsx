@@ -104,10 +104,10 @@ export function CustomManagerGoals({ goals }: { goals: ManagerGoalRecord[] }) {
     </details>;
   }
 
-  return <section className="mt-3 overflow-hidden rounded-md border border-slate-200 bg-white" aria-labelledby="carlos-custom-tasks">
-    <header className="flex items-end justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2.5"><div><h3 id="carlos-custom-tasks" className="text-xs font-bold uppercase tracking-[.12em] text-slate-700">Carlos task list</h3><p className="mt-0.5 text-[11px] text-slate-500">One focus for tomorrow; everything else stays in the active list.</p></div><span className="shrink-0 text-[10px] font-bold text-slate-500">{activeGoals.length} active</span></header>
+  return <section className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white" aria-labelledby="carlos-custom-tasks">
+    <header className="flex items-end justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2.5"><div><h3 id="carlos-custom-tasks" className="text-xs font-bold uppercase tracking-[.12em] text-slate-700">Focus &amp; tasks</h3><p className="mt-0.5 text-[11px] text-slate-500">Focus is the next priority. Open a task only when you need its notes.</p></div><span className="shrink-0 text-[10px] font-bold text-slate-500">{activeGoals.length} open</span></header>
     {focusGoals.length ? <div><p className="border-b border-amber-100 bg-amber-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">Tomorrow&apos;s focus</p>{focusGoals.map(goalRow)}</div> : null}
-    {otherGoals.length ? <div><p className="border-b border-slate-100 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">Active tasks</p>{otherGoals.map(goalRow)}</div> : null}
+    {otherGoals.length ? <div><p className="border-b border-slate-100 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">Other tasks</p>{otherGoals.map(goalRow)}</div> : null}
     {!activeGoals.length ? <p className="px-3 py-4 text-center text-xs text-slate-500">No active tasks.</p> : null}
     {archivedGoals.length ? <details className="group border-t border-slate-200 bg-slate-50"><summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-xs font-semibold text-slate-600"><Archive className="h-3.5 w-3.5" /><span className="flex-1">Archived goals</span><span>{archivedGoals.length}</span><ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" /></summary><div className="border-t border-slate-200">{archivedGoals.map(goalRow)}</div></details> : null}
     {error ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}

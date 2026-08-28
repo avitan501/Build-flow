@@ -103,6 +103,7 @@ test("manager goals are persistent, status-aware, archivable, and protected for 
 
   expect(component).toContain("Add a goal");
   expect(component).toContain("Archived goals");
+  expect(component).toContain("Focus &amp; tasks");
   expect(component).toContain("ManagerGoalStatusSelect");
   expect(component).toContain("deleteManagerGoalAction");
   expect(statusSelect).toContain('label: "In progress"');
