@@ -17,6 +17,8 @@ test("manager WhatsApp shortcut opens the internal filtered communication log", 
   expect(page).toContain('requestedChannel === "email-list"')
   expect(workspace).toContain("useState(initialChannelFilter)")
   expect(workspace).toContain("useState(initialQuery)")
+  expect(workspace).toContain("initialCommunicationForQuery(communications, initialQuery, initialChannelFilter)")
+  expect(workspace).toContain("changeChannelFilter")
 })
 
 test("manager communications can reach customers, leads, and suppliers", async () => {
@@ -37,6 +39,7 @@ test("manager communications can reach customers, leads, and suppliers", async (
   expect(workspace).toContain("Suppliers / Vendors")
   expect(workspace).toContain("ExpandableMessage")
   expect(workspace).toContain("Link email to…")
+  expect(workspace).toContain('<optgroup label="Leads">')
 })
 
 test("manager communications support file attachments and phone-number history", async () => {

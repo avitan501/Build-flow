@@ -108,8 +108,8 @@ test("2Chat browser calls keep secrets server-side and store recordings", async 
   expect(actions).toContain('action: "twochat_voice_token"');
   expect(softphone).toContain('import("@2chat/voice-sdk")');
   expect(inbox).toContain("Call from (347) 937-8665");
-  expect(inbox).toContain("Add contact as");
-  expect(inbox).toContain("Or link to an existing person");
+  expect(inbox).toContain("Save this number");
+  expect(inbox).toContain("Link to an existing person instead");
   expect(broker).not.toContain('await sendTwilioWhatsApp(input.to, input.message');
 });
 

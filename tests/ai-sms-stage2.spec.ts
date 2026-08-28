@@ -62,7 +62,7 @@ test("phone AI stays concise and never fills optional details with guesses", () 
   expect(broker).toContain("candidate.summary.trim().slice(0, 180)");
 });
 
-test("Task To Do contains the owner AI intake and the dashboard no longer duplicates it", () => {
+test("Carlos Focus contains the owner AI intake and the dashboard no longer duplicates it", () => {
   const goals = readFileSync(
     path.join(root, "app/admin/goals-progress/page.tsx"),
     "utf8",
@@ -76,7 +76,8 @@ test("Task To Do contains the owner AI intake and the dashboard no longer duplic
     "utf8",
   );
 
-  expect(goals).toContain("Task To Do");
+  expect(goals).toContain("Carlos Focus");
+  expect(goals).toContain("Phone intake");
   expect(goals).toContain('href="/owner/ai-inbox"');
   expect(dashboard).not.toContain('label: "AI Phone Inbox"');
   expect(inbox).toContain('href="/admin/goals-progress"');

@@ -39,7 +39,7 @@ test("manager push notifications stay private and cover business events", async 
   expect(control).toContain("Open Avantia in Safari");
   expect(control).toContain("Send test notification");
   expect(center).toContain('fetch("/api/manager-notifications"');
-  expect(center).toContain("Notification center");
+  expect(center).toContain("Notifications & activity");
   expect(center).toContain('event.href.startsWith("/")');
   expect(serviceWorker).toContain('self.addEventListener("push"');
   expect(serviceWorker).toContain('self.addEventListener("notificationclick"');
