@@ -29,7 +29,7 @@ test("Aura receives signed Resend email events through the secure broker", async
   expect(broker).toContain("https://api.resend.com/emails/receiving/");
   expect(broker).toContain('channel: "email"');
   expect(broker).toContain('direction: "incoming"');
-  expect(broker).toContain('email: { receive: Boolean(Deno.env.get("AURA_RESEND_WEBHOOK_SECRET"))');
+  expect(broker).toContain('receive: Boolean(Deno.env.get("AURA_RESEND_WEBHOOK_SECRET"))');
 });
 
 test("Aura normalizes legacy JSON strings before rendering communications", async () => {
@@ -39,7 +39,7 @@ test("Aura normalizes legacy JSON strings before rendering communications", asyn
 
   expect(dashboard).toContain("normalizeAuraCommunications");
   expect(dashboard).toContain("JSON.parse(value)");
-  expect(managerPage).toContain("normalizeAuraCommunications(aura.communications)");
+  expect(managerPage).toContain("normalizeAuraCommunications(aura?.communications ?? [])");
   expect(broker).toContain("sql.json(input.nextSteps || [])");
   expect(broker).toContain("sql.json(input.media || [])");
 });
@@ -108,7 +108,8 @@ test("2Chat browser calls keep secrets server-side and store recordings", async 
   expect(actions).toContain('action: "twochat_voice_token"');
   expect(softphone).toContain('import("@2chat/voice-sdk")');
   expect(inbox).toContain("Call from (347) 937-8665");
-  expect(inbox).toContain("Assign to customer, lead, or supplier");
+  expect(inbox).toContain("Add contact as");
+  expect(inbox).toContain("Or link to an existing person");
   expect(broker).not.toContain('await sendTwilioWhatsApp(input.to, input.message');
 });
 

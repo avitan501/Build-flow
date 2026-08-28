@@ -41,6 +41,10 @@ test("incoming client SMS automation keeps conversational context and blocks sen
   expect(broker).toContain("max_output_tokens: 3000")
   expect(broker).toContain("[Attachment included")
   expect(broker).toContain("accurateAttachmentReply")
+  expect(broker).toContain("customerOnlyTranscript")
+  expect(broker).toContain("I have your material list")
+  expect(broker).toContain("A manager still needs to confirm availability and delivery details")
+  expect(broker).toContain('model: "local-context-fallback"')
 })
 
 test("material lists from texts enter a review queue before becoming requests", async () => {

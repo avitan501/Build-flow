@@ -1014,13 +1014,69 @@ function likelyMaterialList(body: string) {
     (lines.length > 1 || /\b\d+(?:\.\d+)?\s*(?:ea|each|pcs?|pieces?|boxes?|sheets?|ft|feet|rolls?|bags?|units?)\b/i.test(text) || materialWords.test(text));
 }
 
-function customerSmsFallback(): CustomerSmsAutomation {
+function customerOnlyTranscript(conversationText: string) {
+  let customer = false;
+  const lines: string[] = [];
+  for (const rawLine of conversationText.split(/\r?\n/)) {
+    const customerLine = rawLine.match(/^Customer:\s*(.*)$/i);
+    const avantiaLine = rawLine.match(/^Avantia:\s*(.*)$/i);
+    if (customerLine) {
+      customer = true;
+      if (customerLine[1].trim()) lines.push(customerLine[1].trim());
+    } else if (avantiaLine) {
+      customer = false;
+    } else if (customer && rawLine.trim()) {
+      lines.push(rawLine.trim());
+    }
+  }
+  return lines.join("\n");
+}
+
+function customerSmsFallback(
+  conversationText = "",
+  latestCustomerMessage = "",
+): CustomerSmsAutomation {
+  const customerText = customerOnlyTranscript(conversationText) || latestCustomerMessage;
+  const items = extractReviewMaterialLines([customerText]);
+  const hasMaterialList = items.length > 0;
+  const latest = latestCustomerMessage.trim();
+  const notedAsap = /(?:^|\n)\s*asap\s*(?:$|\n)/i.test(customerText);
+  const asksAboutList = /\b(?:did you (?:get|receive|see)|do you (?:have|see)|got)\b.{0,32}\b(?:list|materials?)\b/i.test(latest);
+  const asksDeliveryConfirmation = /\b(?:confirm|guarantee|check)\b.{0,36}\bdeliver(?:y|ed|ies)?\b|\bdeliver(?:y|ed|ies)?\b.{0,36}\b(?:confirm|guarantee|check)\b/i.test(latest);
+  const asksPrice = /\b(?:price|pricing|cost|how much|quote)\b/i.test(latest);
+  const saysAsap = /^\s*asap[.!]?\s*$/i.test(latest);
+
+  let reply = "Thank you. A manager will review your message and reply here.";
+  let autoSafe = false;
+  let safetyReason = "The AI service was unavailable, so a manager should review this reply.";
+  if (asksAboutList && hasMaterialList) {
+    reply = "Yes, I can see your material list. A manager will review the items and reply here.";
+    autoSafe = true;
+    safetyReason = "The saved conversation contains a clear material list, so this acknowledgement is safe.";
+  } else if (asksDeliveryConfirmation) {
+    reply = hasMaterialList
+      ? `I have your material list${notedAsap ? " and noted ASAP" : ""}. A manager still needs to confirm availability and delivery details.`
+      : "A manager still needs to review the request and confirm availability and delivery details.";
+    safetyReason = "Delivery confirmation requires manager review.";
+  } else if (saysAsap) {
+    reply = "Got it — ASAP. A manager will review availability and delivery details.";
+    autoSafe = true;
+    safetyReason = "This only acknowledges the requested timing and makes no delivery commitment.";
+  } else if (asksPrice) {
+    reply = hasMaterialList
+      ? "I can see your material list. A manager needs to check current pricing and will reply here."
+      : "A manager needs to check current pricing and will reply here.";
+    safetyReason = "Current pricing requires manager review.";
+  }
+
   return {
-    reply: "Thank you. We received your message and will review it shortly.",
-    autoSafe: false,
-    safetyReason: "AI review was unavailable, so the reply requires approval.",
-    isMaterialRequest: false,
-    request: null,
+    reply,
+    autoSafe,
+    safetyReason,
+    isMaterialRequest: hasMaterialList,
+    request: hasMaterialList
+      ? { title: "Material request from text", department: "Unassigned", items }
+      : null,
     customerName: null,
     customerAddress: null,
   };
@@ -1064,7 +1120,7 @@ function accurateAttachmentReply(message: string, reply: string) {
 
 async function analyzeCustomerSms(conversationText: string, style: string, managerRequestReview = false, latestCustomerMessage = conversationText): Promise<{ result: CustomerSmsAutomation; model: string }> {
   const apiKey = await secret(secretNames.openaiKey);
-  if (!apiKey) return { result: customerSmsFallback(), model: "fallback" };
+  if (!apiKey) return { result: customerSmsFallback(conversationText, latestCustomerMessage), model: "local-context-fallback" };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
@@ -1091,7 +1147,7 @@ async function analyzeCustomerSms(conversationText: string, style: string, manag
         } } },
       }),
     });
-    if (!response.ok) return { result: customerSmsFallback(), model: "fallback" };
+    if (!response.ok) return { result: customerSmsFallback(conversationText, latestCustomerMessage), model: "local-context-fallback" };
     const parsed = JSON.parse(openAiOutputText(await response.json())) as CustomerSmsAutomation;
     const items = Array.isArray(parsed.request?.items) ? parsed.request!.items.flatMap((item) => {
       const name = typeof item.name === "string" ? item.name.trim().slice(0, 300) : "";
@@ -1100,7 +1156,7 @@ async function analyzeCustomerSms(conversationText: string, style: string, manag
     }) : [];
     const forbiddenAuto = /\b(?:price|cost|payment|refund|cancel|complain|damaged?|lawyer|attorney|emergency|danger|unsafe|credit card|discount|delivery time|when will|call me|callback|promise|place the order|invoice|open today|business hours|hours)\b/i.test(latestCustomerMessage);
     const result: CustomerSmsAutomation = {
-      reply: accurateAttachmentReply(conversationText, String(parsed.reply || "").trim().slice(0, 1600) || customerSmsFallback().reply),
+      reply: accurateAttachmentReply(conversationText, String(parsed.reply || "").trim().slice(0, 1600) || customerSmsFallback(conversationText, latestCustomerMessage).reply),
       autoSafe: Boolean(parsed.autoSafe) && !forbiddenAuto,
       safetyReason: String(parsed.safetyReason || "Manager review is safer.").trim().slice(0, 300),
       isMaterialRequest: Boolean(parsed.isMaterialRequest) && items.length > 0,
@@ -1110,7 +1166,7 @@ async function analyzeCustomerSms(conversationText: string, style: string, manag
     };
     return { result, model: "gpt-5-mini" };
   } catch {
-    return { result: customerSmsFallback(), model: "fallback" };
+    return { result: customerSmsFallback(conversationText, latestCustomerMessage), model: "local-context-fallback" };
   } finally {
     clearTimeout(timeout);
   }
