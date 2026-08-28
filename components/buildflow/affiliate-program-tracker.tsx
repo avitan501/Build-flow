@@ -10,6 +10,7 @@ import {
   createAffiliateUploadAction,
   recordAmazonAffiliateLinkAction,
   recordImpactMarketplaceApprovalAction,
+  recordTopTenSupplierAuditAction,
   saveAffiliateReadinessAction,
   toggleAffiliateChecklistAction,
   updateAffiliateProgramAction,
@@ -41,6 +42,20 @@ type Props = {
 
 const dateText = (value: string | null) => value ? new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString() : "—";
 const programSort = (priority: string) => priority === "A" ? 1 : priority === "B" ? 2 : 3;
+const TOP_SUPPLIER_NAMES = [
+  "ABC Supply API / Integration Partnership",
+  "Lowe's Creator",
+  "Home Depot",
+  "Amazon Associates",
+  "Walmart Affiliate Program",
+  "Ferguson Home",
+  "Builders FirstSource / myBLDR (Trade Account)",
+  "Ace Hardware",
+  "Acme Tools",
+  "The RTA Store",
+] as const;
+const TOP_SUPPLIER_ORDER = new Map<string, number>(TOP_SUPPLIER_NAMES.map((name, index) => [name, index]));
+const AUDIT_DATE = "2026-08-28";
 
 function StatusBadge({ status }: { status: AffiliateStatus }) {
   return <span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-1 text-[11px] font-semibold ${STATUS_STYLES[status]}`}>{status}</span>;
@@ -60,10 +75,13 @@ export function AffiliateProgramTracker({ programs, checklist, activities, attac
   const [panel, setPanel] = useState<"programs" | "readiness">("programs");
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
-  const selected = programs.find((item) => item.id === selectedId) ?? null;
+  const topPrograms = useMemo(() => programs
+    .filter((item) => TOP_SUPPLIER_ORDER.has(item.supplier_name))
+    .sort((a, b) => (TOP_SUPPLIER_ORDER.get(a.supplier_name) ?? 99) - (TOP_SUPPLIER_ORDER.get(b.supplier_name) ?? 99)), [programs]);
+  const selected = topPrograms.find((item) => item.id === selectedId) ?? null;
 
-  const networks = useMemo(() => [...new Set(programs.map((item) => item.affiliate_network))].sort(), [programs]);
-  const filtered = useMemo(() => programs.filter((item) => {
+  const networks = useMemo(() => [...new Set(topPrograms.map((item) => item.affiliate_network))].sort(), [topPrograms]);
+  const filtered = useMemo(() => topPrograms.filter((item) => {
     const search = query.trim().toLowerCase();
     return (!search || item.supplier_name.toLowerCase().includes(search))
       && (status === "All" || item.affiliate_status === status)
@@ -78,15 +96,16 @@ export function AffiliateProgramTracker({ programs, checklist, activities, attac
     if (sort === "followup") return (a.next_follow_up_date ?? "9999").localeCompare(b.next_follow_up_date ?? "9999");
     if (sort === "updated") return b.updated_at.localeCompare(a.updated_at);
     return programSort(a.priority) - programSort(b.priority) || a.supplier_name.localeCompare(b.supplier_name);
-  }), [programs, query, status, priority, network, sort]);
+  }), [topPrograms, query, status, priority, network, sort]);
 
-  const count = (name: AffiliateStatus) => programs.filter((item) => item.affiliate_status === name).length;
-  const knownCommission = programs.filter((item) => item.commission_min !== null || item.commission_max !== null);
+  const count = (name: AffiliateStatus) => topPrograms.filter((item) => item.affiliate_status === name).length;
+  const knownCommission = topPrograms.filter((item) => item.commission_min !== null || item.commission_max !== null);
   const minCommission = knownCommission.length ? Math.min(...knownCommission.map((item) => item.commission_min ?? item.commission_max ?? 0)) : 0;
   const maxCommission = knownCommission.length ? Math.max(...knownCommission.map((item) => item.commission_max ?? item.commission_min ?? 0)) : 0;
-  const nyCount = programs.filter((item) => /new york/i.test(item.new_york_access)).length;
-  const amazonNeedsLink = programs.some((item) => item.supplier_name === "Amazon Associates" && !item.affiliate_test_url);
+  const nyCount = topPrograms.filter((item) => /new york/i.test(item.new_york_access)).length;
+  const amazonNeedsLink = topPrograms.some((item) => item.supplier_name === "Amazon Associates" && !item.affiliate_test_url);
   const impactApprovalRecorded = integrations.some((item) => item.supplier_name === "Impact Marketplace" && item.status === "Approved");
+  const auditNeeded = topPrograms.length === TOP_SUPPLIER_NAMES.length && topPrograms.some((item) => item.last_verified_date !== AUDIT_DATE || (item.supplier_name === "Home Depot" && item.affiliate_status !== "Applied"));
   const run = (operation: () => Promise<{ ok: boolean; error?: string }>, success: string) => {
     setMessage("");
     startTransition(async () => {
@@ -97,13 +116,13 @@ export function AffiliateProgramTracker({ programs, checklist, activities, attac
 
   return <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" aria-labelledby="affiliate-goal-title">
     {!hideHeading ? <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 p-4 sm:p-5">
-      <div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Carlos · Supplier program</p><h2 id="affiliate-goal-title" className="mt-1 text-xl font-semibold">Supplier Affiliate Program</h2><p className="mt-1 text-sm text-slate-600">Track applications, approvals, setup, and compliance in one owner-only workspace.</p></div>
+      <div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Carlos · Supplier program</p><h2 id="affiliate-goal-title" className="mt-1 text-xl font-semibold">Top 10 Supplier Programs</h2><p className="mt-1 text-sm text-slate-600">Only the ten active priorities, with verified status and next action.</p></div>
       <div className="inline-flex rounded-md border border-slate-200 p-1 text-xs font-semibold"><button onClick={() => setPanel("programs")} className={`min-h-9 rounded px-3 ${panel === "programs" ? "bg-slate-950 text-white" : "text-slate-600"}`}>Programs</button><button onClick={() => setPanel("readiness")} className={`min-h-9 rounded px-3 ${panel === "readiness" ? "bg-slate-950 text-white" : "text-slate-600"}`}>Application readiness</button></div>
     </div> : <div className="flex justify-end border-b border-slate-200 p-3"><div className="inline-flex rounded-md border border-slate-200 p-1 text-xs font-semibold"><button onClick={() => setPanel("programs")} className={`min-h-9 rounded px-3 ${panel === "programs" ? "bg-slate-950 text-white" : "text-slate-600"}`}>Programs</button><button onClick={() => setPanel("readiness")} className={`min-h-9 rounded px-3 ${panel === "readiness" ? "bg-slate-950 text-white" : "text-slate-600"}`}>Application readiness</button></div></div>}
 
     {panel === "readiness" ? <ReadinessPanel settings={settings} run={run} pending={isPending} /> : <>
       <div className="grid grid-cols-2 gap-y-4 border-b border-slate-200 p-4 sm:grid-cols-5 lg:grid-cols-10">
-        <SummaryCard label="Total" value={programs.length} accent /><SummaryCard label="Not applied" value={count("Not Applied")} /><SummaryCard label="Applied" value={count("Applied")} /><SummaryCard label="In progress" value={count("In Progress")} /><SummaryCard label="Approved" value={count("Approved")} /><SummaryCard label="Set up" value={count("Set Up")} /><SummaryCard label="Rejected / paused" value={count("Rejected") + count("Paused")} /><SummaryCard label="Commission" value={`${minCommission}–${maxCommission}%`} /><SummaryCard label="New York" value={nyCount} /><SummaryCard label="Priority A" value={programs.filter((item) => item.priority === "A").length} />
+        <SummaryCard label="Total" value={topPrograms.length} accent /><SummaryCard label="Not applied" value={count("Not Applied")} /><SummaryCard label="Applied" value={count("Applied")} /><SummaryCard label="In progress" value={count("In Progress")} /><SummaryCard label="Approved" value={count("Approved")} /><SummaryCard label="Set up" value={count("Set Up")} /><SummaryCard label="Rejected / paused" value={count("Rejected") + count("Paused")} /><SummaryCard label="Commission" value={`${minCommission}–${maxCommission}%`} /><SummaryCard label="New York" value={nyCount} /><SummaryCard label="Priority A" value={topPrograms.filter((item) => item.priority === "A").length} />
       </div>
 
       {integrations.length ? <div className="m-4 grid gap-2">{integrations.map((integration) => {
@@ -114,7 +133,7 @@ export function AffiliateProgramTracker({ programs, checklist, activities, attac
         </div>;
       })}</div> : null}
 
-      {amazonNeedsLink || !impactApprovalRecorded ? <div className="mx-4 mb-4 flex flex-wrap gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">{amazonNeedsLink ? <button disabled={isPending} onClick={() => run(recordAmazonAffiliateLinkAction, "Verified Amazon affiliate link saved.")} className="min-h-10 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-50">Save verified Amazon link</button> : null}{!impactApprovalRecorded ? <button disabled={isPending} onClick={() => run(recordImpactMarketplaceApprovalAction, "Impact approval and retailer next steps saved.")} className="min-h-10 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50">Record Impact approval</button> : null}<p className="self-center text-xs text-slate-500">Verified account facts only. Retailer approvals remain separate.</p></div> : null}
+      {auditNeeded || amazonNeedsLink || !impactApprovalRecorded ? <div className="mx-4 mb-4 flex flex-wrap gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">{auditNeeded ? <button disabled={isPending} onClick={() => run(recordTopTenSupplierAuditAction, "Top 10 supplier audit saved.")} className="min-h-10 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50">Apply verified Aug 28 audit</button> : null}{amazonNeedsLink ? <button disabled={isPending} onClick={() => run(recordAmazonAffiliateLinkAction, "Verified Amazon affiliate link saved.")} className="min-h-10 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-50">Save verified Amazon link</button> : null}{!impactApprovalRecorded ? <button disabled={isPending} onClick={() => run(recordImpactMarketplaceApprovalAction, "Impact approval and retailer next steps saved.")} className="min-h-10 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-50">Record Impact approval</button> : null}<p className="self-center text-xs text-slate-500">Verified account facts only. Retailer approvals remain separate.</p></div> : null}
 
       <div className="grid gap-2 border-y border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(13rem,1fr)_repeat(4,minmax(8rem,auto))]">
         <label className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search supplier" className="h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm" /></label>
@@ -125,8 +144,8 @@ export function AffiliateProgramTracker({ programs, checklist, activities, attac
       </div>
 
       <div className="divide-y divide-slate-100 sm:hidden">{filtered.map((item) => <button key={item.id} onClick={() => setSelectedId(item.id)} className="grid w-full grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 p-3 text-left"><span className="flex h-7 w-7 items-center justify-center rounded bg-slate-950 text-xs font-bold text-white">{item.priority}</span><span className="min-w-0"><strong className="block truncate text-sm">{item.supplier_name}</strong><span className="block truncate text-xs text-slate-500">{item.category}</span></span><span className="flex items-center gap-1"><StatusBadge status={item.affiliate_status} /><ChevronRight className="h-4 w-4 text-slate-400" /></span></button>)}</div>
-      <div className="hidden max-h-[38rem] overflow-auto sm:block"><table className="min-w-[3240px] border-collapse text-left text-xs"><thead className="sticky top-0 z-10 bg-slate-100 text-[10px] uppercase text-slate-600"><tr>{["Priority","Supplier Name","Affiliate Status","API/Developer Status","Category","New York Access","Affiliate Network","Published Commission","Cookie Window","Application Difficulty","Approval Outlook","AvantiaBuild Fit","Application URL","Live Affiliate Link","Application Date","Last Contact","Next Follow-Up","Approval Date","Setup Date","Assigned Owner","Next Action","Notes","Last Verified"].map((heading) => <th key={heading} className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2">{heading}</th>)}</tr></thead><tbody>{filtered.map((item) => <tr key={item.id} onClick={() => setSelectedId(item.id)} className="cursor-pointer border-b border-slate-100 hover:bg-sky-50"><td className="px-3 py-2 font-bold">{item.priority}</td><td className="sticky left-0 bg-white px-3 py-2 font-semibold">{item.supplier_name}</td><td className="px-3 py-2"><StatusBadge status={item.affiliate_status} /></td><td className="px-3 py-2">{item.api_status}</td><td className="max-w-64 px-3 py-2">{item.category}</td><td className="max-w-56 px-3 py-2">{item.new_york_access}</td><td className="px-3 py-2">{item.affiliate_network}</td><td className="px-3 py-2">{item.published_commission}</td><td className="px-3 py-2">{item.cookie_window}</td><td className="px-3 py-2">{item.application_difficulty}/5</td><td className="px-3 py-2">{item.approval_outlook}</td><td className="px-3 py-2">{item.avantia_fit}/5</td><td className="px-3 py-2 text-[#0066cc]">Open program</td><td className="px-3 py-2">{item.affiliate_test_url ? <a href={item.affiliate_test_url} target="_blank" rel="sponsored noopener noreferrer" onClick={(event) => event.stopPropagation()} className="font-semibold text-[#0066cc] underline-offset-2 hover:underline">Open live link</a> : "—"}</td><td className="px-3 py-2">{dateText(item.application_date)}</td><td className="px-3 py-2">{dateText(item.last_contact_date)}</td><td className="px-3 py-2">{dateText(item.next_follow_up_date)}</td><td className="px-3 py-2">{dateText(item.approval_date)}</td><td className="px-3 py-2">{dateText(item.setup_date)}</td><td className="px-3 py-2">{item.assigned_owner || "—"}</td><td className="max-w-64 px-3 py-2">{item.next_action}</td><td className="max-w-64 truncate px-3 py-2">{item.notes || "—"}</td><td className="px-3 py-2">{dateText(item.last_verified_date)}</td></tr>)}</tbody></table></div>
-      <p className="px-4 py-2 text-xs text-slate-500">Showing {filtered.length} of {programs.length}. Swipe the desktop chart horizontally; tap any row for the complete record.</p>
+      <div className="hidden max-h-[38rem] overflow-auto sm:block"><table className="min-w-[3240px] border-collapse text-left text-xs"><thead className="sticky top-0 z-10 bg-slate-100 text-[10px] uppercase text-slate-600"><tr>{["Priority","Supplier Name","Program Status","API/Developer Status","Category","New York Access","Affiliate Network","Published Commission","Cookie Window","Application Difficulty","Approval Outlook","AvantiaBuild Fit","Application URL","Live Affiliate Link","Application Date","Last Contact","Next Follow-Up","Approval Date","Setup Date","Assigned Owner","Next Action","Notes","Last Verified"].map((heading) => <th key={heading} className="whitespace-nowrap border-b border-r border-slate-200 px-3 py-2">{heading}</th>)}</tr></thead><tbody>{filtered.map((item) => <tr key={item.id} onClick={() => setSelectedId(item.id)} className="cursor-pointer border-b border-slate-100 hover:bg-sky-50"><td className="px-3 py-2 font-bold">{item.priority}</td><td className="sticky left-0 bg-white px-3 py-2 font-semibold">{item.supplier_name}</td><td className="px-3 py-2"><StatusBadge status={item.affiliate_status} /></td><td className="px-3 py-2">{item.api_status}</td><td className="max-w-64 px-3 py-2">{item.category}</td><td className="max-w-56 px-3 py-2">{item.new_york_access}</td><td className="px-3 py-2">{item.affiliate_network}</td><td className="px-3 py-2">{item.published_commission}</td><td className="px-3 py-2">{item.cookie_window}</td><td className="px-3 py-2">{item.application_difficulty}/5</td><td className="px-3 py-2">{item.approval_outlook}</td><td className="px-3 py-2">{item.avantia_fit}/5</td><td className="px-3 py-2 text-[#0066cc]">Open program</td><td className="px-3 py-2">{item.affiliate_test_url ? <a href={item.affiliate_test_url} target="_blank" rel="sponsored noopener noreferrer" onClick={(event) => event.stopPropagation()} className="font-semibold text-[#0066cc] underline-offset-2 hover:underline">Open live link</a> : "—"}</td><td className="px-3 py-2">{dateText(item.application_date)}</td><td className="px-3 py-2">{dateText(item.last_contact_date)}</td><td className="px-3 py-2">{dateText(item.next_follow_up_date)}</td><td className="px-3 py-2">{dateText(item.approval_date)}</td><td className="px-3 py-2">{dateText(item.setup_date)}</td><td className="px-3 py-2">{item.assigned_owner || "—"}</td><td className="max-w-64 px-3 py-2">{item.next_action}</td><td className="max-w-64 truncate px-3 py-2">{item.notes || "—"}</td><td className="px-3 py-2">{dateText(item.last_verified_date)}</td></tr>)}</tbody></table></div>
+      <p className="px-4 py-2 text-xs text-slate-500">Showing {filtered.length} of {topPrograms.length} priority suppliers. Swipe the desktop chart horizontally; tap any row for the complete record.</p>
     </>}
     {message ? <div className={`border-t px-4 py-3 text-sm font-semibold ${/failed|could not|required|complete every|invalid/i.test(message) ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{message}</div> : null}
     {selected ? <ProgramDrawer key={selected.id} program={selected} checklist={checklist.filter((item) => item.program_id === selected.id)} activities={activities.filter((item) => item.program_id === selected.id)} attachments={attachments.filter((item) => item.program_id === selected.id)} close={() => setSelectedId(null)} run={run} pending={isPending} /> : null}
