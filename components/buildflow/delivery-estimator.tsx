@@ -168,7 +168,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
         setLiveQuote(null)
         setLiveQuoteReceivedAt("")
         setLiveQuoteMessage(payload.code === "address_undeliverable" || payload.providerCode === "address_undeliverable"
-          ? "Uber Direct does not serve this exact route. The address-based planning estimate is still available; try a closer pickup location or another courier."
+          ? "Uber Direct answered, but does not serve this exact route. Choose an autocomplete suggestion or add coordinates for a planning estimate, or try another courier."
           : payload.error || "Uber could not return a live quote right now.")
         setLiveQuoteState("error")
         return

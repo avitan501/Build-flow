@@ -54,6 +54,7 @@ test("jobsite delivery is Manager-only and wired into AI Tools", async () => {
   expect(estimator).toContain("Weight of each box (lb)")
   expect(estimator).toContain("The 50 lb limit applies to each box—not all boxes combined.")
   expect(estimator).toContain("live Uber route fee")
+  expect(estimator).toContain("Uber Direct answered, but does not serve this exact route")
   expect(estimator).toContain("Live now")
   expect(estimator).toContain("Uber quote")
   expect(estimator).toContain('disabled={liveQuoteState === "loading"}')

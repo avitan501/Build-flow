@@ -153,7 +153,7 @@ Deno.serve(async (request) => {
         return json({ ok: false, code: "tax_form_required", error: "Uber requires the business tax form before live quotes." }, 503);
       }
       if (detail.includes("address_undeliverable")) {
-        return json({ ok: false, code: "address_undeliverable", providerCode, error: "Uber Direct does not serve this exact route. Try a closer pickup location or another courier." }, 422);
+        return json({ ok: false, code: "address_undeliverable", providerCode, error: "Uber Direct answered, but does not serve this exact route. Choose an autocomplete suggestion or add coordinates for a planning estimate, or try another courier." }, 422);
       }
       return json({ ok: false, code: "provider_error", providerCode, error: "Uber could not quote this route right now." }, 502);
     }

@@ -1543,7 +1543,7 @@ async function sendTwoChatWhatsApp(
   const config = await activeTwoChatWhatsAppConfig();
   if (!config)
     throw new Error(
-      "Connect WhatsApp number ending 8665 by QR in 2Chat first.",
+      "Complete the official 2Chat Meta Coexistence connection for WhatsApp number ending 8665 first. Do not use WhatsApp Web QR.",
     );
   const to = normalizePhone(toValue);
   const body =
@@ -1637,7 +1637,7 @@ async function subscribeTwoChatWebhook(
     !results.find((result) => result.event === "whatsapp.message.received")?.ok
   ) {
     throw new Error(
-      "2Chat could not activate incoming-message delivery. Confirm the WhatsApp number is connected by QR.",
+      "2Chat could not activate incoming-message delivery. Confirm that Meta Coexistence is fully connected for WhatsApp number ending 8665.",
     );
   }
 }
@@ -3473,7 +3473,7 @@ Deno.serve(async (req: Request) => {
       if (!config)
         return json(
           {
-            error: "Connect WhatsApp number ending 8665 by QR in 2Chat first.",
+            error: "Complete the official 2Chat Meta Coexistence connection for WhatsApp number ending 8665 first. Do not use WhatsApp Web QR.",
           },
           400,
         );

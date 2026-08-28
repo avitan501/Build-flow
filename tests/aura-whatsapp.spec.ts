@@ -134,6 +134,11 @@ test("2Chat uses a protected webhook and the secure Vault broker", async () => {
   expect(actions).toContain('provider === "2chat"');
   expect(actions).toContain('action: "configure_2chat"');
   expect(setup).toContain("2Chat WhatsApp");
+  expect(setup).toContain("Meta Coexistence");
+  expect(setup).toContain("Do not use WhatsApp Web QR");
+  expect(setup).not.toContain("after scanning the WhatsApp QR");
+  expect(broker).toContain("Meta Coexistence connection");
+  expect(broker).not.toContain("connected by QR");
   expect(setup).toContain('value="quo"');
   expect(dashboard).toContain("Boolean(brokerStatus?.whatsapp)");
 });
