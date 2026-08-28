@@ -41,6 +41,31 @@ test("manager navigation is compact and keeps one communication center at the bo
   expect(aiTools).toContain('add=buildavantiap%40gmail.com')
 })
 
+test("installation catalog shows real product identity and keeps internal notes editable", async () => {
+  const [page, workspace, actions, catalog, migration] = await Promise.all([
+    readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/catalog/actions.ts"), "utf8"),
+    readFile(path.join(root, "lib/material-catalog.ts"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260828194740_refine_tile_installation_catalog.sql"), "utf8"),
+  ])
+  expect(catalog).toContain('"Tile Installation & Masonry"')
+  expect(catalog).toContain('tile: "Tile Installation & Masonry"')
+  expect(page).toContain("admin_notes")
+  expect(actions).toContain("admin_notes: clean(input.adminNotes, 4000)")
+  expect(workspace).toContain(">Admin note ")
+  expect(workspace).toContain("item.admin_notes")
+  expect(workspace).toContain("item.brand || \"Supplier-selected\"")
+  expect(workspace).toContain("Store item {price.supplier_sku}")
+  expect(workspace).not.toContain(">Item code<input")
+  expect(workspace).not.toContain(">UPC ")
+  expect(workspace).not.toContain("{item.item_code} · price per")
+  expect(migration).toContain("add column if not exists admin_notes")
+  expect(migration).toContain("USG Durock Cement Board with EdgeGuard")
+  expect(migration).toContain("Heidelberg Materials / Lehigh")
+  expect(migration).toContain("where department = 'Tile'")
+})
+
 test("manager catalog is protected, seeded, editable, and supplier based", async () => {
   const [page, workspace, actions, migration, specificationMigration, retailSupplierMigration, exactLinkMigration, snapshotMigration, homeDepotSnapshot, allDepartmentRetailers, verifiedRetailProducts, curatedProducts, qualityMigration, coreCurationMigration, flyerMigration, grantMigration, qualityHelpers, parser] = await Promise.all([
     readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
@@ -122,7 +147,7 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(actions).toContain("isRetailSnapshot")
   expect(page).toContain("product_url")
   expect(workspace).not.toContain("Sample quantity")
-  expect(workspace).toContain("price per {item.unit}")
+  expect(workspace).toContain("Price per {item.unit}")
   expect(actions).toContain("extractMaterialCatalogItemsFromPdf")
   expect(actions).toContain('upsert(priceRows, { onConflict: "item_id,supplier_id" })')
   expect(actions).toContain("detectSupplierMatch")

@@ -3,7 +3,7 @@ import type { SupplierTrustLevel } from "@/lib/shop-qualification"
 export const MATERIAL_CATALOG_CATEGORIES = [
   "Framing",
   "Electrical",
-  "Tile",
+  "Tile Installation & Masonry",
   "Sheet Rock",
   "Door & Molding",
   "Flooring",
@@ -35,6 +35,7 @@ export type MaterialCatalogItem = {
   brand: string
   manufacturer_model_number: string
   upc: string
+  admin_notes: string
   package_quantity: number
   package_unit: string
   comparison_quantity: number
@@ -102,7 +103,10 @@ const DEPARTMENT_ALIASES: Record<string, MaterialCatalogCategory> = {
   drywall: "Sheet Rock",
   "sheet rock": "Sheet Rock",
   sheetrock: "Sheet Rock",
-  "tile work": "Tile",
+  tile: "Tile Installation & Masonry",
+  "tile work": "Tile Installation & Masonry",
+  "tile installation": "Tile Installation & Masonry",
+  "tile installation & masonry": "Tile Installation & Masonry",
   window: "Windows",
   windows: "Windows",
   "wood floor": "Flooring",

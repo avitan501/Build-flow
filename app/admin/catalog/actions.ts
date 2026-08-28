@@ -30,6 +30,7 @@ type CatalogItemInput = {
   brand?: string
   manufacturerModelNumber?: string
   upc?: string
+  adminNotes?: string
   packageQuantity: number
   packageUnit: string
   comparisonQuantity: number
@@ -145,6 +146,7 @@ export async function saveMaterialCatalogItemAction(input: CatalogItemInput): Pr
     brand: clean(input.brand, 160),
     manufacturer_model_number: clean(input.manufacturerModelNumber, 160),
     upc: clean(input.upc, 80),
+    admin_notes: clean(input.adminNotes, 4000),
     package_quantity: Math.round(packageQuantity * 10000) / 10000,
     package_unit: clean(input.packageUnit, 40) || unit,
     comparison_quantity: Math.round(comparisonQuantity * 10000) / 10000,

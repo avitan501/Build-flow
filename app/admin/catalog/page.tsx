@@ -10,7 +10,7 @@ export default async function ManagerMaterialCatalogPage() {
   const [itemsResult, itemDepartmentsResult, pricesResult, suppliersResult, settingsResult] = await Promise.all([
     supabase
       .from("material_catalog_items")
-      .select("id,category,item_code,name,description,measurement,thickness,brand,manufacturer_model_number,upc,package_quantity,package_unit,comparison_quantity,comparison_unit,review_status,quality_notes,default_quantity,unit,image_url,status,source,sort_order,created_at,updated_at")
+      .select("id,category,item_code,name,description,measurement,thickness,brand,manufacturer_model_number,upc,admin_notes,package_quantity,package_unit,comparison_quantity,comparison_unit,review_status,quality_notes,default_quantity,unit,image_url,status,source,sort_order,created_at,updated_at")
       .order("category")
       .order("sort_order")
       .order("name")
