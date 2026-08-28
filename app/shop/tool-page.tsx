@@ -9,6 +9,8 @@ import { findShopToolCategory, type ShopToolSlug } from "@/lib/shop-tools"
 import { translateShopText } from "@/lib/shop-i18n"
 import { getRequestedShopLanguage } from "@/lib/shop-language-server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { buildShopProducts } from "@/lib/shop-catalog"
+import { loadShopItems } from "@/lib/shop-loader"
 import { applyStorefrontQuestionnaireDefaults, DOOR_MOLDING_QUESTIONNAIRE_PREVIEW, DRYWALL_QUESTIONNAIRE_PREVIEW, ELECTRICAL_QUESTIONNAIRE_PREVIEW, FLOORING_QUESTIONNAIRE_PREVIEW, FRAMING_QUESTIONNAIRE_PREVIEW, TILE_QUESTIONNAIRE_PREVIEW } from "@/lib/material-questionnaire-preview"
 import { buildMaterialQuestionnaireSnapshot } from "@/lib/material-questionnaires"
 import { loadMaterialQuestionnaireForDepartment } from "@/lib/material-questionnaires-server"
@@ -146,6 +148,16 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
   const catalogEssentials = catalogDepartment
     ? await loadCatalogEssentials(catalogDepartment)
     : []
+  const tileProductMatcher = /\b(wire mesh|ultraflex|backer board|primer plus|hydro ban|portland cement|nxt level|strata mat|fine sand|permacolor|209 floor mud|tile mastic)\b/i
+  const departmentProducts = await (async () => {
+    if (baseCategory.slug !== "tile-work" && baseCategory.slug !== "sheet-rock") return []
+    const { data, error } = await loadShopItems({ limit: 240 })
+    const products = buildShopProducts(data, error)
+    if (baseCategory.slug === "sheet-rock") {
+      return products.filter((product) => product.slug === "cement-backer-board-3x5")
+    }
+    return products.filter((product) => product.category === "Tile work" && tileProductMatcher.test(product.name))
+  })()
 
   return (
     <ShopToolCategoryPage
@@ -160,6 +172,7 @@ export async function renderShopToolPage(slug: ShopToolSlug, searchParams?: Prom
       successCode={params.success?.trim() || null}
       questionnaireSnapshot={questionnaireSnapshot}
       catalogEssentials={catalogEssentials}
+      departmentProducts={departmentProducts}
     />
   )
 }

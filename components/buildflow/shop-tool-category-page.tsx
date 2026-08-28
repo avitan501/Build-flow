@@ -11,11 +11,13 @@ import { EitanWhatsAppUploadForm } from "@/components/buildflow/eitan-whatsapp-u
 import { ManagerItemVisibility } from "@/components/buildflow/manager-item-visibility"
 import { PlanRequestUploadCard } from "@/components/buildflow/plan-request-upload-card"
 import { SheetRockProductConfigurator } from "@/components/buildflow/sheet-rock-product-configurator"
+import { ShopToolProductGrid } from "@/components/buildflow/shop-tool-product-grid"
 import type { ProjectRecord } from "@/lib/projects"
 import { getDepartmentEssentials, type CatalogEssentialItem } from "@/lib/department-essentials"
 import type { ManagerDepartmentExperience } from "@/lib/manager-add-ons"
 import type { MaterialQuestionnaireSnapshot } from "@/lib/material-questionnaires"
 import type { ShopToolCategory } from "@/lib/shop-tools"
+import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 
 type ShopToolCategoryPageProps = {
   category: ShopToolCategory
@@ -29,6 +31,7 @@ type ShopToolCategoryPageProps = {
   successCode?: string | null
   questionnaireSnapshot?: MaterialQuestionnaireSnapshot | null
   catalogEssentials?: CatalogEssentialItem[]
+  departmentProducts?: ShopCatalogProduct[]
 }
 
 function QuickOrderAction({ category, questionnaireDepartment }: { category: ShopToolCategory; questionnaireDepartment: string }) {
@@ -291,7 +294,7 @@ function EitanActions({
   )
 }
 
-export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, questionnaireSnapshot, catalogEssentials = [] }: ShopToolCategoryPageProps) {
+export function ShopToolCategoryPage({ category, questionnaireDepartment, experience, projects, selectedProjectId, isSignedIn, errorCode, questionnaireSnapshot, catalogEssentials = [], departmentProducts = [] }: ShopToolCategoryPageProps) {
   const essentials = getDepartmentEssentials(category.slug, catalogEssentials)
   const customOrderOnly = ["siding", "roofing", "window", "door-and-molding", "exterior"].includes(category.slug)
   const usesStandardUpload = !["framing", "kitchen", "eitan", "window", "siding", "roofing"].includes(category.slug)
@@ -317,6 +320,16 @@ export function ShopToolCategoryPage({ category, questionnaireDepartment, experi
         {experience.showPlanUpload && category.slug === "framing" ? <DepartmentUploadActions department="Framing" questionnaireDepartment={questionnaireDepartment} projects={projects} selectedProjectId={selectedProjectId} /> : null}
         {experience.showPlanUpload && category.slug === "kitchen" ? <DepartmentUploadActions department="Kitchen" questionnaireDepartment={questionnaireDepartment} projects={projects} selectedProjectId={selectedProjectId} /> : null}
         {experience.showPlanUpload && category.slug === "eitan" ? <ManagerItemVisibility itemId="eitan-window-schedule"><EitanActions projects={projects} selectedProjectId={selectedProjectId} isSignedIn={isSignedIn} errorCode={errorCode} /></ManagerItemVisibility> : null}
+
+        {departmentProducts.length ? (
+          <section className="grid gap-3" aria-labelledby={`${category.slug}-prices-heading`}>
+            <div>
+              <h2 id={`${category.slug}-prices-heading`} className="text-xl font-bold text-slate-950">{category.slug === "tile-work" ? "Tile department prices" : "Related board products"}</h2>
+              <p className="mt-1 text-sm text-slate-600">Current baseline prices can be replaced by published supplier pricing.</p>
+            </div>
+            <ShopToolProductGrid products={departmentProducts} questionnaireDepartment={questionnaireDepartment} />
+          </section>
+        ) : null}
 
         {!isBulkBagDepartment && (customOrderOnly || experience.showChatToOrder) && usesCompactCustomOrder ? (
           <details open={customOrderOnly} className="group rounded-lg border border-slate-200 bg-white shadow-sm">

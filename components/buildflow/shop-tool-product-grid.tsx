@@ -74,6 +74,11 @@ export function ShopToolProductGrid({ products, questionnaireDepartment }: ShopT
                       <div className="text-[1.05rem] font-bold leading-none text-slate-950">Get pricing</div>
                     )}
                     <div className="mt-0.5 text-[11px] font-medium text-slate-500">{product.unit}</div>
+                    {product.bulkPrice ? (
+                      <div className="mt-1 text-[11px] font-bold text-red-600">
+                        {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(product.bulkPrice)} bulk · {product.bulkMinimum}
+                      </div>
+                    ) : null}
                   </div>
                   <AddToProjectButton product={product} compact questionnaireDepartment={questionnaireDepartment} />
                 </div>
