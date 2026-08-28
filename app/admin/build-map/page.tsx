@@ -183,7 +183,7 @@ export default async function AdminDashboardPage({
   const { supabase, access } = await requireManagerPortalProfile();
   let goalsQuery = supabase
     .from("manager_goals")
-    .select("id,assignee,title,details,status,created_at,updated_at")
+    .select("id,assignee,title,details,status,is_focus,created_at,updated_at")
     .order("created_at", { ascending: false });
   if (!access.owner) goalsQuery = goalsQuery.eq("assignee", "carlos");
 
@@ -272,8 +272,8 @@ export default async function AdminDashboardPage({
   const todaySummary = todaySummaryRow
     ? parseDailyWorkSummary(todaySummaryRow)
     : null;
-  const todayTasks: ManagerTodayTask[] = goals
-    .filter((goal) => goal.details?.startsWith(TODAY_TASK_PREFIX))
+  const focusTasks: ManagerTodayTask[] = goals
+    .filter((goal) => goal.is_focus || goal.details?.startsWith(TODAY_TASK_PREFIX))
     .filter((goal) => goal.status !== "archived")
     .filter(
       (goal) =>
@@ -397,7 +397,7 @@ export default async function AdminDashboardPage({
           className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4"
         >
           <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled />
-          <ManagerTodayTasks tasks={todayTasks} />
+          <ManagerTodayTasks tasks={focusTasks} />
           <Link
             href="/admin/daily-summary"
             className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 shadow-sm"

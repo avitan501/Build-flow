@@ -21,6 +21,7 @@ export async function createManagerGoalAction(input: {
   assignee: string;
   title: string;
   details: string;
+  focus?: boolean;
 }): Promise<GoalResult> {
   const { supabase, user, access } = await requireManagerPortalProfile();
   const assignee = input.assignee.trim().toLowerCase();
@@ -36,9 +37,26 @@ export async function createManagerGoalAction(input: {
     assignee,
     title,
     details: details || null,
+    is_focus: input.focus === true,
     created_by: user.id,
   });
   if (error) return { ok: false, error: "The goal could not be added. Please try again." };
+
+  refreshGoals();
+  return { ok: true };
+}
+
+export async function setManagerGoalFocusAction(input: { id: string; focus: boolean }): Promise<GoalResult> {
+  const { supabase, access } = await requireManagerPortalProfile();
+  if (!/^[0-9a-f-]{36}$/i.test(input.id)) return { ok: false, error: "Choose a valid goal." };
+
+  let update = supabase
+    .from("manager_goals")
+    .update({ is_focus: input.focus })
+    .eq("id", input.id);
+  if (!access.owner) update = update.eq("assignee", "carlos");
+  const { data, error } = await update.select("id").maybeSingle<{ id: string }>();
+  if (error || !data) return { ok: false, error: "Focus could not be updated." };
 
   refreshGoals();
   return { ok: true };

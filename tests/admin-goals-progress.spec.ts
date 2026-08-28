@@ -63,7 +63,7 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(dashboard).toContain("<CarlosGoalsWorkspace embedded />");
   expect(dashboard).not.toContain('href="/admin/goals-progress#client-target"');
   expect(actions).toContain('if (!access.owner && assignee !== "carlos")');
-  expect(actions.match(/if \(!access\.owner\).*\.eq\("assignee", "carlos"\)/g)?.length).toBe(2);
+  expect(actions.match(/if \(!access\.owner\).*\.eq\("assignee", "carlos"\)/g)?.length).toBe(3);
 });
 
 test("ABC task provides a policy-correct certification menu and stable bridge", async () => {
@@ -110,13 +110,35 @@ test("manager goals are persistent, status-aware, archivable, and protected for 
   expect(statusSelect).toContain('label: "Archived"');
   expect(actions).toContain("setManagerGoalStatusAction");
   expect(actions).toContain("setFixedManagerGoalStatusAction");
-  expect(actions.match(/requireManagerPortalProfile\(\)/g)?.length).toBe(5);
+  expect(actions.match(/requireManagerPortalProfile\(\)/g)?.length).toBe(6);
   expect(migration).toContain("create table if not exists public.manager_goals");
   expect(migration).toContain("alter table public.manager_goals enable row level security");
   expect(migration).toContain("role in ('admin', 'staff')");
   expect(migration).toContain("approval_status = 'approved'");
   expect(migration).toContain("created_by = (select auth.uid())");
   expect(archiveMigration).toContain("status in ('open', 'completed', 'archived')");
+});
+
+test("Carlos goals can move in and out of the compact Focus list", async () => {
+  const [page, component, actions, dashboard, focusList, migration] = await Promise.all([
+    readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/manager-goals.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/goals-progress/goal-actions.ts"), "utf8"),
+    readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/manager-today-tasks.tsx"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260828170000_add_manager_goal_focus.sql"), "utf8"),
+  ]);
+
+  expect(page).toContain('status,is_focus');
+  expect(component).toContain("Add to Focus");
+  expect(component).toContain("Remove from Focus");
+  expect(actions).toContain("setManagerGoalFocusAction");
+  expect(actions).toContain(".update({ is_focus: input.focus })");
+  expect(dashboard).toContain("goal.is_focus ||");
+  expect(focusList).toContain(">Focus<");
+  expect(focusList).not.toContain("Today&apos;s tasks");
+  expect(migration).toContain("add column if not exists is_focus boolean not null default false");
+  expect(migration).toContain("where is_focus = true");
 });
 
 test("outreach leads remain separate from clients and store relationship level and language", async () => {

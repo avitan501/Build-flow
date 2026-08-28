@@ -49,6 +49,7 @@ export async function createTodayTaskAction(titleInput: string): Promise<TaskRes
     assignee: "carlos",
     title,
     details: TODAY_TASK_PREFIX,
+    is_focus: true,
     status: "open",
     created_by: user.id,
   })

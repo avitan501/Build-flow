@@ -476,7 +476,7 @@ export async function CarlosGoalsWorkspace({
   const { supabase, access } = await requireManagerPortalProfile();
   const goalsQuery = supabase
     .from("manager_goals")
-    .select("id,assignee,title,details,status")
+    .select("id,assignee,title,details,status,is_focus")
     .eq("assignee", "carlos")
     .order("status")
     .order("created_at", { ascending: false });
