@@ -3,6 +3,8 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
+import { firstListedPrice } from "../lib/catalog-price";
+
 const root = process.cwd();
 
 test("Locate Cheap Item is manager-only and uses live sourced research", async () => {
@@ -29,4 +31,13 @@ test("Locate Cheap Item validates and limits product research", async () => {
   expect(component).toContain("Enter a complete public website address");
   expect(component).toContain("Enter a valid 5-digit ZIP code");
   expect(component).toContain("Prices can change; verify stock, package size, tax, and delivery before buying.");
+});
+
+test("Locate Cheap Item sorts a regular price before a higher result without using its bulk tier", () => {
+  const enteredSupplier = firstListedPrice("$17.78 each; $15.11 at 26+");
+  const otherSupplier = firstListedPrice("$18.77 each");
+
+  expect(enteredSupplier).toBe(17.78);
+  expect(otherSupplier).toBe(18.77);
+  expect(enteredSupplier).toBeLessThan(otherSupplier);
 });

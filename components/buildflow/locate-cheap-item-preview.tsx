@@ -3,6 +3,8 @@
 import { ArrowUpRight, Check, Copy, Globe2, Search, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { firstListedPrice } from "@/lib/catalog-price";
+
 type PriceResult = {
   title: string;
   url: string;
@@ -44,12 +46,6 @@ function Progress({ current }: { current: number }) {
   </ol>;
 }
 
-function priceNumber(value: string | null) {
-  if (!value) return Number.POSITIVE_INFINITY;
-  const parsed = Number(value.replace(/[^0-9.]/g, ""));
-  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
-}
-
 export function LocateCheapItemPreview() {
   const [step, setStep] = useState(1);
   const [website, setWebsite] = useState("");
@@ -82,7 +78,7 @@ export function LocateCheapItemPreview() {
         if (!response.ok) return { item, quantity, results: [], checkedAt: new Date().toISOString(), error: payload?.error || "Live price search failed." };
         const unique = new Map<string, PriceResult>();
         for (const result of payload?.buyNow || []) if (result.url && !unique.has(result.url)) unique.set(result.url, result);
-        const results = [...unique.values()].filter((result) => result.priceText).sort((a, b) => priceNumber(a.priceText) - priceNumber(b.priceText)).slice(0, 5);
+        const results = [...unique.values()].filter((result) => result.priceText).sort((a, b) => firstListedPrice(a.priceText) - firstListedPrice(b.priceText)).slice(0, 5);
         return { item, quantity, results, checkedAt: payload?.checkedAt || new Date().toISOString(), error: results.length ? undefined : "No dependable live price was found. Try a model number or more exact description." };
       }));
       setReviews(next);
