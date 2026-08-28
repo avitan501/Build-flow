@@ -14,27 +14,14 @@ type Result = { ok: true } | { ok: false; error: string }
 type SmsAiMode = "off" | "draft" | "auto_safe"
 type SmsAiStyle = "professional" | "friendly" | "brief"
 
-async function ensureAuraPhoneContact(phoneInput: string) {
-  const phone = normalizeAuraPhone(phoneInput)
-  if (!phone) return { ok: false as const, error: "Choose a conversation with a valid phone number." }
-  const admin = createAdminClient()
-  const existing = await admin.from("aura_contacts").select("id").eq("normalized_phone", phone).maybeSingle<{ id: string }>()
-  if (existing.error) return { ok: false as const, error: "The contact settings could not be loaded." }
-  if (existing.data) return { ok: true as const, id: existing.data.id, phone }
-  const created = await admin.from("aura_contacts").insert({ full_name: phone, normalized_phone: phone, notes: "Created from Communications" }).select("id").single<{ id: string }>()
-  if (created.error || !created.data) return { ok: false as const, error: "The contact settings could not be created." }
-  await admin.from("aura_communications").update({ contact_id: created.data.id }).eq("counterparty_phone", phone)
-  return { ok: true as const, id: created.data.id, phone }
-}
-
 export async function saveSmsAutomationAction(input: { phone: string; mode: SmsAiMode; style: SmsAiStyle; autoCreateRequestDrafts: boolean }) {
-  const { access } = await requireManagerPortalProfile()
+  const { supabase, access } = await requireManagerPortalProfile()
   if (!access.customers) return { ok: false as const, error: "Customer communication access is required." }
   if (!new Set<SmsAiMode>(["off", "draft", "auto_safe"]).has(input.mode) || !new Set<SmsAiStyle>(["professional", "friendly", "brief"]).has(input.style)) return { ok: false as const, error: "Choose valid AI settings." }
-  const contact = await ensureAuraPhoneContact(input.phone)
-  if (!contact.ok) return contact
-  const { error } = await createAdminClient().from("aura_contacts").update({ sms_ai_mode: input.mode, sms_ai_style: input.style, auto_create_request_drafts: Boolean(input.autoCreateRequestDrafts) }).eq("id", contact.id)
-  if (error) return { ok: false as const, error: "The AI reply settings could not be saved." }
+  const phone = normalizeAuraPhone(input.phone)
+  if (!phone) return { ok: false as const, error: "Choose a conversation with a valid phone number." }
+  const { data, error } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>("aura-messaging-broker", { body: { action: "save_sms_automation", phone, mode: input.mode, style: input.style, autoCreateRequestDrafts: Boolean(input.autoCreateRequestDrafts) } })
+  if (error || !data?.ok) return { ok: false as const, error: data?.error || "The AI reply settings could not be saved." }
   revalidatePath("/admin/communications")
   return { ok: true as const }
 }
@@ -139,7 +126,7 @@ export async function linkCommunicationContactAction(input: {
   conversationPhone?: string
   conversationEmail?: string
 }) {
-  const { access } = await requireManagerPortalProfile()
+  const { supabase, access } = await requireManagerPortalProfile()
   if (!access.customers) return { ok: false as const, error: "Customer communication access is required." }
   if (!new Set<ContactKind>(["customer", "lead", "supplier"]).has(input.kind) || !/^[A-Za-z0-9_-]{1,160}$/.test(input.sourceId)) {
     return { ok: false as const, error: "Choose a valid contact." }
@@ -148,33 +135,11 @@ export async function linkCommunicationContactAction(input: {
   const conversationEmail = normalizeAuraEmail(input.conversationEmail || "")
   if (!conversationPhone && !conversationEmail) return { ok: false as const, error: "This conversation has no phone or email to link." }
 
-  const admin = createAdminClient()
-  let existingQuery = admin.from("aura_contacts").select("id").limit(1)
-  existingQuery = conversationPhone ? existingQuery.eq("normalized_phone", conversationPhone) : existingQuery.ilike("email", conversationEmail!)
-  const existing = await existingQuery.maybeSingle()
-  if (existing.error) return { ok: false as const, error: "The contact link could not be checked." }
-
-  const contactValues = {
-    full_name: input.name.trim().slice(0, 160) || "Linked contact",
-    company: input.company?.trim().slice(0, 160) || null,
-    normalized_phone: conversationPhone,
-    email: conversationEmail,
-    notes: `Avantia link:${input.kind}:${input.sourceId}`,
-  }
-  const contact = existing.data?.id
-    ? await admin.from("aura_contacts").update(contactValues).eq("id", existing.data.id).select("id").single()
-    : await admin.from("aura_contacts").insert(contactValues).select("id").single()
-  if (contact.error || !contact.data?.id) return { ok: false as const, error: "The contact link could not be saved." }
-
-  let communicationQuery = admin.from("aura_communications").update({ contact_id: contact.data.id })
-  communicationQuery = conversationPhone
-    ? communicationQuery.eq("counterparty_phone", conversationPhone)
-    : communicationQuery.ilike("counterparty_email", conversationEmail!)
-  const updated = await communicationQuery
-  if (updated.error) return { ok: false as const, error: "The conversation could not be assigned." }
-
-  const { data: emailCommunications } = await admin.from("aura_communications").select("id").eq("channel", "email").ilike("counterparty_email", conversationEmail || input.email || "")
-  await addAuraCommunicationLinks((emailCommunications ?? []).map((item) => item.id), [{ entity_type: input.kind === "customer" ? "client" : input.kind, entity_id: input.sourceId, entity_label: input.name, link_source: "manual", confidence: 1 }], undefined)
+  const { data, error } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>("aura-messaging-broker", { body: {
+    action: "link_communication_contact", kind: input.kind, sourceId: input.sourceId,
+    name: input.name, company: input.company || "", conversationPhone, conversationEmail,
+  } })
+  if (error || !data?.ok) return { ok: false as const, error: data?.error || "The contact link could not be saved." }
 
   revalidatePath("/admin/communications")
   return { ok: true as const }

@@ -2915,6 +2915,75 @@ Deno.serve(async (req: Request) => {
       `;
       return json({ ok: true, proposal, model, status });
     }
+    if (input.action === "save_sms_automation") {
+      const phone = normalizePhone(input.phone);
+      const mode = typeof input.mode === "string" && ["off", "draft", "auto_safe"].includes(input.mode) ? input.mode : "";
+      const style = typeof input.style === "string" && ["professional", "friendly", "brief"].includes(input.style) ? input.style : "";
+      if (!phone || !mode || !style) return json({ error: "Choose valid AI settings." }, 400);
+      const existing = await sql<{ id: string }[]>`
+        select id from public.aura_contacts where normalized_phone = ${phone} order by created_at limit 1
+      `;
+      const contactId = existing[0]?.id || crypto.randomUUID();
+      if (existing[0]?.id) {
+        await sql`
+          update public.aura_contacts
+          set sms_ai_mode = ${mode}, sms_ai_style = ${style},
+              auto_create_request_drafts = ${Boolean(input.autoCreateRequestDrafts)}, updated_at = now()
+          where id = ${contactId}::uuid
+        `;
+      } else {
+        await sql`
+          insert into public.aura_contacts
+            (id, full_name, normalized_phone, notes, sms_ai_mode, sms_ai_style, auto_create_request_drafts)
+          values
+            (${contactId}::uuid, ${phone}, ${phone}, 'Created from Communications', ${mode}, ${style}, ${Boolean(input.autoCreateRequestDrafts)})
+        `;
+      }
+      await sql`update public.aura_communications set contact_id = ${contactId}::uuid where counterparty_phone = ${phone}`;
+      return json({ ok: true });
+    }
+    if (input.action === "link_communication_contact") {
+      const kind = typeof input.kind === "string" && ["customer", "lead", "supplier"].includes(input.kind) ? input.kind : "";
+      const sourceId = typeof input.sourceId === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(input.sourceId) ? input.sourceId : "";
+      const phone = normalizePhone(input.conversationPhone);
+      const email = typeof input.conversationEmail === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.conversationEmail.trim()) ? input.conversationEmail.trim().toLowerCase().slice(0, 320) : null;
+      const name = typeof input.name === "string" ? input.name.trim().slice(0, 160) : "";
+      const company = typeof input.company === "string" ? input.company.trim().slice(0, 160) : "";
+      if (!kind || !sourceId || (!phone && !email)) return json({ error: "Choose a valid contact and conversation." }, 400);
+      const existing = phone
+        ? await sql<{ id: string }[]>`select id from public.aura_contacts where normalized_phone = ${phone} order by created_at limit 1`
+        : await sql<{ id: string }[]>`select id from public.aura_contacts where lower(email) = ${email} order by created_at limit 1`;
+      const contactId = existing[0]?.id || crypto.randomUUID();
+      const notes = `Avantia link:${kind}:${sourceId}`;
+      if (existing[0]?.id) {
+        await sql`
+          update public.aura_contacts
+          set full_name = ${name || phone || email || "Linked contact"}, company = ${company || null},
+              normalized_phone = coalesce(${phone}, normalized_phone), email = coalesce(${email}, email),
+              notes = ${notes}, updated_at = now()
+          where id = ${contactId}::uuid
+        `;
+      } else {
+        await sql`
+          insert into public.aura_contacts (id, full_name, company, normalized_phone, email, notes)
+          values (${contactId}::uuid, ${name || phone || email || "Linked contact"}, ${company || null}, ${phone}, ${email}, ${notes})
+        `;
+      }
+      const communications = phone
+        ? await sql<{ id: string }[]>`update public.aura_communications set contact_id = ${contactId}::uuid where counterparty_phone = ${phone} returning id`
+        : await sql<{ id: string }[]>`update public.aura_communications set contact_id = ${contactId}::uuid where lower(counterparty_email) = ${email} returning id`;
+      const entityType = kind === "customer" ? "client" : kind;
+      for (const communication of communications) {
+        await sql`
+          insert into public.aura_communication_links
+            (communication_id, entity_type, entity_id, entity_label, link_source, confidence, created_by)
+          values (${communication.id}::uuid, ${entityType}, ${sourceId}, ${name || phone || email || "Linked contact"}, 'manual', 1, ${manager.user.id}::uuid)
+          on conflict (communication_id, entity_type, entity_id)
+          do update set entity_label = excluded.entity_label, link_source = 'manual', confidence = 1, created_by = excluded.created_by
+        `;
+      }
+      return json({ ok: true });
+    }
     if (input.action === "quality_check_sms_ai") {
       if (!manager.isOwner) return json({ error: "Only the owner can run AI quality checks." }, 403);
       const cases = Array.isArray(input.cases) ? input.cases.slice(0, 20).flatMap((value, index) => {
