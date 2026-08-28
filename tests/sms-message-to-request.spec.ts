@@ -11,7 +11,8 @@ test("each incoming SMS can be reviewed and converted into a Carlos request", as
     readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
   ])
 
-  expect(workspace).toContain("Create request")
+  expect(workspace).toContain("Review as request")
+  expect(workspace).toContain("messageCanStartMaterialRequest")
   expect(workspace).toContain("Review new request")
   expect(workspace).toContain("Nothing is created until you confirm")
   expect(workspace).toContain("Confirm & create")

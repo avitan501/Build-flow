@@ -362,24 +362,32 @@ export async function addManagerDocumentItemsToCatalogAction(documentId: string)
     supplier = data as CatalogSupplier
   }
 
-  const { data: existingRows, error: existingError } = await supabase.from("material_catalog_items").select("id,name,item_code,package_quantity,comparison_quantity").eq("category", department).returns<Array<{ id: string; name: string; item_code: string; package_quantity: number; comparison_quantity: number }>>()
+  const { data: existingRows, error: existingError } = await supabase.from("material_catalog_items").select("id,category,name,item_code,package_quantity,comparison_quantity").returns<Array<{ id: string; category: string; name: string; item_code: string; package_quantity: number; comparison_quantity: number }>>()
   if (existingError) return { ok: false, error: "The existing catalog could not be checked." }
-  const byCode = new Map((existingRows ?? []).filter((row) => row.item_code).map((row) => [catalogItemKey(row.item_code), row]))
-  const byName = new Map((existingRows ?? []).map((row) => [catalogItemKey(row.name), row]))
+  const byName = new Map((existingRows ?? []).filter((row) => row.category === department).map((row) => [catalogItemKey(row.name), row]))
+  const usedCodes = new Set((existingRows ?? []).map((row) => catalogItemKey(row.item_code)).filter(Boolean))
   const catalogRows = new Map<string, { id: string; package_quantity: number; comparison_quantity: number }>()
   const now = new Date().toISOString()
   let createdCount = 0
   for (const item of items) {
-    const existing = (item.item_code ? byCode.get(catalogItemKey(item.item_code)) : null) ?? byName.get(catalogItemKey(item.description))
+    const existing = byName.get(catalogItemKey(item.description))
     if (existing) { catalogRows.set(item.id, existing); continue }
-    const code = clean(item.item_code, 80) || `DOC-${document.id.slice(0, 6).toUpperCase()}-${item.line_number}`
+    const baseCode = `DOC-${document.id.slice(0, 8).toUpperCase()}-${item.line_number}`
+    let code = baseCode
+    let suffix = 1
+    while (usedCodes.has(catalogItemKey(code))) { suffix += 1; code = `${baseCode}-${suffix}` }
     const { data, error } = await supabase.from("material_catalog_items").insert({
       category: department, item_code: code, name: clean(item.description, 240), description: clean(item.specification, 1000),
       package_quantity: 1, package_unit: clean(item.unit, 60) || "each", comparison_quantity: 1, comparison_unit: clean(item.unit, 60) || "each",
       review_status: "needs_review", quality_notes: `Imported from reviewed source ${clean(document.file_name, 180)}.`, default_quantity: 1,
       unit: clean(item.unit, 60) || "each", status: "active", source: `Manager document: ${clean(document.file_name, 180)}`, created_by: user.id, updated_by: user.id,
     }).select("id,package_quantity,comparison_quantity").single<{ id: string; package_quantity: number; comparison_quantity: number }>()
-    if (error || !data) return { ok: false, error: `Could not add ${item.description} to the catalog.` }
+    if (error || !data) {
+      console.error("Reviewed document catalog item creation failed", { code: error?.code, message: error?.message, department, lineNumber: item.line_number })
+      return { ok: false, error: `Could not add ${item.description} to the catalog. The reviewed document and source are still safe.` }
+    }
+    usedCodes.add(catalogItemKey(code))
+    byName.set(catalogItemKey(item.description), { ...data, category: department, name: item.description, item_code: code })
     catalogRows.set(item.id, data); createdCount += 1
   }
   const observedAt = document.document_date ? `${document.document_date}T12:00:00.000Z` : now

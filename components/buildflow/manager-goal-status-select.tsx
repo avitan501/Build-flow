@@ -43,7 +43,7 @@ export function ManagerGoalStatusSelect({ goalId, fixedKey, status }: { goalId?:
   }
 
   return <span className="relative shrink-0" onClick={(event) => event.stopPropagation()}>
-    <select aria-label="Goal status" value={selected} onChange={(event) => update(event.target.value as ManagerGoalStatus)} disabled={pending} className={`h-7 rounded-full border pl-2.5 pr-7 text-[10px] font-bold ${tone[selected]} disabled:opacity-60`}>
+    <select aria-label="Goal status" value={selected} onChange={(event) => update(event.target.value as ManagerGoalStatus)} disabled={pending} className={`h-7 max-w-[7.5rem] rounded-full border pl-2.5 pr-7 text-[10px] font-bold ${tone[selected]} disabled:opacity-60`}>
       {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
     {pending ? <LoaderCircle className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 animate-spin" /> : null}

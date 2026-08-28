@@ -218,7 +218,8 @@ test("Goals and lists use collapsed disclosures to keep the page compact", async
   expect(page).toContain("Clients in the system");
   expect(leads).toContain('<details className="group');
   expect(goals).toContain("activeGoals.map(goalRow)");
-  expect(goals).toContain("min-h-14");
+  expect(goals).toContain("grid-cols-[2rem_minmax(0,1fr)_auto]");
+  expect(goals).toContain("min-h-16");
 });
 
 test("affiliate tracker is persistent, owner-only, filterable, and setup-gated", async () => {

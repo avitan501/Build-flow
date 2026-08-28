@@ -94,22 +94,22 @@ function GoalDisclosure({
       id={id}
       className="group scroll-mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
     >
-      <summary className="flex min-h-14 cursor-pointer list-none items-center gap-2.5 px-3 py-2">
-        <GoalNumber>{number}</GoalNumber>
+      <summary className="grid min-h-16 cursor-pointer list-none grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-2.5">
+        <span className="row-span-2"><GoalNumber>{number}</GoalNumber></span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">
+          <p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">
             {eyebrow}
           </p>
-          <h3 className="truncate text-sm font-semibold">{title}</h3>
+          <h3 className="text-sm font-semibold leading-5">{title}</h3>
           {description ? (
-            <p className="truncate text-[10px] text-slate-500">{description}</p>
+            <p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-slate-500">{description}</p>
           ) : null}
         </div>
-        <ManagerGoalStatusSelect fixedKey={fixedKey} status={status} />
         <ChevronDown
-          className="h-3.5 w-3.5 shrink-0 text-slate-400 transition group-open:rotate-180"
+          className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180"
           aria-hidden="true"
         />
+        <div className="col-start-2 mt-1 w-fit"><ManagerGoalStatusSelect fixedKey={fixedKey} status={status} /></div>
       </summary>
       <div className="border-t border-slate-200 p-3 sm:p-4">{children}</div>
     </details>
@@ -276,19 +276,17 @@ function AiTaskInbox() {
           <p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">
             Phone task intake
           </p>
-          <h3 className="text-sm font-semibold text-slate-950">
-            AI messages &amp; tasks
-          </h3>
+          <h3 className="text-sm font-semibold text-slate-950">Phone intake</h3>
           <p className="mt-0.5 text-xs text-slate-600">
-            Review phone instructions and screenshots before they become a task,
-            contact, lead, supplier, or material request.
+            Review phone messages before saving a task, contact, supplier, or
+            request.
           </p>
         </div>
         <Link
           href="/owner/ai-inbox"
           className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-xs font-semibold text-white"
         >
-          Open Task To Do
+          Review inbox
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
@@ -580,9 +578,9 @@ export async function CarlosGoalsWorkspace({
       {embedded ? (
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-slate-950">Task To Do</h3>
+            <h3 className="text-sm font-semibold text-slate-950">Carlos work</h3>
             <p className="mt-0.5 text-xs text-slate-500">
-              Open a task or work area here without leaving the dashboard.
+              Focus first, then open the work area you need.
             </p>
           </div>
           <AddManagerGoal assignee="carlos" />
