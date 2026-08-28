@@ -301,6 +301,10 @@ export default async function AdminDashboardPage({
             icon: Sparkles,
             links: [
               { href: "/admin/ai-tools", label: "All Manager Tools" },
+              {
+                href: "https://build-flow-wfl3-1fe6nc1cr-avitanneto-1804s-projects.vercel.app",
+                label: "New Homepage Preview",
+              },
               ...(access.suppliers
                 ? [{ href: "/admin/documents", label: "Documents" }]
                 : []),

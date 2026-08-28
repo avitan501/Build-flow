@@ -4,42 +4,17 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const HIDDEN_DOCK_PATHS = new Set([
-  "/",
-  "/shop",
-  "/how-it-works",
-  "/login",
-  "/signup",
-  "/reset-password",
-]);
+const HIDDEN_DOCK_PATHS = new Set(["/", "/shop", "/how-it-works", "/login", "/signup", "/reset-password"]);
 
 function shouldShowDock(pathname: string) {
-  return (
-    !HIDDEN_DOCK_PATHS.has(pathname) &&
-    !pathname.startsWith("/admin") &&
-    !pathname.startsWith("/ai/renovation-estimator")
-  );
+  return !HIDDEN_DOCK_PATHS.has(pathname) && !pathname.startsWith("/admin") && !pathname.startsWith("/ai/renovation-estimator");
 }
 
 function isActivePath(pathname: string, href: string) {
-  return href === "/"
-    ? pathname === href
-    : pathname === href || pathname.startsWith(`${href}/`);
+  return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function DockItem({
-  href,
-  label,
-  active,
-  children,
-  accent = false,
-}: {
-  href: string;
-  label: string;
-  active: boolean;
-  children: ReactNode;
-  accent?: boolean;
-}) {
+function DockItem({ href, label, active, children, accent = false }: { href: string; label: string; active: boolean; children: ReactNode; accent?: boolean }) {
   return (
     <Link
       href={href}
@@ -70,9 +45,7 @@ function DockItem({
         />
         <span className="relative z-10">{children}</span>
       </span>
-      <span
-        className={`mt-1 flex min-h-6 items-start justify-center text-[9px] font-medium leading-3 ${accent ? "text-slate-800" : active ? "text-slate-800" : "text-slate-500/95"}`}
-      >
+      <span className={`mt-1 flex min-h-6 items-start justify-center text-[9px] font-medium leading-3 ${accent ? "text-slate-800" : active ? "text-slate-800" : "text-slate-500/95"}`}>
         {label}
       </span>
     </Link>
@@ -89,104 +62,43 @@ export function MobileBottomDock() {
   const shopHref = "/shop";
 
   return (
-    <div className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+0.35rem)] left-1/2 z-50 w-[calc(100%-1rem)] max-w-[29rem] -translate-x-1/2 px-2 lg:hidden">
-      <nav
-        aria-label="Mobile homepage"
-        className="pointer-events-auto relative flex w-full items-center justify-between gap-1 overflow-hidden rounded-[24px] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(240,247,255,0.18))] px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.68),inset_0_-12px_20px_rgba(255,255,255,0.08),0_18px_34px_rgba(15,23,42,0.12),0_6px_16px_rgba(148,163,184,0.12)] backdrop-blur-[26px] [backdrop-filter:blur(26px)_saturate(145%)]"
-      >
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-[1px] rounded-[23px] border border-white/35"
-        />
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-8 top-1 h-4 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,255,255,0.14))] opacity-90 blur-[0.8px]"
-        />
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute -top-4 left-10 right-10 h-10 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.35),transparent_72%)] opacity-75"
-        />
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.16),transparent_72%)]"
-        />
-        <DockItem href="/" label="Home" active={isActivePath(pathname, "/")}>
-          <svg
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M3 10.5 12 3l9 7.5" />
-            <path d="M5 9.5V21h14V9.5" />
-          </svg>
-        </DockItem>
-        <DockItem
-          href={shopHref}
-          label="Order Materials"
-          active={isActivePath(pathname, "/shop")}
-          accent
+      <div className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+0.35rem)] left-1/2 z-50 w-[calc(100%-1rem)] max-w-[29rem] -translate-x-1/2 px-2 lg:hidden">
+        <nav
+          aria-label="Mobile homepage"
+          className="pointer-events-auto relative flex w-full items-center justify-between gap-1 overflow-hidden rounded-[24px] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(240,247,255,0.18))] px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.68),inset_0_-12px_20px_rgba(255,255,255,0.08),0_18px_34px_rgba(15,23,42,0.12),0_6px_16px_rgba(148,163,184,0.12)] backdrop-blur-[26px] [backdrop-filter:blur(26px)_saturate(145%)]"
         >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M3.5 11 12 4l8.5 7" />
-            <path d="M5.5 10.5V20h13v-9.5" />
-            <path d="M9 20v-6h6v6" />
-            <path d="M7 7.5V4h3" />
-            <path d="M16.5 7.5h3" />
-            <path d="M18 6v3" />
-          </svg>
-        </DockItem>
-        <DockItem
-          href="/request-quote"
-          label="Get Material Pricing"
-          active={isActivePath(pathname, "/request-quote")}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M4 5h16v14H4z" />
-            <path d="M7 9h10M7 13h6" />
-          </svg>
-        </DockItem>
-        <DockItem
-          href="/beat-a-quote"
-          label="Beat a Supplier Quote"
-          active={isActivePath(pathname, "/beat-a-quote")}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M12 3v18M16 7.5c0-1.7-1.8-3-4-3s-4 1.3-4 3 1.5 2.7 4 3.2 4 1.5 4 3.3-1.8 3.5-4 3.5-4-1.3-4-3" />
-          </svg>
-        </DockItem>
-      </nav>
-    </div>
+          <span aria-hidden="true" className="pointer-events-none absolute inset-[1px] rounded-[23px] border border-white/35" />
+          <span aria-hidden="true" className="pointer-events-none absolute inset-x-8 top-1 h-4 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,255,255,0.14))] opacity-90 blur-[0.8px]" />
+          <span aria-hidden="true" className="pointer-events-none absolute -top-4 left-10 right-10 h-10 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.35),transparent_72%)] opacity-75" />
+          <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-[radial-gradient(circle_at_bottom,rgba(255,255,255,0.16),transparent_72%)]" />
+          <DockItem href="/" label="Home" active={isActivePath(pathname, "/")}>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 10.5 12 3l9 7.5" />
+              <path d="M5 9.5V21h14V9.5" />
+            </svg>
+          </DockItem>
+          <DockItem href={shopHref} label="Order Materials" active={isActivePath(pathname, "/shop")} accent>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3.5 11 12 4l8.5 7" />
+              <path d="M5.5 10.5V20h13v-9.5" />
+              <path d="M9 20v-6h6v6" />
+              <path d="M7 7.5V4h3" />
+              <path d="M16.5 7.5h3" />
+              <path d="M18 6v3" />
+            </svg>
+          </DockItem>
+          <DockItem href="/request-quote" label="Get Material Pricing" active={isActivePath(pathname, "/request-quote")}>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 5h16v14H4z" />
+              <path d="M7 9h10M7 13h6" />
+            </svg>
+          </DockItem>
+          <DockItem href="/beat-a-quote" label="Beat a Supplier Quote" active={isActivePath(pathname, "/beat-a-quote")}>
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 3v18M16 7.5c0-1.7-1.8-3-4-3s-4 1.3-4 3 1.5 2.7 4 3.2 4 1.5 4 3.3-1.8 3.5-4 3.5-4-1.3-4-3" />
+            </svg>
+          </DockItem>
+        </nav>
+      </div>
   );
 }
