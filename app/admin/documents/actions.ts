@@ -407,7 +407,16 @@ export async function addManagerDocumentItemsToCatalogAction(documentId: string)
     }]
   })
   const { error: priceError } = await supabase.from("material_catalog_supplier_prices").upsert(prices, { onConflict: "item_id,supplier_id" })
-  if (priceError) return { ok: false, error: "The items were added, but their supplier prices could not be saved." }
+  if (priceError) {
+    console.error("Reviewed document catalog price save failed", {
+      code: priceError.code,
+      message: priceError.message,
+      documentId,
+      supplierId: supplier.id,
+      priceCount: prices.length,
+    })
+    return { ok: false, error: "The items were added, but their supplier prices could not be saved." }
+  }
   await supabase.from("manager_documents").update({ status: "routed", supplier_id: supplier.id, updated_by: user.id }).eq("id", documentId)
   await supabase.from("manager_document_events").insert({ document_id: documentId, event_type: "routed", summary: `${prices.length} selected price${prices.length === 1 ? "" : "s"} added to the catalog.`, details: { destination: "catalog", supplier_id: supplier.id, created_item_count: createdCount, price_count: prices.length }, created_by: user.id })
   revalidatePath(`/admin/documents/${documentId}`); revalidatePath("/admin/documents"); revalidatePath("/admin/catalog"); revalidatePath("/admin/vendors")
