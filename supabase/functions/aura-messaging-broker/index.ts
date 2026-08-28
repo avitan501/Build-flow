@@ -1080,6 +1080,27 @@ async function analyzeCustomerSms(body: string, style: string, managerRequestRev
   }
 }
 
+function extractReviewMaterialLines(messages: string[]) {
+  const unitAliases: Record<string, string> = {
+    pc: "pieces", pcs: "pieces", piece: "pieces", pieces: "pieces",
+    box: "box", boxes: "boxes", sheet: "sheets", sheets: "sheets",
+    bucket: "bucket", buckets: "buckets", bag: "bag", bags: "bags",
+    roll: "roll", rolls: "rolls", ea: "each", each: "each",
+  };
+  const materialWords = /\b(?:lumber|stud|plywood|sheetrock|drywall|screw|nail|tape|compound|primer|paint|corner\s+(?:bead|bit)|cement|concrete|rebar|wire|outlet|breaker|pipe|fitting|tile|shingle|roof|door|window|cabinet|heater|insulation|siding|molding)\b/i;
+  const dimensionalMaterial = /\b\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?(?:\s*[x×]\s*\d+(?:\.\d+)?)?\b/i;
+  return messages.flatMap((message) => message.split(/\r?\n|;/)).flatMap((rawLine) => {
+    const line = rawLine.trim().replace(/^[-*•]\s*/, "");
+    if (!line || line.length > 300) return [];
+    const numbered = line.match(/^(\d+(?:\.\d+)?)\s*(pc|pcs|piece|pieces|box|boxes|sheet|sheets|bucket|buckets|bag|bags|roll|rolls|ea|each)?\s+(.+)$/i);
+    if (numbered && (materialWords.test(numbered[3]) || dimensionalMaterial.test(numbered[3]))) {
+      const rawUnit = (numbered[2] || "each").toLowerCase();
+      return [{ name: numbered[3].trim().slice(0, 300), quantity: Math.min(Number(numbered[1]), 1_000_000), unit: unitAliases[rawUnit] || rawUnit }];
+    }
+    return materialWords.test(line) && !/[?]/.test(line) ? [{ name: line.slice(0, 300), quantity: 1, unit: "each" }] : [];
+  }).slice(0, 50);
+}
+
 async function reviewSmsConversation(communicationId: string) {
   const selectedRows = await sql<{ id: string; counterparty_phone: string; occurred_at: string; contact_id: string | null; full_name: string | null; sms_ai_style: string | null }[]>`
     select communication.id, communication.counterparty_phone, communication.occurred_at,
@@ -1103,6 +1124,8 @@ async function reviewSmsConversation(communicationId: string) {
   const ordered = [...messages].reverse();
   const transcript = ordered.map((message) => `${message.direction === "incoming" ? "Customer" : "Avantia"}: ${message.body}`).join("\n");
   const { result, model } = await analyzeCustomerSms(transcript, selected.sms_ai_style || "professional", true);
+  const incomingBodies = ordered.filter((message) => message.direction === "incoming").map((message) => message.body);
+  const reviewedItems = result.request?.items.length ? result.request.items : extractReviewMaterialLines(incomingBodies);
   const linked = await sql<{ request_id: string; title: string }[]>`
     select request.id as request_id, request.title
     from public.aura_communications as communication
@@ -1120,8 +1143,8 @@ async function reviewSmsConversation(communicationId: string) {
     customerName: explicitName || storedName || selected.counterparty_phone,
     customerAddress: result.customerAddress || "",
     title: result.request?.title || linked[0]?.title || "Material request from text",
-    department: result.request?.department || "Unassigned",
-    items: result.request?.items || [],
+    department: result.request?.department || (reviewedItems.some((item) => /drywall|sheetrock|compound|tape|corner\s+(?:bead|bit)/i.test(item.name)) ? "Sheet Rock" : "Unassigned"),
+    items: reviewedItems,
     sourceCommunicationIds: ordered.map((message) => message.id),
     sourceMessages: ordered.filter((message) => message.direction === "incoming").map((message) => message.body),
     existingRequestId: linked[0]?.request_id || null,
