@@ -94,7 +94,7 @@ function GoalDisclosure({
       id={id}
       className="group scroll-mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
     >
-      <summary className="grid min-h-16 cursor-pointer list-none grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5">
+      <summary className="grid min-h-16 cursor-pointer list-none grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-2.5">
         <span>
           <GoalNumber>{number}</GoalNumber>
         </span>
@@ -109,9 +109,9 @@ function GoalDisclosure({
             </p>
           ) : null}
         </div>
-        <span className="flex shrink-0 items-center gap-1">
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true" />
+        <span className="col-start-2 mt-1 flex items-center">
           <ManagerGoalStatusSelect fixedKey={fixedKey} status={status} />
-          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true" />
         </span>
       </summary>
       <div className="border-t border-slate-200 p-3 sm:p-4">{children}</div>
@@ -619,12 +619,7 @@ export async function CarlosGoalsWorkspace({
     <>
       {embedded ? (
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-950">Carlos&apos;s task list</h3>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Start with Focus, then open a work area.
-            </p>
-          </div>
+          <p className="text-xs leading-5 text-slate-500">Focus appears first. Open any item for details.</p>
           <AddManagerGoal assignee="carlos" />
         </div>
       ) : null}

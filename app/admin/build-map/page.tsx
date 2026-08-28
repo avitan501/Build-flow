@@ -146,7 +146,7 @@ function GoalDisclosure({
   priorityCount: number;
   children: React.ReactNode;
 }) {
-  const name = assignee === "carlos" ? "Carlos" : "David";
+  const name = assignee === "carlos" ? "Tasks & work areas" : "David Tasks";
   const openGoals = goals.filter((goal) => goal.status === "open").length;
   return (
     <details className="group border-t border-slate-200 first:border-t-0">
@@ -155,7 +155,7 @@ function GoalDisclosure({
           <UserRound className="h-4 w-4" />
         </span>
         <span className="min-w-0 flex-1">
-          <strong className="block text-sm font-semibold">{name} Tasks</strong>
+          <strong className="block text-sm font-semibold">{name}</strong>
           <span className="mt-0.5 block text-xs text-slate-500">
             {priorityCount} priorities
             {openGoals ? ` · ${openGoals} custom open` : ""}

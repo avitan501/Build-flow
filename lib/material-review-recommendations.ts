@@ -1,6 +1,6 @@
 import { materialQuantity, materialReviewReasons, materialSalesUnit, type ReviewableMaterialItem } from "@/lib/client-material-review"
 
-export type RecommendationField = "quantity" | "unit" | "dimensions" | "thickness" | "productType" | "screwLength"
+export type RecommendationField = "dimensions" | "thickness" | "productType" | "screwLength"
 
 export type RecommendationOption = {
   value: string
@@ -22,21 +22,6 @@ function option(value: string, confidence: number): RecommendationOption {
   return { value, confidence }
 }
 
-function quantityChoices(item: ReviewableMaterialItem) {
-  const currentQuantity = materialQuantity(item)
-  const quantity = String(currentQuantity)
-  const nearby = [1, 2, 5, 10]
-    .filter((value) => value !== currentQuantity)
-    .slice(0, 3)
-    .map((value) => option(String(value), 0))
-  return {
-    field: "quantity" as const,
-    label: `Quantity (${materialSalesUnit(item)})`,
-    options: [option(quantity, 100), ...nearby],
-    recommended: quantity,
-  }
-}
-
 function hasChoice(choices: MaterialReviewRecommendation["choices"], field: RecommendationField) {
   return choices.some((choice) => choice.field === field)
 }
@@ -49,7 +34,6 @@ export function materialReviewRecommendation(item: ReviewableMaterialItem): Mate
   const isDrywallScrew = /\b(?:(?:drywall|sheetrock)\s+)?screws?\b/.test(name)
   const isSheetMaterial = isDrywallBoard || isCementBoard || /\b(?:plywood|osb)\b/.test(name)
   const choices: MaterialReviewRecommendation["choices"] = []
-  if (reasons.some((reason) => /\bquantity\b/i.test(reason))) choices.push(quantityChoices(item))
 
   if (isDrywallBoard) {
     const typeOptions = /\b(?:greenboard|moisture)\b/.test(name)
