@@ -143,6 +143,25 @@ function ExpandableMessage({ text }: { text: string }) {
   return <div><p className={`whitespace-pre-wrap break-words text-sm leading-5 ${long && !expanded ? "max-h-32 overflow-hidden" : ""}`}>{text}</p>{long ? <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-[#0066cc]">{expanded ? "Show less" : "Show more"}<ChevronDown className={`h-3 w-3 transition ${expanded ? "rotate-180" : ""}`} /></button> : null}</div>
 }
 
+function initialCommunicationForQuery(communications: AuraCommunicationRow[], query: string) {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return communications[0]
+  return communications.find((communication) => [
+    communication.counterparty_phone || "",
+    communication.counterparty_email || "",
+    communication.subject || "",
+    messageText(communication),
+  ].some((value) => value.toLowerCase().includes(needle))) || communications[0]
+}
+
+function initialConversationKey(communication: AuraCommunicationRow | undefined, contacts: AuraContactRow[]) {
+  if (!communication) return "__new__"
+  const rawKey = identityKey(communication.counterparty_phone, communication.counterparty_email)
+  const contact = contacts.find((item) => identityKey(item.normalized_phone, item.email) === rawKey)
+  const linked = contact?.notes?.match(/^Avantia link:(customer|lead|supplier):([A-Za-z0-9_-]+)$/)
+  return linked ? `${linked[1]}:${linked[2]}` : rawKey || `unknown:${communication.contact_id || communication.id}`
+}
+
 export function UnifiedCommunicationInbox({ communications, contacts, customers, leads = [], suppliers = [], materialRequests = [], connections, initialChannelFilter = "all", initialQuery = "" }: {
   communications: AuraCommunicationRow[]
   contacts: AuraContactRow[]
@@ -155,19 +174,20 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   initialQuery?: string
 }) {
   const router = useRouter()
+  const initialCommunication = initialCommunicationForQuery(communications, initialQuery)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState(initialQuery)
   const [contactFilter, setContactFilter] = useState<ContactFilter>("all")
   const [channelFilter, setChannelFilter] = useState(initialChannelFilter)
-  const [activeKey, setActiveKey] = useState(() => identityKey(communications[0]?.counterparty_phone, communications[0]?.counterparty_email) || "__new__")
+  const [activeKey, setActiveKey] = useState(() => initialConversationKey(initialCommunication, contacts))
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false)
   const [channel, setChannel] = useState<Channel>(() => {
-    const initial = communications[0]?.channel
+    const initial = initialCommunication?.channel
     return initial === "email" || initial === "sms" || initial === "whatsapp" ? initial : "whatsapp"
   })
   const [recipientType, setRecipientType] = useState<Exclude<ContactKind, "contact">>("customer")
   const [selectedRecipientId, setSelectedRecipientId] = useState("")
-  const [recipient, setRecipient] = useState(() => communications[0]?.channel === "email" ? communications[0]?.counterparty_email || "" : communications[0]?.counterparty_phone || "")
+  const [recipient, setRecipient] = useState(() => initialCommunication?.channel === "email" ? initialCommunication.counterparty_email || "" : initialCommunication?.counterparty_phone || "")
   const [subject, setSubject] = useState("")
   const [message, setMessage] = useState("")
   const [attachment, setAttachment] = useState<File | null>(null)
@@ -176,8 +196,8 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const [softphone, setSoftphone] = useState<{ phone: string; name: string } | null>(null)
   const [linkTarget, setLinkTarget] = useState("")
   const [emailLinkTarget, setEmailLinkTarget] = useState("")
-  const [smsAiMode, setSmsAiMode] = useState<"off" | "draft" | "auto_safe">(() => contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(communications[0]?.counterparty_phone, communications[0]?.counterparty_email))?.sms_ai_mode || "off")
-  const [smsAiStyle, setSmsAiStyle] = useState<"professional" | "friendly" | "brief">(() => contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(communications[0]?.counterparty_phone, communications[0]?.counterparty_email))?.sms_ai_style || "professional")
+  const [smsAiMode, setSmsAiMode] = useState<"off" | "draft" | "auto_safe">(() => contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(initialCommunication?.counterparty_phone, initialCommunication?.counterparty_email))?.sms_ai_mode || "off")
+  const [smsAiStyle, setSmsAiStyle] = useState<"professional" | "friendly" | "brief">(() => contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(initialCommunication?.counterparty_phone, initialCommunication?.counterparty_email))?.sms_ai_style || "professional")
   const [requestReview, setRequestReview] = useState<SmsRequestProposal | null>(null)
 
   useEffect(() => {

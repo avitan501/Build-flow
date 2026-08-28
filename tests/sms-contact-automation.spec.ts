@@ -14,6 +14,8 @@ test("communications offers guarded per-contact AI modes and fast contact tags",
   expect(workspace).toContain("Review as request")
   expect(workspace).not.toContain('!outgoing && item.channel === "sms" ? <button')
   expect(workspace).toContain("h-[calc(100dvh-7rem)]")
+  expect(workspace).toContain("initialCommunicationForQuery")
+  expect(workspace).toContain("initialConversationKey(initialCommunication, contacts)")
   for (const kind of ["customer", "lead", "supplier"]) expect(actions).toContain(`"${kind}"`)
   expect(actions).toContain("phoneLoginEmailForPhone")
   expect(actions).toContain("staff_upsert_supplier_directory_entry")
@@ -37,6 +39,8 @@ test("incoming client SMS automation keeps conversational context and blocks sen
   expect(broker).toContain("store: false")
   expect(broker).toContain("quality_check_sms_ai")
   expect(broker).toContain("max_output_tokens: 3000")
+  expect(broker).toContain("[Attachment included")
+  expect(broker).toContain("accurateAttachmentReply")
 })
 
 test("material lists from texts enter a review queue before becoming requests", async () => {
