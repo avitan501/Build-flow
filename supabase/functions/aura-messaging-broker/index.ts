@@ -1027,22 +1027,39 @@ function customerSmsFallback(): CustomerSmsAutomation {
 }
 
 async function smsConversationContext(phone: string) {
-  const rows = await sql<{ direction: string; body: string; occurred_at: string }[]>`
-    select direction, body, occurred_at
+  const rows = await sql<{ direction: string; body: string | null; media: unknown; occurred_at: string }[]>`
+    select direction, body, media, occurred_at
     from public.aura_communications
     where channel = 'sms'
       and counterparty_phone = ${phone}
       and direction in ('incoming', 'outgoing')
-      and body is not null
-      and trim(body) <> ''
+      and ((body is not null and trim(body) <> '') or coalesce(media, '[]'::jsonb) <> '[]'::jsonb)
     order by occurred_at desc
     limit 24
   `;
   const ordered = [...rows].reverse();
-  return {
-    replyText: ordered.map((message) => `${message.direction === "incoming" ? "Customer" : "Avantia"}: ${message.body.trim()}`).join("\n"),
-    customerText: ordered.filter((message) => message.direction === "incoming").map((message) => message.body.trim()).join("\n"),
+  const messageText = (message: typeof rows[number]) => {
+    const media = Array.isArray(message.media) ? message.media : [];
+    const mediaTypes = media.flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return [];
+      const type = "type" in entry && typeof entry.type === "string" ? entry.type.trim().slice(0, 80) : "";
+      return type ? [type] : [];
+    });
+    const attachment = media.length ? `[Attachment included${mediaTypes.length ? `: ${[...new Set(mediaTypes)].join(", ")}` : ""}]` : "";
+    return [message.body?.trim() || "", attachment].filter(Boolean).join(" ");
   };
+  return {
+    replyText: ordered.map((message) => `${message.direction === "incoming" ? "Customer" : "Avantia"}: ${messageText(message)}`).join("\n"),
+    customerText: ordered.filter((message) => message.direction === "incoming").map(messageText).join("\n"),
+  };
+}
+
+function accurateAttachmentReply(message: string, reply: string) {
+  if (/\[Attachment included(?::[^\]]+)?\]/i.test(message)) return reply;
+  if (!/\b(?:see|view|received|got|opened)\b.{0,32}\b(?:photo|image|attachment|file)\b/i.test(reply)) return reply;
+  if (/[\u0590-\u05ff]/.test(message)) return "לא מופיע כאן קובץ מצורף. אפשר לשלוח אותו שוב, ומנהל יבדוק אותו.";
+  if (/\b(?:foto|imagen|archivo|adjunto|envi[eé])\b/i.test(message)) return "No aparece un archivo adjunto aquí. Envíalo de nuevo y un gerente lo revisará.";
+  return "I don't see an attachment here yet. Please resend it, and a manager will review it.";
 }
 
 async function analyzeCustomerSms(conversationText: string, style: string, managerRequestReview = false, latestCustomerMessage = conversationText): Promise<{ result: CustomerSmsAutomation; model: string }> {
@@ -1083,7 +1100,7 @@ async function analyzeCustomerSms(conversationText: string, style: string, manag
     }) : [];
     const forbiddenAuto = /\b(?:price|cost|payment|refund|cancel|complain|damaged?|lawyer|attorney|emergency|danger|unsafe|credit card|discount|delivery time|when will|call me|callback|promise|place the order|invoice|open today|business hours|hours)\b/i.test(latestCustomerMessage);
     const result: CustomerSmsAutomation = {
-      reply: String(parsed.reply || "").trim().slice(0, 1600) || customerSmsFallback().reply,
+      reply: accurateAttachmentReply(conversationText, String(parsed.reply || "").trim().slice(0, 1600) || customerSmsFallback().reply),
       autoSafe: Boolean(parsed.autoSafe) && !forbiddenAuto,
       safetyReason: String(parsed.safetyReason || "Manager review is safer.").trim().slice(0, 300),
       isMaterialRequest: Boolean(parsed.isMaterialRequest) && items.length > 0,
@@ -1202,7 +1219,7 @@ async function evaluateCustomerSmsCases(cases: Array<{ id: string; message: stri
     const forbiddenAuto = /\b(?:price|cost|payment|refund|cancel|complain|damaged?|lawyer|attorney|emergency|danger|unsafe|credit card|discount|delivery time|when will|call me|callback|promise|place the order|invoice|open today|business hours|hours)\b/i.test(original);
     return {
       id: String(item.id || "").slice(0, 40),
-      reply: String(item.reply || "").trim().slice(0, 1600),
+      reply: accurateAttachmentReply(original, String(item.reply || "").trim().slice(0, 1600)),
       autoSafe: Boolean(item.autoSafe) && !forbiddenAuto,
       safetyReason: String(item.safetyReason || "Review required.").trim().slice(0, 300),
       isMaterialRequest: Boolean(item.isMaterialRequest),

@@ -392,7 +392,7 @@ export async function addManagerDocumentItemsToCatalogAction(documentId: string)
   }
   const observedAt = document.document_date ? `${document.document_date}T12:00:00.000Z` : now
   const expiresAt = document.expires_on ? `${document.expires_on}T23:59:59.999Z` : null
-  const prices = pricedItems.flatMap((item) => {
+  const priceCandidates = pricedItems.flatMap((item) => {
     const catalogItem = catalogRows.get(item.id)
     if (!catalogItem || item.unit_price === null) return []
     return [{
@@ -405,6 +405,18 @@ export async function addManagerDocumentItemsToCatalogAction(documentId: string)
       source_document_id: document.id, source_file_name: document.file_name, source_quote_number: document.document_number || null, source_document_date: document.document_date,
       updated_by: user.id, updated_at: now,
     }]
+  })
+  const candidateGroups = new Map<string, typeof priceCandidates>()
+  for (const candidate of priceCandidates) {
+    const key = `${candidate.item_id}:${candidate.supplier_id}`
+    candidateGroups.set(key, [...(candidateGroups.get(key) ?? []), candidate])
+  }
+  const prices = [...candidateGroups.values()].map((group) => {
+    const lowest = group.reduce((best, candidate) => candidate.unit_price < best.unit_price ? candidate : best)
+    return group.length === 1 ? lowest : {
+      ...lowest,
+      notes: clean(`${lowest.notes} Lowest of ${group.length} selected quote rows for the same product.`, 1000),
+    }
   })
   let { error: priceError } = await supabase.from("material_catalog_supplier_prices").upsert(prices, { onConflict: "item_id,supplier_id" })
   let usedCompatibilitySave = false
@@ -441,5 +453,5 @@ export async function addManagerDocumentItemsToCatalogAction(documentId: string)
   await supabase.from("manager_documents").update({ status: "routed", supplier_id: supplier.id, updated_by: user.id }).eq("id", documentId)
   await supabase.from("manager_document_events").insert({ document_id: documentId, event_type: "routed", summary: `${prices.length} selected price${prices.length === 1 ? "" : "s"} added to the catalog.`, details: { destination: "catalog", supplier_id: supplier.id, created_item_count: createdCount, price_count: prices.length }, created_by: user.id })
   revalidatePath(`/admin/documents/${documentId}`); revalidatePath("/admin/documents"); revalidatePath("/admin/catalog"); revalidatePath("/admin/vendors")
-  return { ok: true, data: { itemCount: items.length, priceCount: prices.length, supplierName: supplier.name }, message: `${prices.length} selected price${prices.length === 1 ? "" : "s"} added for ${supplier.name}. Source and date were saved${usedCompatibilitySave ? " in the price note" : ""}.` }
+  return { ok: true, data: { itemCount: items.length, priceCount: prices.length, supplierName: supplier.name }, message: `${prices.length} supplier price${prices.length === 1 ? "" : "s"} saved from ${items.length} selected quote line${items.length === 1 ? "" : "s"} for ${supplier.name}. Source and date were saved${usedCompatibilitySave ? " in the price note" : ""}.` }
 }

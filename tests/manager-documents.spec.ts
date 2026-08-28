@@ -67,6 +67,8 @@ test("document center preserves originals and gates every destination behind rev
   expect(actions).not.toContain("byCode.get(catalogItemKey(item.item_code))")
   expect(actions).toContain("supplier_sku: clean(item.item_code")
   expect(actions).toContain("source_document_id: document.id")
+  expect(actions).toContain("candidateGroups")
+  expect(actions).toContain("Lowest of ${group.length} selected quote rows")
   expect(actions).toContain("Select at least one dependable supplier item")
   expect(review).toContain("Approved manager access is required")
   expect(review).toContain("Ignore source")
