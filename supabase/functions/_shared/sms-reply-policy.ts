@@ -273,6 +273,16 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
   if (!options.exactListOnly && !postListAnswer && halfInchSheetrock.test(value) && !/\b(?:keep|confirm(?:ed)?|yes|use|make|change|actually)?\s*(?:1\s*\/\s*2|5\s*\/\s*8)\b/i.test(textAfter(halfInchSheetrock))) {
     questions.push("Sheetrock thickness: keep 1/2-in., or change to our standard 5/8-in.?");
   }
+  const hasSheetrock = looksLikeSheetrock(value) || /\bsheet\s*rock\b|\bdrywall(?!\s+screws?)\b/i.test(value);
+  const sheetrockThickness = value.match(/\b(?:1\s*\/\s*4|3\s*\/\s*8|1\s*\/\s*2|5\s*\/\s*8)\s*(?:in(?:ch(?:es)?)?\.?|["”])?/i)?.[0] || "";
+  const hasSheetrockType = /\b(?:regular|type\s*x|fire[- ]?rated|moisture[- ]?resistant|mold[- ]?resistant|green\s*board|purple\s*board)\b/i.test(value);
+  if (hasSheetrock && !halfInchSheetrock.test(value) && (!sheetrockThickness || !hasSheetrockType)) {
+    questions.push(!sheetrockThickness && !hasSheetrockType
+      ? "Can we do 5/8-in. regular Sheetrock, or do you need Type X/fire-rated or moisture-resistant?"
+      : !sheetrockThickness
+        ? "Can we do 5/8-in. Sheetrock?"
+        : `For the ${sheetrockThickness.match(/(?:1\s*\/\s*4|3\s*\/\s*8|1\s*\/\s*2|5\s*\/\s*8)/i)?.[0]?.replace(/\s+/g, "") || sheetrockThickness}-in. Sheetrock: regular, Type X/fire-rated, or moisture-resistant?`);
+  }
 
   const cornerBit = /\bcorner\s+bit\b/i;
   const cornerAnswer = textAfter(cornerBit);

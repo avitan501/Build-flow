@@ -62,7 +62,8 @@ test("customer SMS uses semantic-first strong models and deterministic rules onl
   expect(broker).toContain('const fallback = escalated ? "gpt-5.6-sol" : "gpt-5.6-terra"')
   expect(broker).toContain("Interpret customer meaning semantically, not by exact spelling.")
   expect(broker).toContain("Never repeat the exact same question after the customer has answered any part of it.")
-  expect(broker).toContain('&& !/^gpt-/i.test(model)')
+  expect(broker).not.toContain('&& !/^gpt-/i.test(model)')
+  expect(broker).toContain("Reviewed construction rules are final output guards")
   expect(broker).toContain("semanticNormalizationSafe")
   expect(broker).toContain("customerPortalMagicUrl")
   expect(broker).toContain('url.searchParams.set("token_hash", tokenHash)')
@@ -228,6 +229,16 @@ test("material request advances across turns after address until complete", () =
 })
 
 test("ambiguous material lists must be clarified before confirmation", () => {
+  expect(smsMaterialClarificationQuestions("I need 50 Sheet Rock")).toEqual([
+    "Can we do 5/8-in. regular Sheetrock, or do you need Type X/fire-rated or moisture-resistant?",
+  ])
+  expect(smsMaterialClarificationQuestions("50 sheets of regular Sheetrock")).toEqual([
+    "Can we do 5/8-in. Sheetrock?",
+  ])
+  expect(smsMaterialClarificationQuestions("50 sheets of 5/8 Sheetrock")).toEqual([
+    "For the 5/8-in. Sheetrock: regular, Type X/fire-rated, or moisture-resistant?",
+  ])
+  expect(smsMaterialClarificationQuestions("50 sheets of 5/8 regular Sheetrock")).toEqual([])
   const list = `50 pc 2x4x8
 1000 pc box drywall screws 1 1/4
 20 drywall 4x8x1/2
@@ -402,6 +413,9 @@ test("a new request isolates clarification from unrelated conversation history",
   expect(brokerSource).toContain("const activeCustomerText = startsNewRequest ? body : context.customerText || body")
   expect(brokerSource).toContain("smsMaterialClarificationQuestions(activeCustomerText || reviewText, { exactListOnly })")
   expect(brokerSource).toContain("const replyContext = startsNewRequest ? `Customer: ${effectiveBody}`")
+  expect(brokerSource).toContain("A confirmed request is a hard context boundary")
+  expect(brokerSource).toContain("status = 'converted'")
+  expect(brokerSource).toContain("status = 'confirmed', created_request_id")
 
   const dirtyPreviousRequest = `10 Paint Sherwin-Williams OC-13 eggshell.\nNew request: I need 18 sheets of 1/2 regular Sheetrock.`
   expect(smsMaterialClarificationQuestions(dirtyPreviousRequest)).toEqual([
