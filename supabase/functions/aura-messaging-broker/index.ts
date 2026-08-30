@@ -2907,27 +2907,20 @@ async function releaseQuoFastPollLease(leaseToken: string) {
 async function runQuoFastPollWindow(leaseToken: string) {
   let ingested = 0;
   try {
-    // Keep the fallback window well below the next one-minute pg_cron tick.
-    // Quo network work adds time beyond the 5-second sleeps; five cycles
-    // preserve fast retries without keeping the Edge isolate busy at the
-    // following dispatch.
-    for (let cycle = 0; cycle < 5; cycle += 1) {
-      if (!await renewQuoFastPollLease(leaseToken)) {
-        console.error("quo_fast_poll_lease_lost");
-        return;
-      }
-      try {
-        const cycleIngested = await pollRecentQuoMessagesOnce();
-        ingested += cycleIngested;
-        // Processing a recovered inbound message may include AI work. End the
-        // fallback window after that cycle so it cannot overlap the next tick.
-        if (cycleIngested > 0) break;
-      } catch (error) {
-        console.error("quo_fast_poll_failed", error instanceof Error ? error.message : "unknown error");
-      }
-      if (cycle < 4) await new Promise((resolve) => setTimeout(resolve, 5000));
+    // The signed Quo webhook is the real-time path. This cron worker is only
+    // recovery for a missed webhook, so perform one bounded lookback per
+    // minute. A sleeping loop kept an Edge isolate occupied and intermittently
+    // blocked the following pg_net dispatch at its 30-second timeout.
+    if (!await renewQuoFastPollLease(leaseToken)) {
+      console.error("quo_fast_poll_lease_lost");
+      return;
     }
-    await sql`insert into public.aura_audit_log (action, details) values ('quo_fast_poll_window_completed', ${sql.json({ ingested, cycles: 5 })})`;
+    try {
+      ingested = await pollRecentQuoMessagesOnce();
+    } catch (error) {
+      console.error("quo_fast_poll_failed", error instanceof Error ? error.message : "unknown error");
+    }
+    await sql`insert into public.aura_audit_log (action, details) values ('quo_fast_poll_window_completed', ${sql.json({ ingested, cycles: 1 })})`;
   } finally {
     try {
       await releaseQuoFastPollLease(leaseToken);
