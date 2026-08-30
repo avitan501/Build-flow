@@ -1,10 +1,10 @@
 import "server-only";
 
-import { createHmac, timingSafeEqual } from "node:crypto";
-
 import { z } from "zod";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+
+export { verifyQuoSignature } from "@/lib/aura/quo-signature";
 import { normalizeAuraPhone } from "@/lib/aura/identity";
 
 const quoMediaSchema = z.object({
@@ -83,44 +83,6 @@ function allowedPhoneNumberIds() {
 
 export function parseQuoEvent(payload: unknown) {
   return quoEventSchema.safeParse(payload);
-}
-
-export function verifyQuoSignature(rawBody: string, signatureHeader: string | null, now = Date.now()) {
-  const encodedSecret = process.env.AURA_QUO_WEBHOOK_SIGNING_SECRET;
-  if (!encodedSecret || !signatureHeader) return false;
-
-  let compactPayload: string;
-  try {
-    compactPayload = JSON.stringify(JSON.parse(rawBody));
-  } catch {
-    return false;
-  }
-
-  let key: Buffer;
-  try {
-    key = Buffer.from(encodedSecret, "base64");
-  } catch {
-    return false;
-  }
-  if (key.length === 0) return false;
-
-  return signatureHeader.split(",").some((candidate) => {
-    const [scheme, version, timestamp, providedDigest, ...extra] = candidate.trim().split(";");
-    if (scheme !== "hmac" || version !== "1" || !timestamp || !providedDigest || extra.length > 0) return false;
-    const timestampMs = Number(timestamp);
-    if (!Number.isFinite(timestampMs) || Math.abs(now - timestampMs) > 5 * 60 * 1000) return false;
-
-    const expectedDigest = createHmac("sha256", key)
-      .update(`${timestamp}.${compactPayload}`, "utf8")
-      .digest();
-    let suppliedDigest: Buffer;
-    try {
-      suppliedDigest = Buffer.from(providedDigest, "base64");
-    } catch {
-      return false;
-    }
-    return suppliedDigest.length === expectedDigest.length && timingSafeEqual(suppliedDigest, expectedDigest);
-  });
 }
 
 function stringTo(value: string | string[] | undefined) {

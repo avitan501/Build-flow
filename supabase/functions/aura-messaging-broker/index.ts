@@ -402,12 +402,30 @@ async function validQuoSignature(
   encodedSecret: string,
 ) {
   if (!supplied) return false;
-  let compactPayload: string;
+  const payloads = new Set<string>([rawBody, rawBody.trim()]);
   try {
-    compactPayload = JSON.stringify(JSON.parse(rawBody));
+    payloads.add(JSON.stringify(JSON.parse(rawBody)));
   } catch {
     return false;
   }
+
+  let compactPayload = "";
+  let inString = false;
+  let escaped = false;
+  for (const character of rawBody) {
+    if (inString) {
+      compactPayload += character;
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+    } else if (character === '"') {
+      inString = true;
+      compactPayload += character;
+    } else if (!/\s/.test(character)) {
+      compactPayload += character;
+    }
+  }
+  payloads.add(compactPayload);
 
   for (const candidate of supplied.split(",")) {
     const [scheme, version, timestamp, digest, ...extra] = candidate
@@ -427,11 +445,13 @@ async function validQuoSignature(
       Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000
     )
       continue;
-    const expected = await hmacSha256Base64(
-      encodedSecret,
-      `${timestamp}.${compactPayload}`,
-    );
-    if (expected && constantTimeEqual(expected, digest)) return true;
+    for (const payload of payloads) {
+      const expected = await hmacSha256Base64(
+        encodedSecret,
+        `${timestamp}.${payload}`,
+      );
+      if (expected && constantTimeEqual(expected, digest)) return true;
+    }
   }
   return false;
 }
