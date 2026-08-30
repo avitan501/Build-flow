@@ -19,27 +19,33 @@ export async function POST(request: Request) {
   }
 
   const payload = JSON.stringify(body);
-  const timestamp = Date.now().toString();
-  const signature = createHmac("sha256", signingSecret).update(`${timestamp}.${payload}`).digest("base64");
-  let response: Response;
-  try {
-    response = await fetch(`${supabaseUrl}/functions/v1/aura-messaging-broker?mode=start-by-text`, {
-      method: "POST",
-      headers: {
-        apikey: anonKey,
-        authorization: `Bearer ${anonKey}`,
-        "content-type": "application/json",
-        "x-avantia-site-origin": new URL(request.url).origin,
-        "x-avantia-site-timestamp": timestamp,
-        "x-avantia-site-signature": signature,
-        "x-forwarded-for": request.headers.get("x-forwarded-for") || "",
-        "user-agent": request.headers.get("user-agent") || "",
-      },
-      body: payload,
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch {
+  let response: Response | null = null;
+  for (let attempt = 0; attempt < 2 && !response; attempt += 1) {
+    const timestamp = Date.now().toString();
+    const signature = createHmac("sha256", signingSecret).update(`${timestamp}.${payload}`).digest("base64");
+    try {
+      response = await fetch(`${supabaseUrl}/functions/v1/aura-messaging-broker?mode=start-by-text`, {
+        method: "POST",
+        headers: {
+          apikey: anonKey,
+          authorization: `Bearer ${anonKey}`,
+          "content-type": "application/json",
+          "x-avantia-site-origin": new URL(request.url).origin,
+          "x-avantia-site-timestamp": timestamp,
+          "x-avantia-site-signature": signature,
+          "x-forwarded-for": request.headers.get("x-forwarded-for") || "",
+          "user-agent": request.headers.get("user-agent") || "",
+        },
+        body: payload,
+        cache: "no-store",
+        signal: AbortSignal.timeout(12_000),
+      });
+    } catch {
+      // Retry once with the same idempotency key; the broker's unique claim
+      // prevents a late first attempt from sending a second starter text.
+    }
+  }
+  if (!response) {
     return NextResponse.json({ ok: false, error: "Text start is temporarily unavailable." }, { status: 503 });
   }
 
