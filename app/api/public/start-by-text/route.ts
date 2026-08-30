@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 
 const GENERIC_SUCCESS = "Check your phone for a text from Avantia Build.";
 const PRODUCTION_MESSAGING_URL = "https://nprfhspwdflpqlopydmp.supabase.co";
+const CANONICAL_TEXT_START_URL = "https://build-flow-wfl3.vercel.app/api/public/start-by-text";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -14,7 +15,27 @@ export async function POST(request: Request) {
 
   const signingSecret = process.env.START_TEXT_SIGNING_SECRET?.trim();
   if (!signingSecret) {
-    return NextResponse.json({ ok: false, error: "Text start is temporarily unavailable." }, { status: 503 });
+    // The public custom domain is deployed from a separate Vercel project.
+    // When that project does not own the signing secret, forward only this
+    // already-public request to the canonical server route that does. The
+    // canonical route still validates consent/phone, signs server-side, and
+    // enforces the broker's idempotency and 24-hour rate limit.
+    if (request.headers.get("x-avantia-start-proxy") === "1") {
+      return NextResponse.json({ ok: false, error: "Text start is temporarily unavailable." }, { status: 503 });
+    }
+    try {
+      const forwarded = await fetch(CANONICAL_TEXT_START_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-avantia-start-proxy": "1" },
+        body: JSON.stringify(body),
+        cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
+      });
+      const result = await forwarded.json().catch(() => null) as { ok?: boolean; error?: string; message?: string } | null;
+      return NextResponse.json(result || { ok: false, error: "Text start is temporarily unavailable." }, { status: forwarded.status });
+    } catch {
+      return NextResponse.json({ ok: false, error: "Text start is temporarily unavailable." }, { status: 503 });
+    }
   }
 
   const payload = JSON.stringify(body);
