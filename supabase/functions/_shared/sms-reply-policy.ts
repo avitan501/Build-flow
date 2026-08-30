@@ -78,7 +78,8 @@ export function smsHasFullDeliveryAddress(value: string) {
 }
 
 export function smsReplySuggestsOptionalItems(value: string) {
-  return /\b(?:also (?:consider|add|include)|do you also need|would you like (?:to add|any)|related items?|accessories|optional items?|you may (?:also )?need)\b/i.test(value) ||
+  return /\b(?:also (?:consider|add|include)|do you also need|would you like (?:to add|any)|related items?|accessories|optional items?|you may (?:also )?need|you(?:'ll| will| might| probably)? also need|we (?:recommend|suggest) (?:adding|including)|don['’]?t forget)\b/i.test(value) ||
+    /\b(?:is|are) (?:also )?(?:useful|recommended)\b/i.test(value) ||
     /\b(?:tambi[eé]n (?:considere|agregue|incluya)|accesorios|art[ií]culos opcionales)\b/i.test(value) ||
     /(?:כדאי\s*גם|להוסיף\s*גם|אביזרים|פריטים\s*נוספים|תוספות\s*אופציונליות)/i.test(value);
 }
@@ -556,6 +557,7 @@ export function smsUnansweredFollowUpText(params: { originalMessage: string; que
     if (productFamily === "metal_studs" && /\bsize\b/i.test(question) && /\blength\b/i.test(question) && /\bgauge\b/i.test(question)) return "Still need help with the stud size, length, or gauge?";
     if (productFamily === "metal_studs") return "Still need help with the stud length or gauge?";
     if (productFamily === "sheetrock") return "Can you confirm 5/8 in.?";
+    if (productFamily === "wood_studs" && /\blength\b/i.test(question)) return "Still need help with the stud size or length?";
     if (productFamily === "wood_studs") return "Still need help with the stud size?";
     return "Still need help with the product details?";
   }

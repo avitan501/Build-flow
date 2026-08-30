@@ -96,6 +96,40 @@ test("latest decision allows up to three essential questions and rejects padding
   expect(evaluateSmsReplyGate({ message: "20 drywall sheets", reply: "What is your favorite movie?", intent: "material_request", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "red", gateAutoSafe: false })
 })
 
+test("required questions stay green while optional recommendation statements cannot hide beside them", () => {
+  const required = [
+    "What size do you need?",
+    "How many pieces do you need?",
+    "What is the full delivery address?",
+    "When do you need it?",
+    "What color and finish do you need?",
+    "What size and length? What gauge?",
+    "What screw length? What thread type?",
+    "Can you confirm the compound type: 5-gallon all-purpose?",
+  ]
+  const optional = [
+    "Do you also need tape? How many sheets?",
+    "Would you like to add screws? How many sheets?",
+    "Also consider tape. How many sheets?",
+    "You may also need tape. How many sheets?",
+    "You will also need tape. How many sheets?",
+    "You also need tape. How many sheets?",
+    "We recommend adding tape. How many sheets?",
+    "Don't forget tape. How many sheets?",
+    "Tape is useful. How many sheets?",
+    "Need any accessories? How many sheets?",
+    "What size? Would you like any optional items?",
+    "Screws are also recommended. What size?",
+  ]
+  expect(required.length + optional.length).toBe(20)
+  for (const reply of required) {
+    expect(evaluateSmsReplyGate({ message: "I need materials", reply, intent: "material_request", participantRole: "lead", modelAutoSafe: true }), reply).toMatchObject({ level: "green", gateAutoSafe: true })
+  }
+  for (const reply of optional) {
+    expect(evaluateSmsReplyGate({ message: "I need materials", reply, intent: "material_request", participantRole: "lead", modelAutoSafe: true }), reply).toMatchObject({ level: "red", gateAutoSafe: false })
+  }
+})
+
 test("material request advances across turns after address until complete", () => {
   expect(smsHasExplicitQuantity("Need thinset")).toBe(false)
   expect(smsQuantityClarificationReply("Need thinset")).toBe("Sure — how much thinset do you need?")
@@ -346,6 +380,7 @@ test("one-shot unanswered follow-up is question-aware and cancels on every later
   expect(smsUnansweredFollowUpText({ originalMessage: "New request: I need metal studs", questionReply: "What size and length? What gauge?" })).toBe("Still need help with the stud size, length, or gauge?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell metal studs?", questionReply: "What length? What gauge?" })).toBe("Still need help with the stud length or gauge?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell Sheetrock?", questionReply: "Can you confirm 5/8 in.?" })).toBe("Can you confirm 5/8 in.?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "New request: I need wood studs", questionReply: "What size and length?" })).toBe("Still need help with the stud size or length?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Need wood studs", questionReply: "What size? How many do you need?" })).toBe("Still need help with the stud size or quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Need roofing shingles and Sheetrock", questionReply: "Can you confirm 5/8 in.? How many sheets do you need?" })).toBe("Can you confirm 5/8 in., type, and quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Need Sheetrock and wood studs", questionReply: "What stud size? How many do you need?" })).toBe("Still need help with the stud size or quantity?")
