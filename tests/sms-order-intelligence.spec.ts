@@ -71,3 +71,16 @@ test("completed request details cannot satisfy a new request", () => {
     matchedRules: ["drywall-sheet"],
   })
 })
+
+test("common trade shorthand for lumber and drywall screws remains fast", () => {
+  expect(smsMaterialIntelligenceAssessment("50 pcs 2x4x8")).toMatchObject({
+    matchedRules: ["dimensional-lumber"],
+    questions: [],
+    readyForConfirmation: true,
+  })
+  expect(smsMaterialIntelligenceAssessment('1000 pc drywall screws 1-1/4"')).toMatchObject({
+    matchedRules: ["drywall-fastener"],
+    questions: [],
+    readyForConfirmation: true,
+  })
+})
