@@ -32,6 +32,19 @@ import { SUPPLIER_QUOTE_BUCKET } from "@/lib/supplier-quotes";
 
 type Result<T> =
   { ok: true; data: T; message: string } | { ok: false; error: string };
+type PreparedManagerDocumentUpload =
+  | {
+      existingDocumentId: string;
+      documentId: string;
+      filePath: "";
+      token: "";
+    }
+  | {
+      existingDocumentId: null;
+      documentId: string;
+      filePath: string;
+      token: string;
+    };
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED_TYPES = new Set([
@@ -100,6 +113,117 @@ function cleanFileName(value: string) {
       .slice(-180) || "document"
   );
 }
+
+function validateManagerDocumentFile(input: {
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+}) {
+  if (!input.fileName.trim() || !Number.isFinite(input.fileSize) || input.fileSize <= 0)
+    return "Choose a document.";
+  if (input.fileSize > MAX_FILE_SIZE)
+    return "The document must be 25 MB or smaller.";
+  if (!ALLOWED_TYPES.has(input.fileType))
+    return "Use a PDF, CSV, TXT, JPG, PNG, or WEBP file.";
+  return null;
+}
+
+export async function prepareManagerDocumentUploadAction(input: {
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  sourceSha256: string;
+}): Promise<Result<PreparedManagerDocumentUpload>> {
+  const { supabase, user } = await requireStaffProfile("suppliers");
+  const fileError = validateManagerDocumentFile(input);
+  if (fileError) return { ok: false, error: fileError };
+  if (!/^[a-f0-9]{64}$/i.test(input.sourceSha256))
+    return { ok: false, error: "The document could not be verified. Try it again." };
+
+  const duplicate = await supabase
+    .from("manager_documents")
+    .select("id")
+    .eq("source_sha256", input.sourceSha256.toLowerCase())
+    .neq("status", "archived")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (duplicate.data) {
+    return {
+      ok: true,
+      data: {
+        existingDocumentId: duplicate.data.id,
+        documentId: duplicate.data.id,
+        filePath: "",
+        token: "",
+      },
+      message: "This document is already saved. Opening it now.",
+    };
+  }
+
+  const documentId = crypto.randomUUID();
+  const filePath = `${user.id}/staged/${documentId}/${cleanFileName(input.fileName)}`;
+  const { data, error } = await supabase.storage
+    .from(MANAGER_DOCUMENT_BUCKET)
+    .createSignedUploadUrl(filePath);
+  if (error || !data?.token) {
+    console.error("Manager document signed upload preparation failed", error);
+    return { ok: false, error: "The private upload could not be prepared. Try again." };
+  }
+  return {
+    ok: true,
+    data: { existingDocumentId: null, documentId, filePath, token: data.token },
+    message: "Private upload ready.",
+  };
+}
+
+export async function completeManagerDocumentUploadAction(input: {
+  documentId: string;
+  filePath: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  sourceSha256: string;
+  browserOcrText?: string;
+  intent?: string;
+}): Promise<Result<{ documentId: string }>> {
+  const { supabase, user } = await requireStaffProfile("suppliers");
+  const fileError = validateManagerDocumentFile(input);
+  if (fileError) return { ok: false, error: fileError };
+  const expectedPrefix = `${user.id}/staged/${input.documentId}/`;
+  if (
+    !UUID_PATTERN.test(input.documentId) ||
+    !input.filePath.startsWith(expectedPrefix) ||
+    !/^[a-f0-9]{64}$/i.test(input.sourceSha256)
+  )
+    return { ok: false, error: "The private upload reference is invalid. Upload it again." };
+
+  const { data, error } = await supabase.storage
+    .from(MANAGER_DOCUMENT_BUCKET)
+    .download(input.filePath);
+  if (error || !data) {
+    console.error("Manager staged document download failed", error);
+    return { ok: false, error: "The document did not finish uploading. Try again." };
+  }
+
+  try {
+    if (data.size !== input.fileSize)
+      return { ok: false, error: "The document upload was incomplete. Try again." };
+    const formData = new FormData();
+    formData.set("documentFile", new File([data], input.fileName, { type: input.fileType }));
+    formData.set("browserOcrText", input.browserOcrText ?? "");
+    formData.set("intent", input.intent ?? "");
+    formData.set("sourceChannel", "website_upload");
+    formData.set("sourceLabel", "Website upload");
+    return await uploadManagerDocumentAction(formData);
+  } finally {
+    const { error: cleanupError } = await supabase.storage
+      .from(MANAGER_DOCUMENT_BUCKET)
+      .remove([input.filePath]);
+    if (cleanupError)
+      console.error("Manager staged document cleanup failed", cleanupError);
+  }
+}
 function importedSupplierId(name: string) {
   const slug = name
     .toLowerCase()
@@ -152,12 +276,13 @@ export async function uploadManagerDocumentAction(
 ): Promise<Result<{ documentId: string }>> {
   const { supabase, user } = await requireStaffProfile("suppliers");
   const file = formData.get("documentFile");
-  if (!(file instanceof File) || !file.size)
-    return { ok: false, error: "Choose a document." };
-  if (file.size > MAX_FILE_SIZE)
-    return { ok: false, error: "The document must be 25 MB or smaller." };
-  if (!ALLOWED_TYPES.has(file.type))
-    return { ok: false, error: "Use a PDF, CSV, TXT, JPG, PNG, or WEBP file." };
+  if (!(file instanceof File)) return { ok: false, error: "Choose a document." };
+  const fileError = validateManagerDocumentFile({
+    fileName: file.name,
+    fileType: file.type,
+    fileSize: file.size,
+  });
+  if (fileError) return { ok: false, error: fileError };
 
   const bytes = Buffer.from(await file.arrayBuffer());
   const sourceSha256 = createHash("sha256").update(bytes).digest("hex");

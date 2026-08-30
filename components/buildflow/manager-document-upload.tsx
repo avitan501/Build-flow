@@ -4,8 +4,14 @@ import { FileUp, LoaderCircle, ShieldCheck, Sparkles, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
-import { uploadManagerDocumentAction } from "@/app/admin/documents/actions"
+import { completeManagerDocumentUploadAction, prepareManagerDocumentUploadAction } from "@/app/admin/documents/actions"
 import { extractImageTextInBrowser } from "@/lib/browser-document-extraction"
+import { createClient } from "@/lib/supabase/client"
+
+async function sha256(file: File) {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer())
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")
+}
 
 export function ManagerDocumentUpload({ initialIntent = "", initiallyOpen = false }: { initialIntent?: string; initiallyOpen?: boolean }) {
   const router = useRouter()
@@ -18,17 +24,57 @@ export function ManagerDocumentUpload({ initialIntent = "", initiallyOpen = fals
   function submit(formData: FormData) {
     setError("")
     startTransition(async () => {
-      const file = formData.get("documentFile")
-      if (file instanceof File && file.type.startsWith("image/")) {
-        try {
-          setStatus("Reading visible text on this device…")
-          formData.set("browserOcrText", await extractImageTextInBrowser(file, setStatus))
-        } catch { formData.set("browserOcrText", "") }
+      try {
+        const file = formData.get("documentFile")
+        if (!(file instanceof File) || !file.size) { setError("Choose a document."); return }
+        setStatus("Preparing a private upload…")
+        const sourceSha256 = await sha256(file)
+        const prepared = await prepareManagerDocumentUploadAction({
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          sourceSha256,
+        })
+        if (!prepared.ok) { setStatus(""); setError(prepared.error); return }
+        if (prepared.data.existingDocumentId) {
+          router.push(`/admin/documents/${prepared.data.existingDocumentId}`)
+          return
+        }
+
+        let browserOcrText = ""
+        if (file.type.startsWith("image/")) {
+          try {
+            setStatus("Reading visible text on this device…")
+            browserOcrText = await extractImageTextInBrowser(file, setStatus)
+          } catch { browserOcrText = "" }
+        }
+        setStatus("Uploading the original securely…")
+        const { error: uploadError } = await createClient().storage
+          .from("manager-documents")
+          .uploadToSignedUrl(prepared.data.filePath, prepared.data.token, file, {
+            contentType: file.type,
+            upsert: false,
+          })
+        if (uploadError) { setStatus(""); setError("The document could not be uploaded. Try again."); return }
+
+        setStatus("Original saved. Classifying and checking the document…")
+        const result = await completeManagerDocumentUploadAction({
+          documentId: prepared.data.documentId,
+          filePath: prepared.data.filePath,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          sourceSha256,
+          browserOcrText,
+          intent: String(formData.get("intent") ?? ""),
+        })
+        if (!result.ok) { setStatus(""); setError(result.error); return }
+        router.push(`/admin/documents/${result.data.documentId}`)
+      } catch (uploadError) {
+        console.error("Manager document upload flow failed", uploadError)
+        setStatus("")
+        setError("The upload stopped before the document opened. Your page is safe—please try again.")
       }
-      setStatus("Original saved. Classifying and checking the document…")
-      const result = await uploadManagerDocumentAction(formData)
-      if (!result.ok) { setStatus(""); setError(result.error); return }
-      router.push(`/admin/documents/${result.data.documentId}`)
     })
   }
 
