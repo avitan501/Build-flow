@@ -41,8 +41,10 @@ test("supplier prices remain compact without unreadably small primary text", asy
   const source = await readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8")
 
   expect(source).toContain(".slice(0, 3)")
-  expect(source).toContain("min-h-16 w-full")
+  expect(source).toContain("min-h-20 w-full")
   expect(source).toContain("truncate text-base font-bold")
+  expect(source).toContain("manufacturer product photo")
+  expect(source).toContain("Pack: {catalogItemPackLabel(item)}")
   expect(source).toContain("h-10 shrink-0 rounded-md")
 })
 
