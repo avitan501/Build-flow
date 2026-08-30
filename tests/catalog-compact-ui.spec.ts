@@ -37,10 +37,23 @@ test("catalog list expands until an item opens the closable details panel", asyn
   expect(source).toContain('className="flex min-w-0 items-center gap-1.5 overflow-x-auto"')
 })
 
-test("supplier prices stay compact and only the best three are shown", async () => {
+test("supplier prices remain compact without unreadably small primary text", async () => {
   const source = await readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8")
 
   expect(source).toContain(".slice(0, 3)")
-  expect(source).toContain('className="flex w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-left"')
-  expect(source).toContain('text-[10px] font-semibold')
+  expect(source).toContain("min-h-16 w-full")
+  expect(source).toContain("truncate text-base font-bold")
+  expect(source).toContain("h-10 shrink-0 rounded-md")
+})
+
+test("catalog exposes Home Depot and Lowe's without inventing a price", async () => {
+  const workspace = await readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8")
+  const priceCheck = await readFile(path.join(root, "components/buildflow/material-price-check.tsx"), "utf8")
+  const retailerLinks = await readFile(path.join(root, "lib/catalog-retailer-links.ts"), "utf8")
+
+  expect(workspace).toContain("catalogRetailerSearchLinks(selectedItem)")
+  expect(priceCheck).toContain('const majorRetailers = links.filter')
+  expect(priceCheck).toContain("Exact price not shown until verified")
+  expect(retailerLinks).toContain('name: "Home Depot"')
+  expect(retailerLinks).toContain('name: "Lowe\'s"')
 })

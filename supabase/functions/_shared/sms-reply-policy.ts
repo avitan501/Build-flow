@@ -383,12 +383,26 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
 
   const thinset = /\bthin\s*set\b|\bthinset\b|\btile\s+(?:mortar|adhesive)\b/i.test(value);
   if (thinset) {
+    // A manufacturer + model is already the product decision. Once the
+    // customer names MAPEI Ultraflex 1, asking about tile, substrate, or
+    // location is redundant and makes the intake feel like a questionnaire.
+    const hasExactThinsetProduct = /\b(?:mapei\s+)?ultra\s*flex\s*1\b|\b(?:mapei\s+)?ultraflex\s*1\b/i.test(value);
     const hasTile = /\b(?:porcelain|ceramic|glass|marble|granite|stone|mosaic|tile)\b[^\n]{0,35}\b\d+(?:\.\d+)?\s*(?:x|×|in|inch)|\b\d+(?:\.\d+)?\s*(?:x|×)\s*\d+(?:\.\d+)?\b[^\n]{0,35}\b(?:tile|porcelain|ceramic|stone)\b/i.test(value);
     const hasSubstrate = /\b(?:concrete|cement\s*board|backer\s*board|drywall|gypsum|plywood|osb|membrane|ditra)\b/i.test(value);
     const hasLocation = /\b(?:floor|wall|shower|bathroom|kitchen|backsplash|indoor|interior|outdoor|exterior|pool)\b/i.test(value);
-    if (!hasTile) questions.push("What tile type and size are you installing?");
-    if (!hasSubstrate || !hasLocation) questions.push("What substrate and installation location is it for?");
+    if (!hasExactThinsetProduct && !hasTile) questions.push("What tile type and size are you installing?");
+    if (!hasExactThinsetProduct && (!hasSubstrate || !hasLocation)) questions.push("What substrate and installation location is it for?");
     addQuantityQuestion("thinset", "bags", quantityProductPredicates[2]);
+  }
+
+  const sand = /\b(?:sand|arena)\b/i.test(value);
+  if (sand && !/\b(?:mason(?:ry)?|concrete|fill|utility|torpedo|play)\s+sand\b|\bsand\s+(?:for\s+)?(?:masonry|concrete|fill)\b/i.test(value)) {
+    questions.push("Which sand do you need: mason sand, concrete sand, or fill sand?");
+  }
+
+  const portlandCement = /\bportland\s+cement\b|\bcement\s+portland\b/i.test(value);
+  if (portlandCement && !/\b(?:bags?|sacks?)\b|\b(?:47|50|80|92\.6|94)\s*(?:lb|lbs|pounds?)\b|\btype\s*(?:i|ii|iii|iv|v|1|2|3|4|5)(?:\s*\/\s*(?:i|ii|1|2))?\b/i.test(value)) {
+    questions.push("Can we use standard 94-lb Type I/II Portland cement bags?");
   }
 
   const roofing = /\b(?:roofing\s+)?shingles?\b/i.test(value);

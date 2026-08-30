@@ -85,6 +85,18 @@ test("common trade shorthand for lumber and drywall screws remains fast", () => 
   })
 })
 
+test("an exact branded thinset skips generic application questions and asks only true material choices", () => {
+  const assessment = smsMaterialIntelligenceAssessment(
+    "5 yards sand\n45 Portland cement\n50 MAPEI Ultraflex 1 thinset",
+  )
+
+  expect(assessment.questions).toEqual([
+    "Which sand do you need: mason sand, concrete sand, or fill sand?",
+    "Can we use standard 94-lb Type I/II Portland cement bags?",
+  ])
+  expect(assessment.questions.join(" ")).not.toMatch(/tile type|substrate|installation location/i)
+})
+
 test("trade intake never treats one product quantity as every product quantity", () => {
   const assessment = smsMaterialIntelligenceAssessment(
     "50 sheets 5/8 regular Sheetrock and thinset for 12x24 porcelain on a concrete floor",
