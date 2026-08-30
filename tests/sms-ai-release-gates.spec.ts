@@ -53,6 +53,13 @@ test("Quo recovery batches duplicate checks before ingesting messages", async ()
   expect(broker).toContain("if (!activityId || storedIds.has(activityId)) continue")
 })
 
+test("public text start uses a dedicated signing secret instead of a database credential", async () => {
+  const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  expect(broker).toContain('publicStartTextSigningSecret: "public_start_text_signing_secret"')
+  expect(broker).toContain("await secret(secretNames.publicStartTextSigningSecret)")
+  expect(broker).not.toContain('hmacSha256Base64RawKey(serviceKey, `${timestamp}.${payload}`)')
+})
+
 test("fail-closed output gate blocks multilingual prices, stock assertions, promises, and protected intents", () => {
   const unsafe = [
     ["The price is $1,250.", "general"],

@@ -75,6 +75,7 @@ const secretNames = {
   quoWebhookSecret: "aura_quo_webhook_signing_secret",
   quoPhoneNumberId: "aura_quo_phone_number_id",
   openaiKey: "openai_supplier_quote_api_key",
+  publicStartTextSigningSecret: "public_start_text_signing_secret",
 } as const;
 
 function customerReplyModel(escalated = false) {
@@ -4252,8 +4253,9 @@ async function handlePublicStartByText(req: Request) {
   const suppliedSignature = req.headers.get("x-avantia-site-signature") || "";
   const timestampMs = Number(timestamp);
   const signatureIsFresh = Number.isFinite(timestampMs) && Math.abs(Date.now() - timestampMs) <= 2 * 60 * 1000;
-  const expectedSignature = signatureIsFresh
-    ? await hmacSha256Base64RawKey(serviceKey, `${timestamp}.${payload}`)
+  const signingSecret = signatureIsFresh ? await secret(secretNames.publicStartTextSigningSecret) : null;
+  const expectedSignature = signingSecret
+    ? await hmacSha256Base64RawKey(signingSecret, `${timestamp}.${payload}`)
     : "";
   if (!expectedSignature || !constantTimeEqual(expectedSignature, suppliedSignature)) {
     return json({ error: "Invalid site dispatch signature." }, 401);

@@ -13,14 +13,14 @@ export async function POST(request: Request) {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+  const signingSecret = process.env.START_TEXT_SIGNING_SECRET?.trim();
+  if (!supabaseUrl || !anonKey || !signingSecret) {
     return NextResponse.json({ ok: false, error: "Text start is temporarily unavailable." }, { status: 503 });
   }
 
   const payload = JSON.stringify(body);
   const timestamp = Date.now().toString();
-  const signature = createHmac("sha256", serviceRoleKey).update(`${timestamp}.${payload}`).digest("base64");
+  const signature = createHmac("sha256", signingSecret).update(`${timestamp}.${payload}`).digest("base64");
   let response: Response;
   try {
     response = await fetch(`${supabaseUrl}/functions/v1/aura-messaging-broker?mode=start-by-text`, {
