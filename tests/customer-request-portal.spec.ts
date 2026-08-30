@@ -28,15 +28,20 @@ test("only explicit confirmations can complete an exact pending SMS summary", as
   );
   expect(broker).toContain("sql.begin");
   expect(broker).toContain("customer_request_portal_invite_outbox");
-  expect(broker).toContain("await sendQuoSms(phone, outbox[0].message)");
+  expect(broker).toContain(
+    "await sendQuoSms(claimed[0].normalized_phone, message)",
+  );
+  expect(broker).toContain("generated at send time");
   expect(broker).toContain("phone_confirm: true");
   expect(broker).toContain(
     "where phone = ${phone} and phone_confirmed_at is not null",
   );
   expect(broker).toContain("@phone-login.buildflow.local");
-  expect(broker).toContain("admin.auth.admin.generateLink({ type: \"magiclink\", email })");
+  expect(broker).toContain("admin.auth.admin.generateLink({");
+  expect(broker).toContain('type: "magiclink"');
   expect(broker).toContain('url.searchParams.set("token_hash", tokenHash)');
-  expect(broker).toContain("and status in ('pending', 'failed')");
+  expect(broker).toContain("outbox.status in ('pending','failed')");
+  expect(broker).toContain("outbox.status = 'sending'");
 });
 
 test("request numbers and portal ownership are enforced in the database", async () => {

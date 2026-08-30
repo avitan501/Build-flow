@@ -55,6 +55,13 @@ export async function POST(request: Request) {
   let storedByBroker = false;
   if (canUseTwilioWhatsApp()) {
     if (!verifyTwilioWhatsAppRequest(request.url, signature, params)) return twimlResponse(401);
+    try {
+      storedByBroker = await forwardToSecureAuraBroker(request, signature, rawBody);
+    } catch {
+      // The verified local persistence path remains available if the broker is
+      // temporarily unavailable. Shadow analysis must never block WhatsApp.
+      storedByBroker = false;
+    }
   } else {
     try {
       storedByBroker = await forwardToSecureAuraBroker(request, signature, rawBody);

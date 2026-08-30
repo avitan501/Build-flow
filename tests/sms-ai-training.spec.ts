@@ -55,7 +55,8 @@ test("auto-safe replies use multilingual deterministic blocks and concise missin
   }
   expect(broker).toContain("never repeat a question already answered")
   expect(broker).toContain("Ask one to three short, essential")
-  expect(broker).toContain("default quantity to 1 when omitted")
+  expect(broker).toContain("quantityExplicit")
+  expect(broker).toContain("quantity_inferred")
   expect(broker).toContain("Never ask for a ZIP code")
   expect(broker).toContain("full delivery address")
   expect(broker).toContain("never ask the customer for a request ID")

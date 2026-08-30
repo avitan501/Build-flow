@@ -42,6 +42,8 @@ import {
 const root = process.cwd()
 
 test("request summaries pluralize packages and avoid repeated package wording", () => {
+  expect(formatSmsRequestSummaryItem({ name: "1/2 in. regular Sheetrock", quantity: 1, unit: "each", quantityExplicit: false }))
+    .toBe("• Quantity not specified — 1/2 in. regular Sheetrock")
   expect(formatSmsRequestSummaryItem({ name: "Benjamin Moore OC-13, eggshell, one-gallon can", quantity: 3, unit: "can" }))
     .toBe("• 3 one-gallon cans — Benjamin Moore OC-13, eggshell")
   expect(formatSmsRequestSummaryItem({ name: "5/8 regular Sheetrock", quantity: 25, unit: "sheet" }))
