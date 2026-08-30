@@ -106,6 +106,12 @@ test("material request advances across turns after address until complete", () =
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: false, proposedReply: "A manager will review." })).toBe("needed_by")
   expect(smsHasNeededByTiming("Tomorrow")).toBe(true)
   expect(smsNeededByTimingValue("Need it Monday\nActually tomorrow")).toBe("tomorrow")
+  expect(smsHasNeededByTiming("5/8 regular, 23 sheets")).toBe(false)
+  expect(smsNeededByTimingValue("5/8 regular, 23 sheets")).toBeNull()
+  expect(smsNeededByTimingValue("Need by 8/31")).toBe("8/31")
+  expect(smsNeededByTimingValue("8/31/2026")).toBe("8/31/2026")
+  expect(smsNeededByTimingValue("screws for 5/8 Sheetrock")).toBeNull()
+  expect(smsNeededByTimingValue("use on 5/8 drywall")).toBeNull()
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "What thickness? What brand?" })).toBe("proposed")
   expect(inspectSmsQuestionStructure("What thickness? What brand?").valid).toBe(true)
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "I have the details. A manager will review." })).toBe("proposed")
@@ -117,6 +123,9 @@ test("broker-created request progression replies are gated independently from mo
   expect(brokerSource).toContain('const deterministicProgression = params.result.isMaterialRequest')
   expect(brokerSource).toContain("const gateModelAutoSafe = result.autoSafe || deterministicProgression")
   expect(brokerSource).toContain("customerNeededBy: smsNeededByTimingValue(context.customerText || reviewText) || \"\"")
+  expect(brokerSource).toContain("const activeOrdered = newRequestBoundary >= 0 ? ordered.slice(newRequestBoundary) : ordered")
+  expect(brokerSource).toContain('message.direction === "incoming" && smsStartsNewMaterialRequest')
+  expect(brokerSource).toContain('customerEvent !== "correction" && !linkedCorrectionRequestId && deliveryAddressKnown')
   expect(brokerSource).toContain("if (!input.customerAddress.trim() || !input.customerNeededBy.trim() || !input.request.items.length) return false")
   expect(brokerSource).toContain("if (!smsNeededByTimingValue(pending.summary_text))")
   expect(brokerSource).toContain("`Needed by: ${neededBy}`")
@@ -134,6 +143,13 @@ test("broker-created request progression replies are gated independently from mo
     participantRole: "lead",
     modelAutoSafe: true,
   })).toMatchObject({ level: "green", gateAutoSafe: true })
+})
+
+test("new-request boundaries require an affirmative instruction", () => {
+  expect(smsStartsNewMaterialRequest("New request: I need Sheetrock")).toBe(true)
+  expect(smsStartsNewMaterialRequest("This is not a new order—add it to the same request")).toBe(false)
+  expect(smsStartsNewMaterialRequest("Don't make a new order")).toBe(false)
+  expect(smsStartsNewMaterialRequest("Is this a new order?")).toBe(false)
 })
 
 test("product inquiry fallback answers the product and asks only useful next questions", () => {
@@ -215,6 +231,8 @@ test("one-shot unanswered follow-up is question-aware and cancels on every later
   expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell metal studs?", questionReply: "What length and gauge?" })).toBe("Still need help with the stud length or gauge?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell Sheetrock?", questionReply: "Can you confirm 5/8 in.?" })).toBe("Can you confirm 5/8 in.?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Need wood studs", questionReply: "What size? How many do you need?" })).toBe("Still need help with the stud size or quantity?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "Need roofing shingles and Sheetrock", questionReply: "Can you confirm 5/8 in.? How many sheets do you need?" })).toBe("Can you confirm 5/8 in., type, and quantity?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "Need Sheetrock and wood studs", questionReply: "What stud size? How many do you need?" })).toBe("Still need help with the stud size or quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Need product", questionReply: "What type? How many do you need?" })).toBe("Still need help with the product details or quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Necesito yeso", questionReply: "¿Cuál es la dirección completa de entrega?" })).toBe("¿Aún necesita ayuda con la dirección de entrega?")
   expect(smsUnansweredFollowUpText({ originalMessage: "צריך גבס", questionReply: "מתי החומרים נדרשים, ומה כתובת המשלוח המלאה?" })).toBe("עדיין צריך עזרה עם פרטי המשלוח?")

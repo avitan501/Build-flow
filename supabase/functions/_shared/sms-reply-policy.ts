@@ -186,6 +186,9 @@ export function resolveSmsExactListPreference(params: { storedContact?: boolean 
 }
 
 export function smsStartsNewMaterialRequest(value: string) {
+  if (/\b(?:not|don['’]?t|do\s+not|is\s+this|is\s+that|should\s+(?:this|that|i|we))\b.{0,40}\b(?:new|separate|different)\s+(?:order|job|project|request|material list)\b/i.test(value) ||
+    /(?:לא|אל)\s+(?:לפתוח|תפתח|ליצור|תיצור).{0,30}(?:הזמנה|עבודה|פרויקט|בקשה)\s+(?:חדשה|חדש|נפרדת|נפרד)/i.test(value) ||
+    /\b(?:no|not?)\s+(?:abra|crear|cree).{0,30}\b(?:nuevo|nueva|separado|separada)\s+(?:pedido|trabajo|proyecto|solicitud)\b/i.test(value)) return false;
   return /\b(?:new|separate|different)\s+(?:order|job|project|request|material list)\b|(?:הזמנה|עבודה|פרויקט|בקשה|רשימת חומרים)\s+(?:חדשה|חדש|נפרדת|נפרד|אחרת|אחר)|\b(?:nuevo|nueva|separado|separada|diferente)\s+(?:pedido|trabajo|proyecto|solicitud|lista de materiales)\b/i.test(value);
 }
 
@@ -194,11 +197,16 @@ export function resolveSmsDeliveryAddressKnown(params: { storedDraft?: boolean |
   return Boolean(suppliedNow || (!params.startsNewRequest && params.storedDraft));
 }
 
-const SMS_NEEDED_BY_TIMING_PATTERN = /\b(?:asap|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next\s+(?:week|month)|\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)\b|(?:דחוף|בהקדם|היום|מחר|יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי)|שבוע\s+הבא)|\b(?:hoy|ma[nñ]ana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|pr[oó]xima\s+semana)\b/i;
+// A bare two-part fraction such as 5/8 is a common construction specification,
+// not a delivery date. Two-part numeric dates therefore require an explicit
+// timing cue; a three-part date is unambiguous enough to stand alone.
+const SMS_NEEDED_BY_TIMING_PATTERN = /\b(?:asap|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next\s+(?:week|month)|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|(?:need(?:ed)?(?:\s+it)?\s+(?:by|on|for)|by|delivery(?:\s+(?:on|for))?)\s+\d{1,2}[/-]\d{1,2})\b|(?:דחוף|בהקדם|היום|מחר|יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי)|שבוע\s+הבא)|\b(?:hoy|ma[nñ]ana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|pr[oó]xima\s+semana)\b/i;
 
 export function smsNeededByTimingValue(value: string) {
   const matches = [...value.matchAll(new RegExp(SMS_NEEDED_BY_TIMING_PATTERN.source, "gi"))];
-  return matches.at(-1)?.[0]?.trim() || null;
+  const match = matches.at(-1)?.[0]?.trim();
+  if (!match) return null;
+  return match.replace(/^(?:need(?:ed)?(?:\s+it)?\s+(?:by|on|for)|by|delivery(?:\s+(?:on|for))?)\s+/i, "");
 }
 
 export function smsHasNeededByTiming(value: string) {
@@ -375,23 +383,37 @@ export function smsUnansweredFollowUpText(params: { originalMessage: string; que
     return "¿Aún necesita ayuda con esto?";
   }
   if (asksAddress && asksTiming) return "Still need help with the delivery details?";
-  const productContext = `${params.originalMessage}\n${params.questionReply}`;
-  const roofing = /\b(?:roofing|shingles?)\b/i.test(productContext);
-  const metalStuds = /\bmetal\s+studs?\b/i.test(productContext);
-  const sheetrock = /\b(?:sheetrock|drywall)\b/i.test(productContext);
-  const studs = /\bstuds?\b/i.test(productContext);
+  const productFamilies = (value: string, allowGenericStuds = false) => [
+    /\b(?:roofing|shingles?)\b/i.test(value) ? "roofing" : null,
+    /\bmetal\s+studs?\b/i.test(value) ? "metal_studs" : null,
+    /\b(?:sheetrock|drywall)\b/i.test(value) ? "sheetrock" : null,
+    /\bwood(?:en)?\s+studs?\b/i.test(value) ? "wood_studs" : null,
+    allowGenericStuds && /\bstuds?\b/i.test(value) && !/\b(?:metal|wood(?:en)?)\s+studs?\b/i.test(value) ? "studs" : null,
+  ].filter(Boolean) as string[];
+  const questionFamilies = productFamilies(params.questionReply, true);
+  const originalFamilies = productFamilies(params.originalMessage);
+  const originalStudFamilies = originalFamilies.filter((family) => family === "metal_studs" || family === "wood_studs");
+  const sheetrockSpecificationQuestion = /\b5\s*\/\s*8\b/i.test(params.questionReply) && originalFamilies.includes("sheetrock");
+  const questionFamily = sheetrockSpecificationQuestion ? "sheetrock" : questionFamilies.length === 1 ? questionFamilies[0] : null;
+  const productFamily = questionFamily === "studs" && originalStudFamilies.length === 1
+    ? originalStudFamilies[0]
+    : questionFamily && questionFamily !== "studs"
+      ? questionFamily
+      : questionFamilies.length === 0 && originalFamilies.length === 1
+        ? originalFamilies[0]
+        : null;
   if (asksSpecification && asksQuantity) {
-    if (roofing) return "Still need help with the shingle type, color, or quantity?";
-    if (metalStuds) return "Still need help with the stud size, gauge, or quantity?";
-    if (sheetrock) return "Can you confirm 5/8 in., type, and quantity?";
-    if (studs) return "Still need help with the stud size or quantity?";
+    if (productFamily === "roofing") return "Still need help with the shingle type, color, or quantity?";
+    if (productFamily === "metal_studs") return "Still need help with the stud size, gauge, or quantity?";
+    if (productFamily === "sheetrock") return "Can you confirm 5/8 in., type, and quantity?";
+    if (productFamily === "wood_studs") return "Still need help with the stud size or quantity?";
     return "Still need help with the product details or quantity?";
   }
   if (asksSpecification) {
-    if (roofing) return "Still need help with the shingle type or color?";
-    if (metalStuds) return "Still need help with the stud length or gauge?";
-    if (sheetrock) return "Can you confirm 5/8 in.?";
-    if (studs) return "Still need help with the stud size?";
+    if (productFamily === "roofing") return "Still need help with the shingle type or color?";
+    if (productFamily === "metal_studs") return "Still need help with the stud length or gauge?";
+    if (productFamily === "sheetrock") return "Can you confirm 5/8 in.?";
+    if (productFamily === "wood_studs") return "Still need help with the stud size?";
     return "Still need help with the product details?";
   }
   if (asksQuantity) return "Still need help with the quantity?";

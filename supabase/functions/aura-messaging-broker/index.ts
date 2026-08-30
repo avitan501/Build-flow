@@ -1614,6 +1614,12 @@ async function smsConversationContext(phone: string) {
     `,
   ]);
   const ordered = [...rows].reverse();
+  let newRequestBoundary = -1;
+  for (let index = 0; index < ordered.length; index += 1) {
+    const message = ordered[index];
+    if (message.direction === "incoming" && smsStartsNewMaterialRequest(message.body?.trim() || "")) newRequestBoundary = index;
+  }
+  const activeOrdered = newRequestBoundary >= 0 ? ordered.slice(newRequestBoundary) : ordered;
   const messageText = (message: typeof rows[number]) => {
     const media = Array.isArray(message.media) ? message.media : [];
     const mediaTypes = media.flatMap((entry) => {
@@ -1625,8 +1631,8 @@ async function smsConversationContext(phone: string) {
     return [message.body?.trim() || "", attachment].filter(Boolean).join(" ");
   };
   return {
-    replyText: [linkedRequests[0] ? `Avantia record: Linked material request “${linkedRequests[0].title.slice(0, 180)}” has internal status “${linkedRequests[0].status.slice(0, 60)}”. Do not expose the internal status as a promise; use it only to avoid asking the customer for a request ID.` : "", ...ordered.map((message) => `${message.direction === "incoming" ? "Customer" : "Avantia"}: ${messageText(message)}`)].filter(Boolean).join("\n"),
-    customerText: ordered.filter((message) => message.direction === "incoming").map(messageText).join("\n"),
+    replyText: [newRequestBoundary < 0 && linkedRequests[0] ? `Avantia record: Linked material request “${linkedRequests[0].title.slice(0, 180)}” has internal status “${linkedRequests[0].status.slice(0, 60)}”. Do not expose the internal status as a promise; use it only to avoid asking the customer for a request ID.` : "", ...activeOrdered.map((message) => `${message.direction === "incoming" ? "Customer" : "Avantia"}: ${messageText(message)}`)].filter(Boolean).join("\n"),
+    customerText: activeOrdered.filter((message) => message.direction === "incoming").map(messageText).join("\n"),
   };
 }
 
@@ -2216,7 +2222,7 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
         on conflict (communication_id) do nothing
       `;
     }
-    if (customerEvent !== "correction" && !linkedCorrectionRequestId) {
+    if (customerEvent !== "correction" && !linkedCorrectionRequestId && deliveryAddressKnown) {
       confirmationPrepared = await prepareSmsRequestConfirmation({
         phone,
         customerName: result.customerName || openDraft?.customer_name || contact?.full_name || phone,
