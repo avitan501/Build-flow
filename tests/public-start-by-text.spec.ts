@@ -39,6 +39,7 @@ test("public text starter is fixed-copy, consented, rate-limited, and audited", 
   expect(route).toContain("same idempotency key")
   expect(route).not.toContain("input.message")
   expect(broker).toContain("PUBLIC_START_TEXT_MESSAGE")
+  expect(broker).toContain("Example: Send me 50 sheets of Sheetrock and 45 2x4x8s.")
   expect(broker).toContain('req.headers.get("x-avantia-site-signature")')
   expect(broker).toContain('req.headers.get("x-avantia-site-timestamp")')
   expect(broker).toContain("hmacSha256Base64RawKey(signingSecret")

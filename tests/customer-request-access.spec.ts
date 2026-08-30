@@ -20,3 +20,14 @@ test("request PDFs fail closed without an authenticated linked request", async (
   const response = await request.get("/requests/638378/pdf");
   expect(response.status()).toBe(404);
 });
+
+test("opening a request link never starts a PDF download automatically", async ({ page }) => {
+  const pdfRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/\/requests\/\d+\/pdf(?:\?|$)/.test(request.url())) pdfRequests.push(request.url());
+  });
+
+  await page.goto("/requests?request=638379&download=1");
+  await expect(page.getByRole("heading", { name: "Open from your text" })).toBeVisible();
+  expect(pdfRequests).toEqual([]);
+});

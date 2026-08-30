@@ -2093,7 +2093,7 @@ async function customerPortalMagicUrl(userId: string, phone: string, publicNumbe
   const generated = await admin.auth.admin.generateLink({ type: "magiclink", email });
   const tokenHash = generated.data?.properties?.hashed_token;
   if (generated.error || !tokenHash) throw new Error("customer_portal_magic_link_failed");
-  const next = `/requests?request=${publicNumber}&download=1`;
+  const next = `/requests?request=${publicNumber}`;
   const url = new URL("https://build.avantiap.com/auth/confirm");
   url.searchParams.set("token_hash", tokenHash);
   url.searchParams.set("type", "magiclink");
@@ -4314,7 +4314,7 @@ async function handleQuoFastPollDispatch(req: Request) {
 }
 
 const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v1";
-const PUBLIC_START_TEXT_MESSAGE = "Avantia Build: Reply with the construction materials you need. Send a list, photo, plan, product link, or quote. We’ll ask only for missing details. Reply STOP to opt out.";
+const PUBLIC_START_TEXT_MESSAGE = "Avantia Build: Reply with what you need. Example: Send me 50 sheets of Sheetrock and 45 2x4x8s. You can also send a photo, plan, product link, or quote. Reply STOP to opt out.";
 
 async function handlePublicStartByText(req: Request) {
   const payload = await req.text();

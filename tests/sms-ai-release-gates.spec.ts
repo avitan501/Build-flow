@@ -67,11 +67,14 @@ test("customer SMS uses semantic-first strong models and deterministic rules onl
 test("customer request invitation uses a one-tap verified session instead of broken phone OTP", async () => {
   const confirmRoute = await readFile(path.join(root, "app/auth/confirm/route.ts"), "utf8")
   const requestPage = await readFile(path.join(root, "app/requests/page.tsx"), "utf8")
+  const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
   expect(confirmRoute).toContain("supabase.auth.verifyOtp({ token_hash: tokenHash, type })")
   expect(confirmRoute).toContain('destination.searchParams.set("account", "switched")')
   expect(requestPage).not.toContain("CustomerRequestOtp")
   expect(requestPage).toContain("Open from your text")
-  expect(requestPage).toContain("CustomerRequestAutoDownload")
+  expect(requestPage).not.toContain("CustomerRequestAutoDownload")
+  expect(requestPage).toContain("Download request PDF")
+  expect(broker).not.toContain("download=1")
 })
 
 test("public text start uses a dedicated signing secret instead of a database credential", async () => {

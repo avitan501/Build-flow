@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { CustomerRequestAutoDownload } from "@/components/buildflow/customer-request-auto-download";
 import { CustomerRequestLiveRefresh } from "@/components/buildflow/customer-request-live-refresh";
 import { getCustomerPortalRequests } from "@/lib/customer-request-portal";
 
@@ -12,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 type CustomerRequestsPageProps = {
-  searchParams: Promise<{ access?: string; account?: string; request?: string; download?: string }>;
+  searchParams: Promise<{ access?: string; account?: string; request?: string }>;
 };
 
 export default async function CustomerRequestsPage({ searchParams }: CustomerRequestsPageProps) {
@@ -33,9 +32,13 @@ export default async function CustomerRequestsPage({ searchParams }: CustomerReq
       </main>
     );
 
+  const selectedRequest = query.request?.trim() || "";
+  const requests = selectedRequest
+    ? [...portal.requests].sort((left, right) => Number(String(right.publicNumber) === selectedRequest) - Number(String(left.publicNumber) === selectedRequest))
+    : portal.requests;
+
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 py-7 text-slate-950 sm:px-6 sm:py-10">
-      <CustomerRequestAutoDownload publicNumber={query.download === "1" && portal.requests.some((item) => String(item.publicNumber) === query.request) ? Number(query.request) : null} />
       <div className="mx-auto max-w-4xl">
         {query.account === "switched" ? <p role="status" className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900">You were signed into a different account. We securely switched to the account linked to this request.</p> : null}
         <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5">
@@ -60,13 +63,16 @@ export default async function CustomerRequestsPage({ searchParams }: CustomerReq
             <CustomerRequestLiveRefresh />
           </div>
         </header>
-        {portal.requests.length ? (
+        {requests.length ? (
           <div className="mt-5 grid gap-4">
-            {portal.requests.map((request) => (
+            {requests.map((request) => {
+              const openedFromText = String(request.publicNumber) === selectedRequest;
+              return (
               <article
                 key={request.id}
                 id={`request-${request.publicNumber}`}
-                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                aria-current={openedFromText ? "true" : undefined}
+                className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${openedFromText ? "border-sky-400 ring-4 ring-sky-100" : "border-slate-200"}`}
               >
                 <header className="border-b border-slate-100 p-4 sm:p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -74,6 +80,7 @@ export default async function CustomerRequestsPage({ searchParams }: CustomerReq
                       <p className="text-xs font-bold text-[#0066cc]">
                         Request #{request.publicNumber}
                       </p>
+                      {openedFromText ? <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">Opened from your secure text</p> : null}
                       <h2 className="mt-1 text-xl font-bold">
                         {request.title}
                       </h2>
@@ -145,7 +152,8 @@ export default async function CustomerRequestsPage({ searchParams }: CustomerReq
                   </div>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <section className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
