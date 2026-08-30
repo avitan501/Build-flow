@@ -2123,11 +2123,16 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
     select body from public.aura_communications
     where channel = 'sms' and counterparty_phone = ${phone} and direction = 'incoming'
       and id <> ${communicationId}::uuid and body is not null and trim(body) <> ''
-      and occurred_at >= now() - interval '10 minutes'
+      and occurred_at >= now() - interval '20 seconds'
     order by occurred_at desc, created_at desc
     limit 8
   `;
-  const customerEvent = classifyCustomerSmsEvent(body, previousCustomerMessages.map((message) => message.body));
+  // Provider replays are already deduplicated by Quo event/activity IDs. Text
+  // similarity only catches an immediate accidental customer double-send; an
+  // explicit new-request instruction always starts a legitimate fresh flow.
+  const customerEvent = smsStartsNewMaterialRequest(body)
+    ? "message"
+    : classifyCustomerSmsEvent(body, previousCustomerMessages.map((message) => message.body));
   if (customerEvent === "duplicate") {
     await sql`
       insert into public.aura_audit_log (action, details)
