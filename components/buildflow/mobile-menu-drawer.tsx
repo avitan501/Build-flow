@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 
 export type MobileMenuLink = {
@@ -37,6 +37,7 @@ function isActivePath(pathname: string, href: string) {
 
 export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [], moreLinks = [], adminLinks = [], shopLinks = [], shopOpen = false, onShopOpenChange, isSignedIn }: MobileMenuDrawerProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const drawerRef = useRef<HTMLElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
@@ -243,9 +244,14 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
 
           <div className="mt-auto pt-12">
             <Link
-              href={isSignedIn ? "/account" : "/login"}
+              href={isSignedIn ? "/requests" : "/login"}
               prefetch={false}
-              onClick={closeDrawer}
+              onClick={(event) => {
+                event.preventDefault();
+                const destination = isSignedIn ? "/requests" : "/login";
+                closeDrawer();
+                router.push(destination);
+              }}
               className="flex min-h-16 items-center px-1 text-lg font-semibold text-slate-950 transition hover:text-[#0066cc]"
             >
               <span>{isSignedIn ? "My Account" : "Log in"}</span>

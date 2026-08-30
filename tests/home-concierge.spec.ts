@@ -111,7 +111,7 @@ test("homepage material showroom stays compact and expandable on phones", async 
   await expect(showroom.getByRole("heading", { name: "Deals & Liquidation" })).toBeVisible();
   await expect(showroom.locator("details details")).toHaveCount(8);
   await page.evaluate(() => window.scrollTo(0, window.innerHeight));
-  await expect(page.getByTestId("public-contact-bar").getByRole("button", { name: /Start a material request/ })).toBeVisible();
+  await expect(page.getByTestId("public-contact-bar").getByRole("button", { name: "Text me to start" })).toBeVisible();
 });
 
 test("Shop opens the full responsive construction department showroom", async ({ page }) => {

@@ -27,10 +27,7 @@ import {
   type QuoteComparisonRecord,
 } from "@/lib/quote-comparison";
 import { managerPipelineStage } from "@/lib/manager-dashboard";
-import {
-  RelatedEmailTimeline,
-  type RelatedEmailItem,
-} from "@/components/buildflow/related-email-timeline";
+import type { RelatedEmailItem } from "@/components/buildflow/related-email-timeline";
 
 type RequestDetails = {
   id: string;
@@ -368,6 +365,26 @@ export default async function OwnerMaterialRequestPage({
         .order("occurred_at", { ascending: false })
         .returns<RelatedEmailItem[]>()
     : { data: [] as RelatedEmailItem[] };
+  const supplierEmailAddresses = new Set(
+    suppliers
+      .map((supplier) => supplier.email?.trim().toLowerCase())
+      .filter((email): email is string => Boolean(email)),
+  );
+  const normalizedClientEmail = clientEmail.trim().toLowerCase();
+  const supplierEmails = (linkedEmails ?? []).filter((email) => {
+    const counterpart = email.counterparty_email?.trim().toLowerCase() || "";
+    return (
+      supplierEmailAddresses.has(counterpart) ||
+      (email.direction === "incoming" && counterpart !== normalizedClientEmail)
+    );
+  });
+  const clientEmails = (linkedEmails ?? []).filter((email) => {
+    const counterpart = email.counterparty_email?.trim().toLowerCase() || "";
+    return (
+      counterpart === normalizedClientEmail ||
+      (!supplierEmailAddresses.has(counterpart) && email.direction !== "incoming")
+    );
+  });
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-3 pb-28 pt-4 text-slate-950 sm:px-6">
@@ -667,7 +684,6 @@ export default async function OwnerMaterialRequestPage({
             </div>
           </details>
         </div>
-        <RelatedEmailTimeline emails={linkedEmails ?? []} />
         <div className="mt-2">
           <RequestManagementPanel
             requestId={request.id}
@@ -700,6 +716,8 @@ export default async function OwnerMaterialRequestPage({
             step4CompletedOverride={workflowOverrides.get(4) ?? null}
             initialManagerNotes={request.manager_notes || ""}
             initialSupplierRecommendations={(supplierRecommendations ?? []).map((entry) => ({ supplierId: entry.supplier_id, isRecommended: entry.is_recommended, shouldContact: entry.should_contact }))}
+            supplierEmails={supplierEmails}
+            clientEmails={clientEmails}
           />
         </div>
         {clientActions.length ? (

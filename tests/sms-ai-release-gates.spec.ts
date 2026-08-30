@@ -53,6 +53,27 @@ test("Quo recovery batches duplicate checks before ingesting messages", async ()
   expect(broker).toContain("if (!activityId || storedIds.has(activityId)) continue")
 })
 
+test("customer SMS uses semantic-first strong models and deterministic rules only as fallback", async () => {
+  const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  expect(broker).toContain('const fallback = escalated ? "gpt-5.6-sol" : "gpt-5.6-terra"')
+  expect(broker).toContain("Interpret customer meaning semantically, not by exact spelling.")
+  expect(broker).toContain("Never repeat the exact same question after the customer has answered any part of it.")
+  expect(broker).toContain('&& !/^gpt-/i.test(model)')
+  expect(broker).toContain("semanticNormalizationSafe")
+  expect(broker).toContain("customerPortalMagicUrl")
+  expect(broker).toContain('url.searchParams.set("token_hash", tokenHash)')
+})
+
+test("customer request invitation uses a one-tap verified session instead of broken phone OTP", async () => {
+  const confirmRoute = await readFile(path.join(root, "app/auth/confirm/route.ts"), "utf8")
+  const requestPage = await readFile(path.join(root, "app/requests/page.tsx"), "utf8")
+  expect(confirmRoute).toContain("supabase.auth.verifyOtp({ token_hash: tokenHash, type })")
+  expect(confirmRoute).toContain('destination.searchParams.set("account", "switched")')
+  expect(requestPage).not.toContain("CustomerRequestOtp")
+  expect(requestPage).toContain("Open from your text")
+  expect(requestPage).toContain("CustomerRequestAutoDownload")
+})
+
 test("public text start uses a dedicated signing secret instead of a database credential", async () => {
   const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
   const route = await readFile(path.join(root, "app/api/public/start-by-text/route.ts"), "utf8")
@@ -128,6 +149,16 @@ test("latest decision allows up to three essential questions and rejects padding
   expect(evaluateSmsReplyGate({ message: "20 drywall sheets", reply: "What is your favorite movie?", intent: "material_request", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "red", gateAutoSafe: false })
 })
 
+test("paint color and finish are two distinct essential questions, not a repeated field", () => {
+  const reply = "Got it—4 gallons of Sherwin-Williams paint. What color do you need? What finish would you like (flat, eggshell, satin, or semi-gloss)?"
+  expect(inspectSmsQuestionStructure(reply)).toMatchObject({
+    valid: true,
+    fields: ["color", "finish"],
+    reason: null,
+  })
+  expect(evaluateSmsReplyGate({ message: "I need 4 gallons of Sherman William paint.", reply, intent: "material_request", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
+})
+
 test("required questions stay green while optional recommendation statements cannot hide beside them", () => {
   const required = [
     "What size do you need?",
@@ -170,6 +201,7 @@ test("material request advances across turns after address until complete", () =
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, quantityKnown: false, addressKnown: false, neededByKnown: false, proposedReply: "A manager will review." })).toBe("quantity")
   expect(smsHasExplicitQuantity("Need 4 bags of thinset")).toBe(true)
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, quantityKnown: true, addressKnown: false, neededByKnown: false, proposedReply: "A manager will review." })).toBe("address_and_needed_by")
+  expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, quantityKnown: true, addressKnown: false, neededByKnown: false, proposedReply: "Got it—white. Which paint finish: flat, eggshell, satin, or semi-gloss?" })).toBe("proposed")
   expect(smsDeliveryDetailsQuestionReply("Need 4 bags of thinset")).toBe("When do you need it, and what’s the full delivery address?")
   expect(inspectSmsQuestionStructure(smsDeliveryDetailsQuestionReply("Need 4 bags of thinset")).valid).toBe(true)
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: false, neededByKnown: false, proposedReply: "A manager will review." })).toBe("address_and_needed_by")
@@ -200,7 +232,7 @@ Matching tape
   expect(smsMaterialClarificationQuestions(list)).toEqual([
     "Sheetrock thickness: keep 1/2-in., or change to our standard 5/8-in.?",
     "For “corner bit,” which corner bead type and length: metal or vinyl, 8 ft or 10 ft?",
-    "What paint color and finish do you need?",
+    "What paint color, and which finish: flat, eggshell, satin, or semi-gloss?",
   ])
   expect(inspectSmsQuestionStructure(smsMaterialClarificationQuestions(list).join(" "))).toMatchObject({
     valid: true,
@@ -210,14 +242,14 @@ Matching tape
   expect(smsMaterialClarificationQuestions(answered)).toEqual([])
   expect(smsMaterialClarificationQuestions(`${list}\n10 Paint Sherwin Williams OC`)).toEqual([
     "For “corner bit,” which corner bead type: metal or vinyl?",
-    "What paint finish do you need?",
+    "Got it—Sherwin Williams. What color, and which finish: flat, eggshell, satin, or semi-gloss?",
   ])
   expect(smsMaterialClarificationQuestions(`${list}\nUse 5/8. Yes, 10-ft metal corner bead. Sherwin-Williams OC-13.`)).toEqual([
-    "What paint finish do you need?",
+    "Which paint finish: flat, eggshell, satin, or semi-gloss?",
   ])
   expect(smsMaterialClarificationQuestions(`${list}\nUse 5/8. Yes, 10-ft metal corner bead. Sherwin-Williams OC-13 eggshell.`)).toEqual([])
   expect(smsMaterialClarificationQuestions("1 box drywall screws 1/2 in.")).toEqual([])
-  expect(smsMaterialClarificationQuestions(`${list}\nUse 5/8. Yes, 8-ft metal corner bead. Eggshell paint.`)).toEqual(["What paint color do you need?"])
+  expect(smsMaterialClarificationQuestions(`${list}\nUse 5/8. Yes, 8-ft metal corner bead. Eggshell paint.`)).toEqual(["Got it. What paint color do you need?"])
   expect(smsMaterialClarificationQuestions(list, { exactListOnly: true })).not.toContain("Sheetrock thickness: keep 1/2-in., or change to our standard 5/8-in.?")
 
   const normalized = applyAvantiaMaterialDefaults([
@@ -235,6 +267,27 @@ Matching tape
     { name: "Drywall 5-gallon primer", quantity: 1, unit: "bucket" },
   ])
   expect(applyAvantiaMaterialDefaults([{ name: "Metal 2x4x8 studs", quantity: 50, unit: "pieces" }], `${list}\nUse metal studs.`)[0].name).toBe("Metal 2x4x8 studs")
+})
+
+test("paint replies understand brand, color, code, and finish without repeating the same question", () => {
+  const base = "Customer: I need 5 gallons of paint"
+  const cases = [
+    [base, "What paint color, and which finish: flat, eggshell, satin, or semi-gloss?"],
+    [`${base}\nAvantia: What paint color and finish do you need?\nCustomer: Sherman William`, "Got it—Sherwin Williams. What color, and which finish: flat, eggshell, satin, or semi-gloss?"],
+    [`${base}\nAvantia: What paint color and finish do you need?\nCustomer: Sherwin Williams`, "Got it—Sherwin Williams. What color, and which finish: flat, eggshell, satin, or semi-gloss?"],
+    [`${base}\nAvantia: What paint color and finish do you need?\nCustomer: White`, "Got it—white. Which finish: flat, eggshell, satin, or semi-gloss?"],
+    [`${base}\nAvantia: What paint color and finish do you need?\nCustomer: OC-13`, "Which paint finish: flat, eggshell, satin, or semi-gloss?"],
+    [`${base}\nAvantia: What paint color and finish do you need?\nCustomer: Eggshell`, "Got it. What paint color do you need?"],
+    [`${base}\nCustomer: White eggshell`, null],
+    [`${base}\nCustomer: Sherwin-Williams OC-13 eggshell`, null],
+    [`${base}\nCustomer: Satin white`, null],
+    [`${base}\nCustomer: PPG`, "Got it—PPG. What color, and which finish: flat, eggshell, satin, or semi-gloss?"],
+  ] as const
+
+  expect(cases).toHaveLength(10)
+  for (const [conversation, expected] of cases) {
+    expect(smsMaterialClarificationQuestions(conversation)[0] ?? null).toBe(expected)
+  }
 })
 
 test("broker-created request progression replies are gated independently from model review flags", async () => {
@@ -405,14 +458,14 @@ test("bare quantities keep the requested product in wood, finishing, and mixed-l
     ["4 boxes", "Customer: I need drywall screws\nAvantia: How many boxes do you need?", "Got it—4 boxes. What screw length? What thread type?"],
     ["6", "Customer: I need joint compound\nAvantia: How many buckets do you need?", "Got it—6 buckets of joint compound. Can you confirm the compound type: 5-gallon all-purpose?"],
     ["6 buckets", "Customer: I need joint compound\nAvantia: How many buckets do you need?", "Got it—6 buckets of joint compound. Can you confirm the compound type: 5-gallon all-purpose?"],
-    ["10", "Customer: I need paint\nAvantia: How many gallons do you need?", "Got it—10 gallons of paint. What paint color and finish do you need?"],
-    ["10 gallons", "Customer: I need paint\nAvantia: How many gallons do you need?", "Got it—10 gallons of paint. What paint color and finish do you need?"],
+    ["10", "Customer: I need paint\nAvantia: How many gallons do you need?", "Got it—10 gallons of paint. What color, and which finish: flat, eggshell, satin, or semi-gloss?"],
+    ["10 gallons", "Customer: I need paint\nAvantia: How many gallons do you need?", "Got it—10 gallons of paint. What color, and which finish: flat, eggshell, satin, or semi-gloss?"],
     ["24", "Customer: I need corner bead\nAvantia: How many pieces do you need?", "Got it—24 pieces of corner bead. What corner bead type? What length?"],
     ["24 pcs", "Customer: I need corner bead\nAvantia: How many pieces do you need?", "Got it—24 pieces of corner bead. What corner bead type? What length?"],
     ["40", "Customer: I need 20 Sheetrock sheets and metal studs\nAvantia: How many metal studs do you need?", "Got it—40 metal studs. What size and length? What gauge?"],
     ["20", "Customer: I need Sheetrock and metal studs\nAvantia: How many Sheetrock sheets do you need?", "Got it—20 sheets of Sheetrock. Can you confirm 5/8 in.?"],
     ["5", "Customer: I need paint and joint compound\nAvantia: How many buckets of joint compound do you need?", "Got it—5 buckets of joint compound. Can you confirm the compound type: 5-gallon all-purpose?"],
-    ["8", "Customer: I need paint and joint compound\nAvantia: How many gallons of paint do you need?", "Got it—8 gallons of paint. What paint color and finish do you need?"],
+    ["8", "Customer: I need paint and joint compound\nAvantia: How many gallons of paint do you need?", "Got it—8 gallons of paint. What color, and which finish: flat, eggshell, satin, or semi-gloss?"],
     ["30", "Customer: I need wood studs and screws\nAvantia: How many wood studs do you need?", "Got it—30 wood studs. What size and length?"],
     ["3", "Customer: I need wood studs and screws\nAvantia: How many boxes of screws do you need?", "Got it—3 boxes. What screw length? What thread type?"],
     ["12", "Customer: I need corner bead and compound\nAvantia: How many pieces of corner bead do you need?", "Got it—12 pieces of corner bead. What corner bead type? What length?"],

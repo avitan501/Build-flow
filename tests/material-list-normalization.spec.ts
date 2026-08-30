@@ -24,6 +24,10 @@ test("recognizes common singular and plural construction units", () => {
   expect(detectExplicitQuantityUnit("Joint compound: 4 pails")).toMatchObject({ quantity: 4, unit: "pails" })
 })
 
+test("keeps a leading lumber count separate from 2x4x8 dimensions", () => {
+  expect(detectExplicitQuantityUnit("50 pieces — wood lumber 2x4x8")).toMatchObject({ quantity: 50, unit: "pieces" })
+})
+
 test("removes only redundant quantity and unit review reasons", () => {
   const detected = detectExplicitQuantityUnit("14 squares siding")
   expect(removeResolvedQuantityUnitReasons([

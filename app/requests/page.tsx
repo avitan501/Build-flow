@@ -1,17 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { CustomerRequestAutoDownload } from "@/components/buildflow/customer-request-auto-download";
 import { CustomerRequestLiveRefresh } from "@/components/buildflow/customer-request-live-refresh";
-import { CustomerRequestOtp } from "@/components/buildflow/customer-request-otp";
 import { getCustomerPortalRequests } from "@/lib/customer-request-portal";
 
 export const metadata: Metadata = {
-  title: "My Material Requests | Avantia Build",
+  title: "My Account | Avantia Build",
   description:
     "Securely review the status and material details for your Avantia Build requests.",
 };
 
-export default async function CustomerRequestsPage() {
+type CustomerRequestsPageProps = {
+  searchParams: Promise<{ access?: string; account?: string; request?: string; download?: string }>;
+};
+
+export default async function CustomerRequestsPage({ searchParams }: CustomerRequestsPageProps) {
+  const query = await searchParams;
   const portal = await getCustomerPortalRequests();
   if (!portal.signedIn)
     return (
@@ -20,32 +25,29 @@ export default async function CustomerRequestsPage() {
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0071e3]">
             Secure customer access
           </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-            Open your request
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            Use the same phone number that received the Avantia invitation. We
-            will send a one-time code—your phone number is never used as a
-            password.
-          </p>
-          <CustomerRequestOtp />
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Open from your text</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-600">Tap the secure Avantia link sent to your phone. It signs you in and opens the correct request automatically—no phone number or code to enter.</p>
+          {query.access ? <p role="alert" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{query.access === "expired" ? "That secure link expired or was already used. Ask Avantia to send a fresh link." : "That link is not valid. Open the latest Avantia text."}</p> : null}
+          <Link href="/login?next=/requests" className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800">Use an existing account instead</Link>
         </section>
       </main>
     );
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 py-7 text-slate-950 sm:px-6 sm:py-10">
+      <CustomerRequestAutoDownload publicNumber={query.download === "1" && portal.requests.some((item) => String(item.publicNumber) === query.request) ? Number(query.request) : null} />
       <div className="mx-auto max-w-4xl">
+        {query.account === "switched" ? <p role="status" className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900">You were signed into a different account. We securely switched to the account linked to this request.</p> : null}
         <header className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0071e3]">
               Avantia Build
             </p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-              My material requests
+              My Account
             </h1>
             <p className="mt-2 text-sm text-slate-600">
-              Live request status and customer-visible details only.
+              Your material requests, live status, and account security in one place.
             </p>
           </div>
           <div className="grid justify-items-end gap-2">
@@ -63,6 +65,7 @@ export default async function CustomerRequestsPage() {
             {portal.requests.map((request) => (
               <article
                 key={request.id}
+                id={`request-${request.publicNumber}`}
                 className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
               >
                 <header className="border-b border-slate-100 p-4 sm:p-5">
@@ -88,6 +91,7 @@ export default async function CustomerRequestsPage() {
                       minute: "2-digit",
                     })}
                   </p>
+                  <Link href={`/requests/${request.publicNumber}/pdf`} className="mt-3 inline-flex min-h-9 items-center rounded-full border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800">Download request PDF</Link>
                   {request.deliveryAddress ? (
                     <p className="mt-2 text-sm text-slate-600">
                       <strong>Delivery:</strong> {request.deliveryAddress}

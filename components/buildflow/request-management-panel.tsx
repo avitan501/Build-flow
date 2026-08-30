@@ -9,6 +9,7 @@ import { createPortal } from "react-dom"
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
 import { previewRequestClientQuoteAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestWorkflowStepAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
+import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
 import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
@@ -63,6 +64,8 @@ export function RequestManagementPanel({
   step4CompletedOverride,
   initialManagerNotes,
   initialSupplierRecommendations,
+  supplierEmails,
+  clientEmails,
 }: {
   requestId: string
   requestTitle: string
@@ -79,6 +82,8 @@ export function RequestManagementPanel({
   step4CompletedOverride: boolean | null
   initialManagerNotes: string
   initialSupplierRecommendations: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean }>
+  supplierEmails: RelatedEmailItem[]
+  clientEmails: RelatedEmailItem[]
 }) {
   const router = useRouter()
   const [supplierIds, setSupplierIds] = useState<string[]>(() => initialSupplierRecommendations.filter((entry) => entry.shouldContact).map((entry) => entry.supplierId))
@@ -326,6 +331,8 @@ export function RequestManagementPanel({
         <div className="border-t border-slate-200 p-4">
           {comparisons.length ? <div className="mb-3 grid gap-2">{comparisons.map((comparison) => <article key={comparison.id} className="rounded-md border border-slate-200 bg-slate-50 p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-bold">{comparison.title}</h3><p className="mt-0.5 text-xs text-slate-500">{comparison.bids.length ? `${comparison.bids.length} supplier response${comparison.bids.length === 1 ? "" : "s"}` : "Waiting for supplier response"}</p></div><Link href={`/admin/quote-comparison/${comparison.id}`} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-[#0066cc]">Compare <ExternalLink className="h-3.5 w-3.5" /></Link></div>{comparison.bids.length ? <div className="mt-2 divide-y divide-slate-200 border-t border-slate-200">{comparison.bids.map((bid) => <div key={bid.id} className="flex items-center justify-between gap-3 py-2 text-xs"><span className="min-w-0 truncate font-semibold">{bid.supplierName}{bid.recommended ? " · Best match" : ""}</span><span className="shrink-0 text-right"><strong className="block text-sm tabular-nums">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(bid.landedTotal)}</strong><span className="text-slate-500">{bid.pricedItemCount}/{bid.itemCount} items</span></span></div>)}</div> : null}</article>)}</div> : <p className="mb-3 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">Supplier answers and prices will appear here after a quote is linked to this request.</p>}
 
+          <RelatedEmailTimeline title="Supplier email" emails={supplierEmails} />
+
           <details id="supplier-routing" className="group/route scroll-mt-24 rounded-md border border-slate-200 bg-slate-50">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold"><span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-sky-700" />Find Supplier</span><ChevronDown className="h-4 w-4 text-slate-400 transition group-open/route:rotate-180" /></summary>
             <div className="border-t border-slate-200 p-3">
@@ -349,6 +356,7 @@ export function RequestManagementPanel({
       <details open={currentStage === "approval" || currentStage === "delivery"} className={workflowStepCardClass()}>
         <RequestWorkflowStepHeader requestId={requestId} step={4} title="Contact client" detail={replyComplete ? "Client contacted" : "Send an update, estimate, or delivery window"} status={replyStatus} icon="reply" />
         <div className="border-t border-slate-200 p-4">
+          <RelatedEmailTimeline title="Client email" emails={clientEmails} />
           <div>
             {missingQuestions.length ? <p className="mt-1 text-xs font-semibold text-amber-700">{missingQuestions.length} missing details can be added to the reply automatically.</p> : null}
 

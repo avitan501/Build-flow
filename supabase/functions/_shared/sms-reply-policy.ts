@@ -88,7 +88,7 @@ export function enforceSmsQuestionLimit(value: string) {
   return value.trim().slice(0, 1600);
 }
 
-export type SmsRequestedField = "size" | "thickness" | "quantity" | "address" | "needed_by" | "brand" | "specification" | "source";
+export type SmsRequestedField = "size" | "thickness" | "quantity" | "address" | "needed_by" | "brand" | "color" | "finish" | "specification" | "source";
 
 const REQUESTED_FIELD_PATTERNS: Array<{ field: SmsRequestedField; pattern: RegExp }> = [
   { field: "size", pattern: /\b(?:size|length|dimensions?|medida|tama[nñ]o)\b|(?:גודל|אורך|מידות?)/i },
@@ -97,7 +97,9 @@ const REQUESTED_FIELD_PATTERNS: Array<{ field: SmsRequestedField; pattern: RegEx
   { field: "address", pattern: /\b(?:full )?(?:delivery )?address\b|\b(?:direcci[oó]n (?:completa )?(?:de entrega)?)\b|(?:כתובת (?:המשלוח )?המלאה)/i },
   { field: "needed_by", pattern: /\b(?:needed-by date|needed by|when do you need|delivery date|time window|what date|fecha de entrega|para qu[eé] fecha|para cu[aá]ndo|ventana de tiempo)\b|(?:תאריך משלוח|חלון זמן|לאיזה תאריך|מתי)/i },
   { field: "brand", pattern: /\b(?:brand|manufacturer|marca|fabricante)\b|(?:מותג|יצרן)/i },
-  { field: "specification", pattern: /\b(?:product specification|model|type|style|color|finish|modelo|tipo|color|acabado)\b|(?:דגם|סוג|צבע|גימור)/i },
+  { field: "color", pattern: /\b(?:color|colour)\b|\bcolor\b|(?:צבע)/i },
+  { field: "finish", pattern: /\b(?:finish|sheen|acabado)\b|(?:גימור)/i },
+  { field: "specification", pattern: /\b(?:product specification|model|type|style|modelo|tipo)\b|(?:דגם|סוג)/i },
   { field: "source", pattern: /\b(?:material list|photo|image|plan|drawing|product link|lista de materiales|foto|imagen|plano)\b|(?:רשימת חומרים|תמונה|תכנית|קישור למוצר)/i },
 ];
 
@@ -119,7 +121,12 @@ export function inspectSmsQuestionStructure(value: string, knownFields: SmsReque
   const essentialQuestions = fieldsByQuestion.filter((questionFields) => questionFields.length > 0).length;
   const subjectFor = (question: string) => question.match(/\b(?:appliances?|cabinets?|cables?|concrete|doors?|drywall|dumpsters?|flooring|hvac|insulation|lumber|moldings?|paint|pipes?|plumbing|primer|roofing|sheetrock|shingles?|siding|studs?|screws?|corner\s+bead|tape|compound|thinset|tile|trim|windows?|wires?)\b/i)?.[0]?.toLowerCase().replace(/\s+/g, "_") || "generic";
   const safeDeliveryPair = fieldsByQuestion.some((questionFields, index) => questionFields.length === 2 && questionFields.includes("address") && questionFields.includes("needed_by") && /\b(?:and|y)\b|(?:ו)/i.test(questions[index] || ""));
-  const safeProductBundle = fieldsByQuestion.some((questionFields, index) => questionFields.length > 1 && subjectFor(questions[index] || "") !== "generic");
+  const safeProductBundle = fieldsByQuestion.some((questionFields, index) =>
+    questionFields.length > 1 && (
+      subjectFor(questions[index] || "") !== "generic" ||
+      (questionFields.length === 2 && questionFields.includes("color") && questionFields.includes("finish"))
+    )
+  );
   const bundled = fieldsByQuestion.some((questionFields) => questionFields.length > 1) && !safeDeliveryPair && !safeProductBundle;
   // The same kind of detail can be required for two different products in one
   // short list (for example primer type and paint finish). Treat that as two
@@ -262,18 +269,32 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
   }
 
   const paint = /\bpaint\b/i;
-  const paintAnswer = textAfter(paint);
+  const paintCustomerEvidence = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !/^Avantia:/i.test(line))
+    .map((line) => line.replace(/^Customer:\s*/i, ""))
+    .join("\n");
+  const paintMatch = paint.exec(paintCustomerEvidence);
+  const paintAnswer = paintMatch ? paintCustomerEvidence.slice((paintMatch.index || 0) + paintMatch[0].length) : "";
+  const latestCustomerLine = paintCustomerEvidence.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).at(-1) || "";
+  const paintBrandMatch = latestCustomerLine.match(/\b(?:sherm(?:a|e)n[- ]?willi(?:am|ams)?|sherwin[- ]?williams?|benjamin\s+moore|behr|ppg)\b/i)?.[0] || "";
+  const paintBrand = /sherm|sherwin/i.test(paintBrandMatch) ? "Sherwin Williams" : paintBrandMatch;
+  const latestCommonColor = latestCustomerLine.match(/\b(?:white|black|gray|grey|beige|tan|brown|blue|green|red|yellow|orange|cream|ivory)\b/i)?.[0] || "";
   const hasPaintFinish = /\b(?:flat|matte|eggshell|satin|semi[- ]gloss|gloss)\b/i.test(paintAnswer);
   const hasPaintColor = /\b(?:white|black|gray|grey|beige|tan|brown|blue|green|red|yellow|orange|cream|ivory|color\s*(?:is|:)?\s*[a-z][a-z -]{1,30})\b/i.test(paintAnswer) ||
     /\b(?:sherwin[- ]?williams?|benjamin\s+moore|behr|ppg)\b[^\n]{0,30}\b[a-z]{1,4}[- ]?\d{1,5}\b/i.test(paintAnswer) ||
-    /\b[A-Z]{1,4}-\d{1,5}\b/.test(paintAnswer) ||
-    /(?:^|\n)\s*(?:8|10)?\s*paint\s+(?!flat\b|matte\b|eggshell\b|satin\b|semi[- ]gloss\b|gloss\b)[a-z][a-z0-9 -]{1,60}(?:$|\n)/i.test(paintAnswer);
+    /\b[A-Z]{1,4}-\d{1,5}\b/i.test(paintAnswer);
   if (paint.test(value) && !(hasPaintFinish && hasPaintColor)) {
     questions.push(hasPaintColor
-      ? "What paint finish do you need?"
+      ? latestCommonColor
+        ? `Got it—${latestCommonColor.toLowerCase()}. Which finish: flat, eggshell, satin, or semi-gloss?`
+        : "Which paint finish: flat, eggshell, satin, or semi-gloss?"
       : hasPaintFinish
-        ? "What paint color do you need?"
-        : "What paint color and finish do you need?");
+        ? "Got it. What paint color do you need?"
+        : paintBrand
+          ? `Got it—${paintBrand}. What color, and which finish: flat, eggshell, satin, or semi-gloss?`
+          : "What paint color, and which finish: flat, eggshell, satin, or semi-gloss?");
   }
 
   return [...new Set(questions)].slice(0, 3);
@@ -492,7 +513,7 @@ export function smsContextualQuantityAnswerReply(latestMessage: string, conversa
   if (family === "paint") {
     const unit = suppliedUnit || (/gallons?/i.test(latestAvantia) ? "gallons" : "");
     if (!/^gallons?$/.test(unit)) return null;
-    return `Got it—${amount} ${amount === 1 ? "gallon" : "gallons"} of paint. What paint color and finish do you need?`;
+    return `Got it—${amount} ${amount === 1 ? "gallon" : "gallons"} of paint. What color, and which finish: flat, eggshell, satin, or semi-gloss?`;
   }
   if (family === "corner_bead") {
     const unit = suppliedUnit || "pcs";
@@ -634,6 +655,11 @@ export function resolveSmsMaterialReplyStep(params: {
 }) : SmsMaterialReplyStep {
   if (!params.isMaterialRequest || !params.hasGroundedItems) return "proposed";
   if (params.quantityKnown === false) return "quantity";
+  // The semantic model may identify an essential unresolved product choice
+  // (for example paint finish or stud gauge). Resolve that before delivery
+  // logistics instead of replacing the useful question with an address prompt.
+  const proposedFields = inspectSmsQuestionStructure(params.proposedReply).fields;
+  if (proposedFields.some((field) => ["size", "thickness", "brand", "color", "finish", "specification"].includes(field))) return "proposed";
   if (!params.addressKnown && !params.neededByKnown) return "address_and_needed_by";
   if (!params.addressKnown) return "address";
   if (!params.neededByKnown) return "needed_by";

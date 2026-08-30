@@ -10,7 +10,7 @@ const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { max: 1, prepare: false })
 const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 const MAX_FILE_BYTES = 25 * 1024 * 1024
-const AI_MODEL = "gpt-5.6-terra"
+const AI_MODEL = Deno.env.get("OPENAI_CLIENT_MATERIAL_LIST_MODEL") || "gpt-5.6-sol"
 
 type SourceItem = {
   id: string
@@ -19,6 +19,8 @@ type SourceItem = {
   owner_id: string
   name: string
   department: string
+  quantity: number
+  unit: string | null
   answers: unknown
   metadata: Record<string, unknown> | null
 }
@@ -84,7 +86,7 @@ const schema = {
 
 const prompt = `Organize a customer's construction shopping or material list into clean rows. The input may be typed notes, a PDF, a photo, or a scan and may be in English, Hebrew, or Spanish.
 
-For each actual requested material, return one row with a concise construction item name, quantity, sales unit, dimensions, thickness, department, and remaining details. Keep model numbers, brands, colors, grades, lengths, widths, heights, pack sizes, and other specifications. Separate quantity from dimensions. Never use a price as a quantity. Do not include headings, addresses, totals, delivery, tax, labor, or explanatory text as material rows.
+For each actual requested material, return one row with a concise construction item name, quantity, sales unit, dimensions, thickness, department, and remaining details. Keep model numbers, brands, colors, grades, lengths, widths, heights, pack sizes, and other specifications. Separate quantity from dimensions. A construction size such as 2x4x8 is never the quantity: in "50 pieces — 2x4x8 lumber", quantity is 50, unit is pieces, and 2x4x8 is the dimension. Never use a price as a quantity. Do not include headings, addresses, totals, delivery, tax, labor, or explanatory text as material rows.
 
 Do not invent missing information. Copy the shortest exact text fragment supporting each row into sourceText. Combine obvious wrapped lines that describe the same item, but do not combine different products. Use common concise English construction names while preserving printed brands, models, and specifications.
 
@@ -180,7 +182,7 @@ Deno.serve(async (request: Request) => {
 
   const [{ data: requestRecord }, { data: sourceItems }, { data: attachments }] = await Promise.all([
     admin.from("quote_requests").select("id").eq("id", requestId).maybeSingle(),
-    admin.from("quote_request_items").select("id,request_id,project_id,owner_id,name,department,answers,metadata").eq("request_id", requestId).order("created_at").returns<SourceItem[]>(),
+    admin.from("quote_request_items").select("id,request_id,project_id,owner_id,name,department,quantity,unit,answers,metadata").eq("request_id", requestId).order("created_at").returns<SourceItem[]>(),
     admin.from("quote_request_attachments").select("file_name,file_path,file_type,file_size").eq("request_id", requestId).order("created_at").returns<Attachment[]>(),
   ])
   if (!requestRecord || !sourceItems?.length) return json({ error: "Request not found" }, 404)
@@ -201,7 +203,10 @@ Deno.serve(async (request: Request) => {
   try {
     const requestDetails = clean(source.metadata?.request_details, 20_000)
     const sourceName = clean(source.name, 4_000)
-    const typedSource = [requestDetails, sourceName && sourceName !== "Free-text material list" ? sourceName : ""]
+    const savedSourceItem = sourceName && sourceName !== "Free-text material list"
+      ? `${Number(source.quantity) || 1} ${clean(source.unit, 60) || "each"} — ${sourceName}`
+      : ""
+    const typedSource = [requestDetails, savedSourceItem]
       .filter(Boolean)
       .join("\n\n")
     const content: Array<Record<string, unknown>> = [{ type: "input_text", text: prompt }]
@@ -225,7 +230,7 @@ Deno.serve(async (request: Request) => {
       body: JSON.stringify({
         model: AI_MODEL,
         store: false,
-        reasoning: { effort: "low" },
+        reasoning: { effort: "medium" },
         max_output_tokens: 8_000,
         input: [{ role: "user", content }],
         text: { verbosity: "low", format: { type: "json_schema", name: "client_material_list", strict: true, schema } },

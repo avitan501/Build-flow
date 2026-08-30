@@ -95,11 +95,10 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
 
   const primaryLinks = useMemo<MobileMenuLink[]>(() => [
     { href: "/", label: "Home" },
-    ...(isSignedIn ? [{ href: "/requests", label: "My Material Requests", description: "Status, items, questions, and approvals" }] : []),
     { href: "/shop", label: "Shop Materials", description: "Browse products and departments" },
     { href: "/request-quote", label: "Request Material Pricing", description: "Send a list, photo, or plan" },
     { href: "/beat-a-quote", label: "Beat My Quote", description: "Upload a supplier quote for a better price" },
-  ], [isSignedIn]);
+  ], []);
 
   const shopLinks = useMemo<MobileMenuLink[]>(() => [
     ...SHOP_MENU_MATERIAL_LINKS.map((item) => ({ href: item.href, label: item.label, description: item.description, section: "Materials" as const, imageUrl: item.imageUrl })),
@@ -284,10 +283,10 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
           ) : null}
 
           {!isHome ? <Link
-            href={isSignedIn ? "/account" : "/login"}
+            href={isSignedIn ? "/requests" : "/login"}
             prefetch={false}
             aria-label={isSignedIn ? `Open account for ${accountLabel}` : "Log in"}
-            className={`hidden items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium leading-none transition active:scale-[0.98] md:inline-flex ${pathname === "/account" ? "bg-[#f2f5f7] text-[#0071e3]" : "text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"}`}
+            className={`hidden items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium leading-none transition active:scale-[0.98] md:inline-flex ${pathname === "/account" || pathname === "/requests" ? "bg-[#f2f5f7] text-[#0071e3]" : "text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"}`}
           >
             <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isSignedIn ? "bg-[#0071e3] text-white" : "bg-slate-100 text-slate-600"}`}>
               <AccountIcon signedIn={isSignedIn} />

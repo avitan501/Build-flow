@@ -5,24 +5,26 @@ test("public contact bar opens a compact WhatsApp and text sheet", async ({ page
 
   const bar = page.getByTestId("public-contact-bar");
   await expect(bar).toBeVisible();
+  await expect(bar.getByRole("button", { name: "Open chat" })).toBeVisible();
+  await expect(bar.getByRole("button", { name: "Text me to start" })).toBeVisible();
   await expect(page.getByTestId("cinematic-mobile-action")).toHaveCount(0);
 
-  await bar.getByRole("button", { name: /Start a material request/ }).click();
+  await bar.getByRole("button", { name: "Open chat" }).click();
 
   const dialog = page.getByRole("dialog", { name: "Start with one message." });
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByTestId("contact-sheet-video")).toBeVisible();
+  await expect(dialog.getByTestId("contact-sheet-video")).toHaveAttribute("autoplay", "");
   await expect(dialog.getByRole("link", { name: /Open chat/ })).toHaveAttribute(
     "href",
     /https:\/\/wa\.me\/15169088319/,
   );
   await expect(dialog.getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/terms");
-  await expect(dialog.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
+  await expect(dialog.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
 
   const submit = dialog.getByRole("button", { name: "Text me" });
   await expect(submit).toBeDisabled();
   await dialog.getByLabel("Mobile number").fill("(516) 555-0123");
-  await expect(submit).toBeDisabled();
-  await dialog.getByRole("checkbox").check();
   await expect(submit).toBeEnabled();
 });
 
@@ -34,10 +36,9 @@ test("start-by-text sends only the phone, consent, and honeypot to the public en
   });
   await page.goto("/how-it-works");
 
-  await page.getByTestId("public-contact-bar").getByRole("button", { name: /Start a material request/ }).click();
+  await page.getByTestId("public-contact-bar").getByRole("button", { name: "Text me to start" }).click();
   const dialog = page.getByRole("dialog", { name: "Start with one message." });
   await dialog.getByLabel("Mobile number").fill("+1 516 555 0199");
-  await dialog.getByRole("checkbox").check();
   await dialog.getByRole("button", { name: "Text me" }).click();
 
   await expect(dialog.getByRole("heading", { name: "Check your texts" })).toBeVisible();
@@ -53,10 +54,9 @@ test("start-by-text shows a safe server error and remains usable", async ({ page
   }));
   await page.goto("/");
 
-  await page.getByTestId("public-contact-bar").getByRole("button", { name: /Start a material request/ }).click();
+  await page.getByTestId("public-contact-bar").getByRole("button", { name: "Text me to start" }).click();
   const dialog = page.getByRole("dialog", { name: "Start with one message." });
   await dialog.getByLabel("Mobile number").fill("5165550100");
-  await dialog.getByRole("checkbox").check();
   await dialog.getByRole("button", { name: "Text me" }).click();
 
   await expect(dialog.getByRole("alert")).toHaveText("Please wait before requesting another text.");
@@ -89,6 +89,20 @@ test("20-second walkthrough opens in the same compact sheet and starts playing",
   await dialog.getByRole("button", { name: "Start my request" }).click();
   await expect(page.getByRole("dialog", { name: "Start with one message." })).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(1);
+});
+
+test("text submission acknowledges the click immediately while delivery finishes", async ({ page }) => {
+  await page.route("**/api/public/start-by-text", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+  await page.goto("/");
+  await page.getByTestId("public-contact-bar").getByRole("button", { name: "Text me to start" }).click();
+  const dialog = page.getByRole("dialog", { name: "Start with one message." });
+  await dialog.getByLabel("Mobile number").fill("5165550199");
+  await dialog.getByRole("button", { name: "Text me" }).click();
+  await expect(dialog.getByRole("heading", { name: "Got it — starting your text." })).toBeVisible({ timeout: 500 });
+  await expect(dialog.getByRole("heading", { name: "Check your texts" })).toBeVisible();
 });
 
 test("walkthrough respects reduced motion and closes cleanly when navigation hides the launcher", async ({ page }) => {
