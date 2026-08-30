@@ -1632,6 +1632,34 @@ function accurateAttachmentReply(message: string, reply: string) {
 
 async function analyzeCustomerSms(conversationText: string, style: string, managerRequestReview = false, latestCustomerMessage = conversationText, settings: SmsAiSettings = defaultSmsAiSettings, media: TrustedSmsMedia[] = [], forcedEvent: CustomerSmsEvent = "message", persistedExactListOnly = false, persistedDeliveryAddressKnown = false): Promise<CustomerSmsAnalysis> {
   const startedAt = Date.now();
+  const latestProductInquiryReply = forcedEvent === "message"
+    ? smsProductInquiryFallbackReply(latestCustomerMessage)
+    : null;
+  // A direct product question is a new, self-contained intent. Resolve it from
+  // the latest inbound message before older lists in the same phone thread can
+  // pull the model into a stale request flow.
+  if (latestProductInquiryReply) {
+    return finalizeCustomerSmsAnalysis({
+      result: {
+        reply: latestProductInquiryReply,
+        autoSafe: true,
+        safetyReason: "The latest message is a direct product inquiry; the reply asks only for essential specifications and does not claim live stock.",
+        isMaterialRequest: false,
+        request: null,
+        customerName: null,
+        customerAddress: null,
+        participantRole: inferredParticipantRole(latestCustomerMessage) === "supplier" ? "supplier" : "lead",
+      },
+      model: "deterministic-product-inquiry",
+      message: latestCustomerMessage,
+      conversationText,
+      persistedExactListOnly,
+      persistedDeliveryAddressKnown,
+      media,
+      event: forcedEvent,
+      startedAt,
+    });
+  }
   const apiKey = await secret(secretNames.openaiKey);
   if (!apiKey) return finalizeCustomerSmsAnalysis({ result: forcedEvent === "correction" ? guardedEventReply("correction", latestCustomerMessage) : customerSmsFallback(conversationText, latestCustomerMessage, settings), model: "local-context-fallback", message: latestCustomerMessage, conversationText, persistedExactListOnly, persistedDeliveryAddressKnown, media, event: forcedEvent, startedAt });
   const model = customerReplyModel(needsCustomerReplyEscalation(latestCustomerMessage, conversationText, media, forcedEvent));

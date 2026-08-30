@@ -198,7 +198,7 @@ export function smsProductInquiryFallbackReply(message: string) {
   const match = message.trim().match(/^(?:do\s+)?(?:you(?:\s+guys)?|u)\s+(?:sell|carry|have|source)\s+(.+?)[?.!]*$/i);
   if (!match?.[1]) return null;
   const rawProduct = match[1].trim().slice(0, 80);
-  const product = /sheet\s*(?:rock|rok|ric[kgj]?|rick|trick)/i.test(rawProduct)
+  const product = /(?:sheet\s*[- ]?(?:r[a-z]{1,7})|drywall)/i.test(rawProduct)
     ? "Sheetrock"
     : /thin\s*set/i.test(rawProduct)
       ? "thinset"

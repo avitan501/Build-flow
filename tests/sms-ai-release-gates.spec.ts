@@ -105,6 +105,7 @@ test("material request advances across turns after address until complete", () =
 test("product inquiry fallback answers the product and asks only useful next questions", () => {
   const sheetrock = smsProductInquiryFallbackReply("Do you sell sheetricj?")
   expect(sheetrock).toBe("Yes—we can help with Sheetrock. What thickness do you need? How many sheets do you need?")
+  expect(smsProductInquiryFallbackReply("Do you carry Sheetrook drywall?")).toBe(sheetrock)
   expect(inspectSmsQuestionStructure(sheetrock || "")).toMatchObject({ valid: true, questionMarks: 2, requestedFields: 2 })
   expect(evaluateSmsReplyGate({ message: "Do you sell sheetricj?", reply: sheetrock || "", intent: "availability", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
   expect(smsProductInquiryFallbackReply("Need an update on my order")).toBeNull()
@@ -160,6 +161,8 @@ test("unanswered follow-up persistence is ten-minute, unique, one-shot, and cron
   expect(migration).toContain("dispatch-sms-unanswered-followups")
   expect(migration).toContain("* * * * *")
   expect(broker).toContain("now() + interval '10 minutes'")
+  expect(broker).toContain('model: "deterministic-product-inquiry"')
+  expect(broker).toContain("before older lists in the same phone thread")
   expect(broker).toContain("for update skip locked")
   expect(broker).toContain("later.direction = 'incoming'")
   expect(broker).toContain("later.direction = 'outgoing'")
