@@ -475,6 +475,24 @@ test("a supplied quantity can never trigger the same generic quantity question a
   expect(smsAnsweredQuantityGuardReply("I need like 40", "What gauge do you need?")).toBeNull()
 })
 
+test("trade unit abbreviations count as supplied quantities", () => {
+  for (const message of [
+    "Need 2 gal Sherwin Williams OC-13 eggshell paint",
+    "Need 3 qt primer",
+    "Need 500 sf shingles",
+    "Need 120 lf track",
+    "Need 20 lb compound",
+    "Need 6 oz adhesive",
+  ]) expect(smsHasExplicitQuantity(message), message).toBe(true)
+})
+
+test("essential product-type follow-ups pass the safety gate", () => {
+  for (const reply of ["Which thinset do you need?", "Which item is that quantity for?", "Which brick do you need?"]) {
+    expect(inspectSmsQuestionStructure(reply), reply).toMatchObject({ valid: true, fields: ["specification"] })
+    expect(smsOutputSafetySignals({ message: "Need material", reply, intent: "material_request", exactListOnly: true }), reply).toEqual([])
+  }
+})
+
 test("bare quantities keep the requested product in wood, finishing, and mixed-list continuations", () => {
   const cases = [
     ["40", "Customer: I need wood studs\nAvantia: How many pieces do you need?", "Got it—40 wood studs. What size and length?"],

@@ -99,7 +99,7 @@ const REQUESTED_FIELD_PATTERNS: Array<{ field: SmsRequestedField; pattern: RegEx
   { field: "brand", pattern: /\b(?:brand|manufacturer|marca|fabricante)\b|(?:מותג|יצרן)/i },
   { field: "color", pattern: /\b(?:color|colour)\b|\bcolor\b|(?:צבע)/i },
   { field: "finish", pattern: /\b(?:finish|sheen|acabado)\b|(?:גימור)/i },
-  { field: "specification", pattern: /\b(?:product specification|model|type|style|modelo|tipo)\b|(?:דגם|סוג)/i },
+  { field: "specification", pattern: /\b(?:product specification|model|type|style|modelo|tipo)\b|\bwhich\s+(?:item|product|thinset|compound|primer|paint|adhesive|mortar|concrete|lumber|stud|drywall|sheetrock|shingle|brick|block|tile)\b|(?:דגם|סוג)/i },
   { field: "source", pattern: /\b(?:material list|photo|image|plan|drawing|product link|lista de materiales|foto|imagen|plano)\b|(?:רשימת חומרים|תמונה|תכנית|קישור למוצר)/i },
 ];
 
@@ -116,7 +116,15 @@ export function inspectSmsQuestionStructure(value: string, knownFields: SmsReque
   const questions = normalizedQuestionText
     .split(/[.!。！\n]+/)
     .flatMap((sentence) => sentence.match(/[^?？]*[?？]/g) || []);
-  const fieldsByQuestion = questions.map((question) => REQUESTED_FIELD_PATTERNS.filter(({ pattern }) => pattern.test(question)).map(({ field }) => field));
+  const fieldsByQuestion = questions.map((question) => {
+    const matched = REQUESTED_FIELD_PATTERNS.filter(({ pattern }) => pattern.test(question)).map(({ field }) => field);
+    // This asks which product a supplied number belongs to; it does not ask
+    // the customer to provide the quantity again.
+    if (/\bwhich\s+(?:item|product)\s+is\s+(?:that|this|the)\s+quantity\s+for\b/i.test(question)) {
+      return matched.filter((field) => field !== "quantity");
+    }
+    return matched;
+  });
   const fields = fieldsByQuestion.flat();
   const essentialQuestions = fieldsByQuestion.filter((questionFields) => questionFields.length > 0).length;
   const subjectFor = (question: string) => question.match(/\b(?:appliances?|cabinets?|cables?|concrete|doors?|drywall|dumpsters?|flooring|hvac|insulation|lumber|moldings?|paint|pipes?|plumbing|primer|roofing|sheetrock|shingles?|siding|studs?|screws?|corner\s+bead|tape|compound|thinset|tile|trim|windows?|wires?)\b/i)?.[0]?.toLowerCase().replace(/\s+/g, "_") || "generic";
@@ -235,7 +243,7 @@ export function smsHasNeededByTiming(value: string) {
 }
 
 export function smsHasExplicitQuantity(value: string) {
-  return /\b(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:[a-z][a-z/-]*\s+)?(?:ea|each|pcs?|pieces?|boxes?|sheets?|sheetrocks?|bricks?|ft|feet|rolls?|bags?|buckets?|bundles?|cartons?|gallons?|packs?|pallets?|squares?|yards?|units?|appliances?|batts?|beams?|blocks?|cabinets?|containers?|doors?|drywall|dumpsters?|fixtures?|hvac|insulation|lumber|lvl|panels?|shingles?|studs?|thinset|tiles?|windows?)\b/i.test(value) ||
+  return /\b(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:[a-z][a-z/-]*\s+)?(?:ea|each|pcs?|pieces?|boxes?|sheets?|sheetrocks?|bricks?|ft|feet|linear\s+ft|lf|sq\.?\s*ft|sf|rolls?|bags?|buckets?|bundles?|cans?|cartons?|gallons?|gals?|quarts?|qts?|liters?|litres?|ounces?|oz|pounds?|lbs?|packs?|pallets?|squares?|yards?|units?|appliances?|batts?|beams?|blocks?|cabinets?|containers?|doors?|drywall|dumpsters?|fixtures?|hvac|insulation|lumber|lvl|panels?|shingles?|studs?|thinset|tiles?|windows?)\b/i.test(value) ||
     /\b\d+(?:\.\d+)?\s+\d+(?:\s*[-x×/]\s*\d+){1,2}\s*(?:wood|metal)?\s*(?:studs?|lumber|boards?)\b/i.test(value) ||
     /(?:^|\s)(?:אחד|אחת|שניים|שתיים|שלושה|שלוש|\d+(?:\.\d+)?)\s*(?:יחידות?|ארגזים?|לוחות?|שקים?|דלתות?|גבס)/i.test(value) ||
     /\b(?:uno|una|dos|tres|cuatro|cinco|\d+(?:\.\d+)?)\s*(?:unidades?|cajas?|paneles?|placas?|bolsas?|puertas?|yeso)\b/i.test(value);
