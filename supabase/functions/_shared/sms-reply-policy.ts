@@ -194,11 +194,48 @@ export function smsQuantityClarificationReply(message: string) {
   return "Sure — how much do you need?";
 }
 
+function damerauLevenshteinDistance(left: string, right: string) {
+  const rows = Array.from({ length: left.length + 1 }, (_, row) =>
+    Array.from({ length: right.length + 1 }, (_, column) =>
+      row === 0 ? column : column === 0 ? row : 0
+    )
+  );
+  for (let row = 1; row <= left.length; row += 1) {
+    for (let column = 1; column <= right.length; column += 1) {
+      rows[row][column] = Math.min(
+        rows[row - 1][column] + 1,
+        rows[row][column - 1] + 1,
+        rows[row - 1][column - 1] + (left[row - 1] === right[column - 1] ? 0 : 1),
+      );
+      if (
+        row > 1 &&
+        column > 1 &&
+        left[row - 1] === right[column - 2] &&
+        left[row - 2] === right[column - 1]
+      ) {
+        rows[row][column] = Math.min(rows[row][column], rows[row - 2][column - 2] + 1);
+      }
+    }
+  }
+  return rows[left.length][right.length];
+}
+
+function looksLikeSheetrock(value: string) {
+  return value
+    .toLowerCase()
+    .match(/[a-z]+/g)
+    ?.some((token) => token.length >= 7 && token.length <= 10 && damerauLevenshteinDistance(token, "sheetrock") <= 2) ?? false;
+}
+
 export function smsProductInquiryFallbackReply(message: string) {
-  const match = message.trim().match(/^(?:do\s+)?(?:you(?:\s+guys)?|u)\s+(?:sell|carry|have|source)\s+(.+?)[?.!]*$/i);
-  if (!match?.[1]) return null;
-  const rawProduct = match[1].trim().slice(0, 80);
-  const product = /(?:sheet\s*[- ]?(?:r[a-z]{1,7})|drywall)/i.test(rawProduct)
+  const value = message.trim();
+  const standardMatch = value.match(/^(?:do\s+)?(?:you(?:\s+guys)?|u)\s+(?:sell|carry|have|source)\s+(.+?)[?.!]*$/i);
+  const sheetrockGetMatch = value.match(/^(?:can|could)\s+(?:i|we)\s+(?:get|buy|order|source)\s+(.+?)[?.!]*$/i);
+  const rawProduct = (standardMatch?.[1] || (sheetrockGetMatch?.[1] && looksLikeSheetrock(sheetrockGetMatch[1]) ? sheetrockGetMatch[1] : ""))
+    .trim()
+    .slice(0, 80);
+  if (!rawProduct) return null;
+  const product = looksLikeSheetrock(rawProduct) || /drywall/i.test(rawProduct)
     ? "Sheetrock"
     : /thin\s*set/i.test(rawProduct)
       ? "thinset"
