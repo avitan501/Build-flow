@@ -1,6 +1,6 @@
 "use client"
 
-import { AlertTriangle, Archive, Check, ChevronLeft, ChevronRight, ExternalLink, EyeOff, FileUp, ImageIcon, MapPin, PackagePlus, Pencil, Plus, Save, Search, StickyNote, Store, X } from "lucide-react"
+import { AlertTriangle, Archive, Check, ChevronLeft, ChevronRight, ExternalLink, EyeOff, FileUp, ImageIcon, MapPin, PackagePlus, Pencil, Plus, Save, Search, StickyNote, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -149,6 +149,8 @@ export function MaterialCatalogWorkspace({
   const [showInactive, setShowInactive] = useState(false)
   const [showAllSupplierColumns, setShowAllSupplierColumns] = useState(false)
   const [reviewFilter, setReviewFilter] = useState<CatalogReviewFilter>("all")
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [aiSearchOpen, setAiSearchOpen] = useState(false)
   const [itemColumnWidth, setItemColumnWidth] = useState(280)
   const [priceColumnWidth, setPriceColumnWidth] = useState(88)
   const [editor, setEditor] = useState<EditorDraft | null>(null)
@@ -189,6 +191,7 @@ export function MaterialCatalogWorkspace({
       ready: items.filter((item) => catalogItemMatchesReview(item, initialPrices, "ready")).length,
     }
   }, [initialItems, initialPrices, selectedCategory])
+  const selectedItem = categoryItems.find((item) => item.id === selectedItemId) ?? null
   const eligibleCatalogSupplierPool = useMemo(() => suppliers.filter((supplier) => (
     hasRoutableSupplierTrust(supplier.trustLevel) && supplierServesMaterialDepartment(supplier, selectedCategory)
   )), [selectedCategory, suppliers])
@@ -220,7 +223,6 @@ export function MaterialCatalogWorkspace({
     ?? visibleSuppliers.find((supplier) => supplier.id === "home-depot-retail-catalog")
     ?? visibleSuppliers[0]
     ?? null
-  const retailReferences = useMemo(() => ["home-depot-retail-catalog", "lowes-retail-catalog"].map((id) => suppliers.find((supplier) => supplier.id === id)).filter((supplier): supplier is CatalogSupplier => Boolean(supplier)), [suppliers])
   function bestSupplierPrices(item: MaterialCatalogItem) {
     return initialPrices
       .filter((price) => price.item_id === item.id && !RETAIL_CATALOG_SUPPLIER_IDS.has(price.supplier_id) && price.availability !== "not_available" && !["stale", "unavailable", "possible_match", "unverified"].includes(price.verification_status) && normalizedComparisonPrice(item, price) !== null && (!price.expires_at || new Date(price.expires_at).getTime() >= Date.now()))
@@ -241,20 +243,6 @@ export function MaterialCatalogWorkspace({
     })
     return () => window.cancelAnimationFrame(frame)
   }, [])
-
-  function updateItemColumnWidth(width: number) {
-    setItemColumnWidth(width)
-    try { window.localStorage.setItem("avantia-catalog-item-column-width", String(width)) } catch {
-      // Browser storage is optional.
-    }
-  }
-
-  function updatePriceColumnWidth(width: number) {
-    setPriceColumnWidth(width)
-    try { window.localStorage.setItem("avantia-catalog-price-column-width", String(width)) } catch {
-      // Browser storage is optional.
-    }
-  }
 
   function moveMobileSupplier(direction: -1 | 1) {
     if (!mobileSupplier || visibleSuppliers.length < 2) return
@@ -441,70 +429,65 @@ export function MaterialCatalogWorkspace({
   }
 
   return (
-    <main className="min-h-screen bg-[#f5f5f7] px-3 pb-24 pt-4 text-slate-950 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#f7f8fa] px-2 pb-20 pt-2 text-slate-950 sm:px-3 lg:px-4">
       <div className="mx-auto max-w-[100rem]">
-        <header className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-4">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0066cc]">Manager catalog</p>
-            <h1 className="mt-1 text-2xl font-bold sm:text-3xl">Materials & supplier pricing</h1>
-            <p className="mt-1 text-sm text-slate-600">Edit one category at a time. Only suppliers you add become price columns.</p>
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+          <div className="min-w-0">
+            <p className="text-[9px] font-bold uppercase tracking-[0.13em] text-sky-700">Manager · Catalog</p>
+            <h1 className="truncate text-lg font-bold tracking-tight sm:text-xl">Materials</h1>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => router.push(`/admin/documents?intent=catalog&department=${encodeURIComponent(selectedCategory)}&upload=1#document-upload`)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold transition hover:border-sky-400 hover:bg-sky-50">
-              <FileUp className="h-4 w-4 text-[#0071e3]" />Upload document
-            </button>
-            <button type="button" onClick={openCatalogSuppliers} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold hover:border-sky-400"><Store className="h-4 w-4" />Add supplier</button>
-            <button type="button" onClick={() => setEditor(emptyEditor(selectedCategory))} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Add item</button>
-          </div>
+          <nav className="flex flex-wrap items-center gap-1.5" aria-label="Catalog actions">
+            <Link href="/admin/documents" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:border-sky-300"><FileUp className="h-3.5 w-3.5" />Documents</Link>
+            <button type="button" onClick={() => router.push(`/admin/documents?intent=catalog&department=${encodeURIComponent(selectedCategory)}&upload=1#document-upload`)} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:border-sky-300"><FileUp className="h-3.5 w-3.5" />Import</button>
+            <button type="button" onClick={() => setAiSearchOpen((current) => !current)} aria-expanded={aiSearchOpen} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 text-xs font-semibold text-sky-800 hover:bg-sky-100"><Search className="h-3.5 w-3.5" />Ask AI</button>
+            <button type="button" onClick={() => setEditor(emptyEditor(selectedCategory))} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-slate-900 px-2.5 text-xs font-semibold text-white"><Plus className="h-3.5 w-3.5" />Add</button>
+          </nav>
         </header>
 
-        <ExaCatalogResearch department={selectedCategory} onUseResult={prepareExaResult} />
+        {aiSearchOpen ? <ExaCatalogResearch department={selectedCategory} onUseResult={prepareExaResult} /> : null}
 
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Catalog category">
+        <div className="mt-2 flex gap-1 overflow-x-auto pb-1" role="tablist" aria-label="Catalog category">
           {categories.map((category) => {
             const count = initialItems.filter((item) => (item.departments ?? [item.category]).includes(category) && item.status === "active").length
-            return <button key={category} type="button" role="tab" aria-selected={selectedCategory === category} onClick={() => setSelectedCategory(category)} className={`min-h-9 shrink-0 rounded-lg border px-3 text-xs font-bold ${selectedCategory === category ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-700"}`}>{category} <span className="ml-1 opacity-70">{count}</span></button>
+            return <button key={category} type="button" role="tab" aria-selected={selectedCategory === category} onClick={() => { setSelectedCategory(category); setSelectedItemId(null) }} className={`h-7 shrink-0 rounded-md border px-2 text-[11px] font-bold ${selectedCategory === category ? "border-slate-800 bg-slate-800 text-white" : "border-slate-200 bg-white text-slate-600"}`}>{category} <span className="ml-0.5 opacity-60">{count}</span></button>
           })}
         </div>
 
-        <section className="mt-3 border-y border-slate-200 bg-white px-3 py-3 sm:rounded-lg sm:border">
-          <div className="grid gap-2 md:grid-cols-[minmax(14rem,1fr)_minmax(14rem,1fr)_auto_auto]">
-            <label className="relative"><span className="sr-only">Search materials</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} placeholder="Search items or item code" className="h-10 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-sm" /></label>
-            <label className="relative"><span className="sr-only">Search supplier columns</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={supplierSearch} onChange={(event) => setSupplierSearch(event.target.value)} placeholder="Filter supplier columns" className="h-10 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-sm" /></label>
-            <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 px-3 text-xs font-semibold"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} className="h-4 w-4 accent-[#0071e3]" />Show inactive</label>
-            <button type="button" onClick={savePrices} disabled={pending || dirtyKeys.size === 0} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white disabled:opacity-40"><Save className="h-4 w-4" />Save {dirtyKeys.size ? `${dirtyKeys.size} price${dirtyKeys.size === 1 ? "" : "s"}` : "prices"}</button>
-          </div>
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-            <span>{categoryItems.length} item{categoryItems.length === 1 ? "" : "s"} · {visibleSuppliers.length} supplier column{visibleSuppliers.length === 1 ? "" : "s"}</span>
-            <div className="hidden items-center gap-4 md:flex" aria-label="Catalog column sizes">
-              <label className="flex items-center gap-2 font-semibold text-slate-600">Item <input aria-label="Item column width" type="range" min="220" max="520" step="20" value={itemColumnWidth} onChange={(event) => updateItemColumnWidth(Number(event.target.value))} className="w-24 accent-[#0071e3]" /></label>
-              <label className="flex items-center gap-2 font-semibold text-slate-600">Price <input aria-label="Price column width" type="range" min="76" max="220" step="12" value={priceColumnWidth} onChange={(event) => updatePriceColumnWidth(Number(event.target.value))} className="w-24 accent-[#0071e3]" /></label>
-            </div>
-            <span>Retail pricing location: ZIP 11516</span>
-          </div>
-          <div className="mt-3 flex gap-1.5 overflow-x-auto border-t border-slate-100 pt-3" aria-label="Catalog review queue">
+        <section className="mt-1.5 rounded-md border border-slate-200 bg-white p-1.5">
+          <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
+            <label className="relative min-w-[13rem] flex-1"><span className="sr-only">Search materials</span><Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" /><input value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} placeholder="Search materials" className="h-8 w-full rounded-md border border-slate-200 bg-slate-50 pl-8 pr-2 text-xs outline-none focus:border-sky-400 focus:bg-white" /></label>
             {([
               ["all", "All", categoryQuality.total],
-              ["missing_price", "Missing price", categoryQuality.missingPrice],
+              ["missing_price", "Missing", categoryQuality.missingPrice],
               ["stale", "Stale", categoryQuality.stale],
-              ["needs_review", "Needs review", categoryQuality.needsReview],
+              ["needs_review", "Review", categoryQuality.needsReview],
               ["ready", "Ready", categoryQuality.ready],
-            ] as Array<[CatalogReviewFilter, string, number]>).map(([value, label, count]) => <button key={value} type="button" onClick={() => setReviewFilter(value)} className={`min-h-8 shrink-0 rounded-md border px-2.5 text-[11px] font-bold ${reviewFilter === value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-600"}`}>{label} <span className="ml-1 opacity-70">{count}</span></button>)}
+            ] as Array<[CatalogReviewFilter, string, number]>).map(([value, label, count]) => <button key={value} type="button" onClick={() => setReviewFilter(value)} className={`h-8 shrink-0 rounded-md border px-2 text-[10px] font-bold ${reviewFilter === value ? "border-slate-800 bg-slate-800 text-white" : "border-slate-200 bg-white text-slate-600"}`}>{label} <span className="ml-0.5 opacity-60">{count}</span></button>)}
+            <label className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-slate-200 px-2 text-[10px] font-semibold text-slate-600"><input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} className="h-3.5 w-3.5 accent-sky-600" />Inactive</label>
+            <button type="button" onClick={() => setShowAllSupplierColumns((current) => !current)} className="h-8 shrink-0 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-600">All Prices</button>
+            <button type="button" onClick={savePrices} disabled={pending || dirtyKeys.size === 0} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md bg-sky-700 px-2.5 text-[10px] font-bold text-white disabled:opacity-35"><Save className="h-3 w-3" />Save{dirtyKeys.size ? ` ${dirtyKeys.size}` : ""}</button>
           </div>
         </section>
 
         {notice ? <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900" role="status">{notice}</p> : null}
         {error ? <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800" role="alert">{error}</p> : null}
 
-        <section className="mt-3 overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm" aria-label={`${selectedCategory} best verified prices`}>
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-3"><div><h2 className="text-sm font-bold">Best verified prices</h2><p className="mt-0.5 text-xs text-slate-500">Home Depot and Lowe’s are market references. The three lowest comparable supplier prices are shown for each item.</p></div><button type="button" onClick={() => setShowAllSupplierColumns((current) => !current)} className="min-h-9 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700">{showAllSupplierColumns ? "Hide price editor" : "Manage all supplier prices"}</button></header>
-          <div className="divide-y divide-slate-200">{categoryItems.map((item) => {
+        <section className={`mt-2 grid min-h-[30rem] overflow-hidden rounded-md border border-slate-200 bg-white ${selectedItem ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : "grid-cols-1"}`} aria-label={`${selectedCategory} catalog`}>
+          <div className="min-w-0 divide-y divide-slate-100">{categoryItems.map((item) => {
             const cheapest = bestSupplierPrices(item)
-            return <article key={`best-${item.id}`} className="grid gap-3 p-3 lg:grid-cols-[minmax(14rem,1.2fr)_minmax(12rem,.8fr)_minmax(18rem,1.4fr)] lg:items-center"><div className="min-w-0"><p className="font-bold text-slate-950">{item.name}</p><p className="mt-0.5 text-[11px] font-semibold text-slate-600">{item.brand || "Supplier-selected"}{item.manufacturer_model_number ? ` · Model ${item.manufacturer_model_number}` : ""}</p><p className="mt-0.5 text-[10px] text-slate-500">Compare per {item.comparison_unit}</p><button type="button" onClick={() => setPriceCheckItem(item)} className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 text-[11px] font-bold text-[#0066cc]"><MapPin className="h-3.5 w-3.5" />Check ZIP price</button></div><div className="flex gap-2">{retailReferences.map((supplier) => { const price = initialPriceMap.get(cellKey(item.id, supplier.id)); const label = price && normalizedComparisonPrice(item, price) !== null ? `$${normalizedComparisonPrice(item, price)!.toFixed(2)}` : "Not available"; return price?.product_url ? <a key={supplier.id} href={price.product_url} target="_blank" rel="noreferrer" aria-label={`Open exact ${item.name} at ${supplier.name}`} className="min-w-0 flex-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-left hover:border-sky-300"><span className="block truncate text-[10px] font-bold text-slate-500">{supplier.name}</span><span className="mt-0.5 flex items-center justify-between gap-1 text-sm font-bold tabular-nums"><span>{label}</span><ExternalLink className="h-3.5 w-3.5 text-[#0066cc]" /></span>{price.supplier_sku ? <span className="mt-0.5 block truncate text-[9px] text-slate-500">Store item {price.supplier_sku}</span> : null}</a> : <button key={supplier.id} type="button" onClick={() => setPriceEditor({ item, supplier })} className="min-w-0 flex-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-left"><span className="block truncate text-[10px] font-bold text-slate-500">{supplier.name}</span><span className="mt-0.5 block text-sm font-bold text-slate-500">{label}</span>{price?.supplier_sku ? <span className="mt-0.5 block truncate text-[9px] text-slate-500">Store item {price.supplier_sku}</span> : null}</button> })}</div><div className="grid gap-1 sm:grid-cols-3">{cheapest.map((price, index) => <button key={price.supplier_id} type="button" onClick={() => { const supplier = suppliers.find((entry) => entry.id === price.supplier_id); if (supplier) setPriceEditor({ item, supplier }) }} className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-2 text-left"><span className="block text-[9px] font-bold uppercase tracking-wide text-emerald-700">#{index + 1} lowest</span><span className="mt-0.5 block truncate text-xs font-bold text-slate-950">{price.supplier_name_snapshot}</span><span className="block text-sm font-bold tabular-nums text-emerald-800">${normalizedComparisonPrice(item, price)!.toFixed(2)}</span><span className="block truncate text-[9px] text-slate-500">{price.source_document_date || priceCheckedDateLabel(price) || "Verified source"}</span></button>)}{Array.from({ length: 3 - cheapest.length }).map((_, index) => <div key={`empty-${index}`} className="rounded-md border border-dashed border-slate-200 px-2 py-2 text-xs font-semibold text-slate-400">No verified price</div>)}</div></article>
-          })}</div>
+            const issues = catalogItemIssues(item, initialPrices)
+            return <button type="button" key={`best-${item.id}`} onClick={() => setSelectedItemId(item.id)} aria-pressed={selectedItem?.id === item.id} className={`grid w-full gap-2 px-2.5 py-2 text-left transition hover:bg-slate-50 sm:grid-cols-[minmax(12rem,1fr)_minmax(15rem,1.2fr)_auto] sm:items-center ${selectedItem?.id === item.id ? "bg-sky-50/70" : ""}`}><span className="min-w-0"><span className="block truncate text-xs font-bold text-slate-900">{item.name}</span><span className="block truncate text-[10px] text-slate-500">{[item.brand, item.measurement, item.thickness].filter(Boolean).join(" · ") || item.item_code}</span></span><span className="flex min-w-0 gap-1">{cheapest.length ? cheapest.map((price) => <span key={price.supplier_id} className="min-w-0 flex-1 rounded border border-slate-200 bg-white px-1.5 py-1"><span className="block truncate text-[9px] text-slate-500">{price.supplier_name_snapshot}</span><span className="block text-[11px] font-bold tabular-nums text-emerald-800">${normalizedComparisonPrice(item, price)!.toFixed(2)}</span></span>) : <span className="text-[10px] text-slate-400">No verified prices</span>}</span><span className={`justify-self-start rounded-full px-2 py-0.5 text-[9px] font-bold sm:justify-self-end ${issues.length ? "bg-amber-50 text-amber-800 ring-1 ring-amber-200" : "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"}`}>{issues.length ? "Review" : "Ready"}</span></button>
+          })}{!categoryItems.length ? <div className="grid min-h-48 place-items-center p-6 text-center"><div><PackagePlus className="mx-auto h-7 w-7 text-slate-300" /><p className="mt-2 text-sm font-bold">No matching items</p></div></div> : null}</div>
+          {selectedItem ? <aside className="border-t border-slate-200 bg-slate-50/70 lg:border-l lg:border-t-0" aria-label={`${selectedItem.name} details`}>
+            <div className="sticky top-2 p-3">
+              <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-[0.12em] text-sky-700">Details</p><h2 className="truncate text-sm font-bold">{selectedItem.name}</h2><p className="truncate text-[10px] text-slate-500">{[selectedItem.brand, selectedItem.measurement, selectedItem.thickness].filter(Boolean).join(" · ") || selectedItem.item_code}</p>{selectedItem.status === "active" ? <span className="mt-1 inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-[9px] font-bold text-sky-800 ring-1 ring-sky-200">Published</span> : null}</div><button type="button" onClick={() => setSelectedItemId(null)} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500" aria-label="Close details"><X className="h-3.5 w-3.5" /></button></div>
+              <div className="mt-3 grid grid-cols-2 gap-1.5"><button type="button" onClick={() => setPriceCheckItem(selectedItem)} className="inline-flex h-8 items-center justify-center gap-1 rounded-md bg-sky-700 px-2 text-[10px] font-bold text-white"><MapPin className="h-3 w-3" />Online Prices</button><button type="button" onClick={() => setShowAllSupplierColumns(true)} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700">All Prices</button><button type="button" onClick={() => setEditor(itemEditor(selectedItem))} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700">Complete</button><Link href="/admin/supplier-approvals" className="inline-flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700">Send for Approval</Link></div>
+              <div className="mt-3 space-y-1.5"><p className="text-[9px] font-bold uppercase tracking-[0.1em] text-slate-500">Top prices</p>{bestSupplierPrices(selectedItem).map((price, index) => <button key={price.supplier_id} type="button" onClick={() => { const supplier = suppliers.find((entry) => entry.id === price.supplier_id); if (supplier) setPriceEditor({ item: selectedItem, supplier }) }} className="flex w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-left"><span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-emerald-50 text-[9px] font-bold text-emerald-800">{index + 1}</span><span className="min-w-0 flex-1 truncate text-[10px] font-semibold text-slate-700">{price.supplier_name_snapshot}</span><span className="text-xs font-bold tabular-nums text-emerald-800">${normalizedComparisonPrice(selectedItem, price)!.toFixed(2)}</span></button>)}{!bestSupplierPrices(selectedItem).length ? <p className="rounded-md border border-dashed border-slate-200 bg-white px-2 py-3 text-center text-[10px] text-slate-400">No verified prices</p> : null}</div>
+            </div>
+          </aside> : null}
         </section>
 
-        {showAllSupplierColumns ? <><section className="mt-3 overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm md:hidden" aria-label={`${selectedCategory} mobile supplier pricing`}>
+        {showAllSupplierColumns ? <><div className="mt-2 flex items-center gap-2 rounded-md border border-slate-200 bg-white p-1.5"><label className="relative min-w-0 flex-1"><span className="sr-only">Filter suppliers</span><Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" /><input value={supplierSearch} onChange={(event) => setSupplierSearch(event.target.value)} placeholder="Filter suppliers" className="h-8 w-full rounded-md border border-slate-200 bg-slate-50 pl-8 pr-2 text-xs" /></label><button type="button" onClick={openCatalogSuppliers} className="h-8 rounded-md border border-slate-200 px-2.5 text-[10px] font-bold text-slate-700">Add supplier</button><button type="button" onClick={() => setShowAllSupplierColumns(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-500" aria-label="Close all prices"><X className="h-3.5 w-3.5" /></button></div><section className="mt-2 overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm md:hidden" aria-label={`${selectedCategory} mobile supplier pricing`}>
           <header className="border-b border-slate-200 bg-slate-50 p-3">
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => moveMobileSupplier(-1)} disabled={visibleSuppliers.length < 2} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-35" aria-label="Previous supplier"><ChevronLeft className="h-4 w-4" /></button>
@@ -620,7 +603,7 @@ export function MaterialCatalogWorkspace({
             <label className="grid gap-1 text-xs font-bold">Package unit<select value={editor.packageUnit} onChange={(event) => setEditor({ ...editor, packageUnit: event.target.value })} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal">{unitOptions.map((unit) => <option key={unit}>{unit}</option>)}</select></label>
             <label className="grid gap-1 text-xs font-bold">Compare quantity<input inputMode="decimal" value={editor.comparisonQuantity} onChange={(event) => setEditor({ ...editor, comparisonQuantity: event.target.value.replace(/[^0-9.]/g, "") })} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
             <label className="grid gap-1 text-xs font-bold">Compare unit<select value={editor.comparisonUnit} onChange={(event) => setEditor({ ...editor, comparisonUnit: event.target.value })} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal">{unitOptions.map((unit) => <option key={unit}>{unit}</option>)}</select></label>
-            <label className="grid gap-1 text-xs font-bold">Catalog confidence<select value={editor.reviewStatus} onChange={(event) => setEditor({ ...editor, reviewStatus: event.target.value as EditorDraft["reviewStatus"] })} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal"><option value="needs_review">Needs review</option><option value="ambiguous">Ambiguous</option><option value="ready">Ready</option><option value="discontinued">Discontinued</option></select></label>
+            <label className="grid gap-1 text-xs font-bold">Catalog confidence<select value={editor.reviewStatus} onChange={(event) => setEditor({ ...editor, reviewStatus: event.target.value as EditorDraft["reviewStatus"] })} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal"><option value="needs_review">Review</option><option value="ambiguous">Ambiguous</option><option value="ready">Ready</option><option value="discontinued">Discontinued</option></select></label>
             <label className="grid gap-1 text-xs font-bold sm:col-span-2">Description <span className="font-normal text-slate-400">optional</span><textarea value={editor.description} onChange={(event) => setEditor({ ...editor, description: event.target.value })} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
             <label className="grid gap-1 text-xs font-bold sm:col-span-2">Verification notes <span className="font-normal text-slate-400">optional</span><textarea value={editor.qualityNotes} onChange={(event) => setEditor({ ...editor, qualityNotes: event.target.value })} placeholder="Why this exact product was selected or what still needs checking" rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
             <label className="grid gap-1 text-xs font-bold sm:col-span-2">Admin note <span className="font-normal text-slate-400">internal</span><textarea value={editor.adminNotes} onChange={(event) => setEditor({ ...editor, adminNotes: event.target.value })} placeholder="Private ordering reminder, supplier preference, substitution rule, or follow-up" rows={3} maxLength={4000} className="rounded-lg border border-slate-300 bg-amber-50/50 px-3 py-2 text-sm font-normal" /></label>
@@ -651,7 +634,7 @@ export function MaterialCatalogWorkspace({
         </section>
       </div>, document.body) : null}
 
-      {priceCheckItem && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[165] overflow-y-auto bg-slate-950/55 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label={`Check ZIP price for ${priceCheckItem.name}`} onMouseDown={(event) => { if (event.currentTarget === event.target) setPriceCheckItem(null) }}><div className="mx-auto max-w-5xl rounded-xl bg-[#f5f5f7] p-1 shadow-2xl"><MaterialPriceCheck query={[priceCheckItem.brand, priceCheckItem.name, priceCheckItem.measurement, priceCheckItem.manufacturer_model_number].filter(Boolean).join(" · ")} department={selectedCategory} defaultZipCode="11516" onClose={() => setPriceCheckItem(null)} /></div></div>, document.body) : null}
+      {priceCheckItem && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[165] overflow-y-auto bg-slate-950/55 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label={`Online prices for ${priceCheckItem.name}`} onMouseDown={(event) => { if (event.currentTarget === event.target) setPriceCheckItem(null) }}><div className="mx-auto max-w-5xl rounded-xl bg-[#f5f5f7] p-1 shadow-2xl"><MaterialPriceCheck query={[priceCheckItem.brand, priceCheckItem.name, priceCheckItem.measurement, priceCheckItem.manufacturer_model_number].filter(Boolean).join(" · ")} department={selectedCategory} defaultZipCode="11516" onClose={() => setPriceCheckItem(null)} /></div></div>, document.body) : null}
     </main>
   )
 }
