@@ -1787,7 +1787,7 @@ function customerSmsFallback(
 }
 
 async function smsConversationContext(phone: string) {
-  const [rows, linkedRequests] = await Promise.all([
+  const [rows, linkedRequests, latestConfirmations] = await Promise.all([
     sql<{ direction: string; body: string | null; media: unknown; occurred_at: string }[]>`
       select direction, body, media, occurred_at
       from public.aura_communications
@@ -1809,8 +1809,23 @@ async function smsConversationContext(phone: string) {
       order by communication.occurred_at desc
       limit 1
     `,
+    sql<{ completed_at: string }[]>`
+      select completed_at
+      from public.aura_sms_request_confirmations
+      where normalized_phone = ${phone}
+      order by completed_at desc
+      limit 1
+    `,
   ]);
-  const ordered = [...rows].reverse();
+  const latestConfirmationAt = latestConfirmations[0]?.completed_at ? Date.parse(latestConfirmations[0].completed_at) : Number.NaN;
+  const afterConfirmedRequest = Number.isFinite(latestConfirmationAt);
+  // A confirmed request is a hard context boundary even when the customer
+  // starts the next request with natural wording such as “I need 50 Sheetrock”
+  // instead of explicitly saying “new request.” Never reuse its address,
+  // timing, or product answers in the next order.
+  const ordered = [...rows].reverse().filter((message) =>
+    !afterConfirmedRequest || Date.parse(message.occurred_at) > latestConfirmationAt
+  );
   let newRequestBoundary = -1;
   for (let index = 0; index < ordered.length; index += 1) {
     const message = ordered[index];
@@ -1828,7 +1843,7 @@ async function smsConversationContext(phone: string) {
     return [message.body?.trim() || "", attachment].filter(Boolean).join(" ");
   };
   return {
-    replyText: [newRequestBoundary < 0 && linkedRequests[0] ? `Avantia record: Linked material request “${linkedRequests[0].title.slice(0, 180)}” has internal status “${linkedRequests[0].status.slice(0, 60)}”. Do not expose the internal status as a promise; use it only to avoid asking the customer for a request ID.` : "", ...activeOrdered.map((message) => `${message.direction === "incoming" ? "Customer" : "Avantia"}: ${messageText(message)}`)].filter(Boolean).join("\n"),
+    replyText: [newRequestBoundary < 0 && !afterConfirmedRequest && linkedRequests[0] ? `Avantia record: Linked material request “${linkedRequests[0].title.slice(0, 180)}” has internal status “${linkedRequests[0].status.slice(0, 60)}”. Do not expose the internal status as a promise; use it only to avoid asking the customer for a request ID.` : "", ...activeOrdered.map((message) => `${message.direction === "incoming" ? "Customer" : "Avantia"}: ${messageText(message)}`)].filter(Boolean).join("\n"),
     customerText: activeOrdered.filter((message) => message.direction === "incoming").map(messageText).join("\n"),
   };
 }
@@ -2309,6 +2324,21 @@ async function confirmPendingSmsRequest(communicationId: string, phone: string, 
     const invitation = "Your Avantia Build material request is ready. View the order and live status securely: https://build.avantiap.com/requests";
     await transaction`insert into public.customer_request_portal_invite_outbox (request_id, normalized_phone, message) values (${requests[0].id}::uuid, ${phone}, ${invitation}) on conflict (request_id) do nothing`;
     await transaction`update public.aura_sms_request_pending_confirmations set status = 'confirmed', confirmation_communication_id = ${communicationId}::uuid, request_id = ${requests[0].id}::uuid, updated_at = now() where id = ${pending.id}::uuid`;
+    await transaction`
+      update public.aura_sms_request_drafts
+      set status = 'converted', created_request_id = ${requests[0].id}::uuid, updated_at = now()
+      where id = (
+        select id from public.aura_sms_request_drafts
+        where sender_phone = ${phone} and status = 'new' and draft_kind = 'create'
+        order by updated_at desc limit 1
+      )
+    `;
+    await transaction`
+      update public.aura_sms_request_states
+      set status = 'confirmed', created_request_id = ${requests[0].id}::uuid,
+          pending_confirmation_id = null, closed_at = now(), updated_at = now()
+      where normalized_phone = ${phone} and status in ('collecting', 'awaiting_confirmation')
+    `;
     return requests[0];
   });
   if (!result) return null;
@@ -2488,7 +2518,9 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
   }
   const { result, model, intent, metrics, promptVersion } = analyzed;
   let safety = analyzed.safety;
-  const clarificationQuestions = (result.isMaterialRequest || Boolean(openDraft)) && !/^gpt-/i.test(model)
+  // Reviewed construction rules are final output guards, not model fallbacks.
+  // Even a strong semantic model must not skip a required product choice.
+  const clarificationQuestions = result.isMaterialRequest || Boolean(openDraft)
     ? smsMaterialClarificationQuestions(activeCustomerText || reviewText, { exactListOnly })
     : [];
   if (clarificationQuestions.length) {
