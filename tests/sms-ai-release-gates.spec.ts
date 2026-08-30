@@ -34,6 +34,7 @@ import {
   smsUnansweredFollowUpCancellationReason,
   smsUnansweredFollowUpEligible,
   smsUnansweredFollowUpText,
+  smsUnansweredFollowUpStageText,
 } from "../supabase/functions/_shared/sms-reply-policy"
 
 const root = process.cwd()
@@ -505,7 +506,7 @@ test("bare quantities keep the requested product in wood, finishing, and mixed-l
   }
 })
 
-test("one-shot unanswered follow-up is question-aware and cancels on every later response", () => {
+test("staged unanswered follow-up is question-aware and cancels on every later response", () => {
   const eligible = {
     originalMessage: "Need thinset",
     questionReply: "Sure — how much thinset do you need?",
@@ -517,6 +518,9 @@ test("one-shot unanswered follow-up is question-aware and cancels on every later
   }
   expect(smsUnansweredFollowUpEligible(eligible)).toBe(true)
   expect(smsUnansweredFollowUpText(eligible)).toBe("Still need help with the quantity?")
+  expect(smsUnansweredFollowUpStageText({ originalMessage: eligible.originalMessage, questionReply: "Still need help with the quantity?", stage: 1 })).toBe("Still need help with the quantity?")
+  expect(smsUnansweredFollowUpStageText({ ...eligible, stage: 2 })).toBe("Do you still want help completing this material request?")
+  expect(smsUnansweredFollowUpStageText({ ...eligible, stage: 3 })).toBe("Should we keep this material request open for you?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell Sheetrock?", questionReply: "Regular, Type X/fire-rated, or moisture-resistant? How many sheets do you need?" })).toBe("Can you confirm 5/8 in., type, and quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "I need roofing shingles", questionReply: "What shingle type and color? How many square feet do you need?" })).toBe("Still need help with the shingle type, color, or quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "I need roofing shingles", questionReply: "What shingle type and color?" })).toBe("Still need help with the shingle type or color?")
@@ -577,7 +581,7 @@ test("unknown AI fallback stays review-only and never emits the rejected generic
   expect(fallback.reply).toContain("manager review required")
 })
 
-test("unanswered follow-up persistence is ten-minute, unique, one-shot, and cron dispatched", async () => {
+test("unanswered follow-up persistence is staged, unique, and cron dispatched", async () => {
   const [migration, broker] = await Promise.all([
     readFile(path.join(root, "supabase/migrations/20260830223000_add_sms_unanswered_followups.sql"), "utf8"),
     readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
@@ -587,6 +591,8 @@ test("unanswered follow-up persistence is ten-minute, unique, one-shot, and cron
   expect(migration).toContain("dispatch-sms-unanswered-followups")
   expect(migration).toContain("* * * * *")
   expect(broker).toContain("now() + interval '10 minutes'")
+  expect(broker).toContain('followUp.follow_up_stage === 1 ? "2 hours" : "24 hours"')
+  expect(broker).toContain("follow_up_stage = follow_up_stage + 1")
   expect(broker).toContain('model: "deterministic-product-inquiry"')
   expect(broker).toContain("before older lists in the same phone thread")
   expect(broker).toContain("for update skip locked")

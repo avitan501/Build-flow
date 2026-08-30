@@ -630,6 +630,19 @@ export function smsUnansweredFollowUpText(params: { originalMessage: string; que
   return "Still need help with this?";
 }
 
+export function smsUnansweredFollowUpStageText(params: { originalMessage: string; questionReply: string; stage: number }) {
+  if (params.stage <= 1) return params.questionReply.trim();
+  const language = smsReplyLanguage(`${params.originalMessage}\n${params.questionReply}`);
+  if (params.stage === 2) {
+    if (language === "he") return "עדיין רוצה שנמשיך להכין את בקשת החומרים שלך?";
+    if (language === "es") return "¿Quiere que sigamos preparando su solicitud de materiales?";
+    return "Do you still want help completing this material request?";
+  }
+  if (language === "he") return "להשאיר את בקשת החומרים הזאת פתוחה עבורך?";
+  if (language === "es") return "¿Quiere que mantengamos abierta esta solicitud de materiales?";
+  return "Should we keep this material request open for you?";
+}
+
 export function smsUnansweredFollowUpEligible(params: {
   originalMessage: string;
   questionReply: string;

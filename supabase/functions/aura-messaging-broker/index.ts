@@ -33,6 +33,7 @@ import {
   smsUnknownContextFallback,
   smsUnansweredFollowUpCancellationReason,
   smsUnansweredFollowUpEligible,
+  smsUnansweredFollowUpStageText,
   smsUnansweredFollowUpText,
 } from "../_shared/sms-reply-policy.ts";
 
@@ -4214,6 +4215,7 @@ type SmsUnansweredFollowUpRow = {
   counterparty_phone: string;
   initial_outgoing_external_id: string;
   prompt_text: string;
+  follow_up_stage: number;
 };
 
 async function handleSmsUnansweredFollowUpDispatch(req: Request) {
@@ -4235,7 +4237,8 @@ async function handleSmsUnansweredFollowUpDispatch(req: Request) {
     from due
     where followup.id = due.id
     returning followup.id, followup.source_communication_id, followup.contact_id,
-      followup.counterparty_phone, followup.initial_outgoing_external_id, followup.prompt_text
+      followup.counterparty_phone, followup.initial_outgoing_external_id, followup.prompt_text,
+      followup.follow_up_stage
   `;
 
   let sent = 0;
@@ -4285,17 +4288,34 @@ async function handleSmsUnansweredFollowUpDispatch(req: Request) {
       continue;
     }
     try {
-      const externalId = await sendQuoSms(followUp.counterparty_phone, followUp.prompt_text);
+      const followUpText = smsUnansweredFollowUpStageText({
+        originalMessage: "",
+        questionReply: followUp.prompt_text,
+        stage: followUp.follow_up_stage,
+      });
+      const externalId = await sendQuoSms(followUp.counterparty_phone, followUpText);
       const sentRows = await sql<{ id: string }[]>`
         select id from public.aura_communications
         where provider = 'quo' and external_activity_id = ${externalId}
         limit 1
       `;
-      await sql`
-        update public.aura_sms_unanswered_followups
-        set status = 'sent', sent_at = now(), sent_communication_id = ${sentRows[0]?.id || null}, updated_at = now()
-        where id = ${followUp.id}::uuid and status = 'processing'
-      `;
+      if (followUp.follow_up_stage < 3) {
+        const nextDelay = followUp.follow_up_stage === 1 ? "2 hours" : "24 hours";
+        await sql`
+          update public.aura_sms_unanswered_followups
+          set status = 'pending', follow_up_stage = follow_up_stage + 1,
+            due_at = now() + ${nextDelay}::interval,
+            initial_outgoing_external_id = ${externalId}, sent_communication_id = ${sentRows[0]?.id || null},
+            sent_at = now(), claimed_at = null, updated_at = now()
+          where id = ${followUp.id}::uuid and status = 'processing'
+        `;
+      } else {
+        await sql`
+          update public.aura_sms_unanswered_followups
+          set status = 'sent', sent_at = now(), sent_communication_id = ${sentRows[0]?.id || null}, updated_at = now()
+          where id = ${followUp.id}::uuid and status = 'processing'
+        `;
+      }
       sent += 1;
     } catch (error) {
       await sql`
