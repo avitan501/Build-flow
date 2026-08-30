@@ -1154,7 +1154,7 @@ function exactListAcknowledgement(message: string, addressKnown: boolean) {
   if (/[\u0590-\u05ff]/.test(message)) return addressKnown
     ? "הבנתי—אשמור את הבקשה בדיוק לפי הרשימה שלך. מנהל יאשר כאן מחיר וזמינות עדכניים."
     : "הבנתי—אשמור את הבקשה בדיוק לפי הרשימה שלך. מה כתובת המשלוח המלאה?";
-  if (/[áéíóúñ¿¡]/i.test(message) || /\b(?:solo|lista|art[ií]culos)\b/i.test(message)) return addressKnown
+  if (smsReplyLanguage(message) === "es") return addressKnown
     ? "Entendido: mantendré la solicitud exactamente como está en tu lista. Un gerente confirmará aquí el precio y la disponibilidad actuales."
     : "Entendido: mantendré la solicitud exactamente como está en tu lista. ¿Cuál es la dirección completa de entrega?";
   return addressKnown
@@ -1164,19 +1164,19 @@ function exactListAcknowledgement(message: string, addressKnown: boolean) {
 
 function addressFirstReply(message: string) {
   if (/[\u0590-\u05ff]/.test(message)) return "קיבלתי את רשימת החומרים. מה כתובת המשלוח המלאה?";
-  if (/[áéíóúñ¿¡]/i.test(message)) return "Recibí la lista de materiales. ¿Cuál es la dirección completa de entrega?";
+  if (smsReplyLanguage(message) === "es") return "Recibí la lista de materiales. ¿Cuál es la dirección completa de entrega?";
   return "I have the material list. What is the full delivery address?";
 }
 
 function neededByReply(message: string) {
   if (/[\u0590-\u05ff]/.test(message)) return "לאיזה תאריך החומרים נדרשים?";
-  if (/[áéíóúñ¿¡]/i.test(message)) return "¿Para qué fecha necesita los materiales?";
+  if (smsReplyLanguage(message) === "es") return "¿Para qué fecha necesita los materiales?";
   return "What date are the materials needed?";
 }
 
 function requestReadyForManagerReply(message: string) {
   if (/[\u0590-\u05ff]/.test(message)) return "קיבלתי את פרטי הבקשה. מנהל יבדוק מחיר וזמינות עדכניים ויענה כאן.";
-  if (/[áéíóúñ¿¡]/i.test(message)) return "Recibí los detalles de la solicitud. Un gerente revisará el precio y la disponibilidad actuales y responderá aquí.";
+  if (smsReplyLanguage(message) === "es") return "Recibí los detalles de la solicitud. Un gerente revisará el precio y la disponibilidad actuales y responderá aquí.";
   return "I have the request details. A manager will review current price and availability and reply here.";
 }
 
@@ -1208,7 +1208,9 @@ function finalizeCustomerSmsAnalysis(params: { result: CustomerSmsAutomation; mo
   const groundedExactItems = exactListOnly && params.result.request
     ? filterSmsExactListItems(params.result.request.items, customerTranscript)
     : params.result.request?.items;
-  const quantityKnown = smsHasExplicitQuantity(customerTranscript) || (exactListOnly && Boolean(groundedExactItems?.some((item) => item.quantity === 1)));
+  const quantityKnown = smsHasExplicitQuantity(customerTranscript) ||
+    Boolean(groundedExactItems?.some((item) => Number(item.quantity) > 1)) ||
+    (exactListOnly && Boolean(groundedExactItems?.some((item) => item.quantity === 1)));
   const answeredQuantityGuardReply = smsAnsweredQuantityGuardReply(params.message, params.result.reply);
   const replyStep = resolveSmsMaterialReplyStep({
     isMaterialRequest: params.result.isMaterialRequest,

@@ -99,7 +99,7 @@ const REQUESTED_FIELD_PATTERNS: Array<{ field: SmsRequestedField; pattern: RegEx
   { field: "brand", pattern: /\b(?:brand|manufacturer|marca|fabricante)\b|(?:מותג|יצרן)/i },
   { field: "color", pattern: /\b(?:color|colour)\b|\bcolor\b|(?:צבע)/i },
   { field: "finish", pattern: /\b(?:finish|sheen|acabado)\b|(?:גימור)/i },
-  { field: "specification", pattern: /\b(?:product specification|model|type|style|modelo|tipo)\b|\bwhich\s+(?:item|product|thinset|compound|primer|paint|adhesive|mortar|concrete|lumber|stud|drywall|sheetrock|shingle|brick|block|tile)\b|(?:דגם|סוג)/i },
+  { field: "specification", pattern: /\bproduct specification\b|\b(?:what|which)\s+(?:[a-z/-]+\s+){0,4}?(?:model|type|style)\b|\b(?:confirm|choose|select)\b[^?？]{0,60}\b(?:model|type|style)\b|\b(?:model|type|style)\s+(?:do|does|would|should|is|are|did)\b|\b(?:regular|type\s*x|fire[- ]rated|moisture[- ]resistant)\b[^?？]*[?？]|\bwhich\s+(?:item|product|thinset|compound|primer|paint|adhesive|mortar|concrete|lumber|stud|drywall|sheetrock|shingle|brick|block|tile)\b|\b(?:qu[eé]|cu[aá]l)\s+(?:[a-záéíóúñ/-]+\s+){0,4}?(?:modelo|tipo|estilo)\b|(?:איזה|איזו|מה)\s+(?:דגם|סוג)/i },
   { field: "source", pattern: /\b(?:material list|photo|image|plan|drawing|product link|lista de materiales|foto|imagen|plano)\b|(?:רשימת חומרים|תמונה|תכנית|קישור למוצר)/i },
 ];
 
@@ -243,10 +243,10 @@ export function smsHasNeededByTiming(value: string) {
 }
 
 export function smsHasExplicitQuantity(value: string) {
-  return /\b(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:[a-z][a-z/-]*\s+)?(?:ea|each|pcs?|pieces?|boxes?|sheets?|sheetrocks?|bricks?|ft|feet|linear\s+ft|lf|sq\.?\s*ft|sf|rolls?|bags?|buckets?|bundles?|cans?|cartons?|gallons?|gals?|quarts?|qts?|liters?|litres?|ounces?|oz|pounds?|lbs?|packs?|pallets?|squares?|yards?|units?|appliances?|batts?|beams?|blocks?|cabinets?|containers?|doors?|drywall|dumpsters?|fixtures?|hvac|insulation|lumber|lvl|panels?|shingles?|studs?|thinset|tiles?|windows?)\b/i.test(value) ||
+  return /\b(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand)\s*(?:[a-z][a-z/-]*\s+){0,4}?(?:ea|each|pcs?|pieces?|boxes?|sheets?|sheetrocks?|bricks?|ft|feet|foot|linear\s+ft|lf|sq\.?\s*ft|sf|rolls?|bags?|buckets?|bundles?|cans?|cartons?|gallons?|gals?|quarts?|qts?|liters?|litres?|ounces?|oz|pounds?|lbs?|packs?|pallets?|squares?|yards?|units?|appliances?|batts?|beams?|blocks?|cabinets?|containers?|doors?|drywall|dumpsters?|fixtures?|hvac|insulation|lumber|lvl|panels?|shingles?|studs?|thinset|tiles?|windows?)\b/i.test(value) ||
     /\b\d+(?:\.\d+)?\s+\d+(?:\s*[-x×/]\s*\d+){1,2}\s*(?:wood|metal)?\s*(?:studs?|lumber|boards?)\b/i.test(value) ||
-    /(?:^|\s)(?:אחד|אחת|שניים|שתיים|שלושה|שלוש|\d+(?:\.\d+)?)\s*(?:יחידות?|ארגזים?|לוחות?|שקים?|דלתות?|גבס)/i.test(value) ||
-    /\b(?:uno|una|dos|tres|cuatro|cinco|\d+(?:\.\d+)?)\s*(?:unidades?|cajas?|paneles?|placas?|bolsas?|puertas?|yeso)\b/i.test(value);
+    /(?:^|\s)(?:אחד|אחת|שניים|שתיים|שלושה|שלוש|\d+(?:\.\d+)?)\s*(?:יחידות?|ארגזים?|לוחות?|שקים?|דליים?|גלונים?|דלתות?|גבס)/i.test(value) ||
+    /\b(?:uno|una|dos|tres|cuatro|cinco|\d+(?:\.\d+)?)\s*(?:unidades?|cajas?|paneles?|placas?|bolsas?|bloques?|cubetas?|galones?|puertas?|yeso)\b/i.test(value);
 }
 
 export function smsAnsweredQuantityGuardReply(latestMessage: string, proposedReply: string) {
@@ -357,7 +357,7 @@ export function applyAvantiaMaterialDefaults<T extends { name: string; quantity:
 
 export function smsQuantityClarificationReply(message: string) {
   if (/[\u0590-\u05ff]/.test(message)) return "בטח—איזו כמות אתה צריך?";
-  if (/[áéíóúñ¿¡]/i.test(message)) return "Claro—¿qué cantidad necesita?";
+  if (smsReplyLanguage(message) === "es") return "Claro—¿qué cantidad necesita?";
   if (/\bthinset\b/i.test(message)) return "Sure — how much thinset do you need?";
   if (/\b(?:sheetrock|drywall)\b/i.test(message)) return "How many sheets do you need? Is 5/8 in. okay?";
   return "Sure — how much do you need?";
@@ -569,7 +569,7 @@ export function smsReplyParts(params: { reply: string; deterministicProductInqui
 
 export function smsDeliveryDetailsQuestionReply(message: string) {
   if (/[\u0590-\u05ff]/.test(message)) return "מתי החומרים נדרשים, ומה כתובת המשלוח המלאה?";
-  if (/[áéíóúñ¿¡]/i.test(message)) return "¿Para cuándo los necesita y cuál es la dirección completa de entrega?";
+  if (smsReplyLanguage(message) === "es") return "¿Para cuándo los necesita y cuál es la dirección completa de entrega?";
   return "When do you need it, and what’s the full delivery address?";
 }
 

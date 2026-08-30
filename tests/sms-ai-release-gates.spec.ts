@@ -27,6 +27,7 @@ import {
   smsProductInquiryFallbackReply,
   smsQuantityClarificationReply,
   smsReplyParts,
+  smsReplyLanguage,
   smsSheetrockSpecificationFollowUpReply,
   smsShortMaterialAnswerReply,
   smsStartsNewMaterialRequest,
@@ -483,6 +484,10 @@ test("trade unit abbreviations count as supplied quantities", () => {
     "Need 120 lf track",
     "Need 20 lb compound",
     "Need 6 oz adhesive",
+    "I need 24 white vinyl windows",
+    "Nueva solicitud: necesito 400 bloques CMU de 8 pulgadas",
+    "אני צריך 3 דליים של פריימר לגבס",
+    "need fifty two be fours eight foot",
   ]) expect(smsHasExplicitQuantity(message), message).toBe(true)
 })
 
@@ -491,6 +496,19 @@ test("essential product-type follow-ups pass the safety gate", () => {
     expect(inspectSmsQuestionStructure(reply), reply).toMatchObject({ valid: true, fields: ["specification"] })
     expect(smsOutputSafetySignals({ message: "Need material", reply, intent: "material_request", exactListOnly: true }), reply).toEqual([])
   }
+})
+
+test("a product name such as Type S does not look like a repeated specification question", () => {
+  const reply = "When do you need the 8 bags of Type S mortar? What is the full delivery address?"
+  expect(inspectSmsQuestionStructure(reply)).toMatchObject({ valid: true, fields: ["needed_by", "address"] })
+  expect(smsOutputSafetySignals({ message: "Need 8 bags Type S mortar", reply, intent: "material_request" })).toEqual([])
+})
+
+test("deterministic progression keeps Spanish even without accent marks", () => {
+  const message = "Nueva solicitud: necesito 400 bloques CMU de 8 pulgadas"
+  expect(smsReplyLanguage(message)).toBe("es")
+  expect(smsDeliveryDetailsQuestionReply(message)).toBe("¿Para cuándo los necesita y cuál es la dirección completa de entrega?")
+  expect(smsQuantityClarificationReply(message)).toBe("Claro—¿qué cantidad necesita?")
 })
 
 test("bare quantities keep the requested product in wood, finishing, and mixed-list continuations", () => {
