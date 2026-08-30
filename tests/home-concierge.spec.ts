@@ -90,6 +90,7 @@ test("desktop hero scales with the page instead of cropping at narrower widths",
 
 test("homepage switches all principal sales content to Spanish", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "Open navigation menu" }).click();
   await page.getByRole("button", { name: "Ver página en español" }).click();
 
   await expect(page.locator("html")).toHaveAttribute("lang", "es");

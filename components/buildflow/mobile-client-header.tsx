@@ -190,34 +190,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
             )}
           </button>
 
-          {isHome ? (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  const nextLanguage = homeLanguage === "en" ? "es" : "en";
-                  setHomeLanguage(nextLanguage);
-                  document.documentElement.lang = nextLanguage;
-                  window.dispatchEvent(new CustomEvent("avantia-home-language", { detail: nextLanguage }));
-                }}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#1d1d1f]/60 text-white transition hover:bg-[#1d1d1f]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/75"
-                aria-label={homeLanguage === "en" ? "Ver página en español" : "View page in English"}
-                title={homeLanguage === "en" ? "Español" : "English"}
-                data-no-shop-translation
-              >
-                <Languages className="h-4 w-4" aria-hidden="true" />
-              </button>
-              <Link
-                href={isSignedIn ? "/requests" : "/login"}
-                prefetch={false}
-                aria-label="Account"
-                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-[#1d1d1f]/60 px-3 text-sm font-medium text-white transition hover:bg-[#1d1d1f]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/75"
-              >
-                <AccountIcon signedIn={isSignedIn} />
-                <span className="hidden min-[390px]:inline">Account</span>
-              </Link>
-            </>
-          ) : isShopPage ? (
+          {isHome ? null : isShopPage ? (
             <>
             <Link
               href="/"
@@ -333,7 +306,24 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
         ) : null}
       </div>
 
-      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} primaryLinks={isHome ? primaryLinks.filter((link) => link.href !== "/") : primaryLinks} shopLinks={shopLinks} shopOpen={shopDirectoryOpen} onShopOpenChange={setShopDirectoryOpen} adminLinks={adminLinks} isSignedIn={isSignedIn} />
+      <MobileMenuDrawer
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        primaryLinks={isHome ? primaryLinks.filter((link) => link.href !== "/") : primaryLinks}
+        shopLinks={shopLinks}
+        shopOpen={shopDirectoryOpen}
+        onShopOpenChange={setShopDirectoryOpen}
+        adminLinks={adminLinks}
+        isSignedIn={isSignedIn}
+        homeLanguage={isHome ? homeLanguage : undefined}
+        onHomeLanguageChange={isHome ? () => {
+          const nextLanguage = homeLanguage === "en" ? "es" : "en";
+          setHomeLanguage(nextLanguage);
+          document.documentElement.lang = nextLanguage;
+          window.dispatchEvent(new CustomEvent("avantia-home-language", { detail: nextLanguage }));
+          setMenuOpen(false);
+        } : undefined}
+      />
 
       {shopSearchOpen ? (
         <div id="shop-search-overlay" role="dialog" aria-modal="true" className="fixed inset-0 z-[80] bg-white/96 backdrop-blur-sm">

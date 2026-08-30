@@ -152,10 +152,9 @@ export function PublicContactBar() {
             className="relative z-10 flex max-h-[72svh] w-full flex-col overflow-hidden rounded-t-[1.35rem] border border-slate-200 bg-[#f7f7f7] text-[#171a20] shadow-[0_-18px_50px_rgba(23,26,32,0.22)] sm:max-w-[31rem] sm:rounded-[1.35rem]"
           >
             <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-slate-300 sm:hidden" aria-hidden="true" />
-            <header className="flex items-start justify-between gap-3 px-4 pb-2 pt-3 sm:px-5 sm:pt-4">
+            <header className="flex items-start justify-between gap-3 px-4 pb-1 pt-3 sm:px-5 sm:pt-4">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Avantia Build</p>
-                <h2 id={titleId} className="mt-0.5 text-[1.3rem] font-semibold leading-tight tracking-[-0.035em]">{openPanel === "demo" ? "See how it works." : "Start with one message."}</h2>
+                <h2 id={titleId} className="text-[1.15rem] font-semibold leading-tight tracking-[-0.03em]">{openPanel === "demo" ? "See how it works" : "Text me to start"}</h2>
                 {openPanel === "demo" ? <p className="mt-1.5 max-w-sm text-xs leading-5 text-slate-600">A 20-second walkthrough—from your first text to a live material request.</p> : null}
               </div>
               <button
@@ -230,15 +229,15 @@ export function PublicContactBar() {
                   {submitState === "error" ? <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700" role="alert">{errorMessage}</p> : null}
                 </form>
               )}
-              <div className="mt-1.5 flex justify-end">
-                <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-[10px] font-semibold text-slate-700" aria-label="Open chat on WhatsApp"><WhatsAppIcon className="h-3.5 w-3.5 text-[#128c7e]" /> WhatsApp</a>
+              <div className="mt-1 flex justify-end">
+                <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-200 bg-white text-[#128c7e]" aria-label="Open chat on WhatsApp" title="WhatsApp"><WhatsAppIcon className="h-3.5 w-3.5" /></a>
               </div>
               <div className="mt-1.5 h-28 overflow-hidden rounded-xl bg-[#071126] sm:h-36">
                 <video ref={videoRef} data-testid="contact-sheet-video" className="h-full w-full object-cover" autoPlay muted loop playsInline preload="auto" poster="/videos/avantia-request-material-whatsapp-en-clear-20s-poster.jpg" aria-label="How to start an Avantia material request by text">
                   <source src="/videos/avantia-request-material-whatsapp-en-clear-20s.mp4" type="video/mp4" />
                 </video>
               </div>
-              <p className="mt-1 text-[8px] leading-3 text-slate-500">By tapping Text me, you agree to receive request texts. Msg &amp; data rates may apply. Reply STOP to opt out. <Link href="/terms" className="underline">Terms</Link> · <Link href="/privacy" className="underline">Privacy</Link></p>
+              <p className="mt-1 text-[8px] leading-3 text-slate-500">Text me = consent to request texts. Msg rates may apply. STOP to opt out. <Link href="/terms" className="underline">Terms</Link> · <Link href="/privacy" className="underline">Privacy</Link></p>
             </div>
             )}
           </section>

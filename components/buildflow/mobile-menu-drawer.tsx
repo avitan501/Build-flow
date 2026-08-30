@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
-import { UserRound } from "lucide-react";
+import { Languages, UserRound } from "lucide-react";
 
 export type MobileMenuLink = {
   href: string;
@@ -30,13 +30,15 @@ type MobileMenuDrawerProps = {
   shopOpen?: boolean;
   onShopOpenChange?: (open: boolean) => void;
   isSignedIn: boolean;
+  homeLanguage?: "en" | "es";
+  onHomeLanguageChange?: () => void;
 };
 
 function isActivePath(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`) || (href === "/search" && pathname === "/shop");
 }
 
-export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [], moreLinks = [], adminLinks = [], shopLinks = [], shopOpen = false, onShopOpenChange, isSignedIn }: MobileMenuDrawerProps) {
+export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [], moreLinks = [], adminLinks = [], shopLinks = [], shopOpen = false, onShopOpenChange, isSignedIn, homeLanguage, onHomeLanguageChange }: MobileMenuDrawerProps) {
   const pathname = usePathname();
   const router = useRouter();
   const drawerRef = useRef<HTMLElement>(null);
@@ -243,7 +245,7 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
             </div>
           ) : null}
 
-          <div className="mt-auto pt-12">
+          <div className="mt-auto grid gap-1 pt-12">
             <Link
               href={isSignedIn ? "/requests" : "/login"}
               prefetch={false}
@@ -256,8 +258,20 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
               className="flex min-h-16 items-center gap-3 px-1 text-lg font-semibold text-slate-950 transition hover:text-[#0066cc]"
             >
               <UserRound className="h-5 w-5" aria-hidden="true" />
-              <span>Account</span>
+              <span>My Account</span>
             </Link>
+            {homeLanguage && onHomeLanguageChange ? (
+              <button
+                type="button"
+                onClick={onHomeLanguageChange}
+                className="flex min-h-14 items-center gap-3 px-1 text-left text-base font-semibold text-slate-950 transition hover:text-[#0066cc]"
+                aria-label={homeLanguage === "en" ? "Ver página en español" : "View page in English"}
+                data-no-shop-translation
+              >
+                <Languages className="h-5 w-5" aria-hidden="true" />
+                <span>{homeLanguage === "en" ? "Español" : "English"}</span>
+              </button>
+            ) : null}
           </div>
           </>
           )}
