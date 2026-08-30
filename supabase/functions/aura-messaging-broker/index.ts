@@ -2120,6 +2120,16 @@ async function confirmPendingSmsRequest(communicationId: string, phone: string, 
 
 async function processCustomerSmsAutomation(communicationId: string, phone: string, body: string, contact: { id: string; full_name: string | null; notes: string | null; sms_ai_mode: string; sms_ai_style: string; auto_create_request_drafts: boolean; exact_list_only: boolean } | null, media: TrustedSmsMedia[] = []) {
   if ((!body.trim() && trustedImageMedia(media).length === 0) || phone === TRUSTED_SMS_COMMAND_PHONE) return;
+  // A customer response always supersedes reminders from an older turn. Run
+  // this before every early return so an older request cannot interrupt the
+  // active conversation, including confirmations and duplicate/opt-out paths.
+  await sql`
+    update public.aura_sms_unanswered_followups
+    set status = 'cancelled', cancel_reason = 'newer customer message received', updated_at = now()
+    where counterparty_phone = ${phone}
+      and source_communication_id <> ${communicationId}::uuid
+      and status in ('pending', 'processing')
+  `;
   const startsNewRequest = smsStartsNewMaterialRequest(body);
   if (isSmsOptOutMessage(body)) {
     await sql`
