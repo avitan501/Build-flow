@@ -36,6 +36,11 @@ test("cinematic homepage presents Construction Concierge clearly", async ({
     homepageHeader.getByRole("button", { name: "Open navigation menu" }),
   ).toHaveText("Menu");
   await expect(
+    homepageHeader
+      .getByRole("button", { name: "Open navigation menu" })
+      .locator("svg"),
+  ).toHaveCount(0);
+  await expect(
     homepageHeader.getByRole("link", { name: "Avantia Build home" }),
   ).toHaveCount(0);
   await expect(

@@ -13,7 +13,10 @@ test("public contact bar opens a compact text sheet with WhatsApp hidden", async
   ).toBeVisible();
   await expect(page.getByTestId("cinematic-mobile-action")).toHaveCount(0);
 
-  await bar.getByRole("button", { name: "Open chat" }).click();
+  // The Next.js development toolbar occupies the bottom-left corner on the
+  // mobile test viewport. Production has no such toolbar, so open the same
+  // sheet through the unobstructed primary dock action.
+  await bar.getByRole("button", { name: "Start by Text" }).click();
 
   const dialog = page.getByRole("dialog", { name: "Start with one text." });
   await expect(dialog).toBeVisible();
@@ -224,7 +227,7 @@ test("contact bar uses a strict marketing allowlist and never overlaps the mobil
   }
 });
 
-test("20-second walkthrough opens in the same compact sheet and starts playing", async ({
+test("how-it-works opens a six-video swipeable walkthrough", async ({
   page,
 }) => {
   await page.goto("/");
@@ -232,14 +235,20 @@ test("20-second walkthrough opens in the same compact sheet and starts playing",
 
   const dialog = page.getByRole("dialog", { name: "See the full flow." });
   await expect(dialog).toBeVisible();
-  const video = dialog.getByLabel(
-    "How to start an Avantia material request by text",
-  );
+  const carousel = dialog.getByTestId("demo-video-carousel");
+  await expect(carousel.locator("[data-demo-video-card]")).toHaveCount(6);
+  const video = dialog.getByLabel("1 of 6: Start with one text");
   await expect(video).toHaveAttribute("playsinline", "");
   await expect(video.locator('source[type="video/mp4"]')).toHaveAttribute(
     "src",
     "/videos/avantia-request-material-whatsapp-en-clear-20s.mp4",
   );
+  await expect(dialog.getByText("Send the material list", { exact: true })).toBeVisible();
+  await carousel.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth;
+    element.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+  await expect(dialog.getByText("Coordinate delivery", { exact: true })).toBeVisible();
 
   await dialog.getByRole("button", { name: "Start my request" }).click();
   await expect(
@@ -281,9 +290,7 @@ test("walkthrough respects reduced motion and closes cleanly when navigation hid
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await page.getByRole("button", { name: "See How It Works" }).click();
-  const video = page.getByLabel(
-    "How to start an Avantia material request by text",
-  );
+  const video = page.getByLabel("1 of 6: Start with one text");
   await expect(video).toBeVisible();
   await expect
     .poll(() =>

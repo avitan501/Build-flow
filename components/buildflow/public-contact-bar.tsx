@@ -35,6 +35,47 @@ type SubmitState =
   | "error";
 type OpenPanel = "contact" | "demo" | null;
 
+const demoVideos = [
+  {
+    title: "Start with one text",
+    note: "Enter your number and reply with the materials you need.",
+    src: "/videos/avantia-request-material-whatsapp-en-clear-20s.mp4",
+    poster:
+      "/videos/avantia-request-material-whatsapp-en-clear-20s-poster.jpg",
+  },
+  {
+    title: "Send the material list",
+    note: "A list, photo, plan, product link, or supplier quote can start the request.",
+    src: "/videos/avantia-story/01-contractor-request.mp4",
+    poster: "/videos/avantia-story/01-contractor-request-poster.jpg",
+  },
+  {
+    title: "Keep the crew moving",
+    note: "We organize the request while your team stays focused on the job.",
+    src: "/videos/avantia-story/02-contractor-crew-moving.mp4",
+    poster: "/videos/avantia-story/02-contractor-crew-moving-poster.jpg",
+  },
+  {
+    title: "Compare suppliers",
+    note: "Avantia finds practical supplier options for the reviewed materials.",
+    src: "/videos/avantia-story/03-supplier-partner-network.mp4",
+    poster: "/videos/avantia-story/03-supplier-partner-network-poster.jpg",
+  },
+  {
+    title: "Confirm the products",
+    note: "You see the organized request before pricing or ordering moves forward.",
+    src: "/videos/avantia-story/04-supplier-send-products.mp4",
+    poster: "/videos/avantia-story/04-supplier-send-products-poster.jpg",
+  },
+  {
+    title: "Coordinate delivery",
+    note: "After pricing is confirmed, our team calls for payment and delivery details.",
+    src: "/videos/avantia-story/05-designer-order-coordination.mp4",
+    poster:
+      "/videos/avantia-story/05-designer-order-coordination-poster.jpg",
+  },
+] as const;
+
 function normalizePhoneInput(value: string) {
   return value.replace(/[^\d+() .-]/g, "").slice(0, 24);
 }
@@ -52,12 +93,14 @@ export function PublicContactBar() {
   const phoneId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const demoVideoRefs = useRef<Array<HTMLVideoElement | null>>([]);
   const startTextAttemptKeyRef = useRef<string | null>(null);
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
   const [phone, setPhone] = useState("");
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [demoStep, setDemoStep] = useState(0);
+  const [demoIndex, setDemoIndex] = useState(0);
   const [videoPlaying, setVideoPlaying] = useState(true);
   const open = openPanel !== null;
   const phoneIsValid = isValidUsPhone(phone);
@@ -94,7 +137,22 @@ export function PublicContactBar() {
   }, [pathname]);
 
   useEffect(() => {
-    if (openPanel) {
+    if (openPanel === "demo") {
+      demoVideoRefs.current.forEach((video, index) => {
+        if (!video) return;
+        if (
+          index === demoIndex &&
+          videoPlaying &&
+          !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ) {
+          void video.play().catch(() => undefined);
+        } else {
+          video.pause();
+        }
+      });
+      return;
+    }
+    if (openPanel === "contact") {
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         videoRef.current?.pause();
         return;
@@ -107,7 +165,12 @@ export function PublicContactBar() {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
     }
-  }, [openPanel, videoPlaying]);
+    demoVideoRefs.current.forEach((video) => {
+      if (!video) return;
+      video.pause();
+      video.currentTime = 0;
+    });
+  }, [demoIndex, openPanel, videoPlaying]);
 
   if (!pathname || !showsPublicContactBar(pathname)) return null;
 
@@ -115,6 +178,7 @@ export function PublicContactBar() {
     setSubmitState("idle");
     setErrorMessage("");
     setDemoStep(0);
+    setDemoIndex(0);
     startTextAttemptKeyRef.current = null;
     setVideoPlaying(
       !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -177,17 +241,13 @@ export function PublicContactBar() {
     <>
       <div
         data-testid="public-contact-bar"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] px-3 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] sm:px-4 sm:pb-4"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] px-4 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] sm:px-5 sm:pb-4"
       >
-        <div className="pointer-events-auto relative mx-auto flex w-full max-w-[36rem] items-center gap-1.5 overflow-hidden rounded-[1.15rem] border border-white/70 bg-[#071126]/95 p-1.5 text-white shadow-[0_16px_46px_rgba(7,17,38,0.32)] ring-1 ring-[#1d4ed8]/20 backdrop-blur-xl">
-          <span
-            className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#13b8a6] via-[#35d0c2] to-[#2878ff]"
-            aria-hidden="true"
-          />
+        <div className="pointer-events-auto mx-auto flex w-full max-w-[36rem] items-center gap-2 rounded-lg border border-[#d2d2d7] bg-white/95 p-2 text-[#1d1d1f] shadow-[0_10px_30px_rgba(0,0,0,0.14)] backdrop-blur-xl">
           <button
             type="button"
             onClick={() => openSheet("contact")}
-            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[0.72rem] border border-white/15 bg-[#0d9488] text-white shadow-[0_7px_18px_rgba(13,148,136,0.32)] transition hover:bg-[#0f766e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="inline-flex h-11 w-14 shrink-0 items-center justify-center rounded-md bg-[#34373d] text-white shadow-sm transition hover:bg-[#1d1d1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]"
             aria-label="Open chat"
           >
             <MessageCircle
@@ -195,22 +255,14 @@ export function PublicContactBar() {
               aria-hidden="true"
             />
           </button>
-          <span className="hidden min-w-0 pl-2 text-left sm:block">
-            <span className="block text-[9px] font-extrabold uppercase tracking-[0.16em] text-[#67e8d5]">
-              Avantia materials desk
-            </span>
-            <span className="mt-0.5 block truncate text-xs font-semibold text-white/90">
-              Send a list. Start the request.
-            </span>
-          </span>
           <button
             type="button"
             onClick={() => openSheet("contact")}
-            className="group flex min-h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[0.72rem] bg-[#2878ff] px-3 text-xs font-extrabold text-white shadow-[0_8px_22px_rgba(40,120,255,0.35)] transition hover:bg-[#1766ed] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5eead4] sm:flex-none sm:px-6 sm:text-sm"
+            className="group flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-md border border-[#c7c7cc] bg-[#f7f7f8] px-3 text-sm font-semibold text-[#34373d] transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]"
             aria-haspopup="dialog"
             aria-expanded={open}
           >
-            <MessageSquareText className="h-4 w-4" aria-hidden="true" /> Start
+            <MessageSquareText className="h-4 w-4 text-[#2878ff]" aria-hidden="true" /> Start
             by Text
           </button>
         </div>
@@ -270,31 +322,92 @@ export function PublicContactBar() {
             </header>
 
             {openPanel === "demo" ? (
-              <div className="flex min-h-0 flex-1 flex-col px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-6 sm:pb-6">
-                <div className="min-h-0 flex-1 overflow-hidden rounded-2xl bg-[#171a20]">
-                  <video
-                    ref={videoRef}
-                    className="h-full w-full object-contain"
-                    muted
-                    playsInline
-                    controls
-                    preload="metadata"
-                    poster="/videos/avantia-request-material-whatsapp-en-clear-20s-poster.jpg"
-                    aria-label="How to start an Avantia material request by text"
-                  >
-                    <source
-                      src="/videos/avantia-request-material-whatsapp-en-clear-20s.mp4"
-                      type="video/mp4"
-                    />
-                  </video>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setOpenPanel("contact")}
-                  className="mt-3 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#171a20] px-4 text-sm font-semibold text-white"
+              <div className="flex min-h-0 flex-1 flex-col pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+                <div
+                  data-testid="demo-video-carousel"
+                  className="flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  onScroll={(event) => {
+                    const track = event.currentTarget;
+                    const cards = Array.from(
+                      track.querySelectorAll<HTMLElement>(
+                        "[data-demo-video-card]",
+                      ),
+                    );
+                    const trackLeft = track.getBoundingClientRect().left;
+                    const closest = cards.reduce(
+                      (best, card, index) => {
+                        const distance = Math.abs(
+                          card.getBoundingClientRect().left - trackLeft - 20,
+                        );
+                        return distance < best.distance
+                          ? { index, distance }
+                          : best;
+                      },
+                      { index: 0, distance: Number.POSITIVE_INFINITY },
+                    );
+                    setDemoIndex(closest.index);
+                  }}
                 >
-                  Start my request
-                </button>
+                  {demoVideos.map((video, index) => (
+                    <article
+                      key={video.src}
+                      data-demo-video-card
+                      className="relative h-full min-h-[28rem] w-[82vw] max-w-[29rem] shrink-0 snap-center overflow-hidden rounded-xl bg-[#171a20] shadow-[0_14px_36px_rgba(0,0,0,0.2)] sm:w-[27rem]"
+                    >
+                      <video
+                        ref={(element) => {
+                          demoVideoRefs.current[index] = element;
+                        }}
+                        className="h-full w-full object-cover"
+                        muted
+                        loop
+                        playsInline
+                        preload={index === 0 ? "auto" : "metadata"}
+                        poster={video.poster}
+                        aria-label={`${index + 1} of ${demoVideos.length}: ${video.title}`}
+                      >
+                        <source src={video.src} type="video/mp4" />
+                      </video>
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/5 to-black/20" />
+                      <span className="absolute right-3 top-3 rounded-full bg-white/92 px-2.5 py-1 text-[10px] font-bold text-[#171a20] shadow-sm">
+                        {index + 1}/{demoVideos.length}
+                      </span>
+                      <div className="absolute inset-x-0 bottom-0 p-5 text-white">
+                        <p className="text-2xl font-semibold tracking-[-0.03em]">
+                          {video.title}
+                        </p>
+                        <p className="mt-1.5 max-w-sm text-xs font-medium leading-5 text-white/82">
+                          {video.note}
+                        </p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <div className="flex justify-center gap-1.5 py-2" aria-label="Video position">
+                  {demoVideos.map((video, index) => (
+                    <span
+                      key={video.src}
+                      className={`h-2 w-2 rounded-full transition ${index === demoIndex ? "bg-[#171a20]" : "bg-[#c7c7cc]"}`}
+                    />
+                  ))}
+                </div>
+                <div className="mx-5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOpenPanel("contact")}
+                    className="inline-flex h-11 w-14 shrink-0 items-center justify-center rounded-md bg-[#34373d] text-white"
+                    aria-label="Open text request"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOpenPanel("contact")}
+                    className="inline-flex min-h-11 flex-1 items-center justify-center rounded-md bg-[#34373d] px-4 text-sm font-semibold text-white"
+                  >
+                    Start my request
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)+0.45rem)] sm:px-5 sm:pb-4">

@@ -176,15 +176,12 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
             }}
             className={
               isHome
-                ? "inline-flex min-h-10 items-center gap-2 rounded-full bg-[#1d1d1f]/60 px-3 text-sm font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] transition hover:bg-[#1d1d1f]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/75"
+                ? "inline-flex min-h-10 items-center rounded-md bg-[#1d1d1f]/55 px-4 text-sm font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md transition hover:bg-[#1d1d1f]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/75"
                 : "inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-900 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
             }
           >
             {isHome ? (
-              <>
-                <span>Menu</span>
-                <Menu className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-              </>
+              <span>Menu</span>
             ) : (
               <Menu className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
             )}
