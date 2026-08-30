@@ -34,6 +34,7 @@ type CustomerRecord = {
 
 type RequestRecord = {
   id: string
+  public_number: number
   project_id: string
   owner_id: string
   title: string
@@ -117,7 +118,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
       .returns<OutreachLeadRecord[]>(),
     supabase
       .from("quote_requests")
-      .select("id, project_id, owner_id, title, status, created_at, updated_at, submitted_at, projects(name,address), material_questionnaire_responses(id,category_name_snapshot,status)")
+      .select("id, public_number, project_id, owner_id, title, status, created_at, updated_at, submitted_at, projects(name,address), material_questionnaire_responses(id,category_name_snapshot,status)")
       .order("updated_at", { ascending: false })
       .returns<RequestRecord[]>(),
     supabase.from("projects").select("id, owner_id, name, address, status, created_at, updated_at").order("updated_at", { ascending: false }).returns<ProjectRecord[]>(),
@@ -184,7 +185,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
     if (status !== "all" && request.status !== status) return false
     if (!search) return true
     const customer = customerMap.get(request.owner_id)
-    return [request.title, request.projects?.name, request.projects?.address, customer?.full_name, customer?.email].filter(Boolean).join(" ").toLowerCase().includes(search)
+    return [request.public_number, request.title, request.projects?.name, request.projects?.address, customer?.full_name, customer?.email].filter(Boolean).join(" ").toLowerCase().includes(search)
   }).sort((left, right) => sort === "alphabetical" ? left.title.localeCompare(right.title) : sort === "oldest" ? left.created_at.localeCompare(right.created_at) : right.created_at.localeCompare(left.created_at))
   const openRequests = requests.filter((request) => deletableRequestStatuses.has(request.status)).length
   const statuses = Array.from(new Set(requests.map((request) => request.status))).sort()
@@ -215,7 +216,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
         <form className="mt-4 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]" action="/admin/users">
           <input type="hidden" name="view" value={view} />
           {params.customer ? <input type="hidden" name="customer" value={params.customer} /> : null}
-          <label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><span className="sr-only">Search</span><input name="q" defaultValue={params.q || ""} placeholder={view === "customers" ? "Search name, email, company, or phone" : view === "leads" ? "Search lead, company, phone, email, or notes" : "Search request, address, or customer"} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
+          <label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><span className="sr-only">Search</span><input name="q" defaultValue={params.q || ""} placeholder={view === "customers" ? "Search name, email, company, or phone" : view === "leads" ? "Search lead, company, phone, email, or notes" : "Search request number, address, or customer"} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
           {view === "requests" ? <select name="status" defaultValue={status} aria-label="Request status" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="all">All statuses</option>{statuses.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select> : view === "leads" ? <select name="status" defaultValue={status} aria-label="Lead status" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="all">All statuses</option>{leadStatuses.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select> : <span />}
           <select name="sort" defaultValue={sort} aria-label="Directory order" className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="newest">Newest added</option><option value="oldest">Oldest added</option><option value="alphabetical">A–Z</option></select>
           <button type="submit" className="min-h-11 rounded-lg bg-[#0071e3] px-5 text-sm font-semibold text-white">Apply</button>
@@ -256,7 +257,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           <section className="mt-3 grid gap-3" aria-label="Customer requests">
             {params.customer ? <div className="flex items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm"><span>Showing requests for <strong>{customerName(customerMap.get(params.customer))}</strong></span><Link href="/admin/users?view=requests" className="font-semibold text-[#0066cc]">Clear</Link></div> : null}
             {filteredRequests.map((request) => { const customer = customerMap.get(request.owner_id); const isOpen = deletableRequestStatuses.has(request.status); return <article key={request.id} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-              <Link href={`/owner/materials/requests/${request.id}`} className="min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc]"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">{request.title}</h2><span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${badgeTone(request.status)}`}>{request.status.replaceAll("_", " ")}</span></div><p className="mt-1 text-sm text-slate-600">{request.projects?.name === "Material Requests" ? "Direct material request" : request.projects?.name || "Direct material request"}{request.projects?.name !== "Material Requests" && request.projects?.address ? ` · ${request.projects.address}` : ""}</p><p className="mt-2 text-xs text-slate-500">{customerName(customer)} · Updated {formatDate(request.updated_at)}</p><div className="mt-3 flex flex-wrap gap-2">{request.material_questionnaire_responses.length ? request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{response.category_name_snapshot}</span>) : <span className="text-xs font-semibold text-slate-400">Manual material list</span>}</div></Link>
+              <Link href={`/owner/materials/requests/${request.id}`} className="min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#0066cc]"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-bold text-[#0066cc]">#{request.public_number}</span><h2 className="font-bold">{request.title}</h2><span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${badgeTone(request.status)}`}>{request.status.replaceAll("_", " ")}</span></div><p className="mt-1 text-sm text-slate-600">{request.projects?.name === "Material Requests" ? "Direct material request" : request.projects?.name || "Direct material request"}{request.projects?.name !== "Material Requests" && request.projects?.address ? ` · ${request.projects.address}` : ""}</p><p className="mt-2 text-xs text-slate-500">{customerName(customer)} · Updated {formatDate(request.updated_at)}</p><div className="mt-3 flex flex-wrap gap-2">{request.material_questionnaire_responses.length ? request.material_questionnaire_responses.map((response) => <span key={response.id} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${response.status === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{response.category_name_snapshot}</span>) : <span className="text-xs font-semibold text-slate-400">Manual material list</span>}</div></Link>
               {isOpen ? <DeleteManagerRecordButton id={request.id} kind="request" label={request.title} /> : <span className="text-xs font-semibold text-slate-400">Closed requests are retained</span>}
             </article> })}
             {filteredRequests.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No requests match these filters.</p> : null}

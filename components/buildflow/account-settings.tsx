@@ -1,7 +1,6 @@
 import { Bell, KeyRound, LogOut, Mail, UserRound } from "lucide-react";
-import Link from "next/link";
 
-import { updateAccountName, updateAccountPhone, updateAlternateContacts, updateNotificationPreferences } from "@/app/account/actions";
+import { setAccountPassword, updateAccountName, updateAccountPhone, updateAlternateContacts, updateNotificationPreferences } from "@/app/account/actions";
 import { AccountSignOutButton } from "@/components/buildflow/account-sign-out-button";
 import type { ProfileRecord } from "@/lib/auth";
 
@@ -24,6 +23,9 @@ const errorMessages: Record<string, string> = {
   contacts: "Contact details could not be saved.",
   profile: "Profile information could not be saved.",
   notifications: "Notification preferences could not be saved.",
+  password: "Use at least 8 characters for your password.",
+  "password-match": "The two passwords do not match.",
+  "password-save": "The password could not be saved.",
 };
 
 const successMessages: Record<string, string> = {
@@ -31,6 +33,7 @@ const successMessages: Record<string, string> = {
   phone: "Phone number saved.",
   contacts: "Contact details saved.",
   notifications: "Notification preferences saved.",
+  password: "Password saved.",
 };
 
 const inputClass = "min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#0071e3] focus:ring-2 focus:ring-sky-100";
@@ -86,8 +89,12 @@ export function AccountSettings({ email, profile, alternateEmail, alternatePhone
           </form>
         </SectionCard>
 
-        <SectionCard icon={KeyRound} title="Password & security" description="Update your password through the secure recovery flow.">
-          <Link href="/reset-password" className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">Change password</Link>
+        <SectionCard icon={KeyRound} title="Password & security" description="After secure sign-in, you may set a password for later use.">
+          <form action={setAccountPassword} className="grid gap-3">
+            <label className="grid gap-1.5 text-sm font-semibold">New password<input name="password" type="password" minLength={8} required autoComplete="new-password" className={inputClass} /></label>
+            <label className="grid gap-1.5 text-sm font-semibold">Confirm password<input name="passwordConfirmation" type="password" minLength={8} required autoComplete="new-password" className={inputClass} /></label>
+            <button type="submit" className="inline-flex min-h-11 items-center justify-center rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800">Save password</button>
+          </form>
         </SectionCard>
 
         <SectionCard icon={Bell} title="Notifications" description="Choose how Avantia Build contacts you.">

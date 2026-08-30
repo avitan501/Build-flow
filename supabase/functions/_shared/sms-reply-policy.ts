@@ -239,7 +239,8 @@ function looksLikeSheetrock(value: string) {
     ?.some((token) => token.length >= 7 && token.length <= 10 && damerauLevenshteinDistance(token, "sheetrock") <= 2) ?? false;
 }
 
-export function smsProductInquiryFallbackReply(message: string, options: { allowRelatedSuggestion?: boolean } = {}) {
+export function smsProductInquiryFallbackReply(message: string, _options: { allowRelatedSuggestion?: boolean } = {}) {
+  void _options;
   const value = message.trim();
   const standardMatch = value.match(/^(?:do\s+)?(?:you(?:\s+guys)?|u)\s+(?:sell|carry|have|source)\s+(.+?)[?.!]*$/i);
   const sheetrockGetMatch = value.match(/^(?:can|could)\s+(?:i|we)\s+(?:get|buy|order|source)\s+(.+?)[?.!]*$/i);
@@ -253,7 +254,7 @@ export function smsProductInquiryFallbackReply(message: string, options: { allow
       ? "thinset"
       : rawProduct;
   const specification = product === "Sheetrock"
-    ? "1/2 in. is standard for most interior walls. 5/8 in. is commonly used for ceilings or fire-rated assemblies—check the plans/code. Walls or ceiling?"
+    ? "Can you confirm 5/8 in.?\n\nRegular, Type X/fire-rated, or moisture-resistant?"
     : "What type do you need?";
   const quantity = product === "Sheetrock"
     ? "How many sheets do you need?"
@@ -261,14 +262,65 @@ export function smsProductInquiryFallbackReply(message: string, options: { allow
   const primary = product === "Sheetrock"
     ? `Yes. ${specification} ${quantity}`
     : `Yes—we can help with ${product}. ${specification} ${quantity}`;
-  if (product !== "Sheetrock" || options.allowRelatedSuggestion === false) return primary;
-  return `${primary}\n\nDo you also need joint compound, tape, corner bead, or drywall screws?`;
+  return primary;
+}
+
+export function smsSheetrockSpecificationFollowUpReply(latestMessage: string, conversationText: string) {
+  if (!looksLikeSheetrock(conversationText) && !/drywall/i.test(conversationText)) return null;
+  const asksThickness = /\b(?:what|which)\s+(?:thinn?est|thickness(?:es)?)\b|\b(?:thinn?est|thickness(?:es)?)\s+(?:do|can)\s+you\b/i.test(latestMessage);
+  const correctsQuantity = /\b(?:i\s+asked|asking)\b.{0,60}\b(?:what|which)\b.{0,30}\b(?:have|carry|thinn?est|thickness)\b.{0,50}\bnot\b.{0,20}\b(?:how\s+many|quantity)\b/i.test(latestMessage);
+  if (!asksThickness && !correctsQuantity) return null;
+  return "5/8 in. is the standard Sheetrock option. Can you confirm 5/8 in.? Regular, Type X/fire-rated, or moisture-resistant?";
+}
+
+export function smsShortMaterialAnswerReply(latestMessage: string, conversationText: string) {
+  if (!/\bmetal\s+studs?\b/i.test(conversationText)) return null;
+  const match = latestMessage.trim().match(/^(\d+(?:\s*[-x×/]\s*\d+){1,2})\s*(?:,|x|×|-)?\s*(\d{1,6})(?:\s*(?:pcs?|pieces?|ea|each))?[.!]?$/i);
+  if (!match) return null;
+  const size = match[1].replace(/\s+/g, "").replace("×", "x");
+  const quantity = Number(match[2]);
+  if (!Number.isFinite(quantity) || quantity < 1) return null;
+  return `Got it—${quantity} ${size} metal studs. What length and gauge?`;
+}
+
+export function smsContextualQuantityAnswerReply(latestMessage: string, conversationText: string) {
+  const lines = conversationText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const latestAvantia = [...lines].reverse().find((line) => /^Avantia:/i.test(line)) || "";
+  if (!/\b(?:how\s+many|how\s+much|quantity|square\s+feet|sq\.?\s*ft)\b/i.test(latestAvantia)) return null;
+  const customerHistory = lines
+    .filter((line) => /^Customer:/i.test(line))
+    .map((line) => line.replace(/^Customer:\s*/i, ""))
+    .filter((line) => line.trim().toLowerCase() !== latestMessage.trim().toLowerCase());
+  const productContext = [...customerHistory].reverse().find((line) => /\b(?:roof(?:ing)?\s+shingles?|shingles?|thin\s*set|sheetrock|drywall|metal\s+studs?)\b/i.test(line)) || "";
+  if (!productContext) return null;
+  const value = latestMessage.trim().replace(/[.!]+$/, "");
+  const measured = value.match(/^(\d{1,6}(?:\.\d+)?)\s*(sq\.?\s*ft|square\s+feet|sheets?|bags?|pcs?|pieces?|each|ea)?$/i);
+  if (!measured) return null;
+  const amount = Number(measured[1]);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) return null;
+  const suppliedUnit = (measured[2] || "").toLowerCase().replace(/\s+/g, " ");
+  if (/\b(?:roof(?:ing)?\s+shingles?|shingles?)\b/i.test(productContext)) {
+    const unit = suppliedUnit || (/square\s+feet|sq\.?\s*ft/i.test(latestAvantia) ? "sq ft" : "");
+    if (!/^(?:sq\.?\s*ft|square feet)$/.test(unit)) return null;
+    return `Got it—${amount} sq ft of roofing shingles. What shingle type and color?`;
+  }
+  if (/\bthin\s*set\b/i.test(productContext)) {
+    const unit = suppliedUnit || (/bags?/i.test(latestAvantia) ? "bags" : "");
+    if (!/^bags?$/.test(unit)) return null;
+    return `Got it—${amount} ${amount === 1 ? "bag" : "bags"} of thinset. Which thinset do you need?`;
+  }
+  if (/\b(?:sheetrock|drywall)\b/i.test(productContext)) {
+    const unit = suppliedUnit || (/sheets?/i.test(latestAvantia) ? "sheets" : "");
+    if (!/^sheets?$/.test(unit)) return null;
+    return `Got it—${amount} ${amount === 1 ? "sheet" : "sheets"} of Sheetrock. Can you confirm 5/8 in.?`;
+  }
+  return null;
 }
 
 export function smsReplyParts(params: { reply: string; deterministicProductInquiry: boolean; exactListOnly?: boolean }) {
   const reply = params.reply.trim();
   if (!reply) return [];
-  if (!params.deterministicProductInquiry || params.exactListOnly) return [reply];
+  if (!params.deterministicProductInquiry) return [reply];
   return [...new Set(reply.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean))].slice(0, 2);
 }
 
@@ -284,8 +336,10 @@ export function smsUnansweredFollowUpText(params: { originalMessage: string; que
   const asksQuantity = REQUESTED_FIELD_PATTERNS.find(({ field }) => field === "quantity")?.pattern.test(question);
   const asksAddress = REQUESTED_FIELD_PATTERNS.find(({ field }) => field === "address")?.pattern.test(question);
   const asksTiming = REQUESTED_FIELD_PATTERNS.find(({ field }) => field === "needed_by")?.pattern.test(question);
+  const asksSpecification = /\b(?:thickness|walls?\s+or\s+(?:a\s+)?ceilings?|type|size|grade|color)\b|(?:עובי|קיר|תקרה|סוג|מידה|צבע)|\b(?:grosor|pared|techo|tipo|tama[nñ]o|color)\b/i.test(question);
   if (language === "he") {
     if (asksAddress && asksTiming) return "עדיין צריך עזרה עם פרטי המשלוח?";
+    if (asksSpecification && asksQuantity) return "עדיין צריך עזרה בבחירת המפרט או הכמות?";
     if (asksQuantity) return "עדיין צריך עזרה עם הכמות?";
     if (asksAddress) return "עדיין צריך עזרה עם כתובת המשלוח?";
     if (asksTiming) return "עדיין צריך עזרה עם מועד האספקה?";
@@ -293,12 +347,14 @@ export function smsUnansweredFollowUpText(params: { originalMessage: string; que
   }
   if (language === "es") {
     if (asksAddress && asksTiming) return "¿Aún necesita ayuda con los detalles de entrega?";
+    if (asksSpecification && asksQuantity) return "¿Aún necesita ayuda con la especificación o la cantidad?";
     if (asksQuantity) return "¿Aún necesita ayuda con la cantidad?";
     if (asksAddress) return "¿Aún necesita ayuda con la dirección de entrega?";
     if (asksTiming) return "¿Aún necesita ayuda con la fecha necesaria?";
     return "¿Aún necesita ayuda con esto?";
   }
   if (asksAddress && asksTiming) return "Still need help with the delivery details?";
+  if (asksSpecification && asksQuantity) return "Can you confirm 5/8 in. and how many sheets?";
   if (asksQuantity) return "Still need help with the quantity?";
   if (asksAddress) return "Still need help with the delivery address?";
   if (asksTiming) return "Still need help with when you need it?";

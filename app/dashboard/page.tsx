@@ -120,6 +120,7 @@ export default async function DashboardPage() {
                 <Link href="/materials" className={statusButtonClass(materials.status)}>Review Materials</Link>
                 <Link href="/orders" className={statusButtonClass(orders.status)}>Approve Order</Link>
                 <Link href="/projects" className={statusButtonClass(projects.status)}>My Projects</Link>
+                <Link href="/requests" className={statusButtonClass("Live")}>My Material Requests</Link>
                 <Link href={isManager ? "/admin/whatsapp" : "/orders/demo"} className={statusButtonClass(isManager ? whatsapp.status : orders.status)}>
                   {isManager ? "WhatsApp Operations" : "Track Delivery"}
                 </Link>

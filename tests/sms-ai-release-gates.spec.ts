@@ -14,12 +14,15 @@ import {
   resolveSmsExactListPreference,
   resolveSmsMaterialReplyStep,
   smsDeliveryDetailsQuestionReply,
+  smsContextualQuantityAnswerReply,
   smsHasExplicitQuantity,
   smsHasNeededByTiming,
   smsOutputSafetySignals,
   smsProductInquiryFallbackReply,
   smsQuantityClarificationReply,
   smsReplyParts,
+  smsSheetrockSpecificationFollowUpReply,
+  smsShortMaterialAnswerReply,
   smsStartsNewMaterialRequest,
   smsUnknownContextFallback,
   smsUnansweredFollowUpCancellationReason,
@@ -106,33 +109,54 @@ test("material request advances across turns after address until complete", () =
 
 test("product inquiry fallback answers the product and asks only useful next questions", () => {
   const sheetrock = smsProductInquiryFallbackReply("Do you sell sheetricj?")
-  expect(sheetrock).toContain("1/2 in. is standard for most interior walls")
-  expect(sheetrock).toContain("5/8 in. is commonly used for ceilings or fire-rated assemblies")
-  expect(sheetrock).toContain("check the plans/code")
-  expect(sheetrock).toContain("Walls or ceiling? How many sheets do you need?")
-  expect(sheetrock).toContain("Do you also need joint compound, tape, corner bead, or drywall screws?")
+  expect(sheetrock).toContain("Can you confirm 5/8 in.?")
+  expect(sheetrock).toContain("Regular, Type X/fire-rated, or moisture-resistant? How many sheets do you need?")
   expect(smsProductInquiryFallbackReply("Do you carry Sheetrook drywall?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Can I get Sheetrcok?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Could we order shetrock?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Do you have sheetrpck?")).toBe(sheetrock)
-  expect(inspectSmsQuestionStructure(sheetrock || "")).toMatchObject({ valid: true, questionMarks: 3, requestedFields: 1 })
+  expect(inspectSmsQuestionStructure(sheetrock || "")).toMatchObject({ valid: true, questionMarks: 3, requestedFields: 2 })
   expect(evaluateSmsReplyGate({ message: "Do you sell sheetricj?", reply: sheetrock || "", intent: "availability", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
   const replyParts = smsReplyParts({ reply: sheetrock || "", deterministicProductInquiry: true })
   expect(replyParts).toHaveLength(2)
-  expect(replyParts[0]).toContain("check the plans/code")
-  expect(replyParts[0]).toContain("How many sheets")
-  expect(replyParts[1]).toBe("Do you also need joint compound, tape, corner bead, or drywall screws?")
+  expect(replyParts[0]).toBe("Yes. Can you confirm 5/8 in.?")
+  expect(replyParts[1]).toBe("Regular, Type X/fire-rated, or moisture-resistant? How many sheets do you need?")
   expect(new Set(replyParts).size).toBe(replyParts.length)
 
   const exactListReply = smsProductInquiryFallbackReply("Do you sell Sheetrock?", { allowRelatedSuggestion: false }) || ""
-  expect(smsReplyParts({ reply: exactListReply, deterministicProductInquiry: true, exactListOnly: true })).toEqual([exactListReply])
+  expect(smsReplyParts({ reply: exactListReply, deterministicProductInquiry: true, exactListOnly: true })).toHaveLength(2)
   expect(exactListReply).not.toMatch(/joint compound|corner bead|drywall screws/i)
-  expect(evaluateSmsReplyGate({ message: "Do you sell Sheetrock?", reply: sheetrock || "", intent: "availability", event: "message", participantRole: "lead", modelAutoSafe: true, exactListOnly: true })).toMatchObject({ level: "red", gateAutoSafe: false })
+  expect(evaluateSmsReplyGate({ message: "Do you sell Sheetrock?", reply: sheetrock || "", intent: "availability", event: "message", participantRole: "lead", modelAutoSafe: true, exactListOnly: true })).toMatchObject({ level: "green", gateAutoSafe: true })
   const unrelated = smsProductInquiryFallbackReply("Do you carry sheet metal?")
   expect(unrelated).toContain("sheet metal")
   expect(unrelated).not.toContain("Sheetrock")
   expect(smsProductInquiryFallbackReply("Can I get Sherlock?")).toBeNull()
   expect(smsProductInquiryFallbackReply("Need an update on my order")).toBeNull()
+})
+
+test("Sheetrock follow-ups answer thickness corrections instead of repeating quantity", () => {
+  const conversation = "Customer: Do you sell sheetrocc?\nAvantia: What type and how many sheets?"
+  expect(smsSheetrockSpecificationFollowUpReply("What thinnest do you have?", conversation)).toBe("5/8 in. is the standard Sheetrock option. Can you confirm 5/8 in.? Regular, Type X/fire-rated, or moisture-resistant?")
+  expect(smsSheetrockSpecificationFollowUpReply("I asked what do you have not how many?", conversation)).toBe("5/8 in. is the standard Sheetrock option. Can you confirm 5/8 in.? Regular, Type X/fire-rated, or moisture-resistant?")
+  expect(smsSheetrockSpecificationFollowUpReply("How many screws do you have?", conversation)).toBeNull()
+  expect(smsSheetrockSpecificationFollowUpReply("What thickness do you have?", "Customer: plywood")).toBeNull()
+})
+
+test("short metal-stud answers keep conversation context and ask only missing specifications", () => {
+  const conversation = "Customer: Do you sell metal studs?\nAvantia: What type and how many metal studs do you need?"
+  expect(smsShortMaterialAnswerReply("2x4 50", conversation)).toBe("Got it—50 2x4 metal studs. What length and gauge?")
+  expect(smsShortMaterialAnswerReply("2 x 4, 50 pcs", conversation)).toBe("Got it—50 2x4 metal studs. What length and gauge?")
+  expect(smsShortMaterialAnswerReply("2x4 50", "Customer: Do you sell Sheetrock?")).toBeNull()
+})
+
+test("short quantities fill the field just asked instead of repeating the same question", () => {
+  const roofing = "Customer: I need roofing shingles\nAvantia: What shingle type and color? How many square feet do you need?\nCustomer: 500 sq ft"
+  expect(smsContextualQuantityAnswerReply("500 sq ft", roofing)).toBe("Got it—500 sq ft of roofing shingles. What shingle type and color?")
+  const thinset = "Customer: I need thinset\nAvantia: How many bags do you need?\nCustomer: 20 bags"
+  expect(smsContextualQuantityAnswerReply("20 bags", thinset)).toBe("Got it—20 bags of thinset. Which thinset do you need?")
+  const sheetrock = "Customer: I need Sheetrock\nAvantia: How many sheets do you need?\nCustomer: 25"
+  expect(smsContextualQuantityAnswerReply("25", sheetrock)).toBe("Got it—25 sheets of Sheetrock. Can you confirm 5/8 in.?")
+  expect(smsContextualQuantityAnswerReply("500 sq ft", "Customer: I need roofing shingles\nAvantia: What color?\nCustomer: 500 sq ft")).toBeNull()
 })
 
 test("one-shot unanswered follow-up is question-aware and cancels on every later response", () => {
@@ -147,6 +171,7 @@ test("one-shot unanswered follow-up is question-aware and cancels on every later
   }
   expect(smsUnansweredFollowUpEligible(eligible)).toBe(true)
   expect(smsUnansweredFollowUpText(eligible)).toBe("Still need help with the quantity?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell Sheetrock?", questionReply: "Regular, Type X/fire-rated, or moisture-resistant? How many sheets do you need?" })).toBe("Can you confirm 5/8 in. and how many sheets?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Necesito yeso", questionReply: "¿Cuál es la dirección completa de entrega?" })).toBe("¿Aún necesita ayuda con la dirección de entrega?")
   expect(smsUnansweredFollowUpText({ originalMessage: "צריך גבס", questionReply: "מתי החומרים נדרשים, ומה כתובת המשלוח המלאה?" })).toBe("עדיין צריך עזרה עם פרטי המשלוח?")
   expect(smsUnansweredFollowUpEligible({ ...eligible, questionReply: "?" })).toBe(false)

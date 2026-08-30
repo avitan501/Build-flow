@@ -58,9 +58,8 @@ test("SMS AI release dataset enforces intent, auto-send safety, language, and re
     if (scenario.id === "direct-sheetrock-two-part") {
       const parts = smsReplyParts({ reply: scenario.reply, deterministicProductInquiry: true })
       expect(parts).toHaveLength(2)
-      expect(parts[0]).toContain("check the plans/code")
-      expect(parts[0]).toContain("How many sheets")
-      expect(parts[1]).toContain("joint compound, tape, corner bead, or drywall screws")
+      expect(parts[0]).toBe("Yes. Can you confirm 5/8 in.?")
+      expect(parts[1]).toContain("Regular, Type X/fire-rated, or moisture-resistant? How many sheets")
       expect(new Set(parts).size).toBe(parts.length)
     }
   }

@@ -1,5 +1,6 @@
 import { AccountSettings } from "@/components/buildflow/account-settings";
 import { requireSignedInProfile } from "@/lib/auth";
+import { contactEmailForDisplay } from "@/lib/auth-phone";
 
 type AccountPageProps = {
   searchParams?: Promise<{
@@ -14,7 +15,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
   return (
     <AccountSettings
-      email={user.email ?? null}
+      email={contactEmailForDisplay(user.email) || null}
       profile={profile}
       alternateEmail={typeof user.user_metadata.alternate_email === "string" ? user.user_metadata.alternate_email : null}
       alternatePhone={typeof user.user_metadata.alternate_phone === "string" ? user.user_metadata.alternate_phone : null}

@@ -34,6 +34,7 @@ import {
 
 type RequestDetails = {
   id: string;
+  public_number: number;
   project_id: string;
   owner_id: string;
   title: string;
@@ -123,7 +124,7 @@ export default async function OwnerMaterialRequestPage({
     supabase
       .from("quote_requests")
       .select(
-        "id,project_id,owner_id,title,status,manager_assignee,manager_notes,created_at,updated_at,submitted_at,projects(name,address)",
+        "id,public_number,project_id,owner_id,title,status,manager_assignee,manager_notes,created_at,updated_at,submitted_at,projects(name,address)",
       )
       .eq("id", requestId)
       .maybeSingle<RequestDetails>(),
@@ -385,7 +386,7 @@ export default async function OwnerMaterialRequestPage({
                   {quoteRequestStatusLabel(request.status)}
                 </p>
                 <span className="text-xs text-slate-400">
-                  #{request.id.slice(0, 8).toUpperCase()}
+                  Request #{request.public_number}
                 </span>
               </div>
               <h1 className="mt-0.5 truncate text-xl font-bold sm:text-2xl">

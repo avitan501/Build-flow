@@ -4,16 +4,51 @@ import { revalidatePath } from "next/cache"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { normalizeAuraEmail, normalizeAuraPhone } from "@/lib/aura/communications"
-import { phoneLoginEmailForPhone } from "@/lib/auth-phone"
 import { serializeCommunicationLog, type CommunicationLog } from "@/lib/manager-command-center"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { addAuraCommunicationLinks, type AuraEmailEntityType } from "@/lib/aura/email-links"
 import { isSmsCorrectionReason, redactSmsTrainingText, smsTrainingIntent, smsTrainingLanguage, type SmsCorrectionReason } from "@/lib/ai/sms-training-privacy"
+import { isExplicitCustomerRequestConfirmation } from "@/lib/customer-request-confirmation"
 
 type ContactKind = "customer" | "lead" | "supplier"
 type Result = { ok: true } | { ok: false; error: string }
 type SmsAiMode = "off" | "draft" | "auto_safe"
 type SmsAiStyle = "professional" | "friendly" | "brief"
+
+async function findPhoneAuthUser(admin: ReturnType<typeof createAdminClient>, phone: string) {
+  for (let page = 1; page <= 100; page += 1) {
+    const result = await admin.auth.admin.listUsers({ page, perPage: 1000 })
+    if (result.error) return { user: null, error: result.error }
+    const user = result.data.users.find((candidate) => normalizeAuraPhone(candidate.phone || "") === phone)
+    if (user || result.data.users.length < 1000) return { user: user || null, error: null }
+  }
+  return { user: null, error: new Error("customer_directory_scan_limit") }
+}
+
+async function ensureSmsPhoneCustomer(phone: string, name: string) {
+  const admin = createAdminClient()
+  const authLookup = await findPhoneAuthUser(admin, phone)
+  if (authLookup.error) return { ok: false as const, error: "The secure customer directory could not be checked." }
+  let authUser = authLookup.user
+  const profiles = await admin.from("profiles").select("id,email,full_name,phone").eq("role", "client").not("phone", "is", null).limit(1000).returns<Array<{ id: string; email: string; full_name: string | null; phone: string | null }>>()
+  if (profiles.error) return { ok: false as const, error: "The customer directory could not be checked." }
+  const profile = (profiles.data || []).find((candidate) => normalizeAuraPhone(candidate.phone || "") === phone)
+  if (!authUser && profile) {
+    const linked = await admin.auth.admin.updateUserById(profile.id, { phone, phone_confirm: true, user_metadata: { full_name: profile.full_name || name, phone, login_type: "sms_request" } })
+    if (!linked.error) authUser = linked.data.user
+    else authUser = (await findPhoneAuthUser(admin, phone)).user
+  }
+  if (!authUser) {
+    const created = await admin.auth.admin.createUser({ phone, phone_confirm: true, user_metadata: { full_name: name, phone, login_type: "sms_request" } })
+    if (created.error || !created.data.user) return { ok: false as const, error: "The secure phone customer could not be added." }
+    authUser = created.data.user
+  }
+  const currentName = profile?.id === authUser.id ? profile.full_name?.trim() || "" : ""
+  const fullName = currentName && currentName !== phone && !/^\+?[0-9 ()-]+$/.test(currentName) ? currentName : name
+  const saved = await admin.from("profiles").upsert({ id: authUser.id, email: authUser.email || profile?.email || "", full_name: fullName, phone, role: "client", approval_status: "pending", is_active: true }, { onConflict: "id" })
+  if (saved.error) return { ok: false as const, error: "The customer profile could not be saved." }
+  return { ok: true as const, customerId: authUser.id }
+}
 
 export type SmsRequestProposal = {
   communicationId: string
@@ -163,6 +198,7 @@ export async function reviewSmsRequestAction(input: { communicationId: string })
 
 export async function createSmsMaterialRequestAction(input: {
   communicationId: string
+  confirmationCommunicationId: string
   phone: string
   customerName: string
   customerAddress: string
@@ -183,15 +219,43 @@ export async function createSmsMaterialRequestAction(input: {
     return name ? [{ name, quantity: Number.isFinite(quantity) && quantity > 0 ? Math.min(quantity, 1_000_000) : 1, unit }] : []
   }) : []
   const sourceCommunicationIds = [...new Set([input.communicationId, ...(input.sourceCommunicationIds || [])])].filter((id) => /^[0-9a-f-]{36}$/i.test(id)).slice(0, 20)
+  const confirmationCommunicationId = String(input.confirmationCommunicationId || "").trim()
   if (!phone || !title || !items.length || !sourceCommunicationIds.length) return { ok: false as const, error: "Add a request title and at least one material item." }
+  if (!/^[0-9a-f-]{36}$/i.test(confirmationCommunicationId) || !sourceCommunicationIds.includes(confirmationCommunicationId)) return { ok: false as const, error: "Choose the customer's explicit confirmation message." }
+
+  const { supabase, user, access } = await requireManagerPortalProfile()
+  if (!access.customers) return { ok: false as const, error: "Customer access is required." }
+  const admin = createAdminClient()
+  const confirmation = await admin.from("aura_communications").select("id,channel,direction,counterparty_phone,body").eq("id", confirmationCommunicationId).maybeSingle<{ id: string; channel: string; direction: string | null; counterparty_phone: string | null; body: string | null }>()
+  if (confirmation.error || !confirmation.data || confirmation.data.channel !== "sms" || confirmation.data.direction !== "incoming" || normalizeAuraPhone(confirmation.data.counterparty_phone || "") !== phone || !isExplicitCustomerRequestConfirmation(confirmation.data.body)) return { ok: false as const, error: "The selected inbound text does not clearly confirm this request." }
+  const reservation = await admin.from("aura_sms_request_confirmations").insert({ confirmation_communication_id: confirmationCommunicationId, normalized_phone: phone, confirmation_actor_id: user.id }).select("confirmation_communication_id").maybeSingle()
+  if (reservation.error) {
+    const existing = await admin.from("aura_sms_request_confirmations").select("request_id").eq("confirmation_communication_id", confirmationCommunicationId).maybeSingle<{ request_id: string | null }>()
+    if (!existing.data?.request_id) return { ok: false as const, error: "This confirmation is already being processed. Refresh before trying again." }
+    const prior = await admin.from("quote_requests").select("public_number").eq("id", existing.data.request_id).maybeSingle<{ public_number: number }>()
+    await admin.from("customer_request_portal_access").upsert({ request_id: existing.data.request_id, normalized_phone: phone, delivery_address: customerAddress }, { onConflict: "request_id" })
+    return { ok: true as const, requestId: existing.data.request_id, publicNumber: prior.data?.public_number || null, invitation: prior.data?.public_number ? `Your Avantia Build material request #${prior.data.public_number} is ready. Open https://build.avantiap.com/requests and request a one-time code for secure access.` : "Open your Avantia Build request securely: https://build.avantiap.com/requests" }
+  }
 
   const tagged = await quickTagPhoneContactAction({ phone, kind: "customer", name: customerName || phone })
-  if (!tagged.ok) return tagged
-  const { supabase, access } = await requireManagerPortalProfile()
-  if (!access.customers) return { ok: false as const, error: "Customer access is required." }
+  if (!tagged.ok) {
+    await admin.from("aura_sms_request_confirmations").delete().eq("confirmation_communication_id", confirmationCommunicationId)
+    return tagged
+  }
   const notes = [`Created from SMS after manager review.`, `Customer phone: ${phone}`, customerAddress ? `Job address: ${customerAddress}` : "", `Source messages: ${sourceCommunicationIds.length}`].filter(Boolean).join("\n")
   const { data: requestId, error } = await supabase.rpc("staff_create_client_request", { p_customer_id: tagged.sourceId, p_department: department, p_title: title, p_lines: items, p_notes: notes.slice(0, 4000) })
-  if (error || typeof requestId !== "string") return { ok: false as const, error: "The material request could not be created." }
+  if (error || typeof requestId !== "string") {
+    await admin.from("aura_sms_request_confirmations").delete().eq("confirmation_communication_id", confirmationCommunicationId)
+    return { ok: false as const, error: "The material request could not be created." }
+  }
+  // Record the created request immediately so any later partial failure can be
+  // retried idempotently without creating a second customer request.
+  await admin.from("aura_sms_request_confirmations").update({ request_id: requestId }).eq("confirmation_communication_id", confirmationCommunicationId)
+  const requestNumber = await admin.from("quote_requests").select("public_number").eq("id", requestId).single<{ public_number: number }>()
+  if (requestNumber.error || !requestNumber.data?.public_number) return { ok: false as const, error: "The request was created, but its public number needs attention.", requestId }
+  const portalAccess = await admin.from("customer_request_portal_access").upsert({ request_id: requestId, normalized_phone: phone, delivery_address: customerAddress, claimed_by: tagged.sourceId, invited_at: new Date().toISOString() }, { onConflict: "request_id" })
+  if (portalAccess.error) return { ok: false as const, error: "The request was created, but portal access needs attention.", requestId }
+  await admin.from("aura_sms_request_confirmations").update({ completed_at: new Date().toISOString() }).eq("confirmation_communication_id", confirmationCommunicationId)
   const request = await supabase.from("quote_requests").update({ manager_assignee: "carlos" }).eq("id", requestId).select("project_id").maybeSingle<{ project_id: string }>()
   if (request.error || !request.data) return { ok: false as const, error: "The request was created, but Carlos could not be assigned." }
   if (customerAddress) {
@@ -203,7 +267,7 @@ export async function createSmsMaterialRequestAction(input: {
   revalidatePath("/admin/communications")
   revalidatePath("/owner/materials/requests")
   revalidatePath(`/owner/materials/requests/${requestId}`)
-  return { ok: true as const, requestId }
+  return { ok: true as const, requestId, publicNumber: requestNumber.data.public_number, invitation: `Your Avantia Build material request #${requestNumber.data.public_number} is ready. Open https://build.avantiap.com/requests and request a one-time code for secure access.` }
 }
 
 export async function quickTagPhoneContactAction(input: { phone: string; kind: ContactKind; name?: string }) {
@@ -214,15 +278,9 @@ export async function quickTagPhoneContactAction(input: { phone: string; kind: C
   const name = input.name?.trim().slice(0, 160) || phone
   let sourceId = ""
   if (input.kind === "customer") {
-    const existing = await createAdminClient().from("profiles").select("id,phone").eq("role", "client").not("phone", "is", null).limit(1000).returns<Array<{ id: string; phone: string | null }>>()
-    if (existing.error) return { ok: false as const, error: "The customer directory could not be checked." }
-    const matchedCustomer = (existing.data ?? []).find((customer) => normalizeAuraPhone(customer.phone || "") === phone)
-    if (matchedCustomer?.id) sourceId = matchedCustomer.id
-    else {
-      const created = await supabase.functions.invoke<{ ok?: boolean; customerId?: string }>("create-manager-client", { body: { fullName: name, email: phoneLoginEmailForPhone(phone), phone, companyName: null } })
-      if (created.error || !created.data?.ok || !created.data.customerId) return { ok: false as const, error: "The customer could not be added." }
-      sourceId = created.data.customerId
-    }
+    const customer = await ensureSmsPhoneCustomer(phone, name)
+    if (!customer.ok) return customer
+    sourceId = customer.customerId
   } else if (input.kind === "lead") {
     const existing = await supabase.from("manager_outreach_leads").select("id").eq("phone", phone).limit(1).maybeSingle<{ id: string }>()
     if (existing.error) return { ok: false as const, error: "The lead directory could not be checked." }

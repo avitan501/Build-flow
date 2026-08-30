@@ -144,7 +144,7 @@ export const smsAiReleaseDataset: SmsAiReleaseCase[] = [
     id: "direct-sheetrock-two-part",
     style: "direct product",
     message: "Do you sell Sheetrock?",
-    reply: "Yes. 1/2 in. is standard for most interior walls. 5/8 in. is commonly used for ceilings or fire-rated assemblies—check the plans/code. Walls or ceiling? How many sheets do you need?\n\nDo you also need joint compound, tape, corner bead, or drywall screws?",
+    reply: "Yes. Can you confirm 5/8 in.?\n\nRegular, Type X/fire-rated, or moisture-resistant? How many sheets do you need?",
     expectedIntent: "availability",
     expectedAutoSafe: true,
     expectedLanguage: "en",

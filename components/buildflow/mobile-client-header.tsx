@@ -95,10 +95,11 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
 
   const primaryLinks = useMemo<MobileMenuLink[]>(() => [
     { href: "/", label: "Home" },
+    ...(isSignedIn ? [{ href: "/requests", label: "My Material Requests", description: "Status, items, questions, and approvals" }] : []),
     { href: "/shop", label: "Shop Materials", description: "Browse products and departments" },
     { href: "/request-quote", label: "Request Material Pricing", description: "Send a list, photo, or plan" },
     { href: "/beat-a-quote", label: "Beat My Quote", description: "Upload a supplier quote for a better price" },
-  ], []);
+  ], [isSignedIn]);
 
   const shopLinks = useMemo<MobileMenuLink[]>(() => [
     ...SHOP_MENU_MATERIAL_LINKS.map((item) => ({ href: item.href, label: item.label, description: item.description, section: "Materials" as const, imageUrl: item.imageUrl })),
