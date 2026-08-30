@@ -92,7 +92,7 @@ export type SmsRequestedField = "size" | "thickness" | "quantity" | "address" | 
 
 const REQUESTED_FIELD_PATTERNS: Array<{ field: SmsRequestedField; pattern: RegExp }> = [
   { field: "size", pattern: /\b(?:size|length|dimensions?|medida|tama[nñ]o)\b|(?:גודל|אורך|מידות?)/i },
-  { field: "thickness", pattern: /\b(?:thickness|gauge|espesor)\b|(?:עובי)/i },
+  { field: "thickness", pattern: /\b(?:thickness|gauge|espesor)\b|\b\d+\s*\/\s*\d+\b|(?:עובי)/i },
   { field: "quantity", pattern: /\b(?:quantity|how many|how much|cantidad|cu[aá]nt[oa]s?)\b|(?:כמה|כמות|יחידות?)/i },
   { field: "address", pattern: /\b(?:full )?(?:delivery )?address\b|\b(?:direcci[oó]n (?:completa )?(?:de entrega)?)\b|(?:כתובת (?:המשלוח )?המלאה)/i },
   { field: "needed_by", pattern: /\b(?:needed-by date|needed by|when do you need|delivery date|time window|what date|fecha de entrega|para qu[eé] fecha|para cu[aá]ndo|ventana de tiempo)\b|(?:תאריך משלוח|חלון זמן|לאיזה תאריך|מתי)/i },
@@ -103,14 +103,20 @@ const REQUESTED_FIELD_PATTERNS: Array<{ field: SmsRequestedField; pattern: RegEx
 
 export function inspectSmsQuestionStructure(value: string, knownFields: SmsRequestedField[] = []) {
   const questionMarks = (value.match(/[?？]/g) || []).length;
+  // Do not treat construction-unit abbreviations as sentence boundaries. In
+  // copy such as `keep 1/2-in., or change to 5/8-in.?`, splitting on `in.`
+  // stripped the actual thickness question down to a bare `?` and the safety
+  // gate incorrectly blocked it.
+  const normalizedQuestionText = value.replace(/\b(in|ft)\.(?=[,;:?])/gi, "$1");
   // Only inspect the clause that actually contains each question. Without this
   // sentence boundary, an acknowledgement such as "I have the material list."
   // is incorrectly bundled with the following address question.
-  const questions = value
+  const questions = normalizedQuestionText
     .split(/[.!。！\n]+/)
     .flatMap((sentence) => sentence.match(/[^?？]*[?？]/g) || []);
   const fieldsByQuestion = questions.map((question) => REQUESTED_FIELD_PATTERNS.filter(({ pattern }) => pattern.test(question)).map(({ field }) => field));
   const fields = fieldsByQuestion.flat();
+  const essentialQuestions = fieldsByQuestion.filter((questionFields) => questionFields.length > 0).length;
   const subjectFor = (question: string) => question.match(/\b(?:appliances?|cabinets?|cables?|concrete|doors?|drywall|dumpsters?|flooring|hvac|insulation|lumber|moldings?|paint|pipes?|plumbing|primer|roofing|sheetrock|shingles?|siding|studs?|screws?|corner\s+bead|tape|compound|thinset|tile|trim|windows?|wires?)\b/i)?.[0]?.toLowerCase().replace(/\s+/g, "_") || "generic";
   const safeDeliveryPair = fieldsByQuestion.some((questionFields, index) => questionFields.length === 2 && questionFields.includes("address") && questionFields.includes("needed_by") && /\b(?:and|y)\b|(?:ו)/i.test(questions[index] || ""));
   const safeProductBundle = fieldsByQuestion.some((questionFields, index) => questionFields.length > 1 && subjectFor(questions[index] || "") !== "generic");
@@ -123,11 +129,11 @@ export function inspectSmsQuestionStructure(value: string, knownFields: SmsReque
   const repeated = new Set(fieldKeys).size !== fieldKeys.length;
   const asksKnownField = fields.some((field) => knownFields.includes(field));
   return {
-    valid: questionMarks <= 3 && fields.length <= 3 && !bundled && !repeated && !asksKnownField,
+    valid: questionMarks <= 3 && essentialQuestions <= 3 && !bundled && !repeated && !asksKnownField,
     questionMarks,
     requestedFields: fields.length,
     fields,
-    reason: questionMarks > 3 || fields.length > 3 ? "more than three questions" : bundled ? "bundled requested fields" : repeated ? "repeated requested field" : asksKnownField ? "question repeats an already-known field" : null,
+    reason: questionMarks > 3 || essentialQuestions > 3 ? "more than three questions" : bundled ? "bundled requested fields" : repeated ? "repeated requested field" : asksKnownField ? "question repeats an already-known field" : null,
   };
 }
 

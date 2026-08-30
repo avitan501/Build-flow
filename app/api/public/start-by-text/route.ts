@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHmac } from "node:crypto";
 
 const GENERIC_SUCCESS = "Check your phone for a text from Avantia Build.";
+const PRODUCTION_MESSAGING_URL = "https://nprfhspwdflpqlopydmp.supabase.co";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -11,10 +12,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Enter a valid phone number." }, { status: 400 });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   const signingSecret = process.env.START_TEXT_SIGNING_SECRET?.trim();
-  if (!supabaseUrl || !anonKey || !signingSecret) {
+  if (!signingSecret) {
     return NextResponse.json({ ok: false, error: "Text start is temporarily unavailable." }, { status: 503 });
   }
 
@@ -24,11 +23,9 @@ export async function POST(request: Request) {
     const timestamp = Date.now().toString();
     const signature = createHmac("sha256", signingSecret).update(`${timestamp}.${payload}`).digest("base64");
     try {
-      response = await fetch(`${supabaseUrl}/functions/v1/aura-messaging-broker?mode=start-by-text`, {
+      response = await fetch(`${PRODUCTION_MESSAGING_URL}/functions/v1/aura-messaging-broker?mode=start-by-text`, {
         method: "POST",
         headers: {
-          apikey: anonKey,
-          authorization: `Bearer ${anonKey}`,
           "content-type": "application/json",
           "x-avantia-site-origin": new URL(request.url).origin,
           "x-avantia-site-timestamp": timestamp,

@@ -126,7 +126,7 @@ export function ConstructionConciergeHome() {
             {showHeroActions ? (
               <div className="grid grid-cols-2 gap-3 motion-safe:animate-[hero-actions-in_.45s_ease-out_both]">
                 <Link href="/shop" className="inline-flex min-h-11 items-center justify-center rounded bg-[#1877e8] px-2 text-[11px] font-semibold text-white shadow-lg transition hover:bg-[#0d68d5] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/50 min-[390px]:text-xs sm:min-h-12 sm:px-4 sm:text-sm">{text.order}</Link>
-                <Link href="/how-it-works" className="inline-flex min-h-11 items-center justify-center rounded bg-white/94 px-2 text-[11px] font-semibold text-[#071126] shadow-lg transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/50 min-[390px]:text-xs sm:min-h-12 sm:px-4 sm:text-sm">{text.learn}</Link>
+                <button type="button" onClick={() => window.dispatchEvent(new Event("avantia:open-demo"))} className="inline-flex min-h-11 items-center justify-center rounded bg-white/94 px-2 text-[11px] font-semibold text-[#071126] shadow-lg transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/50 min-[390px]:text-xs sm:min-h-12 sm:px-4 sm:text-sm">{text.learn}</button>
               </div>
             ) : null}
           </div>

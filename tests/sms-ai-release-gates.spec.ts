@@ -55,9 +55,13 @@ test("Quo recovery batches duplicate checks before ingesting messages", async ()
 
 test("public text start uses a dedicated signing secret instead of a database credential", async () => {
   const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  const route = await readFile(path.join(root, "app/api/public/start-by-text/route.ts"), "utf8")
   expect(broker).toContain('publicStartTextSigningSecret: "public_start_text_signing_secret"')
   expect(broker).toContain("await secret(secretNames.publicStartTextSigningSecret)")
   expect(broker).not.toContain('hmacSha256Base64RawKey(serviceKey, `${timestamp}.${payload}`)')
+  expect(route).toContain('https://nprfhspwdflpqlopydmp.supabase.co')
+  expect(route).not.toContain("NEXT_PUBLIC_SUPABASE_URL")
+  expect(route).not.toContain("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 })
 
 test("fail-closed output gate blocks multilingual prices, stock assertions, promises, and protected intents", () => {
@@ -289,7 +293,7 @@ test("product inquiry fallback answers the product and asks only useful next que
   expect(smsProductInquiryFallbackReply("Can I get Sheetrcok?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Could we order shetrock?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Do you have sheetrpck?")).toBe(sheetrock)
-  expect(inspectSmsQuestionStructure(sheetrock || "")).toMatchObject({ valid: true, questionMarks: 3, requestedFields: 2 })
+  expect(inspectSmsQuestionStructure(sheetrock || "")).toMatchObject({ valid: true, questionMarks: 3, requestedFields: 3 })
   expect(evaluateSmsReplyGate({ message: "Do you sell sheetricj?", reply: sheetrock || "", intent: "availability", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
   const replyParts = smsReplyParts({ reply: sheetrock || "", deterministicProductInquiry: true })
   expect(replyParts).toHaveLength(2)
@@ -338,6 +342,14 @@ test("a new request isolates clarification from unrelated conversation history",
   expect(smsMaterialClarificationQuestions("New request: I need 18 sheets of 1/2 regular Sheetrock.")).toEqual([
     "Sheetrock thickness: keep 1/2-in., or change to our standard 5/8-in.?",
   ])
+  expect(evaluateSmsReplyGate({
+    message: "New request: I need 18 sheets of 1/2 regular Sheetrock.",
+    reply: "Sheetrock thickness: keep 1/2-in., or change to our standard 5/8-in.?",
+    intent: "material_request",
+    event: "message",
+    participantRole: "lead",
+    modelAutoSafe: true,
+  })).toMatchObject({ level: "green", gateAutoSafe: true })
 })
 
 test("Sheetrock follow-ups answer thickness corrections instead of repeating quantity", () => {

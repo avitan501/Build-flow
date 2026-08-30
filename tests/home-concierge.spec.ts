@@ -9,7 +9,7 @@ test("cinematic homepage presents Construction Concierge clearly", async ({ page
   await expect(page.getByText("Send us your plans or material list. We compare suppliers, organize your order, and coordinate jobsite delivery.", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Start a Material Request" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Start a Material Request" })).toHaveAttribute("href", "/shop", { timeout: 4000 });
-  await expect(page.getByRole("link", { name: "See How It Works" })).toHaveAttribute("href", "/how-it-works");
+  await expect(page.getByRole("button", { name: "See How It Works" })).toBeVisible();
   const homepageHeader = page.getByTestId("site-header");
   await expect(homepageHeader.getByRole("button", { name: "Open navigation menu" })).toHaveText("Menu");
   await expect(homepageHeader.getByRole("link", { name: "Avantia Build home" })).toHaveCount(0);
@@ -111,7 +111,7 @@ test("homepage material showroom stays compact and expandable on phones", async 
   await expect(showroom.getByRole("heading", { name: "Deals & Liquidation" })).toBeVisible();
   await expect(showroom.locator("details details")).toHaveCount(8);
   await page.evaluate(() => window.scrollTo(0, window.innerHeight));
-  await expect(page.getByTestId("public-contact-bar").getByRole("button", { name: /Start here/ })).toBeVisible();
+  await expect(page.getByTestId("public-contact-bar").getByRole("button", { name: /Start a material request/ })).toBeVisible();
 });
 
 test("Shop opens the full responsive construction department showroom", async ({ page }) => {
