@@ -413,33 +413,77 @@ export function smsContextualQuantityAnswerReply(latestMessage: string, conversa
     .filter((line) => /^Customer:/i.test(line))
     .map((line) => line.replace(/^Customer:\s*/i, ""))
     .filter((line) => line.trim().toLowerCase() !== latestMessage.trim().toLowerCase());
-  const productContext = [...customerHistory].reverse().find((line) => /\b(?:roof(?:ing)?\s+shingles?|shingles?|thin\s*set|sheetrock|drywall|metal\s+studs?)\b/i.test(line)) || "";
-  if (!productContext) return null;
+  const familyPatterns = [
+    ["roofing", /\b(?:roof(?:ing)?\s+shingles?|shingles?)\b/i],
+    ["thinset", /\bthin\s*set\b/i],
+    ["sheetrock", /\b(?:sheetrock|drywall(?!\s+screws?))\b/i],
+    ["metal_studs", /\bmetal\s+studs?\b/i],
+    ["wood_studs", /\b(?:wood(?:en)?\s+studs?|lumber\s+studs?)\b/i],
+    ["screws", /\b(?:drywall\s+)?screws?\b/i],
+    ["compound", /\b(?:joint\s+)?compound\b/i],
+    ["paint", /\bpaint\b/i],
+    ["corner_bead", /\bcorner\s+(?:bead|bit)\b/i],
+  ] as const;
+  const questionFamilies = familyPatterns.filter(([, pattern]) => pattern.test(latestAvantia)).map(([family]) => family);
+  const latestProductContext = [...customerHistory].reverse().find((line) => familyPatterns.some(([, pattern]) => pattern.test(line))) || "";
+  const contextFamilies = familyPatterns.filter(([, pattern]) => pattern.test(latestProductContext)).map(([family]) => family);
+  const family = questionFamilies.length === 1 && customerHistory.some((line) => familyPatterns.find(([candidate]) => candidate === questionFamilies[0])?.[1].test(line))
+    ? questionFamilies[0]
+    : questionFamilies.length === 0 && contextFamilies.length === 1
+      ? contextFamilies[0]
+      : null;
+  if (!family) return null;
   const value = latestMessage.trim().replace(/[.!]+$/, "");
-  const measured = value.match(/^(\d{1,3}(?:,\d{3})+|\d{1,6}(?:\.\d+)?)\s*(sq\.?\s*ft|sf|square\s+feet|sheets?|bags?|pcs?|pieces?|each|ea)?$/i);
+  const measured = value.match(/^(\d{1,3}(?:,\d{3})+|\d{1,6}(?:\.\d+)?)\s*(sq\.?\s*ft|sf|square\s+feet|sheets?|bags?|boxes?|buckets?|gallons?|pcs?|pieces?|each|ea)?$/i);
   if (!measured) return null;
   const amount = Number(measured[1].replaceAll(",", ""));
   if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) return null;
   const suppliedUnit = (measured[2] || "").toLowerCase().replace(/\s+/g, " ");
-  if (/\b(?:roof(?:ing)?\s+shingles?|shingles?)\b/i.test(productContext)) {
+  if (family === "roofing") {
     const unit = suppliedUnit || (/square\s+feet|sq\.?\s*ft/i.test(latestAvantia) ? "sq ft" : "");
     if (!/^(?:sq\.?\s*ft|sf|square feet)$/.test(unit)) return null;
     return `Got it—${amount} sq ft of roofing shingles. What shingle type and color?`;
   }
-  if (/\bthin\s*set\b/i.test(productContext)) {
+  if (family === "thinset") {
     const unit = suppliedUnit || (/bags?/i.test(latestAvantia) ? "bags" : "");
     if (!/^bags?$/.test(unit)) return null;
     return `Got it—${amount} ${amount === 1 ? "bag" : "bags"} of thinset. Which thinset do you need?`;
   }
-  if (/\b(?:sheetrock|drywall)\b/i.test(productContext)) {
+  if (family === "sheetrock") {
     const unit = suppliedUnit || (/sheets?/i.test(latestAvantia) ? "sheets" : "");
     if (!/^sheets?$/.test(unit)) return null;
     return `Got it—${amount} ${amount === 1 ? "sheet" : "sheets"} of Sheetrock. Can you confirm 5/8 in.?`;
   }
-  if (/\bmetal\s+studs?\b/i.test(productContext)) {
+  if (family === "metal_studs") {
     const unit = suppliedUnit || "pcs";
     if (!/^(?:pcs?|pieces?|each|ea)$/.test(unit)) return null;
     return `Got it—${amount} metal studs. What size and length? What gauge?`;
+  }
+  if (family === "wood_studs") {
+    const unit = suppliedUnit || "pcs";
+    if (!/^(?:pcs?|pieces?|each|ea)$/.test(unit)) return null;
+    return `Got it—${amount} wood studs. What size and length?`;
+  }
+  if (family === "screws") {
+    const unit = suppliedUnit || (/boxes?/i.test(latestAvantia) ? "boxes" : "");
+    if (!/^(?:boxes?|pcs?|pieces?|each|ea)$/.test(unit)) return null;
+    const label = /^boxes?$/.test(unit) ? (amount === 1 ? "box" : "boxes") : (amount === 1 ? "screw" : "screws");
+    return `Got it—${amount} ${label}. What screw length? What thread type?`;
+  }
+  if (family === "compound") {
+    const unit = suppliedUnit || (/buckets?/i.test(latestAvantia) ? "buckets" : "");
+    if (!/^buckets?$/.test(unit)) return null;
+    return `Got it—${amount} ${amount === 1 ? "bucket" : "buckets"} of joint compound. Can you confirm the compound type: 5-gallon all-purpose?`;
+  }
+  if (family === "paint") {
+    const unit = suppliedUnit || (/gallons?/i.test(latestAvantia) ? "gallons" : "");
+    if (!/^gallons?$/.test(unit)) return null;
+    return `Got it—${amount} ${amount === 1 ? "gallon" : "gallons"} of paint. What paint color and finish do you need?`;
+  }
+  if (family === "corner_bead") {
+    const unit = suppliedUnit || "pcs";
+    if (!/^(?:pcs?|pieces?|each|ea)$/.test(unit)) return null;
+    return `Got it—${amount} ${amount === 1 ? "piece" : "pieces"} of corner bead. What corner bead type? What length?`;
   }
   return null;
 }
@@ -502,13 +546,14 @@ export function smsUnansweredFollowUpText(params: { originalMessage: string; que
         : null;
   if (asksSpecification && asksQuantity) {
     if (productFamily === "roofing") return "Still need help with the shingle type, color, or quantity?";
-    if (productFamily === "metal_studs") return "Still need help with the stud size, gauge, or quantity?";
+    if (productFamily === "metal_studs") return "Still need help with the stud size, length, gauge, or quantity?";
     if (productFamily === "sheetrock") return "Can you confirm 5/8 in., type, and quantity?";
     if (productFamily === "wood_studs") return "Still need help with the stud size or quantity?";
     return "Still need help with the product details or quantity?";
   }
   if (asksSpecification) {
     if (productFamily === "roofing") return "Still need help with the shingle type or color?";
+    if (productFamily === "metal_studs" && /\bsize\b/i.test(question) && /\blength\b/i.test(question) && /\bgauge\b/i.test(question)) return "Still need help with the stud size, length, or gauge?";
     if (productFamily === "metal_studs") return "Still need help with the stud length or gauge?";
     if (productFamily === "sheetrock") return "Can you confirm 5/8 in.?";
     if (productFamily === "wood_studs") return "Still need help with the stud size?";

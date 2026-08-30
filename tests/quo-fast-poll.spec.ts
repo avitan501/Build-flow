@@ -8,7 +8,7 @@ test("Quo fast ingress is authenticated, bounded, and idempotent", async () => {
   const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
 
   expect(broker).toContain("handleQuoFastPollDispatch")
-  expect(broker).toContain('secret("quo_fast_poll_dispatch_secret")')
+  expect(broker).toContain("quoFastPollDispatchSecret")
   expect(broker).toContain('req.headers.get("x-quo-fast-poll")')
   expect(broker).toContain("constantTimeEqual(expectedSecret, suppliedSecret)")
   expect(broker).toContain('url.searchParams.get("mode") === "quo-fast-poll"')
@@ -55,6 +55,14 @@ test("Quo fast-poll control queries do not wait behind the polling connection", 
     expect(leaseOperation).toContain("fastPollControlSql")
     expect(leaseOperation).not.toMatch(/await sql[<`]/)
   }
+
+  const dispatch = broker.slice(
+    broker.indexOf("async function handleQuoFastPollDispatch"),
+    broker.indexOf("const PUBLIC_START_TEXT_TEMPLATE_VERSION"),
+  )
+  expect(broker).toContain("async function quoFastPollDispatchSecret")
+  expect(dispatch).toContain("await quoFastPollDispatchSecret()")
+  expect(dispatch).not.toContain('await secret("quo_fast_poll_dispatch_secret")')
 })
 
 test("Quo fast ingress lease is atomic, private, renewable, and crash recoverable", async () => {

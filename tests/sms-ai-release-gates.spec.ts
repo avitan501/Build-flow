@@ -295,6 +295,37 @@ test("short quantities fill the field just asked instead of repeating the same q
   expect(smsContextualQuantityAnswerReply("500 sq ft", "Customer: I need roofing shingles\nAvantia: What color?\nCustomer: 500 sq ft")).toBeNull()
 })
 
+test("bare quantities keep the requested product in wood, finishing, and mixed-list continuations", () => {
+  const cases = [
+    ["40", "Customer: I need wood studs\nAvantia: How many pieces do you need?", "Got it—40 wood studs. What size and length?"],
+    ["40 pcs", "Customer: I need wood studs\nAvantia: How many pieces do you need?", "Got it—40 wood studs. What size and length?"],
+    ["4", "Customer: I need drywall screws\nAvantia: How many boxes do you need?", "Got it—4 boxes. What screw length? What thread type?"],
+    ["4 boxes", "Customer: I need drywall screws\nAvantia: How many boxes do you need?", "Got it—4 boxes. What screw length? What thread type?"],
+    ["6", "Customer: I need joint compound\nAvantia: How many buckets do you need?", "Got it—6 buckets of joint compound. Can you confirm the compound type: 5-gallon all-purpose?"],
+    ["6 buckets", "Customer: I need joint compound\nAvantia: How many buckets do you need?", "Got it—6 buckets of joint compound. Can you confirm the compound type: 5-gallon all-purpose?"],
+    ["10", "Customer: I need paint\nAvantia: How many gallons do you need?", "Got it—10 gallons of paint. What paint color and finish do you need?"],
+    ["10 gallons", "Customer: I need paint\nAvantia: How many gallons do you need?", "Got it—10 gallons of paint. What paint color and finish do you need?"],
+    ["24", "Customer: I need corner bead\nAvantia: How many pieces do you need?", "Got it—24 pieces of corner bead. What corner bead type? What length?"],
+    ["24 pcs", "Customer: I need corner bead\nAvantia: How many pieces do you need?", "Got it—24 pieces of corner bead. What corner bead type? What length?"],
+    ["40", "Customer: I need 20 Sheetrock sheets and metal studs\nAvantia: How many metal studs do you need?", "Got it—40 metal studs. What size and length? What gauge?"],
+    ["20", "Customer: I need Sheetrock and metal studs\nAvantia: How many Sheetrock sheets do you need?", "Got it—20 sheets of Sheetrock. Can you confirm 5/8 in.?"],
+    ["5", "Customer: I need paint and joint compound\nAvantia: How many buckets of joint compound do you need?", "Got it—5 buckets of joint compound. Can you confirm the compound type: 5-gallon all-purpose?"],
+    ["8", "Customer: I need paint and joint compound\nAvantia: How many gallons of paint do you need?", "Got it—8 gallons of paint. What paint color and finish do you need?"],
+    ["30", "Customer: I need wood studs and screws\nAvantia: How many wood studs do you need?", "Got it—30 wood studs. What size and length?"],
+    ["3", "Customer: I need wood studs and screws\nAvantia: How many boxes of screws do you need?", "Got it—3 boxes. What screw length? What thread type?"],
+    ["12", "Customer: I need corner bead and compound\nAvantia: How many pieces of corner bead do you need?", "Got it—12 pieces of corner bead. What corner bead type? What length?"],
+    ["2", "Customer: I need corner bead and compound\nAvantia: How many buckets of compound do you need?", "Got it—2 buckets of joint compound. Can you confirm the compound type: 5-gallon all-purpose?"],
+    ["50", "Customer: I need Sheetrock and metal studs\nAvantia: How many do you need?", null],
+    ["5", "Customer: I need paint and compound\nAvantia: How much do you need?", null],
+  ] as const
+  expect(cases).toHaveLength(20)
+  for (const [answer, context, expected] of cases) {
+    const reply = smsContextualQuantityAnswerReply(answer, `${context}\nCustomer: ${answer}`)
+    expect(reply, `${answer} in ${context}`).toBe(expected)
+    if (reply) expect(inspectSmsQuestionStructure(reply), reply).toMatchObject({ valid: true })
+  }
+})
+
 test("one-shot unanswered follow-up is question-aware and cancels on every later response", () => {
   const eligible = {
     originalMessage: "Need thinset",
@@ -310,7 +341,8 @@ test("one-shot unanswered follow-up is question-aware and cancels on every later
   expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell Sheetrock?", questionReply: "Regular, Type X/fire-rated, or moisture-resistant? How many sheets do you need?" })).toBe("Can you confirm 5/8 in., type, and quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "I need roofing shingles", questionReply: "What shingle type and color? How many square feet do you need?" })).toBe("Still need help with the shingle type, color, or quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "I need roofing shingles", questionReply: "What shingle type and color?" })).toBe("Still need help with the shingle type or color?")
-  expect(smsUnansweredFollowUpText({ originalMessage: "New request: I need metal studs", questionReply: "What size and length? What gauge? How many do you need?" })).toBe("Still need help with the stud size, gauge, or quantity?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "New request: I need metal studs", questionReply: "What size and length? What gauge? How many do you need?" })).toBe("Still need help with the stud size, length, gauge, or quantity?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "New request: I need metal studs", questionReply: "What size and length? What gauge?" })).toBe("Still need help with the stud size, length, or gauge?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell metal studs?", questionReply: "What length? What gauge?" })).toBe("Still need help with the stud length or gauge?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell Sheetrock?", questionReply: "Can you confirm 5/8 in.?" })).toBe("Can you confirm 5/8 in.?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Need wood studs", questionReply: "What size? How many do you need?" })).toBe("Still need help with the stud size or quantity?")

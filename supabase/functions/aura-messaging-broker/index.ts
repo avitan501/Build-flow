@@ -2880,6 +2880,15 @@ async function claimQuoFastPollLease() {
   return rows[0]?.lease_token || null;
 }
 
+async function quoFastPollDispatchSecret() {
+  const rows = await fastPollControlSql<{ decrypted_secret: string }[]>`
+    select decrypted_secret from vault.decrypted_secrets
+    where name = 'quo_fast_poll_dispatch_secret'
+    limit 1
+  `;
+  return rows[0]?.decrypted_secret || null;
+}
+
 async function renewQuoFastPollLease(leaseToken: string) {
   const rows = await fastPollControlSql<{ renewed: boolean }[]>`
     select private.renew_quo_fast_poll_lease(${leaseToken}::uuid, ${QUO_FAST_POLL_LEASE_SECONDS}) as renewed
@@ -4192,7 +4201,7 @@ async function handleSmsUnansweredFollowUpDispatch(req: Request) {
 }
 
 async function handleQuoFastPollDispatch(req: Request) {
-  const expectedSecret = await secret("quo_fast_poll_dispatch_secret");
+  const expectedSecret = await quoFastPollDispatchSecret();
   const suppliedSecret = req.headers.get("x-quo-fast-poll") || "";
   if (!expectedSecret || !constantTimeEqual(expectedSecret, suppliedSecret)) return json({ error: "Invalid dispatch secret" }, 401);
   const leaseToken = await claimQuoFastPollLease();
