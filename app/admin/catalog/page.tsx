@@ -21,7 +21,7 @@ export default async function ManagerMaterialCatalogPage() {
       .returns<Array<{ item_id: string; department: string }>>(),
     supabase
       .from("material_catalog_supplier_prices")
-      .select("item_id,supplier_id,supplier_name_snapshot,supplier_sku,product_url,unit_price,availability,notes,price_type,verification_status,delivery_price,minimum_order,verified_at,expires_at,comparison_price,retail_store_id,retail_store_name,retail_zip_code,price_observed_at,source_document_id,source_file_name,source_quote_number,source_document_date,updated_at")
+      .select("item_id,supplier_id,supplier_name_snapshot,supplier_sku,product_url,unit_price,availability,notes,price_type,verification_status,delivery_price,minimum_order,verified_at,expires_at,comparison_price,retail_store_id,retail_store_name,retail_zip_code,price_observed_at,source_document_id,source_file_name,source_quote_number,source_document_date,source_quantity,source_unit,source_line_total,source_page,source_text,updated_at")
       .returns<MaterialCatalogSupplierPrice[]>(),
     supabase.rpc("staff_load_catalog_suppliers"),
     supabase

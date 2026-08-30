@@ -77,6 +77,11 @@ export type MaterialCatalogSupplierPrice = {
   source_file_name?: string | null
   source_quote_number?: string | null
   source_document_date?: string | null
+  source_quantity?: number | null
+  source_unit?: string | null
+  source_line_total?: number | null
+  source_page?: number | null
+  source_text?: string | null
   updated_at: string
 }
 
@@ -136,6 +141,16 @@ export function normalizeMaterialCatalogDepartment(value: string | null | undefi
   const categoryName = normalized.replace(/\s*\/\s*materials$/, "")
   const known = MATERIAL_CATALOG_CATEGORIES.find((category) => category.toLowerCase() === categoryName)
   return known ?? DEPARTMENT_ALIASES[categoryName] ?? trimmed
+}
+
+export function canonicalMaterialCatalogDepartment(
+  value: string | null | undefined,
+  fallback: MaterialCatalogCategory = "Others",
+) {
+  const normalized = normalizeMaterialCatalogDepartment(value)
+  return (MATERIAL_CATALOG_CATEGORIES as readonly string[]).includes(normalized)
+    ? normalized as MaterialCatalogCategory
+    : fallback
 }
 
 export function materialCatalogDepartmentOptions(...sources: Array<Iterable<string>>) {

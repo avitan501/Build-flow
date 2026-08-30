@@ -5,6 +5,12 @@ import { createHash } from "node:crypto"
 import { revalidatePath } from "next/cache"
 
 import { requireStaffProfile } from "@/lib/auth"
+import {
+  catalogLineFailureMessage,
+  reviewedDocumentCatalogDepartment,
+  reviewedDocumentPriceRow,
+  type CatalogSourceLine,
+} from "@/lib/manager-document-catalog"
 import { extractManagerDocument, type ManagerDocumentAiInvoker } from "@/lib/manager-document-intelligence"
 import { MANAGER_DOCUMENT_BUCKET, type ManagerDocumentItemRecord, type ManagerDocumentRecord } from "@/lib/manager-documents"
 import { normalizeMaterialCatalogDepartment, type CatalogSupplier } from "@/lib/material-catalog"
@@ -338,7 +344,7 @@ export async function addManagerDocumentItemsToCatalogAction(documentId: string)
   if (!items.length) return { ok: false, error: "Select at least one reviewed product row." }
   const pricedItems = items.filter((item) => item.unit_price !== null)
   if (!pricedItems.length) return { ok: false, error: "The selected rows do not have reviewed unit prices." }
-  const department = normalizeMaterialCatalogDepartment(document.department)
+  const department = reviewedDocumentCatalogDepartment(document)
   const suppliers = Array.isArray(supplierRows) ? supplierRows as CatalogSupplier[] : []
   const detectedName = document.party_name || inferSupplierName(document.raw_text)
   if (!detectedName) return { ok: false, error: "Confirm the vendor name before adding these prices." }
@@ -362,15 +368,29 @@ export async function addManagerDocumentItemsToCatalogAction(documentId: string)
     supplier = data as CatalogSupplier
   }
 
-  const { data: existingRows, error: existingError } = await supabase.from("material_catalog_items").select("id,category,name,item_code,package_quantity,comparison_quantity").returns<Array<{ id: string; category: string; name: string; item_code: string; package_quantity: number; comparison_quantity: number }>>()
+  const [{ data: existingRows, error: existingError }, { data: existingSupplierPrices, error: existingPriceError }] = await Promise.all([
+    supabase.from("material_catalog_items").select("id,category,name,item_code,package_quantity,comparison_quantity").returns<Array<{ id: string; category: string; name: string; item_code: string; package_quantity: number; comparison_quantity: number }>>(),
+    supabase.from("material_catalog_supplier_prices").select("item_id,supplier_sku").eq("supplier_id", supplier.id).returns<Array<{ item_id: string; supplier_sku: string }>>(),
+  ])
   if (existingError) return { ok: false, error: "The existing catalog could not be checked." }
+  if (existingPriceError) return { ok: false, error: "The vendor's existing catalog codes could not be checked safely." }
   const byName = new Map((existingRows ?? []).filter((row) => row.category === department).map((row) => [catalogItemKey(row.name), row]))
+  const rowsById = new Map((existingRows ?? []).map((row) => [row.id, row]))
+  const skuCandidates = new Map<string, typeof existingRows>()
+  for (const price of existingSupplierPrices ?? []) {
+    const key = catalogItemKey(price.supplier_sku)
+    const row = rowsById.get(price.item_id)
+    if (!key || !row || row.category !== department) continue
+    skuCandidates.set(key, [...(skuCandidates.get(key) ?? []), row])
+  }
+  const bySupplierCode = new Map([...skuCandidates].flatMap(([key, rows]) => rows?.length === 1 ? [[key, rows[0]] as const] : []))
   const usedCodes = new Set((existingRows ?? []).map((row) => catalogItemKey(row.item_code)).filter(Boolean))
   const catalogRows = new Map<string, { id: string; package_quantity: number; comparison_quantity: number }>()
   const now = new Date().toISOString()
   let createdCount = 0
   for (const item of items) {
-    const existing = byName.get(catalogItemKey(item.description))
+    const existing = (item.item_code ? bySupplierCode.get(catalogItemKey(item.item_code)) : null)
+      ?? byName.get(catalogItemKey(item.description))
     if (existing) { catalogRows.set(item.id, existing); continue }
     const baseCode = `DOC-${document.id.slice(0, 8).toUpperCase()}-${item.line_number}`
     let code = baseCode
@@ -397,40 +417,34 @@ export async function addManagerDocumentItemsToCatalogAction(documentId: string)
         continue
       }
       console.error("Reviewed document catalog item creation failed", { code: error?.code, message: error?.message, department, lineNumber: item.line_number })
-      return { ok: false, error: `The catalog could not save “${item.description}.” Nothing was lost; reload and try this destination again.` }
+      return { ok: false, error: catalogLineFailureMessage({ item, step: "item", code: error?.code }) }
     }
     usedCodes.add(catalogItemKey(code))
     byName.set(catalogItemKey(item.description), { ...data, category: department, name: item.description, item_code: code })
     catalogRows.set(item.id, data); createdCount += 1
   }
-  const observedAt = document.document_date ? `${document.document_date}T12:00:00.000Z` : now
-  const expiresAt = document.expires_on ? `${document.expires_on}T23:59:59.999Z` : null
   const priceCandidates = pricedItems.flatMap((item) => {
     const catalogItem = catalogRows.get(item.id)
     if (!catalogItem || item.unit_price === null) return []
-    return [{
-      item_id: catalogItem.id, supplier_id: supplier!.id, supplier_name_snapshot: clean(supplier!.name, 300), supplier_sku: clean(item.item_code, 120),
-      unit_price: Math.round(item.unit_price * 10000) / 10000, availability: "available", product_url: null,
-      notes: clean(`Source: ${document.file_name}${document.document_number ? ` · ${document.document_number}` : ""}${document.document_date ? ` · ${document.document_date}` : ""}.`, 1000),
-      price_type: "supplier_quote", verification_status: "supplier_quote", delivery_price: null, minimum_order: 1,
-      comparison_price: Math.round(((item.unit_price / (catalogItem.package_quantity || 1)) * (catalogItem.comparison_quantity || 1)) * 10000) / 10000,
-      verified_at: observedAt, expires_at: expiresAt, price_observed_at: observedAt,
-      source_document_id: document.id, source_file_name: document.file_name, source_quote_number: document.document_number || null, source_document_date: document.document_date,
-      updated_by: user.id, updated_at: now,
-    }]
+    const row = reviewedDocumentPriceRow({ document, item, catalogItem, supplier: supplier!, userId: user.id, now })
+    return row ? [{ row, item }] : []
   })
   const candidateGroups = new Map<string, typeof priceCandidates>()
   for (const candidate of priceCandidates) {
-    const key = `${candidate.item_id}:${candidate.supplier_id}`
+    const key = `${candidate.row.item_id}:${candidate.row.supplier_id}`
     candidateGroups.set(key, [...(candidateGroups.get(key) ?? []), candidate])
   }
-  const prices = [...candidateGroups.values()].map((group) => {
-    const lowest = group.reduce((best, candidate) => candidate.unit_price < best.unit_price ? candidate : best)
+  const selectedPrices = [...candidateGroups.values()].map((group) => {
+    const lowest = group.reduce((best, candidate) => candidate.row.unit_price < best.row.unit_price ? candidate : best)
     return group.length === 1 ? lowest : {
       ...lowest,
-      notes: clean(`${lowest.notes} Lowest of ${group.length} selected quote rows for the same product.`, 1000),
+      row: {
+        ...lowest.row,
+        notes: clean(`${lowest.row.notes} Lowest of ${group.length} selected quote rows for the same product.`, 1000),
+      },
     }
   })
+  const prices = selectedPrices.map((candidate) => candidate.row)
   let { error: priceError } = await supabase.from("material_catalog_supplier_prices").upsert(prices, { onConflict: "item_id,supplier_id" })
   let usedCompatibilitySave = false
   if (priceError) {
@@ -442,11 +456,13 @@ export async function addManagerDocumentItemsToCatalogAction(documentId: string)
       priceCount: prices.length,
     })
     // Older production schemas can accept catalog prices before the dedicated
-    // document-source columns are available. The source, quote number, and date
-    // are already retained in notes, so save the dependable price fields instead
+    // document-source columns are available. The source, quote number, date,
+    // quantity, unit, total, page, and evidence are retained in notes, so save
+    // the dependable price fields instead
     // of leaving a reviewed import half-finished.
-    const compatiblePrices = prices.map(({ source_document_id, source_file_name, source_quote_number, source_document_date, ...price }) => {
+    const compatiblePrices = prices.map(({ source_document_id, source_file_name, source_quote_number, source_document_date, source_quantity, source_unit, source_line_total, source_page, source_text, ...price }) => {
       void source_document_id; void source_file_name; void source_quote_number; void source_document_date
+      void source_quantity; void source_unit; void source_line_total; void source_page; void source_text
       return price
     })
     const fallback = await supabase.from("material_catalog_supplier_prices").upsert(compatiblePrices, { onConflict: "item_id,supplier_id" })
@@ -461,7 +477,16 @@ export async function addManagerDocumentItemsToCatalogAction(documentId: string)
       supplierId: supplier.id,
       priceCount: prices.length,
     })
-    return { ok: false, error: "The items were added, but their supplier prices could not be saved." }
+    const failingLines: string[] = []
+    for (const candidate of selectedPrices) {
+      const { source_document_id, source_file_name, source_quote_number, source_document_date, source_quantity, source_unit, source_line_total, source_page, source_text, ...compatiblePrice } = candidate.row
+      void source_document_id; void source_file_name; void source_quote_number; void source_document_date
+      void source_quantity; void source_unit; void source_line_total; void source_page; void source_text
+      const attempt = await supabase.from("material_catalog_supplier_prices").upsert(compatiblePrice, { onConflict: "item_id,supplier_id" })
+      if (attempt.error) failingLines.push(catalogLineFailureMessage({ item: candidate.item as CatalogSourceLine, step: "price", code: attempt.error.code }))
+    }
+    if (failingLines.length) return { ok: false, error: failingLines.slice(0, 5).join(" ") }
+    usedCompatibilitySave = true
   }
   await supabase.from("manager_documents").update({ status: "routed", supplier_id: supplier.id, updated_by: user.id }).eq("id", documentId)
   await supabase.from("manager_document_events").insert({ document_id: documentId, event_type: "routed", summary: `${prices.length} selected price${prices.length === 1 ? "" : "s"} added to the catalog.`, details: { destination: "catalog", supplier_id: supplier.id, created_item_count: createdCount, price_count: prices.length }, created_by: user.id })

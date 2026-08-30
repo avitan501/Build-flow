@@ -3,18 +3,24 @@ import path from "node:path"
 
 import { expect, test } from "@playwright/test"
 
+import {
+  catalogLineFailureMessage,
+  reviewedDocumentCatalogDepartment,
+  reviewedDocumentPriceRow,
+} from "../lib/manager-document-catalog"
 import { documentArithmeticWarnings, documentLineValidationStatus, isManagerDocumentChargeLine } from "../lib/manager-document-validation"
 
 const root = process.cwd()
 
 test("document center preserves originals and gates every destination behind review", async () => {
-  const [migration, approvalMigration, sourceMigration, indexMigration, departmentMigration, actions, page, review, upload, shell, toolsPage, documents, edgeFunction] = await Promise.all([
+  const [migration, approvalMigration, sourceMigration, indexMigration, departmentMigration, actions, catalogImport, page, review, upload, shell, toolsPage, documents, edgeFunction] = await Promise.all([
     readFile(path.join(root, "supabase/migrations/20260827143000_create_manager_document_center.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260827144500_restrict_document_financial_approval.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260827151000_add_document_sources_and_staff_approval.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260827152500_index_manager_document_relationships.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260827182029_add_manager_document_department_suggestion.sql"), "utf8"),
     readFile(path.join(root, "app/admin/documents/actions.ts"), "utf8"),
+    readFile(path.join(root, "lib/manager-document-catalog.ts"), "utf8"),
     readFile(path.join(root, "app/admin/documents/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/manager-document-review.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/manager-document-upload.tsx"), "utf8"),
@@ -67,8 +73,8 @@ test("document center preserves originals and gates every destination behind rev
   expect(actions).toContain("usedCodes")
   expect(actions).toContain("DOC-${document.id.slice(0, 8).toUpperCase()}")
   expect(actions).not.toContain("byCode.get(catalogItemKey(item.item_code))")
-  expect(actions).toContain("supplier_sku: clean(item.item_code")
-  expect(actions).toContain("source_document_id: document.id")
+  expect(catalogImport).toContain("supplier_sku: clean(item.item_code")
+  expect(catalogImport).toContain("source_document_id: document.id")
   expect(actions).toContain("candidateGroups")
   expect(actions).toContain("Lowest of ${group.length} selected quote rows")
   expect(actions).toContain("Select at least one dependable supplier item")
@@ -101,4 +107,110 @@ test("document intelligence keeps charges and tax out of product rows", () => {
     expect(isManagerDocumentChargeLine(charge)).toBeTruthy()
   }
   expect(isManagerDocumentChargeLine("White Oak flooring")).toBeFalsy()
+})
+
+test("reviewed Firecode drywall line keeps supplier pricing and original PDF evidence", () => {
+  const document = {
+    id: "11111111-1111-4111-8111-111111111111",
+    department: "drywall",
+    suggested_department: "Sheet Rock",
+    document_number: "28104219-00",
+    document_date: "2026-08-25",
+    expires_on: "2026-09-25",
+    file_name: "fbm-quote-28104219.pdf",
+  }
+  const item = {
+    id: "22222222-2222-4222-8222-222222222222",
+    line_number: 5,
+    item_code: "TTX-1110",
+    description: "5/8 in. x 4 ft. x 8 ft. Firecode X Drywall",
+    specification: "Type X, smooth face",
+    quantity: 1,
+    unit: "MLF",
+    unit_price: 185,
+    line_total: 185,
+    source_page: 1,
+    source_text: "5 1.00 PC TTX-1110 4.0 1,000 MLF 185.00",
+  }
+
+  expect(reviewedDocumentCatalogDepartment(document)).toBe("Sheet Rock")
+  const price = reviewedDocumentPriceRow({
+    document,
+    item,
+    catalogItem: { id: "33333333-3333-4333-8333-333333333333", package_quantity: 1, comparison_quantity: 1 },
+    supplier: { id: "fbm-branch-281", name: "Foundation Building Materials (FBM) Branch 281" },
+    userId: "44444444-4444-4444-8444-444444444444",
+    now: "2026-08-30T18:45:00.000Z",
+  })
+
+  expect(price).not.toBeNull()
+  expect(price).toMatchObject({
+    supplier_id: "fbm-branch-281",
+    supplier_name_snapshot: "Foundation Building Materials (FBM) Branch 281",
+    supplier_sku: "TTX-1110",
+    unit_price: 185,
+    source_document_date: "2026-08-25",
+    source_quantity: 1,
+    source_unit: "MLF",
+    source_line_total: 185,
+    source_page: 1,
+    source_text: "5 1.00 PC TTX-1110 4.0 1,000 MLF 185.00",
+  })
+  expect(price?.notes).toContain("supplier code TTX-1110")
+  expect(price?.notes).toContain("quantity 1 MLF")
+})
+
+test("catalog routing rejects invented departments and reports the exact failed reviewed line", () => {
+  expect(reviewedDocumentCatalogDepartment({ department: "Department 1", suggested_department: "drywall" })).toBe("Sheet Rock")
+  expect(reviewedDocumentCatalogDepartment({ department: "Department 1", suggested_department: "mystery" })).toBe("Others")
+  expect(catalogLineFailureMessage({
+    item: { line_number: 5, item_code: "TTX-1110", description: "5/8 in. x 4 ft. x 8 ft. Firecode X Drywall" },
+    step: "item",
+    code: "23505",
+  })).toBe("Line 5 — 5/8 in. x 4 ft. x 8 ft. Firecode X Drywall (supplier code TTX-1110): A catalog item with the same name or internal code already exists; reload the document and retry so Avantia can match it.")
+})
+
+test("mixed reviewed supplier rows keep their own code, quantity, unit, price, and evidence", () => {
+  const document = {
+    id: "11111111-1111-4111-8111-111111111111",
+    department: "Siding",
+    suggested_department: "Siding",
+    document_number: "28104219-00",
+    document_date: "2026-08-25",
+    expires_on: null,
+    file_name: "fbm-mixed-products.pdf",
+  }
+  const rows = [
+    { id: "a", line_number: 1, item_code: "GAP-531667", description: "GAF Grand Sequoia", specification: "", quantity: 480, unit: "PC", unit_price: 9.35, line_total: 4488, source_page: 1, source_text: "GAP-531667 480 PC 9.35 4488" },
+    { id: "b", line_number: 2, item_code: "TVH-HW9150", description: "Housewrap", specification: "", quantity: 5, unit: "RL", unit_price: 261.4, line_total: 1307, source_page: 1, source_text: "TVH-HW9150 5 RL 261.40 1307" },
+  ]
+  const prices = rows.map((item, index) => reviewedDocumentPriceRow({
+    document,
+    item,
+    catalogItem: { id: `catalog-${index}`, package_quantity: 1, comparison_quantity: 1 },
+    supplier: { id: "fbm-281", name: "FBM Branch 281" },
+    userId: "manager",
+    now: "2026-08-30T18:45:00.000Z",
+  }))
+  expect(prices.map((price) => [price?.supplier_sku, price?.source_quantity, price?.source_unit, price?.unit_price, price?.source_document_date])).toEqual([
+    ["GAP-531667", 480, "PC", 9.35, "2026-08-25"],
+    ["TVH-HW9150", 5, "RL", 261.4, "2026-08-25"],
+  ])
+})
+
+test("catalog evidence migration archives every reviewed source field", async () => {
+  const [migration, actions, catalogPage] = await Promise.all([
+    readFile(path.join(root, "supabase/migrations/20260830184500_preserve_document_catalog_line_evidence.sql"), "utf8"),
+    readFile(path.join(root, "app/admin/documents/actions.ts"), "utf8"),
+    readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
+  ])
+  for (const field of ["source_quantity", "source_unit", "source_line_total", "source_page", "source_text"]) {
+    expect(migration).toContain(`add column if not exists ${field}`)
+    expect(migration).toContain(`old.${field}`)
+    expect(actions).toContain(field)
+    expect(catalogPage).toContain(field)
+  }
+  expect(actions).toContain("bySupplierCode")
+  expect(actions).toContain("reviewedDocumentCatalogDepartment(document)")
+  expect(actions).toContain("catalogLineFailureMessage")
 })
