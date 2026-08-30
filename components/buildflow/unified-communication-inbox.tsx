@@ -183,7 +183,7 @@ function initialConversationKey(communication: AuraCommunicationRow | undefined,
   return linked ? `${linked[1]}:${linked[2]}` : rawKey || `unknown:${communication.contact_id || communication.id}`
 }
 
-export function UnifiedCommunicationInbox({ communications, contacts, customers, leads = [], suppliers = [], materialRequests = [], smsReplyDrafts = [], connections, initialChannelFilter = "all", initialQuery = "" }: {
+export function UnifiedCommunicationInbox({ communications, contacts, customers, leads = [], suppliers = [], materialRequests = [], smsReplyDrafts = [], connections, initialChannelFilter = "all", initialQuery = "", initialDraft = "" }: {
   communications: AuraCommunicationRow[]
   contacts: AuraContactRow[]
   customers: AuraCustomerIdentity[]
@@ -194,6 +194,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   connections: Connections
   initialChannelFilter?: string
   initialQuery?: string
+  initialDraft?: string
 }) {
   const router = useRouter()
   const initialCommunication = initialCommunicationForQuery(communications, initialQuery, initialChannelFilter)
@@ -202,18 +203,19 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const [query, setQuery] = useState(initialQuery)
   const [contactFilter, setContactFilter] = useState<ContactFilter>("all")
   const [channelFilter, setChannelFilter] = useState(initialChannelFilter)
-  const [activeKey, setActiveKey] = useState(() => initialConversationKey(initialCommunication, contacts))
-  const [mobileThreadOpen, setMobileThreadOpen] = useState(false)
+  const [activeKey, setActiveKey] = useState(() => initialDraft ? "__new__" : initialConversationKey(initialCommunication, contacts))
+  const [mobileThreadOpen, setMobileThreadOpen] = useState(Boolean(initialDraft))
   const [channel, setChannel] = useState<Channel>(() => {
+    if (initialDraft && ["sms", "whatsapp", "email"].includes(initialChannelFilter)) return initialChannelFilter as Channel
     if (initialStoredDraft) return "sms"
     const initial = initialCommunication?.channel
     return initial === "email" || initial === "sms" || initial === "whatsapp" ? initial : "whatsapp"
   })
   const [recipientType, setRecipientType] = useState<Exclude<ContactKind, "contact">>("customer")
   const [selectedRecipientId, setSelectedRecipientId] = useState("")
-  const [recipient, setRecipient] = useState(() => initialCommunication?.channel === "email" ? initialCommunication.counterparty_email || "" : initialCommunication?.counterparty_phone || "")
-  const [subject, setSubject] = useState(() => initialCommunication?.channel === "email" ? replySubject(initialCommunication.subject) : "")
-  const [message, setMessage] = useState(initialStoredDraft?.reply_text || "")
+  const [recipient, setRecipient] = useState(() => initialDraft ? "" : initialCommunication?.channel === "email" ? initialCommunication.counterparty_email || "" : initialCommunication?.counterparty_phone || "")
+  const [subject, setSubject] = useState(() => initialDraft ? "" : initialCommunication?.channel === "email" ? replySubject(initialCommunication.subject) : "")
+  const [message, setMessage] = useState(initialDraft || initialStoredDraft?.reply_text || "")
   const [attachment, setAttachment] = useState<File | null>(null)
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null)
   const [pending, startTransition] = useTransition()
@@ -223,7 +225,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const [smsAiMode, setSmsAiMode] = useState<"off" | "draft" | "auto_safe">(() => contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(initialCommunication?.counterparty_phone, initialCommunication?.counterparty_email))?.sms_ai_mode || "auto_safe")
   const [smsAiStyle, setSmsAiStyle] = useState<"professional" | "friendly" | "brief">(() => contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(initialCommunication?.counterparty_phone, initialCommunication?.counterparty_email))?.sms_ai_style || "friendly")
   const [requestReview, setRequestReview] = useState<SmsRequestProposal | null>(null)
-  const [activeDraftId, setActiveDraftId] = useState<string | null>(initialStoredDraft?.id || null)
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(initialDraft ? null : initialStoredDraft?.id || null)
   const [teachAi, setTeachAi] = useState(false)
   const [correctionReasons, setCorrectionReasons] = useState<SmsCorrectionReason[]>([])
 

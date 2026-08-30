@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Activity, BarChart3, Bot, Calculator, FilePenLine, Files, ListTree, MapPinned, PanelsTopLeft, SearchCheck, Store, Video } from "lucide-react"
+import { Activity, BarChart3, Bot, Calculator, Clapperboard, FilePenLine, Files, ListTree, MapPinned, PanelsTopLeft, SearchCheck, Store, Video } from "lucide-react"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 
@@ -11,6 +11,7 @@ export default async function AdminAiToolsPage() {
   const tools = [
     { href: "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Avantia%20Build%20meeting%20with%20Carlos&details=Avantia%20Build%20manager%20meeting&add=buildavantiap%40gmail.com", title: "Google Meet", description: "Schedule a manager meeting with Carlos without using permanent sidebar space.", icon: Video },
     { href: "https://build-flow-wfl3-1fe6nc1cr-avitanneto-1804s-projects.vercel.app", title: "New Homepage Preview", description: "View the saved homepage concept without changing the current public homepage.", icon: PanelsTopLeft, badge: "Preview" },
+    { href: "/admin/ai-tools/media-messages", title: "Media & Messages", description: "Preview approved videos and pages, copy exact wording, and open a safe editable communication draft.", icon: Clapperboard },
     ...(access.customers ? [{ href: "/admin/ai-tools/sms-replies", title: "AI Reply Settings", description: "Set the default voice, safe automatic replies, and material-request review behavior for customer texts.", icon: Bot }] : []),
     ...(access.suppliers ? [{ href: "/admin/documents", title: "Documents", description: "Upload once, let AI prepare the details, then review and choose the correct destination.", icon: Files }] : []),
     { href: "/admin/ai-tools/jobsite-delivery", title: "Jobsite Delivery", description: "Plan routes and loads, estimate delivery cost, and manage every request through completion.", icon: MapPinned },

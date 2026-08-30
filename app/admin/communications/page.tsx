@@ -50,11 +50,12 @@ async function loadManagerAura(
 export default async function CommunicationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ channel?: string | string[]; q?: string | string[] }>
+  searchParams: Promise<{ channel?: string | string[]; q?: string | string[]; draft?: string | string[] }>
 }) {
   const query = await searchParams
   const requestedChannel = Array.isArray(query.channel) ? query.channel[0] : query.channel
   const requestedSearch = Array.isArray(query.q) ? query.q[0] : query.q
+  const requestedDraft = Array.isArray(query.draft) ? query.draft[0] : query.draft
   const initialChannelFilter = requestedChannel === "email-list"
     ? "email"
     : ["all", "call", "sms", "whatsapp", "email"].includes(requestedChannel || "") ? requestedChannel! : "all"
@@ -93,5 +94,5 @@ export default async function CommunicationsPage({
       }
     : null
 
-  return <main className="h-[calc(100dvh-4rem)] min-h-0 min-w-0 overflow-hidden bg-[#f5f5f7] p-2 text-slate-950 sm:p-4 lg:h-screen lg:px-6"><div className="mx-auto h-full min-h-0 min-w-0 max-w-[96rem]">{liveAura ? <UnifiedCommunicationInbox communications={liveAura.communications} contacts={liveAura.contacts} customers={liveAura.customers} leads={liveAura.leads} suppliers={liveAura.suppliers} materialRequests={(requestsResult.data ?? []).map((request) => ({ id: request.id, title: request.title, status: request.status }))} smsReplyDrafts={(smsDraftsResult.data ?? []) as SmsReplyDraft[]} connections={liveAura.connections} initialChannelFilter={initialChannelFilter} initialQuery={(requestedSearch || "").slice(0, 160)} /> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Live phone connections are temporarily unavailable.</p>}<details className="mt-3 hidden rounded-lg border border-slate-200 bg-white p-3"><summary className="cursor-pointer text-xs font-semibold text-slate-600">Manual communication log</summary><div className="mt-4"><CommunicationCenter clients={clients} logs={logs} threads={threads} /></div></details></div></main>
+  return <main className="h-[calc(100dvh-4rem)] min-h-0 min-w-0 overflow-hidden bg-[#f5f5f7] p-2 text-slate-950 sm:p-4 lg:h-screen lg:px-6"><div className="mx-auto h-full min-h-0 min-w-0 max-w-[96rem]">{liveAura ? <UnifiedCommunicationInbox communications={liveAura.communications} contacts={liveAura.contacts} customers={liveAura.customers} leads={liveAura.leads} suppliers={liveAura.suppliers} materialRequests={(requestsResult.data ?? []).map((request) => ({ id: request.id, title: request.title, status: request.status }))} smsReplyDrafts={(smsDraftsResult.data ?? []) as SmsReplyDraft[]} connections={liveAura.connections} initialChannelFilter={initialChannelFilter} initialQuery={(requestedSearch || "").slice(0, 160)} initialDraft={(requestedDraft || "").slice(0, 1600)} /> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Live phone connections are temporarily unavailable.</p>}<details className="mt-3 hidden rounded-lg border border-slate-200 bg-white p-3"><summary className="cursor-pointer text-xs font-semibold text-slate-600">Manual communication log</summary><div className="mt-4"><CommunicationCenter clients={clients} logs={logs} threads={threads} /></div></details></div></main>
 }

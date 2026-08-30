@@ -6,106 +6,17 @@ import { ArrowDown, ArrowRight, Pause, Play, Volume2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
+import { approvedStoryVideos, type AvantiaStoryVideo } from "@/lib/avantia-media-library";
+
 import styles from "./concierge-video-library.module.css";
 
-type VideoStory = {
-  id: string;
-  src: string;
-  poster: string;
-  title: string;
-  label: string;
-  transcript: string;
-};
-
-const stories: Record<string, VideoStory> = {
-  request: {
-    id: "request",
-    src: "/videos/avantia-story/01-contractor-request.mp4",
-    poster: "/videos/avantia-story/01-contractor-request-poster.jpg",
-    title: "Request materials from your phone",
-    label: "Send it from the jobsite",
-    transcript:
-      "Need material for the job? From your phone, send Avantia one list, photo, plan, or product link, and we will organize the request, compare practical options, and coordinate delivery after you approve, so you can stop chasing suppliers and get back to building.",
-  },
-  crew: {
-    id: "crew",
-    src: "/videos/avantia-story/02-contractor-crew-moving.mp4",
-    poster: "/videos/avantia-story/02-contractor-crew-moving-poster.jpg",
-    title: "Keep the crew moving",
-    label: "Keep the schedule moving",
-    transcript:
-      "Your crew is ready, but the material is not, and every missing item costs time and puts the schedule at risk, so send Avantia one list, photo, plan, or link, and we will organize the options, coordinate delivery after you approve, and help keep your crew moving and your job on schedule.",
-  },
-  suppliers: {
-    id: "suppliers",
-    src: "/videos/avantia-story/03-supplier-partner-network.mp4",
-    poster: "/videos/avantia-story/03-supplier-partner-network-poster.jpg",
-    title: "Join the supplier network",
-    label: "Qualified supplier options",
-    transcript:
-      "Avantia receives material requests from contractors who need reliable supplier options, so if your company offers competitive pricing, dependable availability, and jobsite delivery, send us your information, and when the right request comes in, we may invite you to quote an opportunity that fits your business.",
-  },
-  products: {
-    id: "products",
-    src: "/videos/avantia-story/04-supplier-send-products.mp4",
-    poster: "/videos/avantia-story/04-supplier-send-products-poster.jpg",
-    title: "Send us what you sell",
-    label: "Catalogs, prices, availability",
-    transcript:
-      "Do you sell construction materials? Send Avantia your catalog, current pricing, availability, and delivery area, and we will review it against the requests our clients send, so when your product and price are the right fit, we can present your company as a supplier option.",
-  },
-  designerOrder: {
-    id: "designer-order",
-    src: "/videos/avantia-story/05-designer-order-coordination.mp4",
-    poster: "/videos/avantia-story/05-designer-order-coordination-poster.jpg",
-    title: "Every selection, one process",
-    label: "Coordinate many vendors",
-    transcript:
-      "You find the perfect tile on one website, the lighting on another, and the flooring somewhere else, but ordering everything can become another full-time job, so send Avantia the links and selections, approve the final list, and we will coordinate the orders and deliveries for you.",
-  },
-  designerDesk: {
-    id: "designer-desk",
-    src: "/videos/avantia-story/06-designer-materials-desk.mp4",
-    poster: "/videos/avantia-story/06-designer-materials-desk-poster.jpg",
-    title: "One design. One materials desk.",
-    label: "Finish schedules organized",
-    transcript:
-      "A beautiful design depends on every detail arriving at the right time, so send Avantia your finish schedule or project selection list, and we will organize the vendor details, follow the orders, and coordinate delivery after approval, while you stay focused on your client and the design.",
-  },
-  calls: {
-    id: "calls",
-    src: "/videos/avantia-story/07-many-calls-one-job.mp4",
-    poster: "/videos/avantia-story/07-many-calls-one-job-poster.jpg",
-    title: "How many calls for one job?",
-    label: "Upload the plans once",
-    transcript:
-      "How many people do you call for one job? Dumpster, lumber, windows, roofing, HVAC, flooring, drywall, tile, doors, paint—different supplier, different quote, different follow-up. Upload the plans once to Avantia. We help organize quantities, pricing, ordering, and delivery. One materials concierge behind the entire job.",
-  },
-  cost: {
-    id: "cost",
-    src: "/videos/avantia-story/08-material-actual-cost.mp4",
-    poster: "/videos/avantia-story/08-material-actual-cost-poster.jpg",
-    title: "What did the material actually cost?",
-    label: "See another option",
-    transcript:
-      "Your sub gives you one number—but what did the material actually cost? Send Avantia the plans, quote, or material list. We can help check quantities, price the material separately, and give you another option before you approve. Keep your sub. Keep your supplier. Use Avantia wherever you need clarity.",
-  },
-  busy: {
-    id: "busy",
-    src: "/videos/avantia-story/09-job-gets-busy.mp4",
-    poster: "/videos/avantia-story/09-job-gets-busy-poster.jpg",
-    title: "When the job gets busy",
-    label: "One missing item can stop the day",
-    transcript:
-      "One missing pump, one special light, one late delivery—and now the whole day stops. Send Avantia a plan, photo, link, list, or voice note. We can coordinate with your subs, track what your jobs use, and help source the small items everyone forgets. When the job gets busy, call your materials concierge.",
-  },
-};
+const stories = Object.fromEntries(approvedStoryVideos.map((story) => [story.id, story])) as Record<string, AvantiaStoryVideo>;
 
 function StoryVideo({
   story,
   featured = false,
 }: {
-  story: VideoStory;
+  story: AvantiaStoryVideo;
   featured?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -153,7 +64,7 @@ function StoryVideo({
         >
           <source src={story.src} type="video/mp4" />
           <track
-            src={`/videos/avantia-story/${story.id}.vtt`}
+            src={story.captions}
             kind="captions"
             srcLang="en"
             label="English"
@@ -504,8 +415,8 @@ export function ConciergeVideoLibrary() {
 
       <section className={styles.storyBand}>
         <div className={styles.storySelector}>
-          <StoryVideo story={stories.designerOrder} />
-          <StoryVideo story={stories.designerDesk} />
+          <StoryVideo story={stories["designer-order"]} />
+          <StoryVideo story={stories["designer-desk"]} />
         </div>
       </section>
 
