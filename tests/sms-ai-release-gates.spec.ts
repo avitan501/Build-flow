@@ -47,6 +47,12 @@ test("request summaries pluralize packages and avoid repeated package wording", 
     .toBe("• 6 each — LUS28Z")
 })
 
+test("Quo recovery batches duplicate checks before ingesting messages", async () => {
+  const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  expect(broker).toContain("external_activity_id = any(${candidateIds}::text[])")
+  expect(broker).toContain("if (!activityId || storedIds.has(activityId)) continue")
+})
+
 test("fail-closed output gate blocks multilingual prices, stock assertions, promises, and protected intents", () => {
   const unsafe = [
     ["The price is $1,250.", "general"],

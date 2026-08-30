@@ -2886,7 +2886,19 @@ async function pollRecentQuoMessagesOnce() {
     }
     const messagesPayload = await messagesResponse.json() as { data?: QuoPolledMessage[] };
     const incoming = (messagesPayload.data || []).filter((message) => message.direction === "incoming").sort((left, right) => String(left.createdAt || "").localeCompare(String(right.createdAt || "")));
-    for (const message of incoming) if (await ingestPolledQuoMessage(message, conversation.id || null, api.from)) ingested += 1;
+    const candidateIds = incoming.map((message) => typeof message.id === "string" ? message.id.trim() : "").filter((id) => /^AC[A-Za-z0-9_-]+$/.test(id));
+    const alreadyStored = candidateIds.length
+      ? await sql<{ external_activity_id: string }[]>`
+          select external_activity_id from public.aura_communications
+          where provider = 'quo' and external_activity_id = any(${candidateIds}::text[])
+        `
+      : [];
+    const storedIds = new Set(alreadyStored.map((row) => row.external_activity_id));
+    for (const message of incoming) {
+      const activityId = typeof message.id === "string" ? message.id.trim() : "";
+      if (!activityId || storedIds.has(activityId)) continue;
+      if (await ingestPolledQuoMessage(message, conversation.id || null, api.from)) ingested += 1;
+    }
   }
   return ingested;
 }
