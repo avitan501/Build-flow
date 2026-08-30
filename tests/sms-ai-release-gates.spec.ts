@@ -317,6 +317,27 @@ test("product inquiry fallback answers the product and asks only useful next que
   const prefixedMetalStuds = smsProductInquiryFallbackReply("New request: I need metal studs") || ""
   expect(prefixedMetalStuds).toBe("Sure—we can help source metal studs.\n\nWhat size and length? What gauge? How many do you need?")
   expect(inspectSmsQuestionStructure(prefixedMetalStuds)).toMatchObject({ valid: true, questionMarks: 3 })
+
+  // A fully quantified request must continue through material extraction. It
+  // must never be reduced to a generic availability reply that re-asks fields
+  // the customer already supplied.
+  expect(smsProductInquiryFallbackReply("New request: I need 18 sheets of 1/2 regular Sheetrock.")).toBeNull()
+  expect(smsProductInquiryFallbackReply("I need 50 2x4x8 metal studs.")).toBeNull()
+})
+
+test("a new request isolates clarification from unrelated conversation history", async () => {
+  const brokerSource = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  expect(brokerSource).toContain("const activeCustomerText = startsNewRequest ? body : context.customerText || body")
+  expect(brokerSource).toContain("smsMaterialClarificationQuestions(activeCustomerText || reviewText, { exactListOnly })")
+  expect(brokerSource).toContain("const replyContext = startsNewRequest ? `Customer: ${effectiveBody}`")
+
+  const dirtyPreviousRequest = `10 Paint Sherwin-Williams OC-13 eggshell.\nNew request: I need 18 sheets of 1/2 regular Sheetrock.`
+  expect(smsMaterialClarificationQuestions(dirtyPreviousRequest)).toEqual([
+    "Sheetrock thickness: keep 1/2-in., or change to our standard 5/8-in.?",
+  ])
+  expect(smsMaterialClarificationQuestions("New request: I need 18 sheets of 1/2 regular Sheetrock.")).toEqual([
+    "Sheetrock thickness: keep 1/2-in., or change to our standard 5/8-in.?",
+  ])
 })
 
 test("Sheetrock follow-ups answer thickness corrections instead of repeating quantity", () => {

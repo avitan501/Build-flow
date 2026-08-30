@@ -223,6 +223,7 @@ export function smsHasNeededByTiming(value: string) {
 
 export function smsHasExplicitQuantity(value: string) {
   return /\b(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:[a-z][a-z/-]*\s+)?(?:ea|each|pcs?|pieces?|boxes?|sheets?|ft|feet|rolls?|bags?|buckets?|bundles?|cartons?|gallons?|packs?|pallets?|squares?|yards?|units?|appliances?|batts?|beams?|blocks?|cabinets?|containers?|doors?|drywall|dumpsters?|fixtures?|hvac|insulation|lumber|lvl|panels?|shingles?|studs?|thinset|tiles?|windows?)\b/i.test(value) ||
+    /\b\d+(?:\.\d+)?\s+\d+(?:\s*[-x×/]\s*\d+){1,2}\s*(?:wood|metal)?\s*(?:studs?|lumber|boards?)\b/i.test(value) ||
     /(?:^|\s)(?:אחד|אחת|שניים|שתיים|שלושה|שלוש|\d+(?:\.\d+)?)\s*(?:יחידות?|ארגזים?|לוחות?|שקים?|דלתות?|גבס)/i.test(value) ||
     /\b(?:uno|una|dos|tres|cuatro|cinco|\d+(?:\.\d+)?)\s*(?:unidades?|cajas?|paneles?|placas?|bolsas?|puertas?|yeso)\b/i.test(value);
 }
@@ -363,6 +364,12 @@ export function smsProductInquiryFallbackReply(message: string, _options: { allo
     .trim()
     .slice(0, 80);
   if (!rawProduct) return null;
+  // A message with a concrete quantity is an order/request, not a generic
+  // product-availability question. Let the material-request pipeline extract
+  // and preserve the supplied quantity/specifications, then ask only for the
+  // next genuinely missing field. Treating it as a product inquiry caused the
+  // deterministic fallback to ask for quantity and type a second time.
+  if (smsHasExplicitQuantity(value)) return null;
   const product = looksLikeSheetrock(rawProduct) || /drywall/i.test(rawProduct)
     ? "Sheetrock"
     : /thin\s*set/i.test(rawProduct)

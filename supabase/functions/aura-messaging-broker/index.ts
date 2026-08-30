@@ -2247,9 +2247,13 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
     `;
     return;
   }
-  const reviewText = openDraft?.original_message ? `${openDraft.original_message}\n${body}` : context.customerText || body;
+  // A declared new request is a hard conversation boundary. Older customer
+  // messages can contain unrelated paint/specification answers and must not
+  // suppress or create clarification questions for this new request.
+  const activeCustomerText = startsNewRequest ? body : context.customerText || body;
+  const reviewText = openDraft?.original_message ? `${openDraft.original_message}\n${body}` : activeCustomerText;
   const effectiveBody = body.trim() || "[Image attached]";
-  const replyContext = context.replyText || `Customer: ${effectiveBody}`;
+  const replyContext = startsNewRequest ? `Customer: ${effectiveBody}` : context.replyText || `Customer: ${effectiveBody}`;
   let analyzed = customerEvent === "cancellation"
     ? finalizeCustomerSmsAnalysis({ result: guardedEventReply("cancellation", effectiveBody), model: "deterministic-event-guard", message: effectiveBody, media, event: customerEvent, startedAt: Date.now() })
     : await analyzeCustomerSms(replyContext, contact?.sms_ai_style || settings.preferredVoice, false, effectiveBody, settings, media, customerEvent, exactListOnly, deliveryAddressKnown);
@@ -2263,7 +2267,7 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
   const { result, model, intent, metrics, promptVersion } = analyzed;
   let safety = analyzed.safety;
   const clarificationQuestions = (result.isMaterialRequest || Boolean(openDraft))
-    ? smsMaterialClarificationQuestions(context.customerText || reviewText, { exactListOnly })
+    ? smsMaterialClarificationQuestions(activeCustomerText || reviewText, { exactListOnly })
     : [];
   if (clarificationQuestions.length) {
     result.reply = clarificationQuestions.join(" ");
