@@ -29,7 +29,11 @@ export async function POST(request: Request) {
         headers: { "content-type": "application/json", "x-avantia-start-proxy": "1" },
         body: JSON.stringify(body),
         cache: "no-store",
-        signal: AbortSignal.timeout(15_000),
+        // The canonical route may retry once when a provider request finishes
+        // just after its 12-second transport timeout. Keep the proxy alive long
+        // enough to receive that idempotent result instead of showing a false
+        // failure after Quo has already accepted the message.
+        signal: AbortSignal.timeout(30_000),
       });
       const result = await forwarded.json().catch(() => null) as { ok?: boolean; error?: string; message?: string } | null;
       return NextResponse.json(result || { ok: false, error: "Text start is temporarily unavailable." }, { status: forwarded.status });

@@ -36,6 +36,7 @@ test("public text starter is fixed-copy, consented, rate-limited, and audited", 
   expect(route).toContain('"x-avantia-site-signature": signature')
   expect(route).toContain("attempt < 2")
   expect(route).toContain("AbortSignal.timeout(12_000)")
+  expect(route).toContain("AbortSignal.timeout(30_000)")
   expect(route).toContain("same idempotency key")
   expect(route).not.toContain("input.message")
   expect(broker).toContain("PUBLIC_START_TEXT_WELCOME")
