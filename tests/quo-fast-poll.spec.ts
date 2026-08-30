@@ -32,6 +32,31 @@ test("Quo fast ingress is authenticated, bounded, and idempotent", async () => {
   expect(broker).toContain("on conflict (provider, external_activity_id) do nothing")
 })
 
+test("Quo fast-poll control queries do not wait behind the polling connection", async () => {
+  const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+
+  expect(broker).toContain("const fastPollControlSql = postgres")
+  expect(broker.match(/max: 1/g)).toHaveLength(2)
+
+  const claim = broker.slice(
+    broker.indexOf("async function claimQuoFastPollLease"),
+    broker.indexOf("async function renewQuoFastPollLease"),
+  )
+  const renew = broker.slice(
+    broker.indexOf("async function renewQuoFastPollLease"),
+    broker.indexOf("async function releaseQuoFastPollLease"),
+  )
+  const release = broker.slice(
+    broker.indexOf("async function releaseQuoFastPollLease"),
+    broker.indexOf("async function runQuoFastPollWindow"),
+  )
+
+  for (const leaseOperation of [claim, renew, release]) {
+    expect(leaseOperation).toContain("fastPollControlSql")
+    expect(leaseOperation).not.toMatch(/await sql[<`]/)
+  }
+})
+
 test("Quo fast ingress lease is atomic, private, renewable, and crash recoverable", async () => {
   const migration = await readFile(path.join(root, "supabase/migrations/20260830125147_harden_quo_fast_poll_lease.sql"), "utf8")
 

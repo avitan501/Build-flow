@@ -253,7 +253,10 @@ test("product inquiry fallback answers the product and asks only useful next que
   ])
   expect(inspectSmsQuestionStructure(roofing)).toMatchObject({ valid: true, questionMarks: 2 })
   expect(smsProductInquiryFallbackReply("I need thinset")).toContain("How many bags do you need?")
-  expect(smsProductInquiryFallbackReply("I need metal studs")).toContain("What stud size? What gauge? How many do you need?")
+  expect(smsProductInquiryFallbackReply("I need metal studs")).toContain("What size and length? What gauge? How many do you need?")
+  const prefixedMetalStuds = smsProductInquiryFallbackReply("New request: I need metal studs") || ""
+  expect(prefixedMetalStuds).toBe("Sure—we can help source metal studs.\n\nWhat size and length? What gauge? How many do you need?")
+  expect(inspectSmsQuestionStructure(prefixedMetalStuds)).toMatchObject({ valid: true, questionMarks: 3 })
 })
 
 test("Sheetrock follow-ups answer thickness corrections instead of repeating quantity", () => {
@@ -266,18 +269,29 @@ test("Sheetrock follow-ups answer thickness corrections instead of repeating qua
 
 test("short metal-stud answers keep conversation context and ask only missing specifications", () => {
   const conversation = "Customer: Do you sell metal studs?\nAvantia: What type and how many metal studs do you need?"
-  expect(smsShortMaterialAnswerReply("2x4 50", conversation)).toBe("Got it—50 2x4 metal studs. What length and gauge?")
-  expect(smsShortMaterialAnswerReply("2 x 4, 50 pcs", conversation)).toBe("Got it—50 2x4 metal studs. What length and gauge?")
+  const partial = smsShortMaterialAnswerReply("2x4 50", conversation) || ""
+  expect(partial).toBe("Got it—50 2x4 metal studs. What length? What gauge?")
+  expect(inspectSmsQuestionStructure(partial)).toMatchObject({ valid: true, questionMarks: 2 })
+  expect(evaluateSmsReplyGate({ message: "2x4 50", reply: partial, intent: "material_request", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
+  expect(smsShortMaterialAnswerReply("2 x 4, 50 pcs", conversation)).toBe("Got it—50 2x4 metal studs. What length? What gauge?")
+  expect(smsShortMaterialAnswerReply("2x4x10 50", conversation)).toBe("Got it—50 2x4x10 metal studs. What gauge?")
   expect(smsShortMaterialAnswerReply("2x4 50", "Customer: Do you sell Sheetrock?")).toBeNull()
 })
 
 test("short quantities fill the field just asked instead of repeating the same question", () => {
   const roofing = "Customer: I need roofing shingles\nAvantia: What shingle type and color? How many square feet do you need?\nCustomer: 500 sq ft"
   expect(smsContextualQuantityAnswerReply("500 sq ft", roofing)).toBe("Got it—500 sq ft of roofing shingles. What shingle type and color?")
+  expect(smsContextualQuantityAnswerReply("500 sf", roofing)).toBe("Got it—500 sq ft of roofing shingles. What shingle type and color?")
   const thinset = "Customer: I need thinset\nAvantia: How many bags do you need?\nCustomer: 20 bags"
   expect(smsContextualQuantityAnswerReply("20 bags", thinset)).toBe("Got it—20 bags of thinset. Which thinset do you need?")
   const sheetrock = "Customer: I need Sheetrock\nAvantia: How many sheets do you need?\nCustomer: 25"
   expect(smsContextualQuantityAnswerReply("25", sheetrock)).toBe("Got it—25 sheets of Sheetrock. Can you confirm 5/8 in.?")
+  expect(smsContextualQuantityAnswerReply("1,000", sheetrock)).toBe("Got it—1000 sheets of Sheetrock. Can you confirm 5/8 in.?")
+  const metalStuds = "Customer: New request: I need metal studs.\nAvantia: Sure — how much do you need?\nCustomer: 40"
+  const metalStudReply = smsContextualQuantityAnswerReply("40", metalStuds) || ""
+  expect(metalStudReply).toBe("Got it—40 metal studs. What size and length? What gauge?")
+  expect(inspectSmsQuestionStructure(metalStudReply)).toMatchObject({ valid: true, questionMarks: 2 })
+  expect(evaluateSmsReplyGate({ message: "40", reply: metalStudReply, intent: "material_request", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
   expect(smsContextualQuantityAnswerReply("500 sq ft", "Customer: I need roofing shingles\nAvantia: What color?\nCustomer: 500 sq ft")).toBeNull()
 })
 
@@ -296,8 +310,8 @@ test("one-shot unanswered follow-up is question-aware and cancels on every later
   expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell Sheetrock?", questionReply: "Regular, Type X/fire-rated, or moisture-resistant? How many sheets do you need?" })).toBe("Can you confirm 5/8 in., type, and quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "I need roofing shingles", questionReply: "What shingle type and color? How many square feet do you need?" })).toBe("Still need help with the shingle type, color, or quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "I need roofing shingles", questionReply: "What shingle type and color?" })).toBe("Still need help with the shingle type or color?")
-  expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell metal studs?", questionReply: "What stud size and gauge? How many do you need?" })).toBe("Still need help with the stud size, gauge, or quantity?")
-  expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell metal studs?", questionReply: "What length and gauge?" })).toBe("Still need help with the stud length or gauge?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "New request: I need metal studs", questionReply: "What size and length? What gauge? How many do you need?" })).toBe("Still need help with the stud size, gauge, or quantity?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell metal studs?", questionReply: "What length? What gauge?" })).toBe("Still need help with the stud length or gauge?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell Sheetrock?", questionReply: "Can you confirm 5/8 in.?" })).toBe("Can you confirm 5/8 in.?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Need wood studs", questionReply: "What size? How many do you need?" })).toBe("Still need help with the stud size or quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Need roofing shingles and Sheetrock", questionReply: "Can you confirm 5/8 in.? How many sheets do you need?" })).toBe("Can you confirm 5/8 in., type, and quantity?")

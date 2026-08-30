@@ -37,6 +37,14 @@ const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, {
   max: 1,
   prepare: false,
 });
+// Keep the fast-poll lease path independent from the long-running poll window.
+// A warm Edge isolate can still be polling when the next pg_net tick arrives;
+// sharing the single main connection made that dispatch wait until pg_net's
+// 30-second timeout instead of returning its 202 immediately.
+const fastPollControlSql = postgres(Deno.env.get("SUPABASE_DB_URL")!, {
+  max: 1,
+  prepare: false,
+});
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const secretKeys = JSON.parse(
   Deno.env.get("SUPABASE_SECRET_KEYS") || "{}",
@@ -2866,21 +2874,21 @@ async function pollRecentQuoMessagesOnce() {
 const QUO_FAST_POLL_LEASE_SECONDS = 180;
 
 async function claimQuoFastPollLease() {
-  const rows = await sql<{ lease_token: string | null }[]>`
+  const rows = await fastPollControlSql<{ lease_token: string | null }[]>`
     select private.claim_quo_fast_poll_lease(${QUO_FAST_POLL_LEASE_SECONDS}) as lease_token
   `;
   return rows[0]?.lease_token || null;
 }
 
 async function renewQuoFastPollLease(leaseToken: string) {
-  const rows = await sql<{ renewed: boolean }[]>`
+  const rows = await fastPollControlSql<{ renewed: boolean }[]>`
     select private.renew_quo_fast_poll_lease(${leaseToken}::uuid, ${QUO_FAST_POLL_LEASE_SECONDS}) as renewed
   `;
   return rows[0]?.renewed === true;
 }
 
 async function releaseQuoFastPollLease(leaseToken: string) {
-  await sql`select private.release_quo_fast_poll_lease(${leaseToken}::uuid)`;
+  await fastPollControlSql`select private.release_quo_fast_poll_lease(${leaseToken}::uuid)`;
 }
 
 async function runQuoFastPollWindow(leaseToken: string) {

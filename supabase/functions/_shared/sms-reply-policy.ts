@@ -25,7 +25,7 @@ export function isSmsOptOutMessage(value: string) {
   return SMS_OPT_OUT_PATTERN.test(value);
 }
 
-const MATERIAL_TERMS = /\b(?:drywal+l?|sheetrock|plywood|lumber|studs?|tracks?|boards?|sheets?|bags?|boxes?|buckets?|rolls?|thinset|mortar|cement|concrete|compound|screws?|insulation|material(?:s)?)\b|(?:חומר(?:ים)?|לוחות?|שקים?|ארגזים?|ברגים|בידוד|גבס)|\b(?:material(?:es)?|paneles?|placas?|bolsas?|cajas?|tornillos?|aislamiento|yeso|mortero)\b/i;
+const MATERIAL_TERMS = /\b(?:aggregates?|appliances?|baseboards?|batts?|blocks?|breakers?|cabinets?|cables?|cement|cladding|compound|concrete|containers?|doors?|drywal+l?|dumpsters?|ducts?|electrical|fittings?|flooring|grout|hardwood|hvac|insulation|lumber|lvl|materials?|mesh|moldings?|mortar|paint|panels?|pipes?|plumbing|plywood|primer|rebar|registers?|rolls?|roofing|sheetrock|sheets?|shingles?|siding|screws?|studs?|thinset|tiles?|tracks?|trim|valves?|vinyl|windows?|wires?|bags?|boards?|boxes?|buckets?)\b|(?:חומר(?:ים)?|לוחות?|שקים?|ארגזים?|ברגים|בידוד|גבס|רעפים|חלונות|דלתות|צבע|ריצוף|ארונות|צנרת|חשמל)|\b(?:aislamiento|azulejos?|baldosas?|bolsas?|cables?|cajas?|cemento|concreto|contenedores?|gabinetes?|material(?:es)?|paneles?|placas?|pintura|plomer[ií]a|puertas?|techo|tornillos?|tuber[ií]a|ventanas?|yeso|mortero)\b/i;
 
 export function smsReplyLanguage(value: string) {
   if (/[\u0590-\u05ff]/.test(value)) return "he";
@@ -110,7 +110,7 @@ export function inspectSmsQuestionStructure(value: string, knownFields: SmsReque
     .flatMap((sentence) => sentence.match(/[^?？]*[?？]/g) || []);
   const fieldsByQuestion = questions.map((question) => REQUESTED_FIELD_PATTERNS.filter(({ pattern }) => pattern.test(question)).map(({ field }) => field));
   const fields = fieldsByQuestion.flat();
-  const subjectFor = (question: string) => question.match(/\b(?:sheetrock|drywall|studs?|screws?|corner\s+bead|tape|compound|primer|paint|thinset|roofing|shingles?)\b/i)?.[0]?.toLowerCase().replace(/\s+/g, "_") || "generic";
+  const subjectFor = (question: string) => question.match(/\b(?:appliances?|cabinets?|cables?|concrete|doors?|drywall|dumpsters?|flooring|hvac|insulation|lumber|moldings?|paint|pipes?|plumbing|primer|roofing|sheetrock|shingles?|siding|studs?|screws?|corner\s+bead|tape|compound|thinset|tile|trim|windows?|wires?)\b/i)?.[0]?.toLowerCase().replace(/\s+/g, "_") || "generic";
   const safeDeliveryPair = fieldsByQuestion.some((questionFields, index) => questionFields.length === 2 && questionFields.includes("address") && questionFields.includes("needed_by") && /\b(?:and|y)\b|(?:ו)/i.test(questions[index] || ""));
   const safeProductBundle = fieldsByQuestion.some((questionFields, index) => questionFields.length > 1 && subjectFor(questions[index] || "") !== "generic");
   const bundled = fieldsByQuestion.some((questionFields) => questionFields.length > 1) && !safeDeliveryPair && !safeProductBundle;
@@ -221,7 +221,7 @@ export function smsHasNeededByTiming(value: string) {
 }
 
 export function smsHasExplicitQuantity(value: string) {
-  return /\b(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:ea|each|pcs?|pieces?|boxes?|sheets?|ft|feet|rolls?|bags?|buckets?|units?|doors?|drywall|thinset|cement|lumber|studs?)\b/i.test(value) ||
+  return /\b(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:[a-z][a-z/-]*\s+)?(?:ea|each|pcs?|pieces?|boxes?|sheets?|ft|feet|rolls?|bags?|buckets?|bundles?|cartons?|gallons?|packs?|pallets?|squares?|yards?|units?|appliances?|batts?|beams?|blocks?|cabinets?|containers?|doors?|drywall|dumpsters?|fixtures?|hvac|insulation|lumber|lvl|panels?|shingles?|studs?|thinset|tiles?|windows?)\b/i.test(value) ||
     /(?:^|\s)(?:אחד|אחת|שניים|שתיים|שלושה|שלוש|\d+(?:\.\d+)?)\s*(?:יחידות?|ארגזים?|לוחות?|שקים?|דלתות?|גבס)/i.test(value) ||
     /\b(?:uno|una|dos|tres|cuatro|cinco|\d+(?:\.\d+)?)\s*(?:unidades?|cajas?|paneles?|placas?|bolsas?|puertas?|yeso)\b/i.test(value);
 }
@@ -350,7 +350,10 @@ function looksLikeSheetrock(value: string) {
 
 export function smsProductInquiryFallbackReply(message: string, _options: { allowRelatedSuggestion?: boolean } = {}) {
   void _options;
-  const value = message.trim();
+  const value = message
+    .trim()
+    .replace(/^new\s+(?:request|order|job|project|material\s+list)\s*:\s*/i, "")
+    .trim();
   const standardMatch = value.match(/^(?:do\s+)?(?:you(?:\s+guys)?|u)\s+(?:sell|carry|have|source)\s+(.+?)[?.!]*$/i);
   const sheetrockGetMatch = value.match(/^(?:can|could)\s+(?:i|we)\s+(?:get|buy|order|source)\s+(.+?)[?.!]*$/i);
   const needMatch = value.match(/^(?:i|we)\s+(?:need|want|am\s+looking\s+for|are\s+looking\s+for)\s+(.+?)[?.!]*$/i);
@@ -370,7 +373,7 @@ export function smsProductInquiryFallbackReply(message: string, _options: { allo
       : rawProduct;
   if (product === "roofing shingles") return "Sure—we can help source roofing shingles.\n\nWhat shingle type and color? How many square feet do you need?";
   if (product === "thinset") return "Sure—we can help source thinset.\n\nWhat type do you need? How many bags do you need?";
-  if (product === "metal studs") return "Sure—we can help source metal studs.\n\nWhat stud size? What gauge? How many do you need?";
+  if (product === "metal studs") return "Sure—we can help source metal studs.\n\nWhat size and length? What gauge? How many do you need?";
   const specification = product === "Sheetrock"
     ? "Can you confirm 5/8 in.?\n\nRegular, Type X/fire-rated, or moisture-resistant?"
     : "What type do you need?";
@@ -398,7 +401,8 @@ export function smsShortMaterialAnswerReply(latestMessage: string, conversationT
   const size = match[1].replace(/\s+/g, "").replace("×", "x");
   const quantity = Number(match[2]);
   if (!Number.isFinite(quantity) || quantity < 1) return null;
-  return `Got it—${quantity} ${size} metal studs. What length and gauge?`;
+  const hasLength = (size.match(/x/g) || []).length >= 2;
+  return `Got it—${quantity} ${size} metal studs. ${hasLength ? "What gauge?" : "What length? What gauge?"}`;
 }
 
 export function smsContextualQuantityAnswerReply(latestMessage: string, conversationText: string) {
@@ -412,14 +416,14 @@ export function smsContextualQuantityAnswerReply(latestMessage: string, conversa
   const productContext = [...customerHistory].reverse().find((line) => /\b(?:roof(?:ing)?\s+shingles?|shingles?|thin\s*set|sheetrock|drywall|metal\s+studs?)\b/i.test(line)) || "";
   if (!productContext) return null;
   const value = latestMessage.trim().replace(/[.!]+$/, "");
-  const measured = value.match(/^(\d{1,6}(?:\.\d+)?)\s*(sq\.?\s*ft|square\s+feet|sheets?|bags?|pcs?|pieces?|each|ea)?$/i);
+  const measured = value.match(/^(\d{1,3}(?:,\d{3})+|\d{1,6}(?:\.\d+)?)\s*(sq\.?\s*ft|sf|square\s+feet|sheets?|bags?|pcs?|pieces?|each|ea)?$/i);
   if (!measured) return null;
-  const amount = Number(measured[1]);
+  const amount = Number(measured[1].replaceAll(",", ""));
   if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) return null;
   const suppliedUnit = (measured[2] || "").toLowerCase().replace(/\s+/g, " ");
   if (/\b(?:roof(?:ing)?\s+shingles?|shingles?)\b/i.test(productContext)) {
     const unit = suppliedUnit || (/square\s+feet|sq\.?\s*ft/i.test(latestAvantia) ? "sq ft" : "");
-    if (!/^(?:sq\.?\s*ft|square feet)$/.test(unit)) return null;
+    if (!/^(?:sq\.?\s*ft|sf|square feet)$/.test(unit)) return null;
     return `Got it—${amount} sq ft of roofing shingles. What shingle type and color?`;
   }
   if (/\bthin\s*set\b/i.test(productContext)) {
@@ -431,6 +435,11 @@ export function smsContextualQuantityAnswerReply(latestMessage: string, conversa
     const unit = suppliedUnit || (/sheets?/i.test(latestAvantia) ? "sheets" : "");
     if (!/^sheets?$/.test(unit)) return null;
     return `Got it—${amount} ${amount === 1 ? "sheet" : "sheets"} of Sheetrock. Can you confirm 5/8 in.?`;
+  }
+  if (/\bmetal\s+studs?\b/i.test(productContext)) {
+    const unit = suppliedUnit || "pcs";
+    if (!/^(?:pcs?|pieces?|each|ea)$/.test(unit)) return null;
+    return `Got it—${amount} metal studs. What size and length? What gauge?`;
   }
   return null;
 }
