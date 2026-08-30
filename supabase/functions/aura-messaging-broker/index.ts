@@ -53,6 +53,9 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const secretKeys = JSON.parse(
   Deno.env.get("SUPABASE_SECRET_KEYS") || "{}",
 ) as Record<string, string>;
+const SECRET_CACHE_TTL_MS = 60_000;
+const secretCache = new Map<string, { value: string; expiresAt: number }>();
+const secretLoads = new Map<string, Promise<string | null>>();
 const serviceKey =
   secretKeys.default || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(supabaseUrl, serviceKey, {
@@ -133,10 +136,24 @@ function normalizePhone(value: unknown) {
 }
 
 async function secret(name: string) {
-  const rows = await sql<{ decrypted_secret: string }[]>`
-    select decrypted_secret from vault.decrypted_secrets where name = ${name} limit 1
-  `;
-  return rows[0]?.decrypted_secret || null;
+  const cached = secretCache.get(name);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const inFlight = secretLoads.get(name);
+  if (inFlight) return await inFlight;
+  const load = (async () => {
+    const rows = await sql<{ decrypted_secret: string }[]>`
+      select decrypted_secret from vault.decrypted_secrets where name = ${name} limit 1
+    `;
+    const value = rows[0]?.decrypted_secret || null;
+    if (value) secretCache.set(name, { value, expiresAt: Date.now() + SECRET_CACHE_TTL_MS });
+    return value;
+  })();
+  secretLoads.set(name, load);
+  try {
+    return await load;
+  } finally {
+    secretLoads.delete(name);
+  }
 }
 
 async function saveSecret(name: string, value: string, description: string) {
@@ -148,6 +165,7 @@ async function saveSecret(name: string, value: string, description: string) {
   } else {
     await sql`select vault.create_secret(${value}, ${name}, ${description})`;
   }
+  secretCache.delete(name);
 }
 
 async function requireManager(req: Request) {
@@ -1572,7 +1590,7 @@ async function loadRelevantCatalogMatches(latestCustomerMessage: string): Promis
 function groundingContextText(knowledge: ApprovedKnowledge[], catalog: GroundedCatalogMatch[]) {
   const facts = knowledge.map((entry, index) => `Fact ${index + 1} [source ${entry.source_path}; category ${entry.category}]: ${entry.fact.trim().slice(0, 600)}`);
   const products = catalog.map((entry, index) => `Catalog match ${index + 1} [source ${entry.source_file_name || "supplier quote"}; dated ${entry.source_document_date || "recent verification"}]: ${entry.name} (${entry.item_code}), category ${entry.category}, supplier ${entry.supplier_name_snapshot}${entry.supplier_sku ? `, supplier code ${entry.supplier_sku}` : ""}. This match does not confirm current price or live stock.`);
-  return [...facts, ...products].join("\n").slice(0, 3800) || "No relevant approved business knowledge or recent verified catalog match was found.";
+  return [...products, ...facts].join("\n").slice(0, 3800) || "No relevant approved business knowledge or recent verified catalog match was found.";
 }
 
 function hasForbiddenAutoReplyTopic(value: string) {
@@ -1952,10 +1970,14 @@ async function analyzeCustomerSms(conversationText: string, style: string, manag
   }
   const apiKey = await secret(secretNames.openaiKey);
   if (!apiKey) return finalizeCustomerSmsAnalysis({ result: forcedEvent === "correction" ? guardedEventReply("correction", latestCustomerMessage) : customerSmsFallback(conversationText, latestCustomerMessage, settings), model: "local-context-fallback", message: latestCustomerMessage, conversationText, persistedExactListOnly, persistedDeliveryAddressKnown, media, event: forcedEvent, startedAt });
-  const model = customerReplyModel(needsCustomerReplyEscalation(latestCustomerMessage, conversationText, media, forcedEvent));
+  const escalated = needsCustomerReplyEscalation(latestCustomerMessage, conversationText, media, forcedEvent);
+  const model = customerReplyModel(escalated);
   const preliminaryIntent = classifyCustomerSmsIntent(latestCustomerMessage, media, forcedEvent);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
+  // Most customer turns are short and have a deterministic fallback. Bound the
+  // normal AI path so an upstream slowdown cannot leave a buyer waiting; retain
+  // the longer budget only for images, corrections, or unusually long context.
+  const timeout = setTimeout(() => controller.abort(), escalated ? 15_000 : 8_000);
   try {
     const [approvedExamples, approvedKnowledge, catalogMatches, imageInputs] = await Promise.all([
       loadApprovedReplyExamples(preliminaryIntent, smsMessageLanguage(latestCustomerMessage), latestCustomerMessage),
@@ -2650,7 +2672,10 @@ async function enqueueSmsAutomation(communicationId: string) {
 
 type SmsAutomationQueueRow = { id: number; communication_id: string; attempts: number };
 
-async function drainSmsAutomationQueue(limit = 5) {
+async function drainSmsAutomationQueue(limit = 5, preferredCommunicationId: string | null = null) {
+  const preferred = preferredCommunicationId && /^[0-9a-f-]{36}$/i.test(preferredCommunicationId)
+    ? preferredCommunicationId
+    : null;
   const claimed = await sql<SmsAutomationQueueRow[]>`
     with ready as (
       select id
@@ -2660,7 +2685,8 @@ async function drainSmsAutomationQueue(limit = 5) {
       ) or (
         status = 'processing' and locked_at < now() - interval '2 minutes'
       )
-      order by available_at, id
+      order by case when communication_id = ${preferred}::uuid then 0 else 1 end,
+        available_at, id
       for update skip locked
       limit ${Math.max(1, Math.min(limit, 20))}
     )
@@ -2953,7 +2979,10 @@ async function handleQuoWebhook(req: Request) {
     if (stored[0]?.id && canonicalEvents[0]?.external_event_id === eventId) {
       await enqueueSmsAutomation(stored[0].id);
       EdgeRuntime.waitUntil(
-        drainSmsAutomationQueue(3)
+        // Claim this newly received message first. Backlog recovery remains on
+        // the durable cron worker, so an older slow AI job cannot delay the
+        // live conversation's fast path.
+        drainSmsAutomationQueue(1, stored[0].id)
           .catch(async (automationError) => {
             await sql`
               update public.aura_webhook_events
@@ -3184,7 +3213,7 @@ async function ingestPolledQuoMessage(message: QuoPolledMessage, conversationId:
   await sql`update public.aura_webhook_events set processed_at = now() where provider = 'quo' and external_event_id = ${pollEventId}`;
   if (!inserted[0]?.id) return false;
   await enqueueSmsAutomation(inserted[0].id);
-  await drainSmsAutomationQueue(3);
+  await drainSmsAutomationQueue(1, inserted[0].id);
   return true;
 }
 

@@ -97,8 +97,8 @@ test("customer portal returns a minimal server-only view, refreshes live, and us
   expect(liveRefresh).toContain('document.visibilityState !== "visible"');
   expect(liveRefresh).toContain('window.addEventListener("focus", refresh)');
   expect(pageSource).toContain("CustomerRequestLiveRefresh");
-  expect(pageSource).toContain("Your material requests, live status, and account security in one place.");
-  expect(pageSource).toContain("Download request PDF");
+  expect(pageSource).toContain("Your materials. One clear view.");
+  expect(pageSource).toContain("Download PDF");
   expect(pageSource).not.toContain("CustomerRequestOtp");
   expect(accountActions).toContain("updateUserById(user.id");
   expect(accountActions).toContain("phone_confirm: true");

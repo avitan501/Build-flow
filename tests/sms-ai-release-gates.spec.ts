@@ -77,7 +77,7 @@ test("customer request invitation uses a one-tap verified session instead of bro
   expect(requestPage).not.toContain("CustomerRequestOtp")
   expect(requestPage).toContain("Open from your text")
   expect(requestPage).not.toContain("CustomerRequestAutoDownload")
-  expect(requestPage).toContain("Download request PDF")
+  expect(requestPage).toContain("Download PDF")
   expect(broker).not.toContain("download=1")
 })
 

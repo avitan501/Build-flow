@@ -291,13 +291,17 @@ export async function retryManagerDocumentExtractionAction(documentId: string, r
   return { ok: true, data: { itemCount: extraction.items.length }, message: "Latest AI reading is ready for review." }
 }
 
-export async function routeManagerDocumentToSupplierPricingAction(documentId: string): Promise<Result<{ quoteId: string }>> {
+export async function routeManagerDocumentToSupplierPricingAction(documentId: string): Promise<Result<{ quoteId: string; itemIds: string[] }>> {
   const { supabase, user } = await requireStaffProfile("suppliers")
   if (!UUID_PATTERN.test(documentId)) return { ok: false, error: "Invalid document." }
   const { data: document } = await supabase.from("manager_documents").select("*").eq("id", documentId).maybeSingle<ManagerDocumentRecord>()
   if (!document) return { ok: false, error: "Document not found." }
-  if (document.status !== "ready") return { ok: false, error: "Approve the reviewed document before sending it to supplier pricing." }
-  if (document.legacy_supplier_quote_id) return { ok: true, data: { quoteId: document.legacy_supplier_quote_id }, message: "Supplier pricing is already linked." }
+  if (!["ready", "routed"].includes(document.status)) return { ok: false, error: "Approve the reviewed document before sending it to supplier pricing." }
+  if (document.legacy_supplier_quote_id) {
+    const { data: linkedItems, error: linkedItemsError } = await supabase.from("supplier_quote_items").select("id").eq("quote_id", document.legacy_supplier_quote_id).eq("selected", true).order("line_number").returns<Array<{ id: string }>>()
+    if (linkedItemsError || !linkedItems?.length) return { ok: false, error: "The linked supplier pricing rows could not be loaded." }
+    return { ok: true, data: { quoteId: document.legacy_supplier_quote_id, itemIds: linkedItems.map((item) => item.id) }, message: "Supplier pricing is already linked." }
+  }
   const { data: items } = await supabase.from("manager_document_items").select("*").eq("document_id", documentId).eq("selected", true).order("line_number").returns<ManagerDocumentItemRecord[]>()
   if (!items?.length) return { ok: false, error: "Select at least one dependable product row before routing." }
 
@@ -318,16 +322,21 @@ export async function routeManagerDocumentToSupplierPricingAction(documentId: st
     tax_percent: document.tax_percent ?? 0, notes: match ? "" : "Confirm the Supplier Directory match before catalog routing.", created_by: user.id, updated_by: user.id,
   })
   if (quoteError) { await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).remove([quotePath]); return { ok: false, error: "The supplier pricing record could not be created." } }
-  const { error: itemsError } = await supabase.from("supplier_quote_items").insert(items.map((item, index) => ({
+  const { data: routedItems, error: itemsError } = await supabase.from("supplier_quote_items").insert(items.map((item, index) => ({
     quote_id: quoteId, line_number: index + 1, item_code: item.item_code, description: item.description, specification: item.specification,
     quantity: item.quantity || 1, unit: item.unit || "each", unit_price: item.unit_price, line_total: item.line_total,
     selected: true, review_status: "ready",
-  })))
-  if (itemsError) { console.error("Routed supplier quote item creation failed", itemsError); return { ok: false, error: "The supplier record was created, but its rows need attention." } }
+  }))).select("id").returns<Array<{ id: string }>>()
+  if (itemsError || routedItems?.length !== items.length) {
+    console.error("Routed supplier quote item creation failed", itemsError)
+    await supabase.from("supplier_quotes").delete().eq("id", quoteId)
+    await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).remove([quotePath])
+    return { ok: false, error: "The reviewed rows could not be prepared. Nothing was routed." }
+  }
   await supabase.from("manager_documents").update({ status: "routed", legacy_supplier_quote_id: quoteId, updated_by: user.id }).eq("id", documentId)
   await supabase.from("manager_document_events").insert({ document_id: documentId, event_type: "routed", summary: "Approved rows sent to supplier pricing.", details: { supplier_quote_id: quoteId }, created_by: user.id })
   revalidatePath("/admin/documents"); revalidatePath("/admin/supplier-quotes")
-  return { ok: true, data: { quoteId }, message: "Reviewed rows are ready in supplier pricing." }
+  return { ok: true, data: { quoteId, itemIds: (routedItems ?? []).map((item) => item.id) }, message: "Reviewed rows are ready in supplier pricing." }
 }
 
 export async function addManagerDocumentItemsToCatalogAction(documentId: string): Promise<Result<{ itemCount: number; priceCount: number; supplierName: string }>> {
