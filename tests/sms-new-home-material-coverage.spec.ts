@@ -42,7 +42,7 @@ test("twenty common new-home orders are recognized without another quantity ques
 
 test("new-home coverage does not invent code or assembly clarifications", () => {
   for (const message of COMMON_NEW_HOME_ORDERS) {
-    const expected = message === "10 gallons paint" ? ["What paint color and finish do you need?"] : []
+    const expected = message === "10 gallons paint" ? ["What paint color, and which finish: flat, eggshell, satin, or semi-gloss?"] : []
     expect(smsMaterialClarificationQuestions(message), message).toEqual(expected)
   }
 

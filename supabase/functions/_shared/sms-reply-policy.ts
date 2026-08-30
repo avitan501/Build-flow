@@ -487,7 +487,10 @@ export function smsContextualQuantityAnswerReply(latestMessage: string, conversa
       ? contextFamilies[0]
       : null;
   if (!family) return null;
-  const value = latestMessage.trim().replace(/[.!]+$/, "").replace(/^(?:i\s+(?:need|want)\s+)?(?:about|around|like|approximately)\s+/i, "");
+  const value = latestMessage.trim()
+    .replace(/[.!]+$/, "")
+    .replace(/^i\s+(?:need|want)\s+/i, "")
+    .replace(/^(?:about|around|like|approximately)\s+/i, "");
   const measured = value.match(/^(\d{1,3}(?:,\d{3})+|\d{1,6}(?:\.\d+)?)\s*(sq\.?\s*ft|sf|square\s+feet|sheets?|bags?|boxes?|buckets?|gallons?|pcs?|pieces?|peices?|each|ea)?$/i);
   if (!measured) return null;
   const amount = Number(measured[1].replaceAll(",", ""));
