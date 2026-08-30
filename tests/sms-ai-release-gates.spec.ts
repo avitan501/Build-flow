@@ -17,6 +17,7 @@ import {
   resolveSmsMaterialReplyStep,
   smsDeliveryDetailsQuestionReply,
   smsContextualQuantityAnswerReply,
+  smsCorrectionPendingQuestionReply,
   smsHasExplicitQuantity,
   smsHasNeededByTiming,
   smsMaterialClarificationQuestions,
@@ -433,6 +434,16 @@ test("short metal-stud answers keep conversation context and ask only missing sp
   expect(smsShortMaterialAnswerReply("2 x 4, 50 pcs", conversation)).toBe("Got it—50 2x4 metal studs. What length? What gauge?")
   expect(smsShortMaterialAnswerReply("2x4x10 50", conversation)).toBe("Got it—50 2x4x10 metal studs. What gauge?")
   expect(smsShortMaterialAnswerReply("2x4 50", "Customer: Do you sell Sheetrock?")).toBeNull()
+})
+
+test("quantity corrections preserve every unanswered essential question", () => {
+  const gaugeOnly = "Customer: I need 40 3-5/8 x 10 ft metal studs\nAvantia: What gauge do you need?\nCustomer: Correction, make it 44";
+  expect(smsCorrectionPendingQuestionReply("Correction, make it 44", gaugeOnly)).toBe("Got it—I’ll note 44 for review. What gauge do you need?");
+
+  const multiplePending = "Customer: I need metal studs\nAvantia: What size and length? What gauge? How many do you need?\nCustomer: Correction: 44";
+  expect(smsCorrectionPendingQuestionReply("Correction: 44", multiplePending)).toBe("Got it—I’ll note 44 for review. What size and length? What gauge?");
+  expect(inspectSmsQuestionStructure(smsCorrectionPendingQuestionReply("Correction: 44", multiplePending) || "")).toMatchObject({ valid: true, questionMarks: 2 });
+  expect(smsCorrectionPendingQuestionReply("Correction, make it 44", "Customer: I need Sheetrock\nAvantia: How many sheets do you need?\nCustomer: Correction, make it 44")).toBeNull();
 })
 
 test("short quantities fill the field just asked instead of repeating the same question", () => {

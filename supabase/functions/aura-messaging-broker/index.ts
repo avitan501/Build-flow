@@ -17,6 +17,7 @@ import {
   resolveSmsMaterialReplyStep,
   smsDeliveryDetailsQuestionReply,
   smsContextualQuantityAnswerReply,
+  smsCorrectionPendingQuestionReply,
   smsReplyLanguage,
   smsHasExplicitQuantity,
   smsHasNeededByTiming,
@@ -1863,8 +1864,11 @@ async function analyzeCustomerSms(conversationText: string, style: string, manag
       customerAddress: typeof parsed.customerAddress === "string" ? parsed.customerAddress.trim().replace(/\s+/g, " ").slice(0, 500) || null : null,
       participantRole: ["customer", "lead", "supplier", "unknown"].includes(parsed.participantRole) ? parsed.participantRole : inferredParticipantRole(customerOnlyTranscript(conversationText)),
     };
+    const pendingCorrectionReply = forcedEvent === "correction"
+      ? smsCorrectionPendingQuestionReply(latestCustomerMessage, conversationText)
+      : null;
     const result = forcedEvent === "correction"
-      ? { ...modelResult, ...guardedEventReply("correction", latestCustomerMessage), isMaterialRequest: modelResult.isMaterialRequest, request: modelResult.request }
+      ? { ...modelResult, ...guardedEventReply("correction", latestCustomerMessage), reply: pendingCorrectionReply || guardedEventReply("correction", latestCustomerMessage).reply, isMaterialRequest: modelResult.isMaterialRequest, request: modelResult.request }
       : modelResult;
     return finalizeCustomerSmsAnalysis({ result, model, message: latestCustomerMessage, conversationText, persistedExactListOnly, persistedDeliveryAddressKnown, media, event: forcedEvent, startedAt, usage: payload.usage && typeof payload.usage === "object" ? payload.usage as Record<string, unknown> : undefined });
   } catch {

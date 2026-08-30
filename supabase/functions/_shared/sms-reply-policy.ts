@@ -523,6 +523,24 @@ export function smsContextualQuantityAnswerReply(latestMessage: string, conversa
   return null;
 }
 
+export function smsCorrectionPendingQuestionReply(latestMessage: string, conversationText: string) {
+  if (!/\b(?:correction|correct(?:ion)?|change (?:it|that)|make it|instead of|replace .* with)\b|\bnot\s+\d+(?:\.\d+)?\b/i.test(latestMessage)) return null;
+  const lines = conversationText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const latestAvantia = [...lines].reverse().find((line) => /^Avantia:/i.test(line))?.replace(/^Avantia:\s*/i, "") || "";
+  if (!latestAvantia) return null;
+  const questions = latestAvantia.replace(/\b(in|ft)\.(?=[,;:?])/gi, "$1").match(/[^?？]*[?？]/g) || [];
+  const unresolved = questions.filter((question) => {
+    const fields = inspectSmsQuestionStructure(question).fields;
+    return fields.length > 0 && fields.some((field) => field !== "quantity");
+  }).map((question) => question.trim());
+  if (!unresolved.length) return null;
+  const correctedValue = latestMessage.match(/(?:make it|change (?:it|that) to|instead of\s+\d+(?:\.\d+)?\s*(?:,|use)?|correction[:,]?|correct(?:ion)?[:,]?)\s*(\d+(?:\.\d+)?(?:\s*(?:pcs?|pieces?|sheets?|bags?|boxes?|buckets?|gallons?|sq\.?\s*ft|sf))?)/i)?.[1]?.trim();
+  const acknowledgement = correctedValue
+    ? `Got it—I’ll note ${correctedValue} for review.`
+    : "Got it—I’ll note the correction for review.";
+  return `${acknowledgement} ${unresolved.join(" ").trim()}`;
+}
+
 export function smsReplyParts(params: { reply: string; deterministicProductInquiry: boolean; exactListOnly?: boolean }) {
   const reply = params.reply.trim();
   if (!reply) return [];
