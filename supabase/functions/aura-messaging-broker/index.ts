@@ -1981,8 +1981,8 @@ async function prepareSmsRequestConfirmation(input: {
     await transaction`update public.aura_sms_request_pending_confirmations set status = 'superseded', updated_at = now() where normalized_phone = ${input.phone} and status = 'pending'`;
     const inserted = await transaction<{ id: string }[]>`
       insert into public.aura_sms_request_pending_confirmations
-        (normalized_phone, customer_name, customer_address, title, department, items, source_communication_ids, summary_text, summary_hash)
-      values (${input.phone}, ${input.customerName.slice(0, 160)}, ${input.customerAddress.slice(0, 500)}, ${input.request.title.slice(0, 180)}, ${input.request.department.slice(0, 100)}, ${sql.json(input.request.items)}, ${input.sourceCommunicationIds}::uuid[], ${summary}, ${summaryHash})
+        (normalized_phone, customer_name, customer_address, title, department, items, source_communication_ids, needed_by_text, summary_text, summary_hash)
+      values (${input.phone}, ${input.customerName.slice(0, 160)}, ${input.customerAddress.slice(0, 500)}, ${input.request.title.slice(0, 180)}, ${input.request.department.slice(0, 100)}, ${sql.json(input.request.items)}, ${input.sourceCommunicationIds}::uuid[], ${input.customerNeededBy.trim().slice(0, 160)}, ${summary}, ${summaryHash})
       returning id
     `;
     return { id: inserted[0].id, alreadySent: false };
@@ -2044,13 +2044,14 @@ async function smsCustomerProfile(phone: string, name: string) {
 
 async function confirmPendingSmsRequest(communicationId: string, phone: string, body: string) {
   if (!isExplicitRequestConfirmation(body)) return null;
-  const pendingRows = await sql<{ id: string; customer_name: string; customer_address: string; title: string; department: string; items: Array<{ name: string; quantity: number; unit: string }>; source_communication_ids: string[]; request_id: string | null; summary_text: string }[]>`
-    select id, customer_name, customer_address, title, department, items, source_communication_ids, request_id, summary_text
+  const pendingRows = await sql<{ id: string; customer_name: string; customer_address: string; title: string; department: string; items: Array<{ name: string; quantity: number; unit: string }>; source_communication_ids: string[]; request_id: string | null; needed_by_text: string | null; summary_text: string }[]>`
+    select id, customer_name, customer_address, title, department, items, source_communication_ids, request_id, needed_by_text, summary_text
     from public.aura_sms_request_pending_confirmations where normalized_phone = ${phone} and status = 'pending' and summary_sent_at is not null order by summary_sent_at desc limit 1
   `;
   const pending = pendingRows[0];
   if (!pending) return null;
-  if (!smsNeededByTimingValue(pending.summary_text)) {
+  const neededBy = pending.needed_by_text?.trim() || smsNeededByTimingValue(pending.summary_text);
+  if (!neededBy) {
     await sql`update public.aura_sms_request_pending_confirmations set status = 'superseded', updated_at = now() where id = ${pending.id}::uuid and status = 'pending'`;
     return null;
   }
@@ -2065,7 +2066,7 @@ async function confirmPendingSmsRequest(communicationId: string, phone: string, 
     let project = await transaction<{ id: string }[]>`select id from public.projects where owner_id = ${customerId}::uuid and name = 'Material Requests' and status <> 'archived' order by updated_at desc limit 1`;
     if (!project[0]) project = await transaction<{ id: string }[]>`insert into public.projects (owner_id, name, address, status) values (${customerId}::uuid, 'Material Requests', ${pending.customer_address}, 'active') returning id`;
     else if (pending.customer_address) await transaction`update public.projects set address = ${pending.customer_address}, updated_at = now() where id = ${project[0].id}::uuid`;
-    const requests = await transaction<{ id: string; public_number: number }[]>`insert into public.quote_requests (project_id, owner_id, title, status, submitted_at, manager_assignee) values (${project[0].id}::uuid, ${customerId}::uuid, ${pending.title}, 'submitted', now(), 'carlos') returning id, public_number`;
+    const requests = await transaction<{ id: string; public_number: number }[]>`insert into public.quote_requests (project_id, owner_id, title, status, submitted_at, manager_assignee, manager_notes) values (${project[0].id}::uuid, ${customerId}::uuid, ${pending.title}, 'submitted', now(), 'carlos', ${`Needed by: ${neededBy}`}) returning id, public_number`;
     for (const item of pending.items.slice(0, 50)) {
       await transaction`insert into public.quote_request_items (request_id, project_id, owner_id, name, department, item_type, quantity, unit, unit_price, qualification_status, metadata) values (${requests[0].id}::uuid, ${project[0].id}::uuid, ${customerId}::uuid, ${String(item.name).slice(0, 300)}, ${pending.department}, 'custom_priced', ${Number(item.quantity) || 1}, ${String(item.unit || "each").slice(0, 40)}, 0, 'not_required', ${sql.json({ created_from_confirmed_sms: true })})`;
     }
