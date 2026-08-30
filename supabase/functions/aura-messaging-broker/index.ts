@@ -2507,6 +2507,16 @@ async function handleQuoWebhook(req: Request) {
     counterpartyPhone &&
     (body || trustedImageMedia(media).length > 0)
   ) {
+    // Quo may emit distinct webhook event IDs for the same message activity.
+    // Select one canonical event before starting automation so a provider
+    // replay cannot dismiss drafts or send a second reply.
+    const canonicalEvents = await sql<{ external_event_id: string }[]>`
+      select external_event_id
+      from public.aura_webhook_events
+      where provider = 'quo' and activity_id = ${activityId} and event_type = 'message.received'
+      order by created_at asc, external_event_id asc
+      limit 1
+    `;
     const stored = await sql<{ id: string }[]>`
       select id from public.aura_communications
       where provider = 'quo' and external_activity_id = ${activityId}
@@ -2516,7 +2526,7 @@ async function handleQuoWebhook(req: Request) {
       select id, full_name, notes, sms_ai_mode, sms_ai_style, auto_create_request_drafts, exact_list_only
       from public.aura_contacts where id = ${linkedContact}::uuid limit 1
     ` : [];
-    if (stored[0]?.id) {
+    if (stored[0]?.id && canonicalEvents[0]?.external_event_id === eventId) {
       EdgeRuntime.waitUntil(
         processCustomerSmsAutomation(stored[0].id, counterpartyPhone, body || "", contactRows[0] || null, media)
           .catch(async (automationError) => {
@@ -2527,6 +2537,11 @@ async function handleQuoWebhook(req: Request) {
             `;
           }),
       );
+    } else if (canonicalEvents[0]?.external_event_id !== eventId) {
+      await sql`
+        insert into public.aura_audit_log (action, details)
+        values ('sms_ai_provider_replay_suppressed', ${sql.json({ communicationId: stored[0]?.id || null, route: "canonical-quo-activity" })})
+      `;
     }
   }
   if (
