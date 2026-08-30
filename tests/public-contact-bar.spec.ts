@@ -11,7 +11,7 @@ test("public contact bar opens a compact WhatsApp and text sheet", async ({ page
 
   await bar.getByRole("button", { name: "Open chat" }).click();
 
-  const dialog = page.getByRole("dialog", { name: "Text me to start" });
+  const dialog = page.getByRole("dialog", { name: "Start with one text." });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByTestId("contact-sheet-video")).toBeVisible();
   await expect(dialog.getByTestId("contact-sheet-video")).toHaveAttribute("autoplay", "");
@@ -34,9 +34,9 @@ test("public contact bar opens a compact WhatsApp and text sheet", async ({ page
   });
   expect(contentOrder).toEqual({ phoneBeforeVideo: true, videoBeforeTerms: true });
 
-  const submit = dialog.getByRole("button", { name: "Text me" });
+  const submit = dialog.getByRole("button", { name: "Send text" });
   await expect(submit).toBeDisabled();
-  await dialog.getByLabel("Text this number").fill("(516) 555-0123");
+  await dialog.getByLabel("Where should we text you?").fill("(516) 555-0123");
   await expect(submit).toBeEnabled();
 });
 
@@ -49,11 +49,11 @@ test("start-by-text sends only the phone, consent, and honeypot to the public en
   await page.goto("/how-it-works");
 
   await page.getByTestId("public-contact-bar").getByRole("button", { name: "Text me to start" }).click();
-  const dialog = page.getByRole("dialog", { name: "Text me to start" });
-  await dialog.getByLabel("Text this number").fill("+1 516 555 0199");
-  await dialog.getByRole("button", { name: "Text me" }).click();
+  const dialog = page.getByRole("dialog", { name: "Start with one text." });
+  await dialog.getByLabel("Where should we text you?").fill("+1 516 555 0199");
+  await dialog.getByRole("button", { name: "Send text" }).click();
 
-  await expect(dialog.getByRole("heading", { name: "Check your texts" })).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Text sent." })).toBeVisible();
   expect(requestBody).toMatchObject({ phone: "+1 516 555 0199", consent: true, website: "" });
   expect((requestBody as { idempotencyKey?: string }).idempotencyKey).toMatch(/^[a-f0-9-]{20,80}$/i);
 });
@@ -67,12 +67,12 @@ test("start-by-text shows a safe server error and remains usable", async ({ page
   await page.goto("/");
 
   await page.getByTestId("public-contact-bar").getByRole("button", { name: "Text me to start" }).click();
-  const dialog = page.getByRole("dialog", { name: "Text me to start" });
-  await dialog.getByLabel("Text this number").fill("5165550100");
-  await dialog.getByRole("button", { name: "Text me" }).click();
+  const dialog = page.getByRole("dialog", { name: "Start with one text." });
+  await dialog.getByLabel("Where should we text you?").fill("5165550100");
+  await dialog.getByRole("button", { name: "Send text" }).click();
 
   await expect(dialog.getByRole("alert")).toHaveText("Please wait before requesting another text.");
-  await expect(dialog.getByRole("button", { name: "Text me" })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "Send text" })).toBeEnabled();
 });
 
 test("contact bar uses a strict marketing allowlist and never overlaps the mobile dock", async ({ page }) => {
@@ -92,14 +92,14 @@ test("20-second walkthrough opens in the same compact sheet and starts playing",
   await page.goto("/");
   await page.getByRole("button", { name: "See How It Works" }).click();
 
-  const dialog = page.getByRole("dialog", { name: "See how it works" });
+  const dialog = page.getByRole("dialog", { name: "See the full flow." });
   await expect(dialog).toBeVisible();
   const video = dialog.getByLabel("How to start an Avantia material request by text");
   await expect(video).toHaveAttribute("playsinline", "");
   await expect(video.locator('source[type="video/mp4"]')).toHaveAttribute("src", "/videos/avantia-request-material-whatsapp-en-clear-20s.mp4");
 
   await dialog.getByRole("button", { name: "Start my request" }).click();
-  await expect(page.getByRole("dialog", { name: "Text me to start" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Start with one text." })).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(1);
 });
 
@@ -110,11 +110,11 @@ test("text submission acknowledges the click immediately while delivery finishes
   });
   await page.goto("/");
   await page.getByTestId("public-contact-bar").getByRole("button", { name: "Text me to start" }).click();
-  const dialog = page.getByRole("dialog", { name: "Text me to start" });
-  await dialog.getByLabel("Text this number").fill("5165550199");
-  await dialog.getByRole("button", { name: "Text me" }).click();
-  await expect(dialog.getByRole("heading", { name: "Got it — starting your text." })).toBeVisible({ timeout: 500 });
-  await expect(dialog.getByRole("heading", { name: "Check your texts" })).toBeVisible();
+  const dialog = page.getByRole("dialog", { name: "Start with one text." });
+  await dialog.getByLabel("Where should we text you?").fill("5165550199");
+  await dialog.getByRole("button", { name: "Send text" }).click();
+  await expect(dialog.getByRole("heading", { name: "Sending your text now…" })).toBeVisible({ timeout: 500 });
+  await expect(dialog.getByRole("heading", { name: "Text sent." })).toBeVisible();
 });
 
 test("walkthrough respects reduced motion and closes cleanly when navigation hides the launcher", async ({ page }) => {

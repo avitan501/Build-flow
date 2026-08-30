@@ -33,7 +33,9 @@ test("only explicit confirmations can complete an exact pending SMS summary", as
   expect(broker).toContain(
     "where phone = ${phone} and phone_confirmed_at is not null",
   );
-  expect(broker).not.toContain("@phone-login.buildflow.local");
+  expect(broker).toContain("@phone-login.buildflow.local");
+  expect(broker).toContain("admin.auth.admin.generateLink({ type: \"magiclink\", email })");
+  expect(broker).toContain('url.searchParams.set("token_hash", tokenHash)');
   expect(broker).toContain("and status in ('pending', 'failed')");
 });
 
@@ -56,14 +58,11 @@ test("request numbers and portal ownership are enforced in the database", async 
   expect(migration).not.toContain("to anon\nusing ( true )");
 });
 
-test("customer portal returns a minimal server-only view, refreshes live, and uses phone OTP", async () => {
-  const [portal, otp, liveRefresh, pageSource, accountActions] =
+test("customer portal returns a minimal server-only view, refreshes live, and uses one-tap secure access", async () => {
+  const [portal, confirmRoute, liveRefresh, pageSource, accountActions] =
     await Promise.all([
       readFile(path.join(root, "lib/customer-request-portal.ts"), "utf8"),
-      readFile(
-        path.join(root, "components/buildflow/customer-request-otp.tsx"),
-        "utf8",
-      ),
+      readFile(path.join(root, "app/auth/confirm/route.ts"), "utf8"),
       readFile(
         path.join(
           root,
@@ -84,50 +83,37 @@ test("customer portal returns a minimal server-only view, refreshes live, and us
   );
   expect(portal).not.toContain("supplier_packages");
   expect(portal).not.toContain("manager_notes");
-  expect(otp).toContain('"/api/auth/phone/send"');
-  expect(otp).toContain('"/api/auth/phone/verify"');
-  expect(otp).not.toContain('type="password"');
-  expect(otp).toContain("A request number alone never grants access");
+  expect(confirmRoute).toContain("supabase.auth.verifyOtp({ token_hash: tokenHash, type })");
+  expect(confirmRoute).toContain('const next = safeNext(requestUrl.searchParams.get("next"))');
+  expect(confirmRoute).toContain("const destination = new URL(next, requestUrl.origin)");
+  const broker = await readFile(
+    path.join(root, "supabase/functions/aura-messaging-broker/index.ts"),
+    "utf8",
+  );
+  expect(broker).toContain('const next = `/requests?request=${publicNumber}`');
+  expect(broker).toContain('url.searchParams.set("next", next)');
   expect(liveRefresh).toContain("router.refresh()");
   expect(liveRefresh).toContain("REFRESH_INTERVAL_MS = 20_000");
   expect(liveRefresh).toContain('document.visibilityState !== "visible"');
   expect(liveRefresh).toContain('window.addEventListener("focus", refresh)');
   expect(pageSource).toContain("CustomerRequestLiveRefresh");
-  expect(pageSource).toContain("customer-visible details only");
+  expect(pageSource).toContain("Your material requests, live status, and account security in one place.");
+  expect(pageSource).toContain("Download request PDF");
+  expect(pageSource).not.toContain("CustomerRequestOtp");
   expect(accountActions).toContain("updateUserById(user.id");
   expect(accountActions).toContain("phone_confirm: true");
 });
 
-test("OTP portal works on desktop and mobile without asking for a password", async ({
+test("one-tap portal explains secure access without asking for a phone, code, or password", async ({
   page,
 }) => {
-  const calls: Array<Record<string, string>> = [];
-  await page.route("**/api/auth/phone/send", async (route) => {
-    calls.push(await route.request().postDataJSON());
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true }),
-    });
-  });
-  await page.route("**/api/auth/phone/verify", async (route) => {
-    calls.push(await route.request().postDataJSON());
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true }),
-    });
-  });
   await page.goto("/requests");
   await page.waitForLoadState("networkidle");
   await expect(
-    page.getByRole("heading", { name: "Open your request" }),
+    page.getByRole("heading", { name: "Open from your text" }),
   ).toBeVisible();
   await expect(page.locator('input[type="password"]')).toHaveCount(0);
-  await page.getByLabel("Phone number").fill("516 555 1234");
-  await page.getByRole("button", { name: "Send secure code" }).click();
-  await page.getByLabel("One-time code").fill("123456");
-  await page.getByRole("button", { name: "Open my requests" }).click();
-  expect(calls[0]).toEqual({ phone: "+15165551234" });
-  expect(calls[1]).toEqual({ phone: "+15165551234", token: "123456" });
+  await expect(page.locator('input[type="tel"]')).toHaveCount(0);
+  await expect(page.getByText(/signs you in and opens the correct request automatically/i)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Use an existing account instead" })).toHaveAttribute("href", "/login?next=/requests");
 });

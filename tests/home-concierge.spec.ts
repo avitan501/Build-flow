@@ -35,8 +35,8 @@ test("cinematic homepage presents Construction Concierge clearly", async ({ page
     video.dispatchEvent(new Event("timeupdate"));
   });
   await expect.poll(() => activeHeroVideo.evaluate((video) => video.currentTime)).toBeLessThan(1.5);
-  await expect(page.getByRole("button", { name: "Ver página en español" })).toBeVisible();
-  await expect(homepageHeader.getByRole("link", { name: "Account" })).toHaveAttribute("href", "/login");
+  await expect(homepageHeader.getByRole("button", { name: "Ver página en español" })).toHaveCount(0);
+  await expect(homepageHeader.getByRole("link", { name: "Account" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "One place for material pricing and delivery." })).toBeVisible();
   await expect(page.locator("main video")).toHaveCount(2);
   await expect(page.getByRole("heading", { name: "Less purchasing work. More building." })).toBeVisible();
@@ -161,7 +161,8 @@ test("primary customer routes remain available in Menu", async ({ page }) => {
   await drawer.getByRole("button", { name: "Back to main menu" }).click();
   await expect(navigation.getByRole("link", { name: /Request Material Pricing/ })).toHaveAttribute("href", "/request-quote");
   await expect(navigation.getByRole("link", { name: /Beat My Quote/ })).toHaveAttribute("href", "/beat-a-quote");
-  await expect(drawer.getByRole("link", { name: "Account", exact: true })).toHaveAttribute("href", "/login");
+  await expect(drawer.getByRole("link", { name: "My Account", exact: true })).toHaveAttribute("href", "/login");
+  await expect(drawer.getByRole("button", { name: "Ver página en español" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
 });

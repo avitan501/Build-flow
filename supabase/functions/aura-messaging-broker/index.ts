@@ -4610,9 +4610,9 @@ async function handleQuoFastPollDispatch(req: Request) {
   return json({ ok: true, started: true }, 202);
 }
 
-const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v2";
-const PUBLIC_START_TEXT_WELCOME = "Welcome to Avantia Build. Reply with what you need to start your material request.";
-const PUBLIC_START_TEXT_EXAMPLE = "Example: Send me 50 sheets of Sheetrock and 45 2x4x8s. You can also send a photo, plan, product link, or quote. Reply STOP to opt out.";
+const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v3";
+const PUBLIC_START_TEXT_WELCOME = "Hi—Avantia Build here. Send your material list, photo, plan, product link, or quote.";
+const PUBLIC_START_TEXT_EXAMPLE = "Example:\n50 sheets 5/8 regular Sheetrock\n45 pcs 2x4x8\n\nReply STOP to opt out.";
 
 async function handlePublicStartByText(req: Request) {
   const payload = await req.text();
