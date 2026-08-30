@@ -500,7 +500,7 @@ test("flooring uses a compact contractor configurator with a live summary", asyn
   await expect(page.getByRole("heading", { name: "Sign in to send your request" })).toBeVisible()
   const continueDialog = page.getByRole("dialog")
   await expect(continueDialog.getByText("Choose a project", { exact: true })).toHaveCount(0)
-  await expect(continueDialog.getByRole("link", { name: "Log in", exact: true })).toBeVisible()
+  await expect(continueDialog.getByRole("link", { name: "Account", exact: true })).toBeVisible()
   await expect(continueDialog.getByRole("link", { name: "Create account", exact: true })).toBeVisible()
 
   const widths = await page.evaluate(() => ({

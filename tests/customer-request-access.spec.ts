@@ -12,7 +12,7 @@ test("request access no longer exposes a broken phone-auth form", async ({ page 
 test("menu login closes the drawer and navigates", async ({ page }) => {
   await page.goto("/shop");
   await page.getByRole("button", { name: "Open navigation menu" }).click();
-  await page.getByLabel("Site navigation").getByRole("link", { name: "Log in" }).click();
+  await page.getByLabel("Site navigation").getByRole("link", { name: "Account" }).click();
   await expect(page).toHaveURL(/\/login$/);
 });
 

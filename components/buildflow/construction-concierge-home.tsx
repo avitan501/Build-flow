@@ -73,6 +73,24 @@ export function ConstructionConciergeHome() {
   const text = copy[language];
 
   useEffect(() => {
+    const handleLanguage = (event: Event) => {
+      const nextLanguage = (event as CustomEvent<Language>).detail;
+      if (nextLanguage === "en" || nextLanguage === "es") setLanguage(nextLanguage);
+    };
+    const syncLanguageAttribute = () => {
+      const nextLanguage = document.documentElement.lang;
+      if (nextLanguage === "en" || nextLanguage === "es") setLanguage(nextLanguage);
+    };
+    const observer = new MutationObserver(syncLanguageAttribute);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
+    window.addEventListener("avantia-home-language", handleLanguage);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("avantia-home-language", handleLanguage);
+    };
+  }, []);
+
+  useEffect(() => {
     document.documentElement.lang = language;
     return () => { document.documentElement.lang = "en"; };
   }, [language]);
@@ -113,10 +131,6 @@ export function ConstructionConciergeHome() {
           <source src="/videos/avantia-hero-background-v13-desktop.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(7,17,38,.34)_0%,rgba(7,17,38,.04)_48%,rgba(7,17,38,.4)_100%)]" aria-hidden="true" />
-
-        <button type="button" onClick={() => setLanguage((current) => current === "en" ? "es" : "en")} className="absolute right-4 top-20 z-10 inline-flex h-7 min-w-7 items-center justify-center rounded px-1.5 text-[10px] font-bold uppercase text-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:right-8 sm:top-24" aria-label={language === "en" ? "Ver página en español" : "View page in English"}>
-          {language === "en" ? "ES" : "EN"}
-        </button>
 
         <div className="mx-auto flex w-full max-w-4xl flex-col items-center px-5 pb-24 pt-32 text-center sm:px-8 sm:py-10">
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/82 sm:text-xs">{text.heroEyebrow}</p>

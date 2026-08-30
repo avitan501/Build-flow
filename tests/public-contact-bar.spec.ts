@@ -22,6 +22,18 @@ test("public contact bar opens a compact WhatsApp and text sheet", async ({ page
   await expect(dialog.getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/terms");
   await expect(dialog.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
 
+  const contentOrder = await dialog.evaluate((element) => {
+    const phone = element.querySelector<HTMLInputElement>('input[name="phone"]');
+    const video = element.querySelector<HTMLElement>('[data-testid="contact-sheet-video"]');
+    const terms = Array.from(element.querySelectorAll("a")).find((link) => link.textContent === "Terms");
+    if (!phone || !video || !terms) return null;
+    return {
+      phoneBeforeVideo: Boolean(phone.compareDocumentPosition(video) & Node.DOCUMENT_POSITION_FOLLOWING),
+      videoBeforeTerms: Boolean(video.compareDocumentPosition(terms) & Node.DOCUMENT_POSITION_FOLLOWING),
+    };
+  });
+  expect(contentOrder).toEqual({ phoneBeforeVideo: true, videoBeforeTerms: true });
+
   const submit = dialog.getByRole("button", { name: "Text me" });
   await expect(submit).toBeDisabled();
   await dialog.getByLabel("Mobile number").fill("(516) 555-0123");

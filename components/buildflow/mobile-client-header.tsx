@@ -69,6 +69,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
   const searchParams = useSearchParams();
   const router = useRouter();
   const { language, setLanguage } = useShopLanguage();
+  const [homeLanguage, setHomeLanguage] = useState<"en" | "es">("en");
   const [menuOpen, setMenuOpen] = useState(false);
   const [shopDirectoryOpen, setShopDirectoryOpen] = useState(false);
   const [shopSearchOpen, setShopSearchOpen] = useState(false);
@@ -78,7 +79,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
   const isHome = pathname === "/";
   const isRequestQuotePage = pathname === "/request-quote";
   const shopQuery = isShopPage ? searchParams.get("q") ?? "" : "";
-  const accountLabel = isSignedIn ? displayName?.split(/\s+/)[0] || "My Account" : "Log in";
+  const accountLabel = isSignedIn ? displayName?.split(/\s+/)[0] || "Account" : "Account";
 
   useEffect(() => {
     if (shopSearchOpen) {
@@ -163,7 +164,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
             : "sticky top-0 z-[60] border-b border-[#d2d2d7] bg-white/95 backdrop-blur-md"
         }
       >
-        <div className={`mx-auto flex w-full max-w-[92rem] items-center ${isHome ? "justify-end px-3 py-2 sm:px-5" : "gap-2 px-3 py-2 sm:px-5 lg:px-8"}`}>
+        <div className={`mx-auto flex w-full max-w-[92rem] items-center ${isHome ? "justify-end gap-2 px-3 py-2 sm:px-5" : "gap-2 px-3 py-2 sm:px-5 lg:px-8"}`}>
           <button
             type="button"
             aria-label="Open navigation menu"
@@ -189,7 +190,34 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
             )}
           </button>
 
-          {isHome ? null : isShopPage ? (
+          {isHome ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextLanguage = homeLanguage === "en" ? "es" : "en";
+                  setHomeLanguage(nextLanguage);
+                  document.documentElement.lang = nextLanguage;
+                  window.dispatchEvent(new CustomEvent("avantia-home-language", { detail: nextLanguage }));
+                }}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#1d1d1f]/60 text-white transition hover:bg-[#1d1d1f]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/75"
+                aria-label={homeLanguage === "en" ? "Ver página en español" : "View page in English"}
+                title={homeLanguage === "en" ? "Español" : "English"}
+                data-no-shop-translation
+              >
+                <Languages className="h-4 w-4" aria-hidden="true" />
+              </button>
+              <Link
+                href={isSignedIn ? "/requests" : "/login"}
+                prefetch={false}
+                aria-label="Account"
+                className="inline-flex h-10 items-center gap-1.5 rounded-full bg-[#1d1d1f]/60 px-3 text-sm font-medium text-white transition hover:bg-[#1d1d1f]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/75"
+              >
+                <AccountIcon signedIn={isSignedIn} />
+                <span className="hidden min-[390px]:inline">Account</span>
+              </Link>
+            </>
+          ) : isShopPage ? (
             <>
             <Link
               href="/"
@@ -285,7 +313,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
           {!isHome ? <Link
             href={isSignedIn ? "/requests" : "/login"}
             prefetch={false}
-            aria-label={isSignedIn ? `Open account for ${accountLabel}` : "Log in"}
+            aria-label={isSignedIn ? `Open account for ${accountLabel}` : "Account"}
             className={`hidden items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-medium leading-none transition active:scale-[0.98] md:inline-flex ${pathname === "/account" || pathname === "/requests" ? "bg-[#f2f5f7] text-[#0071e3]" : "text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"}`}
           >
             <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${isSignedIn ? "bg-[#0071e3] text-white" : "bg-slate-100 text-slate-600"}`}>
@@ -305,7 +333,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
         ) : null}
       </div>
 
-      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} primaryLinks={primaryLinks} shopLinks={shopLinks} shopOpen={shopDirectoryOpen} onShopOpenChange={setShopDirectoryOpen} adminLinks={adminLinks} isSignedIn={isSignedIn} />
+      <MobileMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} primaryLinks={isHome ? primaryLinks.filter((link) => link.href !== "/") : primaryLinks} shopLinks={shopLinks} shopOpen={shopDirectoryOpen} onShopOpenChange={setShopDirectoryOpen} adminLinks={adminLinks} isSignedIn={isSignedIn} />
 
       {shopSearchOpen ? (
         <div id="shop-search-overlay" role="dialog" aria-modal="true" className="fixed inset-0 z-[80] bg-white/96 backdrop-blur-sm">

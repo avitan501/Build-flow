@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
+import { UserRound } from "lucide-react";
 
 export type MobileMenuLink = {
   href: string;
@@ -252,9 +253,10 @@ export function MobileMenuDrawer({ open, onClose, primaryLinks, requestLinks = [
                 closeDrawer();
                 router.push(destination);
               }}
-              className="flex min-h-16 items-center px-1 text-lg font-semibold text-slate-950 transition hover:text-[#0066cc]"
+              className="flex min-h-16 items-center gap-3 px-1 text-lg font-semibold text-slate-950 transition hover:text-[#0066cc]"
             >
-              <span>{isSignedIn ? "My Account" : "Log in"}</span>
+              <UserRound className="h-5 w-5" aria-hidden="true" />
+              <span>Account</span>
             </Link>
           </div>
           </>
