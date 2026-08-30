@@ -1,4 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
+const root = process.cwd();
 
 test("request access no longer exposes a broken phone-auth form", async ({ page }) => {
   await page.goto("/requests");
@@ -30,4 +34,12 @@ test("opening a request link never starts a PDF download automatically", async (
   await page.goto("/requests?request=638379&download=1");
   await expect(page.getByRole("heading", { name: "Open from your text" })).toBeVisible();
   expect(pdfRequests).toEqual([]);
+});
+
+test("secure text entry prioritizes the opened request instead of account dashboard chrome", async () => {
+  const source = await readFile(path.join(root, "app/requests/page.tsx"), "utf8");
+  expect(source).toContain("Opened securely from your text");
+  expect(source).toContain("The request from your text is open below.");
+  expect(source).toContain("!openedRequest ? <section");
+  expect(source).toContain("Request <span className=\"font-mono text-cyan-200\"");
 });

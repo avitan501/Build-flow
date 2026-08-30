@@ -42,6 +42,10 @@ test("catalog list expands until an item opens the closable details panel", asyn
   expect(source).toContain("setSelectedItemId(item.id)");
   expect(source).toContain("setSelectedItemId(null)");
   expect(source).toContain('aria-label="Close details"');
+  expect(source).toContain('className="fixed inset-0 z-[80] overflow-y-auto');
+  expect(source).toContain('document.body.style.overflow = "hidden"');
+  expect(source).toContain('lg:static lg:z-auto lg:overflow-visible');
+  expect(source).toContain('sticky top-[calc(env(safe-area-inset-top)+0.5rem)]');
   expect(source).toContain(
     'className="flex min-w-0 items-center gap-1.5 overflow-x-auto"',
   );

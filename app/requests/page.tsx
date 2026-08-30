@@ -57,41 +57,46 @@ export default async function CustomerRequestsPage({ searchParams }: CustomerReq
   const requests = selectedRequest
     ? [...portal.requests].sort((left, right) => Number(String(right.publicNumber) === selectedRequest) - Number(String(left.publicNumber) === selectedRequest))
     : portal.requests;
+  const openedRequest = selectedRequest
+    ? requests.find((request) => String(request.publicNumber) === selectedRequest) ?? null
+    : null;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#e8f4ff_0,_#f4f7fa_32rem,_#f5f5f7_70rem)] px-4 py-7 text-slate-950 sm:px-6 sm:py-10">
       <a href="#material-requests" className="sr-only rounded-md bg-white px-4 py-2 font-bold text-slate-950 focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100]">Skip to material requests</a>
       <div className="mx-auto max-w-5xl">
         {query.account === "switched" ? <p role="status" className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900">You were signed into a different account. We securely switched to the account linked to this request.</p> : null}
-        <header className="overflow-hidden rounded-[1.75rem] bg-[#081b33] text-white shadow-[0_24px_70px_rgba(8,27,51,0.18)]">
-          <div className="relative px-5 py-6 sm:px-8 sm:py-8">
+        <header className={`overflow-hidden bg-[#081b33] text-white shadow-[0_24px_70px_rgba(8,27,51,0.18)] ${openedRequest ? "rounded-[1.35rem]" : "rounded-[1.75rem]"}`}>
+          <div className={`relative ${openedRequest ? "px-4 py-4 sm:px-6 sm:py-5" : "px-5 py-6 sm:px-8 sm:py-8"}`}>
             <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-[#087f8c]/35 blur-3xl" aria-hidden="true" />
             <div className="relative flex flex-wrap items-start justify-between gap-5">
               <div className="max-w-2xl">
-                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-300">Avantia customer portal</p>
-                <h1 className="mt-2 text-3xl font-black tracking-[-0.035em] sm:text-5xl">Your materials. One clear view.</h1>
-                <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">Track requests, review every item, download the request PDF, or text us a change without starting over.</p>
+                <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-300"><ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />{openedRequest ? "Opened securely from your text" : "Avantia customer portal"}</p>
+                <h1 className={`${openedRequest ? "mt-1.5 text-2xl sm:text-3xl" : "mt-2 text-3xl sm:text-5xl"} font-black tracking-[-0.035em]`}>
+                  {openedRequest ? <>Request <span className="font-mono text-cyan-200">#{openedRequest.publicNumber}</span></> : "Your materials. One clear view."}
+                </h1>
+                <p className={`${openedRequest ? "mt-1.5" : "mt-3"} max-w-xl text-sm leading-6 text-slate-300`}>{openedRequest ? `You’re signed in. ${openedRequest.statusLabel} · ${openedRequest.items.length} material line${openedRequest.items.length === 1 ? "" : "s"}.` : "Track requests, review every item, download the request PDF, or text us a change without starting over."}</p>
               </div>
               <Link href="/account" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 text-sm font-bold text-white backdrop-blur transition hover:bg-white/15">
                 <Settings className="h-4 w-4" aria-hidden="true" /> Account &amp; security
               </Link>
             </div>
-            <div className="relative mt-6 grid grid-cols-3 gap-2 sm:max-w-xl sm:gap-3">
+            {!openedRequest ? <div className="relative mt-6 grid grid-cols-3 gap-2 sm:max-w-xl sm:gap-3">
               <div className="rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-3"><strong className="block text-xl">{requests.length}</strong><span className="text-[11px] text-slate-300">Requests</span></div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-3"><strong className="block text-xl">{requests.reduce((total, request) => total + request.items.length, 0)}</strong><span className="text-[11px] text-slate-300">Material lines</span></div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-3"><strong className="block text-xl">Live</strong><span className="text-[11px] text-slate-300">Status updates</span></div>
-            </div>
+            </div> : null}
           </div>
         </header>
 
-        <section className="relative -mt-3 mx-3 grid gap-2 rounded-2xl border border-slate-200/80 bg-white p-2 shadow-[0_14px_40px_rgba(15,23,42,0.10)] sm:mx-6 sm:grid-cols-3" aria-label="Account quick actions">
+        {!openedRequest ? <section className="relative -mt-3 mx-3 grid gap-2 rounded-2xl border border-slate-200/80 bg-white p-2 shadow-[0_14px_40px_rgba(15,23,42,0.10)] sm:mx-6 sm:grid-cols-3" aria-label="Account quick actions">
           <Link href="/shop" className="flex min-h-14 items-center gap-3 rounded-xl bg-[#1473e6] px-4 text-sm font-bold text-white transition hover:bg-[#0d65d1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1473e6] focus-visible:ring-offset-2"><span className="grid h-9 w-9 place-items-center rounded-full bg-white/15"><Plus className="h-4 w-4" aria-hidden="true" /></span><span className="min-w-0 flex-1">Start another request</span><ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
           <a href="sms:+15169088319" className="flex min-h-14 items-center gap-3 rounded-xl px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1473e6] focus-visible:ring-offset-2"><span className="grid h-9 w-9 place-items-center rounded-full bg-teal-50 text-teal-700"><MessageCircle className="h-4 w-4" aria-hidden="true" /></span><span className="min-w-0 flex-1">Text Avantia</span><ArrowRight className="h-4 w-4 text-slate-400" aria-hidden="true" /></a>
           <Link href="/account" className="flex min-h-14 items-center gap-3 rounded-xl px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1473e6] focus-visible:ring-offset-2"><span className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-700"><ShieldCheck className="h-4 w-4" aria-hidden="true" /></span><span className="min-w-0 flex-1">Manage account</span><ArrowRight className="h-4 w-4 text-slate-400" aria-hidden="true" /></Link>
-        </section>
+        </section> : null}
 
-        <div id="material-requests" className="mt-5 flex scroll-mt-24 flex-wrap items-center justify-between gap-2 px-1">
-          <div><h2 className="text-xl font-black tracking-tight">Material requests</h2><p className="mt-0.5 text-xs text-slate-500">Newest first. Updates appear automatically.</p></div>
+        <div id="material-requests" className={`${openedRequest ? "mt-3" : "mt-5"} flex scroll-mt-24 flex-wrap items-center justify-between gap-2 px-1`}>
+          <div><h2 className="text-xl font-black tracking-tight">{openedRequest ? "Your request" : "Material requests"}</h2><p className="mt-0.5 text-xs text-slate-500">{openedRequest ? "The request from your text is open below." : "Newest first. Updates appear automatically."}</p></div>
           <CustomerRequestLiveRefresh />
         </div>
         {requests.length ? (

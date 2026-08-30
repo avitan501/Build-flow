@@ -492,6 +492,16 @@ export function MaterialCatalogWorkspace({
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
+  useEffect(() => {
+    if (!selectedItemId || !window.matchMedia("(max-width: 1023px)").matches)
+      return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [selectedItemId]);
+
   function moveMobileSupplier(direction: -1 | 1) {
     if (!mobileSupplier || visibleSuppliers.length < 2) return;
     const currentIndex = visibleSuppliers.findIndex(
@@ -1103,10 +1113,10 @@ export function MaterialCatalogWorkspace({
           </div>
           {selectedItem ? (
             <aside
-              className="border-t border-slate-200 bg-slate-50/70 lg:border-l lg:border-t-0"
+              className="fixed inset-0 z-[80] overflow-y-auto bg-slate-50 shadow-2xl lg:static lg:z-auto lg:overflow-visible lg:border-l lg:border-t-0 lg:bg-slate-50/70 lg:shadow-none"
               aria-label={`${selectedItem.name} details`}
             >
-              <div className="sticky top-2 p-3">
+              <div className="mx-auto min-h-full max-w-2xl p-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] lg:sticky lg:top-2 lg:min-h-0 lg:max-w-none lg:p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 gap-3">
                     {selectedItem.image_url ? (
@@ -1183,7 +1193,7 @@ export function MaterialCatalogWorkspace({
                   <button
                     type="button"
                     onClick={() => setSelectedItemId(null)}
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500"
+                    className="sticky top-[calc(env(safe-area-inset-top)+0.5rem)] z-10 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm lg:static lg:rounded-md lg:shadow-none"
                     aria-label="Close details"
                   >
                     <X className="h-4 w-4" />
