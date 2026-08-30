@@ -3,11 +3,18 @@ import { canRunSmsReplyLab } from "../lib/ai/sms-reply-lab-access"
 import { redactSmsTrainingText } from "../lib/ai/sms-training-privacy"
 import {
   classifySmsReplyIntent,
+  evaluateSmsReplyGate,
   filterSmsExactListItems,
   inspectSmsQuestionStructure,
   resolveSmsDeliveryAddressKnown,
   resolveSmsExactListPreference,
+  resolveSmsMaterialReplyStep,
+  smsDeliveryDetailsQuestionReply,
+  smsHasExplicitQuantity,
+  smsHasNeededByTiming,
   smsOutputSafetySignals,
+  smsQuantityClarificationReply,
+  smsStartsNewMaterialRequest,
 } from "../supabase/functions/_shared/sms-reply-policy"
 
 test("fail-closed output gate blocks multilingual prices, stock assertions, promises, and protected intents", () => {
@@ -24,9 +31,6 @@ test("fail-closed output gate blocks multilingual prices, stock assertions, prom
     ["נספק מחר.", "general"],
     ["Vamos a entregar mañana.", "general"],
     ["Delivery is tomorrow.", "general"],
-    ["A manager will confirm current pricing.", "pricing"],
-    ["A manager will confirm availability.", "availability"],
-    ["What is the full delivery address?", "delivery"],
   ] as const
   for (const [reply, intent] of unsafe) {
     expect(smsOutputSafetySignals({ reply, intent }), `${intent}: ${reply}`).not.toEqual([])
@@ -35,13 +39,57 @@ test("fail-closed output gate blocks multilingual prices, stock assertions, prom
   expect(classifySmsReplyIntent({ message: "Is this available?" })).toBe("availability")
 })
 
-test("question structure accepts one requested field and rejects bundled or repeated questions", () => {
+test("broker gate auto-sends safe pricing and delivery clarification but blocks transactional claims", () => {
+  const decide = (reply: string, intent: "pricing" | "availability" | "delivery" | "follow_up", overrides: Partial<Parameters<typeof evaluateSmsReplyGate>[0]> = {}) => evaluateSmsReplyGate({
+    message: "Customer request",
+    reply,
+    intent,
+    event: "message",
+    participantRole: "lead",
+    modelAutoSafe: true,
+    ...overrides,
+  })
+
+  expect(decide("What quantity?", "pricing")).toMatchObject({ level: "green", gateAutoSafe: true })
+  expect(decide("What is the full delivery address?", "delivery")).toMatchObject({ level: "green", gateAutoSafe: true })
+  expect(decide("The price is $1,250.", "pricing")).toMatchObject({ level: "red", gateAutoSafe: false })
+  expect(decide("We have it in stock.", "availability")).toMatchObject({ level: "red", gateAutoSafe: false })
+  expect(decide("We will deliver tomorrow.", "delivery")).toMatchObject({ level: "red", gateAutoSafe: false })
+  expect(decide("Your quote is ready.", "follow_up")).toMatchObject({ level: "red", gateAutoSafe: false })
+  expect(decide("What quantity?", "pricing", { participantRole: "supplier" })).toMatchObject({ level: "red", gateAutoSafe: false })
+  expect(decide("Got it.", "follow_up", { event: "correction" })).toMatchObject({ level: "red", gateAutoSafe: false })
+  expect(decide("Got it.", "follow_up", { event: "cancellation" })).toMatchObject({ level: "red", gateAutoSafe: false })
+})
+
+test("latest decision allows up to three essential questions and rejects padding, repeats, and bundles", () => {
   expect(inspectSmsQuestionStructure("What size?").valid).toBe(true)
   expect(inspectSmsQuestionStructure("What is the full delivery address?").valid).toBe(true)
   expect(inspectSmsQuestionStructure("What size and thickness?")).toMatchObject({ valid: false, requestedFields: 2 })
-  expect(inspectSmsQuestionStructure("What size? What quantity?")).toMatchObject({ valid: false, questionMarks: 2 })
+  expect(inspectSmsQuestionStructure("What size? What thickness? What quantity?")).toMatchObject({ valid: true, questionMarks: 3 })
+  expect(inspectSmsQuestionStructure("What size? What thickness? What quantity? What brand?")).toMatchObject({ valid: false, questionMarks: 4 })
+  expect(inspectSmsQuestionStructure("What size? What size?").valid).toBe(false)
+  expect(inspectSmsQuestionStructure("What is the full delivery address?", ["address"]).valid).toBe(false)
   expect(inspectSmsQuestionStructure("¿Qué tamaño y cantidad necesita?").valid).toBe(false)
   expect(inspectSmsQuestionStructure("איזה גודל וכמה יחידות?").valid).toBe(false)
+  expect(evaluateSmsReplyGate({ message: "20 drywall sheets", reply: "Would you like to add accessories?", intent: "material_request", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "red", gateAutoSafe: false })
+  expect(evaluateSmsReplyGate({ message: "20 drywall sheets", reply: "What is your favorite movie?", intent: "material_request", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "red", gateAutoSafe: false })
+})
+
+test("material request advances across turns after address until complete", () => {
+  expect(smsHasExplicitQuantity("Need thinset")).toBe(false)
+  expect(smsQuantityClarificationReply("Need thinset")).toBe("Sure — how much thinset do you need?")
+  expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, quantityKnown: false, addressKnown: false, neededByKnown: false, proposedReply: "A manager will review." })).toBe("quantity")
+  expect(smsHasExplicitQuantity("Need 4 bags of thinset")).toBe(true)
+  expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, quantityKnown: true, addressKnown: false, neededByKnown: false, proposedReply: "A manager will review." })).toBe("address_and_needed_by")
+  expect(smsDeliveryDetailsQuestionReply("Need 4 bags of thinset")).toBe("When do you need it, and what’s the full delivery address?")
+  expect(inspectSmsQuestionStructure(smsDeliveryDetailsQuestionReply("Need 4 bags of thinset")).valid).toBe(true)
+  expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: false, neededByKnown: false, proposedReply: "A manager will review." })).toBe("address_and_needed_by")
+  expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: false, proposedReply: "A manager will review." })).toBe("needed_by")
+  expect(smsHasNeededByTiming("Tomorrow")).toBe(true)
+  expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "What thickness? What brand?" })).toBe("proposed")
+  expect(inspectSmsQuestionStructure("What thickness? What brand?").valid).toBe(true)
+  expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "I have the details. A manager will review." })).toBe("proposed")
+  expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "Would you like to add accessories?" })).toBe("complete")
 })
 
 test("exact-list preference persists beyond the 24-message context window", () => {
@@ -52,9 +100,16 @@ test("exact-list preference persists beyond the 24-message context window", () =
   expect(resolveSmsExactListPreference({ storedContact: true, conversationText: truncatedWindow, latestMessage: "Any update?" })).toBe(true)
   expect(resolveSmsExactListPreference({ storedContact: false, storedDraft: true, conversationText: truncatedWindow })).toBe(true)
   expect(resolveSmsExactListPreference({ conversationText: `${oldInstruction}\n${newerMessages}` })).toBe(true)
-  expect(resolveSmsDeliveryAddressKnown({ storedContact: true, conversationText: truncatedWindow })).toBe(true)
   expect(resolveSmsDeliveryAddressKnown({ latestMessage: "Calle Sol 55" })).toBe(true)
   expect(resolveSmsDeliveryAddressKnown({ latestMessage: "רחוב הרצל 10" })).toBe(true)
+})
+
+test("delivery-address state belongs to one active request and resets for a second job", () => {
+  expect(resolveSmsDeliveryAddressKnown({ storedDraft: true, latestMessage: "Add 10 studs" })).toBe(true)
+  expect(smsStartsNewMaterialRequest("New job: 10 doors")).toBe(true)
+  expect(resolveSmsDeliveryAddressKnown({ storedDraft: true, latestMessage: "New job: 10 doors", startsNewRequest: true })).toBe(false)
+  expect(resolveSmsDeliveryAddressKnown({ storedDraft: false, latestMessage: "10 doors" })).toBe(false)
+  expect(resolveSmsDeliveryAddressKnown({ storedDraft: true, latestMessage: "New job at 18 Main St", startsNewRequest: true })).toBe(true)
 })
 
 test("exact-list item provenance removes model-added accessories before persistence", () => {
@@ -68,6 +123,20 @@ test("exact-list item provenance removes model-added accessories before persiste
   expect(filterSmsExactListItems(modelItems, customer)).toEqual(modelItems.slice(0, 2))
 })
 
+test("exact-list grounding preserves explicit singular items without guessing package quantities", () => {
+  const door = { name: "door", quantity: 1, unit: "each" }
+  const drywallSheet = { name: "drywall sheets", quantity: 1, unit: "sheets" }
+  const canonicalSheetrock = { name: "sheetrock sheet", quantity: 1, unit: "sheets" }
+  const accessory = { name: "door screws", quantity: 1, unit: "box" }
+  const ambiguousBox = { name: "drywall screws", quantity: 1, unit: "box" }
+
+  expect(filterSmsExactListItems([door, accessory], "exact list only: one door")).toEqual([door])
+  expect(filterSmsExactListItems([drywallSheet], "exact list only: drywall sheet")).toEqual([drywallSheet])
+  expect(filterSmsExactListItems([canonicalSheetrock], "exact list only: drywall sheet")).toEqual([canonicalSheetrock])
+  expect(filterSmsExactListItems([ambiguousBox], "exact list only: drywall screws")).toEqual([])
+  expect(filterSmsExactListItems([{ ...drywallSheet, quantity: 2 }], "exact list only: drywall sheet")).toEqual([])
+})
+
 test("training redaction removes identity, project, references, and atypical multilingual addresses", () => {
   const raw = "My name is David Avitan; Company: Apex Build LLC; Project: Sunset Tower; Customer ID CUST-7788; PO #PO-9912; deliver to 18-22 Main Street, Brooklyn NY 11201; dirección Calle Sol 55; שם: דוד אביטן; רחוב הרצל 10, תל אביב"
   const safe = redactSmsTrainingText(raw)
@@ -77,6 +146,7 @@ test("training redaction removes identity, project, references, and atypical mul
   expect(safe).toContain("[PRIVATE_NAME]")
   expect(safe).toContain("[REFERENCE]")
   expect(safe).toContain("[FULL_ADDRESS]")
+  expect(redactSmsTrainingText("Thanks, David — Apex Construction will follow up.", ["David Avitan", "David", "Apex Construction"])).toBe("Thanks, [PRIVATE_NAME] — [PRIVATE_NAME] will follow up.")
 })
 
 test("Reply Lab authorization matches the manager page capabilities", () => {

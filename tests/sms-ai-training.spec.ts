@@ -54,7 +54,7 @@ test("auto-safe replies use multilingual deterministic blocks and concise missin
     expect(broker).toContain(protectedTerm)
   }
   expect(broker).toContain("never repeat a question already answered")
-  expect(broker).toContain("Ask at most one short question")
+  expect(broker).toContain("Ask one to three short, essential")
   expect(broker).toContain("default quantity to 1 when omitted")
   expect(broker).toContain("Never ask for a ZIP code")
   expect(broker).toContain("full delivery address")
@@ -107,7 +107,7 @@ test("unknown numbers are buyer prospects while clear sellers receive no automat
   expect(broker).toContain("material list, photo, plan, product link, or quote")
   expect(broker).toContain("Never ask whether the sender is a customer")
   expect(broker).toContain("Automatic sending uses one SMS per inbound event")
-  expect(broker).toContain("Do not bundle questions")
+  expect(broker).toContain("Never bundle unrelated fields into hard-to-read wording")
 })
 
 test("reply grounding is manager-reviewed, relevant, source-aware, and never confirms live price or stock", async () => {
@@ -168,11 +168,8 @@ test("runtime replies use intent playbooks, a deterministic manager-only safety 
   ])
 
   expect(broker).toContain("intentPlaybook")
-  expect(broker).toContain("enforceOneQuestionRule")
+  expect(broker).toContain("enforceQuestionLimit")
   expect(broker).toContain("deterministicSmsSafety")
-  expect(broker).toContain('level: "green"')
-  expect(broker).toContain('level: "yellow"')
-  expect(broker).toContain('level: "red"')
   expect(broker).toContain("AURA_SMS_AI_LUNA_INPUT_USD_PER_MILLION")
   expect(broker).toContain("latencyMs")
   expect(page).toContain("Reply performance")
@@ -200,20 +197,4 @@ test("Manager Reply Lab exercises the real reply path without sending or saving 
   const qualityFunction = broker.slice(broker.indexOf("async function evaluateCustomerSmsCases"), broker.indexOf("async function processCustomerSmsAutomation"))
   expect(qualityFunction).not.toContain("sendQuoSms")
   expect(qualityFunction).not.toContain("insert into")
-})
-
-test("exact-list preference suppresses accessories and address comes before optional suggestions", async () => {
-  const [broker, policy] = await Promise.all([
-    readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
-    readFile(path.join(root, "supabase/functions/_shared/sms-reply-policy.ts"), "utf8"),
-  ])
-
-  expect(broker).toContain("customerRequiresExactList")
-  expect(broker).toContain("exact-list-only preference enforced")
-  expect(broker).toContain("only what I wrote")
-  expect(broker).toContain("never suggest accessories, related items, upgrades, or additions")
-  expect(broker).toContain("address requested before optional-item suggestions")
-  expect(broker).toContain("What is the full delivery address?")
-  expect(policy).toContain("בלי\\s*(?:תוספות|אביזרים|הצעות)")
-  expect(policy).toContain("sin (?:extras|accesorios|sugerencias)")
 })

@@ -62,7 +62,7 @@ export const smsReply10StyleCases: SmsReplySimulationCase[] = [
     nextMessage: "60 drywall sheets\n24 metal studs\n12 tracks\n8 compound buckets\n10 screw boxes",
     expectedIntent: "material_request",
     expectedLanguage: "en",
-    expectedBehavior: "asks address first and keeps one question",
+    expectedBehavior: "asks address first and keeps questions concise",
   },
   {
     style: "image request",
@@ -123,7 +123,7 @@ export const smsReply10StyleCases: SmsReplySimulationCase[] = [
     nextMessage: "Necesito entrega de 30 paneles",
     expectedIntent: "delivery",
     expectedLanguage: "es",
-    expectedBehavior: "retrieves Spanish address-first wording with one question",
+    expectedBehavior: "retrieves concise Spanish address-first wording",
   },
   {
     style: "price/order follow-up",

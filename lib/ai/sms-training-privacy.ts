@@ -31,8 +31,14 @@ export function smsTrainingIntent(value: string) {
 }
 
 /** Remove customer-specific values before an approved reply becomes a reusable style example. */
-export function redactSmsTrainingText(value: string) {
-  return value
+export function redactSmsTrainingText(value: string, privateValues: string[] = []) {
+  const escapedPrivateValues = [...new Set(privateValues.map((entry) => entry.trim()).filter((entry) => entry.length >= 3))]
+    .sort((left, right) => right.length - left.length)
+  const contactSafeValue = escapedPrivateValues.reduce((current, privateValue) => current.replace(
+    new RegExp(privateValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"),
+    "[PRIVATE_NAME]",
+  ), value)
+  return contactSafeValue
     .replace(/\b(?:customer|client|account|order|purchase order|p\.?o\.?)\s*(?:id|number|no\.?|#|ref(?:erence)?)?\s*[:#-]?\s*[A-Z0-9][A-Z0-9_-]{3,}\b/gi, "[REFERENCE]")
     .replace(/\b(?:cliente|cuenta|pedido|orden de compra)\s*(?:id|n[uú]mero|no\.?|#|referencia)?\s*[:#-]?\s*[A-Z0-9][A-Z0-9_-]{3,}\b/gi, "[REFERENCE]")
     .replace(/(?:לקוח|חשבון|הזמנה)\s*(?:מספר|מזהה|#)?\s*[:#-]?\s*[A-Z0-9][A-Z0-9_-]{3,}/gi, "[REFERENCE]")

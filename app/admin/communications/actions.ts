@@ -64,12 +64,21 @@ export async function completeSmsReplyDraftAction(input: { draftId: string; repl
   if (draftError || !draft) return { ok: false as const, error: "The AI draft could not be found." }
 
   const { data: communication, error: communicationError } = await supabase.from("aura_communications")
-    .select("id,body")
+    .select("id,body,contact_id")
     .eq("id", draft.communication_id)
     .eq("channel", "sms")
     .eq("direction", "incoming")
-    .maybeSingle<{ id: string; body: string | null }>()
+    .maybeSingle<{ id: string; body: string | null; contact_id: string | null }>()
   if (communicationError || !communication?.body?.trim()) return { ok: false as const, error: "The customer message for this draft could not be found." }
+
+  const { data: trainingContact } = communication.contact_id
+    ? await supabase.from("aura_contacts").select("full_name,company").eq("id", communication.contact_id).maybeSingle<{ full_name: string | null; company: string | null }>()
+    : { data: null }
+  const privateTrainingValues = [
+    trainingContact?.full_name,
+    ...(trainingContact?.full_name?.split(/\s+/).filter((part) => part.length >= 3) || []),
+    trainingContact?.company,
+  ].filter((value): value is string => Boolean(value?.trim()))
 
   const { error: updateError } = await supabase.from("aura_sms_reply_drafts")
     .update({ reply_text: reply, decision: "sent_manually" })
@@ -80,8 +89,8 @@ export async function completeSmsReplyDraftAction(input: { draftId: string; repl
   const correctionReasons = [...new Set((input.correctionReasons || []).filter(isSmsCorrectionReason))].slice(0, 6)
   const language = smsTrainingLanguage(communication.body)
   const intent = smsTrainingIntent(communication.body)
-  const privateSafeOriginalReply = redactSmsTrainingText(draft.reply_text.trim())
-  const privateSafeCorrectedReply = redactSmsTrainingText(reply)
+  const privateSafeOriginalReply = redactSmsTrainingText(draft.reply_text.trim(), privateTrainingValues)
+  const privateSafeCorrectedReply = redactSmsTrainingText(reply, privateTrainingValues)
   const { error: feedbackError } = await supabase.from("aura_ai_reply_feedback").insert({
     communication_id: communication.id,
     draft_id: draft.id,
@@ -103,7 +112,7 @@ export async function completeSmsReplyDraftAction(input: { draftId: string; repl
   if (feedbackError) return { ok: false as const, error: "The reply was sent, but its AI feedback could not be saved." }
 
   if (input.teachAi) {
-    const privateSafeCustomerMessage = redactSmsTrainingText(communication.body)
+    const privateSafeCustomerMessage = redactSmsTrainingText(communication.body, privateTrainingValues)
     const privateSafeApprovedReply = privateSafeCorrectedReply
     const { error: exampleError } = await supabase.from("aura_ai_reply_examples").upsert({
       customer_message: privateSafeCustomerMessage,

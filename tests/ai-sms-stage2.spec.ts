@@ -77,7 +77,7 @@ test("Carlos Focus contains the owner AI intake and the dashboard no longer dupl
   );
 
   expect(goals).toContain("Carlos Focus");
-  expect(goals).toContain("Phone intake");
+  expect(goals).toContain("Phone task intake");
   expect(goals).toContain('href="/owner/ai-inbox"');
   expect(goals).toContain("ManagerNotificationCenter");
   expect(dashboard).not.toContain('label: "AI Phone Inbox"');

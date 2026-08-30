@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import { isSmsCorrectionReason, redactSmsTrainingText, smsTrainingIntent, smsTrainingLanguage } from "../lib/ai/sms-training-privacy"
 import {
   classifySmsReplyIntent,
-  enforceSmsOneQuestion,
+  enforceSmsQuestionLimit,
   rankSmsReplyExamples,
   smsReplyLanguage,
   smsReplySuggestsOptionalItems,
@@ -46,7 +46,7 @@ test("10-style no-send simulation learns only safe manager corrections and impro
       expect(nextIntent, `${scenario.style}: deterministic correction gate remains active`).toBe("correction")
     }
 
-    expect(enforceSmsOneQuestion(scenario.correction).match(/\?/g)?.length || 0, `${scenario.style}: one-question rule`).toBeLessThanOrEqual(1)
+    expect(enforceSmsQuestionLimit(scenario.correction).match(/\?/g)?.length || 0, `${scenario.style}: concise question limit`).toBeLessThanOrEqual(3)
   }
 })
 
