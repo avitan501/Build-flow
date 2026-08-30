@@ -22,7 +22,9 @@ import {
   smsReplyLanguage,
   smsHasExplicitQuantity,
   smsHasNeededByTiming,
+  smsMaterialIntelligenceAssessment,
   smsMaterialClarificationQuestions,
+  smsMessagesAfterConfirmedRequest,
   smsNeededByTimingValue,
   smsProductInquiryFallbackReply,
   smsQuantityClarificationReply,
@@ -1513,8 +1515,8 @@ type GroundedCatalogMatch = {
   item_code: string;
   name: string;
   category: string;
-  supplier_name_snapshot: string;
-  supplier_sku: string;
+  supplier_name_snapshot: string | null;
+  supplier_sku: string | null;
   source_file_name: string | null;
   source_document_date: string | null;
 };
@@ -1563,22 +1565,38 @@ async function loadRelevantApprovedKnowledge(latestCustomerMessage: string): Pro
 
 async function loadRelevantCatalogMatches(latestCustomerMessage: string): Promise<GroundedCatalogMatch[]> {
   const generic = new Set(["availability", "catalog", "delivery", "item", "material", "order", "product", "request", "stock"]);
-  const term = groundingTokens(latestCustomerMessage).filter((token) => !generic.has(token)).sort((left, right) => right.length - left.length)[0];
-  if (!term) return [];
-  const pattern = `%${term.replace(/[\\%_]/g, "")}%`;
+  const baseTerms = groundingTokens(latestCustomerMessage).filter((token) => !generic.has(token));
+  const semanticAliases = [
+    [/\b(?:sheet\s*rock|sheetroc+k?|sheetrok|sherlock|drywall)\b/i, ["sheetrock", "drywall"]],
+    [/\b(?:thin\s*set|thinset|tile\s+mortar)\b/i, ["thinset", "tile mortar"]],
+    [/\b(?:corner\s+bit|corner\s+bead)\b/i, ["corner bead"]],
+    [/\b(?:sherm(?:a|e)n|sherwin)[- ]?willi(?:am|ams)?\b/i, ["sherwin williams"]],
+    [/\b(?:osb|oriented\s+strand\s+board)\b/i, ["osb", "oriented strand board"]],
+  ].filter(([pattern]) => (pattern as RegExp).test(latestCustomerMessage)).flatMap(([, aliases]) => aliases as string[]);
+  const terms = [...new Set([...semanticAliases, ...baseTerms.sort((left, right) => right.length - left.length)])].slice(0, 6);
+  if (!terms.length) return [];
+  const patterns = terms.map((term) => `%${term.replace(/[\\%_]/g, "")}%`);
   try {
     return await sql<GroundedCatalogMatch[]>`
       select item.item_code, item.name, item.category,
         price.supplier_name_snapshot, price.supplier_sku,
         price.source_file_name, price.source_document_date::text
       from public.material_catalog_items as item
-      join public.material_catalog_supplier_prices as price on price.item_id = item.id
+      left join lateral (
+        select candidate.supplier_name_snapshot, candidate.supplier_sku,
+          candidate.source_file_name, candidate.source_document_date,
+          candidate.verified_at, candidate.updated_at
+        from public.material_catalog_supplier_prices as candidate
+        where candidate.item_id = item.id
+          and candidate.unit_price is not null
+          and candidate.verification_status in ('verified_today', 'recently_verified', 'supplier_quote')
+          and coalesce(candidate.source_document_date, candidate.verified_at::date, candidate.updated_at::date) >= current_date - interval '60 days'
+        order by coalesce(candidate.source_document_date, candidate.verified_at::date, candidate.updated_at::date) desc
+        limit 1
+      ) as price on true
       where item.status = 'active'
         and item.review_status = 'ready'
-        and price.unit_price is not null
-        and price.verification_status in ('verified_today', 'recently_verified', 'supplier_quote')
-        and coalesce(price.source_document_date, price.verified_at::date, price.updated_at::date) >= current_date - interval '60 days'
-        and (item.name ilike ${pattern} or item.description ilike ${pattern} or item.item_code ilike ${pattern} or item.manufacturer_model_number ilike ${pattern})
+        and (item.name ilike any(${patterns}::text[]) or item.description ilike any(${patterns}::text[]) or item.item_code ilike any(${patterns}::text[]) or item.manufacturer_model_number ilike any(${patterns}::text[]))
       order by coalesce(price.source_document_date, price.verified_at::date, price.updated_at::date) desc
       limit 5
     `;
@@ -1589,7 +1607,7 @@ async function loadRelevantCatalogMatches(latestCustomerMessage: string): Promis
 
 function groundingContextText(knowledge: ApprovedKnowledge[], catalog: GroundedCatalogMatch[]) {
   const facts = knowledge.map((entry, index) => `Fact ${index + 1} [source ${entry.source_path}; category ${entry.category}]: ${entry.fact.trim().slice(0, 600)}`);
-  const products = catalog.map((entry, index) => `Catalog match ${index + 1} [source ${entry.source_file_name || "supplier quote"}; dated ${entry.source_document_date || "recent verification"}]: ${entry.name} (${entry.item_code}), category ${entry.category}, supplier ${entry.supplier_name_snapshot}${entry.supplier_sku ? `, supplier code ${entry.supplier_sku}` : ""}. This match does not confirm current price or live stock.`);
+  const products = catalog.map((entry, index) => `Catalog match ${index + 1} [source ${entry.source_file_name || "Avantia reviewed catalog"}; dated ${entry.source_document_date || "catalog review"}]: ${entry.name} (${entry.item_code}), category ${entry.category}${entry.supplier_name_snapshot ? `, supplier ${entry.supplier_name_snapshot}` : ""}${entry.supplier_sku ? `, supplier code ${entry.supplier_sku}` : ""}. This match does not confirm current price or live stock.`);
   return [...products, ...facts].join("\n").slice(0, 3800) || "No relevant approved business knowledge or recent verified catalog match was found.";
 }
 
@@ -1817,15 +1835,13 @@ async function smsConversationContext(phone: string) {
       limit 1
     `,
   ]);
-  const latestConfirmationAt = latestConfirmations[0]?.completed_at ? Date.parse(latestConfirmations[0].completed_at) : Number.NaN;
-  const afterConfirmedRequest = Number.isFinite(latestConfirmationAt);
+  const latestConfirmationAt = latestConfirmations[0]?.completed_at || null;
+  const afterConfirmedRequest = Boolean(latestConfirmationAt && Number.isFinite(Date.parse(latestConfirmationAt)));
   // A confirmed request is a hard context boundary even when the customer
   // starts the next request with natural wording such as “I need 50 Sheetrock”
   // instead of explicitly saying “new request.” Never reuse its address,
   // timing, or product answers in the next order.
-  const ordered = [...rows].reverse().filter((message) =>
-    !afterConfirmedRequest || Date.parse(message.occurred_at) > latestConfirmationAt
-  );
+  const ordered = smsMessagesAfterConfirmedRequest([...rows].reverse(), latestConfirmationAt);
   let newRequestBoundary = -1;
   for (let index = 0; index < ordered.length; index += 1) {
     const message = ordered[index];
@@ -2188,8 +2204,10 @@ async function prepareSmsRequestConfirmation(input: {
   request: NonNullable<CustomerSmsAutomation["request"]>;
   sourceCommunicationIds: string[];
   latestCustomerMessage: string;
+  intelligenceReady: boolean;
+  intelligenceAssessment: ReturnType<typeof smsMaterialIntelligenceAssessment>;
 }) {
-  if (!input.customerAddress.trim() || !input.customerNeededBy.trim() || !input.request.items.length) return false;
+  if (!input.customerAddress.trim() || !input.customerNeededBy.trim() || !input.request.items.length || !input.intelligenceReady) return false;
   const summary = requestConfirmationSummary(input.request, input.customerAddress.trim(), input.customerNeededBy.trim(), input.latestCustomerMessage);
   const summaryHash = await sha256Hex(JSON.stringify({ phone: input.phone, address: input.customerAddress.trim(), neededBy: input.customerNeededBy.trim(), title: input.request.title, department: input.request.department, items: input.request.items }));
   const pending = await sql.begin(async (transaction) => {
@@ -2203,8 +2221,8 @@ async function prepareSmsRequestConfirmation(input: {
     await transaction`update public.aura_sms_request_pending_confirmations set status = 'superseded', updated_at = now() where normalized_phone = ${input.phone} and status = 'pending'`;
     const inserted = await transaction<{ id: string }[]>`
       insert into public.aura_sms_request_pending_confirmations
-        (normalized_phone, customer_name, customer_address, title, department, items, source_communication_ids, needed_by_text, summary_text, summary_hash)
-      values (${input.phone}, ${input.customerName.slice(0, 160)}, ${input.customerAddress.slice(0, 500)}, ${input.request.title.slice(0, 180)}, ${input.request.department.slice(0, 100)}, ${sql.json(input.request.items)}, ${input.sourceCommunicationIds}::uuid[], ${input.customerNeededBy.trim().slice(0, 160)}, ${summary}, ${summaryHash})
+        (normalized_phone, customer_name, customer_address, title, department, items, source_communication_ids, needed_by_text, summary_text, summary_hash, intelligence_assessment, intelligence_ready)
+      values (${input.phone}, ${input.customerName.slice(0, 160)}, ${input.customerAddress.slice(0, 500)}, ${input.request.title.slice(0, 180)}, ${input.request.department.slice(0, 100)}, ${sql.json(input.request.items)}, ${input.sourceCommunicationIds}::uuid[], ${input.customerNeededBy.trim().slice(0, 160)}, ${summary}, ${summaryHash}, ${sql.json(input.intelligenceAssessment)}, true)
       returning id
     `;
     return { id: inserted[0].id, alreadySent: false };
@@ -2292,7 +2310,7 @@ async function confirmPendingSmsRequest(communicationId: string, phone: string, 
   if (!isExplicitRequestConfirmation(body)) return null;
   const pendingRows = await sql<{ id: string; customer_name: string; customer_address: string; title: string; department: string; items: Array<{ name: string; quantity: number; unit: string }>; source_communication_ids: string[]; request_id: string | null; needed_by_text: string | null; summary_text: string }[]>`
     select id, customer_name, customer_address, title, department, items, source_communication_ids, request_id, needed_by_text, summary_text
-    from public.aura_sms_request_pending_confirmations where normalized_phone = ${phone} and status = 'pending' and summary_sent_at is not null order by summary_sent_at desc limit 1
+    from public.aura_sms_request_pending_confirmations where normalized_phone = ${phone} and status = 'pending' and summary_sent_at is not null and intelligence_ready = true order by summary_sent_at desc limit 1
   `;
   const pending = pendingRows[0];
   if (!pending) return null;
@@ -2315,6 +2333,22 @@ async function confirmPendingSmsRequest(communicationId: string, phone: string, 
     const requests = await transaction<{ id: string; public_number: number }[]>`insert into public.quote_requests (project_id, owner_id, title, status, submitted_at, manager_assignee, manager_notes) values (${project[0].id}::uuid, ${customerId}::uuid, ${pending.title}, 'submitted', now(), 'carlos', ${`Needed by: ${neededBy}`}) returning id, public_number`;
     for (const item of pending.items.slice(0, 50)) {
       await transaction`insert into public.quote_request_items (request_id, project_id, owner_id, name, department, item_type, quantity, unit, unit_price, qualification_status, metadata) values (${requests[0].id}::uuid, ${project[0].id}::uuid, ${customerId}::uuid, ${String(item.name).slice(0, 300)}, ${pending.department}, 'custom_priced', ${Number(item.quantity) || 1}, ${String(item.unit || "each").slice(0, 40)}, 0, 'not_required', ${sql.json({ created_from_confirmed_sms: true })})`;
+      await transaction`
+        insert into public.aura_material_order_patterns
+          (normalized_item_name, unit, confirmation_count, last_confirmed_request_id, sample_item)
+        values (
+          lower(trim(regexp_replace(${String(item.name).slice(0, 300)}, '\\s+', ' ', 'g'))),
+          lower(${String(item.unit || "each").slice(0, 40)}),
+          1,
+          ${requests[0].id}::uuid,
+          ${sql.json({ name: String(item.name).slice(0, 300), quantity: Number(item.quantity) || 1, unit: String(item.unit || "each").slice(0, 40) })}
+        )
+        on conflict (normalized_item_name, unit) do update set
+          confirmation_count = public.aura_material_order_patterns.confirmation_count + 1,
+          last_confirmed_request_id = excluded.last_confirmed_request_id,
+          sample_item = excluded.sample_item,
+          last_confirmed_at = now()
+      `;
     }
     await transaction`insert into public.customer_request_portal_access (request_id, normalized_phone, delivery_address, claimed_by) values (${requests[0].id}::uuid, ${phone}, ${pending.customer_address}, ${customerId}::uuid) on conflict (request_id) do update set normalized_phone = excluded.normalized_phone, delivery_address = excluded.delivery_address, claimed_by = excluded.claimed_by, updated_at = now()`;
     await transaction`insert into public.aura_sms_request_confirmations (confirmation_communication_id, request_id, normalized_phone, confirmation_actor_id, completed_at) values (${communicationId}::uuid, ${requests[0].id}::uuid, ${phone}, ${customerId}::uuid, now()) on conflict (confirmation_communication_id) do nothing`;
@@ -2520,8 +2554,9 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
   let safety = analyzed.safety;
   // Reviewed construction rules are final output guards, not model fallbacks.
   // Even a strong semantic model must not skip a required product choice.
+  const materialIntelligence = smsMaterialIntelligenceAssessment(activeCustomerText || reviewText, { exactListOnly });
   const clarificationQuestions = result.isMaterialRequest || Boolean(openDraft)
-    ? smsMaterialClarificationQuestions(activeCustomerText || reviewText, { exactListOnly })
+    ? materialIntelligence.questions
     : [];
   if (clarificationQuestions.length) {
     result.reply = clarificationQuestions.join(" ");
@@ -2580,6 +2615,39 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
   } catch (stateError) {
     console.error("sms_order_state_persist_failed", stateError instanceof Error ? stateError.message : "unknown error");
   }
+  if (result.isMaterialRequest || Boolean(openDraft)) {
+    try {
+      await sql`
+        insert into public.aura_material_intelligence_evaluations
+          (communication_id, matched_rule_keys, missing_questions, confidence, ready_for_confirmation, source_priority, ai_model)
+        values (${communicationId}::uuid, ${materialIntelligence.matchedRules}::text[], ${materialIntelligence.questions}::text[],
+          ${materialIntelligence.confidence}, ${materialIntelligence.readyForConfirmation}, ${materialIntelligence.sourcePriority}::text[], ${model})
+        on conflict (communication_id) do update set
+          matched_rule_keys = excluded.matched_rule_keys,
+          missing_questions = excluded.missing_questions,
+          confidence = excluded.confidence,
+          ready_for_confirmation = excluded.ready_for_confirmation,
+          source_priority = excluded.source_priority,
+          ai_model = excluded.ai_model,
+          evaluated_at = now()
+      `;
+    } catch (intelligenceError) {
+      console.error("sms_material_intelligence_persist_failed", intelligenceError instanceof Error ? intelligenceError.message : "unknown error");
+    }
+    if (customerEvent === "correction") {
+      try {
+        await sql`
+          insert into public.aura_material_learning_candidates
+            (communication_id, candidate_kind, matched_rule_keys, reason)
+          values (${communicationId}::uuid, 'customer_correction', ${materialIntelligence.matchedRules}::text[],
+            'Customer corrected an active material request. Review the linked conversation before promoting any reusable rule.')
+          on conflict (communication_id) do nothing
+        `;
+      } catch (learningError) {
+        console.error("sms_material_learning_candidate_failed", learningError instanceof Error ? learningError.message : "unknown error");
+      }
+    }
+  }
   const linkedCorrectionRequests = customerEvent === "correction" ? await sql<{ id: string }[]>`
     select request.id
     from public.aura_communications as communication
@@ -2603,14 +2671,16 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
           items = ${sql.json(result.request.items)}, original_message = ${reviewText.slice(0, 4000)},
           exact_list_only = ${exactListOnly},
           delivery_address_known = ${deliveryAddressKnown},
+          intelligence_assessment = ${sql.json(materialIntelligence)},
+          intelligence_ready = ${materialIntelligence.readyForConfirmation},
           source_communication_ids = ${sql.json(sources)}, review_note = 'New text reviewed by AI — confirm the updated details.', ai_model = ${model}
         where id = ${openDraft.id}::uuid
       `;
     } else {
       await sql`
         insert into public.aura_sms_request_drafts
-          (communication_id, contact_id, sender_phone, customer_name, customer_address, title, department, items, original_message, exact_list_only, delivery_address_known, draft_kind, created_request_id, source_communication_ids, review_note, ai_model)
-        values (${communicationId}::uuid, ${contact?.id || null}, ${phone}, ${result.customerName || contact?.full_name || phone}, ${result.customerAddress}, ${result.request.title}, ${result.request.department}, ${sql.json(result.request.items)}, ${body.slice(0, 4000)}, ${exactListOnly}, ${deliveryAddressKnown}, ${customerEvent === "correction" && linkedCorrectionRequestId ? "update" : "create"}, ${linkedCorrectionRequestId}, ${sql.json([communicationId])}, ${customerEvent === "correction" ? "AI detected a correction. Review every changed value before applying it." : "AI found a material request. Review before creating it."}, ${model})
+          (communication_id, contact_id, sender_phone, customer_name, customer_address, title, department, items, original_message, exact_list_only, delivery_address_known, intelligence_assessment, intelligence_ready, draft_kind, created_request_id, source_communication_ids, review_note, ai_model)
+        values (${communicationId}::uuid, ${contact?.id || null}, ${phone}, ${result.customerName || contact?.full_name || phone}, ${result.customerAddress}, ${result.request.title}, ${result.request.department}, ${sql.json(result.request.items)}, ${body.slice(0, 4000)}, ${exactListOnly}, ${deliveryAddressKnown}, ${sql.json(materialIntelligence)}, ${materialIntelligence.readyForConfirmation}, ${customerEvent === "correction" && linkedCorrectionRequestId ? "update" : "create"}, ${linkedCorrectionRequestId}, ${sql.json([communicationId])}, ${customerEvent === "correction" ? "AI detected a correction. Review every changed value before applying it." : "AI found a material request. Review before creating it."}, ${model})
         on conflict (communication_id) do nothing
       `;
     }
@@ -2623,6 +2693,8 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
         request: result.request,
         sourceCommunicationIds: sources,
         latestCustomerMessage: body,
+        intelligenceReady: materialIntelligence.readyForConfirmation,
+        intelligenceAssessment: materialIntelligence,
       });
     }
   }

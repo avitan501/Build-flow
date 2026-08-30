@@ -18,12 +18,15 @@ test("SMS grounding gives the reviewed Avantia catalog priority over constructio
   expect(grounding).toContain("return [...products, ...facts]")
 })
 
-test("SMS catalog evidence is reviewed, recent, and never treated as live price or stock", async () => {
+test("SMS catalog evidence includes reviewed products, prefers recent verified supplier evidence, and never claims live price or stock", async () => {
   const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
 
   expect(broker).toContain("item.review_status = 'ready'")
-  expect(broker).toContain("price.verification_status in ('verified_today', 'recently_verified', 'supplier_quote')")
+  expect(broker).toContain("candidate.verification_status in ('verified_today', 'recently_verified', 'supplier_quote')")
   expect(broker).toContain("current_date - interval '60 days'")
+  expect(broker).toContain("left join lateral")
+  expect(broker).toContain("item.name ilike any(${patterns}::text[])")
+  expect(broker).toContain('[/\\b(?:sheet\\s*rock|sheetroc+k?|sheetrok|sherlock|drywall)\\b/i, ["sheetrock", "drywall"]]')
   expect(broker).toContain("This match does not confirm current price or live stock")
   expect(broker).toContain("Exact price, availability, and delivery still require manager confirmation")
 
@@ -42,4 +45,3 @@ test("SMS catalog evidence is reviewed, recent, and never treated as live price 
     }), reply).toMatchObject({ level: "red", gateAutoSafe: false })
   }
 })
-
