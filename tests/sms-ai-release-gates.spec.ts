@@ -22,6 +22,7 @@ import {
   smsHasExplicitQuantity,
   smsHasNeededByTiming,
   smsMaterialClarificationQuestions,
+  smsMaterialIntelligenceAssessment,
   smsNeededByTimingValue,
   smsOutputSafetySignals,
   smsProductInquiryFallbackReply,
@@ -338,7 +339,7 @@ test("broker-created request progression replies are gated independently from mo
   expect(brokerSource).toContain("const neededBy = pending.needed_by_text?.trim() || smsNeededByTimingValue(pending.summary_text)")
   expect(brokerSource).toContain('manager_notes) values')
   expect(brokerSource).toContain('Needed by: ${neededBy}')
-  expect(brokerSource).toContain("if (!input.customerAddress.trim() || !input.customerNeededBy.trim() || !input.request.items.length) return false")
+  expect(brokerSource).toContain("!input.request.items.length || !input.intelligenceReady")
   expect(brokerSource).toContain("if (!neededBy)")
   expect(brokerSource).toContain("`Needed by: ${neededBy}`")
   expect(brokerSource).toContain("async function activeSmsRequestSourceIds")
@@ -411,7 +412,7 @@ test("product inquiry fallback answers the product and asks only useful next que
 test("a new request isolates clarification from unrelated conversation history", async () => {
   const brokerSource = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
   expect(brokerSource).toContain("const activeCustomerText = startsNewRequest ? body : context.customerText || body")
-  expect(brokerSource).toContain("smsMaterialClarificationQuestions(activeCustomerText || reviewText, { exactListOnly })")
+  expect(brokerSource).toContain("smsMaterialIntelligenceAssessment(activeCustomerText || reviewText, { exactListOnly })")
   expect(brokerSource).toContain("const replyContext = startsNewRequest ? `Customer: ${effectiveBody}`")
   expect(brokerSource).toContain("A confirmed request is a hard context boundary")
   expect(brokerSource).toContain("status = 'converted'")
@@ -432,6 +433,49 @@ test("a new request isolates clarification from unrelated conversation history",
     participantRole: "lead",
     modelAutoSafe: true,
   })).toMatchObject({ level: "green", gateAutoSafe: true })
+})
+
+test("order intelligence blocks incomplete trade shorthand across core categories", () => {
+  const cases = [
+    ["I need 50 Sheet Rock", /5\/8-in\. regular Sheetrock/],
+    ["I need 50 metal studs", /width and length/],
+    ["I need 10 bags of thinset", /tile type and size/],
+    ["I need roofing shingles for 500 sq ft", /shingle type and color/],
+    ["I need 20 sheets plywood", /thickness and sheet size/],
+    ["I need 10 windows", /window size and operating type/],
+    ["I need a dumpster", /dumpster size/],
+  ] as const
+
+  for (const [message, expectedQuestion] of cases) {
+    const assessment = smsMaterialIntelligenceAssessment(message)
+    expect(assessment.readyForConfirmation, message).toBe(false)
+    expect(assessment.missingCriticalDetails, message).toBe(true)
+    expect(assessment.questions.join(" "), message).toMatch(expectedQuestion)
+    expect(assessment.sourcePriority).toEqual([
+      "avantia_catalog",
+      "owner_approved_rule",
+      "manufacturer_document",
+      "general_construction_knowledge",
+    ])
+  }
+})
+
+test("order intelligence permits a fully specified Sheetrock request", () => {
+  expect(smsMaterialIntelligenceAssessment("50 sheets of 5/8 regular Sheetrock")).toMatchObject({
+    matchedRules: ["drywall-sheet"],
+    questions: [],
+    missingCriticalDetails: false,
+    readyForConfirmation: true,
+    confidence: 0.98,
+  })
+})
+
+test("request creation has a second hard intelligence gate", async () => {
+  const brokerSource = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  expect(brokerSource).toContain("!input.intelligenceReady")
+  expect(brokerSource).toContain("and intelligence_ready = true")
+  expect(brokerSource).toContain("aura_material_intelligence_evaluations")
+  expect(brokerSource).toContain("intelligence_assessment")
 })
 
 test("Sheetrock follow-ups answer thickness corrections instead of repeating quantity", () => {

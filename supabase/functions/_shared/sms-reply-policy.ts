@@ -326,7 +326,120 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
           : "What paint color, and which finish: flat, eggshell, satin, or semi-gloss?");
   }
 
+  const hasQuantity = smsHasExplicitQuantity(value);
+  const addQuantityQuestion = (product: string, unit: string) => {
+    if (!hasQuantity) questions.push(`How many ${unit} of ${product} do you need?`);
+  };
+
+  const metalStuds = /\bmetal\s+(?:studs?|framing)\b|\bstuds?\b[^\n]{0,30}\b(?:gauge|ga\.?|metal)\b/i.test(value);
+  if (metalStuds) {
+    const hasSizeAndLength = /\b(?:1\s*5\/8|2\s*1\/2|3\s*5\/8|4|6)\s*(?:in\.?|inch(?:es)?|["”])?\b[^\n]{0,40}\b(?:8|10|12|14|16)\s*(?:ft|feet|foot|['’])\b|\b\d+\s*[x×]\s*\d+(?:\s*[x×]\s*\d+)?\b/i.test(value);
+    const hasGauge = /\b(?:14|16|18|20|22|25)\s*(?:ga\.?|gauge)\b/i.test(value);
+    if (!hasSizeAndLength) questions.push("What metal-stud width and length do you need?");
+    if (!hasGauge) questions.push("What gauge do you need?");
+    addQuantityQuestion("metal studs", "pieces");
+  }
+
+  const thinset = /\bthin\s*set\b|\bthinset\b|\btile\s+(?:mortar|adhesive)\b/i.test(value);
+  if (thinset) {
+    const hasTile = /\b(?:porcelain|ceramic|glass|marble|granite|stone|mosaic|tile)\b[^\n]{0,35}\b\d+(?:\.\d+)?\s*(?:x|×|in|inch)|\b\d+(?:\.\d+)?\s*(?:x|×)\s*\d+(?:\.\d+)?\b[^\n]{0,35}\b(?:tile|porcelain|ceramic|stone)\b/i.test(value);
+    const hasSubstrate = /\b(?:concrete|cement\s*board|backer\s*board|drywall|gypsum|plywood|osb|membrane|ditra)\b/i.test(value);
+    const hasLocation = /\b(?:floor|wall|shower|bathroom|kitchen|backsplash|indoor|interior|outdoor|exterior|pool)\b/i.test(value);
+    if (!hasTile) questions.push("What tile type and size are you installing?");
+    if (!hasSubstrate || !hasLocation) questions.push("What substrate and installation location is it for?");
+    addQuantityQuestion("thinset", "bags");
+  }
+
+  const roofing = /\b(?:roofing\s+)?shingles?\b/i.test(value);
+  if (roofing) {
+    const hasRoofType = /\b(?:3[- ]tab|architectural|designer|asphalt|cedar|wood|metal)\b/i.test(value);
+    const hasRoofColor = /\b(?:black|brown|gray|grey|charcoal|slate|weathered\s+wood|driftwood|red|green|blue|color\s*[:#-]?\s*[a-z])\b/i.test(value);
+    const hasRoofArea = /\b\d+(?:\.\d+)?\s*(?:sq\.?\s*ft|square\s*feet|sf|squares?)\b/i.test(value);
+    if (!hasRoofType || !hasRoofColor) questions.push("What shingle type and color do you need?");
+    if (!hasRoofArea) questions.push("How many square feet or roofing squares do you need?");
+  }
+
+  const insulation = /\binsulation\b|\b(?:fiberglass|mineral\s+wool|rockwool)\s+(?:batt|roll|insulation)\b/i.test(value);
+  if (insulation) {
+    const hasRValue = /\bR[- ]?\d{1,2}\b/i.test(value);
+    const hasInsulationType = /\b(?:batt|roll|rigid|foam\s*board|spray\s*foam|blown[- ]in|fiberglass|mineral\s+wool|rockwool)\b/i.test(value);
+    const hasInsulationSize = /\b(?:15|16|23|24)\s*(?:in\.?|inch(?:es)?|["”])\b|\b\d+(?:\.\d+)?\s*(?:sq\.?\s*ft|sf)\b/i.test(value);
+    if (!hasRValue || !hasInsulationType) questions.push("What insulation type and R-value do you need?");
+    if (!hasInsulationSize) questions.push("What width or coverage do you need?");
+    addQuantityQuestion("insulation", "packages");
+  }
+
+  const panels = /\b(?:plywood|osb|oriented\s+strand\s+board)\b/i.test(value);
+  if (panels) {
+    const hasPanelThickness = /\b(?:1\/4|3\/8|7\/16|1\/2|5\/8|3\/4)\s*(?:in\.?|inch(?:es)?|["”])?\b/i.test(value);
+    const hasPanelSize = /\b(?:4\s*[x×]\s*8|4\s*[x×]\s*9|4\s*[x×]\s*10)\b/i.test(value);
+    if (!hasPanelThickness || !hasPanelSize) questions.push("What panel thickness and sheet size do you need?");
+    addQuantityQuestion("panels", "sheets");
+  }
+
+  const doors = /\bdoors?\b/i.test(value) && !/\bgarage\s+doors?\b/i.test(value);
+  if (doors) {
+    const hasDoorSize = /\b(?:1|2|3|4|5|6|7|8)\s*[-x×]\s*(?:6|7|8)|\b\d{2,3}\s*[x×]\s*\d{2,3}\b/i.test(value);
+    const hasDoorUse = /\b(?:interior|exterior|entry|prehung|slab|fire[- ]rated)\b/i.test(value);
+    const hasHanding = /\b(?:left|right)[- ]?hand|\bLH\b|\bRH\b|\binswing|\boutswing/i.test(value);
+    if (!hasDoorSize || !hasDoorUse) questions.push("What door size and type do you need: interior, exterior, prehung, or slab?");
+    if (/\b(?:prehung|exterior|entry)\b/i.test(value) && !hasHanding) questions.push("What handing and swing do you need?");
+    addQuantityQuestion("doors", "doors");
+  }
+
+  const windows = /\bwindows?\b/i.test(value);
+  if (windows) {
+    const hasWindowSize = /\b\d{2,3}\s*[x×]\s*\d{2,3}\b|\b\d+\s*(?:ft|feet|foot|['’])\s*(?:x|×)\s*\d+/i.test(value);
+    const hasWindowType = /\b(?:double[- ]hung|single[- ]hung|casement|slider|sliding|picture|awning|hopper|fixed)\b/i.test(value);
+    if (!hasWindowSize || !hasWindowType) questions.push("What window size and operating type do you need?");
+    addQuantityQuestion("windows", "windows");
+  }
+
+  const dumpster = /\b(?:dumpsters?|roll[- ]?offs?|containers?)\b/i.test(value);
+  if (dumpster) {
+    const hasDumpsterSize = /\b(?:10|12|15|20|30|40)\s*(?:yd|yard)s?\b/i.test(value);
+    const hasDebris = /\b(?:construction|demolition|concrete|brick|dirt|soil|roofing|shingles|wood|mixed|household)\s+(?:debris|waste)|\b(?:concrete|brick|dirt|soil|shingles)\b/i.test(value);
+    const hasDuration = /\b\d+\s*(?:day|days|week|weeks)\b/i.test(value);
+    if (!hasDumpsterSize) questions.push("Which dumpster size do you need: 10, 20, 30, or 40 yards?");
+    if (!hasDebris) questions.push("What material or debris is going into it?");
+    if (!hasDuration) questions.push("How long do you need the dumpster?");
+  }
+
   return [...new Set(questions)].slice(0, 3);
+}
+
+export function smsMaterialIntelligenceAssessment(value: string, options: { exactListOnly?: boolean } = {}) {
+  const questions = smsMaterialClarificationQuestions(value, options);
+  const matchedRules = [
+    [/\b(?:sheet\s*rock|drywall(?!\s+screws?))\b/i, "drywall-sheet"],
+    [/\bmetal\s+(?:studs?|framing)\b/i, "metal-stud"],
+    [/\b(?:thin\s*set|thinset|tile\s+(?:mortar|adhesive))\b/i, "thinset"],
+    [/\b(?:roofing\s+)?shingles?\b/i, "roofing-shingle"],
+    [/\bpaint\b/i, "paint"],
+    [/\bcorner\s+(?:bit|bead)\b/i, "corner-bead"],
+    [/\binsulation\b|\b(?:fiberglass|rockwool|mineral\s+wool)\b/i, "insulation"],
+    [/\b(?:plywood|osb|oriented\s+strand\s+board)\b/i, "structural-panel"],
+    [/\bdoors?\b/i, "door"],
+    [/\bwindows?\b/i, "window"],
+    [/\b(?:dumpsters?|roll[- ]?offs?|containers?)\b/i, "dumpster"],
+  ].filter(([pattern]) => (pattern as RegExp).test(value)).map(([, key]) => key as string);
+  const readyForConfirmation = matchedRules.length > 0 && questions.length === 0;
+  const confidence = matchedRules.length === 0 ? 0.45 : readyForConfirmation ? 0.98 : Math.max(0.5, 0.82 - questions.length * 0.1);
+  return {
+    matchedRules,
+    questions,
+    missingCriticalDetails: questions.length > 0,
+    readyForConfirmation,
+    confidence,
+    sourcePriority: ["avantia_catalog", "owner_approved_rule", "manufacturer_document", "general_construction_knowledge"] as const,
+  };
+}
+
+export function smsMessagesAfterConfirmedRequest<T extends { occurred_at: string }>(messages: T[], completedAt: string | null | undefined) {
+  if (!completedAt) return messages;
+  const boundary = Date.parse(completedAt);
+  if (!Number.isFinite(boundary)) return messages;
+  return messages.filter((message) => Date.parse(message.occurred_at) > boundary);
 }
 
 export function applyAvantiaMaterialDefaults<T extends { name: string; quantity: number; unit: string }>(items: T[], customerText: string): T[] {
