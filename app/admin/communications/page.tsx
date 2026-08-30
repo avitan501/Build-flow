@@ -1,5 +1,6 @@
 import { CommunicationCenter } from "@/components/buildflow/communication-center"
 import { UnifiedCommunicationInbox, type AuraLeadRecipient } from "@/components/buildflow/unified-communication-inbox"
+import type { SmsReplyDraft } from "@/app/admin/communications/actions"
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { contactEmailForDisplay } from "@/lib/auth-phone"
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard"
@@ -59,11 +60,12 @@ export default async function CommunicationsPage({
     : ["all", "call", "sms", "whatsapp", "email"].includes(requestedChannel || "") ? requestedChannel! : "all"
   const { supabase, access } = await requireManagerPortalProfile()
   if (access.customers) await syncRecentTwilioWhatsAppMessages().catch(() => null)
-  const [clientsResult, leadsResult, suppliersResult, requestsResult, logsResult, threads, aura] = await Promise.all([
+  const [clientsResult, leadsResult, suppliersResult, requestsResult, smsDraftsResult, logsResult, threads, aura] = await Promise.all([
     access.customers ? supabase.from("profiles").select("id,full_name,email,phone,company_name").eq("role", "client").eq("is_active", true).order("full_name").limit(500) : Promise.resolve({ data: [] }),
     access.customers ? supabase.from("manager_outreach_leads").select("id,full_name,company_name,email,phone").neq("status", "archived").order("full_name").limit(500).returns<AuraLeadRecipient[]>() : Promise.resolve({ data: [] }),
     access.suppliers ? supabase.rpc("staff_load_supplier_directory_snapshot") : Promise.resolve({ data: null }),
     access.customers ? supabase.from("quote_requests").select("id,title,status").neq("status", "draft").order("updated_at", { ascending: false }).limit(150) : Promise.resolve({ data: [] }),
+    access.customers ? supabase.from("aura_sms_reply_drafts").select("id,communication_id,counterparty_phone,reply_text,decision,safety_reason,ai_model,updated_at").in("decision", ["draft", "blocked", "send_failed"]).order("updated_at", { ascending: false }).limit(200).returns<SmsReplyDraft[]>() : Promise.resolve({ data: [] }),
     supabase.from("manager_goals").select("details,updated_at").like("details", `${COMMUNICATION_LOG_PREFIX}%`).order("updated_at", { ascending: false }).limit(100),
     listInboxThreads().catch(() => []),
     access.customers
@@ -91,5 +93,5 @@ export default async function CommunicationsPage({
       }
     : null
 
-  return <main className="h-[calc(100dvh-4rem)] min-h-0 min-w-0 overflow-hidden bg-[#f5f5f7] p-2 text-slate-950 sm:p-4 lg:h-screen lg:px-6"><div className="mx-auto h-full min-h-0 min-w-0 max-w-[96rem]">{liveAura ? <UnifiedCommunicationInbox communications={liveAura.communications} contacts={liveAura.contacts} customers={liveAura.customers} leads={liveAura.leads} suppliers={liveAura.suppliers} materialRequests={(requestsResult.data ?? []).map((request) => ({ id: request.id, title: request.title, status: request.status }))} connections={liveAura.connections} initialChannelFilter={initialChannelFilter} initialQuery={(requestedSearch || "").slice(0, 160)} /> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Live phone connections are temporarily unavailable.</p>}<details className="mt-3 hidden rounded-lg border border-slate-200 bg-white p-3"><summary className="cursor-pointer text-xs font-semibold text-slate-600">Manual communication log</summary><div className="mt-4"><CommunicationCenter clients={clients} logs={logs} threads={threads} /></div></details></div></main>
+  return <main className="h-[calc(100dvh-4rem)] min-h-0 min-w-0 overflow-hidden bg-[#f5f5f7] p-2 text-slate-950 sm:p-4 lg:h-screen lg:px-6"><div className="mx-auto h-full min-h-0 min-w-0 max-w-[96rem]">{liveAura ? <UnifiedCommunicationInbox communications={liveAura.communications} contacts={liveAura.contacts} customers={liveAura.customers} leads={liveAura.leads} suppliers={liveAura.suppliers} materialRequests={(requestsResult.data ?? []).map((request) => ({ id: request.id, title: request.title, status: request.status }))} smsReplyDrafts={(smsDraftsResult.data ?? []) as SmsReplyDraft[]} connections={liveAura.connections} initialChannelFilter={initialChannelFilter} initialQuery={(requestedSearch || "").slice(0, 160)} /> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Live phone connections are temporarily unavailable.</p>}<details className="mt-3 hidden rounded-lg border border-slate-200 bg-white p-3"><summary className="cursor-pointer text-xs font-semibold text-slate-600">Manual communication log</summary><div className="mt-4"><CommunicationCenter clients={clients} logs={logs} threads={threads} /></div></details></div></main>
 }
