@@ -102,7 +102,12 @@ const REQUESTED_FIELD_PATTERNS: Array<{ field: SmsRequestedField; pattern: RegEx
 
 export function inspectSmsQuestionStructure(value: string, knownFields: SmsRequestedField[] = []) {
   const questionMarks = (value.match(/[?？]/g) || []).length;
-  const questions = value.match(/[^?？]*[?？]/g) || [];
+  // Only inspect the clause that actually contains each question. Without this
+  // sentence boundary, an acknowledgement such as "I have the material list."
+  // is incorrectly bundled with the following address question.
+  const questions = value
+    .split(/[.!。！\n]+/)
+    .flatMap((sentence) => sentence.match(/[^?？]*[?？]/g) || []);
   const fieldsByQuestion = questions.map((question) => REQUESTED_FIELD_PATTERNS.filter(({ pattern }) => pattern.test(question)).map(({ field }) => field));
   const fields = fieldsByQuestion.flat();
   const safeDeliveryPair = fieldsByQuestion.some((questionFields, index) => questionFields.length === 2 && questionFields.includes("address") && questionFields.includes("needed_by") && /\b(?:and|y)\b|(?:ו)/i.test(questions[index] || ""));

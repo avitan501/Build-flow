@@ -79,6 +79,9 @@ test("broker gate auto-sends safe pricing and delivery clarification but blocks 
 test("latest decision allows up to three essential questions and rejects padding, repeats, and bundles", () => {
   expect(inspectSmsQuestionStructure("What size?").valid).toBe(true)
   expect(inspectSmsQuestionStructure("What is the full delivery address?").valid).toBe(true)
+  expect(inspectSmsQuestionStructure("I have the material list. What is the full delivery address?")).toMatchObject({ valid: true, requestedFields: 1, fields: ["address"] })
+  expect(inspectSmsQuestionStructure("קיבלתי את רשימת החומרים. מה כתובת המשלוח המלאה?")).toMatchObject({ valid: true, requestedFields: 1, fields: ["address"] })
+  expect(inspectSmsQuestionStructure("Recibí la lista de materiales. ¿Cuál es la dirección completa de entrega?")).toMatchObject({ valid: true, requestedFields: 1, fields: ["address"] })
   expect(inspectSmsQuestionStructure("What size and thickness?")).toMatchObject({ valid: false, requestedFields: 2 })
   expect(inspectSmsQuestionStructure("What size? What thickness? What quantity?")).toMatchObject({ valid: true, questionMarks: 3 })
   expect(inspectSmsQuestionStructure("What size? What thickness? What quantity? What brand?")).toMatchObject({ valid: false, questionMarks: 4 })
