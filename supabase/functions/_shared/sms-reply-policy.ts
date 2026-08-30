@@ -357,7 +357,7 @@ export function smsUnansweredFollowUpText(params: { originalMessage: string; que
   const asksQuantity = REQUESTED_FIELD_PATTERNS.find(({ field }) => field === "quantity")?.pattern.test(question);
   const asksAddress = REQUESTED_FIELD_PATTERNS.find(({ field }) => field === "address")?.pattern.test(question);
   const asksTiming = REQUESTED_FIELD_PATTERNS.find(({ field }) => field === "needed_by")?.pattern.test(question);
-  const asksSpecification = /\b(?:thickness|walls?\s+or\s+(?:a\s+)?ceilings?|type|size|grade|color)\b|(?:עובי|קיר|תקרה|סוג|מידה|צבע)|\b(?:grosor|pared|techo|tipo|tama[nñ]o|color)\b/i.test(question);
+  const asksSpecification = /\b(?:thickness|walls?\s+or\s+(?:a\s+)?ceilings?|type|size|length|gauge|grade|color)\b|\b5\s*\/\s*8\b|(?:עובי|קיר|תקרה|סוג|מידה|אורך|צבע)|\b(?:grosor|pared|techo|tipo|tama[nñ]o|largo|calibre|color)\b/i.test(question);
   if (language === "he") {
     if (asksAddress && asksTiming) return "עדיין צריך עזרה עם פרטי המשלוח?";
     if (asksSpecification && asksQuantity) return "עדיין צריך עזרה בבחירת המפרט או הכמות?";
@@ -375,12 +375,24 @@ export function smsUnansweredFollowUpText(params: { originalMessage: string; que
     return "¿Aún necesita ayuda con esto?";
   }
   if (asksAddress && asksTiming) return "Still need help with the delivery details?";
+  const productContext = `${params.originalMessage}\n${params.questionReply}`;
+  const roofing = /\b(?:roofing|shingles?)\b/i.test(productContext);
+  const metalStuds = /\bmetal\s+studs?\b/i.test(productContext);
+  const sheetrock = /\b(?:sheetrock|drywall)\b/i.test(productContext);
+  const studs = /\bstuds?\b/i.test(productContext);
   if (asksSpecification && asksQuantity) {
-    const productContext = `${params.originalMessage}\n${params.questionReply}`;
-    if (/\b(?:roofing|shingles?)\b/i.test(productContext)) return "Still need help with the shingle type, color, or quantity?";
-    if (/\b(?:metal\s+studs?|studs?)\b/i.test(productContext)) return "Still need help with the stud size, gauge, or quantity?";
-    if (/\b(?:sheetrock|drywall)\b/i.test(productContext)) return "Can you confirm 5/8 in., type, and quantity?";
+    if (roofing) return "Still need help with the shingle type, color, or quantity?";
+    if (metalStuds) return "Still need help with the stud size, gauge, or quantity?";
+    if (sheetrock) return "Can you confirm 5/8 in., type, and quantity?";
+    if (studs) return "Still need help with the stud size or quantity?";
     return "Still need help with the product details or quantity?";
+  }
+  if (asksSpecification) {
+    if (roofing) return "Still need help with the shingle type or color?";
+    if (metalStuds) return "Still need help with the stud length or gauge?";
+    if (sheetrock) return "Can you confirm 5/8 in.?";
+    if (studs) return "Still need help with the stud size?";
+    return "Still need help with the product details?";
   }
   if (asksQuantity) return "Still need help with the quantity?";
   if (asksAddress) return "Still need help with the delivery address?";

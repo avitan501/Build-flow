@@ -122,6 +122,10 @@ test("broker-created request progression replies are gated independently from mo
   expect(brokerSource).toContain("`Needed by: ${neededBy}`")
   expect(brokerSource).toContain("async function activeSmsRequestSourceIds")
   expect(brokerSource).toContain(".slice(-12)")
+  expect(brokerSource).toContain("if (smsStartsNewMaterialRequest(message)) boundary = index")
+  expect(brokerSource).not.toContain("smsProductInquiryFallbackReply(message)) || likelyMaterialList(message)")
+  expect(brokerSource).toContain("24 * 60 * 60 * 1000")
+  expect(brokerSource).toContain("set status = 'dismissed'")
   expect(evaluateSmsReplyGate({
     message: "Yes, 5/8 regular, 21 sheets",
     reply: "I have the material list. What is the full delivery address?",
@@ -206,7 +210,11 @@ test("one-shot unanswered follow-up is question-aware and cancels on every later
   expect(smsUnansweredFollowUpText(eligible)).toBe("Still need help with the quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell Sheetrock?", questionReply: "Regular, Type X/fire-rated, or moisture-resistant? How many sheets do you need?" })).toBe("Can you confirm 5/8 in., type, and quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "I need roofing shingles", questionReply: "What shingle type and color? How many square feet do you need?" })).toBe("Still need help with the shingle type, color, or quantity?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "I need roofing shingles", questionReply: "What shingle type and color?" })).toBe("Still need help with the shingle type or color?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell metal studs?", questionReply: "What stud size and gauge? How many do you need?" })).toBe("Still need help with the stud size, gauge, or quantity?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell metal studs?", questionReply: "What length and gauge?" })).toBe("Still need help with the stud length or gauge?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell Sheetrock?", questionReply: "Can you confirm 5/8 in.?" })).toBe("Can you confirm 5/8 in.?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "Need wood studs", questionReply: "What size? How many do you need?" })).toBe("Still need help with the stud size or quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Need product", questionReply: "What type? How many do you need?" })).toBe("Still need help with the product details or quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Necesito yeso", questionReply: "¿Cuál es la dirección completa de entrega?" })).toBe("¿Aún necesita ayuda con la dirección de entrega?")
   expect(smsUnansweredFollowUpText({ originalMessage: "צריך גבס", questionReply: "מתי החומרים נדרשים, ומה כתובת המשלוח המלאה?" })).toBe("עדיין צריך עזרה עם פרטי המשלוח?")

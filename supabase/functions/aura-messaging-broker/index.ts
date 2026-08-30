@@ -1642,7 +1642,7 @@ async function activeSmsRequestSourceIds(phone: string, currentCommunicationId: 
   let boundary = -1;
   for (let index = 0; index < ordered.length; index += 1) {
     const message = ordered[index].body?.trim() || "";
-    if (smsStartsNewMaterialRequest(message) || Boolean(smsProductInquiryFallbackReply(message)) || likelyMaterialList(message)) boundary = index;
+    if (smsStartsNewMaterialRequest(message)) boundary = index;
   }
   const active = boundary >= 0 ? ordered.slice(boundary).map((message) => message.id) : [...existingSourceIds, currentCommunicationId];
   return [...new Set([...active, currentCommunicationId])].slice(-12);
@@ -2136,14 +2136,19 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
       where normalized_phone = ${phone} and status = 'pending'
     `;
   }
-  const openDrafts = await sql<{ id: string; original_message: string | null; customer_name: string; customer_address: string | null; source_communication_ids: string[]; exact_list_only: boolean; delivery_address_known: boolean }[]>`
-    select id, original_message, customer_name, customer_address, source_communication_ids, exact_list_only, delivery_address_known
+  const openDrafts = await sql<{ id: string; original_message: string | null; customer_name: string; customer_address: string | null; source_communication_ids: string[]; exact_list_only: boolean; delivery_address_known: boolean; created_at: string }[]>`
+    select id, original_message, customer_name, customer_address, source_communication_ids, exact_list_only, delivery_address_known, created_at
     from public.aura_sms_request_drafts
     where sender_phone = ${phone} and status = 'new' and draft_kind = 'create'
     order by created_at desc limit 1
   `;
   const startsNewRequest = smsStartsNewMaterialRequest(body);
-  const openDraft = startsNewRequest ? undefined : openDrafts[0];
+  const draftCandidate = openDrafts[0];
+  const staleDraft = Boolean(draftCandidate && Date.now() - new Date(draftCandidate.created_at).getTime() > 24 * 60 * 60 * 1000);
+  if (draftCandidate && (startsNewRequest || staleDraft)) {
+    await sql`update public.aura_sms_request_drafts set status = 'dismissed', updated_at = now() where id = ${draftCandidate.id}::uuid and status = 'new'`;
+  }
+  const openDraft = startsNewRequest || staleDraft ? undefined : draftCandidate;
   const exactListOnly = resolveSmsExactListPreference({ storedContact: contact?.exact_list_only, storedDraft: openDraft?.exact_list_only, latestMessage: body });
   const deliveryAddressKnown = resolveSmsDeliveryAddressKnown({ storedDraft: openDraft?.delivery_address_known, latestMessage: body, startsNewRequest });
   if (exactListOnly && !contact?.exact_list_only && contact?.id) {

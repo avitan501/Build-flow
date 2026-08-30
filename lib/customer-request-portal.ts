@@ -1,6 +1,5 @@
 import "server-only"
 
-import { createAdminClient } from "@/lib/supabase/admin"
 import { getSessionWithProfile } from "@/lib/auth"
 
 export type CustomerPortalRequest = {
@@ -44,10 +43,9 @@ export async function getCustomerPortalRequests(): Promise<{ signedIn: boolean; 
   const requestIds = [...new Set([...(accessRows || []).map((row) => row.request_id), ...(ownedRows || []).map((row) => row.id)])]
   if (!requestIds.length) return { signedIn: true, requests: [] }
 
-  const admin = createAdminClient()
   const [{ data: requests, error: requestError }, { data: items, error: itemError }] = await Promise.all([
-    admin.from("quote_requests").select("id,public_number,title,status,updated_at").in("id", requestIds).order("updated_at", { ascending: false }).returns<Array<{ id: string; public_number: number; title: string; status: string; updated_at: string }>>(),
-    admin.from("quote_request_items").select("id,request_id,name,quantity,unit,qualification_status").in("request_id", requestIds).order("created_at").returns<Array<{ id: string; request_id: string; name: string; quantity: number; unit: string | null; qualification_status: string }>>(),
+    supabase.from("quote_requests").select("id,public_number,title,status,updated_at").in("id", requestIds).order("updated_at", { ascending: false }).returns<Array<{ id: string; public_number: number; title: string; status: string; updated_at: string }>>(),
+    supabase.from("quote_request_items").select("id,request_id,name,quantity,unit,qualification_status").in("request_id", requestIds).order("created_at").returns<Array<{ id: string; request_id: string; name: string; quantity: number; unit: string | null; qualification_status: string }>>(),
   ])
   if (requestError || itemError) throw new Error("Could not load your material requests.")
 

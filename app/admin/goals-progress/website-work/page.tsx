@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { lockWebsiteWorkAction } from "@/app/admin/goals-progress/website-work/actions";
 import { WebsiteWorkPinForm } from "@/components/buildflow/website-work-pin-form";
 import { requireManagerPortalProfile } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { verifyWebsiteWorkToken, WEBSITE_WORK_COOKIE } from "@/lib/website-work-access";
 
 type WebsiteWorkItem = {
@@ -54,7 +54,8 @@ export default async function WebsiteWorkPage() {
     return <main className="grid min-h-[calc(100vh-4rem)] place-items-center bg-[#f5f5f7] px-4 py-10"><WebsiteWorkPinForm /></main>;
   }
 
-  const { data, error } = await createAdminClient()
+  const supabase = await createClient();
+  const { data, error } = await supabase
     .from("website_work_items")
     .select("id,title,category,status,assigned_agent,progress_percent,summary,next_step,updated_at")
     .not("status", "in", "(completed,superseded,archived)")

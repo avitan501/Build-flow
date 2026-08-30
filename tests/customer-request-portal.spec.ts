@@ -49,6 +49,7 @@ test("customer portal returns a minimal server-only view and uses phone OTP", as
     readFile(path.join(root, "app/account/actions.ts"), "utf8"),
   ])
   expect(portal).toContain('import "server-only"')
+  expect(portal).not.toContain("createAdminClient")
   expect(portal).toContain('select("id,public_number,title,status,updated_at")')
   expect(portal).toContain('select("id,request_id,name,quantity,unit,qualification_status")')
   expect(portal).not.toContain("supplier_packages")

@@ -7,7 +7,8 @@ export const WEBSITE_WORK_COOKIE_SECONDS = 60 * 60 * 12;
 
 function secret() {
   const value = process.env.WEBSITE_WORK_PIN_SECRET?.trim()
-    || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+    || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+    || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!value) throw new Error("Website work access is not configured.");
   return value;
 }

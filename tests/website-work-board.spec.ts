@@ -5,17 +5,19 @@ import path from "node:path";
 const root = process.cwd();
 
 test("website work board is manager-authenticated, PIN-gated, and server-only", async () => {
-  const [page, actions, access, migration, goals] = await Promise.all([
+  const [page, actions, access, migration, readPolicy, goals] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/website-work/page.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/goals-progress/website-work/actions.ts"), "utf8"),
     readFile(path.join(root, "lib/website-work-access.ts"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260830044717_create_website_work_items.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260830114000_allow_staff_website_work_read.sql"), "utf8"),
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
   ]);
 
   expect(page).toContain("requireManagerPortalProfile")
   expect(page).toContain("verifyWebsiteWorkToken")
-  expect(page).toContain("createAdminClient")
+  expect(page).toContain("createClient")
+  expect(page).not.toContain("createAdminClient")
   expect(actions).toContain("requireManagerPortalProfile")
   expect(actions).toContain("httpOnly: true")
   expect(actions).toContain('sameSite: "strict"')
@@ -24,6 +26,8 @@ test("website work board is manager-authenticated, PIN-gated, and server-only", 
   expect(migration).toContain("alter table public.website_work_items enable row level security")
   expect(migration).toContain("revoke all on table public.website_work_items from anon, authenticated")
   expect(migration).not.toContain("grant select")
+  expect(readPolicy).toContain("grant select on table public.website_work_items to authenticated")
+  expect(readPolicy).toContain("private.is_admin_or_staff()")
   expect(goals).toContain('href="/admin/goals-progress/website-work"')
 });
 
