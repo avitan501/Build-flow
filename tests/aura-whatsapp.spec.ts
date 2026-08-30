@@ -239,6 +239,8 @@ test("Aura Q U O inbound events use Vault-backed verification", async () => {
   expect(broker).toContain('quoWebhookSecret: "aura_quo_webhook_signing_secret"');
   expect(broker).toContain('quoPhoneNumberId: "aura_quo_phone_number_id"');
   expect(broker).toContain("validQuoSignature");
+  expect(broker).toContain("matchesConfiguredBusinessPhone");
+  expect(broker).toContain("eventBusinessPhone === configuredBusinessPhone");
   expect(broker).toContain('input.action === "configure_quo_webhook"');
   expect(broker).toContain('quo: { receive: Boolean(smsReceive), send: Boolean(sms) }');
   expect(actions).toContain('provider === "quo-webhook"');

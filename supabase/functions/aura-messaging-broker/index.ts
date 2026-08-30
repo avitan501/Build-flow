@@ -198,12 +198,13 @@ async function quoConfig() {
 }
 
 async function quoWebhookConfig() {
-  const [signingSecret, phoneNumberId] = await Promise.all([
+  const [signingSecret, phoneNumberId, from] = await Promise.all([
     secret(secretNames.quoWebhookSecret),
     secret(secretNames.quoPhoneNumberId),
+    secret(secretNames.quoFrom),
   ]);
-  return signingSecret && phoneNumberId
-    ? { signingSecret, phoneNumberId }
+  return signingSecret && phoneNumberId && from
+    ? { signingSecret, phoneNumberId, from }
     : null;
 }
 
@@ -1953,7 +1954,26 @@ async function handleQuoWebhook(req: Request) {
   ) {
     return json({ error: "Unsupported event" }, 400);
   }
-  if (object.phoneNumberId && object.phoneNumberId !== config.phoneNumberId) {
+  const eventTo = Array.isArray(object.to) ? object.to[0] : object.to;
+  const eventBusinessPhone = normalizePhone(
+    object.direction === "outgoing" ? object.from : eventTo,
+  );
+  const configuredBusinessPhone = normalizePhone(config.from);
+  const matchesConfiguredPhoneId =
+    object.phoneNumberId === config.phoneNumberId;
+  const matchesConfiguredBusinessPhone =
+    Boolean(eventBusinessPhone) &&
+    eventBusinessPhone === configuredBusinessPhone;
+  // Quo can send a message event whose opaque phoneNumberId differs from the
+  // resource ID returned by its webhook settings. The signed payload's actual
+  // business line is authoritative for message events; call enrichment events
+  // without numbers continue to require the configured phoneNumberId or an
+  // already stored activity below.
+  if (
+    object.phoneNumberId &&
+    !matchesConfiguredPhoneId &&
+    !matchesConfiguredBusinessPhone
+  ) {
     return json({ error: "Phone number not allowed" }, 403);
   }
 
@@ -1988,7 +2008,7 @@ async function handleQuoWebhook(req: Request) {
     return json({ error: "Related call has not arrived yet" }, 409);
   }
 
-  const to = Array.isArray(object.to) ? object.to[0] : object.to;
+  const to = eventTo;
   const direction =
     object.direction === "outgoing"
       ? "outgoing"
