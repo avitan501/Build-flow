@@ -106,10 +106,10 @@ test("material request advances across turns after address until complete", () =
 
 test("product inquiry fallback answers the product and asks only useful next questions", () => {
   const sheetrock = smsProductInquiryFallbackReply("Do you sell sheetricj?")
-  expect(sheetrock).toContain("For most interior walls, 1/2 in. is standard")
+  expect(sheetrock).toContain("1/2 in. is standard for most interior walls")
   expect(sheetrock).toContain("5/8 in. is commonly used for ceilings or fire-rated assemblies")
-  expect(sheetrock).toContain("subject to the plans and code")
-  expect(sheetrock).toContain("Is it for walls or ceilings? How many sheets do you need?")
+  expect(sheetrock).toContain("check the plans/code")
+  expect(sheetrock).toContain("Walls or ceiling? How many sheets do you need?")
   expect(sheetrock).toContain("Do you also need joint compound, tape, corner bead, or drywall screws?")
   expect(smsProductInquiryFallbackReply("Do you carry Sheetrook drywall?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Can I get Sheetrcok?")).toBe(sheetrock)
@@ -119,7 +119,7 @@ test("product inquiry fallback answers the product and asks only useful next que
   expect(evaluateSmsReplyGate({ message: "Do you sell sheetricj?", reply: sheetrock || "", intent: "availability", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
   const replyParts = smsReplyParts({ reply: sheetrock || "", deterministicProductInquiry: true })
   expect(replyParts).toHaveLength(2)
-  expect(replyParts[0]).toContain("subject to the plans and code")
+  expect(replyParts[0]).toContain("check the plans/code")
   expect(replyParts[0]).toContain("How many sheets")
   expect(replyParts[1]).toBe("Do you also need joint compound, tape, corner bead, or drywall screws?")
   expect(new Set(replyParts).size).toBe(replyParts.length)

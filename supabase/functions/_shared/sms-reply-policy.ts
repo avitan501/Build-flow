@@ -253,12 +253,14 @@ export function smsProductInquiryFallbackReply(message: string, options: { allow
       ? "thinset"
       : rawProduct;
   const specification = product === "Sheetrock"
-    ? "For most interior walls, 1/2 in. is standard; 5/8 in. is commonly used for ceilings or fire-rated assemblies, subject to the plans and code. Is it for walls or ceilings?"
+    ? "1/2 in. is standard for most interior walls. 5/8 in. is commonly used for ceilings or fire-rated assemblies—check the plans/code. Walls or ceiling?"
     : "What type do you need?";
   const quantity = product === "Sheetrock"
     ? "How many sheets do you need?"
     : `How much ${product} do you need?`;
-  const primary = `Yes—we can help with ${product}. ${specification} ${quantity}`;
+  const primary = product === "Sheetrock"
+    ? `Yes. ${specification} ${quantity}`
+    : `Yes—we can help with ${product}. ${specification} ${quantity}`;
   if (product !== "Sheetrock" || options.allowRelatedSuggestion === false) return primary;
   return `${primary}\n\nDo you also need joint compound, tape, corner bead, or drywall screws?`;
 }
