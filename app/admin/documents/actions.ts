@@ -1693,12 +1693,27 @@ async function legacyAddManagerDocumentItemsToCatalogAction(
 
 export async function addManagerDocumentItemsToCatalogAction(
   documentId: string,
+  itemIds?: string[],
 ): Promise<
   Result<{ itemCount: number; priceCount: number; supplierName: string | null }>
 > {
   const { supabase } = await requireStaffProfile("suppliers");
   if (!UUID_PATTERN.test(documentId))
     return { ok: false, error: "Invalid document." };
+  const requestedItemIds = itemIds
+    ? [...new Set(itemIds.filter((itemId) => UUID_PATTERN.test(itemId)))].slice(0, 200)
+    : null;
+  if (itemIds && requestedItemIds?.length !== itemIds.length)
+    return { ok: false, error: "Invalid catalog product selection." };
+
+  let selectedItemsQuery = supabase
+    .from("manager_document_items")
+    .select("*")
+    .eq("document_id", documentId)
+    .eq("selected", true)
+    .order("line_number");
+  if (requestedItemIds)
+    selectedItemsQuery = selectedItemsQuery.in("id", requestedItemIds);
 
   const [{ data: document }, { data: selectedItems }, { data: supplierRows }] =
     await Promise.all([
@@ -1707,13 +1722,7 @@ export async function addManagerDocumentItemsToCatalogAction(
         .select("*")
         .eq("id", documentId)
         .maybeSingle<ManagerDocumentRecord>(),
-      supabase
-        .from("manager_document_items")
-        .select("*")
-        .eq("document_id", documentId)
-        .eq("selected", true)
-        .order("line_number")
-        .returns<ManagerDocumentItemRecord[]>(),
+      selectedItemsQuery.returns<ManagerDocumentItemRecord[]>(),
       supabase.rpc("staff_load_catalog_suppliers"),
     ]);
   if (!document) return { ok: false, error: "Document not found." };

@@ -70,6 +70,11 @@ export function ManagerDocumentReview({
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [selectionChanged, setSelectionChanged] = useState(false);
+  const [rowImportNotice, setRowImportNotice] = useState<{
+    lineId: string;
+    message: string;
+  } | null>(null);
+  const [importingLineId, setImportingLineId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const supplierDocument = [
     "supplier_quote",
@@ -97,19 +102,22 @@ export function ManagerDocumentReview({
   const suggestedDepartment = draft.suggested_department
     ? normalizeMaterialCatalogDepartment(draft.suggested_department)
     : "";
-  const importBlocker = !canApprove
-    ? "Manager approval access is required."
-    : !selectedLines.length
-      ? "Select at least one product."
-      : !departmentChosen
-        ? suggestedDepartment
-          ? `Choose a department. Suggested: ${suggestedDepartment}.`
-          : "Choose a department."
-        : !allSelectedValid
-          ? "Complete the highlighted product details."
-          : actionableWarnings.length > 0 && !acknowledgeWarnings
-            ? "Review and confirm the document notes."
-            : "";
+  function catalogImportBlocker(importLines: ManagerDocumentItemRecord[]) {
+    return !canApprove
+      ? "Manager approval access is required."
+      : !importLines.length
+        ? "Select at least one product."
+        : !departmentChosen
+          ? suggestedDepartment
+            ? `Choose a department. Suggested: ${suggestedDepartment}.`
+            : "Choose a department."
+          : importLines.some((line) => line.validation_status !== "valid")
+            ? "Complete the highlighted product details."
+            : actionableWarnings.length > 0 && !acknowledgeWarnings
+              ? "Review and confirm the document notes."
+              : "";
+  }
+  const importBlocker = catalogImportBlocker(selectedLines);
 
   function run(work: () => Promise<void>) {
     setError("");
@@ -235,12 +243,22 @@ export function ManagerDocumentReview({
       router.refresh();
     });
   }
-  function saveApproveAndImport() {
-    if (importBlocker) {
+  function saveApproveAndImport(lineId?: string) {
+    const originalLines = lines;
+    const linesForImport = lineId
+      ? lines.map((line) => ({ ...line, selected: line.id === lineId }))
+      : lines;
+    const blocker = catalogImportBlocker(
+      linesForImport.filter((line) => line.selected),
+    );
+    if (blocker) {
       setFeedback("");
-      setError(importBlocker);
+      setError(blocker);
+      if (lineId) setRowImportNotice({ lineId, message: blocker });
       return;
     }
+    setImportingLineId(lineId ?? null);
+    setRowImportNotice(null);
     run(async () => {
       const saved = await saveManagerDocumentReviewAction({
         documentId: document.id,
@@ -260,7 +278,7 @@ export function ManagerDocumentReview({
         total: draft.total,
         acknowledgeWarnings,
         evidence: draft.evidence,
-        items: lines.map((line) => ({
+        items: linesForImport.map((line) => ({
           id: line.id,
           description: line.description,
           itemCode: line.item_code,
@@ -274,31 +292,83 @@ export function ManagerDocumentReview({
       });
       if (!saved.ok) {
         setError(saved.error);
+        if (lineId) setRowImportNotice({ lineId, message: saved.error });
+        setImportingLineId(null);
         return;
       }
       if (saved.data.warningCount > 0) {
-        setError("Check the highlighted warning, then try again.");
+        const message = "Check the highlighted warning, then try again.";
+        setError(message);
+        if (lineId) setRowImportNotice({ lineId, message });
+        setImportingLineId(null);
         router.refresh();
         return;
       }
       const approvedResult = await approveManagerDocumentAction(document.id);
       if (!approvedResult.ok) {
         setError(approvedResult.error);
+        if (lineId)
+          setRowImportNotice({ lineId, message: approvedResult.error });
+        setImportingLineId(null);
         router.refresh();
         return;
       }
       const imported = await addManagerDocumentItemsToCatalogAction(
         document.id,
+        lineId ? [lineId] : undefined,
       );
       if (!imported.ok) {
         setError(imported.error);
+        if (lineId) setRowImportNotice({ lineId, message: imported.error });
+        setImportingLineId(null);
         router.refresh();
         return;
+      }
+      if (lineId) {
+        // Importing one row must not silently clear the manager's other choices.
+        // Restore the original selection and return the document to review if
+        // another selected row still needs attention.
+        const restored = await saveManagerDocumentReviewAction({
+          documentId: document.id,
+          documentType: draft.document_type,
+          title: draft.title,
+          partyName: draft.party_name,
+          documentNumber: draft.document_number,
+          documentDate: draft.document_date || "",
+          dueDate: draft.due_date || "",
+          expiresOn: draft.expires_on || "",
+          department: draft.department,
+          subtotal: draft.subtotal,
+          discount: draft.discount,
+          deliveryCharge: draft.delivery_charge,
+          taxAmount: draft.tax_amount,
+          taxPercent: draft.tax_percent,
+          total: draft.total,
+          acknowledgeWarnings,
+          evidence: draft.evidence,
+          items: originalLines.map((line) => ({
+            id: line.id,
+            description: line.description,
+            itemCode: line.item_code,
+            specification: line.specification,
+            quantity: line.quantity,
+            unit: line.unit,
+            unitPrice: line.unit_price,
+            lineTotal: line.line_total,
+            selected: line.selected,
+          })),
+        });
+        if (!restored.ok) {
+          setError(
+            "The product was imported, but the previous checkbox selection could not be restored. Reload this document.",
+          );
+        }
       }
       setSelectionChanged(false);
       setFeedback(
         `${imported.data.itemCount} selected product${imported.data.itemCount === 1 ? "" : "s"} imported to Catalog with ${imported.data.priceCount} supplier price${imported.data.priceCount === 1 ? "" : "s"}.`,
       );
+      setImportingLineId(null);
       router.refresh();
     });
   }
@@ -591,7 +661,7 @@ export function ManagerDocumentReview({
                 <table className="w-full min-w-[58rem] border-collapse text-left text-xs">
                   <thead className="bg-slate-950 text-white">
                     <tr>
-                      <th className="px-3 py-3">Import</th>
+                      <th className="min-w-32 px-3 py-3">Catalog</th>
                       <th className="min-w-56 px-3 py-3">Item</th>
                       <th className="px-3 py-3">Supplier code</th>
                       <th className="px-3 py-3">Qty</th>
@@ -609,17 +679,57 @@ export function ManagerDocumentReview({
                         className={`align-top ${line.selected ? "bg-sky-50/40" : "bg-slate-50 opacity-70"}`}
                       >
                         <td className="px-3 py-3">
-                          <input
-                            type="checkbox"
-                            aria-label={`Import ${line.description || `line ${index + 1}`} to catalog`}
-                            checked={line.selected}
-                            onChange={(event) =>
-                              updateLine(index, {
-                                selected: event.target.checked,
-                              })
-                            }
-                            className="h-5 w-5 accent-[#0071e3]"
-                          />
+                          <div className="grid justify-items-start gap-2">
+                            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${line.description || `line ${index + 1}`} for catalog import`}
+                                checked={line.selected}
+                                onChange={(event) =>
+                                  updateLine(index, {
+                                    selected: event.target.checked,
+                                  })
+                                }
+                                className="h-4 w-4 accent-[#0071e3]"
+                              />
+                              Select
+                            </label>
+                            {line.catalog_import_status === "imported" &&
+                            line.matched_catalog_item_id ? (
+                              <Link
+                                href="/admin/catalog"
+                                className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 font-bold text-emerald-800"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                In Catalog
+                              </Link>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => saveApproveAndImport(line.id)}
+                                disabled={!canApprove || pending}
+                                aria-label={`Add ${line.description || `line ${index + 1}`} to Catalog`}
+                                className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-[#0071e3] px-2.5 font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                {pending && importingLineId === line.id ? (
+                                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <BookOpenCheck className="h-3.5 w-3.5" />
+                                )}
+                                {pending && importingLineId === line.id
+                                  ? "Adding…"
+                                  : "Add to Catalog"}
+                              </button>
+                            )}
+                            {rowImportNotice?.lineId === line.id ? (
+                              <span
+                                role="alert"
+                                className="max-w-40 text-[10px] font-semibold leading-4 text-rose-700"
+                              >
+                                {rowImportNotice.message}
+                              </span>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="px-3 py-3">
                           <input
@@ -792,7 +902,7 @@ export function ManagerDocumentReview({
                   </div>
                   <button
                     type="button"
-                    onClick={saveApproveAndImport}
+                    onClick={() => saveApproveAndImport()}
                     disabled={!canApprove || pending || !selectedLines.length}
                     aria-describedby="catalog-import-status"
                     className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
