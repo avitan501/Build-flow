@@ -405,6 +405,20 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
     if (!hasDuration) questions.push("How long do you need the dumpster?");
   }
 
+  const dimensionalLumber = /\b(?:wood\s+)?lumber\b|\b\d+\s*[x×]\s*\d+(?:\s*[x×]\s*\d+)?\b[^\n]{0,30}\b(?:wood|studs?|lumber|boards?)?\b/i.test(value) && !metalStuds;
+  if (dimensionalLumber) {
+    const hasLumberDimensions = /\b\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?(?:\s*[x×]\s*\d+(?:\.\d+)?)?\b/i.test(value);
+    if (!hasLumberDimensions) questions.push("What lumber dimensions and length do you need?");
+    addQuantityQuestion("lumber", "pieces");
+  }
+
+  const drywallFastener = /\b(?:drywall|sheetrock)\s+screws?\b|\bscrews?\b[^\n]{0,30}\b(?:drywall|sheetrock)\b/i.test(value);
+  if (drywallFastener) {
+    const hasScrewLength = /\b(?:1|1\s*1\/4|1\s*5\/8|2|2\s*1\/2|3)\s*(?:in\.?|inch(?:es)?|["”])\b|\b1[- ]?1\/4\b|\b1[- ]?5\/8\b/i.test(value);
+    if (!hasScrewLength) questions.push("What drywall-screw length do you need?");
+    addQuantityQuestion("drywall screws", "pieces");
+  }
+
   return [...new Set(questions)].slice(0, 3);
 }
 
@@ -422,6 +436,8 @@ export function smsMaterialIntelligenceAssessment(value: string, options: { exac
     [/\bdoors?\b/i, "door"],
     [/\bwindows?\b/i, "window"],
     [/\b(?:dumpsters?|roll[- ]?offs?|containers?)\b/i, "dumpster"],
+    [/\b(?:wood\s+)?lumber\b|\b\d+\s*[x×]\s*\d+\s*[x×]\s*\d+\b/i, "dimensional-lumber"],
+    [/\b(?:drywall|sheetrock)\s+screws?\b|\bscrews?\b[^\n]{0,30}\b(?:drywall|sheetrock)\b/i, "drywall-fastener"],
   ].filter(([pattern]) => (pattern as RegExp).test(value)).map(([, key]) => key as string);
   const readyForConfirmation = matchedRules.length > 0 && questions.length === 0;
   const confidence = matchedRules.length === 0 ? 0.45 : readyForConfirmation ? 0.98 : Math.max(0.5, 0.82 - questions.length * 0.1);
