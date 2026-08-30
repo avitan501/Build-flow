@@ -147,3 +147,15 @@ test("Quo recovery retries every 30 seconds and records safe failures", async ()
   const pollWindow = broker.slice(broker.indexOf("async function runQuoFastPollWindow"), broker.indexOf("function validEmail"))
   expect(pollWindow).not.toContain("String(error)")
 })
+
+test("Quo recovery ACK timeout tolerates a cold worker without overlapping cron ticks", async () => {
+  const migration = await readFile(
+    path.join(root, "supabase/migrations/20260830224000_extend_quo_worker_ack_timeout.sql"),
+    "utf8",
+  )
+  expect(migration).toContain("timeout_milliseconds := 10000")
+  expect(migration).toContain("https://nprfhspwdflpqlopydmp.supabase.co")
+  expect(migration).toContain("aura-quo-fast-poll-worker?mode=quo-fast-poll")
+  expect(migration).toContain("revoke all on function public.dispatch_quo_fast_poll() from public, anon, authenticated")
+  expect(migration).not.toContain("cron.schedule")
+})
