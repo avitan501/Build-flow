@@ -2903,7 +2903,10 @@ async function releaseQuoFastPollLease(leaseToken: string) {
 async function runQuoFastPollWindow(leaseToken: string) {
   let ingested = 0;
   try {
-    for (let cycle = 0; cycle < 12; cycle += 1) {
+    // Leave headroom before the next one-minute pg_cron tick. Poll/network
+    // work adds time beyond the 5-second sleeps, so a 12-cycle window could
+    // overlap the next dispatch and make pg_net wait for a busy isolate.
+    for (let cycle = 0; cycle < 10; cycle += 1) {
       if (!await renewQuoFastPollLease(leaseToken)) {
         console.error("quo_fast_poll_lease_lost");
         return;
@@ -2913,9 +2916,9 @@ async function runQuoFastPollWindow(leaseToken: string) {
       } catch (error) {
         console.error("quo_fast_poll_failed", error instanceof Error ? error.message : "unknown error");
       }
-      if (cycle < 11) await new Promise((resolve) => setTimeout(resolve, 5000));
+      if (cycle < 9) await new Promise((resolve) => setTimeout(resolve, 5000));
     }
-    await sql`insert into public.aura_audit_log (action, details) values ('quo_fast_poll_window_completed', ${sql.json({ ingested, cycles: 12 })})`;
+    await sql`insert into public.aura_audit_log (action, details) values ('quo_fast_poll_window_completed', ${sql.json({ ingested, cycles: 10 })})`;
   } finally {
     try {
       await releaseQuoFastPollLease(leaseToken);
