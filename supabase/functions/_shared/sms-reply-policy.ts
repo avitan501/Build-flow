@@ -40,6 +40,10 @@ export function looksLikeSmsMaterialRequest(value: string) {
   return quantifiedMaterial || structuredList || /\b(?:need|order|send)\b.{0,80}/i.test(value) && MATERIAL_TERMS.test(value) || /(?:צריך|צריכ(?:ה|ים)|להזמין).{0,80}/i.test(value) && MATERIAL_TERMS.test(value) || /\b(?:necesito|ordenar|mandar)\b.{0,80}/i.test(value) && MATERIAL_TERMS.test(value);
 }
 
+export function smsReferencesPriorAttachment(value: string) {
+  return /\b(?:what(?:'s| is)\s+(?:this|that)|what\s+product\s+is\s+(?:this|that)|can\s+you\s+(?:identify|confirm)(?:\s+(?:this|that|it))?|do\s+you\s+know\s+what\s+(?:this|that|it)\s+is|is\s+(?:this|that)\s+(?:the\s+)?(?:right|correct)\s+(?:item|product)?)\b|(?:מה\s+זה|מהו\s+המוצר|אתה\s+יכול\s+(?:לזהות|לאשר)|אפשר\s+(?:לזהות|לאשר)|זה\s+המוצר\s+הנכון)|\b(?:qu[eé]\s+es\s+(?:esto|eso)|puede\s+(?:identificar|confirmar)(?:lo)?|cu[aá]l\s+es\s+este\s+producto)\b/i.test(value);
+}
+
 export function classifySmsReplyIntent(params: {
   message: string;
   hasImage?: boolean;
