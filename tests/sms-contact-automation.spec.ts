@@ -21,7 +21,9 @@ test("communications offers guarded per-contact AI modes and fast contact tags",
   expect(workspace).toContain("Teach AI from my approved reply")
   expect(workspace).toContain('href="/admin/ai-tools/sms-replies"')
   for (const kind of ["customer", "lead", "supplier"]) expect(actions).toContain(`"${kind}"`)
-  expect(actions).toContain("phoneLoginEmailForPhone")
+  expect(actions).not.toContain("phoneLoginEmailForPhone")
+  expect(actions).toContain("findPhoneAuthUser")
+  expect(actions).toContain("createUser({ phone, phone_confirm: true")
   expect(actions).toContain("staff_upsert_supplier_directory_entry")
 })
 
