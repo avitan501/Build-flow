@@ -2287,6 +2287,23 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
       protectedTopic: hasForbiddenAutoReplyTopic(effectiveBody),
     });
   }
+  // The analyzer intentionally labels every correction RED. For an intake
+  // draft that has not been confirmed yet, re-run the deterministic output
+  // gate as a normal missing-detail turn. Unsafe claims still remain RED;
+  // only a concise, non-committal next question can pass automatically.
+  if (preConfirmationCorrection) {
+    result.autoSafe = true;
+    safety = evaluateSmsReplyGate({
+      message: effectiveBody,
+      reply: result.reply,
+      intent: "material_request",
+      event: "message",
+      participantRole: result.participantRole || "lead",
+      modelAutoSafe: true,
+      exactListOnly,
+      protectedTopic: hasForbiddenAutoReplyTopic(effectiveBody),
+    });
+  }
   const linkedRole = contact?.notes?.match(/^Avantia link:(customer|lead|supplier):/)?.[1] as CustomerSmsAutomation["participantRole"] | undefined;
   result.participantRole = linkedRole || result.participantRole || inferredParticipantRole(context.customerText);
   if (result.participantRole === "unknown") result.participantRole = "lead";

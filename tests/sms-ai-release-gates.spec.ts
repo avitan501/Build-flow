@@ -254,6 +254,8 @@ test("broker-created request progression replies are gated independently from mo
   expect(brokerSource).toContain('if (customerEvent === "correction") {')
   expect(brokerSource).toContain('const preConfirmationCorrection = customerEvent === "correction" && Boolean(openDraft)')
   expect(brokerSource).toContain('event: preConfirmationCorrection ? "message" : customerEvent')
+  expect(brokerSource).toContain('if (preConfirmationCorrection) {')
+  expect(brokerSource).toContain('only a concise, non-committal next question can pass automatically')
   expect(brokerSource).toContain('(customerEvent !== "correction" || preConfirmationCorrection)')
   expect(brokerSource).toContain("and activity_id = ${activityId} and event_type = 'message.received'")
   expect(brokerSource).toContain("canonicalEvents[0]?.external_event_id === eventId")
