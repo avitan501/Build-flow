@@ -73,7 +73,7 @@ test("manager links and communication handoff are review-only", async () => {
   expect(dashboard).toContain('{ href: "/admin/ai-tools/media-messages", label: "Media & Messages" }')
   expect(communicationsPage).toContain("requestedDraft")
   expect(communicationsPage).toContain('slice(0, 1600)')
-  expect(inbox).toContain('const [message, setMessage] = useState(initialDraft)')
+  expect(inbox).toContain('const [message, setMessage] = useState(initialDraft || initialStoredDraft?.reply_text || "")')
   expect(inbox).toContain('initialDraft ? "__new__"')
   expect(cinematic).toContain('from "@/lib/avantia-media-library"')
   expect(cinematic).not.toContain("Need material for the job? From your phone")
