@@ -65,7 +65,7 @@ export default async function CommunicationsPage({
     access.customers ? supabase.from("manager_outreach_leads").select("id,full_name,company_name,email,phone").neq("status", "archived").order("full_name").limit(500).returns<AuraLeadRecipient[]>() : Promise.resolve({ data: [] }),
     access.suppliers ? supabase.rpc("staff_load_supplier_directory_snapshot") : Promise.resolve({ data: null }),
     access.customers ? supabase.from("quote_requests").select("id,title,status").neq("status", "draft").order("updated_at", { ascending: false }).limit(150) : Promise.resolve({ data: [] }),
-    access.customers ? supabase.from("aura_sms_reply_drafts").select("id,communication_id,counterparty_phone,reply_text,decision,safety_reason,ai_model,updated_at").in("decision", ["draft", "blocked", "send_failed"]).order("updated_at", { ascending: false }).limit(200).returns<SmsReplyDraft[]>() : Promise.resolve({ data: [] }),
+    access.customers ? supabase.from("aura_sms_reply_drafts").select("id,communication_id,counterparty_phone,reply_text,decision,safety_reason,safety_level,safety_signals,intent,latency_ms,input_tokens,output_tokens,estimated_cost_usd,prompt_version,ai_model,updated_at").in("decision", ["draft", "blocked", "send_failed"]).order("updated_at", { ascending: false }).limit(200).returns<SmsReplyDraft[]>() : Promise.resolve({ data: [] }),
     supabase.from("manager_goals").select("details,updated_at").like("details", `${COMMUNICATION_LOG_PREFIX}%`).order("updated_at", { ascending: false }).limit(100),
     listInboxThreads().catch(() => []),
     access.customers

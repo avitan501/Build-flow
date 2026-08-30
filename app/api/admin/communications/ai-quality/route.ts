@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "Invalid quality-check request." }, { status: 400 })
   }
-  const cases = Array.isArray(body.cases) ? body.cases.slice(0, 20).flatMap((entry, index) => {
+  const cases = Array.isArray(body.cases) ? body.cases.slice(0, 10).flatMap((entry, index) => {
     const message = typeof entry?.message === "string" ? entry.message.trim().slice(0, 1600) : ""
     if (!message) return []
     return [{ id: typeof entry.id === "string" ? entry.id.slice(0, 40) : `case-${index + 1}`, message }]

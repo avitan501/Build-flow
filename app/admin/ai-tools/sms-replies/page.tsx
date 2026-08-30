@@ -1,9 +1,10 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Bot, CheckCircle2, ChevronLeft, MessageCircleMore, ShieldCheck, Sparkles } from "lucide-react"
+import { Activity, Bot, CheckCircle2, ChevronLeft, MessageCircleMore, ShieldCheck, Sparkles } from "lucide-react"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { deleteSmsAiKnowledgeAction, deleteSmsAiReplyExampleAction, saveSmsAiKnowledgeAction, saveSmsAiPreferencesAction, setSmsAiKnowledgeEnabledAction, setSmsAiReplyExampleEnabledAction } from "./actions"
+import { SmsReplyLab } from "./SmsReplyLab"
 
 type SettingsRow = {
   enabled: boolean
@@ -24,8 +25,20 @@ type TrainingExampleRow = {
   approved_reply: string
   language: string | null
   tags: string[]
+  intent: string
+  privacy_redacted: boolean
   enabled: boolean
   updated_at: string
+}
+
+type ReplyMetricRow = {
+  decision: string
+  safety_level: "green" | "yellow" | "red"
+  ai_model: string | null
+  latency_ms: number | null
+  input_tokens: number | null
+  output_tokens: number | null
+  estimated_cost_usd: number | null
 }
 
 type KnowledgeRow = {
@@ -58,14 +71,22 @@ export default async function SmsAiRepliesSettingsPage({ searchParams }: { searc
   const params = await searchParams
   const { supabase, access } = await requireManagerPortalProfile()
   if (!access.aiTools || !access.customers) redirect("/")
-  const [result, examplesResult, knowledgeResult] = await Promise.all([
+  const [result, examplesResult, knowledgeResult, metricsResult] = await Promise.all([
     supabase.from("aura_sms_ai_settings").select("enabled,preferred_voice,max_sentences,match_customer_language,auto_acknowledge_follow_ups,auto_ask_delivery_details,auto_acknowledge_pricing,auto_create_request_drafts,custom_instructions,updated_at").eq("id", 1).maybeSingle<SettingsRow>(),
-    supabase.from("aura_ai_reply_examples").select("id,customer_message,approved_reply,language,tags,enabled,updated_at").order("updated_at", { ascending: false }).limit(50).returns<TrainingExampleRow[]>(),
+    supabase.from("aura_ai_reply_examples").select("id,customer_message,approved_reply,language,tags,intent,privacy_redacted,enabled,updated_at").order("updated_at", { ascending: false }).limit(50).returns<TrainingExampleRow[]>(),
     supabase.from("aura_ai_reply_knowledge").select("id,fact,category,source_path,enabled,reviewed_at").order("reviewed_at", { ascending: false }).limit(100).returns<KnowledgeRow[]>(),
+    supabase.from("aura_sms_reply_drafts").select("decision,safety_level,ai_model,latency_ms,input_tokens,output_tokens,estimated_cost_usd").order("created_at", { ascending: false }).limit(500).returns<ReplyMetricRow[]>(),
   ])
   const settings = result.data ?? fallback
   const examples = examplesResult.data ?? []
   const knowledge = knowledgeResult.data ?? []
+  const metrics = metricsResult.data ?? []
+  const measuredLatency = metrics.map((row) => row.latency_ms).filter((value): value is number => typeof value === "number").sort((a, b) => a - b)
+  const percentile = (ratio: number) => measuredLatency.length ? measuredLatency[Math.min(measuredLatency.length - 1, Math.floor((measuredLatency.length - 1) * ratio))] : null
+  const totalEstimatedCost = metrics.reduce((total, row) => total + (row.estimated_cost_usd || 0), 0)
+  const knownCostRows = metrics.filter((row) => row.estimated_cost_usd !== null).length
+  const greenRows = metrics.filter((row) => row.safety_level === "green").length
+  const terraRows = metrics.filter((row) => row.ai_model?.includes("terra")).length
 
   return <main className="min-h-screen bg-[#f5f6f8] px-3 py-5 sm:px-6 sm:py-8">
     <div className="mx-auto max-w-4xl">
@@ -104,10 +125,23 @@ export default async function SmsAiRepliesSettingsPage({ searchParams }: { searc
         <div className="sticky bottom-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur"><Link href="/admin/communications?channel=sms" className="px-3 text-xs font-bold text-sky-700">Open Communications</Link><button type="submit" className="h-11 rounded-xl bg-slate-950 px-5 text-sm font-bold text-white">Save AI settings</button></div>
       </form>
 
+      <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6" aria-labelledby="reply-performance">
+        <div className="flex items-start gap-3"><Activity className="mt-0.5 h-5 w-5 text-sky-600" /><div><h2 id="reply-performance" className="font-bold text-slate-950">Reply performance</h2><p className="mt-1 text-xs leading-5 text-slate-500">Manager-only measurements from the latest {metrics.length} prepared replies. Costs appear only when model rates are configured.</p></div></div>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{[
+          ["Green safety", metrics.length ? `${Math.round(greenRows / metrics.length * 100)}%` : "—"],
+          ["p50 latency", percentile(0.5) === null ? "—" : `${percentile(0.5)} ms`],
+          ["p95 latency", percentile(0.95) === null ? "—" : `${percentile(0.95)} ms`],
+          ["Terra share", metrics.length ? `${Math.round(terraRows / metrics.length * 100)}%` : "—"],
+        ].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 text-lg font-bold text-slate-950">{value}</p></div>)}</div>
+        <p className="mt-3 text-[10px] text-slate-500">Recorded tokens: {metrics.reduce((total, row) => total + (row.input_tokens || 0) + (row.output_tokens || 0), 0).toLocaleString()} · Estimated AI cost: {knownCostRows ? `$${totalEstimatedCost.toFixed(4)} across ${knownCostRows} replies` : "configure Luna/Terra per-million-token rates to calculate"}</p>
+      </section>
+
+      <SmsReplyLab />
+
       <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6" aria-labelledby="approved-reply-examples">
         <div className="flex items-start gap-3"><Bot className="mt-0.5 h-5 w-5 text-sky-600" /><div><h2 id="approved-reply-examples" className="font-bold text-slate-950">Approved reply examples</h2><p className="mt-1 text-xs leading-5 text-slate-500">Check “Teach AI” on an edited draft in Communications to add an example here. AI uses enabled examples only as wording patterns, never as facts.</p></div></div>
         <div className="mt-4 space-y-3">
-          {examples.length ? examples.map((example) => <article key={example.id} className={`rounded-xl border p-3 ${example.enabled ? "border-sky-200 bg-sky-50/60" : "border-slate-200 bg-slate-50 opacity-75"}`}><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><span className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase text-slate-600">{example.language || "auto"}</span><span className="text-[10px] font-bold text-slate-500">{example.enabled ? "Active" : "Paused"}</span></div><div className="flex gap-2"><form action={setSmsAiReplyExampleEnabledAction}><input type="hidden" name="exampleId" value={example.id} /><input type="hidden" name="enabled" value={example.enabled ? "false" : "true"} /><button type="submit" className="text-[10px] font-bold text-sky-700">{example.enabled ? "Pause" : "Enable"}</button></form><form action={deleteSmsAiReplyExampleAction}><input type="hidden" name="exampleId" value={example.id} /><button type="submit" className="text-[10px] font-bold text-rose-700">Remove</button></form></div></div><p className="mt-2 text-xs leading-5 text-slate-600"><strong className="text-slate-800">Customer:</strong> {example.customer_message}</p><p className="mt-1 text-xs leading-5 text-slate-700"><strong className="text-slate-900">Approved reply:</strong> {example.approved_reply}</p></article>) : <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-xs text-slate-500">No approved examples yet. Nothing is learned automatically.</p>}
+          {examples.length ? examples.map((example) => <article key={example.id} className={`rounded-xl border p-3 ${example.enabled ? "border-sky-200 bg-sky-50/60" : "border-slate-200 bg-slate-50 opacity-75"}`}><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><span className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase text-slate-600">{example.language || "auto"} · {example.intent}</span><span className="text-[10px] font-bold text-slate-500">{example.enabled ? "Active" : "Paused"}{example.privacy_redacted ? " · privacy-safe" : ""}</span></div><div className="flex gap-2"><form action={setSmsAiReplyExampleEnabledAction}><input type="hidden" name="exampleId" value={example.id} /><input type="hidden" name="enabled" value={example.enabled ? "false" : "true"} /><button type="submit" className="text-[10px] font-bold text-sky-700">{example.enabled ? "Pause" : "Enable"}</button></form><form action={deleteSmsAiReplyExampleAction}><input type="hidden" name="exampleId" value={example.id} /><button type="submit" className="text-[10px] font-bold text-rose-700">Remove</button></form></div></div><p className="mt-2 text-xs leading-5 text-slate-600"><strong className="text-slate-800">Customer:</strong> {example.customer_message}</p><p className="mt-1 text-xs leading-5 text-slate-700"><strong className="text-slate-900">Approved reply:</strong> {example.approved_reply}</p></article>) : <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-xs text-slate-500">No approved examples yet. Nothing is learned automatically.</p>}
         </div>
       </section>
 

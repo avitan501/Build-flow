@@ -11,6 +11,7 @@ import { TwoChatSoftphone } from "@/components/buildflow/two-chat-softphone"
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard"
 import { normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identity"
 import { looksLikeMaterialRequestMessage } from "@/lib/aura/material-request-detection"
+import { SMS_CORRECTION_REASONS, type SmsCorrectionReason } from "@/lib/ai/sms-training-privacy"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 
 export type AuraLeadRecipient = {
@@ -57,6 +58,14 @@ type Conversation = {
 }
 
 const QUICK_REPLIES = ["Received, thank you.", "I need a few more details.", "I am checking current pricing.", "A manager will confirm the next step."]
+const CORRECTION_REASON_LABELS: Record<SmsCorrectionReason, string> = {
+  tone: "Tone",
+  too_long: "Too long",
+  repeated_question: "Repeated question",
+  wrong_or_missing_fact: "Wrong / missing fact",
+  wrong_item_or_quantity: "Wrong item / quantity",
+  safety_or_commitment: "Safety / commitment",
+}
 
 function identityKey(phone?: string | null, email?: string | null) {
   return normalizeAuraPhone(phone) || email?.trim().toLowerCase() || ""
@@ -216,6 +225,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const [requestReview, setRequestReview] = useState<SmsRequestProposal | null>(null)
   const [activeDraftId, setActiveDraftId] = useState<string | null>(initialStoredDraft?.id || null)
   const [teachAi, setTeachAi] = useState(false)
+  const [correctionReasons, setCorrectionReasons] = useState<SmsCorrectionReason[]>([])
 
   useEffect(() => {
     const refresh = () => { if (document.visibilityState === "visible") router.refresh() }
@@ -304,6 +314,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     setMessage(storedDraft?.reply_text || "")
     setActiveDraftId(storedDraft?.id || null)
     setTeachAi(false)
+    setCorrectionReasons([])
     if (storedDraft) setChannel("sms")
     setFeedback(null)
     const auraContact = contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(conversation.phone, conversation.email))
@@ -334,6 +345,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     setMessage(nextStoredDraft?.reply_text || "")
     setActiveDraftId(nextStoredDraft?.id || null)
     setTeachAi(false)
+    setCorrectionReasons([])
     setFeedback(null)
   }
 
@@ -400,6 +412,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     setMessage("")
     setActiveDraftId(null)
     setTeachAi(false)
+    setCorrectionReasons([])
     setFeedback(null)
   }
 
@@ -445,9 +458,10 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       const result = await sendAuraMessageAction({ channel: messageChannel, recipient, subject, message })
       if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return }
       if (sentDraftId) {
-        const completed = await completeSmsReplyDraftAction({ draftId: sentDraftId, reply: message, teachAi: teachSentReply })
+        const completed = await completeSmsReplyDraftAction({ draftId: sentDraftId, reply: message, teachAi: teachSentReply, correctionReasons })
         setActiveDraftId(null)
         setTeachAi(false)
+        setCorrectionReasons([])
         if (!completed.ok) {
           setMessage("")
           setFeedback({ tone: "error", text: completed.error })
@@ -503,6 +517,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const activeHasEmail = activeConversation?.messages.some((item) => item.channel === "email") ?? false
   const requestCandidateId = activeConversation ? [...activeConversation.messages].reverse().find((item) => messageCanStartMaterialRequest(item) && !(item.links ?? []).some((link) => link.entity_type === "material_request"))?.id ?? null : null
   const activeSmsDraft = activeDraftId ? smsReplyDrafts.find((draft) => draft.id === activeDraftId) || null : null
+  const activeDraftEdited = Boolean(activeSmsDraft && message.trim() !== activeSmsDraft.reply_text.trim())
 
   const threadVisible = mobileThreadOpen || activeKey === "__new__"
 
@@ -533,7 +548,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
 
         <footer className="shrink-0 border-t border-slate-200 bg-white p-2.5 sm:p-3">
           <div className="mx-auto max-w-3xl">
-            {activeSmsDraft ? <section className="mb-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2" aria-label="AI reply draft"><div className="flex items-start gap-2"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-sky-700" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-[11px] font-bold text-sky-950">AI draft ready · edit before sending</p><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${activeSmsDraft.decision === "blocked" || activeSmsDraft.decision === "send_failed" ? "bg-amber-100 text-amber-800" : "bg-white text-sky-700"}`}>{activeSmsDraft.decision.replaceAll("_", " ")}</span></div><p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-sky-800">{activeSmsDraft.safety_reason || "Manager review is required before sending."}</p><label className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 text-[10px] font-bold text-sky-950"><input type="checkbox" checked={teachAi} onChange={(event) => setTeachAi(event.target.checked)} className="h-3.5 w-3.5 rounded border-sky-300 accent-sky-700" />Teach AI from my approved reply</label><p className="mt-0.5 text-[9px] text-sky-700">Nothing is learned unless you check this box and send. Internal AI model: {activeSmsDraft.ai_model || "recorded by broker"}.</p></div></div></section> : null}
+            {activeSmsDraft ? <section className="mb-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2" aria-label="AI reply draft"><div className="flex items-start gap-2"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-sky-700" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-[11px] font-bold text-sky-950">AI draft ready · edit before sending</p><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${activeSmsDraft.decision === "blocked" || activeSmsDraft.decision === "send_failed" ? "bg-amber-100 text-amber-800" : "bg-white text-sky-700"}`}>{activeSmsDraft.decision.replaceAll("_", " ")}</span><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${activeSmsDraft.safety_level === "green" ? "bg-emerald-100 text-emerald-800" : activeSmsDraft.safety_level === "red" ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"}`}>{activeSmsDraft.safety_level || "yellow"} safety</span></div><p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-sky-800">{activeSmsDraft.safety_reason || "Manager review is required before sending."}</p>{activeDraftEdited ? <div className="mt-2"><p className="text-[9px] font-bold uppercase tracking-wide text-sky-900">Why did you edit it?</p><div className="mt-1 flex flex-wrap gap-1">{SMS_CORRECTION_REASONS.map((reason) => <button key={reason} type="button" onClick={() => setCorrectionReasons((current) => current.includes(reason) ? current.filter((item) => item !== reason) : [...current, reason])} className={`rounded-full border px-2 py-1 text-[9px] font-bold ${correctionReasons.includes(reason) ? "border-sky-700 bg-sky-700 text-white" : "border-sky-200 bg-white text-sky-800"}`}>{CORRECTION_REASON_LABELS[reason]}</button>)}</div></div> : null}<label className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 text-[10px] font-bold text-sky-950"><input type="checkbox" checked={teachAi} onChange={(event) => setTeachAi(event.target.checked)} className="h-3.5 w-3.5 rounded border-sky-300 accent-sky-700" />Teach AI from my approved reply</label><p className="mt-0.5 text-[9px] text-sky-700">Nothing is learned unless you check this box and send. Customer details are redacted before reuse. Internal AI model: {activeSmsDraft.ai_model || "recorded by broker"}{activeSmsDraft.latency_ms ? ` · ${activeSmsDraft.latency_ms} ms` : ""}.</p></div></div></section> : null}
             <div className="flex gap-1.5 overflow-x-auto pb-2">{activeConversation?.phone ? <button type="button" onClick={prepareAiReply} disabled={pending} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold text-sky-800 disabled:opacity-40"><Sparkles className="h-3 w-3" />AI answer</button> : null}{QUICK_REPLIES.map((reply) => <button key={reply} type="button" onClick={() => setMessage(reply)} className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600">{reply}</button>)}</div>
             <div className="flex items-end gap-2 rounded-lg border border-slate-300 bg-white p-1.5 focus-within:border-[#0071e3]">
               <select value={channel} onChange={(event) => changeChannel(event.target.value as Channel)} className="h-9 w-[5.25rem] shrink-0 rounded-md border-0 bg-slate-100 px-1.5 text-[10px] font-bold sm:w-[6.6rem] sm:px-2"><option value="whatsapp">WhatsApp</option><option value="sms">Text</option><option value="email">Email</option></select>

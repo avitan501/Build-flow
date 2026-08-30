@@ -8,6 +8,7 @@ import { phoneLoginEmailForPhone } from "@/lib/auth-phone"
 import { serializeCommunicationLog, type CommunicationLog } from "@/lib/manager-command-center"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { addAuraCommunicationLinks, type AuraEmailEntityType } from "@/lib/aura/email-links"
+import { isSmsCorrectionReason, redactSmsTrainingText, smsTrainingIntent, smsTrainingLanguage, type SmsCorrectionReason } from "@/lib/ai/sms-training-privacy"
 
 type ContactKind = "customer" | "lead" | "supplier"
 type Result = { ok: true } | { ok: false; error: string }
@@ -38,11 +39,19 @@ export type SmsReplyDraft = {
   reply_text: string
   decision: "draft" | "blocked" | "auto_sent" | "sent_manually" | "send_failed"
   safety_reason: string | null
+  safety_level: "green" | "yellow" | "red"
+  safety_signals: string[]
+  intent: string
+  latency_ms: number | null
+  input_tokens: number | null
+  output_tokens: number | null
+  estimated_cost_usd: number | null
+  prompt_version: string
   ai_model: string | null
   updated_at: string
 }
 
-export async function completeSmsReplyDraftAction(input: { draftId: string; reply: string; teachAi: boolean }) {
+export async function completeSmsReplyDraftAction(input: { draftId: string; reply: string; teachAi: boolean; correctionReasons?: SmsCorrectionReason[] }) {
   const { supabase, user, access } = await requireManagerPortalProfile()
   if (!access.customers || !/^[0-9a-f-]{36}$/i.test(input.draftId)) return { ok: false as const, error: "Choose a valid AI draft." }
   const reply = String(input.reply || "").trim().slice(0, 1600)
@@ -68,22 +77,38 @@ export async function completeSmsReplyDraftAction(input: { draftId: string; repl
   if (updateError) return { ok: false as const, error: "The AI draft status could not be updated." }
 
   const corrected = reply !== draft.reply_text.trim()
+  const correctionReasons = [...new Set((input.correctionReasons || []).filter(isSmsCorrectionReason))].slice(0, 6)
+  const language = smsTrainingLanguage(communication.body)
+  const intent = smsTrainingIntent(communication.body)
   const { error: feedbackError } = await supabase.from("aura_ai_reply_feedback").insert({
     communication_id: communication.id,
     draft_id: draft.id,
     original_reply: draft.reply_text.trim(),
     corrected_reply: reply,
     promoted_to_example: Boolean(input.teachAi),
+    correction_reasons: correctionReasons,
+    intent,
+    language,
+    privacy_redacted: Boolean(input.teachAi),
+    learning_metadata: {
+      corrected,
+      reason_count: correctionReasons.length,
+      redaction_version: input.teachAi ? "sms-training-v1" : null,
+    },
     created_by: user.id,
   })
   if (feedbackError) return { ok: false as const, error: "The reply was sent, but its AI feedback could not be saved." }
 
   if (input.teachAi) {
+    const privateSafeCustomerMessage = redactSmsTrainingText(communication.body)
+    const privateSafeApprovedReply = redactSmsTrainingText(reply)
     const { error: exampleError } = await supabase.from("aura_ai_reply_examples").upsert({
-      customer_message: communication.body.trim().slice(0, 1600),
-      approved_reply: reply,
-      language: /[\u0590-\u05ff]/.test(communication.body) ? "he" : /[áéíóúñ¿¡]/i.test(communication.body) ? "es" : "en",
-      tags: corrected ? ["manager-corrected"] : ["manager-approved"],
+      customer_message: privateSafeCustomerMessage,
+      approved_reply: privateSafeApprovedReply,
+      language,
+      intent,
+      privacy_redacted: true,
+      tags: [...(corrected ? ["manager-corrected"] : ["manager-approved"]), ...correctionReasons],
       enabled: true,
       source_draft_id: draft.id,
       approved_by: user.id,
