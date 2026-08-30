@@ -3,6 +3,7 @@ import {
   ArrowRight,
   ChevronDown,
   CircleDollarSign,
+  ClipboardList,
   ListTodo,
   PhoneCall,
   Target,
@@ -340,6 +341,19 @@ function AiTaskInbox() {
   );
 }
 
+function WebsiteWorkBoardLink() {
+  return (
+    <Link
+      href="/admin/goals-progress/website-work"
+      className="mt-3 flex min-h-16 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition hover:border-sky-300"
+    >
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white"><ClipboardList className="h-4 w-4" /></span>
+      <span className="min-w-0 flex-1"><span className="block text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">Website delivery</span><span className="block text-sm font-semibold text-slate-950">Website work board</span><span className="block text-[11px] text-slate-500">Open tasks, status, owner, and next step.</span></span>
+      <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
+    </Link>
+  );
+}
+
 function ClientTargetGoal({
   clients,
   leads,
@@ -628,6 +642,7 @@ export async function CarlosGoalsWorkspace({
         </div>
       ) : null}
       <CustomManagerGoals goals={regularGoals} />
+      <WebsiteWorkBoardLink />
       {access.owner ? <AiTaskInbox /> : null}
       <section className="mt-4" aria-labelledby="carlos-work-areas">
         <div className="mb-2">
