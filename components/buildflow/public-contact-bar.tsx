@@ -149,7 +149,7 @@ export function PublicContactBar() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className="relative z-10 flex max-h-[72svh] w-full flex-col overflow-hidden rounded-t-[1.35rem] border border-slate-200 bg-[#f7f7f7] text-[#171a20] shadow-[0_-18px_50px_rgba(23,26,32,0.22)] sm:max-w-[31rem] sm:rounded-[1.35rem]"
+            className="relative z-10 flex max-h-[94svh] w-full flex-col overflow-hidden rounded-t-[1.35rem] border border-slate-200 bg-[#f7f7f7] text-[#171a20] shadow-[0_-18px_50px_rgba(23,26,32,0.22)] sm:max-w-[31rem] sm:rounded-[1.35rem]"
           >
             <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-slate-300 sm:hidden" aria-hidden="true" />
             <header className="flex items-start justify-between gap-3 px-4 pb-1 pt-3 sm:px-5 sm:pt-4">
@@ -157,15 +157,18 @@ export function PublicContactBar() {
                 <h2 id={titleId} className="text-[1.15rem] font-semibold leading-tight tracking-[-0.03em]">{openPanel === "demo" ? "See how it works" : "Text me to start"}</h2>
                 {openPanel === "demo" ? <p className="mt-1.5 max-w-sm text-xs leading-5 text-slate-600">A 20-second walkthrough—from your first text to a live material request.</p> : null}
               </div>
-              <button
-                ref={closeButtonRef}
-                type="button"
-                onClick={() => setOpenPanel(null)}
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]"
-                aria-label="Close contact options"
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                {openPanel === "contact" ? <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-white text-[#128c7e]" aria-label="Open chat on WhatsApp" title="WhatsApp"><WhatsAppIcon className="h-4 w-4" /></a> : null}
+                <button
+                  ref={closeButtonRef}
+                  type="button"
+                  onClick={() => setOpenPanel(null)}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]"
+                  aria-label="Close contact options"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
             </header>
 
             {openPanel === "demo" ? (
@@ -197,7 +200,7 @@ export function PublicContactBar() {
               ) : (
                 <form onSubmit={submitStartByText} className="rounded-xl border border-slate-200 bg-white p-3">
                   <label htmlFor={phoneId} className="flex items-center gap-2 text-xs font-extrabold text-slate-800">
-                    <MessageSquareText className="h-4 w-4 text-[#0f766e]" aria-hidden="true" /> Mobile number
+                    <MessageSquareText className="h-4 w-4 text-[#0f766e]" aria-hidden="true" /> Text this number
                   </label>
                   <div className="mt-2 flex gap-2">
                     <input
@@ -229,11 +232,8 @@ export function PublicContactBar() {
                   {submitState === "error" ? <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700" role="alert">{errorMessage}</p> : null}
                 </form>
               )}
-              <div className="mt-1 flex justify-end">
-                <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-200 bg-white text-[#128c7e]" aria-label="Open chat on WhatsApp" title="WhatsApp"><WhatsAppIcon className="h-3.5 w-3.5" /></a>
-              </div>
-              <div className="mt-1.5 h-28 overflow-hidden rounded-xl bg-[#071126] sm:h-36">
-                <video ref={videoRef} data-testid="contact-sheet-video" className="h-full w-full object-cover" autoPlay muted loop playsInline preload="auto" poster="/videos/avantia-request-material-whatsapp-en-clear-20s-poster.jpg" aria-label="How to start an Avantia material request by text">
+              <div className="mt-1.5 h-[52svh] min-h-80 max-h-[30rem] overflow-hidden rounded-xl bg-[#071126]">
+                <video ref={videoRef} data-testid="contact-sheet-video" className="h-full w-full object-contain" autoPlay muted loop playsInline preload="auto" poster="/videos/avantia-request-material-whatsapp-en-clear-20s-poster.jpg" aria-label="How to start an Avantia material request by text">
                   <source src="/videos/avantia-request-material-whatsapp-en-clear-20s.mp4" type="video/mp4" />
                 </video>
               </div>

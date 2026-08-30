@@ -36,7 +36,7 @@ test("public contact bar opens a compact WhatsApp and text sheet", async ({ page
 
   const submit = dialog.getByRole("button", { name: "Text me" });
   await expect(submit).toBeDisabled();
-  await dialog.getByLabel("Mobile number").fill("(516) 555-0123");
+  await dialog.getByLabel("Text this number").fill("(516) 555-0123");
   await expect(submit).toBeEnabled();
 });
 
@@ -50,7 +50,7 @@ test("start-by-text sends only the phone, consent, and honeypot to the public en
 
   await page.getByTestId("public-contact-bar").getByRole("button", { name: "Text me to start" }).click();
   const dialog = page.getByRole("dialog", { name: "Text me to start" });
-  await dialog.getByLabel("Mobile number").fill("+1 516 555 0199");
+  await dialog.getByLabel("Text this number").fill("+1 516 555 0199");
   await dialog.getByRole("button", { name: "Text me" }).click();
 
   await expect(dialog.getByRole("heading", { name: "Check your texts" })).toBeVisible();
@@ -68,7 +68,7 @@ test("start-by-text shows a safe server error and remains usable", async ({ page
 
   await page.getByTestId("public-contact-bar").getByRole("button", { name: "Text me to start" }).click();
   const dialog = page.getByRole("dialog", { name: "Text me to start" });
-  await dialog.getByLabel("Mobile number").fill("5165550100");
+  await dialog.getByLabel("Text this number").fill("5165550100");
   await dialog.getByRole("button", { name: "Text me" }).click();
 
   await expect(dialog.getByRole("alert")).toHaveText("Please wait before requesting another text.");
@@ -111,7 +111,7 @@ test("text submission acknowledges the click immediately while delivery finishes
   await page.goto("/");
   await page.getByTestId("public-contact-bar").getByRole("button", { name: "Text me to start" }).click();
   const dialog = page.getByRole("dialog", { name: "Text me to start" });
-  await dialog.getByLabel("Mobile number").fill("5165550199");
+  await dialog.getByLabel("Text this number").fill("5165550199");
   await dialog.getByRole("button", { name: "Text me" }).click();
   await expect(dialog.getByRole("heading", { name: "Got it — starting your text." })).toBeVisible({ timeout: 500 });
   await expect(dialog.getByRole("heading", { name: "Check your texts" })).toBeVisible();
