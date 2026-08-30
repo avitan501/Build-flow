@@ -121,10 +121,10 @@ test("broker-created request progression replies are gated independently from mo
   expect(brokerSource).toContain("if (!smsNeededByTimingValue(pending.summary_text))")
   expect(brokerSource).toContain("`Needed by: ${neededBy}`")
   expect(brokerSource).toContain("async function activeSmsRequestSourceIds")
-  expect(brokerSource).toContain(".slice(-12)")
+  expect(brokerSource).not.toContain(".slice(-12)")
   expect(brokerSource).toContain("if (smsStartsNewMaterialRequest(message)) boundary = index")
   expect(brokerSource).not.toContain("smsProductInquiryFallbackReply(message)) || likelyMaterialList(message)")
-  expect(brokerSource).toContain("24 * 60 * 60 * 1000")
+  expect(brokerSource).not.toContain("staleDraft")
   expect(brokerSource).toContain("set status = 'dismissed'")
   expect(evaluateSmsReplyGate({
     message: "Yes, 5/8 regular, 21 sheets",
