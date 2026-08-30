@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
-import { smsMaterialIntelligenceAssessment, smsMessagesAfterConfirmedRequest } from "../supabase/functions/_shared/sms-reply-policy"
+import { smsMaterialIntelligenceAssessment, smsMessagesAfterConfirmedRequest, smsReferencesPriorAttachment } from "../supabase/functions/_shared/sms-reply-policy"
 
 const root = process.cwd()
 
@@ -150,4 +150,20 @@ test("six complete contractor-style requests pass without unnecessary questions"
       readyForConfirmation: true,
     })
   }
+})
+
+test("a question about the previous product image reuses vision instead of asking quantity", async () => {
+  const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  const references = [
+    "What is this do you know can you confirm?",
+    "Can you identify it?",
+    "Is this the right product?",
+    "מה זה, אתה יכול לאשר?",
+    "¿Qué es esto?",
+  ]
+
+  for (const message of references) expect(smsReferencesPriorAttachment(message), message).toBe(true)
+  expect(broker).toContain("recentImageMedia: activeOrdered")
+  expect(broker).toContain("smsReferencesPriorAttachment(effectiveBody)")
+  expect(broker).toContain("settings, analysisMedia, customerEvent")
 })

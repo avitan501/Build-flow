@@ -28,6 +28,7 @@ import {
   smsNeededByTimingValue,
   smsProductInquiryFallbackReply,
   smsQuantityClarificationReply,
+  smsReferencesPriorAttachment,
   smsReplyParts,
   smsSheetrockSpecificationFollowUpReply,
   smsShortMaterialAnswerReply,
@@ -1297,7 +1298,7 @@ function intentPlaybook(intent: CustomerSmsIntent) {
   const playbooks: Record<CustomerSmsIntent, string> = {
     greeting: "Invite the buyer to send a material list, photo, plan, product link, or quote. Ask only the essential starting details they need to provide.",
     material_request: "Extract every clear line. Ask up to three short essential missing fields, using separate questions and fewer when fewer are needed. After the full delivery address, collect the needed-by date, then only truly essential material or delivery details. When complete, say a manager will review current price and availability.",
-    image_or_plan: "Acknowledge an image only when one is attached. Extract visible facts, then ask one to three short, essential, closely related missing questions; never ask the customer to repeat visible information.",
+    image_or_plan: "When the customer asks what a pictured product is or asks you to identify or confirm it, answer that visual question first with every product name, brand, package size, and type actually visible. Clearly say what cannot be confirmed visually. Never replace that answer with a quantity question. For other images, extract visible facts, then ask one to three short essential missing questions without asking the customer to repeat visible information.",
     pricing: "Never provide or confirm a live price. Ask concisely for the missing product specification or quantity first, then delivery details. Mention manager review only after intake is complete.",
     availability: "Never confirm live stock or availability. Collect the next essential missing detail without a manager disclaimer; mention manager review only after intake is complete.",
     delivery: "Ask for missing needed-by timing and the full delivery address together when both are absent, or only the one that remains. Never ask for ZIP alone.",
@@ -1861,6 +1862,12 @@ async function smsConversationContext(phone: string) {
   return {
     replyText: [newRequestBoundary < 0 && !afterConfirmedRequest && linkedRequests[0] ? `Avantia record: Linked material request “${linkedRequests[0].title.slice(0, 180)}” has internal status “${linkedRequests[0].status.slice(0, 60)}”. Do not expose the internal status as a promise; use it only to avoid asking the customer for a request ID.` : "", ...activeOrdered.map((message) => `${message.direction === "incoming" ? "Customer" : "Avantia"}: ${messageText(message)}`)].filter(Boolean).join("\n"),
     customerText: activeOrdered.filter((message) => message.direction === "incoming").map(messageText).join("\n"),
+    recentImageMedia: activeOrdered
+      .filter((message) => message.direction === "incoming" && Array.isArray(message.media))
+      .reverse()
+      .flatMap((message) => message.media as TrustedSmsMedia[])
+      .filter((item) => trustedImageMedia([item]).length > 0)
+      .slice(0, 2),
   };
 }
 
@@ -2539,16 +2546,25 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
   const reviewText = openDraft?.original_message ? `${openDraft.original_message}\n${body}` : activeCustomerText;
   const effectiveBody = body.trim() || "[Image attached]";
   const replyContext = startsNewRequest ? `Customer: ${effectiveBody}` : context.replyText || `Customer: ${effectiveBody}`;
+  // Quo commonly delivers the product photo first and the customer's
+  // “what is this?” text as the next message. Reuse only the latest incoming
+  // image, only for an explicit visual reference, so the vision model can
+  // answer the product question instead of falling back to quantity intake.
+  const analysisMedia = trustedImageMedia(media).length > 0
+    ? media
+    : smsReferencesPriorAttachment(effectiveBody)
+      ? context.recentImageMedia
+      : media;
   const persistedOrderState = startsNewRequest ? null : await loadPersistedSmsOrderState(phone);
   let analyzed = customerEvent === "cancellation"
     ? finalizeCustomerSmsAnalysis({ result: guardedEventReply("cancellation", effectiveBody), model: "deterministic-event-guard", message: effectiveBody, media, event: customerEvent, startedAt: Date.now() })
-    : await analyzeCustomerSms(replyContext, contact?.sms_ai_style || settings.preferredVoice, false, effectiveBody, settings, media, customerEvent, exactListOnly, deliveryAddressKnown, persistedOrderState);
+    : await analyzeCustomerSms(replyContext, contact?.sms_ai_style || settings.preferredVoice, false, effectiveBody, settings, analysisMedia, customerEvent, exactListOnly, deliveryAddressKnown, persistedOrderState);
   // A terse answer can look unrelated in isolation even though it completes an
   // active material draft. Re-run extraction in request-review mode against the
   // full conversation so the structured draft advances instead of falling back
   // or confirming stale item details.
   if (openDraft && customerEvent === "message" && !analyzed.result.isMaterialRequest) {
-    analyzed = await analyzeCustomerSms(replyContext, contact?.sms_ai_style || settings.preferredVoice, true, effectiveBody, settings, media, customerEvent, exactListOnly, deliveryAddressKnown, persistedOrderState);
+    analyzed = await analyzeCustomerSms(replyContext, contact?.sms_ai_style || settings.preferredVoice, true, effectiveBody, settings, analysisMedia, customerEvent, exactListOnly, deliveryAddressKnown, persistedOrderState);
   }
   const { result, model, intent, metrics, promptVersion } = analyzed;
   let safety = analyzed.safety;
