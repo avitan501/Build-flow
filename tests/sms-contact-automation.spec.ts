@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
+import { isSmsOptOutMessage } from "../supabase/functions/_shared/sms-reply-policy"
 
 const root = process.cwd()
 
@@ -35,7 +36,9 @@ test("incoming client SMS automation keeps conversational context and blocks sen
   expect(broker).toContain('result.autoSafe;')
   expect(broker).toContain("EdgeRuntime.waitUntil(")
   expect(broker).toContain("if (shouldAuto && replyDrafts[0]?.id)")
-  expect(broker).toContain("stop|unsubscribe|end|quit")
+  for (const phrase of ["STOP", "UNSUBSCRIBE", "END", "QUIT", "BAJA", "PARAR", "CANCELAR", "הסר", "הפסק"]) {
+    expect(isSmsOptOutMessage(phrase), phrase).toBe(true)
+  }
   expect(broker).toContain("forbiddenAuto")
   expect(broker).toContain("phone === TRUSTED_SMS_COMMAND_PHONE")
   expect(broker).toContain("likelyMaterialList")

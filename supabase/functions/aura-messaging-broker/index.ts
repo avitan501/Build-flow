@@ -7,6 +7,7 @@ import {
   enforceSmsQuestionLimit,
   evaluateSmsReplyGate,
   filterSmsExactListItems,
+  isSmsOptOutMessage,
   looksLikeSmsMaterialRequest,
   rankSmsReplyExamples,
   resolveSmsDeliveryAddressKnown,
@@ -18,6 +19,7 @@ import {
   smsHasNeededByTiming,
   smsProductInquiryFallbackReply,
   smsQuantityClarificationReply,
+  smsReplyParts,
   smsStartsNewMaterialRequest,
   smsUnknownContextFallback,
   smsUnansweredFollowUpCancellationReason,
@@ -1143,7 +1145,7 @@ function enforceQuestionLimit(value: string) {
   return enforceSmsQuestionLimit(value);
 }
 
-function deterministicSmsSafety(params: { message: string; reply: string; event: CustomerSmsEvent; intent: CustomerSmsIntent; modelAutoSafe: boolean; participantRole: CustomerSmsAutomation["participantRole"]; knownFields?: Array<"address" | "needed_by"> }) : SmsSafetyAssessment {
+function deterministicSmsSafety(params: { message: string; reply: string; event: CustomerSmsEvent; intent: CustomerSmsIntent; modelAutoSafe: boolean; participantRole: CustomerSmsAutomation["participantRole"]; knownFields?: Array<"address" | "needed_by">; exactListOnly?: boolean }) : SmsSafetyAssessment {
   return evaluateSmsReplyGate({ ...params, protectedTopic: hasForbiddenAutoReplyTopic(params.message) });
 }
 
@@ -1185,7 +1187,7 @@ function finalizeCustomerSmsAnalysis(params: { result: CustomerSmsAutomation; mo
   const reply = enforceQuestionLimit(candidateReply);
   const result = { ...params.result, reply, request: params.result.request ? { ...params.result.request, items: groundedExactItems || [] } : null };
   const intent = classifyCustomerSmsIntent(params.message, params.media, params.event, result);
-  const safety = deterministicSmsSafety({ message: params.message, reply, event: params.event, intent, modelAutoSafe: result.autoSafe, participantRole: result.participantRole, knownFields: [addressKnown ? "address" : null, neededByKnown ? "needed_by" : null].filter((field): field is "address" | "needed_by" => field !== null) });
+  const safety = deterministicSmsSafety({ message: params.message, reply, event: params.event, intent, modelAutoSafe: result.autoSafe, participantRole: result.participantRole, knownFields: [addressKnown ? "address" : null, neededByKnown ? "needed_by" : null].filter((field): field is "address" | "needed_by" => field !== null), exactListOnly });
   if (exactListOnly) safety.signals.push("exact-list-only preference enforced");
   if (exactListOnly && params.result.request && groundedExactItems?.length !== params.result.request.items.length) safety.signals.push("non-customer exact-list items removed");
   if (replyStep === "quantity") safety.signals.push("quantity requested before delivery details");
@@ -1491,8 +1493,8 @@ function customerSmsFallback(
   const greeting = /^\s*(?:hi|hello|hey|good (?:morning|afternoon|evening)|shalom|hola)[!.?\s]*$/i.test(latest);
   const shortConfirmation = /^\s*(?:yes|no|ok(?:ay)?|thanks?|thank you|got it)[!.?\s]*$/i.test(latest);
   const saysAsap = /^\s*asap[.!]?\s*$/i.test(latest);
-  const hardBlocked = /^\s*(?:stop|unsubscribe|end|quit)\s*[.!]?\s*$/i.test(latest) || hasForbiddenAutoReplyTopic(latest);
-  const productInquiryReply = smsProductInquiryFallbackReply(latest);
+  const hardBlocked = isSmsOptOutMessage(latest) || hasForbiddenAutoReplyTopic(latest);
+  const productInquiryReply = smsProductInquiryFallbackReply(latest, { allowRelatedSuggestion: !resolveSmsExactListPreference({ conversationText: customerText, latestMessage: latest }) });
 
   const unknownFallback = smsUnknownContextFallback();
   let reply: string = unknownFallback.reply;
@@ -1632,8 +1634,9 @@ function accurateAttachmentReply(message: string, reply: string) {
 
 async function analyzeCustomerSms(conversationText: string, style: string, managerRequestReview = false, latestCustomerMessage = conversationText, settings: SmsAiSettings = defaultSmsAiSettings, media: TrustedSmsMedia[] = [], forcedEvent: CustomerSmsEvent = "message", persistedExactListOnly = false, persistedDeliveryAddressKnown = false): Promise<CustomerSmsAnalysis> {
   const startedAt = Date.now();
+  const directProductExactListOnly = resolveSmsExactListPreference({ storedContact: persistedExactListOnly, conversationText, latestMessage: latestCustomerMessage });
   const latestProductInquiryReply = forcedEvent === "message"
-    ? smsProductInquiryFallbackReply(latestCustomerMessage)
+    ? smsProductInquiryFallbackReply(latestCustomerMessage, { allowRelatedSuggestion: !directProductExactListOnly })
     : null;
   // A direct product question is a new, self-contained intent. Resolve it from
   // the latest inbound message before older lists in the same phone thread can
@@ -1831,7 +1834,21 @@ async function evaluateCustomerSmsCases(cases: Array<{ id: string; message: stri
 
 async function processCustomerSmsAutomation(communicationId: string, phone: string, body: string, contact: { id: string; full_name: string | null; notes: string | null; sms_ai_mode: string; sms_ai_style: string; auto_create_request_drafts: boolean; exact_list_only: boolean } | null, media: TrustedSmsMedia[] = []) {
   if ((!body.trim() && trustedImageMedia(media).length === 0) || phone === TRUSTED_SMS_COMMAND_PHONE) return;
-  if (/^\s*(?:stop|unsubscribe|end|quit)\s*[.!]?\s*$/i.test(body)) return;
+  if (isSmsOptOutMessage(body)) {
+    if (contact?.id) {
+      await sql`update public.aura_contacts set sms_ai_mode = 'off' where id = ${contact.id}::uuid`;
+      await sql`
+        update public.aura_sms_unanswered_followups
+        set status = 'cancelled', cancel_reason = 'customer opted out', updated_at = now()
+        where contact_id = ${contact.id}::uuid and status = 'pending'
+      `;
+    }
+    await sql`
+      insert into public.aura_audit_log (action, details)
+      values ('sms_ai_customer_opted_out', ${sql.json({ communicationId, phone, route: "deterministic-multilingual-opt-out" })})
+    `;
+    return;
+  }
   const settings = await loadSmsAiSettings();
   const needsAiReply = settings.enabled && contact && contact.sms_ai_mode !== "off";
   const previousCustomerMessages = await sql<{ body: string }[]>`
@@ -1946,8 +1963,14 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
     returning id
   `;
   if (shouldAuto && replyDrafts[0]?.id) {
+    const replyParts = smsReplyParts({ reply: result.reply, deterministicProductInquiry: model === "deterministic-product-inquiry", exactListOnly });
+    let sentPartCount = 0;
     try {
-      const initialOutgoingExternalId = await sendQuoSms(phone, result.reply);
+      let initialOutgoingExternalId = "";
+      for (const replyPart of replyParts) {
+        initialOutgoingExternalId = await sendQuoSms(phone, replyPart);
+        sentPartCount += 1;
+      }
       await sql`
         update public.aura_sms_reply_drafts
         set decision = 'auto_sent', updated_at = now()
@@ -1978,7 +2001,7 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
       await sql`
         update public.aura_sms_reply_drafts
         set decision = 'send_failed',
-          safety_reason = ${`Reply prepared safely, but Q U O delivery failed: ${error instanceof Error ? error.message : "unknown error"}`.slice(0, 300)},
+          safety_reason = ${`${sentPartCount ? `Partial delivery: ${sentPartCount} of ${replyParts.length} SMS parts sent. ` : ""}Q U O delivery failed: ${error instanceof Error ? error.message : "unknown error"}`.slice(0, 300)},
           updated_at = now()
         where id = ${replyDrafts[0].id}::uuid
       `;

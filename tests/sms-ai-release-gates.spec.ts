@@ -8,6 +8,7 @@ import {
   evaluateSmsReplyGate,
   filterSmsExactListItems,
   inspectSmsQuestionStructure,
+  isSmsOptOutMessage,
   looksLikeSmsMaterialRequest,
   resolveSmsDeliveryAddressKnown,
   resolveSmsExactListPreference,
@@ -18,6 +19,7 @@ import {
   smsOutputSafetySignals,
   smsProductInquiryFallbackReply,
   smsQuantityClarificationReply,
+  smsReplyParts,
   smsStartsNewMaterialRequest,
   smsUnknownContextFallback,
   smsUnansweredFollowUpCancellationReason,
@@ -104,13 +106,28 @@ test("material request advances across turns after address until complete", () =
 
 test("product inquiry fallback answers the product and asks only useful next questions", () => {
   const sheetrock = smsProductInquiryFallbackReply("Do you sell sheetricj?")
-  expect(sheetrock).toBe("Yes—we can help with Sheetrock. What thickness do you need? How many sheets do you need?")
+  expect(sheetrock).toContain("For most interior walls, 1/2 in. is standard")
+  expect(sheetrock).toContain("5/8 in. is commonly used for ceilings or fire-rated assemblies")
+  expect(sheetrock).toContain("subject to the plans and code")
+  expect(sheetrock).toContain("Is it for walls or ceilings? How many sheets do you need?")
+  expect(sheetrock).toContain("Do you also need joint compound, tape, corner bead, or drywall screws?")
   expect(smsProductInquiryFallbackReply("Do you carry Sheetrook drywall?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Can I get Sheetrcok?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Could we order shetrock?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Do you have sheetrpck?")).toBe(sheetrock)
-  expect(inspectSmsQuestionStructure(sheetrock || "")).toMatchObject({ valid: true, questionMarks: 2, requestedFields: 2 })
+  expect(inspectSmsQuestionStructure(sheetrock || "")).toMatchObject({ valid: true, questionMarks: 3, requestedFields: 1 })
   expect(evaluateSmsReplyGate({ message: "Do you sell sheetricj?", reply: sheetrock || "", intent: "availability", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
+  const replyParts = smsReplyParts({ reply: sheetrock || "", deterministicProductInquiry: true })
+  expect(replyParts).toHaveLength(2)
+  expect(replyParts[0]).toContain("subject to the plans and code")
+  expect(replyParts[0]).toContain("How many sheets")
+  expect(replyParts[1]).toBe("Do you also need joint compound, tape, corner bead, or drywall screws?")
+  expect(new Set(replyParts).size).toBe(replyParts.length)
+
+  const exactListReply = smsProductInquiryFallbackReply("Do you sell Sheetrock?", { allowRelatedSuggestion: false }) || ""
+  expect(smsReplyParts({ reply: exactListReply, deterministicProductInquiry: true, exactListOnly: true })).toEqual([exactListReply])
+  expect(exactListReply).not.toMatch(/joint compound|corner bead|drywall screws/i)
+  expect(evaluateSmsReplyGate({ message: "Do you sell Sheetrock?", reply: sheetrock || "", intent: "availability", event: "message", participantRole: "lead", modelAutoSafe: true, exactListOnly: true })).toMatchObject({ level: "red", gateAutoSafe: false })
   const unrelated = smsProductInquiryFallbackReply("Do you carry sheet metal?")
   expect(unrelated).toContain("sheet metal")
   expect(unrelated).not.toContain("Sheetrock")
@@ -146,6 +163,26 @@ test("one-shot unanswered follow-up is question-aware and cancels on every later
   expect(smsUnansweredFollowUpCancellationReason({ ...active, hasLaterOutbound: true })).toBe("a human or later outbound reply was sent")
   expect(smsUnansweredFollowUpCancellationReason({ ...active, requestClosed: true })).toBe("the material request is already complete or closed")
   expect(smsUnansweredFollowUpCancellationReason({ ...active, autoSafeActive: false })).toBe("contact auto-safe mode is no longer active")
+})
+
+test("multilingual opt-out disables every automatic reply and unanswered follow-up", () => {
+  const optOuts = ["STOP", "unsubscribe.", "END!", "quit?", "BAJA", "PARAR.", "CANCELAR!", "הסר", "הפסק!"]
+  const eligible = {
+    questionReply: "What quantity?",
+    intent: "material_request" as const,
+    event: "message" as const,
+    participantRole: "lead" as const,
+    safetyLevel: "green" as const,
+    gateAutoSafe: true,
+  }
+
+  for (const originalMessage of optOuts) {
+    expect(isSmsOptOutMessage(originalMessage), originalMessage).toBe(true)
+    expect(smsUnansweredFollowUpEligible({ ...eligible, originalMessage }), originalMessage).toBe(false)
+  }
+
+  expect(isSmsOptOutMessage("Please cancel my order")).toBe(false)
+  expect(isSmsOptOutMessage("Do not cancel the delivery")).toBe(false)
 })
 
 test("unknown AI fallback stays review-only and never emits the rejected generic sentence", () => {

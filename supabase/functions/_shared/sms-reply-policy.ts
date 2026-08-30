@@ -19,6 +19,12 @@ export type SmsReplyExample = {
   intent: string;
 };
 
+const SMS_OPT_OUT_PATTERN = /^\s*(?:stop|unsubscribe|end|quit|baja|parar|cancelar|הסר|הפסק)\s*[.!?¿¡。！？]?\s*$/iu;
+
+export function isSmsOptOutMessage(value: string) {
+  return SMS_OPT_OUT_PATTERN.test(value);
+}
+
 const MATERIAL_TERMS = /\b(?:drywal+l?|sheetrock|plywood|lumber|studs?|tracks?|boards?|sheets?|bags?|boxes?|buckets?|rolls?|thinset|mortar|cement|concrete|compound|screws?|insulation|material(?:s)?)\b|(?:חומר(?:ים)?|לוחות?|שקים?|ארגזים?|ברגים|בידוד|גבס)|\b(?:material(?:es)?|paneles?|placas?|bolsas?|cajas?|tornillos?|aislamiento|yeso|mortero)\b/i;
 
 export function smsReplyLanguage(value: string) {
@@ -72,7 +78,7 @@ export function smsHasFullDeliveryAddress(value: string) {
 }
 
 export function smsReplySuggestsOptionalItems(value: string) {
-  return /\b(?:also (?:consider|add|include)|would you like (?:to add|any)|related items?|accessories|optional items?|you may (?:also )?need)\b/i.test(value) ||
+  return /\b(?:also (?:consider|add|include)|do you also need|would you like (?:to add|any)|related items?|accessories|optional items?|you may (?:also )?need)\b/i.test(value) ||
     /\b(?:tambi[eé]n (?:considere|agregue|incluya)|accesorios|art[ií]culos opcionales)\b/i.test(value) ||
     /(?:כדאי\s*גם|להוסיף\s*גם|אביזרים|פריטים\s*נוספים|תוספות\s*אופציונליות)/i.test(value);
 }
@@ -112,7 +118,12 @@ export function inspectSmsQuestionStructure(value: string, knownFields: SmsReque
   };
 }
 
-export function smsOutputSafetySignals(params: { reply: string; intent: SmsReplyIntent; knownFields?: SmsRequestedField[] }) {
+function isApprovedSheetrockRelatedSuggestion(message: string, reply: string, exactListOnly = false) {
+  if (exactListOnly || (!looksLikeSheetrock(message) && !/drywall/i.test(message))) return false;
+  return /do you also need joint compound, tape, corner bead, or drywall screws\?/i.test(reply);
+}
+
+export function smsOutputSafetySignals(params: { message?: string; reply: string; intent: SmsReplyIntent; knownFields?: SmsRequestedField[]; exactListOnly?: boolean }) {
   const signals: string[] = [];
   const reply = params.reply;
   const numericPrice = /(?:[$€£]\s*\d|\b\d[\d,.]*\s*(?:usd|dollars?|euros?|shekels?|₪|each|ea\b|\/\s*ea\b|per\s+(?:unit|piece|sheet|bag|box))|\b(?:price|cost|total|מחיר|עלות|סה[״']?כ|precio|costo|total)\s*(?:is|:|הוא|es)?\s*[$€£₪]?\s*\d)/i.test(reply);
@@ -125,7 +136,7 @@ export function smsOutputSafetySignals(params: { reply: string; intent: SmsReply
   if (stockAssertion) signals.push("reply asserts stock or availability");
   if (deliveryOrOrderPromise) signals.push("reply makes a delivery or order promise");
   if (transactionalStatusAssertion) signals.push("reply asserts an unsupported transactional status");
-  if (smsReplySuggestsOptionalItems(reply)) signals.push("reply asks an accessory or optional-item question");
+  if (smsReplySuggestsOptionalItems(reply) && !isApprovedSheetrockRelatedSuggestion(params.message || "", reply, params.exactListOnly)) signals.push("reply asks an accessory or optional-item question");
   if (requiresEssentialField && question.questionMarks > 0 && question.requestedFields === 0) signals.push("question is not an essential request field");
   if (!question.valid && question.reason) signals.push(question.reason);
   return signals;
@@ -147,6 +158,7 @@ export function evaluateSmsReplyGate(params: {
   modelAutoSafe: boolean;
   protectedTopic?: boolean;
   knownFields?: SmsRequestedField[];
+  exactListOnly?: boolean;
 }): SmsReplyGateDecision {
   const signals: string[] = [];
   const protectedEvent = params.event === "correction" || params.event === "cancellation";
@@ -156,7 +168,7 @@ export function evaluateSmsReplyGate(params: {
   if (supplier) signals.push("supplier routed to manager");
   if (/\bzip(?:\s+code)?\b/i.test(params.reply)) signals.push("reply asks for ZIP instead of full address");
   if (!params.modelAutoSafe) signals.push("model requested manager review");
-  signals.push(...smsOutputSafetySignals({ reply: params.reply, intent: params.intent, knownFields: params.knownFields }));
+  signals.push(...smsOutputSafetySignals({ message: params.message, reply: params.reply, intent: params.intent, knownFields: params.knownFields, exactListOnly: params.exactListOnly }));
   const hardBlock = Boolean(params.protectedTopic || protectedEvent || supplier || signals.some((signal) => signal !== "model requested manager review"));
   if (hardBlock) return { level: "red", signals, explanation: signals.join(" · ") || "Manager review is required.", gateAutoSafe: false };
   if (!params.modelAutoSafe) return { level: "yellow", signals, explanation: signals.join(" · ") || "Review this draft before sending.", gateAutoSafe: false };
@@ -227,7 +239,7 @@ function looksLikeSheetrock(value: string) {
     ?.some((token) => token.length >= 7 && token.length <= 10 && damerauLevenshteinDistance(token, "sheetrock") <= 2) ?? false;
 }
 
-export function smsProductInquiryFallbackReply(message: string) {
+export function smsProductInquiryFallbackReply(message: string, options: { allowRelatedSuggestion?: boolean } = {}) {
   const value = message.trim();
   const standardMatch = value.match(/^(?:do\s+)?(?:you(?:\s+guys)?|u)\s+(?:sell|carry|have|source)\s+(.+?)[?.!]*$/i);
   const sheetrockGetMatch = value.match(/^(?:can|could)\s+(?:i|we)\s+(?:get|buy|order|source)\s+(.+?)[?.!]*$/i);
@@ -241,12 +253,21 @@ export function smsProductInquiryFallbackReply(message: string) {
       ? "thinset"
       : rawProduct;
   const specification = product === "Sheetrock"
-    ? "What thickness do you need?"
+    ? "For most interior walls, 1/2 in. is standard; 5/8 in. is commonly used for ceilings or fire-rated assemblies, subject to the plans and code. Is it for walls or ceilings?"
     : "What type do you need?";
   const quantity = product === "Sheetrock"
     ? "How many sheets do you need?"
     : `How much ${product} do you need?`;
-  return `Yes—we can help with ${product}. ${specification} ${quantity}`;
+  const primary = `Yes—we can help with ${product}. ${specification} ${quantity}`;
+  if (product !== "Sheetrock" || options.allowRelatedSuggestion === false) return primary;
+  return `${primary}\n\nDo you also need joint compound, tape, corner bead, or drywall screws?`;
+}
+
+export function smsReplyParts(params: { reply: string; deterministicProductInquiry: boolean; exactListOnly?: boolean }) {
+  const reply = params.reply.trim();
+  if (!reply) return [];
+  if (!params.deterministicProductInquiry || params.exactListOnly) return [reply];
+  return [...new Set(reply.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean))].slice(0, 2);
 }
 
 export function smsDeliveryDetailsQuestionReply(message: string) {
@@ -296,7 +317,7 @@ export function smsUnansweredFollowUpEligible(params: {
   if (params.safetyLevel !== "green" || !params.gateAutoSafe || params.requestComplete) return false;
   if (params.event === "correction" || params.event === "cancellation") return false;
   if (params.participantRole === "supplier" || ["supplier", "correction", "cancellation", "sensitive", "follow_up"].includes(params.intent)) return false;
-  if (/^\s*(?:stop|unsubscribe|end|quit)\s*[.!]?\s*$/i.test(params.originalMessage)) return false;
+  if (isSmsOptOutMessage(params.originalMessage)) return false;
   if (!/[?？]/.test(reply) || /^\s*[?？]+\s*$/.test(reply)) return false;
   return inspectSmsQuestionStructure(reply).valid;
 }
