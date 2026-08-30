@@ -129,6 +129,8 @@ test("broker-created request progression replies are gated independently from mo
   expect(brokerSource).toContain("occurred_at >= now() - interval '20 seconds'")
   expect(brokerSource).toContain('const customerEvent = smsStartsNewMaterialRequest(body)')
   expect(brokerSource).not.toContain("occurred_at >= now() - interval '10 minutes'")
+  expect(brokerSource).toContain("if (startsNewRequest) {")
+  expect(brokerSource).toContain('if (customerEvent === "correction") {')
   expect(brokerSource).toContain("if (!input.customerAddress.trim() || !input.customerNeededBy.trim() || !input.request.items.length) return false")
   expect(brokerSource).toContain("if (!smsNeededByTimingValue(pending.summary_text))")
   expect(brokerSource).toContain("`Needed by: ${neededBy}`")

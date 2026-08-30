@@ -2096,6 +2096,7 @@ async function confirmPendingSmsRequest(communicationId: string, phone: string, 
 
 async function processCustomerSmsAutomation(communicationId: string, phone: string, body: string, contact: { id: string; full_name: string | null; notes: string | null; sms_ai_mode: string; sms_ai_style: string; auto_create_request_drafts: boolean; exact_list_only: boolean } | null, media: TrustedSmsMedia[] = []) {
   if ((!body.trim() && trustedImageMedia(media).length === 0) || phone === TRUSTED_SMS_COMMAND_PHONE) return;
+  const startsNewRequest = smsStartsNewMaterialRequest(body);
   if (isSmsOptOutMessage(body)) {
     await sql`
       update public.aura_sms_request_pending_confirmations
@@ -2115,6 +2116,13 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
       values ('sms_ai_customer_opted_out', ${sql.json({ communicationId, phone, route: "deterministic-multilingual-opt-out" })})
     `;
     return;
+  }
+  if (startsNewRequest) {
+    await sql`
+      update public.aura_sms_request_pending_confirmations
+      set status = 'superseded', updated_at = now()
+      where normalized_phone = ${phone} and status = 'pending'
+    `;
   }
   if (await confirmPendingSmsRequest(communicationId, phone, body)) return;
   const settings = await loadSmsAiSettings();
@@ -2147,13 +2155,19 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
       where normalized_phone = ${phone} and status = 'pending'
     `;
   }
+  if (customerEvent === "correction") {
+    await sql`
+      update public.aura_sms_request_pending_confirmations
+      set status = 'superseded', updated_at = now()
+      where normalized_phone = ${phone} and status = 'pending'
+    `;
+  }
   const openDrafts = await sql<{ id: string; original_message: string | null; customer_name: string; customer_address: string | null; source_communication_ids: string[]; exact_list_only: boolean; delivery_address_known: boolean }[]>`
     select id, original_message, customer_name, customer_address, source_communication_ids, exact_list_only, delivery_address_known
     from public.aura_sms_request_drafts
     where sender_phone = ${phone} and status = 'new' and draft_kind = 'create'
     order by created_at desc limit 1
   `;
-  const startsNewRequest = smsStartsNewMaterialRequest(body);
   const draftCandidate = openDrafts[0];
   if (draftCandidate && startsNewRequest) {
     await sql`update public.aura_sms_request_drafts set status = 'dismissed', updated_at = now() where id = ${draftCandidate.id}::uuid and status = 'new'`;
