@@ -1190,7 +1190,12 @@ function finalizeCustomerSmsAnalysis(params: { result: CustomerSmsAutomation; mo
   const reply = enforceQuestionLimit(candidateReply);
   const result = { ...params.result, reply, request: params.result.request ? { ...params.result.request, items: groundedExactItems || [] } : null };
   const intent = classifyCustomerSmsIntent(params.message, params.media, params.event, result);
-  const safety = deterministicSmsSafety({ message: params.message, reply, event: params.event, intent, modelAutoSafe: result.autoSafe, participantRole: result.participantRole, knownFields: [addressKnown ? "address" : null, neededByKnown ? "needed_by" : null].filter((field): field is "address" | "needed_by" => field !== null), exactListOnly });
+  // Progression replies are selected from audited deterministic templates after
+  // the model run. Their send decision must depend on the output gate below,
+  // not on a stale/nondeterministic model autoSafe flag for a reply we replaced.
+  const deterministicProgression = params.result.isMaterialRequest && Boolean(groundedExactItems?.length) && params.event === "message" && ["quantity", "address_and_needed_by", "address", "needed_by"].includes(replyStep);
+  const gateModelAutoSafe = result.autoSafe || deterministicProgression;
+  const safety = deterministicSmsSafety({ message: params.message, reply, event: params.event, intent, modelAutoSafe: gateModelAutoSafe, participantRole: result.participantRole, knownFields: [addressKnown ? "address" : null, neededByKnown ? "needed_by" : null].filter((field): field is "address" | "needed_by" => field !== null), exactListOnly });
   if (exactListOnly) safety.signals.push("exact-list-only preference enforced");
   if (exactListOnly && params.result.request && groundedExactItems?.length !== params.result.request.items.length) safety.signals.push("non-customer exact-list items removed");
   if (replyStep === "quantity") safety.signals.push("quantity requested before delivery details");

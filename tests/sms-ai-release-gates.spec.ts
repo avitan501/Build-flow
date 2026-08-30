@@ -110,6 +110,20 @@ test("material request advances across turns after address until complete", () =
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "Would you like to add accessories?" })).toBe("complete")
 })
 
+test("broker-created request progression replies are gated independently from model review flags", async () => {
+  const brokerSource = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  expect(brokerSource).toContain('const deterministicProgression = params.result.isMaterialRequest')
+  expect(brokerSource).toContain("const gateModelAutoSafe = result.autoSafe || deterministicProgression")
+  expect(evaluateSmsReplyGate({
+    message: "Yes, 5/8 regular, 21 sheets",
+    reply: "I have the material list. What is the full delivery address?",
+    intent: "material_request",
+    event: "message",
+    participantRole: "lead",
+    modelAutoSafe: true,
+  })).toMatchObject({ level: "green", gateAutoSafe: true })
+})
+
 test("product inquiry fallback answers the product and asks only useful next questions", () => {
   const sheetrock = smsProductInquiryFallbackReply("Do you sell sheetricj?")
   expect(sheetrock).toContain("Can you confirm 5/8 in.?")
