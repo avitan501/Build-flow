@@ -80,10 +80,10 @@ export async function addOrderStandardAction(formData: FormData) {
   const fact = [
     `Order standard: ${name}.`,
     `Use when: ${customerNeed}.`,
-    options ? `Common intake shorthand or options: ${options}.` : "",
     `Ask only what is still unresolved: ${questions}.`,
     `Confirm before finalizing: ${confirmations}.`,
     `Short customer reply example: ${sampleReply}`,
+    options ? `Common intake shorthand or options: ${options}.` : "",
   ].filter(Boolean).join(" ").slice(0, 2000)
 
   const error = await insertReviewedKnowledge({

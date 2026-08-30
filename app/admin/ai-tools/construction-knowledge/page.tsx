@@ -92,6 +92,81 @@ const NEW_HOME_STANDARD_TEMPLATES = [
   },
 ] as const
 
+const NEW_HOME_SYSTEM_STANDARD_TEMPLATES = [
+  {
+    stage: "Concrete & Masonry",
+    sourcePath: "/shop/concrete-masonry",
+    customerNeed: "A customer asks for concrete, block, mortar, reinforcement, aggregate, or a new-home foundation and masonry material package.",
+    shorthand: "Keep every stated mix or product, bag or yard quantity, block size, reinforcement size, mesh dimension, and accessory quantity. Treat “yard” as supplied volume shorthand only when the customer clearly uses it that way; never calculate structural quantities from a brief message.",
+    questions: "What exact material or mix is requested? What quantities or approved takeoff are available? Can you send the foundation or masonry plan? What is the delivery address, access condition, and needed date?",
+    confirmations: "Confirm design mix, strength, exposure, reinforcement, footing and wall details, frost or soil requirements, admixtures, placement conditions, testing, engineer details, manufacturer instructions, access and load limits, and local code before finalizing. These are project-specific.",
+    sampleReply: "Which concrete or masonry materials and quantities do you need? Send the approved plan or takeoff, delivery address, access details, and needed date.",
+  },
+  {
+    stage: "Windows",
+    sourcePath: "/shop/window",
+    customerNeed: "A customer asks for new-construction or replacement windows, a window schedule, or a complete new-home window package.",
+    shorthand: "Keep stated unit size, rough opening, manufacturer, series, operation, handing, color, glazing, grille, jamb, flange, and quantity exactly as written. Never infer unit size from a room name or opening photo.",
+    questions: "Can you send the window schedule? Which sizes, operation types, colors, and quantities are still missing? Is this new construction or replacement? What is the delivery address and needed date?",
+    confirmations: "Confirm field measurements, rough openings, egress, safety glazing, energy and wind ratings, tempered or impact requirements, flashing and installation system, manufacturer instructions, design-professional requirements, and local code before ordering. None are universal defaults.",
+    sampleReply: "Send the window schedule or the missing sizes, types, colors, and quantities. Is this new construction or replacement, and where and when is delivery needed?",
+  },
+  {
+    stage: "Plumbing",
+    sourcePath: "/request-quote?request=plumbing",
+    customerNeed: "A customer asks for plumbing rough-in material, pipe and fittings, valves, drains, fixtures, trim, or a new-home plumbing package.",
+    shorthand: "Keep every stated material, diameter, fitting type, connection, valve, fixture model, finish, quantity, and pipe length. Do not infer pipe material, fitting system, or fixture rough-in from a generic room name.",
+    questions: "Is this rough-in, finish fixtures, or both? What pipe or fitting system, sizes, fixture models or finishes, and quantities are specified? Can you send the plumbing plans or fixture schedule? What is the delivery address and needed date?",
+    confirmations: "Confirm approved plans, pressure and drainage application, compatible joining system, fixture rough-ins, backflow and venting requirements, listings, manufacturer instructions, licensed-trade review, and applicable plumbing code before finalizing. These are confirm-only project items.",
+    sampleReply: "Is this plumbing rough-in, fixtures, or both? Send the plans or list with sizes, models, finishes, quantities, delivery address, and needed date.",
+  },
+  {
+    stage: "Electrical",
+    sourcePath: "/shop/electrical",
+    customerNeed: "A customer asks for electrical rough-in material, wire or cable, panels, breakers, boxes, devices, lighting, or a new-home electrical package.",
+    shorthand: "Keep stated cable type, conductor count and gauge, length, panel or breaker model, voltage, box or device type, color, rating, and quantity exactly as provided. Never infer conductor size, breaker rating, or panel compatibility.",
+    questions: "Can you send the electrical plan or complete list? Which cable types and lengths, panel or breaker models, boxes, devices, fixtures, and quantities are missing? What is the delivery address and needed date?",
+    confirmations: "Confirm load calculations, conductor and overcurrent sizing, panel and breaker compatibility, service and grounding details, wet or exterior listings, fire and energy requirements, manufacturer instructions, licensed-electrician review, and applicable electrical code. These are not universal defaults.",
+    sampleReply: "Send the electrical plan or list with cable sizes and lengths, device or panel models, quantities, delivery address, and needed date.",
+  },
+  {
+    stage: "HVAC & Mechanical",
+    sourcePath: "/request-quote?request=hvac",
+    customerNeed: "A customer asks for HVAC equipment, duct, registers, line sets, controls, ventilation, or a new-home mechanical material package.",
+    shorthand: "Keep every stated equipment manufacturer and model, capacity, fuel, voltage, efficiency, duct dimension, line-set size and length, register size, control, accessory, and quantity. Never size equipment from house square footage alone.",
+    questions: "Can you send the mechanical plans, equipment schedule, or approved load calculation? Which equipment models, capacities, duct or line-set sizes, controls, accessories, and quantities are specified? What is the delivery address and needed date?",
+    confirmations: "Confirm approved load and ventilation calculations, equipment matchups, fuel and electrical requirements, refrigerant and line sizing, condensate and venting, clearances, listings, manufacturer instructions, licensed-trade review, permits, and applicable mechanical code before finalizing.",
+    sampleReply: "Send the mechanical plan or equipment schedule with models, capacities, duct or line-set sizes, quantities, delivery address, and needed date.",
+  },
+  {
+    stage: "Cabinets",
+    sourcePath: "/shop/kitchen",
+    customerNeed: "A customer asks for kitchen, bath, laundry, or other new-home cabinetry and related panels, trim, fillers, or hardware.",
+    shorthand: "Keep stated cabinet codes, dimensions, door style, color, finish, construction, side exposure, hinge direction, quantity, panels, fillers, moldings, and hardware. Never infer layout dimensions or handing from a room name.",
+    questions: "Can you send the approved cabinet layout or schedule? Which cabinet codes, dimensions, door style, finish, exposed sides, panels, fillers, moldings, hardware, and quantities are still missing? What is the delivery address and needed date?",
+    confirmations: "Confirm final field dimensions, appliance and fixture clearances, fillers and finished ends, crown and toe-kick details, hardware, anchorage, accessibility or safety requirements, designer approval, manufacturer instructions, and applicable local requirements before ordering.",
+    sampleReply: "Send the approved cabinet layout or list with cabinet codes, style, finish, panels, fillers, hardware, quantities, delivery address, and needed date.",
+  },
+  {
+    stage: "Appliances",
+    sourcePath: "/shop/appliances",
+    customerNeed: "A customer asks for a new-home or rental appliance package, individual appliances, or appliance coordination with cabinets and utilities.",
+    shorthand: "Keep exact manufacturer, model, fuel, voltage, finish, dimensions, hinge or door configuration, quantity, and requested accessories. Never substitute a model or infer fuel, voltage, venting, or opening compatibility.",
+    questions: "Which appliance types and exact models or required dimensions are needed? What fuel, voltage, finish, handing, and quantities are specified? Can you send the appliance schedule? What is the delivery address and needed date?",
+    confirmations: "Confirm final openings and clearances, utility locations and capacities, fuel and voltage, venting, water and drain connections, stacking or trim kits, manufacturer instructions, installer requirements, and applicable safety or local requirements before finalizing.",
+    sampleReply: "Send the appliance schedule or exact models, dimensions, fuel or voltage, finish, quantities, delivery address, and needed date.",
+  },
+  {
+    stage: "Flooring",
+    sourcePath: "/shop/wood-floor",
+    customerNeed: "A customer asks for hardwood, engineered wood, resilient flooring, underlayment, transitions, adhesive, or a new-home flooring package.",
+    shorthand: "Keep stated material, species, grade, construction, width, thickness, color, finish, square footage, waste instruction, carton count, underlayment, adhesive, and transition details. Never infer waste, moisture system, or installation method.",
+    questions: "What flooring material, product or species, width, color or finish, and measured area are specified? Which rooms and transitions are included? Is there an approved waste instruction? What is the delivery address and needed date?",
+    confirmations: "Confirm substrate and moisture conditions, approved installation method, acclimation and site conditions, underlayment or adhesive compatibility, radiant-heat limitations, transitions, waste, manufacturer instructions, installer review, and applicable project requirements before finalizing.",
+    sampleReply: "Which flooring product, width, color or finish, and square footage do you need? Send the room list, transitions, delivery address, and needed date.",
+  },
+] as const
+
 function questionTerms(question: string) {
   return [...new Set(question.toLowerCase().match(/[a-z0-9]+/g)?.filter((term) => term.length > 1 && !QUESTION_STOP_WORDS.has(term)) ?? [])]
 }
@@ -183,7 +258,7 @@ export default async function ConstructionKnowledgePage({ searchParams }: { sear
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950"><strong>Review-only:</strong> nothing below is active until the owner reviews and saves one template. Common shorthand helps intake; local-code, fire, structural, wet-area, energy, and manufacturer requirements are confirm-only project items—not universal defaults.</div>
 
         <div className="mt-4 space-y-3">
-          {NEW_HOME_STANDARD_TEMPLATES.map((template, index) => <details key={template.stage} className="rounded-xl border border-slate-200 bg-slate-50" open={index === 0}>
+          {[...NEW_HOME_STANDARD_TEMPLATES, ...NEW_HOME_SYSTEM_STANDARD_TEMPLATES].map((template, index) => <details key={template.stage} className="rounded-xl border border-slate-200 bg-slate-50" open={index === 0}>
             <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-slate-950">{String(index + 1).padStart(2, "0")} · {template.stage}</summary>
             <form action={addOrderStandardAction} className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2">
               <input type="hidden" name="standardName" value={`New home — ${template.stage}`} />

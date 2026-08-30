@@ -33,6 +33,8 @@ test("construction knowledge has one owner-only workspace and one existing store
   expect(actions).toContain("export async function addOrderStandardAction")
   expect(actions).toContain("order-standard-${slug}")
   expect(actions).toContain("Ask only what is still unresolved")
+  expect(actions.indexOf("Ask only what is still unresolved")).toBeLessThan(actions.indexOf("Common intake shorthand or options"))
+  expect(actions.indexOf("Confirm before finalizing")).toBeLessThan(actions.indexOf("Common intake shorthand or options"))
   expect(actions.match(/from\("aura_ai_reply_knowledge"\)/g)?.length).toBe(4)
   expect(actions).not.toContain("order_standards")
   expect(smsPage).toContain('href="/admin/ai-tools/construction-knowledge"')
@@ -51,11 +53,15 @@ test("new-home starter standards remain owner-reviewed, staged, and non-universa
   expect(knowledgePage).toContain("Common / default intake shorthand")
   expect(knowledgePage).toContain("Truly required intake questions")
   expect(knowledgePage).toContain("Confirm-only safety, plans, manufacturer, and code items")
-  for (const stage of ["Framing", "Roofing", "Exterior", "Insulation", "Drywall", "Tile", "Paint", "Trim & Doors"]) {
+  for (const stage of ["Framing", "Roofing", "Exterior", "Insulation", "Drywall", "Tile", "Paint", "Trim & Doors", "Concrete & Masonry", "Windows", "Plumbing", "Electrical", "HVAC & Mechanical", "Cabinets", "Appliances", "Flooring"]) {
     expect(knowledgePage).toContain(`stage: "${stage}"`)
     expect(knowledgePage).toContain(`Review and save {template.stage}`)
   }
-  expect(knowledgePage.match(/sourcePath: "\//g)).toHaveLength(8)
+  expect(knowledgePage.match(/sourcePath: "\//g)).toHaveLength(16)
+  expect(knowledgePage).toContain("NEW_HOME_SYSTEM_STANDARD_TEMPLATES")
+  expect(knowledgePage).toContain("Never size equipment from house square footage alone")
+  expect(knowledgePage).toContain("Never infer conductor size, breaker rating, or panel compatibility")
+  expect(knowledgePage).toContain("Never substitute a model or infer fuel, voltage, venting, or opening compatibility")
   expect(knowledgePage).toContain("Never label these as universal defaults")
   expect(knowledgePage).toContain("Wet-area requirements are not universal defaults")
   expect(knowledgePage).toContain("Never infer handing or fire rating")
