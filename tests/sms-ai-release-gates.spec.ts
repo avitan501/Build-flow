@@ -143,14 +143,14 @@ test("broker gate auto-sends safe pricing and delivery clarification but blocks 
   expect(decide("Got it.", "follow_up", { event: "cancellation" })).toMatchObject({ level: "red", gateAutoSafe: false })
 })
 
-test("latest decision allows up to three essential questions and rejects padding, repeats, and bundles", () => {
+test("latest decision allows one essential blocker and rejects padding, repeats, and bundles", () => {
   expect(inspectSmsQuestionStructure("What size?").valid).toBe(true)
   expect(inspectSmsQuestionStructure("What is the full delivery address?").valid).toBe(true)
   expect(inspectSmsQuestionStructure("I have the material list. What is the full delivery address?")).toMatchObject({ valid: true, requestedFields: 1, fields: ["address"] })
   expect(inspectSmsQuestionStructure("קיבלתי את רשימת החומרים. מה כתובת המשלוח המלאה?")).toMatchObject({ valid: true, requestedFields: 1, fields: ["address"] })
   expect(inspectSmsQuestionStructure("Recibí la lista de materiales. ¿Cuál es la dirección completa de entrega?")).toMatchObject({ valid: true, requestedFields: 1, fields: ["address"] })
   expect(inspectSmsQuestionStructure("What size and thickness?")).toMatchObject({ valid: false, requestedFields: 2 })
-  expect(inspectSmsQuestionStructure("What size? What thickness? What quantity?")).toMatchObject({ valid: true, questionMarks: 3 })
+  expect(inspectSmsQuestionStructure("What size? What thickness? What quantity?")).toMatchObject({ valid: false, questionMarks: 3 })
   expect(inspectSmsQuestionStructure("What size? What thickness? What quantity? What brand?")).toMatchObject({ valid: false, questionMarks: 4 })
   expect(inspectSmsQuestionStructure("What size? What size?").valid).toBe(false)
   expect(inspectSmsQuestionStructure("What is the full delivery address?", ["address"]).valid).toBe(false)
@@ -160,11 +160,11 @@ test("latest decision allows up to three essential questions and rejects padding
   expect(evaluateSmsReplyGate({ message: "20 drywall sheets", reply: "What is your favorite movie?", intent: "material_request", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "red", gateAutoSafe: false })
 })
 
-test("paint color and finish are two distinct essential questions, not a repeated field", () => {
-  const reply = "Got it—4 gallons of Sherwin-Williams paint. What color do you need? What finish would you like (flat, eggshell, satin, or semi-gloss)?"
+test("paint intake asks color first and finish on the next turn", () => {
+  const reply = "Got it—4 gallons of Sherwin-Williams paint. What paint color do you need?"
   expect(inspectSmsQuestionStructure(reply)).toMatchObject({
     valid: true,
-    fields: ["color", "finish"],
+    fields: ["color"],
     reason: null,
   })
   expect(evaluateSmsReplyGate({ message: "I need 4 gallons of Sherman William paint.", reply, intent: "material_request", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
@@ -176,9 +176,9 @@ test("required questions stay green while optional recommendation statements can
     "How many pieces do you need?",
     "What is the full delivery address?",
     "When do you need it?",
-    "What color and finish do you need?",
-    "What size and length? What gauge?",
-    "What screw length? What thread type?",
+    "What paint color do you need?",
+    "What metal-stud size do you need?",
+    "What screw length do you need?",
     "Can you confirm the compound type: 5-gallon all-purpose?",
   ]
   const optional = [
@@ -207,13 +207,13 @@ test("required questions stay green while optional recommendation statements can
 test("material request advances across turns after address until complete", () => {
   expect(smsHasExplicitQuantity("Need thinset")).toBe(false)
   expect(smsQuantityClarificationReply("Need thinset")).toBe("Sure — how much thinset do you need?")
-  expect(smsQuantityClarificationReply("New request: I need Sheetrock")).toBe("How many sheets do you need? Is 5/8 in. okay?")
+  expect(smsQuantityClarificationReply("New request: I need Sheetrock")).toBe("How many sheets do you need?")
   expect(inspectSmsQuestionStructure(smsQuantityClarificationReply("New request: I need Sheetrock")).valid).toBe(true)
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, quantityKnown: false, addressKnown: false, neededByKnown: false, proposedReply: "A manager will review." })).toBe("quantity")
   expect(smsHasExplicitQuantity("Need 4 bags of thinset")).toBe(true)
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, quantityKnown: true, addressKnown: false, neededByKnown: false, proposedReply: "A manager will review." })).toBe("address_and_needed_by")
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, quantityKnown: true, addressKnown: false, neededByKnown: false, proposedReply: "Got it—white. Which paint finish: flat, eggshell, satin, or semi-gloss?" })).toBe("proposed")
-  expect(smsDeliveryDetailsQuestionReply("Need 4 bags of thinset")).toBe("When do you need it, and what’s the full delivery address?")
+  expect(smsDeliveryDetailsQuestionReply("Need 4 bags of thinset")).toBe("What’s the full delivery address?")
   expect(inspectSmsQuestionStructure(smsDeliveryDetailsQuestionReply("Need 4 bags of thinset")).valid).toBe(true)
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: false, neededByKnown: false, proposedReply: "A manager will review." })).toBe("address_and_needed_by")
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: false, proposedReply: "A manager will review." })).toBe("needed_by")
@@ -226,7 +226,7 @@ test("material request advances across turns after address until complete", () =
   expect(smsNeededByTimingValue("screws for 5/8 Sheetrock")).toBeNull()
   expect(smsNeededByTimingValue("use on 5/8 drywall")).toBeNull()
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "What thickness? What brand?" })).toBe("proposed")
-  expect(inspectSmsQuestionStructure("What thickness? What brand?").valid).toBe(true)
+  expect(inspectSmsQuestionStructure("What thickness? What brand?").valid).toBe(false)
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "I have the details. A manager will review." })).toBe("proposed")
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "Would you like to add accessories?" })).toBe("complete")
 })
@@ -252,18 +252,15 @@ Matching tape
 1 bucket 5gl paint`
   expect(smsMaterialClarificationQuestions(list)).toEqual([
     "Sheetrock thickness: keep 1/2-in., or change to our standard 5/8-in.?",
-    "For “corner bit,” which corner bead type and length: metal or vinyl, 8 ft or 10 ft?",
-    "What paint color, and which finish: flat, eggshell, satin, or semi-gloss?",
   ])
   expect(inspectSmsQuestionStructure(smsMaterialClarificationQuestions(list).join(" "))).toMatchObject({
     valid: true,
-    questionMarks: 3,
+    questionMarks: 1,
   })
   const answered = `${list}\nUse 5/8. Yes, 8-ft metal corner bead. White eggshell paint.`
   expect(smsMaterialClarificationQuestions(answered)).toEqual([])
   expect(smsMaterialClarificationQuestions(`${list}\n10 Paint Sherwin Williams OC`)).toEqual([
     "For “corner bit,” which corner bead type: metal or vinyl?",
-    "Got it—Sherwin Williams. What color, and which finish: flat, eggshell, satin, or semi-gloss?",
   ])
   expect(smsMaterialClarificationQuestions(`${list}\nUse 5/8. Yes, 10-ft metal corner bead. Sherwin-Williams OC-13.`)).toEqual([
     "Which paint finish: flat, eggshell, satin, or semi-gloss?",
@@ -293,16 +290,16 @@ Matching tape
 test("paint replies understand brand, color, code, and finish without repeating the same question", () => {
   const base = "Customer: I need 5 gallons of paint"
   const cases = [
-    [base, "What paint color, and which finish: flat, eggshell, satin, or semi-gloss?"],
-    [`${base}\nAvantia: What paint color and finish do you need?\nCustomer: Sherman William`, "Got it—Sherwin Williams. What color, and which finish: flat, eggshell, satin, or semi-gloss?"],
-    [`${base}\nAvantia: What paint color and finish do you need?\nCustomer: Sherwin Williams`, "Got it—Sherwin Williams. What color, and which finish: flat, eggshell, satin, or semi-gloss?"],
+    [base, "What paint color do you need?"],
+    [`${base}\nAvantia: What paint color and finish do you need?\nCustomer: Sherman William`, "Got it—Sherwin Williams. What paint color do you need?"],
+    [`${base}\nAvantia: What paint color and finish do you need?\nCustomer: Sherwin Williams`, "Got it—Sherwin Williams. What paint color do you need?"],
     [`${base}\nAvantia: What paint color and finish do you need?\nCustomer: White`, "Got it—white. Which finish: flat, eggshell, satin, or semi-gloss?"],
     [`${base}\nAvantia: What paint color and finish do you need?\nCustomer: OC-13`, "Which paint finish: flat, eggshell, satin, or semi-gloss?"],
     [`${base}\nAvantia: What paint color and finish do you need?\nCustomer: Eggshell`, "Got it. What paint color do you need?"],
     [`${base}\nCustomer: White eggshell`, null],
     [`${base}\nCustomer: Sherwin-Williams OC-13 eggshell`, null],
     [`${base}\nCustomer: Satin white`, null],
-    [`${base}\nCustomer: PPG`, "Got it—PPG. What color, and which finish: flat, eggshell, satin, or semi-gloss?"],
+    [`${base}\nCustomer: PPG`, "Got it—PPG. What paint color do you need?"],
   ] as const
 
   expect(cases).toHaveLength(10)
@@ -313,12 +310,12 @@ test("paint replies understand brand, color, code, and finish without repeating 
 
 test("broker-created request progression replies are gated independently from model review flags", async () => {
   const brokerSource = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
-  expect(brokerSource).toContain('const deterministicProgression = params.result.isMaterialRequest')
+  expect(brokerSource).toMatch(/const deterministicProgression\s*=\s*params\.result\.isMaterialRequest/)
   expect(brokerSource).toContain("const gateModelAutoSafe = result.autoSafe || deterministicProgression")
-  expect(brokerSource).toContain("customerNeededBy: smsNeededByTimingValue(context.customerText || reviewText) || \"\"")
-  expect(brokerSource).toContain("const activeOrdered = newRequestBoundary >= 0 ? ordered.slice(newRequestBoundary) : ordered")
-  expect(brokerSource).toContain('message.direction === "incoming" && smsStartsNewMaterialRequest')
-  expect(brokerSource).toContain('(customerEvent !== "correction" || preConfirmationCorrection) && !linkedCorrectionRequestId && deliveryAddressKnown')
+  expect(brokerSource).toContain('customerNeededBy: smsNeededByTimingValue(reviewText) || ""')
+  expect(brokerSource).toMatch(/const activeOrdered\s*=\s*newRequestBoundary >= 0\s*\? ordered\.slice\(newRequestBoundary\)\s*:\s*ordered/)
+  expect(brokerSource).toMatch(/message\.direction === "incoming"\s*&&\s*smsStartsNewMaterialRequest/)
+  expect(brokerSource).toMatch(/\(customerEvent !== "correction" \|\| preConfirmationCorrection\)\s*&&\s*!linkedCorrectionRequestId/)
   expect(brokerSource).toContain("occurred_at >= now() - interval '20 seconds'")
   expect(brokerSource).toContain("const customerEvent = exactRecentDuplicate")
   expect(brokerSource).toContain('smsStartsNewMaterialRequest(body)\n      ? "message"')
@@ -326,23 +323,22 @@ test("broker-created request progression replies are gated independently from mo
   expect(brokerSource).toContain("if (draftCandidate && startsNewRequest) {")
   expect(brokerSource).toContain("if (!explicitConfirmation) {")
   expect(brokerSource).toContain("clarificationQuestions.length === 0")
-  expect(brokerSource).toContain('if (openDraft && customerEvent === "message" && !analyzed.result.isMaterialRequest)')
+  expect(brokerSource).toMatch(/if \(\s*openDraft\s*&&\s*customerEvent === "message"\s*&&\s*!analyzed\.result\.isMaterialRequest\s*\)/)
   expect(brokerSource).toContain("the structured draft advances instead of falling back")
   expect(brokerSource).toContain('if (customerEvent === "correction") {')
-  expect(brokerSource).toContain('const preConfirmationCorrection = customerEvent === "correction" && Boolean(openDraft)')
+  expect(brokerSource).toMatch(/const preConfirmationCorrection\s*=\s*customerEvent === "correction"\s*&&\s*Boolean\(openDraft\)/)
   expect(brokerSource).toContain('event: preConfirmationCorrection ? "message" : customerEvent')
   expect(brokerSource).toContain('if (preConfirmationCorrection) {')
   expect(brokerSource).toContain('only a concise, non-committal next question can pass automatically')
-  expect(brokerSource).toContain('(customerEvent !== "correction" || preConfirmationCorrection)')
+  expect(brokerSource).toMatch(/\(customerEvent !== "correction" \|\| preConfirmationCorrection\)/)
   expect(brokerSource).toContain("and activity_id = ${activityId} and event_type = 'message.received'")
   expect(brokerSource).toContain("canonicalEvents[0]?.external_event_id === eventId")
   expect(brokerSource).toContain("sms_ai_provider_replay_suppressed")
   expect(brokerSource).toContain("needed_by_text, summary_text, summary_hash")
-  expect(brokerSource).toContain("const neededBy = pending.needed_by_text?.trim() || smsNeededByTimingValue(pending.summary_text)")
+  expect(brokerSource).toMatch(/const neededBy\s*=\s*pending\.needed_by_text\?\.trim\(\)\s*\|\|\s*smsNeededByTimingValue\(pending\.summary_text\)/)
   expect(brokerSource).toContain('manager_notes) values')
   expect(brokerSource).toContain('Needed by: ${neededBy}')
-  expect(brokerSource).toContain("!input.request.items.length || !input.intelligenceReady")
-  expect(brokerSource).toContain("if (!neededBy)")
+  expect(brokerSource).toMatch(/!input\.request\.items\.length\s*\|\|\s*\(!SIMPLE_REQUEST_INTAKE[\s\S]*?!input\.intelligenceReady\)/)
   expect(brokerSource).toContain("`Needed by: ${neededBy}`")
   expect(brokerSource).toContain("async function activeSmsRequestSourceIds")
   expect(brokerSource).not.toContain(".slice(-12)")
@@ -369,22 +365,20 @@ test("new-request boundaries require an affirmative instruction", () => {
 
 test("product inquiry fallback answers the product and asks only useful next questions", () => {
   const sheetrock = smsProductInquiryFallbackReply("Do you sell sheetricj?")
-  expect(sheetrock).toContain("Can you confirm 5/8 in.?")
-  expect(sheetrock).toContain("Regular, Type X/fire-rated, or moisture-resistant? How many sheets do you need?")
+  expect(sheetrock).toBe("Yes. Can you confirm 5/8 in.?")
   expect(smsProductInquiryFallbackReply("Do you carry Sheetrook drywall?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Can I get Sheetrcok?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Could we order shetrock?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Do you have sheetrpck?")).toBe(sheetrock)
-  expect(inspectSmsQuestionStructure(sheetrock || "")).toMatchObject({ valid: true, questionMarks: 3, requestedFields: 3 })
+  expect(inspectSmsQuestionStructure(sheetrock || "")).toMatchObject({ valid: true, questionMarks: 1, requestedFields: 1 })
   expect(evaluateSmsReplyGate({ message: "Do you sell sheetricj?", reply: sheetrock || "", intent: "availability", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
   const replyParts = smsReplyParts({ reply: sheetrock || "", deterministicProductInquiry: true })
-  expect(replyParts).toHaveLength(2)
+  expect(replyParts).toHaveLength(1)
   expect(replyParts[0]).toBe("Yes. Can you confirm 5/8 in.?")
-  expect(replyParts[1]).toBe("Regular, Type X/fire-rated, or moisture-resistant? How many sheets do you need?")
   expect(new Set(replyParts).size).toBe(replyParts.length)
 
   const exactListReply = smsProductInquiryFallbackReply("Do you sell Sheetrock?", { allowRelatedSuggestion: false }) || ""
-  expect(smsReplyParts({ reply: exactListReply, deterministicProductInquiry: true, exactListOnly: true })).toHaveLength(2)
+  expect(smsReplyParts({ reply: exactListReply, deterministicProductInquiry: true, exactListOnly: true })).toHaveLength(1)
   expect(exactListReply).not.toMatch(/joint compound|corner bead|drywall screws/i)
   expect(evaluateSmsReplyGate({ message: "Do you sell Sheetrock?", reply: sheetrock || "", intent: "availability", event: "message", participantRole: "lead", modelAutoSafe: true, exactListOnly: true })).toMatchObject({ level: "green", gateAutoSafe: true })
   const unrelated = smsProductInquiryFallbackReply("Do you carry sheet metal?")
@@ -394,15 +388,14 @@ test("product inquiry fallback answers the product and asks only useful next que
   expect(smsProductInquiryFallbackReply("Need an update on my order")).toBeNull()
   const roofing = smsProductInquiryFallbackReply("I need roofing shingles") || ""
   expect(smsReplyParts({ reply: roofing, deterministicProductInquiry: true })).toEqual([
-    "Sure—we can help source roofing shingles.",
-    "What shingle type and color? How many square feet do you need?",
+    "Sure—we can help source roofing shingles. What shingle type do you need?",
   ])
-  expect(inspectSmsQuestionStructure(roofing)).toMatchObject({ valid: true, questionMarks: 2 })
-  expect(smsProductInquiryFallbackReply("I need thinset")).toContain("How many bags do you need?")
-  expect(smsProductInquiryFallbackReply("I need metal studs")).toContain("What size and length? What gauge? How many do you need?")
+  expect(inspectSmsQuestionStructure(roofing)).toMatchObject({ valid: true, questionMarks: 1 })
+  expect(smsProductInquiryFallbackReply("I need thinset")).toContain("What type do you need?")
+  expect(smsProductInquiryFallbackReply("I need metal studs")).toContain("What stud size do you need?")
   const prefixedMetalStuds = smsProductInquiryFallbackReply("New request: I need metal studs") || ""
-  expect(prefixedMetalStuds).toBe("Sure—we can help source metal studs.\n\nWhat size and length? What gauge? How many do you need?")
-  expect(inspectSmsQuestionStructure(prefixedMetalStuds)).toMatchObject({ valid: true, questionMarks: 3 })
+  expect(prefixedMetalStuds).toBe("Sure—we can help source metal studs. What stud size do you need?")
+  expect(inspectSmsQuestionStructure(prefixedMetalStuds)).toMatchObject({ valid: true, questionMarks: 1 })
 
   // A fully quantified request must continue through material extraction. It
   // must never be reduced to a generic availability reply that re-asks fields
@@ -413,9 +406,9 @@ test("product inquiry fallback answers the product and asks only useful next que
 
 test("a new request isolates clarification from unrelated conversation history", async () => {
   const brokerSource = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
-  expect(brokerSource).toContain("const activeCustomerText = startsNewRequest ? body : context.customerText || body")
-  expect(brokerSource).toContain("smsMaterialIntelligenceAssessment(activeCustomerText || reviewText, { exactListOnly })")
-  expect(brokerSource).toContain("const replyContext = startsNewRequest ? `Customer: ${effectiveBody}`")
+  expect(brokerSource).toMatch(/const activeCustomerText = startsNewRequest\s*\? body\s*:\s*context\.customerText \|\| body/)
+  expect(brokerSource).toMatch(/smsMaterialIntelligenceAssessment\(\s*activeCustomerText \|\| reviewText,\s*\{ exactListOnly \},?\s*\)/)
+  expect(brokerSource).toMatch(/const replyContext = startsNewRequest\s*\? `Customer: \$\{effectiveBody\}`/)
   expect(brokerSource).toContain("A confirmed request is a hard context boundary")
   expect(brokerSource).toContain("status = 'converted'")
   expect(brokerSource).toContain("status = 'confirmed', created_request_id")
@@ -472,18 +465,19 @@ test("order intelligence permits a fully specified Sheetrock request", () => {
   })
 })
 
-test("request creation has a second hard intelligence gate", async () => {
+test("simple intake preserves intelligence status for manager review", async () => {
   const brokerSource = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
   expect(brokerSource).toContain("!input.intelligenceReady")
-  expect(brokerSource).toContain("and intelligence_ready = true")
+  expect(brokerSource).toContain("const SIMPLE_REQUEST_INTAKE")
+  expect(brokerSource).toContain("!SIMPLE_REQUEST_INTAKE")
   expect(brokerSource).toContain("aura_material_intelligence_evaluations")
   expect(brokerSource).toContain("intelligence_assessment")
 })
 
 test("Sheetrock follow-ups answer thickness corrections instead of repeating quantity", () => {
   const conversation = "Customer: Do you sell sheetrocc?\nAvantia: What type and how many sheets?"
-  expect(smsSheetrockSpecificationFollowUpReply("What thinnest do you have?", conversation)).toBe("5/8 in. is the standard Sheetrock option. Can you confirm 5/8 in.? Regular, Type X/fire-rated, or moisture-resistant?")
-  expect(smsSheetrockSpecificationFollowUpReply("I asked what do you have not how many?", conversation)).toBe("5/8 in. is the standard Sheetrock option. Can you confirm 5/8 in.? Regular, Type X/fire-rated, or moisture-resistant?")
+  expect(smsSheetrockSpecificationFollowUpReply("What thinnest do you have?", conversation)).toBe("5/8 in. is the standard Sheetrock option. Can you confirm 5/8 in.?")
+  expect(smsSheetrockSpecificationFollowUpReply("I asked what do you have not how many?", conversation)).toBe("5/8 in. is the standard Sheetrock option. Can you confirm 5/8 in.?")
   expect(smsSheetrockSpecificationFollowUpReply("How many screws do you have?", conversation)).toBeNull()
   expect(smsSheetrockSpecificationFollowUpReply("What thickness do you have?", "Customer: plywood")).toBeNull()
 })
@@ -491,28 +485,28 @@ test("Sheetrock follow-ups answer thickness corrections instead of repeating qua
 test("short metal-stud answers keep conversation context and ask only missing specifications", () => {
   const conversation = "Customer: Do you sell metal studs?\nAvantia: What type and how many metal studs do you need?"
   const partial = smsShortMaterialAnswerReply("2x4 50", conversation) || ""
-  expect(partial).toBe("Got it—50 2x4 metal studs. What length? What gauge?")
-  expect(inspectSmsQuestionStructure(partial)).toMatchObject({ valid: true, questionMarks: 2 })
+  expect(partial).toBe("Got it—50 2x4 metal studs. What length do you need?")
+  expect(inspectSmsQuestionStructure(partial)).toMatchObject({ valid: true, questionMarks: 1 })
   expect(evaluateSmsReplyGate({ message: "2x4 50", reply: partial, intent: "material_request", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
-  expect(smsShortMaterialAnswerReply("2 x 4, 50 pcs", conversation)).toBe("Got it—50 2x4 metal studs. What length? What gauge?")
+  expect(smsShortMaterialAnswerReply("2 x 4, 50 pcs", conversation)).toBe("Got it—50 2x4 metal studs. What length do you need?")
   expect(smsShortMaterialAnswerReply("2x4x10 50", conversation)).toBe("Got it—50 2x4x10 metal studs. What gauge?")
   expect(smsShortMaterialAnswerReply("2x4 50", "Customer: Do you sell Sheetrock?")).toBeNull()
 })
 
-test("quantity corrections preserve every unanswered essential question", () => {
+test("quantity corrections preserve the next unanswered essential question", () => {
   const gaugeOnly = "Customer: I need 40 3-5/8 x 10 ft metal studs\nAvantia: What gauge do you need?\nCustomer: Correction, make it 44";
   expect(smsCorrectionPendingQuestionReply("Correction, make it 44", gaugeOnly)).toBe("Got it—I’ll note 44 for review. What gauge do you need?");
 
   const multiplePending = "Customer: I need metal studs\nAvantia: What size and length? What gauge? How many do you need?\nCustomer: Correction: 44";
-  expect(smsCorrectionPendingQuestionReply("Correction: 44", multiplePending)).toBe("Got it—I’ll note 44 for review. What size and length? What gauge?");
-  expect(inspectSmsQuestionStructure(smsCorrectionPendingQuestionReply("Correction: 44", multiplePending) || "")).toMatchObject({ valid: true, questionMarks: 2 });
+  expect(smsCorrectionPendingQuestionReply("Correction: 44", multiplePending)).toBe("Got it—I’ll note 44 for review. What size and length?");
+  expect(inspectSmsQuestionStructure(smsCorrectionPendingQuestionReply("Correction: 44", multiplePending) || "")).toMatchObject({ valid: true, questionMarks: 1 });
   expect(smsCorrectionPendingQuestionReply("Correction, make it 44", "Customer: I need Sheetrock\nAvantia: How many sheets do you need?\nCustomer: Correction, make it 44")).toBeNull();
 })
 
 test("short quantities fill the field just asked instead of repeating the same question", () => {
   const roofing = "Customer: I need roofing shingles\nAvantia: What shingle type and color? How many square feet do you need?\nCustomer: 500 sq ft"
-  expect(smsContextualQuantityAnswerReply("500 sq ft", roofing)).toBe("Got it—500 sq ft of roofing shingles. What shingle type and color?")
-  expect(smsContextualQuantityAnswerReply("500 sf", roofing)).toBe("Got it—500 sq ft of roofing shingles. What shingle type and color?")
+  expect(smsContextualQuantityAnswerReply("500 sq ft", roofing)).toBe("Got it—500 sq ft of roofing shingles. What shingle type do you need?")
+  expect(smsContextualQuantityAnswerReply("500 sf", roofing)).toBe("Got it—500 sq ft of roofing shingles. What shingle type do you need?")
   const thinset = "Customer: I need thinset\nAvantia: How many bags do you need?\nCustomer: 20 bags"
   expect(smsContextualQuantityAnswerReply("20 bags", thinset)).toBe("Got it—20 bags of thinset. Which thinset do you need?")
   const sheetrock = "Customer: I need Sheetrock\nAvantia: How many sheets do you need?\nCustomer: 25"
@@ -520,17 +514,17 @@ test("short quantities fill the field just asked instead of repeating the same q
   expect(smsContextualQuantityAnswerReply("1,000", sheetrock)).toBe("Got it—1000 sheets of Sheetrock. Can you confirm 5/8 in.?")
   const metalStuds = "Customer: New request: I need metal studs.\nAvantia: Sure — how much do you need?\nCustomer: 40"
   const metalStudReply = smsContextualQuantityAnswerReply("40", metalStuds) || ""
-  expect(metalStudReply).toBe("Got it—40 metal studs. What size and length? What gauge?")
-  expect(inspectSmsQuestionStructure(metalStudReply)).toMatchObject({ valid: true, questionMarks: 2 })
+  expect(metalStudReply).toBe("Got it—40 metal studs. What stud size do you need?")
+  expect(inspectSmsQuestionStructure(metalStudReply)).toMatchObject({ valid: true, questionMarks: 1 })
   expect(evaluateSmsReplyGate({ message: "40", reply: metalStudReply, intent: "material_request", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
-  expect(smsContextualQuantityAnswerReply("40 peices", metalStuds)).toBe("Got it—40 metal studs. What size and length? What gauge?")
+  expect(smsContextualQuantityAnswerReply("40 peices", metalStuds)).toBe("Got it—40 metal studs. What stud size do you need?")
   expect(smsContextualQuantityAnswerReply("500 sq ft", "Customer: I need roofing shingles\nAvantia: What color?\nCustomer: 500 sq ft")).toBeNull()
 })
 
 test("a supplied quantity can never trigger the same generic quantity question again", () => {
   expect(smsHasExplicitQuantity("I need 45 sheetrocks and 20 bricks")).toBe(true)
   expect(smsAnsweredQuantityGuardReply("I need 45 sheetrocks and 20 bricks", "Sure — how much do you need?")).toBe(
-    "Got it—45 Sheetrock sheets and 20 bricks. Can you confirm 5/8 in. Sheetrock? What brick type and size?",
+    "Got it—45 Sheetrock sheets and 20 bricks. Can you confirm 5/8 in. Sheetrock?",
   )
   expect(smsAnsweredQuantityGuardReply("I need like 40", "Sure — how much do you need?")).toBe("Got it—40. Which item is that quantity for?")
   expect(smsAnsweredQuantityGuardReply("I need like 40", "What gauge do you need?")).toBeNull()
@@ -559,37 +553,37 @@ test("essential product-type follow-ups pass the safety gate", () => {
 })
 
 test("a product name such as Type S does not look like a repeated specification question", () => {
-  const reply = "When do you need the 8 bags of Type S mortar? What is the full delivery address?"
-  expect(inspectSmsQuestionStructure(reply)).toMatchObject({ valid: true, fields: ["needed_by", "address"] })
+  const reply = "What is the full delivery address for the 8 bags of Type S mortar?"
+  expect(inspectSmsQuestionStructure(reply)).toMatchObject({ valid: true, fields: ["address"] })
   expect(smsOutputSafetySignals({ message: "Need 8 bags Type S mortar", reply, intent: "material_request" })).toEqual([])
 })
 
 test("deterministic progression keeps Spanish even without accent marks", () => {
   const message = "Nueva solicitud: necesito 400 bloques CMU de 8 pulgadas"
   expect(smsReplyLanguage(message)).toBe("es")
-  expect(smsDeliveryDetailsQuestionReply(message)).toBe("¿Para cuándo los necesita y cuál es la dirección completa de entrega?")
+  expect(smsDeliveryDetailsQuestionReply(message)).toBe("¿Cuál es la dirección completa de entrega?")
   expect(smsQuantityClarificationReply(message)).toBe("Claro—¿qué cantidad necesita?")
 })
 
 test("bare quantities keep the requested product in wood, finishing, and mixed-list continuations", () => {
   const cases = [
-    ["40", "Customer: I need wood studs\nAvantia: How many pieces do you need?", "Got it—40 wood studs. What size and length?"],
-    ["40 pcs", "Customer: I need wood studs\nAvantia: How many pieces do you need?", "Got it—40 wood studs. What size and length?"],
-    ["4", "Customer: I need drywall screws\nAvantia: How many boxes do you need?", "Got it—4 boxes. What screw length? What thread type?"],
-    ["4 boxes", "Customer: I need drywall screws\nAvantia: How many boxes do you need?", "Got it—4 boxes. What screw length? What thread type?"],
+    ["40", "Customer: I need wood studs\nAvantia: How many pieces do you need?", "Got it—40 wood studs. What stud size do you need?"],
+    ["40 pcs", "Customer: I need wood studs\nAvantia: How many pieces do you need?", "Got it—40 wood studs. What stud size do you need?"],
+    ["4", "Customer: I need drywall screws\nAvantia: How many boxes do you need?", "Got it—4 boxes. What screw length do you need?"],
+    ["4 boxes", "Customer: I need drywall screws\nAvantia: How many boxes do you need?", "Got it—4 boxes. What screw length do you need?"],
     ["6", "Customer: I need joint compound\nAvantia: How many buckets do you need?", "Got it—6 buckets of joint compound. Can you confirm the compound type: 5-gallon all-purpose?"],
     ["6 buckets", "Customer: I need joint compound\nAvantia: How many buckets do you need?", "Got it—6 buckets of joint compound. Can you confirm the compound type: 5-gallon all-purpose?"],
-    ["10", "Customer: I need paint\nAvantia: How many gallons do you need?", "Got it—10 gallons of paint. What color, and which finish: flat, eggshell, satin, or semi-gloss?"],
-    ["10 gallons", "Customer: I need paint\nAvantia: How many gallons do you need?", "Got it—10 gallons of paint. What color, and which finish: flat, eggshell, satin, or semi-gloss?"],
-    ["24", "Customer: I need corner bead\nAvantia: How many pieces do you need?", "Got it—24 pieces of corner bead. What corner bead type? What length?"],
-    ["24 pcs", "Customer: I need corner bead\nAvantia: How many pieces do you need?", "Got it—24 pieces of corner bead. What corner bead type? What length?"],
-    ["40", "Customer: I need 20 Sheetrock sheets and metal studs\nAvantia: How many metal studs do you need?", "Got it—40 metal studs. What size and length? What gauge?"],
+    ["10", "Customer: I need paint\nAvantia: How many gallons do you need?", "Got it—10 gallons of paint. What paint color do you need?"],
+    ["10 gallons", "Customer: I need paint\nAvantia: How many gallons do you need?", "Got it—10 gallons of paint. What paint color do you need?"],
+    ["24", "Customer: I need corner bead\nAvantia: How many pieces do you need?", "Got it—24 pieces of corner bead. What corner bead type do you need?"],
+    ["24 pcs", "Customer: I need corner bead\nAvantia: How many pieces do you need?", "Got it—24 pieces of corner bead. What corner bead type do you need?"],
+    ["40", "Customer: I need 20 Sheetrock sheets and metal studs\nAvantia: How many metal studs do you need?", "Got it—40 metal studs. What stud size do you need?"],
     ["20", "Customer: I need Sheetrock and metal studs\nAvantia: How many Sheetrock sheets do you need?", "Got it—20 sheets of Sheetrock. Can you confirm 5/8 in.?"],
     ["5", "Customer: I need paint and joint compound\nAvantia: How many buckets of joint compound do you need?", "Got it—5 buckets of joint compound. Can you confirm the compound type: 5-gallon all-purpose?"],
-    ["8", "Customer: I need paint and joint compound\nAvantia: How many gallons of paint do you need?", "Got it—8 gallons of paint. What color, and which finish: flat, eggshell, satin, or semi-gloss?"],
-    ["30", "Customer: I need wood studs and screws\nAvantia: How many wood studs do you need?", "Got it—30 wood studs. What size and length?"],
-    ["3", "Customer: I need wood studs and screws\nAvantia: How many boxes of screws do you need?", "Got it—3 boxes. What screw length? What thread type?"],
-    ["12", "Customer: I need corner bead and compound\nAvantia: How many pieces of corner bead do you need?", "Got it—12 pieces of corner bead. What corner bead type? What length?"],
+    ["8", "Customer: I need paint and joint compound\nAvantia: How many gallons of paint do you need?", "Got it—8 gallons of paint. What paint color do you need?"],
+    ["30", "Customer: I need wood studs and screws\nAvantia: How many wood studs do you need?", "Got it—30 wood studs. What stud size do you need?"],
+    ["3", "Customer: I need wood studs and screws\nAvantia: How many boxes of screws do you need?", "Got it—3 boxes. What screw length do you need?"],
+    ["12", "Customer: I need corner bead and compound\nAvantia: How many pieces of corner bead do you need?", "Got it—12 pieces of corner bead. What corner bead type do you need?"],
     ["2", "Customer: I need corner bead and compound\nAvantia: How many buckets of compound do you need?", "Got it—2 buckets of joint compound. Can you confirm the compound type: 5-gallon all-purpose?"],
     ["50", "Customer: I need Sheetrock and metal studs\nAvantia: How many do you need?", null],
     ["5", "Customer: I need paint and compound\nAvantia: How much do you need?", null],

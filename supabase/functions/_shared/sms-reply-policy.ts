@@ -172,7 +172,12 @@ export function smsReplySuggestsOptionalItems(value: string) {
 }
 
 export function enforceSmsQuestionLimit(value: string) {
-  return value.trim().slice(0, 1600);
+  const trimmed = value.trim().slice(0, 1600);
+  if (!trimmed) return trimmed;
+  // The production intake is intentionally one-blocker-at-a-time. Keep any
+  // short acknowledgement that precedes the first question, but never let a
+  // model or deterministic fallback send a second question in the same SMS.
+  return trimmed.match(/^[\s\S]*?[?？]/)?.[0]?.trim() || trimmed;
 }
 
 export type SmsRequestedField =
@@ -569,7 +574,7 @@ export function smsAnsweredQuantityGuardReply(
   )?.[1];
   const bricks = latestMessage.match(/\b(\d{1,6})\s*bricks?\b/i)?.[1];
   if (sheetrock && bricks)
-    return `Got it—${sheetrock} Sheetrock sheets and ${bricks} bricks. Can you confirm 5/8 in. Sheetrock? What brick type and size?`;
+    return `Got it—${sheetrock} Sheetrock sheets and ${bricks} bricks. Can you confirm 5/8 in. Sheetrock?`;
   if (smsHasExplicitQuantity(latestMessage))
     return "Got it—I have the quantities. What product specifications still need to be confirmed?";
   const standalone = latestMessage.match(
@@ -772,8 +777,8 @@ export function smsMaterialClarificationQuestions(
         : hasPaintFinish
           ? "Got it. What paint color do you need?"
           : paintBrand
-            ? `Got it—${paintBrand}. What color, and which finish: flat, eggshell, satin, or semi-gloss?`
-            : "What paint color, and which finish: flat, eggshell, satin, or semi-gloss?",
+            ? `Got it—${paintBrand}. What paint color do you need?`
+            : "What paint color do you need?",
     );
   }
   if (paint.test(value) && !hasProductQuantity(quantityProductPredicates[3])) {
@@ -1168,7 +1173,7 @@ export function smsQuantityClarificationReply(message: string) {
   if (/\bthinset\b/i.test(message))
     return "Sure — how much thinset do you need?";
   if (/\b(?:sheetrock|drywall)\b/i.test(message))
-    return "How many sheets do you need? Is 5/8 in. okay?";
+    return "How many sheets do you need?";
   return "Sure — how much do you need?";
 }
 
@@ -1268,23 +1273,19 @@ export function smsProductInquiryFallbackReply(
             ? "metal studs"
             : rawProduct;
   if (product === "roofing shingles")
-    return "Sure—we can help source roofing shingles.\n\nWhat shingle type and color? How many square feet do you need?";
+    return "Sure—we can help source roofing shingles. What shingle type do you need?";
   if (product === "thinset")
-    return "Sure—we can help source thinset.\n\nWhat type do you need? How many bags do you need?";
+    return "Sure—we can help source thinset. What type do you need?";
   if (product === "metal studs")
-    return "Sure—we can help source metal studs.\n\nWhat size and length? What gauge? How many do you need?";
+    return "Sure—we can help source metal studs. What stud size do you need?";
   const specification =
     product === "Sheetrock"
-      ? "Can you confirm 5/8 in.?\n\nRegular, Type X/fire-rated, or moisture-resistant?"
+      ? "Can you confirm 5/8 in.?"
       : "What type do you need?";
-  const quantity =
-    product === "Sheetrock"
-      ? "How many sheets do you need?"
-      : `How much ${product} do you need?`;
   const primary =
     product === "Sheetrock"
-      ? `Yes. ${specification} ${quantity}`
-      : `Yes—we can help with ${product}. ${specification} ${quantity}`;
+      ? `Yes. ${specification}`
+      : `Yes—we can help with ${product}. ${specification}`;
   return primary;
 }
 
@@ -1306,7 +1307,7 @@ export function smsSheetrockSpecificationFollowUpReply(
       latestMessage,
     );
   if (!asksThickness && !correctsQuantity) return null;
-  return "5/8 in. is the standard Sheetrock option. Can you confirm 5/8 in.? Regular, Type X/fire-rated, or moisture-resistant?";
+  return "5/8 in. is the standard Sheetrock option. Can you confirm 5/8 in.?";
 }
 
 export function smsShortMaterialAnswerReply(
@@ -1324,7 +1325,7 @@ export function smsShortMaterialAnswerReply(
   const quantity = Number(match[2]);
   if (!Number.isFinite(quantity) || quantity < 1) return null;
   const hasLength = (size.match(/x/g) || []).length >= 2;
-  return `Got it—${quantity} ${size} metal studs. ${hasLength ? "What gauge?" : "What length? What gauge?"}`;
+  return `Got it—${quantity} ${size} metal studs. ${hasLength ? "What gauge?" : "What length do you need?"}`;
 }
 
 export function smsContextualQuantityAnswerReply(
@@ -1405,7 +1406,7 @@ export function smsContextualQuantityAnswerReply(
       suppliedUnit ||
       (/square\s+feet|sq\.?\s*ft/i.test(latestAvantia) ? "sq ft" : "");
     if (!/^(?:sq\.?\s*ft|sf|square feet)$/.test(unit)) return null;
-    return `Got it—${amount} sq ft of roofing shingles. What shingle type and color?`;
+    return `Got it—${amount} sq ft of roofing shingles. What shingle type do you need?`;
   }
   if (family === "thinset") {
     const unit = suppliedUnit || (/bags?/i.test(latestAvantia) ? "bags" : "");
@@ -1421,12 +1422,12 @@ export function smsContextualQuantityAnswerReply(
   if (family === "metal_studs") {
     const unit = suppliedUnit || "pcs";
     if (!/^(?:pcs?|pieces?|each|ea)$/.test(unit)) return null;
-    return `Got it—${amount} metal studs. What size and length? What gauge?`;
+    return `Got it—${amount} metal studs. What stud size do you need?`;
   }
   if (family === "wood_studs") {
     const unit = suppliedUnit || "pcs";
     if (!/^(?:pcs?|pieces?|each|ea)$/.test(unit)) return null;
-    return `Got it—${amount} wood studs. What size and length?`;
+    return `Got it—${amount} wood studs. What stud size do you need?`;
   }
   if (family === "screws") {
     const unit = suppliedUnit || (/boxes?/i.test(latestAvantia) ? "boxes" : "");
@@ -1438,7 +1439,7 @@ export function smsContextualQuantityAnswerReply(
       : amount === 1
         ? "screw"
         : "screws";
-    return `Got it—${amount} ${label}. What screw length? What thread type?`;
+    return `Got it—${amount} ${label}. What screw length do you need?`;
   }
   if (family === "compound") {
     const unit =
@@ -1450,12 +1451,12 @@ export function smsContextualQuantityAnswerReply(
     const unit =
       suppliedUnit || (/gallons?/i.test(latestAvantia) ? "gallons" : "");
     if (!/^gallons?$/.test(unit)) return null;
-    return `Got it—${amount} ${amount === 1 ? "gallon" : "gallons"} of paint. What color, and which finish: flat, eggshell, satin, or semi-gloss?`;
+    return `Got it—${amount} ${amount === 1 ? "gallon" : "gallons"} of paint. What paint color do you need?`;
   }
   if (family === "corner_bead") {
     const unit = suppliedUnit || "pcs";
     if (!/^(?:pcs?|pieces?|each|ea)$/.test(unit)) return null;
-    return `Got it—${amount} ${amount === 1 ? "piece" : "pieces"} of corner bead. What corner bead type? What length?`;
+    return `Got it—${amount} ${amount === 1 ? "piece" : "pieces"} of corner bead. What corner bead type do you need?`;
   }
   return null;
 }
@@ -1499,7 +1500,7 @@ export function smsCorrectionPendingQuestionReply(
   const acknowledgement = correctedValue
     ? `Got it—I’ll note ${correctedValue} for review.`
     : "Got it—I’ll note the correction for review.";
-  return `${acknowledgement} ${unresolved.join(" ").trim()}`;
+  return `${acknowledgement} ${unresolved[0]}`;
 }
 
 export function smsReplyParts(params: {
@@ -1522,10 +1523,10 @@ export function smsReplyParts(params: {
 
 export function smsDeliveryDetailsQuestionReply(message: string) {
   if (/[\u0590-\u05ff]/.test(message))
-    return "מתי החומרים נדרשים, ומה כתובת המשלוח המלאה?";
+    return "מה כתובת המשלוח המלאה?";
   if (smsReplyLanguage(message) === "es")
-    return "¿Para cuándo los necesita y cuál es la dirección completa de entrega?";
-  return "When do you need it, and what’s the full delivery address?";
+    return "¿Cuál es la dirección completa de entrega?";
+  return "What’s the full delivery address?";
 }
 
 export function smsUnansweredFollowUpText(params: {
