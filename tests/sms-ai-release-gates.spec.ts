@@ -17,6 +17,7 @@ import {
   smsContextualQuantityAnswerReply,
   smsHasExplicitQuantity,
   smsHasNeededByTiming,
+  smsNeededByTimingValue,
   smsOutputSafetySignals,
   smsProductInquiryFallbackReply,
   smsQuantityClarificationReply,
@@ -104,6 +105,7 @@ test("material request advances across turns after address until complete", () =
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: false, neededByKnown: false, proposedReply: "A manager will review." })).toBe("address_and_needed_by")
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: false, proposedReply: "A manager will review." })).toBe("needed_by")
   expect(smsHasNeededByTiming("Tomorrow")).toBe(true)
+  expect(smsNeededByTimingValue("Need it Monday\nActually tomorrow")).toBe("tomorrow")
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "What thickness? What brand?" })).toBe("proposed")
   expect(inspectSmsQuestionStructure("What thickness? What brand?").valid).toBe(true)
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "I have the details. A manager will review." })).toBe("proposed")
@@ -114,6 +116,10 @@ test("broker-created request progression replies are gated independently from mo
   const brokerSource = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
   expect(brokerSource).toContain('const deterministicProgression = params.result.isMaterialRequest')
   expect(brokerSource).toContain("const gateModelAutoSafe = result.autoSafe || deterministicProgression")
+  expect(brokerSource).toContain("customerNeededBy: smsNeededByTimingValue(context.customerText || reviewText) || \"\"")
+  expect(brokerSource).toContain("if (!input.customerAddress.trim() || !input.customerNeededBy.trim() || !input.request.items.length) return false")
+  expect(brokerSource).toContain("if (!smsNeededByTimingValue(pending.summary_text))")
+  expect(brokerSource).toContain("`Needed by: ${neededBy}`")
   expect(evaluateSmsReplyGate({
     message: "Yes, 5/8 regular, 21 sheets",
     reply: "I have the material list. What is the full delivery address?",

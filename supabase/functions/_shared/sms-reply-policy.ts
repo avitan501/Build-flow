@@ -194,8 +194,15 @@ export function resolveSmsDeliveryAddressKnown(params: { storedDraft?: boolean |
   return Boolean(suppliedNow || (!params.startsNewRequest && params.storedDraft));
 }
 
+const SMS_NEEDED_BY_TIMING_PATTERN = /\b(?:asap|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next\s+(?:week|month)|\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)\b|(?:דחוף|בהקדם|היום|מחר|יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי)|שבוע\s+הבא)|\b(?:hoy|ma[nñ]ana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|pr[oó]xima\s+semana)\b/i;
+
+export function smsNeededByTimingValue(value: string) {
+  const matches = [...value.matchAll(new RegExp(SMS_NEEDED_BY_TIMING_PATTERN.source, "gi"))];
+  return matches.at(-1)?.[0]?.trim() || null;
+}
+
 export function smsHasNeededByTiming(value: string) {
-  return /\b(?:asap|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next\s+(?:week|month)|\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)\b|(?:דחוף|בהקדם|היום|מחר|יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי)|שבוע\s+הבא)|\b(?:hoy|ma[nñ]ana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|pr[oó]xima\s+semana)\b/i.test(value);
+  return Boolean(smsNeededByTimingValue(value));
 }
 
 export function smsHasExplicitQuantity(value: string) {

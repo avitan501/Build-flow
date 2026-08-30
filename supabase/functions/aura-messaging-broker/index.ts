@@ -18,6 +18,7 @@ import {
   smsReplyLanguage,
   smsHasExplicitQuantity,
   smsHasNeededByTiming,
+  smsNeededByTimingValue,
   smsProductInquiryFallbackReply,
   smsQuantityClarificationReply,
   smsReplyParts,
@@ -1926,24 +1927,25 @@ async function sha256Hex(value: string) {
   return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function requestConfirmationSummary(request: NonNullable<CustomerSmsAutomation["request"]>, address: string, latest: string) {
+function requestConfirmationSummary(request: NonNullable<CustomerSmsAutomation["request"]>, address: string, neededBy: string, latest: string) {
   const items = request.items.map((item) => `• ${item.quantity || 1} ${item.unit || "each"} — ${item.name}`);
-  if (/\p{Script=Hebrew}/u.test(latest)) return ["סיכום הבקשה שלך:", ...items, `כתובת משלוח: ${address}`, "נא להשיב כן כדי לאשר את הבקשה המדויקת הזאת."].join("\n").slice(0, 1600);
-  if (/\b(?:hola|gracias|necesito|precio|entrega|direcci[oó]n)\b/i.test(latest)) return ["Resumen de su solicitud:", ...items, `Dirección de entrega: ${address}`, "Responda SÍ para confirmar esta solicitud exacta."].join("\n").slice(0, 1600);
-  return ["Your request summary:", ...items, `Delivery address: ${address}`, "Reply YES to confirm this exact request."].join("\n").slice(0, 1600);
+  if (/\p{Script=Hebrew}/u.test(latest)) return ["סיכום הבקשה שלך:", ...items, `כתובת משלוח: ${address}`, `נדרש עד: ${neededBy}`, "נא להשיב כן כדי לאשר את הבקשה המדויקת הזאת."].join("\n").slice(0, 1600);
+  if (/\b(?:hola|gracias|necesito|precio|entrega|direcci[oó]n)\b/i.test(latest)) return ["Resumen de su solicitud:", ...items, `Dirección de entrega: ${address}`, `Necesario para: ${neededBy}`, "Responda SÍ para confirmar esta solicitud exacta."].join("\n").slice(0, 1600);
+  return ["Your request summary:", ...items, `Delivery address: ${address}`, `Needed by: ${neededBy}`, "Reply YES to confirm this exact request."].join("\n").slice(0, 1600);
 }
 
 async function prepareSmsRequestConfirmation(input: {
   phone: string;
   customerName: string;
   customerAddress: string;
+  customerNeededBy: string;
   request: NonNullable<CustomerSmsAutomation["request"]>;
   sourceCommunicationIds: string[];
   latestCustomerMessage: string;
 }) {
-  if (!input.customerAddress.trim() || !input.request.items.length) return false;
-  const summary = requestConfirmationSummary(input.request, input.customerAddress.trim(), input.latestCustomerMessage);
-  const summaryHash = await sha256Hex(JSON.stringify({ phone: input.phone, address: input.customerAddress.trim(), title: input.request.title, department: input.request.department, items: input.request.items }));
+  if (!input.customerAddress.trim() || !input.customerNeededBy.trim() || !input.request.items.length) return false;
+  const summary = requestConfirmationSummary(input.request, input.customerAddress.trim(), input.customerNeededBy.trim(), input.latestCustomerMessage);
+  const summaryHash = await sha256Hex(JSON.stringify({ phone: input.phone, address: input.customerAddress.trim(), neededBy: input.customerNeededBy.trim(), title: input.request.title, department: input.request.department, items: input.request.items }));
   const pending = await sql.begin(async (transaction) => {
     await transaction`select pg_advisory_xact_lock(hashtextextended(${input.phone}, 0))`;
     const same = await transaction<{ id: string; summary_sent_at: string | null }[]>`
@@ -2018,12 +2020,16 @@ async function smsCustomerProfile(phone: string, name: string) {
 
 async function confirmPendingSmsRequest(communicationId: string, phone: string, body: string) {
   if (!isExplicitRequestConfirmation(body)) return null;
-  const pendingRows = await sql<{ id: string; customer_name: string; customer_address: string; title: string; department: string; items: Array<{ name: string; quantity: number; unit: string }>; source_communication_ids: string[]; request_id: string | null }[]>`
-    select id, customer_name, customer_address, title, department, items, source_communication_ids, request_id
+  const pendingRows = await sql<{ id: string; customer_name: string; customer_address: string; title: string; department: string; items: Array<{ name: string; quantity: number; unit: string }>; source_communication_ids: string[]; request_id: string | null; summary_text: string }[]>`
+    select id, customer_name, customer_address, title, department, items, source_communication_ids, request_id, summary_text
     from public.aura_sms_request_pending_confirmations where normalized_phone = ${phone} and status = 'pending' and summary_sent_at is not null order by summary_sent_at desc limit 1
   `;
   const pending = pendingRows[0];
   if (!pending) return null;
+  if (!smsNeededByTimingValue(pending.summary_text)) {
+    await sql`update public.aura_sms_request_pending_confirmations set status = 'superseded', updated_at = now() where id = ${pending.id}::uuid and status = 'pending'`;
+    return null;
+  }
   const customerId = await smsCustomerProfile(phone, pending.customer_name || phone);
   const result = await sql.begin(async (transaction) => {
     const locked = await transaction<{ id: string; status: string; request_id: string | null }[]>`select id, status, request_id from public.aura_sms_request_pending_confirmations where id = ${pending.id}::uuid for update`;
@@ -2194,6 +2200,7 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
         phone,
         customerName: result.customerName || openDraft?.customer_name || contact?.full_name || phone,
         customerAddress: result.customerAddress || openDraft?.customer_address || "",
+        customerNeededBy: smsNeededByTimingValue(context.customerText || reviewText) || "",
         request: result.request,
         sourceCommunicationIds: sources,
         latestCustomerMessage: body,
