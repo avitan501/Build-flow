@@ -292,6 +292,7 @@ test("short quantities fill the field just asked instead of repeating the same q
   expect(metalStudReply).toBe("Got it—40 metal studs. What size and length? What gauge?")
   expect(inspectSmsQuestionStructure(metalStudReply)).toMatchObject({ valid: true, questionMarks: 2 })
   expect(evaluateSmsReplyGate({ message: "40", reply: metalStudReply, intent: "material_request", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
+  expect(smsContextualQuantityAnswerReply("40 peices", metalStuds)).toBe("Got it—40 metal studs. What size and length? What gauge?")
   expect(smsContextualQuantityAnswerReply("500 sq ft", "Customer: I need roofing shingles\nAvantia: What color?\nCustomer: 500 sq ft")).toBeNull()
 })
 

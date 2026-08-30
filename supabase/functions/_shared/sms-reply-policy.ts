@@ -434,11 +434,11 @@ export function smsContextualQuantityAnswerReply(latestMessage: string, conversa
       : null;
   if (!family) return null;
   const value = latestMessage.trim().replace(/[.!]+$/, "");
-  const measured = value.match(/^(\d{1,3}(?:,\d{3})+|\d{1,6}(?:\.\d+)?)\s*(sq\.?\s*ft|sf|square\s+feet|sheets?|bags?|boxes?|buckets?|gallons?|pcs?|pieces?|each|ea)?$/i);
+  const measured = value.match(/^(\d{1,3}(?:,\d{3})+|\d{1,6}(?:\.\d+)?)\s*(sq\.?\s*ft|sf|square\s+feet|sheets?|bags?|boxes?|buckets?|gallons?|pcs?|pieces?|peices?|each|ea)?$/i);
   if (!measured) return null;
   const amount = Number(measured[1].replaceAll(",", ""));
   if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) return null;
-  const suppliedUnit = (measured[2] || "").toLowerCase().replace(/\s+/g, " ");
+  const suppliedUnit = (measured[2] || "").toLowerCase().replace(/\s+/g, " ").replace(/^peices?$/, "pieces");
   if (family === "roofing") {
     const unit = suppliedUnit || (/square\s+feet|sq\.?\s*ft/i.test(latestAvantia) ? "sq ft" : "");
     if (!/^(?:sq\.?\s*ft|sf|square feet)$/.test(unit)) return null;
