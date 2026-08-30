@@ -4684,13 +4684,17 @@ async function handlePublicStartByText(req: Request) {
     const existing = await transaction<{ id: string; status: string }[]>`
       select id, status from public.public_start_text_requests where idempotency_key = ${idempotencyKey} limit 1
     `;
-    if (existing[0]) return { id: existing[0].id, send: false };
+    if (existing[0]) return {
+      id: existing[0].id,
+      send: false,
+      delivery: existing[0].status === "sent" ? "sent" : "processing",
+    };
     const optedOut = await transaction<{ id: string }[]>`
       select id from public.aura_contacts where normalized_phone = ${phone} and sms_ai_mode = 'off' limit 1
     `;
     const phoneRecent = await transaction<{ count: number }[]>`
       select count(*)::int as count from public.public_start_text_requests
-      where normalized_phone = ${phone} and created_at >= now() - interval '24 hours' and status in ('processing', 'sent', 'suppressed')
+      where normalized_phone = ${phone} and created_at >= now() - interval '5 minutes' and status in ('processing', 'sent')
     `;
     const ipRecent = await transaction<{ count: number }[]>`
       select count(*)::int as count from public.public_start_text_requests
@@ -4708,26 +4712,31 @@ async function handlePublicStartByText(req: Request) {
       values (${phone}, ${ipHash}, ${idempotencyKey}, ${PUBLIC_START_TEXT_TEMPLATE_VERSION}, ${userAgent || null}, ${suppressed ? "suppressed" : "processing"})
       returning id
     `;
-    return { id: inserted[0].id, send: !suppressed };
+    return { id: inserted[0].id, send: !suppressed, delivery: suppressed ? "already_sent" : "processing" };
   }).catch((error) => {
     if (error instanceof Error && error.message.includes("public_start_rate_limited")) return null;
     throw error;
   });
   if (!claim) return json({ error: "Please wait before requesting another text." }, 429);
-  if (!claim.send) return json({ ok: true });
-  // Start provider delivery immediately and return without making the visitor
-  // wait for two provider calls plus communication persistence. waitUntil keeps
-  // the audited delivery alive after the fast HTTP acknowledgement.
-  EdgeRuntime.waitUntil((async () => {
-    try {
-      const providerId = await sendQuoSms(phone, PUBLIC_START_TEXT_WELCOME);
-      await sendQuoSms(phone, PUBLIC_START_TEXT_EXAMPLE);
-      await sql`update public.public_start_text_requests set status = 'sent', provider_message_id = ${providerId}, updated_at = now() where id = ${claim.id}::uuid`;
-    } catch (error) {
-      await sql`update public.public_start_text_requests set status = 'failed', last_error = ${String(error instanceof Error ? error.message : "send_failed").slice(0, 500)}, updated_at = now() where id = ${claim.id}::uuid`;
-    }
-  })());
-  return json({ ok: true });
+  if (!claim.send) return json({ ok: true, delivery: claim.delivery });
+  // Confirm the first provider acceptance before the website says "Text sent."
+  // The example remains a second SMS, but finishes after the visitor receives
+  // an honest acknowledgement for the welcome message.
+  try {
+    const providerId = await sendQuoSms(phone, PUBLIC_START_TEXT_WELCOME);
+    await sql`update public.public_start_text_requests set status = 'sent', provider_message_id = ${providerId}, updated_at = now() where id = ${claim.id}::uuid`;
+    EdgeRuntime.waitUntil((async () => {
+      try {
+        await sendQuoSms(phone, PUBLIC_START_TEXT_EXAMPLE);
+      } catch (error) {
+        await sql`update public.public_start_text_requests set last_error = ${`Starter example failed: ${String(error instanceof Error ? error.message : "send_failed")}`.slice(0, 500)}, updated_at = now() where id = ${claim.id}::uuid`;
+      }
+    })());
+    return json({ ok: true, delivery: "sent" });
+  } catch (error) {
+    await sql`update public.public_start_text_requests set status = 'failed', last_error = ${String(error instanceof Error ? error.message : "send_failed").slice(0, 500)}, updated_at = now() where id = ${claim.id}::uuid`;
+    return json({ error: "We couldn't send the text. Please use WhatsApp or try again shortly." }, 503);
+  }
 }
 
 Deno.serve(async (req: Request) => {

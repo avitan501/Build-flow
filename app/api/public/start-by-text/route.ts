@@ -67,10 +67,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Text start is temporarily unavailable." }, { status: 503 });
   }
 
-  const result = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+  const result = await response.json().catch(() => null) as { ok?: boolean; error?: string; delivery?: "sent" | "already_sent" | "processing" } | null;
   if (!response.ok || !result?.ok) {
     const status = response.status === 429 ? 429 : response.status >= 500 ? 503 : 400;
     return NextResponse.json({ ok: false, error: result?.error || "Text start is temporarily unavailable." }, { status });
   }
-  return NextResponse.json({ ok: true, message: GENERIC_SUCCESS });
+  return NextResponse.json({ ok: true, message: GENERIC_SUCCESS, delivery: result.delivery || "sent" });
 }
