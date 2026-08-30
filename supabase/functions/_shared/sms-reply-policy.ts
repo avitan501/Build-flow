@@ -19,7 +19,7 @@ export type SmsReplyExample = {
   intent: string;
 };
 
-const MATERIAL_TERMS = /\b(?:drywal+l?|sheetrock|plywood|lumber|studs?|tracks?|boards?|sheets?|bags?|boxes?|buckets?|rolls?|cement|concrete|compound|screws?|insulation|material(?:s)?)\b|(?:חומר(?:ים)?|לוחות?|שקים?|ארגזים?|ברגים|בידוד|גבס)|\b(?:material(?:es)?|paneles?|placas?|bolsas?|cajas?|tornillos?|aislamiento|yeso)\b/i;
+const MATERIAL_TERMS = /\b(?:drywal+l?|sheetrock|plywood|lumber|studs?|tracks?|boards?|sheets?|bags?|boxes?|buckets?|rolls?|thinset|mortar|cement|concrete|compound|screws?|insulation|material(?:s)?)\b|(?:חומר(?:ים)?|לוחות?|שקים?|ארגזים?|ברגים|בידוד|גבס)|\b(?:material(?:es)?|paneles?|placas?|bolsas?|cajas?|tornillos?|aislamiento|yeso|mortero)\b/i;
 
 export function smsReplyLanguage(value: string) {
   if (/[\u0590-\u05ff]/.test(value)) return "he";
@@ -86,7 +86,7 @@ export type SmsRequestedField = "size" | "thickness" | "quantity" | "address" | 
 const REQUESTED_FIELD_PATTERNS: Array<{ field: SmsRequestedField; pattern: RegExp }> = [
   { field: "size", pattern: /\b(?:size|dimensions?|medida|tama[nñ]o)\b|(?:גודל|מידות?)/i },
   { field: "thickness", pattern: /\b(?:thickness|gauge|espesor)\b|(?:עובי)/i },
-  { field: "quantity", pattern: /\b(?:quantity|how many|cantidad)\b|(?:כמה|כמות|יחידות?)/i },
+  { field: "quantity", pattern: /\b(?:quantity|how many|how much|cantidad|cu[aá]nt[oa]s?)\b|(?:כמה|כמות|יחידות?)/i },
   { field: "address", pattern: /\b(?:full )?(?:delivery )?address\b|\b(?:direcci[oó]n (?:completa )?(?:de entrega)?)\b|(?:כתובת (?:המשלוח )?המלאה)/i },
   { field: "needed_by", pattern: /\b(?:needed-by date|needed by|when do you need|delivery date|time window|what date|fecha de entrega|para qu[eé] fecha|para cu[aá]ndo|ventana de tiempo)\b|(?:תאריך משלוח|חלון זמן|לאיזה תאריך|מתי)/i },
   { field: "brand", pattern: /\b(?:brand|manufacturer|marca|fabricante)\b|(?:מותג|יצרן)/i },
@@ -216,6 +216,75 @@ export function smsDeliveryDetailsQuestionReply(message: string) {
   if (/[\u0590-\u05ff]/.test(message)) return "מתי החומרים נדרשים, ומה כתובת המשלוח המלאה?";
   if (/[áéíóúñ¿¡]/i.test(message)) return "¿Para cuándo los necesita y cuál es la dirección completa de entrega?";
   return "When do you need it, and what’s the full delivery address?";
+}
+
+export function smsUnansweredFollowUpText(params: { originalMessage: string; questionReply: string }) {
+  const language = smsReplyLanguage(`${params.originalMessage}\n${params.questionReply}`);
+  const question = params.questionReply;
+  const asksQuantity = REQUESTED_FIELD_PATTERNS.find(({ field }) => field === "quantity")?.pattern.test(question);
+  const asksAddress = REQUESTED_FIELD_PATTERNS.find(({ field }) => field === "address")?.pattern.test(question);
+  const asksTiming = REQUESTED_FIELD_PATTERNS.find(({ field }) => field === "needed_by")?.pattern.test(question);
+  if (language === "he") {
+    if (asksAddress && asksTiming) return "עדיין צריך עזרה עם פרטי המשלוח?";
+    if (asksQuantity) return "עדיין צריך עזרה עם הכמות?";
+    if (asksAddress) return "עדיין צריך עזרה עם כתובת המשלוח?";
+    if (asksTiming) return "עדיין צריך עזרה עם מועד האספקה?";
+    return "עדיין צריך עזרה עם הבקשה?";
+  }
+  if (language === "es") {
+    if (asksAddress && asksTiming) return "¿Aún necesita ayuda con los detalles de entrega?";
+    if (asksQuantity) return "¿Aún necesita ayuda con la cantidad?";
+    if (asksAddress) return "¿Aún necesita ayuda con la dirección de entrega?";
+    if (asksTiming) return "¿Aún necesita ayuda con la fecha necesaria?";
+    return "¿Aún necesita ayuda con esto?";
+  }
+  if (asksAddress && asksTiming) return "Still need help with the delivery details?";
+  if (asksQuantity) return "Still need help with the quantity?";
+  if (asksAddress) return "Still need help with the delivery address?";
+  if (asksTiming) return "Still need help with when you need it?";
+  return "Still need help with this?";
+}
+
+export function smsUnansweredFollowUpEligible(params: {
+  originalMessage: string;
+  questionReply: string;
+  intent: SmsReplyIntent;
+  event?: "message" | "duplicate" | "correction" | "cancellation";
+  participantRole?: "customer" | "lead" | "supplier" | "unknown";
+  safetyLevel: "green" | "yellow" | "red";
+  gateAutoSafe: boolean;
+  requestComplete?: boolean;
+}) {
+  const reply = params.questionReply.trim();
+  if (params.safetyLevel !== "green" || !params.gateAutoSafe || params.requestComplete) return false;
+  if (params.event === "correction" || params.event === "cancellation") return false;
+  if (params.participantRole === "supplier" || ["supplier", "correction", "cancellation", "sensitive", "follow_up"].includes(params.intent)) return false;
+  if (/^\s*(?:stop|unsubscribe|end|quit)\s*[.!]?\s*$/i.test(params.originalMessage)) return false;
+  if (!/[?？]/.test(reply) || /^\s*[?？]+\s*$/.test(reply)) return false;
+  return inspectSmsQuestionStructure(reply).valid;
+}
+
+export function smsUnansweredFollowUpCancellationReason(params: {
+  sourceExists: boolean;
+  autoSafeActive: boolean;
+  hasLaterInbound: boolean;
+  hasLaterOutbound: boolean;
+  requestClosed: boolean;
+}) {
+  if (!params.sourceExists) return "source message no longer exists";
+  if (!params.autoSafeActive) return "contact auto-safe mode is no longer active";
+  if (params.hasLaterInbound) return "customer replied after the AI question";
+  if (params.hasLaterOutbound) return "a human or later outbound reply was sent";
+  if (params.requestClosed) return "the material request is already complete or closed";
+  return null;
+}
+
+export function smsUnknownContextFallback() {
+  return {
+    reply: "Automatic reply unavailable — manager review required.",
+    autoSafe: false,
+    safetyReason: "The request context is not clear enough for a useful automatic reply.",
+  } as const;
 }
 
 export type SmsMaterialReplyStep = "quantity" | "address" | "address_and_needed_by" | "needed_by" | "complete" | "proposed";

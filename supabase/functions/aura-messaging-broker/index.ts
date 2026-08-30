@@ -19,6 +19,10 @@ import {
   smsProductInquiryFallbackReply,
   smsQuantityClarificationReply,
   smsStartsNewMaterialRequest,
+  smsUnknownContextFallback,
+  smsUnansweredFollowUpCancellationReason,
+  smsUnansweredFollowUpEligible,
+  smsUnansweredFollowUpText,
 } from "../_shared/sms-reply-policy.ts";
 
 const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, {
@@ -1490,17 +1494,33 @@ function customerSmsFallback(
   const hardBlocked = /^\s*(?:stop|unsubscribe|end|quit)\s*[.!]?\s*$/i.test(latest) || hasForbiddenAutoReplyTopic(latest);
   const productInquiryReply = smsProductInquiryFallbackReply(latest);
 
-  let reply = "Thank you. A manager will review your message and reply here.";
-  let autoSafe = false;
-  let safetyReason = "The AI service was unavailable, so a manager should review this reply.";
+  const unknownFallback = smsUnknownContextFallback();
+  let reply: string = unknownFallback.reply;
+  let autoSafe: boolean = unknownFallback.autoSafe;
+  let safetyReason: string = unknownFallback.safetyReason;
   if (productInquiryReply && !hardBlocked) {
     reply = productInquiryReply;
     autoSafe = true;
     safetyReason = "This answers a product inquiry without claiming live stock and asks only for essential specifications.";
-  } else if (asksAboutList && hasMaterialList) {
-    reply = "Yes, I can see your material list. A manager will review the items and reply here.";
+  } else if (hasMaterialList && !hardBlocked) {
+    const quantityKnown = smsHasExplicitQuantity(customerText);
+    const addressKnown = resolveSmsDeliveryAddressKnown({ conversationText: customerText, latestMessage: latest });
+    const neededByKnown = smsHasNeededByTiming(customerText);
+    reply = !quantityKnown
+      ? smsQuantityClarificationReply(latest)
+      : !addressKnown && !neededByKnown
+        ? smsDeliveryDetailsQuestionReply(latest)
+        : !addressKnown
+          ? addressFirstReply(latest)
+          : !neededByKnown
+            ? neededByReply(latest)
+            : requestReadyForManagerReply(latest);
     autoSafe = true;
-    safetyReason = "The saved conversation contains a clear material list, so this acknowledgement is safe.";
+    safetyReason = "A clear material request was recovered deterministically without inventing facts.";
+  } else if (asksAboutList && hasMaterialList) {
+    reply = "Automatic reply unavailable — manager review required.";
+    autoSafe = false;
+    safetyReason = "The material-list follow-up is protected, so a manager should review it.";
   } else if (asksDeliveryConfirmation) {
     const hasStreetAddress = /\b\d{1,6}\s+[a-z0-9.'-]+(?:\s+[a-z0-9.'-]+){0,5}\s+(?:st(?:reet)?|ave(?:nue)?|rd|road|blvd|boulevard|dr(?:ive)?|ln|lane|ct|court|way|pkwy|parkway)\b/i.test(customerText);
     const hasRequestedDate = /\b(?:today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}[/-]\d{1,2})\b/i.test(customerText);
@@ -1541,9 +1561,7 @@ function customerSmsFallback(
     autoSafe = !hardBlocked;
     safetyReason = "This only acknowledges the customer's short reply.";
   } else if (!hardBlocked) {
-    reply = "A manager will review this message before we reply.";
-    autoSafe = false;
-    safetyReason = "The local fallback could not identify a useful next question, so it must not send generic filler.";
+    ({ reply, autoSafe, safetyReason } = unknownFallback);
   }
 
   return {
@@ -1689,7 +1707,7 @@ function extractReviewMaterialLines(messages: string[]) {
     bucket: "bucket", buckets: "buckets", bag: "bag", bags: "bags",
     roll: "roll", rolls: "rolls", ea: "each", each: "each",
   };
-  const materialWords = /\b(?:lumber|stud|plywood|sheetrock|drywall|screw|nail|tape|compound|primer|paint|corner\s+(?:bead|bit)|cement|concrete|rebar|wire|outlet|breaker|pipe|fitting|tile|shingle|roof|door|window|cabinet|heater|insulation|siding|molding)\b/i;
+  const materialWords = /\b(?:lumber|stud|plywood|sheetrock|drywall|screw|nail|tape|compound|thinset|mortar|primer|paint|corner\s+(?:bead|bit)|cement|concrete|rebar|wire|outlet|breaker|pipe|fitting|tile|shingle|roof|door|window|cabinet|heater|insulation|siding|molding)\b/i;
   const dimensionalMaterial = /\b\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?(?:\s*[x×]\s*\d+(?:\.\d+)?)?\b/i;
   return messages.flatMap((message) => message.split(/\r?\n|;/)).flatMap((rawLine) => {
     const line = rawLine.trim().replace(/^[-*•]\s*/, "");
@@ -1901,12 +1919,33 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
   `;
   if (shouldAuto && replyDrafts[0]?.id) {
     try {
-      await sendQuoSms(phone, result.reply);
+      const initialOutgoingExternalId = await sendQuoSms(phone, result.reply);
       await sql`
         update public.aura_sms_reply_drafts
         set decision = 'auto_sent', updated_at = now()
         where id = ${replyDrafts[0].id}::uuid
       `;
+      if (smsUnansweredFollowUpEligible({
+        originalMessage: body,
+        questionReply: result.reply,
+        intent,
+        event: customerEvent,
+        participantRole: result.participantRole,
+        safetyLevel: safety.level,
+        gateAutoSafe: safety.gateAutoSafe,
+      })) {
+        const followUpText = smsUnansweredFollowUpText({ originalMessage: body, questionReply: result.reply });
+        try {
+          await sql`
+            insert into public.aura_sms_unanswered_followups
+              (source_communication_id, contact_id, counterparty_phone, initial_outgoing_external_id, prompt_text, due_at)
+            values (${communicationId}::uuid, ${contact?.id || null}, ${phone}, ${initialOutgoingExternalId}, ${followUpText}, now() + interval '10 minutes')
+            on conflict (source_communication_id) do nothing
+          `;
+        } catch (error) {
+          console.error("sms_unanswered_followup_schedule_failed", error instanceof Error ? error.message : "unknown error");
+        }
+      }
     } catch (error) {
       await sql`
         update public.aura_sms_reply_drafts
@@ -3466,6 +3505,108 @@ async function priceResearch(
   return { buyNow, callForPrice, salesContacts };
 }
 
+type SmsUnansweredFollowUpRow = {
+  id: string;
+  source_communication_id: string;
+  contact_id: string | null;
+  counterparty_phone: string;
+  initial_outgoing_external_id: string;
+  prompt_text: string;
+};
+
+async function handleSmsUnansweredFollowUpDispatch(req: Request) {
+  const expectedSecret = await secret("sms_unanswered_followup_dispatch_secret");
+  const suppliedSecret = req.headers.get("x-sms-followup-dispatch") || "";
+  if (!expectedSecret || !constantTimeEqual(expectedSecret, suppliedSecret)) return json({ error: "Invalid dispatch secret" }, 401);
+
+  const claimed = await sql<SmsUnansweredFollowUpRow[]>`
+    with due as (
+      select id
+      from public.aura_sms_unanswered_followups
+      where status = 'pending' and due_at <= now()
+      order by due_at, created_at
+      for update skip locked
+      limit 25
+    )
+    update public.aura_sms_unanswered_followups as followup
+    set status = 'processing', claimed_at = now(), updated_at = now()
+    from due
+    where followup.id = due.id
+    returning followup.id, followup.source_communication_id, followup.contact_id,
+      followup.counterparty_phone, followup.initial_outgoing_external_id, followup.prompt_text
+  `;
+
+  let sent = 0;
+  let cancelled = 0;
+  let failed = 0;
+  for (const followUp of claimed) {
+    const cancellation = await sql<{ source_exists: boolean; auto_safe_active: boolean; has_later_inbound: boolean; has_later_outbound: boolean; request_closed: boolean }[]>`
+      select source.id is not null as source_exists,
+        contact.sms_ai_mode = 'auto_safe' as auto_safe_active,
+        exists (
+          select 1 from public.aura_communications as later
+          where later.channel = 'sms'
+            and later.counterparty_phone = ${followUp.counterparty_phone}
+            and later.direction = 'incoming'
+            and later.id <> ${followUp.source_communication_id}::uuid
+            and later.occurred_at > source.occurred_at
+        ) as has_later_inbound,
+        exists (
+          select 1 from public.aura_communications as later
+          where later.channel = 'sms'
+            and later.counterparty_phone = ${followUp.counterparty_phone}
+            and later.direction = 'outgoing'
+            and later.external_activity_id <> ${followUp.initial_outgoing_external_id}
+            and later.occurred_at > source.occurred_at
+        ) as has_later_outbound,
+        exists (
+          select 1 from public.aura_sms_request_drafts as draft
+          where draft.communication_id = ${followUp.source_communication_id}::uuid
+            and draft.status <> 'new'
+        ) as request_closed
+      from (select 1) as singleton
+      left join public.aura_communications as source on source.id = ${followUp.source_communication_id}::uuid
+      left join public.aura_contacts as contact on contact.id = ${followUp.contact_id}::uuid
+      limit 1
+    `;
+    const cancellationState = cancellation[0];
+    const cancelReason = smsUnansweredFollowUpCancellationReason({
+      sourceExists: Boolean(cancellationState?.source_exists),
+      autoSafeActive: Boolean(cancellationState?.auto_safe_active),
+      hasLaterInbound: Boolean(cancellationState?.has_later_inbound),
+      hasLaterOutbound: Boolean(cancellationState?.has_later_outbound),
+      requestClosed: Boolean(cancellationState?.request_closed),
+    });
+    if (cancelReason) {
+      await sql`update public.aura_sms_unanswered_followups set status = 'cancelled', cancel_reason = ${cancelReason}, updated_at = now() where id = ${followUp.id}::uuid and status = 'processing'`;
+      cancelled += 1;
+      continue;
+    }
+    try {
+      const externalId = await sendQuoSms(followUp.counterparty_phone, followUp.prompt_text);
+      const sentRows = await sql<{ id: string }[]>`
+        select id from public.aura_communications
+        where provider = 'quo' and external_activity_id = ${externalId}
+        limit 1
+      `;
+      await sql`
+        update public.aura_sms_unanswered_followups
+        set status = 'sent', sent_at = now(), sent_communication_id = ${sentRows[0]?.id || null}, updated_at = now()
+        where id = ${followUp.id}::uuid and status = 'processing'
+      `;
+      sent += 1;
+    } catch (error) {
+      await sql`
+        update public.aura_sms_unanswered_followups
+        set status = 'failed', last_error = ${String(error instanceof Error ? error.message : "unknown error").slice(0, 500)}, updated_at = now()
+        where id = ${followUp.id}::uuid and status = 'processing'
+      `;
+      failed += 1;
+    }
+  }
+  return json({ ok: true, claimed: claimed.length, sent, cancelled, failed });
+}
+
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   if (
@@ -3501,6 +3642,13 @@ Deno.serve(async (req: Request) => {
   if (req.method === "POST" && url.searchParams.get("mode") === "quo-webhook") {
     try {
       return await handleQuoWebhook(req);
+    } catch {
+      return json({ error: "Processing failed" }, 500);
+    }
+  }
+  if (req.method === "POST" && url.searchParams.get("mode") === "sms-followup-dispatch") {
+    try {
+      return await handleSmsUnansweredFollowUpDispatch(req);
     } catch {
       return json({ error: "Processing failed" }, 500);
     }

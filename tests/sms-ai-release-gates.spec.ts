@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test"
+import { readFile } from "node:fs/promises"
+import path from "node:path"
 import { canRunSmsReplyLab } from "../lib/ai/sms-reply-lab-access"
 import { redactSmsTrainingText } from "../lib/ai/sms-training-privacy"
 import {
@@ -6,6 +8,7 @@ import {
   evaluateSmsReplyGate,
   filterSmsExactListItems,
   inspectSmsQuestionStructure,
+  looksLikeSmsMaterialRequest,
   resolveSmsDeliveryAddressKnown,
   resolveSmsExactListPreference,
   resolveSmsMaterialReplyStep,
@@ -16,7 +19,13 @@ import {
   smsProductInquiryFallbackReply,
   smsQuantityClarificationReply,
   smsStartsNewMaterialRequest,
+  smsUnknownContextFallback,
+  smsUnansweredFollowUpCancellationReason,
+  smsUnansweredFollowUpEligible,
+  smsUnansweredFollowUpText,
 } from "../supabase/functions/_shared/sms-reply-policy"
+
+const root = process.cwd()
 
 test("fail-closed output gate blocks multilingual prices, stock assertions, promises, and protected intents", () => {
   const unsafe = [
@@ -99,6 +108,63 @@ test("product inquiry fallback answers the product and asks only useful next que
   expect(inspectSmsQuestionStructure(sheetrock || "")).toMatchObject({ valid: true, questionMarks: 2, requestedFields: 2 })
   expect(evaluateSmsReplyGate({ message: "Do you sell sheetricj?", reply: sheetrock || "", intent: "availability", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
   expect(smsProductInquiryFallbackReply("Need an update on my order")).toBeNull()
+})
+
+test("one-shot unanswered follow-up is question-aware and cancels on every later response", () => {
+  const eligible = {
+    originalMessage: "Need thinset",
+    questionReply: "Sure — how much thinset do you need?",
+    intent: "material_request" as const,
+    event: "message" as const,
+    participantRole: "lead" as const,
+    safetyLevel: "green" as const,
+    gateAutoSafe: true,
+  }
+  expect(smsUnansweredFollowUpEligible(eligible)).toBe(true)
+  expect(smsUnansweredFollowUpText(eligible)).toBe("Still need help with the quantity?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "Necesito yeso", questionReply: "¿Cuál es la dirección completa de entrega?" })).toBe("¿Aún necesita ayuda con la dirección de entrega?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "צריך גבס", questionReply: "מתי החומרים נדרשים, ומה כתובת המשלוח המלאה?" })).toBe("עדיין צריך עזרה עם פרטי המשלוח?")
+  expect(smsUnansweredFollowUpEligible({ ...eligible, questionReply: "?" })).toBe(false)
+  expect(smsUnansweredFollowUpEligible({ ...eligible, safetyLevel: "red" })).toBe(false)
+  expect(smsUnansweredFollowUpEligible({ ...eligible, gateAutoSafe: false })).toBe(false)
+  expect(smsUnansweredFollowUpEligible({ ...eligible, participantRole: "supplier" })).toBe(false)
+  expect(smsUnansweredFollowUpEligible({ ...eligible, intent: "follow_up" })).toBe(false)
+  expect(smsUnansweredFollowUpEligible({ ...eligible, requestComplete: true })).toBe(false)
+  expect(smsUnansweredFollowUpEligible({ ...eligible, originalMessage: "STOP" })).toBe(false)
+
+  const active = { sourceExists: true, autoSafeActive: true, hasLaterInbound: false, hasLaterOutbound: false, requestClosed: false }
+  expect(smsUnansweredFollowUpCancellationReason(active)).toBeNull()
+  expect(smsUnansweredFollowUpCancellationReason({ ...active, hasLaterInbound: true })).toBe("customer replied after the AI question")
+  expect(smsUnansweredFollowUpCancellationReason({ ...active, hasLaterOutbound: true })).toBe("a human or later outbound reply was sent")
+  expect(smsUnansweredFollowUpCancellationReason({ ...active, requestClosed: true })).toBe("the material request is already complete or closed")
+  expect(smsUnansweredFollowUpCancellationReason({ ...active, autoSafeActive: false })).toBe("contact auto-safe mode is no longer active")
+})
+
+test("unknown AI fallback stays review-only and never emits the rejected generic sentence", () => {
+  expect(looksLikeSmsMaterialRequest("Need thinset")).toBe(true)
+  expect(smsHasExplicitQuantity("Need thinset")).toBe(false)
+  expect(smsQuantityClarificationReply("Need thinset")).toBe("Sure — how much thinset do you need?")
+  const fallback = smsUnknownContextFallback()
+  expect(fallback.autoSafe).toBe(false)
+  expect(fallback.reply).not.toBe("Thanks for your message. I am checking the conversation, and a manager will reply here if confirmation is needed.")
+  expect(fallback.reply).toContain("manager review required")
+})
+
+test("unanswered follow-up persistence is ten-minute, unique, one-shot, and cron dispatched", async () => {
+  const [migration, broker] = await Promise.all([
+    readFile(path.join(root, "supabase/migrations/20260830223000_add_sms_unanswered_followups.sql"), "utf8"),
+    readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+  ])
+  expect(migration).toContain("unique (source_communication_id)")
+  expect(migration).toContain("status in ('pending', 'processing', 'sent', 'cancelled', 'failed')")
+  expect(migration).toContain("dispatch-sms-unanswered-followups")
+  expect(migration).toContain("* * * * *")
+  expect(broker).toContain("now() + interval '10 minutes'")
+  expect(broker).toContain("for update skip locked")
+  expect(broker).toContain("later.direction = 'incoming'")
+  expect(broker).toContain("later.direction = 'outgoing'")
+  expect(broker).toContain("where id = ${followUp.id}::uuid and status = 'processing'")
+  expect(broker).not.toContain("Thanks for your message. I am checking the conversation, and a manager will reply here if confirmation is needed.")
 })
 
 test("exact-list preference persists beyond the 24-message context window", () => {
