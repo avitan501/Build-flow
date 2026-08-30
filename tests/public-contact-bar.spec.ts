@@ -83,11 +83,23 @@ test("20-second walkthrough opens in the same compact sheet and starts playing",
   const dialog = page.getByRole("dialog", { name: "See how it works." });
   await expect(dialog).toBeVisible();
   const video = dialog.getByLabel("How to start an Avantia material request by text");
-  await expect(video).toHaveAttribute("autoplay", "");
   await expect(video).toHaveAttribute("playsinline", "");
   await expect(video.locator('source[type="video/mp4"]')).toHaveAttribute("src", "/videos/avantia-request-material-whatsapp-en-clear-20s.mp4");
 
   await dialog.getByRole("button", { name: "Start my request" }).click();
   await expect(page.getByRole("dialog", { name: "Start with one message." })).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(1);
+});
+
+test("walkthrough respects reduced motion and closes cleanly when navigation hides the launcher", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await page.getByRole("button", { name: "See How It Works" }).click();
+  const video = page.getByLabel("How to start an Avantia material request by text");
+  await expect(video).toBeVisible();
+  await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(true);
+
+  await page.goto("/materials");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe("");
 });

@@ -2233,6 +2233,10 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
     await sql`update public.aura_sms_request_drafts set status = 'dismissed', updated_at = now() where id = ${draftCandidate.id}::uuid and status = 'new'`;
   }
   const openDraft = startsNewRequest ? undefined : draftCandidate;
+  // A quantity/spec correction is safe to continue automatically while the
+  // request is still an unconfirmed intake draft. Once a real request exists,
+  // corrections remain protected and require manager review.
+  const preConfirmationCorrection = customerEvent === "correction" && Boolean(openDraft);
   const exactListOnly = resolveSmsExactListPreference({ storedContact: contact?.exact_list_only, storedDraft: openDraft?.exact_list_only, latestMessage: body });
   const deliveryAddressKnown = resolveSmsDeliveryAddressKnown({ storedDraft: openDraft?.delivery_address_known, latestMessage: body, startsNewRequest });
   if (exactListOnly && !contact?.exact_list_only && contact?.id) {
@@ -2276,7 +2280,7 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
       message: effectiveBody,
       reply: result.reply,
       intent: "material_request",
-      event: customerEvent,
+      event: preConfirmationCorrection ? "message" : customerEvent,
       participantRole: result.participantRole || "lead",
       modelAutoSafe: true,
       exactListOnly,
@@ -2330,7 +2334,7 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
         on conflict (communication_id) do nothing
       `;
     }
-    if (customerEvent !== "correction" && !linkedCorrectionRequestId && deliveryAddressKnown && clarificationQuestions.length === 0) {
+    if ((customerEvent !== "correction" || preConfirmationCorrection) && !linkedCorrectionRequestId && deliveryAddressKnown && clarificationQuestions.length === 0) {
       confirmationPrepared = await prepareSmsRequestConfirmation({
         phone,
         customerName: result.customerName || openDraft?.customer_name || contact?.full_name || phone,
@@ -2885,10 +2889,7 @@ async function pollRecentQuoMessagesOnce() {
     messagesUrl.searchParams.set("createdAfter", updatedAfter);
     messagesUrl.searchParams.set("maxResults", "25");
     const messagesResponse = await fetch(messagesUrl, { headers: { Authorization: api.apiKey }, signal: pollSignal });
-    if (!messagesResponse.ok) {
-      if (messagesResponse.status === 429) break;
-      continue;
-    }
+    if (!messagesResponse.ok) throw new Error(`Q U O messages returned HTTP ${messagesResponse.status}.`);
     const messagesPayload = await messagesResponse.json() as { data?: QuoPolledMessage[] };
     const incoming = (messagesPayload.data || []).filter((message) => message.direction === "incoming").sort((left, right) => String(left.createdAt || "").localeCompare(String(right.createdAt || "")));
     const candidateIds = incoming.map((message) => typeof message.id === "string" ? message.id.trim() : "").filter((id) => /^AC[A-Za-z0-9_-]+$/.test(id));
@@ -2937,6 +2938,15 @@ async function releaseQuoFastPollLease(leaseToken: string) {
   await fastPollControlSql`select private.release_quo_fast_poll_lease(${leaseToken}::uuid)`;
 }
 
+function quoFastPollErrorCode(error: unknown) {
+  if (error instanceof DOMException && ["AbortError", "TimeoutError"].includes(error.name)) return "timeout";
+  const message = error instanceof Error ? error.message : "";
+  if (/HTTP\s+429\b/i.test(message)) return "http_429";
+  if (/HTTP\s+5\d\d\b/i.test(message)) return "http_5xx";
+  if (/abort|timeout/i.test(message)) return "timeout";
+  return "unknown";
+}
+
 async function runQuoFastPollWindow(leaseToken: string) {
   let ingested = 0;
   try {
@@ -2946,12 +2956,16 @@ async function runQuoFastPollWindow(leaseToken: string) {
     // blocked the following pg_net dispatch at its 30-second timeout.
     if (!await renewQuoFastPollLease(leaseToken)) {
       console.error("quo_fast_poll_lease_lost");
+      await sql`insert into public.aura_audit_log (action, details) values ('quo_fast_poll_window_failed', ${sql.json({ ingested, cycles: 1, error_code: "lease_lost" })})`;
       return;
     }
     try {
       ingested = await pollRecentQuoMessagesOnce();
     } catch (error) {
-      console.error("quo_fast_poll_failed", error instanceof Error ? error.message : "unknown error");
+      const errorCode = quoFastPollErrorCode(error);
+      console.error("quo_fast_poll_failed", errorCode);
+      await sql`insert into public.aura_audit_log (action, details) values ('quo_fast_poll_window_failed', ${sql.json({ ingested, cycles: 1, error_code: errorCode })})`;
+      return;
     }
     await sql`insert into public.aura_audit_log (action, details) values ('quo_fast_poll_window_completed', ${sql.json({ ingested, cycles: 1 })})`;
   } finally {

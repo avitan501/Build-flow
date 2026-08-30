@@ -59,14 +59,19 @@ export function PublicContactBar() {
 
   useEffect(() => {
     function openDemo() {
-      setOpenPanel("demo");
+      if (pathname && showsPublicContactBar(pathname)) setOpenPanel("demo");
     }
     window.addEventListener("avantia:open-demo", openDemo);
     return () => window.removeEventListener("avantia:open-demo", openDemo);
-  }, []);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (pathname && !showsPublicContactBar(pathname)) setOpenPanel(null);
+  }, [pathname]);
 
   useEffect(() => {
     if (openPanel === "demo") {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       videoRef.current?.play().catch(() => undefined);
       return;
     }
@@ -168,7 +173,7 @@ export function PublicContactBar() {
             {openPanel === "demo" ? (
               <div className="flex min-h-0 flex-1 flex-col px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-6 sm:pb-6">
                 <div className="min-h-0 flex-1 overflow-hidden rounded-2xl bg-[#171a20]">
-                  <video ref={videoRef} className="h-full w-full object-contain" autoPlay muted playsInline controls preload="metadata" poster="/videos/avantia-materials-demo-phone-poster.png" aria-label="How to start an Avantia material request by text">
+                  <video ref={videoRef} className="h-full w-full object-contain" muted playsInline controls preload="metadata" poster="/videos/avantia-request-material-whatsapp-en-clear-20s-poster.jpg" aria-label="How to start an Avantia material request by text">
                     <source src="/videos/avantia-request-material-whatsapp-en-clear-20s.mp4" type="video/mp4" />
                   </video>
                 </div>

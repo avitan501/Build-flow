@@ -127,3 +127,23 @@ test("Quo recovery dispatch is isolated from the live customer webhook worker", 
   expect(migration).toContain("quo_fast_poll_dispatch_secret")
   expect(migration).toContain("revoke all on function public.dispatch_quo_fast_poll() from public, anon, authenticated")
 })
+
+test("Quo recovery retries every 30 seconds and records safe failures", async () => {
+  const [broker, migration] = await Promise.all([
+    readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260830223200_schedule_quo_recovery_every_30_seconds.sql"), "utf8"),
+  ])
+
+  expect(migration).toContain("'30 seconds'")
+  expect(migration).toContain("cron.alter_job")
+  expect(migration).toContain("cron.schedule")
+  expect(migration).toContain("'select public.dispatch_quo_fast_poll();'")
+  expect(migration).not.toMatch(/decrypted_secret|quo_fast_poll_dispatch_secret|X-Quo-Fast-Poll/)
+  expect(broker).toContain("function quoFastPollErrorCode")
+  expect(broker).toContain("'quo_fast_poll_window_failed'")
+  expect(broker).toContain('error_code: errorCode')
+  expect(broker).toContain('error_code: "lease_lost"')
+  expect(broker).toContain("if (!messagesResponse.ok) throw new Error")
+  const pollWindow = broker.slice(broker.indexOf("async function runQuoFastPollWindow"), broker.indexOf("function validEmail"))
+  expect(pollWindow).not.toContain("String(error)")
+})
