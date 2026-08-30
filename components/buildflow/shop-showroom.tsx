@@ -85,6 +85,7 @@ export function ShopShowroom({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <Root className={`block overflow-hidden bg-[#f5f5f7] text-[#1d1d1f] ${embedded ? "px-3 py-4 sm:px-5 sm:py-7" : "py-3 sm:py-5"}`} aria-label={embedded ? "Shop materials" : undefined}>
+      {!embedded ? <h1 className="sr-only">Order Construction Materials</h1> : null}
       <CollectionRoot className={embedded ? "group/showroom mx-auto block w-full max-w-[110rem] overflow-hidden rounded-[8px] border border-black/10 bg-white shadow-[0_10px_34px_rgba(0,0,0,.07)]" : "contents"}>
         {embedded ? (
           <summary className="flex min-h-[84px] cursor-pointer list-none items-center gap-4 px-5 py-4 outline-none transition hover:bg-black/[.025] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0071e3] [&::-webkit-details-marker]:hidden sm:min-h-[100px] sm:px-8">

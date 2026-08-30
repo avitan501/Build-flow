@@ -24,9 +24,8 @@ export async function getSessionWithProfile() {
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data, error: authError } = await supabase.auth.getUser();
+  const user = authError ? null : data.user;
 
   if (!user) {
     return { supabase, user: null, profile: null };

@@ -73,9 +73,23 @@ export async function recordAmazonAffiliateLinkAction(): Promise<Result> {
     updated_at: new Date().toISOString(),
   }).eq("id", program.id);
   if (error) return { ok: false, error: "Could not save the verified Amazon affiliate link." };
-  await supabase.from("affiliate_program_checklist").update({ completed: true, completed_at: new Date().toISOString(), completed_by: user.id }).eq("program_id", program.id).in("item_key", ["commission", "cookie", "tracking", "test_link", "test_click", "redirect", "no_secrets", "integration_notes"]);
-  await supabase.from("affiliate_program_activities").insert({ program_id: program.id, activity_type: "note", title: "Verified affiliate link recorded", details: AMAZON_LINK_NOTE, created_by: user.id });
+  const { data: existingActivity, error: activityLookupError } = await supabase
+    .from("affiliate_program_activities")
+    .select("id")
+    .eq("program_id", program.id)
+    .eq("title", "Verified affiliate link recorded")
+    .eq("details", AMAZON_LINK_NOTE)
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (activityLookupError) return { ok: false, error: "The Amazon link was saved, but its activity could not be checked." };
+  if (!existingActivity) {
+    const { error: activityError } = await supabase.from("affiliate_program_activities").insert({ program_id: program.id, activity_type: "note", title: "Verified affiliate link recorded", details: AMAZON_LINK_NOTE, created_by: user.id });
+    if (activityError) return { ok: false, error: "The Amazon link was saved, but its activity could not be recorded." };
+  }
+  const { error: checklistError } = await supabase.from("affiliate_program_checklist").update({ completed: true, completed_at: new Date().toISOString(), completed_by: user.id }).eq("program_id", program.id).in("item_key", ["commission", "cookie", "tracking", "test_link", "test_click", "redirect", "no_secrets", "integration_notes"]);
+  if (checklistError) return { ok: false, error: "The Amazon link was saved, but the verified checklist could not be completed." };
   revalidatePath(PAGE);
+  revalidatePath("/admin/ai-tools/construction-amazon-deals");
   return { ok: true };
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, PackageCheck, Search, Truck } from "lucide-react";
+import { Check, PackageCheck, Search, Truck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { CoverageScrollSection } from "@/components/buildflow/coverage-scroll-section";
@@ -70,7 +70,6 @@ export function ConstructionConciergeHome() {
   const desktopVideoRef = useRef<HTMLVideoElement>(null);
   const [language, setLanguage] = useState<Language>("en");
   const [showHeroActions, setShowHeroActions] = useState(false);
-  const [showStickyOrder, setShowStickyOrder] = useState(false);
   const text = copy[language];
 
   useEffect(() => {
@@ -81,13 +80,6 @@ export function ConstructionConciergeHome() {
   useEffect(() => {
     const actionTimer = setTimeout(() => setShowHeroActions(true), 2000);
     return () => clearTimeout(actionTimer);
-  }, []);
-
-  useEffect(() => {
-    const updateStickyOrder = () => setShowStickyOrder(window.scrollY > window.innerHeight * 0.7);
-    updateStickyOrder();
-    window.addEventListener("scroll", updateStickyOrder, { passive: true });
-    return () => window.removeEventListener("scroll", updateStickyOrder);
   }, []);
 
   useEffect(() => {
@@ -186,7 +178,6 @@ export function ConstructionConciergeHome() {
 
       <CoverageScrollSection language={language} />
 
-      {showStickyOrder ? <Link href="/shop" className="fixed bottom-4 left-1/2 z-40 inline-flex min-h-12 -translate-x-1/2 items-center gap-2 rounded-md bg-[#1877e8] px-6 text-sm font-bold text-white shadow-[0_10px_30px_rgba(7,17,38,.3)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-200 sm:hidden">Start Order<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link> : null}
       <style jsx global>{`
         @keyframes hero-actions-in {
           from { opacity: 0; transform: translateY(8px); }

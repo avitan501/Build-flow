@@ -4,6 +4,7 @@ import path from "node:path"
 import { canRunSmsReplyLab } from "../lib/ai/sms-reply-lab-access"
 import { redactSmsTrainingText } from "../lib/ai/sms-training-privacy"
 import {
+  applyAvantiaMaterialDefaults,
   classifySmsReplyIntent,
   evaluateSmsReplyGate,
   filterSmsExactListItems,
@@ -17,6 +18,7 @@ import {
   smsContextualQuantityAnswerReply,
   smsHasExplicitQuantity,
   smsHasNeededByTiming,
+  smsMaterialClarificationQuestions,
   smsNeededByTimingValue,
   smsOutputSafetySignals,
   smsProductInquiryFallbackReply,
@@ -97,6 +99,8 @@ test("latest decision allows up to three essential questions and rejects padding
 test("material request advances across turns after address until complete", () => {
   expect(smsHasExplicitQuantity("Need thinset")).toBe(false)
   expect(smsQuantityClarificationReply("Need thinset")).toBe("Sure — how much thinset do you need?")
+  expect(smsQuantityClarificationReply("New request: I need Sheetrock")).toBe("How many sheets do you need? Is 5/8 in. okay?")
+  expect(inspectSmsQuestionStructure(smsQuantityClarificationReply("New request: I need Sheetrock")).valid).toBe(true)
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, quantityKnown: false, addressKnown: false, neededByKnown: false, proposedReply: "A manager will review." })).toBe("quantity")
   expect(smsHasExplicitQuantity("Need 4 bags of thinset")).toBe(true)
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, quantityKnown: true, addressKnown: false, neededByKnown: false, proposedReply: "A manager will review." })).toBe("address_and_needed_by")
@@ -118,6 +122,55 @@ test("material request advances across turns after address until complete", () =
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "Would you like to add accessories?" })).toBe("complete")
 })
 
+test("ambiguous material lists must be clarified before confirmation", () => {
+  const list = `50 pc 2x4x8
+1000 pc box drywall screws 1 1/4
+20 drywall 4x8x1/2
+10 pc Corner bit
+Matching tape
+1 bucket 5gl compound
+1 bucket 5gl primer
+1 bucket 5gl paint`
+  expect(smsMaterialClarificationQuestions(list)).toEqual([
+    "Sheetrock thickness: keep 1/2-in., or change to our standard 5/8-in.?",
+    "For “corner bit,” which corner bead type and length: metal or vinyl, 8 ft or 10 ft?",
+    "What paint color and finish do you need?",
+  ])
+  expect(inspectSmsQuestionStructure(smsMaterialClarificationQuestions(list).join(" "))).toMatchObject({
+    valid: true,
+    questionMarks: 3,
+  })
+  const answered = `${list}\nUse 5/8. Yes, 8-ft metal corner bead. White eggshell paint.`
+  expect(smsMaterialClarificationQuestions(answered)).toEqual([])
+  expect(smsMaterialClarificationQuestions(`${list}\n10 Paint Sherwin Williams OC`)).toEqual([
+    "For “corner bit,” which corner bead type: metal or vinyl?",
+    "What paint finish do you need?",
+  ])
+  expect(smsMaterialClarificationQuestions(`${list}\nUse 5/8. Yes, 10-ft metal corner bead. Sherwin-Williams OC-13.`)).toEqual([
+    "What paint finish do you need?",
+  ])
+  expect(smsMaterialClarificationQuestions(`${list}\nUse 5/8. Yes, 10-ft metal corner bead. Sherwin-Williams OC-13 eggshell.`)).toEqual([])
+  expect(smsMaterialClarificationQuestions("1 box drywall screws 1/2 in.")).toEqual([])
+  expect(smsMaterialClarificationQuestions(`${list}\nUse 5/8. Yes, 8-ft metal corner bead. Eggshell paint.`)).toEqual(["What paint color do you need?"])
+  expect(smsMaterialClarificationQuestions(list, { exactListOnly: true })).not.toContain("Sheetrock thickness: keep 1/2-in., or change to our standard 5/8-in.?")
+
+  const normalized = applyAvantiaMaterialDefaults([
+    { name: "2x4x8 studs", quantity: 50, unit: "pieces" },
+    { name: "1-1/4 in. drywall screws", quantity: 1000, unit: "boxes" },
+    { name: "Matching tape", quantity: 1, unit: "each" },
+    { name: "5-gallon compound", quantity: 1, unit: "bucket" },
+    { name: "5-gallon primer", quantity: 1, unit: "bucket" },
+  ], list)
+  expect(normalized).toEqual([
+    { name: "Wood 2x4x8 studs", quantity: 50, unit: "pieces" },
+    { name: "1-1/4 in. drywall screws (one 1,000-count box)", quantity: 1000, unit: "pieces" },
+    { name: "Matching tape", quantity: 1, unit: "roll" },
+    { name: "All-purpose 5-gallon compound", quantity: 1, unit: "bucket" },
+    { name: "Drywall 5-gallon primer", quantity: 1, unit: "bucket" },
+  ])
+  expect(applyAvantiaMaterialDefaults([{ name: "Metal 2x4x8 studs", quantity: 50, unit: "pieces" }], `${list}\nUse metal studs.`)[0].name).toBe("Metal 2x4x8 studs")
+})
+
 test("broker-created request progression replies are gated independently from model review flags", async () => {
   const brokerSource = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
   expect(brokerSource).toContain('const deterministicProgression = params.result.isMaterialRequest')
@@ -129,7 +182,11 @@ test("broker-created request progression replies are gated independently from mo
   expect(brokerSource).toContain("occurred_at >= now() - interval '20 seconds'")
   expect(brokerSource).toContain('const customerEvent = smsStartsNewMaterialRequest(body)')
   expect(brokerSource).not.toContain("occurred_at >= now() - interval '10 minutes'")
-  expect(brokerSource).toContain("if (startsNewRequest) {")
+  expect(brokerSource).toContain("if (draftCandidate && startsNewRequest) {")
+  expect(brokerSource).toContain("if (!explicitConfirmation) {")
+  expect(brokerSource).toContain("clarificationQuestions.length === 0")
+  expect(brokerSource).toContain('if (openDraft && customerEvent === "message" && !analyzed.result.isMaterialRequest)')
+  expect(brokerSource).toContain("the structured draft advances instead of falling back")
   expect(brokerSource).toContain('if (customerEvent === "correction") {')
   expect(brokerSource).toContain("and activity_id = ${activityId} and event_type = 'message.received'")
   expect(brokerSource).toContain("canonicalEvents[0]?.external_event_id === eventId")

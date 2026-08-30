@@ -111,19 +111,19 @@ test("unknown numbers are buyer prospects while clear sellers receive no automat
 })
 
 test("reply grounding is manager-reviewed, relevant, source-aware, and never confirms live price or stock", async () => {
-  const [migration, settingsPage, actions, broker] = await Promise.all([
+  const [migration, knowledgePage, actions, broker] = await Promise.all([
     readFile(path.join(root, "supabase/migrations/20260830033620_add_ai_reply_training_examples.sql"), "utf8"),
-    readFile(path.join(root, "app/admin/ai-tools/sms-replies/page.tsx"), "utf8"),
-    readFile(path.join(root, "app/admin/ai-tools/sms-replies/actions.ts"), "utf8"),
+    readFile(path.join(root, "app/admin/ai-tools/construction-knowledge/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/ai-tools/construction-knowledge/actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
   ])
 
   expect(migration).toContain("create table if not exists public.aura_ai_reply_knowledge")
   expect(migration).toContain('"aura_ai_reply_knowledge_manager_select"')
   expect(migration).toContain("reviewed_at")
-  expect(settingsPage).toContain("Approved business knowledge")
-  expect(settingsPage).toContain("Source path or HTTPS URL")
-  expect(actions).toContain("saveSmsAiKnowledgeAction")
+  expect(knowledgePage).toContain("Construction Knowledge")
+  expect(knowledgePage).toContain("Source path or HTTPS URL")
+  expect(actions).toContain("addConstructionKnowledgeAction")
   expect(broker).toContain("loadRelevantApprovedKnowledge")
   expect(broker).toContain("filter(({ score }) => score > 0)")
   expect(broker).toContain("loadRelevantCatalogMatches")
@@ -194,7 +194,7 @@ test("Manager Reply Lab exercises the real reply path without sending or saving 
   expect(route).toContain("canRunSmsReplyLab(access)")
   expect(broker).toContain("noSend: true")
   expect(broker).toContain("await analyzeCustomerSms")
-  const qualityFunction = broker.slice(broker.indexOf("async function evaluateCustomerSmsCases"), broker.indexOf("async function processCustomerSmsAutomation"))
+  const qualityFunction = broker.slice(broker.indexOf("async function evaluateCustomerSmsCases"), broker.indexOf("function isExplicitRequestConfirmation"))
   expect(qualityFunction).not.toContain("sendQuoSms")
   expect(qualityFunction).not.toContain("insert into")
 })

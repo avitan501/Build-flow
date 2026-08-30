@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { Activity, Bot, CheckCircle2, ChevronLeft, MessageCircleMore, ShieldCheck, Sparkles } from "lucide-react"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
-import { deleteSmsAiKnowledgeAction, deleteSmsAiReplyExampleAction, saveSmsAiKnowledgeAction, saveSmsAiPreferencesAction, setSmsAiKnowledgeEnabledAction, setSmsAiReplyExampleEnabledAction } from "./actions"
+import { deleteSmsAiReplyExampleAction, saveSmsAiPreferencesAction, setSmsAiReplyExampleEnabledAction } from "./actions"
 import { SmsReplyLab } from "./SmsReplyLab"
 
 type SettingsRow = {
@@ -41,15 +41,6 @@ type ReplyMetricRow = {
   estimated_cost_usd: number | null
 }
 
-type KnowledgeRow = {
-  id: string
-  fact: string
-  category: string
-  source_path: string
-  enabled: boolean
-  reviewed_at: string
-}
-
 const fallback: SettingsRow = {
   enabled: true,
   preferred_voice: "friendly",
@@ -71,15 +62,13 @@ export default async function SmsAiRepliesSettingsPage({ searchParams }: { searc
   const params = await searchParams
   const { supabase, access } = await requireManagerPortalProfile()
   if (!access.aiTools || !access.customers) redirect("/")
-  const [result, examplesResult, knowledgeResult, metricsResult] = await Promise.all([
+  const [result, examplesResult, metricsResult] = await Promise.all([
     supabase.from("aura_sms_ai_settings").select("enabled,preferred_voice,max_sentences,match_customer_language,auto_acknowledge_follow_ups,auto_ask_delivery_details,auto_acknowledge_pricing,auto_create_request_drafts,custom_instructions,updated_at").eq("id", 1).maybeSingle<SettingsRow>(),
     supabase.from("aura_ai_reply_examples").select("id,customer_message,approved_reply,language,tags,intent,privacy_redacted,enabled,updated_at").order("updated_at", { ascending: false }).limit(50).returns<TrainingExampleRow[]>(),
-    supabase.from("aura_ai_reply_knowledge").select("id,fact,category,source_path,enabled,reviewed_at").order("reviewed_at", { ascending: false }).limit(100).returns<KnowledgeRow[]>(),
     supabase.from("aura_sms_reply_drafts").select("decision,safety_level,ai_model,latency_ms,input_tokens,output_tokens,estimated_cost_usd").order("created_at", { ascending: false }).limit(500).returns<ReplyMetricRow[]>(),
   ])
   const settings = result.data ?? fallback
   const examples = examplesResult.data ?? []
-  const knowledge = knowledgeResult.data ?? []
   const metrics = metricsResult.data ?? []
   const measuredLatency = metrics.map((row) => row.latency_ms).filter((value): value is number => typeof value === "number").sort((a, b) => a - b)
   const percentile = (ratio: number) => measuredLatency.length ? measuredLatency[Math.min(measuredLatency.length - 1, Math.floor((measuredLatency.length - 1) * ratio))] : null
@@ -145,18 +134,7 @@ export default async function SmsAiRepliesSettingsPage({ searchParams }: { searc
         </div>
       </section>
 
-      <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6" aria-labelledby="approved-ai-knowledge">
-        <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 text-sky-600" /><div><h2 id="approved-ai-knowledge" className="font-bold text-slate-950">Approved business knowledge</h2><p className="mt-1 text-xs leading-5 text-slate-500">Add only reviewed facts with their website page or authoritative source. AI receives a small relevant subset and cannot treat catalog prices or stock as confirmed.</p></div></div>
-        <form action={saveSmsAiKnowledgeAction} className="mt-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2">
-          <label className="text-xs font-bold text-slate-700">Category<input name="category" required maxLength={80} placeholder="delivery" className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label>
-          <label className="text-xs font-bold text-slate-700">Source path or HTTPS URL<input name="sourcePath" required maxLength={500} placeholder="/delivery-policy" className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label>
-          <label className="text-xs font-bold text-slate-700 sm:col-span-2">Reviewed fact<textarea name="fact" required maxLength={2000} rows={3} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm leading-6" /></label>
-          <div className="sm:col-span-2 flex justify-end"><button type="submit" className="h-10 rounded-lg bg-slate-950 px-4 text-xs font-bold text-white">Add approved fact</button></div>
-        </form>
-        <div className="mt-4 space-y-3">
-          {knowledge.length ? knowledge.map((entry) => <article key={entry.id} className={`rounded-xl border p-3 ${entry.enabled ? "border-emerald-200 bg-emerald-50/50" : "border-slate-200 bg-slate-50 opacity-75"}`}><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><span className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase text-slate-600">{entry.category}</span><span className="text-[10px] font-bold text-slate-500">{entry.enabled ? "Active" : "Paused"}</span></div><div className="flex gap-2"><form action={setSmsAiKnowledgeEnabledAction}><input type="hidden" name="knowledgeId" value={entry.id} /><input type="hidden" name="enabled" value={entry.enabled ? "false" : "true"} /><button type="submit" className="text-[10px] font-bold text-sky-700">{entry.enabled ? "Pause" : "Enable"}</button></form><form action={deleteSmsAiKnowledgeAction}><input type="hidden" name="knowledgeId" value={entry.id} /><button type="submit" className="text-[10px] font-bold text-rose-700">Remove</button></form></div></div><p className="mt-2 text-xs leading-5 text-slate-700">{entry.fact}</p><p className="mt-1 break-all text-[10px] font-semibold text-sky-700">Source: {entry.source_path}</p></article>) : <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-xs text-slate-500">No approved facts yet. AI will rely only on the conversation and safety fallback.</p>}
-        </div>
-      </section>
+      {access.owner ? <section className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm sm:p-5" aria-labelledby="approved-ai-knowledge"><div className="flex items-start justify-between gap-4"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 text-sky-700" /><div><h2 id="approved-ai-knowledge" className="font-bold text-slate-950">Approved business knowledge</h2><p className="mt-1 text-xs leading-5 text-slate-600">Construction facts now have one owner-only workspace, backed by the same AI knowledge store.</p></div></div><Link href="/admin/ai-tools/construction-knowledge" className="shrink-0 rounded-lg bg-slate-950 px-3 py-2 text-xs font-bold text-white">Open</Link></div></section> : null}
     </div>
   </main>
 }

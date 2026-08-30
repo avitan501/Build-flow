@@ -90,7 +90,7 @@ export function enforceSmsQuestionLimit(value: string) {
 export type SmsRequestedField = "size" | "thickness" | "quantity" | "address" | "needed_by" | "brand" | "specification" | "source";
 
 const REQUESTED_FIELD_PATTERNS: Array<{ field: SmsRequestedField; pattern: RegExp }> = [
-  { field: "size", pattern: /\b(?:size|dimensions?|medida|tama[nñ]o)\b|(?:גודל|מידות?)/i },
+  { field: "size", pattern: /\b(?:size|length|dimensions?|medida|tama[nñ]o)\b|(?:גודל|אורך|מידות?)/i },
   { field: "thickness", pattern: /\b(?:thickness|gauge|espesor)\b|(?:עובי)/i },
   { field: "quantity", pattern: /\b(?:quantity|how many|how much|cantidad|cu[aá]nt[oa]s?)\b|(?:כמה|כמות|יחידות?)/i },
   { field: "address", pattern: /\b(?:full )?(?:delivery )?address\b|\b(?:direcci[oó]n (?:completa )?(?:de entrega)?)\b|(?:כתובת (?:המשלוח )?המלאה)/i },
@@ -110,9 +110,16 @@ export function inspectSmsQuestionStructure(value: string, knownFields: SmsReque
     .flatMap((sentence) => sentence.match(/[^?？]*[?？]/g) || []);
   const fieldsByQuestion = questions.map((question) => REQUESTED_FIELD_PATTERNS.filter(({ pattern }) => pattern.test(question)).map(({ field }) => field));
   const fields = fieldsByQuestion.flat();
+  const subjectFor = (question: string) => question.match(/\b(?:sheetrock|drywall|studs?|screws?|corner\s+bead|tape|compound|primer|paint|thinset|roofing|shingles?)\b/i)?.[0]?.toLowerCase().replace(/\s+/g, "_") || "generic";
   const safeDeliveryPair = fieldsByQuestion.some((questionFields, index) => questionFields.length === 2 && questionFields.includes("address") && questionFields.includes("needed_by") && /\b(?:and|y)\b|(?:ו)/i.test(questions[index] || ""));
-  const bundled = fieldsByQuestion.some((questionFields) => questionFields.length > 1) && !safeDeliveryPair;
-  const repeated = new Set(fields).size !== fields.length;
+  const safeProductBundle = fieldsByQuestion.some((questionFields, index) => questionFields.length > 1 && subjectFor(questions[index] || "") !== "generic");
+  const bundled = fieldsByQuestion.some((questionFields) => questionFields.length > 1) && !safeDeliveryPair && !safeProductBundle;
+  // The same kind of detail can be required for two different products in one
+  // short list (for example primer type and paint finish). Treat that as two
+  // distinct questions, while still blocking a repeated question about the
+  // same product or a repeated generic field.
+  const fieldKeys = fieldsByQuestion.flatMap((questionFields, index) => questionFields.map((field) => `${field}:${subjectFor(questions[index] || "")}`));
+  const repeated = new Set(fieldKeys).size !== fieldKeys.length;
   const asksKnownField = fields.some((field) => knownFields.includes(field));
   return {
     valid: questionMarks <= 3 && fields.length <= 3 && !bundled && !repeated && !asksKnownField,
@@ -219,10 +226,92 @@ export function smsHasExplicitQuantity(value: string) {
     /\b(?:uno|una|dos|tres|cuatro|cinco|\d+(?:\.\d+)?)\s*(?:unidades?|cajas?|paneles?|placas?|bolsas?|puertas?|yeso)\b/i.test(value);
 }
 
+export function smsMaterialClarificationQuestions(value: string, options: { exactListOnly?: boolean } = {}) {
+  const questions: string[] = [];
+  const textAfter = (pattern: RegExp) => {
+    const match = pattern.exec(value);
+    return match ? value.slice((match.index || 0) + match[0].length) : "";
+  };
+
+  const paintMatches = [...value.matchAll(/\bpaint\b/gi)];
+  const postListAnswer = paintMatches.length > 1 ? value.slice((paintMatches[0].index || 0) + paintMatches[0][0].length) : "";
+  const halfInchSheetrock = /\b(?:drywall(?!\s+screws?)|sheetrock)\b[^\n]{0,40}\b(?:4\s*[x×]\s*8\s*[x×]\s*)?1\s*\/\s*2\b|\b1\s*\/\s*2\b[^\n]{0,40}\b(?:drywall(?!\s+screws?)|sheetrock)\b/i;
+  if (!options.exactListOnly && !postListAnswer && halfInchSheetrock.test(value) && !/\b(?:keep|confirm(?:ed)?|yes|use|make|change|actually)?\s*(?:1\s*\/\s*2|5\s*\/\s*8)\b/i.test(textAfter(halfInchSheetrock))) {
+    questions.push("Sheetrock thickness: keep 1/2-in., or change to our standard 5/8-in.?");
+  }
+
+  const cornerBit = /\bcorner\s+bit\b/i;
+  const cornerAnswer = textAfter(cornerBit);
+  const hasCornerType = /\b(?:metal|vinyl|paper[- ]faced)\b/i.test(cornerAnswer);
+  const hasCornerLength = /\b(?:8|10)[-\s]*(?:ft|feet|foot|['’])\b/i.test(cornerAnswer) ||
+    /(?:^|\n)\s*(?:8|10)\b[^\n]*\bpaint\b/i.test(cornerAnswer);
+  if (cornerBit.test(value) && !(hasCornerType && hasCornerLength)) {
+    questions.push(hasCornerLength
+      ? "For “corner bit,” which corner bead type: metal or vinyl?"
+      : hasCornerType
+        ? "For “corner bit,” which length: 8 ft or 10 ft?"
+        : "For “corner bit,” which corner bead type and length: metal or vinyl, 8 ft or 10 ft?");
+  }
+
+  const paint = /\bpaint\b/i;
+  const paintAnswer = textAfter(paint);
+  const hasPaintFinish = /\b(?:flat|matte|eggshell|satin|semi[- ]gloss|gloss)\b/i.test(paintAnswer);
+  const hasPaintColor = /\b(?:white|black|gray|grey|beige|tan|brown|blue|green|red|yellow|orange|cream|ivory|color\s*(?:is|:)?\s*[a-z][a-z -]{1,30})\b/i.test(paintAnswer) ||
+    /\b(?:sherwin[- ]?williams?|benjamin\s+moore|behr|ppg)\b[^\n]{0,30}\b[a-z]{1,4}[- ]?\d{1,5}\b/i.test(paintAnswer) ||
+    /\b[A-Z]{1,4}-\d{1,5}\b/.test(paintAnswer) ||
+    /(?:^|\n)\s*(?:8|10)?\s*paint\s+(?!flat\b|matte\b|eggshell\b|satin\b|semi[- ]gloss\b|gloss\b)[a-z][a-z0-9 -]{1,60}(?:$|\n)/i.test(paintAnswer);
+  if (paint.test(value) && !(hasPaintFinish && hasPaintColor)) {
+    questions.push(hasPaintColor
+      ? "What paint finish do you need?"
+      : hasPaintFinish
+        ? "What paint color do you need?"
+        : "What paint color and finish do you need?");
+  }
+
+  return [...new Set(questions)].slice(0, 3);
+}
+
+export function applyAvantiaMaterialDefaults<T extends { name: string; quantity: number; unit: string }>(items: T[], customerText: string): T[] {
+  const bareWood2x4 = /\b\d+\s*(?:pc|pcs|pieces?)?\s*2\s*x\s*4\s*x\s*8\b/i.test(customerText) &&
+    !/\bmetal\b[^\n]{0,40}\b2\s*x\s*4\s*x\s*8\b|\b2\s*x\s*4\s*x\s*8\b[^\n]{0,40}\bmetal\b/i.test(customerText);
+  const oneThousandScrews = /\b1000\s*(?:pc|pcs|pieces?)\s+(?:box\s+)?(?:drywall\s+)?screws?\b|\b(?:drywall\s+)?screws?\b[^\n]{0,60}\b1000\s*(?:pc|pcs|pieces?)\b/i.test(customerText.replaceAll(",", ""));
+  const tapeWithoutQuantity = /^(?![^\n]*\d)[^\n]*\b(?:matching\s+)?tape\b[^\n]*$/im.test(customerText);
+  const compoundWithoutType = /\b(?:1\s+)?bucket\b[^\n]{0,40}\bcompound\b/i.test(customerText) && !/\b(?:all[- ]purpose|taping|finishing|lightweight|setting)\b[^\n]{0,40}\bcompound\b|\bcompound\b[^\n]{0,40}\b(?:all[- ]purpose|taping|finishing|lightweight|setting)\b/i.test(customerText);
+  const primerWithoutType = /\b(?:1\s+)?bucket\b[^\n]{0,40}\bprimer\b/i.test(customerText) && !/\b(?:drywall|interior|exterior|oil|latex|water[- ]based|shellac)\b[^\n]{0,30}\bprimer\b|\bprimer\b[^\n]{0,30}\b(?:drywall|interior|exterior|oil|latex|water[- ]based|shellac)\b/i.test(customerText);
+
+  return items.map((item) => {
+    const normalized = { ...item };
+    if (bareWood2x4 && /\b2\s*x\s*4\s*x\s*8\b/i.test(normalized.name) && !/\b(?:wood|metal)\b/i.test(normalized.name)) {
+      normalized.name = `Wood ${normalized.name}`;
+    }
+    if (oneThousandScrews && /\bscrews?\b/i.test(normalized.name)) {
+      normalized.quantity = 1000;
+      normalized.unit = "pieces";
+      if (!/\b1,?000[- ]count\b/i.test(normalized.name)) normalized.name = `${normalized.name} (one 1,000-count box)`;
+    }
+    if (tapeWithoutQuantity && /\btape\b/i.test(normalized.name)) {
+      normalized.quantity = 1;
+      normalized.unit = "roll";
+    }
+    if (compoundWithoutType && /\bcompound\b/i.test(normalized.name) && !/\ball[- ]purpose\b/i.test(normalized.name)) {
+      normalized.name = `All-purpose ${normalized.name}`;
+      normalized.quantity = 1;
+      normalized.unit = "bucket";
+    }
+    if (primerWithoutType && /\bprimer\b/i.test(normalized.name) && !/\bdrywall\b/i.test(normalized.name)) {
+      normalized.name = `Drywall ${normalized.name}`;
+      normalized.quantity = 1;
+      normalized.unit = "bucket";
+    }
+    return normalized;
+  });
+}
+
 export function smsQuantityClarificationReply(message: string) {
   if (/[\u0590-\u05ff]/.test(message)) return "בטח—איזו כמות אתה צריך?";
   if (/[áéíóúñ¿¡]/i.test(message)) return "Claro—¿qué cantidad necesita?";
   if (/\bthinset\b/i.test(message)) return "Sure — how much thinset do you need?";
+  if (/\b(?:sheetrock|drywall)\b/i.test(message)) return "How many sheets do you need? Is 5/8 in. okay?";
   return "Sure — how much do you need?";
 }
 

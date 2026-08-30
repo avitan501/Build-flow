@@ -33,7 +33,7 @@ function sanitizeNextPath(value: string | null | undefined) {
 }
 
 export async function proxy(request: NextRequest) {
-  const response = NextResponse.next({
+  let response = NextResponse.next({
     request: {
       headers: request.headers,
     },
@@ -57,28 +57,47 @@ export async function proxy(request: NextRequest) {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
+      setAll(cookiesToSet, cacheHeaders) {
+        cookiesToSet.forEach(({ name, value }) => {
           request.cookies.set(name, value);
+        });
+        response = NextResponse.next({
+          request: {
+            headers: request.headers,
+          },
+        });
+        cookiesToSet.forEach(({ name, value, options }) => {
           response.cookies.set(name, value, options);
+        });
+        Object.entries(cacheHeaders).forEach(([name, value]) => {
+          response.headers.set(name, value);
         });
       },
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  const isSignedIn = Boolean(!claimsError && claimsData?.claims?.sub);
 
-  if (!user && isProtectedPath(pathname)) {
+  function redirectWithAuthState(url: URL) {
+    const redirectResponse = NextResponse.redirect(url);
+    response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
+    for (const name of ["cache-control", "expires", "pragma"]) {
+      const value = response.headers.get(name);
+      if (value) redirectResponse.headers.set(name, value);
+    }
+    return redirectResponse;
+  }
+
+  if (!isSignedIn && isProtectedPath(pathname)) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.search = "";
     loginUrl.searchParams.set("next", `${pathname}${search}`);
-    return NextResponse.redirect(loginUrl);
+    return redirectWithAuthState(loginUrl);
   }
 
-  if (user && AUTH_PAGES.has(pathname)) {
+  if (isSignedIn && AUTH_PAGES.has(pathname)) {
     const nextPath = sanitizeNextPath(request.nextUrl.searchParams.get("next")) ?? "/";
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = nextPath;
@@ -90,14 +109,14 @@ export async function proxy(request: NextRequest) {
       redirectUrl.search = targetSearch ? `?${targetSearch}` : "";
     }
 
-    return NextResponse.redirect(redirectUrl);
+    return redirectWithAuthState(redirectUrl);
   }
 
-  if (user && CLIENT_HOME_REDIRECT_PATHS.has(pathname)) {
+  if (isSignedIn && CLIENT_HOME_REDIRECT_PATHS.has(pathname)) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/";
     redirectUrl.search = "";
-    return NextResponse.redirect(redirectUrl);
+    return redirectWithAuthState(redirectUrl);
   }
 
   return response;

@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Activity, BarChart3, Bot, Calculator, Clapperboard, FilePenLine, Files, ListTree, MapPinned, PanelsTopLeft, SearchCheck, Store, Video } from "lucide-react"
+import { Activity, BadgeDollarSign, BarChart3, BookOpenCheck, Bot, Calculator, Clapperboard, FilePenLine, Files, ListTree, MapPinned, PanelsTopLeft, SearchCheck, Store, Video } from "lucide-react"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 
@@ -13,12 +13,14 @@ export default async function AdminAiToolsPage() {
     { href: "https://build-flow-wfl3-1fe6nc1cr-avitanneto-1804s-projects.vercel.app", title: "New Homepage Preview", description: "View the saved homepage concept without changing the current public homepage.", icon: PanelsTopLeft, badge: "Preview" },
     { href: "/admin/ai-tools/media-messages", title: "Media & Messages", description: "Preview approved videos and pages, copy exact wording, and open a safe editable communication draft.", icon: Clapperboard },
     ...(access.customers ? [{ href: "/admin/ai-tools/sms-replies", title: "AI Reply Settings", description: "Set the default voice, safe automatic replies, and material-request review behavior for customer texts.", icon: Bot }] : []),
+    ...(access.owner ? [{ href: "/admin/ai-tools/construction-knowledge", title: "Construction Knowledge", description: "Review the stable construction facts the customer AI may use in replies.", icon: BookOpenCheck, badge: "Owner" }] : []),
     ...(access.suppliers ? [{ href: "/admin/documents", title: "Documents", description: "Upload once, let AI prepare the details, then review and choose the correct destination.", icon: Files }] : []),
     { href: "/admin/ai-tools/jobsite-delivery", title: "Jobsite Delivery", description: "Plan routes and loads, estimate delivery cost, and manage every request through completion.", icon: MapPinned },
     { href: "/admin/ai-tools/estimate-converter", title: "Beat Estimate Converter", description: "Remove company and client identity and prepare an Avantia proposal request.", icon: FilePenLine },
     { href: "/admin/ai-tools/material-list", title: "Material List Organizer", description: "Turn field notes and supplier lists into editable rows and CSV.", icon: ListTree },
     { href: "/admin/ai-tools/order-test", title: "Department Order Test", description: "Check Quick Order or plan upload without creating a fake request.", icon: Activity },
     { href: "/admin/ai-tools/locate-cheap-item", title: "Locate Cheap Item", description: "Search live public product pages and compare source-backed prices.", icon: SearchCheck, badge: "Live beta" },
+    ...(access.owner ? [{ href: "/admin/ai-tools/construction-amazon-deals", title: "Amazon Construction Deals", description: "Open the verified Amazon Associates workflow and prepare construction deal links without inventing live prices.", icon: BadgeDollarSign, badge: "Owner" }] : []),
     { href: "/shop/wood-floor/flooring-calculator", title: "Wood Floor Calculator", description: "Room takeoff, waste allowance, and marked-plan workflow.", icon: Calculator },
     ...(access.owner ? [{ href: "/admin/abc", title: "ABC Private Pricing", description: "Check owner-only ABC account pricing.", icon: Store }] : []),
     ...(access.traffic ? [{ href: "/admin/traffic", title: "Website Traffic", description: "Review production visitors and traffic status.", icon: BarChart3 }] : []),

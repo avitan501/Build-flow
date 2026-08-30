@@ -234,7 +234,7 @@ export async function createSmsMaterialRequestAction(input: {
     if (!existing.data?.request_id) return { ok: false as const, error: "This confirmation is already being processed. Refresh before trying again." }
     const prior = await admin.from("quote_requests").select("public_number").eq("id", existing.data.request_id).maybeSingle<{ public_number: number }>()
     await admin.from("customer_request_portal_access").upsert({ request_id: existing.data.request_id, normalized_phone: phone, delivery_address: customerAddress }, { onConflict: "request_id" })
-    return { ok: true as const, requestId: existing.data.request_id, publicNumber: prior.data?.public_number || null, invitation: prior.data?.public_number ? `Your Avantia Build material request #${prior.data.public_number} is ready. Open https://build.avantiap.com/requests and request a one-time code for secure access.` : "Open your Avantia Build request securely: https://build.avantiap.com/requests" }
+    return { ok: true as const, requestId: existing.data.request_id, publicNumber: prior.data?.public_number || null, invitation: "Your Avantia Build material request is ready. View the order and live status securely: https://build.avantiap.com/requests" }
   }
 
   const tagged = await quickTagPhoneContactAction({ phone, kind: "customer", name: customerName || phone })
@@ -267,7 +267,7 @@ export async function createSmsMaterialRequestAction(input: {
   revalidatePath("/admin/communications")
   revalidatePath("/owner/materials/requests")
   revalidatePath(`/owner/materials/requests/${requestId}`)
-  return { ok: true as const, requestId, publicNumber: requestNumber.data.public_number, invitation: `Your Avantia Build material request #${requestNumber.data.public_number} is ready. Open https://build.avantiap.com/requests and request a one-time code for secure access.` }
+  return { ok: true as const, requestId, publicNumber: requestNumber.data.public_number, invitation: "Your Avantia Build material request is ready. View the order and live status securely: https://build.avantiap.com/requests" }
 }
 
 export async function quickTagPhoneContactAction(input: { phone: string; kind: ContactKind; name?: string }) {

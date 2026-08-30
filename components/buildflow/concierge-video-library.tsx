@@ -137,7 +137,6 @@ function SplitSection({
 export function ConciergeVideoLibrary() {
   const heroRef = useRef<HTMLVideoElement>(null);
   const [heroPlaying, setHeroPlaying] = useState(false);
-  const [heroInView, setHeroInView] = useState(true);
 
   useEffect(() => {
     const video = heroRef.current;
@@ -146,7 +145,6 @@ export function ConciergeVideoLibrary() {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setHeroInView(entry.isIntersecting && entry.intersectionRatio >= 0.1);
         if (
           reducedMotion.matches ||
           !entry.isIntersecting ||
@@ -574,15 +572,6 @@ export function ConciergeVideoLibrary() {
         </div>
       </section>
 
-      <Link
-        href="/shop"
-        data-testid="cinematic-mobile-action"
-        className={`${styles.mobileAction} ${heroInView ? styles.mobileActionHidden : ""}`}
-        aria-hidden={heroInView}
-        tabIndex={heroInView ? -1 : undefined}
-      >
-        Send a request <ArrowRight aria-hidden="true" />
-      </Link>
     </main>
   );
 }

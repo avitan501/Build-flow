@@ -5,8 +5,8 @@ import Script from "next/script";
 import { Fragment } from "react";
 
 import { AvantiaBuildClientShell } from "@/components/buildflow/buildflow-client-shell";
-import { MobileBottomDock } from "@/components/buildflow/mobile-bottom-dock";
 import { MobileClientHeader } from "@/components/buildflow/mobile-client-header";
+import { PublicContactBar } from "@/components/buildflow/public-contact-bar";
 import { SiteFooter } from "@/components/buildflow/site-footer";
 import { ShopLanguageProvider } from "@/components/buildflow/shop-language-provider";
 import { TrafficTracker } from "@/components/buildflow/traffic-tracker";
@@ -156,7 +156,7 @@ export default async function RootLayout({
               <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isOwner={managerAccess.owner} managerHref={managerHref} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />
               {children}
               <SiteFooter />
-              <MobileBottomDock />
+              <PublicContactBar />
             </Fragment>
           </AvantiaBuildClientShell>
         </ShopLanguageProvider>
