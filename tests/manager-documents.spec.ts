@@ -8,7 +8,7 @@ import {
   reviewedDocumentCatalogDepartment,
   reviewedDocumentPriceRow,
 } from "../lib/manager-document-catalog"
-import { documentArithmeticWarnings, documentLineValidationStatus, isManagerDocumentChargeLine, isObsoleteSelectionSubtotalWarning } from "../lib/manager-document-validation"
+import { documentArithmeticWarnings, documentLineValidationStatus, isManagerDocumentChargeLine, isObsoleteSelectionSubtotalWarning, managerDocumentReviewLineIncomplete } from "../lib/manager-document-validation"
 
 const root = process.cwd()
 
@@ -80,6 +80,10 @@ test("document center preserves originals and gates every destination behind rev
   expect(review).toContain("selectedProductCount")
   expect(review).toMatch(/<h2[^>]*>\s*Items\s*<\/h2>/)
   expect(review).toContain("Import selected")
+  expect(review).toContain('disabled={!canApprove || pending || !selectedLines.length}')
+  expect(review).toContain("Use {suggestedDepartment}")
+  expect(review).toContain("I reviewed the notes")
+  expect(review).toContain("Review and confirm the document notes.")
   expect(review).toContain("Select all")
   expect(review).toContain("Clear")
   expect(review).toContain("selectionChanged")
@@ -139,6 +143,27 @@ test("document intelligence keeps charges and tax out of product rows", () => {
 test("choosing one catalog product does not keep the obsolete partial-subtotal warning", () => {
   expect(isObsoleteSelectionSubtotalWarning("Selected lines add to $235.00, but subtotal is $746.95.")).toBeTruthy()
   expect(isObsoleteSelectionSubtotalWarning("All line totals add to $235.00, but subtotal is $746.95.")).toBeFalsy()
+})
+
+test("a price-list product needs a unit price but not an order quantity or line total", () => {
+  expect(managerDocumentReviewLineIncomplete({
+    documentType: "catalog_price_list",
+    selected: true,
+    description: "SPECTRALOCK 1 Pre-Mixed Epoxy Grout",
+    quantity: null,
+    unit: "each",
+    unitPrice: 125,
+    lineTotal: null,
+  })).toBeFalsy()
+  expect(managerDocumentReviewLineIncomplete({
+    documentType: "catalog_price_list",
+    selected: true,
+    description: "SPECTRALOCK 1 Pre-Mixed Epoxy Grout",
+    quantity: null,
+    unit: "each",
+    unitPrice: null,
+    lineTotal: null,
+  })).toBeTruthy()
 })
 
 test("reviewed Firecode drywall line keeps supplier pricing and original PDF evidence", () => {

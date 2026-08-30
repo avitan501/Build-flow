@@ -24,7 +24,10 @@ import {
   normalizeMaterialCatalogDepartment,
   type CatalogSupplier,
 } from "@/lib/material-catalog";
-import { isObsoleteSelectionSubtotalWarning } from "@/lib/manager-document-validation";
+import {
+  isObsoleteSelectionSubtotalWarning,
+  managerDocumentReviewLineIncomplete,
+} from "@/lib/manager-document-validation";
 import {
   detectSupplierMatch,
   inferSupplierName,
@@ -657,12 +660,15 @@ export async function saveManagerDocumentReviewAction(input: {
       expected !== null &&
       lineTotal !== null &&
       Math.abs(expected - lineTotal) > 0.03;
-    const incomplete =
-      item.selected &&
-      (!clean(item.description, 500) ||
-        quantity === null ||
-        !clean(item.unit, 40) ||
-        (requiresPricing && (unitPrice === null || lineTotal === null)));
+    const incomplete = managerDocumentReviewLineIncomplete({
+      documentType: input.documentType,
+      selected: item.selected,
+      description: clean(item.description, 500),
+      quantity,
+      unit: clean(item.unit, 40),
+      unitPrice,
+      lineTotal,
+    });
     return {
       ...item,
       description: clean(item.description, 500),
@@ -725,7 +731,9 @@ export async function saveManagerDocumentReviewAction(input: {
     )
   )
     warnings.push(
-      requiresPricing
+      input.documentType === "catalog_price_list"
+        ? "One or more selected price-list products still need a description, unit, or unit price."
+        : requiresPricing
         ? "One or more selected lines still need quantity, unit, unit price, or line total."
         : "One or more selected lines still need a description, quantity, or unit.",
     );

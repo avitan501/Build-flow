@@ -18,6 +18,40 @@ export function isManagerDocumentChargeLine(description: string) {
   return NON_ITEM_LINE_PATTERN.test(description.trim())
 }
 
+export function managerDocumentReviewLineIncomplete(input: {
+  documentType: string
+  selected: boolean
+  description: string
+  quantity: number | null
+  unit: string
+  unitPrice: number | null
+  lineTotal: number | null
+}) {
+  if (!input.selected) return false
+  if (!input.description.trim() || !input.unit.trim()) return true
+
+  // A supplier catalog/price list describes the price of one sale unit. It
+  // normally has no ordered quantity or extended line total, so those fields
+  // must not block a manager from saving one reviewed product to the catalog.
+  if (input.documentType === "catalog_price_list") {
+    return input.unitPrice === null
+  }
+
+  const requiresPricing = [
+    "supplier_quote",
+    "supplier_invoice",
+    "receipt",
+    "client_estimate",
+    "purchase_order",
+  ].includes(input.documentType)
+
+  return (
+    input.quantity === null ||
+    (requiresPricing &&
+      (input.unitPrice === null || input.lineTotal === null))
+  )
+}
+
 export function documentLineValidationStatus(item: DocumentValidationItem): "valid" | "needs_review" | "mismatch" {
   const expected = item.quantity !== null && item.unitPrice !== null ? Math.round(item.quantity * item.unitPrice * 100) / 100 : null
   if (expected !== null && item.lineTotal !== null && Math.abs(expected - item.lineTotal) > MONEY_TOLERANCE) return "mismatch"

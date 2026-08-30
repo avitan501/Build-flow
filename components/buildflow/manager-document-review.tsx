@@ -37,7 +37,10 @@ import {
   type ManagerDocumentItemRecord,
   type ManagerDocumentRecord,
 } from "@/lib/manager-documents";
-import { isObsoleteSelectionSubtotalWarning } from "@/lib/manager-document-validation";
+import {
+  isObsoleteSelectionSubtotalWarning,
+  managerDocumentReviewLineIncomplete,
+} from "@/lib/manager-document-validation";
 
 function inputMoney(value: number | null) {
   return value === null ? "" : String(value);
@@ -75,14 +78,6 @@ export function ManagerDocumentReview({
     "catalog_price_list",
     "purchase_order",
   ].includes(draft.document_type);
-  const requiresPricing = [
-    "supplier_quote",
-    "supplier_invoice",
-    "receipt",
-    "catalog_price_list",
-    "client_estimate",
-    "purchase_order",
-  ].includes(draft.document_type);
   const selectedLines = lines.filter((line) => line.selected);
   const actionableWarnings = document.warnings.filter(
     (warning) => !isObsoleteSelectionSubtotalWarning(warning),
@@ -102,6 +97,19 @@ export function ManagerDocumentReview({
   const suggestedDepartment = draft.suggested_department
     ? normalizeMaterialCatalogDepartment(draft.suggested_department)
     : "";
+  const importBlocker = !canApprove
+    ? "Manager approval access is required."
+    : !selectedLines.length
+      ? "Select at least one product."
+      : !departmentChosen
+        ? suggestedDepartment
+          ? `Choose a department. Suggested: ${suggestedDepartment}.`
+          : "Choose a department."
+        : !allSelectedValid
+          ? "Complete the highlighted product details."
+          : actionableWarnings.length > 0 && !acknowledgeWarnings
+            ? "Review and confirm the document notes."
+            : "";
 
   function run(work: () => Promise<void>) {
     setError("");
@@ -228,6 +236,11 @@ export function ManagerDocumentReview({
     });
   }
   function saveApproveAndImport() {
+    if (importBlocker) {
+      setFeedback("");
+      setError(importBlocker);
+      return;
+    }
     run(async () => {
       const saved = await saveManagerDocumentReviewAction({
         documentId: document.id,
@@ -359,13 +372,15 @@ export function ManagerDocumentReview({
           expected !== null &&
           next.line_total !== null &&
           Math.abs(expected - next.line_total) > 0.03;
-        const incomplete =
-          next.selected &&
-          (!next.description.trim() ||
-            next.quantity === null ||
-            !next.unit.trim() ||
-            (requiresPricing &&
-              (next.unit_price === null || next.line_total === null)));
+        const incomplete = managerDocumentReviewLineIncomplete({
+          documentType: draft.document_type,
+          selected: next.selected,
+          description: next.description,
+          quantity: next.quantity,
+          unit: next.unit,
+          unitPrice: next.unit_price,
+          lineTotal: next.line_total,
+        });
         return {
           ...next,
           validation_status: mismatch
@@ -735,30 +750,63 @@ export function ManagerDocumentReview({
                   </tbody>
                 </table>
               </div>
-              <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-4 py-2 backdrop-blur">
-                <p className="text-xs font-semibold text-slate-600">
-                  {selectedLines.length} selected · saves review and approval
-                  first
-                </p>
-                <button
-                  type="button"
-                  onClick={saveApproveAndImport}
-                  disabled={
-                    !canApprove ||
-                    pending ||
-                    !selectedLines.length ||
-                    !departmentChosen ||
-                    !allSelectedValid ||
-                    (actionableWarnings.length > 0 && !acknowledgeWarnings)
-                  }
-                  className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <BookOpenCheck className="h-4 w-4" />
-                  {pending ? "Importing…" : "Import selected"}
-                  <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">
-                    {selectedLines.length}
-                  </span>
-                </button>
+              <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-white/95 px-4 py-2 backdrop-blur">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-slate-700">
+                      {importBlocker ||
+                        `${selectedLines.length} selected · ready to import`}
+                    </p>
+                    {!departmentChosen && suggestedDepartment ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraft({
+                            ...draft,
+                            department: suggestedDepartment,
+                          });
+                          setSelectionChanged(true);
+                          setError("");
+                        }}
+                        className="mt-1 text-xs font-bold text-[#0071e3] underline decoration-sky-300 underline-offset-2"
+                      >
+                        Use {suggestedDepartment}
+                      </button>
+                    ) : null}
+                    {departmentChosen &&
+                    actionableWarnings.length > 0 &&
+                    !acknowledgeWarnings ? (
+                      <label className="mt-1 flex items-center gap-2 text-xs font-bold text-amber-800">
+                        <input
+                          type="checkbox"
+                          checked={acknowledgeWarnings}
+                          onChange={(event) => {
+                            setAcknowledgeWarnings(event.target.checked);
+                            setError("");
+                          }}
+                          className="h-4 w-4 accent-amber-700"
+                        />
+                        I reviewed the notes
+                      </label>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={saveApproveAndImport}
+                    disabled={!canApprove || pending || !selectedLines.length}
+                    aria-describedby="catalog-import-status"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <BookOpenCheck className="h-4 w-4" />
+                    {pending ? "Importing…" : "Import selected"}
+                    <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">
+                      {selectedLines.length}
+                    </span>
+                  </button>
+                </div>
+                <span id="catalog-import-status" className="sr-only">
+                  {importBlocker || "Selected products are ready to import."}
+                </span>
               </div>
             </>
           ) : (
