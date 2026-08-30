@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { BookOpenCheck, CheckCircle2, ChevronLeft, ClipboardCheck, MessageSquareText, Search, ShieldCheck } from "lucide-react"
+import { BookOpenCheck, CheckCircle2, ChevronLeft, ClipboardCheck, House, MessageSquareText, Search, ShieldCheck } from "lucide-react"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { addConstructionKnowledgeAction, addOrderStandardAction, deleteConstructionKnowledgeAction, setConstructionKnowledgeEnabledAction, updateConstructionKnowledgeAction } from "./actions"
@@ -16,6 +16,81 @@ type KnowledgeRow = {
 }
 
 const QUESTION_STOP_WORDS = new Set(["a", "an", "and", "are", "can", "do", "for", "how", "i", "in", "is", "it", "of", "on", "or", "should", "the", "to", "we", "what", "when", "with"])
+
+const NEW_HOME_STANDARD_TEMPLATES = [
+  {
+    stage: "Framing",
+    sourcePath: "/shop/framing",
+    customerNeed: "A customer sends framing shorthand, a lumber list, a framing plan, or asks for a new-home framing package.",
+    shorthand: "Read a bare 2x4x8 as wood dimensional lumber unless the customer says metal or another material. Keep every stated size, length, quantity, species, grade, and treatment exactly as written.",
+    questions: "What sizes, lengths, and quantities are still missing? Can you send the framing plan or complete material list? What is the full delivery address, and when is the material needed?",
+    confirmations: "Confirm engineered-member schedules, spans, species and grade, treatment or exposure needs, connectors and fasteners, structural drawings, engineer requirements, manufacturer instructions, and applicable local code before finalizing. These are project-specific, not universal defaults.",
+    sampleReply: "Send me the framing plan or list, the full delivery address, and when you need it. I’ll keep every size and quantity exactly as written and flag only the missing details.",
+  },
+  {
+    stage: "Roofing",
+    sourcePath: "/shop/roofing",
+    customerNeed: "A customer asks for a new-home roofing package, shingles, membrane, flashing, ventilation, or roofing accessories.",
+    shorthand: "Keep stated roof squares, product type, brand, color, exposure, bundle count, and accessory quantities as written. Treat a square as estimating shorthand, not a final takeoff or waste allowance.",
+    questions: "What roofing system or shingle is requested? What color and quantity or measured roof area do you have? Can you send the roof plan? What is the delivery address and needed date?",
+    confirmations: "Confirm deck and slope conditions, underlayment, ice-and-water coverage, flashing, ventilation, fastening, wind or fire classifications, waste, manufacturer instructions, warranty requirements, and local code before finalizing. Do not assume these requirements are universal.",
+    sampleReply: "What roofing product and color do you need, how many squares or what roof plan do you have, and what is the delivery address?",
+  },
+  {
+    stage: "Exterior",
+    sourcePath: "/shop/exterior",
+    customerNeed: "A customer asks for siding, cladding, weatherproofing, exterior trim, or a new-home exterior-envelope package.",
+    shorthand: "Preserve the stated material, profile, exposure, color, panel or piece quantities, trim names, and opening dimensions. Do not infer a weather barrier or flashing assembly from siding shorthand alone.",
+    questions: "Which siding or cladding system, profile, and color are requested? What wall area, elevations, or quantities are available? Which trims and openings must be included? What is the delivery address and needed date?",
+    confirmations: "Confirm substrate, weather-resistive barrier, drainage and flashing details, fastening, clearances, sealants, wind or fire requirements, manufacturer instructions, design professional details, and local code before finalizing. These are confirm-only project requirements.",
+    sampleReply: "Which siding or cladding, profile, and color do you need? Send the elevations or quantities, delivery address, and needed date.",
+  },
+  {
+    stage: "Insulation",
+    sourcePath: "/request-quote?request=insulation",
+    customerNeed: "A customer asks for a new-home insulation package for walls, ceilings, roof areas, floors, sound control, or mechanical spaces.",
+    shorthand: "Keep stated batt, roll, board, foam, mineral-wool, thickness, width, R-value, square-foot, bag, or bundle information exactly as provided. Never infer required R-value or vapor control from location alone.",
+    questions: "Which areas are being insulated? What cavity dimensions, material preference, and measured area or quantities are available? Can you send the insulation schedule or plans? What is the delivery address and needed date?",
+    confirmations: "Confirm required R-values, assembly design, vapor and air control, ignition or thermal barriers, fire and acoustic assemblies, equipment clearances, manufacturer instructions, energy requirements, and local code before finalizing. None are universal defaults.",
+    sampleReply: "Which areas are you insulating, what cavity sizes and quantities do you have, and can you send the insulation schedule or plans?",
+  },
+  {
+    stage: "Drywall",
+    sourcePath: "/shop/sheet-rock",
+    customerNeed: "A customer sends a new-home drywall list or asks for board, compound, tape, bead, screws, primer, or related accessories.",
+    shorthand: "Avantia may offer 5/8-inch as its normal Sheetrock option, but never replace an explicit thickness without confirmation. Read “1000 pc box” as one 1,000-count screw box. On an otherwise clear drywall list, matching tape may mean one standard roll, a five-gallon compound bucket may mean all-purpose compound, and primer may mean drywall primer unless the customer says otherwise.",
+    questions: "What board dimensions, thicknesses, types, and quantities are requested or shown on the plans? Which areas have special assembly requirements? What is the delivery address and needed date? Ask whether to keep an explicit thickness that conflicts with the Avantia 5/8-inch option.",
+    confirmations: "Confirm every fire-rated, shaft, moisture, wet-area, abuse-resistant, ceiling, acoustic, fastening, finish-level, manufacturer, plan, design-professional, and local-code requirement before finalizing. Never label these as universal defaults.",
+    sampleReply: "Send the drywall list or plans, delivery address, and needed date. If you wrote a different thickness, should we keep it or price Avantia’s 5/8-inch option?",
+  },
+  {
+    stage: "Tile",
+    sourcePath: "/shop/tile-work",
+    customerNeed: "A customer asks for tile, mortar or thinset, grout, backer board, waterproofing, or a new-home tile-setting package.",
+    shorthand: "Keep the stated tile type, dimensions, finish, color, measured area, bag count, grout color, substrate, and installation location. Do not select thinset or waterproofing from square footage alone.",
+    questions: "What tile type and size are being installed? What is the substrate? Is the location interior or exterior and wet or dry? What measured area and waste instruction are provided? What is the delivery address and needed date?",
+    confirmations: "Confirm mortar and grout compatibility, substrate preparation, waterproofing, drainage and slope, movement joints, coverage and trowel requirements, cure conditions, manufacturer instructions, design details, and applicable code before finalizing. Wet-area requirements are not universal defaults.",
+    sampleReply: "What tile type and size, what substrate, and is the area wet or dry? Send the square footage, address, and needed date too.",
+  },
+  {
+    stage: "Paint",
+    sourcePath: "/request-quote?request=paint",
+    customerNeed: "A customer asks for new-home paint, primer, coatings, or a room-by-room paint and finish package.",
+    shorthand: "Keep every stated brand, product line, color name or code, finish, container size, and quantity. A five-gallon primer on a clear drywall list may mean drywall primer unless another product or substrate is stated; never infer paint color or finish.",
+    questions: "Which surfaces and rooms are being painted? What exact colors or codes and finishes are required? What product line and quantities or measured areas are available? Is the work interior or exterior? What is the delivery address and needed date?",
+    confirmations: "Confirm substrate preparation, primer and topcoat compatibility, coats and coverage, moisture conditions, specialty or fire-rated coating requirements, VOC or occupancy requirements, manufacturer instructions, finish schedule, and local rules before finalizing. These are not universal defaults.",
+    sampleReply: "Which rooms or surfaces, exact color codes, and finishes do you need? Send the quantities or areas, delivery address, and needed date.",
+  },
+  {
+    stage: "Trim & Doors",
+    sourcePath: "/shop/door-and-molding",
+    customerNeed: "A customer asks for interior or exterior doors, jambs, casing, base, crown, molding, hardware, or a new-home trim package.",
+    shorthand: "Keep stated door style, slab or prehung condition, size, handing, swing, jamb width, bore or prep, quantity, trim profile, width, length, species, material, and finish exactly as provided. Never infer handing or fire rating.",
+    questions: "For doors, what style, size, handing, swing, jamb width, prep, and quantity are required? For trim, what profile, material, lengths, and quantities are required? Can you send the door schedule or finish schedule? What is the delivery address and needed date?",
+    confirmations: "Confirm rough openings and field measurements, wall thickness, handing, hardware and keying, fire or egress requirements, safety glazing where relevant, moisture exposure, finish, manufacturer instructions, schedules, design-professional requirements, and local code before finalizing. These are project-specific.",
+    sampleReply: "Send the door or trim schedule, missing sizes and quantities, delivery address, and needed date. I’ll flag handing, jamb, hardware, or profile details that still need confirmation.",
+  },
+] as const
 
 function questionTerms(question: string) {
   return [...new Set(question.toLowerCase().match(/[a-z0-9]+/g)?.filter((term) => term.length > 1 && !QUESTION_STOP_WORDS.has(term)) ?? [])]
@@ -101,6 +176,27 @@ export default async function ConstructionKnowledgePage({ searchParams }: { sear
           <label className="text-xs font-bold text-slate-700 sm:col-span-2">Short customer reply example<textarea name="sampleReply" required maxLength={300} rows={2} defaultValue="Yes—we can help with a dumpster. What are you throwing out, what size do you need, and what is the delivery address?" className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm leading-6" /></label>
           <div className="flex items-center justify-between gap-3 sm:col-span-2"><p className="max-w-xl text-[10px] leading-4 text-slate-500">Saving creates one active order-standard fact in the existing AI knowledge store. Review the generated fact below and pause it any time.</p><button type="submit" className="h-10 shrink-0 rounded-lg bg-indigo-700 px-4 text-xs font-bold text-white">Save order standard</button></div>
         </form>
+      </section>
+
+      <section id="new-home-standards" className="mt-4 rounded-2xl border border-cyan-200 bg-white p-4 shadow-sm sm:p-6" aria-labelledby="new-home-standards-title">
+        <div className="flex items-start gap-3"><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-800"><House className="h-5 w-5" /></span><div><h2 id="new-home-standards-title" className="font-bold text-slate-950">New Home Common Standards</h2><p className="mt-1 text-xs leading-5 text-slate-500">Owner-review starter pack organized by construction stage. Save only the stages Avantia wants the customer AI to use.</p></div></div>
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950"><strong>Review-only:</strong> nothing below is active until the owner reviews and saves one template. Common shorthand helps intake; local-code, fire, structural, wet-area, energy, and manufacturer requirements are confirm-only project items—not universal defaults.</div>
+
+        <div className="mt-4 space-y-3">
+          {NEW_HOME_STANDARD_TEMPLATES.map((template, index) => <details key={template.stage} className="rounded-xl border border-slate-200 bg-slate-50" open={index === 0}>
+            <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-slate-950">{String(index + 1).padStart(2, "0")} · {template.stage}</summary>
+            <form action={addOrderStandardAction} className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2">
+              <input type="hidden" name="standardName" value={`New home — ${template.stage}`} />
+              <label className="text-xs font-bold text-slate-700 sm:col-span-2">Use when<textarea name="customerNeed" required maxLength={300} rows={2} defaultValue={template.customerNeed} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm leading-6" /></label>
+              <label className="text-xs font-bold text-slate-700 sm:col-span-2">Common / default intake shorthand<textarea name="options" maxLength={500} rows={4} defaultValue={template.shorthand} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm leading-6" /></label>
+              <label className="text-xs font-bold text-slate-700 sm:col-span-2">Truly required intake questions<textarea name="questions" required maxLength={500} rows={4} defaultValue={template.questions} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm leading-6" /></label>
+              <label className="text-xs font-bold text-slate-700 sm:col-span-2">Confirm-only safety, plans, manufacturer, and code items<textarea name="confirmations" required maxLength={400} rows={4} defaultValue={template.confirmations} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm leading-6" /></label>
+              <label className="text-xs font-bold text-slate-700">Source path or HTTPS URL<input name="sourcePath" required maxLength={500} defaultValue={template.sourcePath} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm" /></label>
+              <label className="text-xs font-bold text-slate-700">Short customer reply<textarea name="sampleReply" required maxLength={300} rows={3} defaultValue={template.sampleReply} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm leading-6" /></label>
+              <div className="flex items-center justify-between gap-3 sm:col-span-2"><p className="text-[10px] leading-4 text-slate-500">Saves one reviewed {template.stage.toLowerCase()} standard to the existing AI knowledge store.</p><button type="submit" className="h-10 shrink-0 rounded-lg bg-cyan-800 px-4 text-xs font-bold text-white">Review and save {template.stage}</button></div>
+            </form>
+          </details>)}
+        </div>
       </section>
 
       <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">

@@ -39,6 +39,32 @@ test("construction knowledge has one owner-only workspace and one existing store
   expect(smsPage).not.toContain("saveSmsAiKnowledgeAction")
 })
 
+test("new-home starter standards remain owner-reviewed, staged, and non-universal", async () => {
+  const [knowledgePage, actions] = await Promise.all([
+    readFile(path.join(root, "app/admin/ai-tools/construction-knowledge/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/ai-tools/construction-knowledge/actions.ts"), "utf8"),
+  ])
+
+  expect(knowledgePage).toContain("New Home Common Standards")
+  expect(knowledgePage).toContain("nothing below is active until the owner reviews and saves one template")
+  expect(knowledgePage).toContain("not universal defaults")
+  expect(knowledgePage).toContain("Common / default intake shorthand")
+  expect(knowledgePage).toContain("Truly required intake questions")
+  expect(knowledgePage).toContain("Confirm-only safety, plans, manufacturer, and code items")
+  for (const stage of ["Framing", "Roofing", "Exterior", "Insulation", "Drywall", "Tile", "Paint", "Trim & Doors"]) {
+    expect(knowledgePage).toContain(`stage: "${stage}"`)
+    expect(knowledgePage).toContain(`Review and save {template.stage}`)
+  }
+  expect(knowledgePage.match(/sourcePath: "\//g)).toHaveLength(8)
+  expect(knowledgePage).toContain("Never label these as universal defaults")
+  expect(knowledgePage).toContain("Wet-area requirements are not universal defaults")
+  expect(knowledgePage).toContain("Never infer handing or fire rating")
+  expect(knowledgePage).not.toContain("fire-rated drywall is the default")
+  expect(knowledgePage).not.toContain("waterproofing is always required")
+  expect(actions).toContain('from("aura_ai_reply_knowledge")')
+  expect(actions).not.toContain("new_home_standards")
+})
+
 test("knowledge RLS preserves staff reads and restricts every mutation to owners", async () => {
   const migration = await readFile(path.join(root, "supabase/migrations/20260830122854_owner_construction_knowledge.sql"), "utf8")
 

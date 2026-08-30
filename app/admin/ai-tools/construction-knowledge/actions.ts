@@ -80,7 +80,7 @@ export async function addOrderStandardAction(formData: FormData) {
   const fact = [
     `Order standard: ${name}.`,
     `Use when: ${customerNeed}.`,
-    options ? `Relevant options: ${options}.` : "",
+    options ? `Common intake shorthand or options: ${options}.` : "",
     `Ask only what is still unresolved: ${questions}.`,
     `Confirm before finalizing: ${confirmations}.`,
     `Short customer reply example: ${sampleReply}`,
