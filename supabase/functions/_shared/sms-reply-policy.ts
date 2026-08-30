@@ -266,6 +266,35 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
     const match = pattern.exec(value);
     return match ? value.slice((match.index || 0) + match[0].length) : "";
   };
+  const customerLines = value
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/^Customer:\s*/i, ""))
+    .filter((line) => line && !/^Avantia:/i.test(line));
+  const quantityClauses = customerLines.flatMap((line) => line.split(/\s+(?:and|plus)\s+|[,;]/i).map((clause) => clause.trim()).filter(Boolean));
+  const quantityProductPredicates: Array<(text: string) => boolean> = [
+    (text) => looksLikeSheetrock(text) || /\bsheet\s*rock\b|\bdrywall(?!\s+screws?)/i.test(text),
+    (text) => /\bmetal\s+(?:studs?|framing)\b|\bstuds?\b[^\n]{0,30}\b(?:gauge|ga\.?|metal)\b/i.test(text),
+    (text) => /\bthin\s*set\b|\bthinset\b|\btile\s+(?:mortar|adhesive)\b/i.test(text),
+    (text) => /\bpaint\b/i.test(text),
+    (text) => /\bcorner\s+(?:bit|bead)\b/i.test(text),
+    (text) => /\binsulation\b|\b(?:fiberglass|mineral\s+wool|rockwool)\b/i.test(text),
+    (text) => /\b(?:plywood|osb|oriented\s+strand\s+board)\b/i.test(text),
+    (text) => /\bdoors?\b/i.test(text) && !/\bgarage\s+doors?\b/i.test(text),
+    (text) => /\bwindows?\b/i.test(text),
+    (text) => /\b(?:wood\s+)?lumber\b|\b\d+\s*[x×]\s*\d+(?:\s*[x×]\s*\d+)?\b[^\n]{0,30}\b(?:wood|studs?|lumber|boards?)?\b/i.test(text),
+    (text) => /\b(?:drywall|sheetrock)\s+screws?\b|\bscrews?\b[^\n]{0,30}\b(?:drywall|sheetrock)\b/i.test(text),
+  ];
+  const quantityProductCount = quantityProductPredicates.filter((predicate) => predicate(value)).length;
+  const standaloneQuantityAnswer = quantityProductCount === 1 && customerLines.some((line) => /^\s*\d{1,6}\s*(?:pcs?|pieces?|each|ea|sheets?|bags?|buckets?|bundles?|cans?|gallons?|gals?|rolls?|packs?)?\s*[.!]?\s*$/i.test(line));
+  const hasProductQuantity = (predicate: (text: string) => boolean) => standaloneQuantityAnswer || quantityClauses.some((clause) => {
+    if (!predicate(clause)) return false;
+    // A denominator in a construction fraction is a specification, never a
+    // count. Without removing it, `5/8 regular Sheetrock` looked like eight
+    // pieces and could pass the request-creation gate without a quantity.
+    const quantityText = clause.replace(/\b\d+\s*\/\s*\d+\b/g, "SPEC");
+    return /\b\d{1,6}\s*(?:pcs?|pieces?|each|ea|sheets?|bags?|buckets?|bundles?|cans?|gallons?|gals?|rolls?|packs?)\b/i.test(quantityText) ||
+      /^\s*\d{1,6}\s+/.test(quantityText);
+  });
 
   const paintMatches = [...value.matchAll(/\bpaint\b/gi)];
   const postListAnswer = paintMatches.length > 1 ? value.slice((paintMatches[0].index || 0) + paintMatches[0][0].length) : "";
@@ -283,9 +312,12 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
         ? "Can we do 5/8-in. Sheetrock?"
         : `For the ${sheetrockThickness.match(/(?:1\s*\/\s*4|3\s*\/\s*8|1\s*\/\s*2|5\s*\/\s*8)/i)?.[0]?.replace(/\s+/g, "") || sheetrockThickness}-in. Sheetrock: regular, Type X/fire-rated, or moisture-resistant?`);
   }
+  if (hasSheetrock && !hasProductQuantity(quantityProductPredicates[0])) {
+    questions.push("How many sheets of Sheetrock do you need?");
+  }
 
-  const cornerBit = /\bcorner\s+bit\b/i;
-  const cornerAnswer = textAfter(cornerBit);
+  const cornerBit = /\bcorner\s+(?:bit|bead)\b/i;
+  const cornerAnswer = value;
   const hasCornerType = /\b(?:metal|vinyl|paper[- ]faced)\b/i.test(cornerAnswer);
   const hasCornerLength = /\b(?:8|10)[-\s]*(?:ft|feet|foot|['’])\b/i.test(cornerAnswer) ||
     /(?:^|\n)\s*(?:8|10)\b[^\n]*\bpaint\b/i.test(cornerAnswer);
@@ -296,6 +328,9 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
         ? "For “corner bit,” which length: 8 ft or 10 ft?"
         : "For “corner bit,” which corner bead type and length: metal or vinyl, 8 ft or 10 ft?");
   }
+  if (cornerBit.test(value) && !hasProductQuantity(quantityProductPredicates[4])) {
+    questions.push("How many pieces of corner bead do you need?");
+  }
 
   const paint = /\bpaint\b/i;
   const paintCustomerEvidence = value
@@ -305,15 +340,15 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
     .map((line) => line.replace(/^Customer:\s*/i, ""))
     .join("\n");
   const paintMatch = paint.exec(paintCustomerEvidence);
-  const paintAnswer = paintMatch ? paintCustomerEvidence.slice((paintMatch.index || 0) + paintMatch[0].length) : "";
+  const paintAnswer = paintMatch ? paintCustomerEvidence.slice(paintMatch.index || 0) : "";
   const latestCustomerLine = paintCustomerEvidence.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).at(-1) || "";
-  const paintBrandMatch = latestCustomerLine.match(/\b(?:sherm(?:a|e)n[- ]?willi(?:am|ams)?|sherwin[- ]?williams?|benjamin\s+moore|behr|ppg)\b/i)?.[0] || "";
+  const paintBrandMatch = paintCustomerEvidence.match(/\b(?:sherm(?:a|e)n[- ]?willi(?:am|ams)?|sherwin[- ]?williams?|benjamin\s+moore|behr|ppg)\b/i)?.[0] || "";
   const paintBrand = /sherm|sherwin/i.test(paintBrandMatch) ? "Sherwin Williams" : paintBrandMatch;
-  const latestCommonColor = latestCustomerLine.match(/\b(?:white|black|gray|grey|beige|tan|brown|blue|green|red|yellow|orange|cream|ivory)\b/i)?.[0] || "";
-  const hasPaintFinish = /\b(?:flat|matte|eggshell|satin|semi[- ]gloss|gloss)\b/i.test(paintAnswer);
-  const hasPaintColor = /\b(?:white|black|gray|grey|beige|tan|brown|blue|green|red|yellow|orange|cream|ivory|color\s*(?:is|:)?\s*[a-z][a-z -]{1,30})\b/i.test(paintAnswer) ||
-    /\b(?:sherwin[- ]?williams?|benjamin\s+moore|behr|ppg)\b[^\n]{0,30}\b[a-z]{1,4}[- ]?\d{1,5}\b/i.test(paintAnswer) ||
-    /\b[A-Z]{1,4}-\d{1,5}\b/i.test(paintAnswer);
+  const latestCommonColor = [...paintCustomerEvidence.matchAll(/\b(?:white|black|gray|grey|beige|tan|brown|blue|green|red|yellow|orange|cream|ivory)\b/gi)].at(-1)?.[0] || "";
+  const hasPaintFinish = /\b(?:flat|matte|eggshell|satin|semi[- ]gloss|gloss)\b/i.test(paintCustomerEvidence);
+  const hasPaintColor = /\b(?:white|black|gray|grey|beige|tan|brown|blue|green|red|yellow|orange|cream|ivory|color\s*(?:is|:)?\s*[a-z][a-z -]{1,30})\b/i.test(paintCustomerEvidence) ||
+    /\b(?:sherm(?:a|e)n[- ]?willi(?:am|ams)?|sherwin[- ]?williams?|benjamin\s+moore|behr|ppg)\b[^\n]{0,30}\b[a-z]{1,4}[- ]?\d{1,5}\b/i.test(paintCustomerEvidence) ||
+    /\b[A-Z]{1,4}-\d{1,5}\b/i.test(paintCustomerEvidence);
   if (paint.test(value) && !(hasPaintFinish && hasPaintColor)) {
     questions.push(hasPaintColor
       ? latestCommonColor
@@ -325,19 +360,21 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
           ? `Got it—${paintBrand}. What color, and which finish: flat, eggshell, satin, or semi-gloss?`
           : "What paint color, and which finish: flat, eggshell, satin, or semi-gloss?");
   }
+  if (paint.test(value) && !hasProductQuantity(quantityProductPredicates[3])) {
+    questions.push("How many gallons or cans of paint do you need?");
+  }
 
-  const hasQuantity = smsHasExplicitQuantity(value);
-  const addQuantityQuestion = (product: string, unit: string) => {
-    if (!hasQuantity) questions.push(`How many ${unit} of ${product} do you need?`);
+  const addQuantityQuestion = (product: string, unit: string, predicate: (text: string) => boolean) => {
+    if (!hasProductQuantity(predicate)) questions.push(`How many ${unit} of ${product} do you need?`);
   };
 
   const metalStuds = /\bmetal\s+(?:studs?|framing)\b|\bstuds?\b[^\n]{0,30}\b(?:gauge|ga\.?|metal)\b/i.test(value);
   if (metalStuds) {
-    const hasSizeAndLength = /\b(?:1\s*5\/8|2\s*1\/2|3\s*5\/8|4|6)\s*(?:in\.?|inch(?:es)?|["”])?\b[^\n]{0,40}\b(?:8|10|12|14|16)\s*(?:ft|feet|foot|['’])\b|\b\d+\s*[x×]\s*\d+(?:\s*[x×]\s*\d+)?\b/i.test(value);
+    const hasSizeAndLength = /\b(?:1\s*[- ]?\s*5\/8|2\s*[- ]?\s*1\/2|3\s*[- ]?\s*5\/8|4|6)\s*(?:in\.?|inch(?:es)?|["”])?\b[^\n]{0,40}\b(?:8|10|12|14|16)\s*(?:ft|feet|foot|['’])\b|\b\d+\s*[x×]\s*\d+(?:\s*[x×]\s*\d+)?\b/i.test(value);
     const hasGauge = /\b(?:14|16|18|20|22|25)\s*(?:ga\.?|gauge)\b/i.test(value);
     if (!hasSizeAndLength) questions.push("What metal-stud width and length do you need?");
     if (!hasGauge) questions.push("What gauge do you need?");
-    addQuantityQuestion("metal studs", "pieces");
+    addQuantityQuestion("metal studs", "pieces", quantityProductPredicates[1]);
   }
 
   const thinset = /\bthin\s*set\b|\bthinset\b|\btile\s+(?:mortar|adhesive)\b/i.test(value);
@@ -347,7 +384,7 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
     const hasLocation = /\b(?:floor|wall|shower|bathroom|kitchen|backsplash|indoor|interior|outdoor|exterior|pool)\b/i.test(value);
     if (!hasTile) questions.push("What tile type and size are you installing?");
     if (!hasSubstrate || !hasLocation) questions.push("What substrate and installation location is it for?");
-    addQuantityQuestion("thinset", "bags");
+    addQuantityQuestion("thinset", "bags", quantityProductPredicates[2]);
   }
 
   const roofing = /\b(?:roofing\s+)?shingles?\b/i.test(value);
@@ -366,7 +403,7 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
     const hasInsulationSize = /\b(?:15|16|23|24)\s*(?:in\.?|inch(?:es)?|["”])\b|\b\d+(?:\.\d+)?\s*(?:sq\.?\s*ft|sf)\b/i.test(value);
     if (!hasRValue || !hasInsulationType) questions.push("What insulation type and R-value do you need?");
     if (!hasInsulationSize) questions.push("What width or coverage do you need?");
-    addQuantityQuestion("insulation", "packages");
+    addQuantityQuestion("insulation", "packages", quantityProductPredicates[5]);
   }
 
   const panels = /\b(?:plywood|osb|oriented\s+strand\s+board)\b/i.test(value);
@@ -374,25 +411,25 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
     const hasPanelThickness = /\b(?:1\/4|3\/8|7\/16|1\/2|5\/8|3\/4)\s*(?:in\.?|inch(?:es)?|["”])?\b/i.test(value);
     const hasPanelSize = /\b(?:4\s*[x×]\s*8|4\s*[x×]\s*9|4\s*[x×]\s*10)\b/i.test(value);
     if (!hasPanelThickness || !hasPanelSize) questions.push("What panel thickness and sheet size do you need?");
-    addQuantityQuestion("panels", "sheets");
+    addQuantityQuestion("panels", "sheets", quantityProductPredicates[6]);
   }
 
   const doors = /\bdoors?\b/i.test(value) && !/\bgarage\s+doors?\b/i.test(value);
   if (doors) {
-    const hasDoorSize = /\b(?:1|2|3|4|5|6|7|8)\s*[-x×]\s*(?:6|7|8)|\b\d{2,3}\s*[x×]\s*\d{2,3}\b/i.test(value);
+    const hasDoorSize = /\b(?:1|2|3|4|5|6|7|8)\s*[-x×]\s*(?:6|7|8)|\b\d{2,3}\s*[x×]\s*\d{2,3}\b|\b\d{4}\b/i.test(value);
     const hasDoorUse = /\b(?:interior|exterior|entry|prehung|slab|fire[- ]rated)\b/i.test(value);
     const hasHanding = /\b(?:left|right)[- ]?hand|\bLH\b|\bRH\b|\binswing|\boutswing/i.test(value);
     if (!hasDoorSize || !hasDoorUse) questions.push("What door size and type do you need: interior, exterior, prehung, or slab?");
     if (/\b(?:prehung|exterior|entry)\b/i.test(value) && !hasHanding) questions.push("What handing and swing do you need?");
-    addQuantityQuestion("doors", "doors");
+    addQuantityQuestion("doors", "doors", quantityProductPredicates[7]);
   }
 
   const windows = /\bwindows?\b/i.test(value);
   if (windows) {
-    const hasWindowSize = /\b\d{2,3}\s*[x×]\s*\d{2,3}\b|\b\d+\s*(?:ft|feet|foot|['’])\s*(?:x|×)\s*\d+/i.test(value);
+    const hasWindowSize = /\b\d{2,3}\s*[x×]\s*\d{2,3}\b|\b\d+\s*(?:ft|feet|foot|['’])\s*(?:x|×)\s*\d+|\b\d{4}\b/i.test(value);
     const hasWindowType = /\b(?:double[- ]hung|single[- ]hung|casement|slider|sliding|picture|awning|hopper|fixed)\b/i.test(value);
     if (!hasWindowSize || !hasWindowType) questions.push("What window size and operating type do you need?");
-    addQuantityQuestion("windows", "windows");
+    addQuantityQuestion("windows", "windows", quantityProductPredicates[8]);
   }
 
   const dumpster = /\b(?:dumpsters?|roll[- ]?offs?|containers?)\b/i.test(value);
@@ -409,14 +446,14 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
   if (dimensionalLumber) {
     const hasLumberDimensions = /\b\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?(?:\s*[x×]\s*\d+(?:\.\d+)?)?\b/i.test(value);
     if (!hasLumberDimensions) questions.push("What lumber dimensions and length do you need?");
-    addQuantityQuestion("lumber", "pieces");
+    addQuantityQuestion("lumber", "pieces", quantityProductPredicates[9]);
   }
 
   const drywallFastener = /\b(?:drywall|sheetrock)\s+screws?\b|\bscrews?\b[^\n]{0,30}\b(?:drywall|sheetrock)\b/i.test(value);
   if (drywallFastener) {
     const hasScrewLength = /\b(?:1|1\s*1\/4|1\s*5\/8|2|2\s*1\/2|3)\s*(?:in\.?|inch(?:es)?|["”])\b|\b1[- ]?1\/4\b|\b1[- ]?5\/8\b/i.test(value);
     if (!hasScrewLength) questions.push("What drywall-screw length do you need?");
-    addQuantityQuestion("drywall screws", "pieces");
+    addQuantityQuestion("drywall screws", "pieces", quantityProductPredicates[10]);
   }
 
   return [...new Set(questions)].slice(0, 3);
@@ -425,20 +462,20 @@ export function smsMaterialClarificationQuestions(value: string, options: { exac
 export function smsMaterialIntelligenceAssessment(value: string, options: { exactListOnly?: boolean } = {}) {
   const questions = smsMaterialClarificationQuestions(value, options);
   const matchedRules = [
-    [/\b(?:sheet\s*rock|drywall(?!\s+screws?))\b/i, "drywall-sheet"],
-    [/\bmetal\s+(?:studs?|framing)\b/i, "metal-stud"],
-    [/\b(?:thin\s*set|thinset|tile\s+(?:mortar|adhesive))\b/i, "thinset"],
-    [/\b(?:roofing\s+)?shingles?\b/i, "roofing-shingle"],
-    [/\bpaint\b/i, "paint"],
-    [/\bcorner\s+(?:bit|bead)\b/i, "corner-bead"],
-    [/\binsulation\b|\b(?:fiberglass|rockwool|mineral\s+wool)\b/i, "insulation"],
-    [/\b(?:plywood|osb|oriented\s+strand\s+board)\b/i, "structural-panel"],
-    [/\bdoors?\b/i, "door"],
-    [/\bwindows?\b/i, "window"],
-    [/\b(?:dumpsters?|roll[- ]?offs?|containers?)\b/i, "dumpster"],
-    [/\b(?:wood\s+)?lumber\b|\b\d+\s*[x×]\s*\d+\s*[x×]\s*\d+\b/i, "dimensional-lumber"],
-    [/\b(?:drywall|sheetrock)\s+screws?\b|\bscrews?\b[^\n]{0,30}\b(?:drywall|sheetrock)\b/i, "drywall-fastener"],
-  ].filter(([pattern]) => (pattern as RegExp).test(value)).map(([, key]) => key as string);
+    [(text: string) => looksLikeSheetrock(text) || /\bsheet\s*rock\b|\bdrywall(?!\s+screws?)/i.test(text), "drywall-sheet"],
+    [(text: string) => /\bmetal\s+(?:studs?|framing)\b/i.test(text), "metal-stud"],
+    [(text: string) => /\b(?:thin\s*set|thinset|tile\s+(?:mortar|adhesive))\b/i.test(text), "thinset"],
+    [(text: string) => /\b(?:roofing\s+)?shingles?\b/i.test(text), "roofing-shingle"],
+    [(text: string) => /\bpaint\b/i.test(text), "paint"],
+    [(text: string) => /\bcorner\s+(?:bit|bead)\b/i.test(text), "corner-bead"],
+    [(text: string) => /\binsulation\b|\b(?:fiberglass|rockwool|mineral\s+wool)\b/i.test(text), "insulation"],
+    [(text: string) => /\b(?:plywood|osb|oriented\s+strand\s+board)\b/i.test(text), "structural-panel"],
+    [(text: string) => /\bdoors?\b/i.test(text), "door"],
+    [(text: string) => /\bwindows?\b/i.test(text), "window"],
+    [(text: string) => /\b(?:dumpsters?|roll[- ]?offs?|containers?)\b/i.test(text), "dumpster"],
+    [(text: string) => /\b(?:wood\s+)?lumber\b|\b\d+\s*[x×]\s*\d+\s*[x×]\s*\d+\b/i.test(text), "dimensional-lumber"],
+    [(text: string) => /\b(?:drywall|sheetrock)\s+screws?\b|\bscrews?\b[^\n]{0,30}\b(?:drywall|sheetrock)\b/i.test(text), "drywall-fastener"],
+  ].filter(([matches]) => (matches as (text: string) => boolean)(value)).map(([, key]) => key as string);
   const readyForConfirmation = matchedRules.length > 0 && questions.length === 0;
   const confidence = matchedRules.length === 0 ? 0.45 : readyForConfirmation ? 0.98 : Math.max(0.5, 0.82 - questions.length * 0.1);
   return {
