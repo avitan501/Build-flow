@@ -2837,6 +2837,10 @@ async function ingestPolledQuoMessage(message: QuoPolledMessage, conversationId:
 async function pollRecentQuoMessagesOnce() {
   const [api, webhook] = await Promise.all([quoConfig(), quoWebhookConfig()]);
   if (!api || !webhook) throw new Error("Q U O polling is not configured.");
+  // One aggregate budget covers the conversations request and every message
+  // request in this cycle. Per-request timeouts could multiply across the
+  // eight changed conversations and overrun the next cron tick.
+  const pollSignal = AbortSignal.timeout(3000);
   const updatedAfter = new Date(Date.now() - 3 * 60 * 1000).toISOString();
   // Quo's current API host is api.quo.com. Keep the signed webhook as the
   // primary path; this short poll window only closes occasional provider-side
@@ -2846,7 +2850,7 @@ async function pollRecentQuoMessagesOnce() {
   conversationsUrl.searchParams.set("updatedAfter", updatedAfter);
   conversationsUrl.searchParams.set("excludeInactive", "true");
   conversationsUrl.searchParams.set("maxResults", "25");
-  const conversationsResponse = await fetch(conversationsUrl, { headers: { Authorization: api.apiKey } });
+  const conversationsResponse = await fetch(conversationsUrl, { headers: { Authorization: api.apiKey }, signal: pollSignal });
   if (!conversationsResponse.ok) throw new Error(`Q U O conversations returned HTTP ${conversationsResponse.status}.`);
   const conversationsPayload = await conversationsResponse.json() as { data?: Array<{ id?: string; participants?: string[]; phoneNumberId?: string }> };
   let ingested = 0;
@@ -2859,7 +2863,7 @@ async function pollRecentQuoMessagesOnce() {
     messagesUrl.searchParams.append("participants", participant);
     messagesUrl.searchParams.set("createdAfter", updatedAfter);
     messagesUrl.searchParams.set("maxResults", "25");
-    const messagesResponse = await fetch(messagesUrl, { headers: { Authorization: api.apiKey } });
+    const messagesResponse = await fetch(messagesUrl, { headers: { Authorization: api.apiKey }, signal: pollSignal });
     if (!messagesResponse.ok) {
       if (messagesResponse.status === 429) break;
       continue;
@@ -2903,22 +2907,27 @@ async function releaseQuoFastPollLease(leaseToken: string) {
 async function runQuoFastPollWindow(leaseToken: string) {
   let ingested = 0;
   try {
-    // Leave headroom before the next one-minute pg_cron tick. Poll/network
-    // work adds time beyond the 5-second sleeps, so a 12-cycle window could
-    // overlap the next dispatch and make pg_net wait for a busy isolate.
-    for (let cycle = 0; cycle < 10; cycle += 1) {
+    // Keep the fallback window well below the next one-minute pg_cron tick.
+    // Quo network work adds time beyond the 5-second sleeps; five cycles
+    // preserve fast retries without keeping the Edge isolate busy at the
+    // following dispatch.
+    for (let cycle = 0; cycle < 5; cycle += 1) {
       if (!await renewQuoFastPollLease(leaseToken)) {
         console.error("quo_fast_poll_lease_lost");
         return;
       }
       try {
-        ingested += await pollRecentQuoMessagesOnce();
+        const cycleIngested = await pollRecentQuoMessagesOnce();
+        ingested += cycleIngested;
+        // Processing a recovered inbound message may include AI work. End the
+        // fallback window after that cycle so it cannot overlap the next tick.
+        if (cycleIngested > 0) break;
       } catch (error) {
         console.error("quo_fast_poll_failed", error instanceof Error ? error.message : "unknown error");
       }
-      if (cycle < 9) await new Promise((resolve) => setTimeout(resolve, 5000));
+      if (cycle < 4) await new Promise((resolve) => setTimeout(resolve, 5000));
     }
-    await sql`insert into public.aura_audit_log (action, details) values ('quo_fast_poll_window_completed', ${sql.json({ ingested, cycles: 10 })})`;
+    await sql`insert into public.aura_audit_log (action, details) values ('quo_fast_poll_window_completed', ${sql.json({ ingested, cycles: 5 })})`;
   } finally {
     try {
       await releaseQuoFastPollLease(leaseToken);
