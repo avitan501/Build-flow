@@ -37,6 +37,7 @@ import {
   type ManagerDocumentItemRecord,
   type ManagerDocumentRecord,
 } from "@/lib/manager-documents";
+import { isObsoleteSelectionSubtotalWarning } from "@/lib/manager-document-validation";
 
 function inputMoney(value: number | null) {
   return value === null ? "" : String(value);
@@ -83,6 +84,9 @@ export function ManagerDocumentReview({
     "purchase_order",
   ].includes(draft.document_type);
   const selectedLines = lines.filter((line) => line.selected);
+  const actionableWarnings = document.warnings.filter(
+    (warning) => !isObsoleteSelectionSubtotalWarning(warning),
+  );
   const selectedProductCount = new Set(
     selectedLines
       .map((line) => line.description.trim().toLowerCase())
@@ -380,7 +384,7 @@ export function ManagerDocumentReview({
         className="flex min-w-0 flex-col gap-3"
         onChangeCapture={() => setSelectionChanged(true)}
       >
-        {document.warnings.length ? (
+        {actionableWarnings.length ? (
           <section
             className="order-2 border border-amber-200 bg-amber-50 p-4"
             aria-labelledby="document-warnings-heading"
@@ -395,7 +399,7 @@ export function ManagerDocumentReview({
               </h2>
             </div>
             <ul className="mt-3 space-y-2 text-sm leading-5 text-amber-950">
-              {document.warnings.map((warning) => (
+              {actionableWarnings.map((warning) => (
                 <li key={warning}>• {warning}</li>
               ))}
             </ul>
@@ -745,7 +749,7 @@ export function ManagerDocumentReview({
                     !selectedLines.length ||
                     !departmentChosen ||
                     !allSelectedValid ||
-                    (document.warnings.length > 0 && !acknowledgeWarnings)
+                    (actionableWarnings.length > 0 && !acknowledgeWarnings)
                   }
                   className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -986,7 +990,7 @@ export function ManagerDocumentReview({
                 !allSelectedValid ||
                 pending ||
                 (approved && !selectionChanged) ||
-                (document.warnings.length > 0 && !acknowledgeWarnings)
+                (actionableWarnings.length > 0 && !acknowledgeWarnings)
               }
               className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -1008,7 +1012,7 @@ export function ManagerDocumentReview({
                 onClick={save}
                 disabled={
                   pending ||
-                  (document.warnings.length > 0 && !acknowledgeWarnings)
+                  (actionableWarnings.length > 0 && !acknowledgeWarnings)
                 }
                 className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold disabled:opacity-40"
               >

@@ -8,7 +8,7 @@ import {
   reviewedDocumentCatalogDepartment,
   reviewedDocumentPriceRow,
 } from "../lib/manager-document-catalog"
-import { documentArithmeticWarnings, documentLineValidationStatus, isManagerDocumentChargeLine } from "../lib/manager-document-validation"
+import { documentArithmeticWarnings, documentLineValidationStatus, isManagerDocumentChargeLine, isObsoleteSelectionSubtotalWarning } from "../lib/manager-document-validation"
 
 const root = process.cwd()
 
@@ -134,6 +134,11 @@ test("document intelligence keeps charges and tax out of product rows", () => {
     expect(isManagerDocumentChargeLine(charge)).toBeTruthy()
   }
   expect(isManagerDocumentChargeLine("White Oak flooring")).toBeFalsy()
+})
+
+test("choosing one catalog product does not keep the obsolete partial-subtotal warning", () => {
+  expect(isObsoleteSelectionSubtotalWarning("Selected lines add to $235.00, but subtotal is $746.95.")).toBeTruthy()
+  expect(isObsoleteSelectionSubtotalWarning("All line totals add to $235.00, but subtotal is $746.95.")).toBeFalsy()
 })
 
 test("reviewed Firecode drywall line keeps supplier pricing and original PDF evidence", () => {

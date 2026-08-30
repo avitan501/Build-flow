@@ -24,6 +24,7 @@ import {
   normalizeMaterialCatalogDepartment,
   type CatalogSupplier,
 } from "@/lib/material-catalog";
+import { isObsoleteSelectionSubtotalWarning } from "@/lib/manager-document-validation";
 import {
   detectSupplierMatch,
   inferSupplierName,
@@ -736,7 +737,7 @@ export async function saveManagerDocumentReviewAction(input: {
       .maybeSingle<{ warnings: string[] }>();
     warnings.unshift(
       ...(document?.warnings ?? []).filter(
-        (warning) => !warning.startsWith("Selected lines add to $"),
+        (warning) => !isObsoleteSelectionSubtotalWarning(warning),
       ),
     );
   }

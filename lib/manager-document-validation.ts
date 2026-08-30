@@ -10,6 +10,10 @@ export type DocumentValidationItem = {
 
 const NON_ITEM_LINE_PATTERN = /^(?:subtotal|sales tax|tax|delivery(?: fee| charge)?|shipping(?: fee| charge)?|freight(?: fee| charge)?|discount|grand total|total|balance due|payments?\/?credits?)$/i
 
+export function isObsoleteSelectionSubtotalWarning(warning: string) {
+  return warning.trim().startsWith("Selected lines add to $")
+}
+
 export function isManagerDocumentChargeLine(description: string) {
   return NON_ITEM_LINE_PATTERN.test(description.trim())
 }
