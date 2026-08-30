@@ -41,10 +41,14 @@ test("supplier prices remain compact without unreadably small primary text", asy
   const source = await readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8")
 
   expect(source).toContain(".slice(0, 3)")
-  expect(source).toContain("min-h-20 w-full")
+  expect(source).toContain("min-h-24 w-full")
   expect(source).toContain("truncate text-base font-bold")
   expect(source).toContain("manufacturer product photo")
   expect(source).toContain("Pack: {catalogItemPackLabel(item)}")
+  expect(source).toContain("Brand:")
+  expect(source).toContain("Model:")
+  expect(source).toContain("Size:")
+  expect(source).toContain("Add photo")
   expect(source).toContain("h-10 shrink-0 rounded-md")
 })
 
@@ -58,4 +62,16 @@ test("catalog exposes Home Depot and Lowe's without inventing a price", async ()
   expect(priceCheck).toContain("Exact price not shown until verified")
   expect(retailerLinks).toContain('name: "Home Depot"')
   expect(retailerLinks).toContain('name: "Lowe\'s"')
+})
+
+test("catalog groups size variants without losing individual SKU actions", async () => {
+  const source = await readFile(path.join(root, "components/buildflow/material-catalog-workspace.tsx"), "utf8")
+
+  expect(source).toContain("catalogItemFamilyKey")
+  expect(source).toContain("catalogGroups.map")
+  expect(source).toContain("available sizes/types")
+  expect(source).toContain(">Variants</p>")
+  expect(source).toContain("setSelectedItemId(variant.id)")
+  expect(source).toContain("Archive product")
+  expect(source).toContain("deleteItem(selectedItem)")
 })
