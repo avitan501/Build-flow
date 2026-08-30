@@ -52,7 +52,7 @@ export function classifySmsReplyIntent(params: {
   // A status question stays a follow-up even when it mentions a quote, price, order, or delivery.
   if (/\b(?:status|update|following up|follow up|any news|where is|what(?:'s| is) happening)\b|(?:סטטוס|עדכון|מה\s*קורה)|\b(?:estado|actualizaci[oó]n|alguna novedad|qu[eé] pasa)\b/i.test(message)) return "follow_up";
   if (/\b(?:price|pric|pricing|cost|quote|quot|how much)\b|(?:מחיר|הצעת\s*מחיר)|\b(?:precio|cotizaci[oó]n|cu[aá]nto cuesta)\b/i.test(message)) return "pricing";
-  if (/\b(?:in stock|available|availability|inventory)\b|(?:במלאי|זמין|זמינות)|\b(?:en stock|disponible|disponibilidad|inventario)\b/i.test(message)) return "availability";
+  if (/\b(?:in stock|available|availability|inventory|do you (?:sell|carry|have|source)|you guys (?:sell|carry|have|source))\b|(?:במלאי|זמין|זמינות)|\b(?:en stock|disponible|disponibilidad|inventario)\b/i.test(message)) return "availability";
   if (/\b(?:delivery|deliver|jobsite|address)\b|(?:משלוח|אספקה|כתובת)|\b(?:entrega|direcci[oó]n)\b/i.test(message)) return "delivery";
   if (params.isMaterialRequest || looksLikeSmsMaterialRequest(message)) return "material_request";
   if (/^\s*(?:hi|hello|hey|hola|שלום|היי|good (?:morning|afternoon|evening))[!.?\s]*$/i.test(message)) return "greeting";
@@ -192,6 +192,24 @@ export function smsQuantityClarificationReply(message: string) {
   if (/[áéíóúñ¿¡]/i.test(message)) return "Claro—¿qué cantidad necesita?";
   if (/\bthinset\b/i.test(message)) return "Sure — how much thinset do you need?";
   return "Sure — how much do you need?";
+}
+
+export function smsProductInquiryFallbackReply(message: string) {
+  const match = message.trim().match(/^(?:do\s+)?(?:you(?:\s+guys)?|u)\s+(?:sell|carry|have|source)\s+(.+?)[?.!]*$/i);
+  if (!match?.[1]) return null;
+  const rawProduct = match[1].trim().slice(0, 80);
+  const product = /sheet\s*(?:rock|rok|ric[kgj]?|rick|trick)/i.test(rawProduct)
+    ? "Sheetrock"
+    : /thin\s*set/i.test(rawProduct)
+      ? "thinset"
+      : rawProduct;
+  const specification = product === "Sheetrock"
+    ? "What thickness do you need?"
+    : "What type do you need?";
+  const quantity = product === "Sheetrock"
+    ? "How many sheets do you need?"
+    : `How much ${product} do you need?`;
+  return `Yes—we can help with ${product}. ${specification} ${quantity}`;
 }
 
 export function smsDeliveryDetailsQuestionReply(message: string) {

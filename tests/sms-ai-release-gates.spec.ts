@@ -13,6 +13,7 @@ import {
   smsHasExplicitQuantity,
   smsHasNeededByTiming,
   smsOutputSafetySignals,
+  smsProductInquiryFallbackReply,
   smsQuantityClarificationReply,
   smsStartsNewMaterialRequest,
 } from "../supabase/functions/_shared/sms-reply-policy"
@@ -90,6 +91,14 @@ test("material request advances across turns after address until complete", () =
   expect(inspectSmsQuestionStructure("What thickness? What brand?").valid).toBe(true)
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "I have the details. A manager will review." })).toBe("proposed")
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "Would you like to add accessories?" })).toBe("complete")
+})
+
+test("product inquiry fallback answers the product and asks only useful next questions", () => {
+  const sheetrock = smsProductInquiryFallbackReply("Do you sell sheetricj?")
+  expect(sheetrock).toBe("Yes—we can help with Sheetrock. What thickness do you need? How many sheets do you need?")
+  expect(inspectSmsQuestionStructure(sheetrock || "")).toMatchObject({ valid: true, questionMarks: 2, requestedFields: 2 })
+  expect(evaluateSmsReplyGate({ message: "Do you sell sheetricj?", reply: sheetrock || "", intent: "availability", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
+  expect(smsProductInquiryFallbackReply("Need an update on my order")).toBeNull()
 })
 
 test("exact-list preference persists beyond the 24-message context window", () => {

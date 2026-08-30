@@ -16,6 +16,7 @@ import {
   smsReplyLanguage,
   smsHasExplicitQuantity,
   smsHasNeededByTiming,
+  smsProductInquiryFallbackReply,
   smsQuantityClarificationReply,
   smsStartsNewMaterialRequest,
 } from "../_shared/sms-reply-policy.ts";
@@ -1486,11 +1487,16 @@ function customerSmsFallback(
   const shortConfirmation = /^\s*(?:yes|no|ok(?:ay)?|thanks?|thank you|got it)[!.?\s]*$/i.test(latest);
   const saysAsap = /^\s*asap[.!]?\s*$/i.test(latest);
   const hardBlocked = /^\s*(?:stop|unsubscribe|end|quit)\s*[.!]?\s*$/i.test(latest) || hasForbiddenAutoReplyTopic(latest);
+  const productInquiryReply = smsProductInquiryFallbackReply(latest);
 
   let reply = "Thank you. A manager will review your message and reply here.";
   let autoSafe = false;
   let safetyReason = "The AI service was unavailable, so a manager should review this reply.";
-  if (asksAboutList && hasMaterialList) {
+  if (productInquiryReply && !hardBlocked) {
+    reply = productInquiryReply;
+    autoSafe = true;
+    safetyReason = "This answers a product inquiry without claiming live stock and asks only for essential specifications.";
+  } else if (asksAboutList && hasMaterialList) {
     reply = "Yes, I can see your material list. A manager will review the items and reply here.";
     autoSafe = true;
     safetyReason = "The saved conversation contains a clear material list, so this acknowledgement is safe.";
@@ -1534,9 +1540,9 @@ function customerSmsFallback(
     autoSafe = !hardBlocked;
     safetyReason = "This only acknowledges the customer's short reply.";
   } else if (!hardBlocked) {
-    reply = "Thanks for your message. I am checking the conversation, and a manager will reply here if confirmation is needed.";
-    autoSafe = settings.autoAcknowledgeFollowUps;
-    safetyReason = "This is a non-committal acknowledgement and does not invent an answer.";
+    reply = "A manager will review this message before we reply.";
+    autoSafe = false;
+    safetyReason = "The local fallback could not identify a useful next question, so it must not send generic filler.";
   }
 
   return {
