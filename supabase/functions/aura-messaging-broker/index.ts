@@ -1630,6 +1630,24 @@ async function smsConversationContext(phone: string) {
   };
 }
 
+async function activeSmsRequestSourceIds(phone: string, currentCommunicationId: string, existingSourceIds: string[] = []) {
+  const rows = await sql<{ id: string; body: string | null }[]>`
+    select id, body
+    from public.aura_communications
+    where channel = 'sms' and direction = 'incoming' and counterparty_phone = ${phone}
+    order by occurred_at desc, created_at desc
+    limit 30
+  `;
+  const ordered = [...rows].reverse();
+  let boundary = -1;
+  for (let index = 0; index < ordered.length; index += 1) {
+    const message = ordered[index].body?.trim() || "";
+    if (smsStartsNewMaterialRequest(message) || Boolean(smsProductInquiryFallbackReply(message)) || likelyMaterialList(message)) boundary = index;
+  }
+  const active = boundary >= 0 ? ordered.slice(boundary).map((message) => message.id) : [...existingSourceIds, currentCommunicationId];
+  return [...new Set([...active, currentCommunicationId])].slice(-12);
+}
+
 function accurateAttachmentReply(message: string, reply: string) {
   if (/\[Attachment included(?::[^\]]+)?\]/i.test(message)) return reply;
   const asksAboutAttachment = /\b(?:photo|image|attachment|file|picture)\b/i.test(message) &&
@@ -2172,9 +2190,8 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
   const linkedCorrectionRequestId = linkedCorrectionRequests[0]?.id || null;
   let confirmationPrepared = false;
   if (result.isMaterialRequest && result.request && settings.autoCreateRequestDrafts && (contact?.auto_create_request_drafts ?? true)) {
-    let sources = [communicationId];
+    const sources = await activeSmsRequestSourceIds(phone, communicationId, Array.isArray(openDraft?.source_communication_ids) ? openDraft.source_communication_ids : []);
     if (openDraft) {
-      sources = [...new Set([...(Array.isArray(openDraft.source_communication_ids) ? openDraft.source_communication_ids : []), communicationId])];
       await sql`
         update public.aura_sms_request_drafts set
           contact_id = coalesce(${contact?.id || null}, contact_id),

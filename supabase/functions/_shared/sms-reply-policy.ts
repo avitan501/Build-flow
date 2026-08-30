@@ -375,7 +375,13 @@ export function smsUnansweredFollowUpText(params: { originalMessage: string; que
     return "¿Aún necesita ayuda con esto?";
   }
   if (asksAddress && asksTiming) return "Still need help with the delivery details?";
-  if (asksSpecification && asksQuantity) return "Can you confirm 5/8 in. and how many sheets?";
+  if (asksSpecification && asksQuantity) {
+    const productContext = `${params.originalMessage}\n${params.questionReply}`;
+    if (/\b(?:roofing|shingles?)\b/i.test(productContext)) return "Still need help with the shingle type, color, or quantity?";
+    if (/\b(?:metal\s+studs?|studs?)\b/i.test(productContext)) return "Still need help with the stud size, gauge, or quantity?";
+    if (/\b(?:sheetrock|drywall)\b/i.test(productContext)) return "Can you confirm 5/8 in., type, and quantity?";
+    return "Still need help with the product details or quantity?";
+  }
   if (asksQuantity) return "Still need help with the quantity?";
   if (asksAddress) return "Still need help with the delivery address?";
   if (asksTiming) return "Still need help with when you need it?";

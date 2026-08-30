@@ -120,6 +120,8 @@ test("broker-created request progression replies are gated independently from mo
   expect(brokerSource).toContain("if (!input.customerAddress.trim() || !input.customerNeededBy.trim() || !input.request.items.length) return false")
   expect(brokerSource).toContain("if (!smsNeededByTimingValue(pending.summary_text))")
   expect(brokerSource).toContain("`Needed by: ${neededBy}`")
+  expect(brokerSource).toContain("async function activeSmsRequestSourceIds")
+  expect(brokerSource).toContain(".slice(-12)")
   expect(evaluateSmsReplyGate({
     message: "Yes, 5/8 regular, 21 sheets",
     reply: "I have the material list. What is the full delivery address?",
@@ -202,7 +204,10 @@ test("one-shot unanswered follow-up is question-aware and cancels on every later
   }
   expect(smsUnansweredFollowUpEligible(eligible)).toBe(true)
   expect(smsUnansweredFollowUpText(eligible)).toBe("Still need help with the quantity?")
-  expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell Sheetrock?", questionReply: "Regular, Type X/fire-rated, or moisture-resistant? How many sheets do you need?" })).toBe("Can you confirm 5/8 in. and how many sheets?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell Sheetrock?", questionReply: "Regular, Type X/fire-rated, or moisture-resistant? How many sheets do you need?" })).toBe("Can you confirm 5/8 in., type, and quantity?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "I need roofing shingles", questionReply: "What shingle type and color? How many square feet do you need?" })).toBe("Still need help with the shingle type, color, or quantity?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "Do you sell metal studs?", questionReply: "What stud size and gauge? How many do you need?" })).toBe("Still need help with the stud size, gauge, or quantity?")
+  expect(smsUnansweredFollowUpText({ originalMessage: "Need product", questionReply: "What type? How many do you need?" })).toBe("Still need help with the product details or quantity?")
   expect(smsUnansweredFollowUpText({ originalMessage: "Necesito yeso", questionReply: "¿Cuál es la dirección completa de entrega?" })).toBe("¿Aún necesita ayuda con la dirección de entrega?")
   expect(smsUnansweredFollowUpText({ originalMessage: "צריך גבס", questionReply: "מתי החומרים נדרשים, ומה כתובת המשלוח המלאה?" })).toBe("עדיין צריך עזרה עם פרטי המשלוח?")
   expect(smsUnansweredFollowUpEligible({ ...eligible, questionReply: "?" })).toBe(false)
