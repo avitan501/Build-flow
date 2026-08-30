@@ -6,7 +6,7 @@ import Link from "next/link"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
-import { createSmsMaterialRequestAction, generateSmsReplyAction, linkCommunicationContactAction, linkEmailConversationAction, markEmailConversationReadAction, quickTagPhoneContactAction, reviewSmsRequestAction, saveSmsAutomationAction, type SmsRequestProposal } from "@/app/admin/communications/actions"
+import { completeSmsReplyDraftAction, createSmsMaterialRequestAction, generateSmsReplyAction, linkCommunicationContactAction, linkEmailConversationAction, markEmailConversationReadAction, quickTagPhoneContactAction, reviewSmsRequestAction, saveSmsAutomationAction, type SmsReplyDraft, type SmsRequestProposal } from "@/app/admin/communications/actions"
 import { TwoChatSoftphone } from "@/components/buildflow/two-chat-softphone"
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard"
 import { normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identity"
@@ -56,7 +56,7 @@ type Conversation = {
   channels: AuraCommunicationRow["channel"][]
 }
 
-const QUICK_REPLIES = ["Received, thank you.", "I need a few more details.", "I am checking current pricing.", "Everything is ready to proceed."]
+const QUICK_REPLIES = ["Received, thank you.", "I need a few more details.", "I am checking current pricing.", "A manager will confirm the next step."]
 
 function identityKey(phone?: string | null, email?: string | null) {
   return normalizeAuraPhone(phone) || email?.trim().toLowerCase() || ""
@@ -174,19 +174,21 @@ function initialConversationKey(communication: AuraCommunicationRow | undefined,
   return linked ? `${linked[1]}:${linked[2]}` : rawKey || `unknown:${communication.contact_id || communication.id}`
 }
 
-export function UnifiedCommunicationInbox({ communications, contacts, customers, leads = [], suppliers = [], materialRequests = [], connections, initialChannelFilter = "all", initialQuery = "" }: {
+export function UnifiedCommunicationInbox({ communications, contacts, customers, leads = [], suppliers = [], materialRequests = [], smsReplyDrafts = [], connections, initialChannelFilter = "all", initialQuery = "" }: {
   communications: AuraCommunicationRow[]
   contacts: AuraContactRow[]
   customers: AuraCustomerIdentity[]
   leads?: AuraLeadRecipient[]
   suppliers?: SupplierRoutingOption[]
   materialRequests?: MaterialRequestRecipient[]
+  smsReplyDrafts?: SmsReplyDraft[]
   connections: Connections
   initialChannelFilter?: string
   initialQuery?: string
 }) {
   const router = useRouter()
   const initialCommunication = initialCommunicationForQuery(communications, initialQuery, initialChannelFilter)
+  const initialStoredDraft = smsReplyDrafts.find((draft) => draft.communication_id === initialCommunication?.id)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState(initialQuery)
   const [contactFilter, setContactFilter] = useState<ContactFilter>("all")
@@ -194,6 +196,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const [activeKey, setActiveKey] = useState(() => initialConversationKey(initialCommunication, contacts))
   const [mobileThreadOpen, setMobileThreadOpen] = useState(false)
   const [channel, setChannel] = useState<Channel>(() => {
+    if (initialStoredDraft) return "sms"
     const initial = initialCommunication?.channel
     return initial === "email" || initial === "sms" || initial === "whatsapp" ? initial : "whatsapp"
   })
@@ -201,16 +204,18 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const [selectedRecipientId, setSelectedRecipientId] = useState("")
   const [recipient, setRecipient] = useState(() => initialCommunication?.channel === "email" ? initialCommunication.counterparty_email || "" : initialCommunication?.counterparty_phone || "")
   const [subject, setSubject] = useState(() => initialCommunication?.channel === "email" ? replySubject(initialCommunication.subject) : "")
-  const [message, setMessage] = useState("")
+  const [message, setMessage] = useState(initialStoredDraft?.reply_text || "")
   const [attachment, setAttachment] = useState<File | null>(null)
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null)
   const [pending, startTransition] = useTransition()
   const [softphone, setSoftphone] = useState<{ phone: string; name: string } | null>(null)
   const [linkTarget, setLinkTarget] = useState("")
   const [emailLinkTarget, setEmailLinkTarget] = useState("")
-  const [smsAiMode, setSmsAiMode] = useState<"off" | "draft" | "auto_safe">(() => contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(initialCommunication?.counterparty_phone, initialCommunication?.counterparty_email))?.sms_ai_mode || "off")
-  const [smsAiStyle, setSmsAiStyle] = useState<"professional" | "friendly" | "brief">(() => contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(initialCommunication?.counterparty_phone, initialCommunication?.counterparty_email))?.sms_ai_style || "professional")
+  const [smsAiMode, setSmsAiMode] = useState<"off" | "draft" | "auto_safe">(() => contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(initialCommunication?.counterparty_phone, initialCommunication?.counterparty_email))?.sms_ai_mode || "auto_safe")
+  const [smsAiStyle, setSmsAiStyle] = useState<"professional" | "friendly" | "brief">(() => contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(initialCommunication?.counterparty_phone, initialCommunication?.counterparty_email))?.sms_ai_style || "friendly")
   const [requestReview, setRequestReview] = useState<SmsRequestProposal | null>(null)
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(initialStoredDraft?.id || null)
+  const [teachAi, setTeachAi] = useState(false)
 
   useEffect(() => {
     const refresh = () => { if (document.visibilityState === "visible") router.refresh() }
@@ -295,10 +300,14 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     const latestEmail = [...conversation.messages].reverse().find((item) => item.channel === "email")
     setSubject(latestEmail ? replySubject(latestEmail.subject) : "")
     setSelectedRecipientId("")
-    setMessage("")
+    const storedDraft = smsReplyDrafts.find((draft) => conversation.messages.some((item) => item.id === draft.communication_id))
+    setMessage(storedDraft?.reply_text || "")
+    setActiveDraftId(storedDraft?.id || null)
+    setTeachAi(false)
+    if (storedDraft) setChannel("sms")
     setFeedback(null)
     const auraContact = contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(conversation.phone, conversation.email))
-    setSmsAiMode(auraContact?.sms_ai_mode || "off")
+    setSmsAiMode(auraContact?.sms_ai_mode || "auto_safe")
     setSmsAiStyle(auraContact?.sms_ai_style || "professional")
     if (conversation.email && conversation.messages.some((item) => item.channel === "email" && item.direction === "incoming" && !item.read_at)) {
       startTransition(async () => {
@@ -321,7 +330,10 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     setRecipient(nextChannel === "email" ? nextCommunication.counterparty_email || "" : nextCommunication.counterparty_phone || "")
     setSubject(nextChannel === "email" ? replySubject(nextCommunication.subject) : "")
     setSelectedRecipientId("")
-    setMessage("")
+    const nextStoredDraft = smsReplyDrafts.find((draft) => draft.communication_id === nextCommunication.id)
+    setMessage(nextStoredDraft?.reply_text || "")
+    setActiveDraftId(nextStoredDraft?.id || null)
+    setTeachAi(false)
     setFeedback(null)
   }
 
@@ -386,6 +398,8 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     setSelectedRecipientId("")
     setRecipient("")
     setMessage("")
+    setActiveDraftId(null)
+    setTeachAi(false)
     setFeedback(null)
   }
 
@@ -406,6 +420,8 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   function sendMessage() {
     if (channel === "call") return
     const messageChannel = channel
+    const sentDraftId = messageChannel === "sms" ? activeDraftId : null
+    const teachSentReply = Boolean(sentDraftId && teachAi)
     setFeedback(null)
     startTransition(async () => {
       if (messageChannel === "sms" && attachment) {
@@ -428,8 +444,19 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       }
       const result = await sendAuraMessageAction({ channel: messageChannel, recipient, subject, message })
       if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return }
+      if (sentDraftId) {
+        const completed = await completeSmsReplyDraftAction({ draftId: sentDraftId, reply: message, teachAi: teachSentReply })
+        setActiveDraftId(null)
+        setTeachAi(false)
+        if (!completed.ok) {
+          setMessage("")
+          setFeedback({ tone: "error", text: completed.error })
+          router.refresh()
+          return
+        }
+      }
       setMessage("")
-      setFeedback({ tone: "success", text: `${messageChannel === "sms" ? "Text" : messageChannel === "whatsapp" ? "WhatsApp" : "Email"} sent and saved.` })
+      setFeedback({ tone: "success", text: `${messageChannel === "sms" ? "Text" : messageChannel === "whatsapp" ? "WhatsApp" : "Email"} sent and saved.${teachSentReply ? " This manager-approved correction was added to AI training examples." : ""}` })
       router.refresh()
     })
   }
@@ -475,6 +502,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const activeEmailLinks = activeConversation ? [...new Map(activeConversation.messages.flatMap((item) => item.links ?? []).map((link) => [`${link.entity_type}:${link.entity_id}`, link])).values()] : []
   const activeHasEmail = activeConversation?.messages.some((item) => item.channel === "email") ?? false
   const requestCandidateId = activeConversation ? [...activeConversation.messages].reverse().find((item) => messageCanStartMaterialRequest(item) && !(item.links ?? []).some((link) => link.entity_type === "material_request"))?.id ?? null : null
+  const activeSmsDraft = activeDraftId ? smsReplyDrafts.find((draft) => draft.id === activeDraftId) || null : null
 
   const threadVisible = mobileThreadOpen || activeKey === "__new__"
 
@@ -505,6 +533,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
 
         <footer className="shrink-0 border-t border-slate-200 bg-white p-2.5 sm:p-3">
           <div className="mx-auto max-w-3xl">
+            {activeSmsDraft ? <section className="mb-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2" aria-label="AI reply draft"><div className="flex items-start gap-2"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-sky-700" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-[11px] font-bold text-sky-950">AI draft ready · edit before sending</p><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${activeSmsDraft.decision === "blocked" || activeSmsDraft.decision === "send_failed" ? "bg-amber-100 text-amber-800" : "bg-white text-sky-700"}`}>{activeSmsDraft.decision.replaceAll("_", " ")}</span></div><p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-sky-800">{activeSmsDraft.safety_reason || "Manager review is required before sending."}</p><label className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 text-[10px] font-bold text-sky-950"><input type="checkbox" checked={teachAi} onChange={(event) => setTeachAi(event.target.checked)} className="h-3.5 w-3.5 rounded border-sky-300 accent-sky-700" />Teach AI from my approved reply</label><p className="mt-0.5 text-[9px] text-sky-700">Nothing is learned unless you check this box and send. Internal AI model: {activeSmsDraft.ai_model || "recorded by broker"}.</p></div></div></section> : null}
             <div className="flex gap-1.5 overflow-x-auto pb-2">{activeConversation?.phone ? <button type="button" onClick={prepareAiReply} disabled={pending} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-bold text-sky-800 disabled:opacity-40"><Sparkles className="h-3 w-3" />AI answer</button> : null}{QUICK_REPLIES.map((reply) => <button key={reply} type="button" onClick={() => setMessage(reply)} className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600">{reply}</button>)}</div>
             <div className="flex items-end gap-2 rounded-lg border border-slate-300 bg-white p-1.5 focus-within:border-[#0071e3]">
               <select value={channel} onChange={(event) => changeChannel(event.target.value as Channel)} className="h-9 w-[5.25rem] shrink-0 rounded-md border-0 bg-slate-100 px-1.5 text-[10px] font-bold sm:w-[6.6rem] sm:px-2"><option value="whatsapp">WhatsApp</option><option value="sms">Text</option><option value="email">Email</option></select>

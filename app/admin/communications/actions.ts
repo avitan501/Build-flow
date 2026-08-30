@@ -31,6 +31,71 @@ export type SmsRequestProposal = {
   aiModel: string
 }
 
+export type SmsReplyDraft = {
+  id: string
+  communication_id: string
+  counterparty_phone: string
+  reply_text: string
+  decision: "draft" | "blocked" | "auto_sent" | "sent_manually" | "send_failed"
+  safety_reason: string | null
+  ai_model: string | null
+  updated_at: string
+}
+
+export async function completeSmsReplyDraftAction(input: { draftId: string; reply: string; teachAi: boolean }) {
+  const { supabase, user, access } = await requireManagerPortalProfile()
+  if (!access.customers || !/^[0-9a-f-]{36}$/i.test(input.draftId)) return { ok: false as const, error: "Choose a valid AI draft." }
+  const reply = String(input.reply || "").trim().slice(0, 1600)
+  if (!reply) return { ok: false as const, error: "The sent reply cannot be empty." }
+
+  const { data: draft, error: draftError } = await supabase.from("aura_sms_reply_drafts")
+    .select("id,communication_id,reply_text")
+    .eq("id", input.draftId)
+    .maybeSingle<{ id: string; communication_id: string; reply_text: string }>()
+  if (draftError || !draft) return { ok: false as const, error: "The AI draft could not be found." }
+
+  const { data: communication, error: communicationError } = await supabase.from("aura_communications")
+    .select("id,body")
+    .eq("id", draft.communication_id)
+    .eq("channel", "sms")
+    .eq("direction", "incoming")
+    .maybeSingle<{ id: string; body: string | null }>()
+  if (communicationError || !communication?.body?.trim()) return { ok: false as const, error: "The customer message for this draft could not be found." }
+
+  const { error: updateError } = await supabase.from("aura_sms_reply_drafts")
+    .update({ reply_text: reply, decision: "sent_manually" })
+    .eq("id", draft.id)
+  if (updateError) return { ok: false as const, error: "The AI draft status could not be updated." }
+
+  const corrected = reply !== draft.reply_text.trim()
+  const { error: feedbackError } = await supabase.from("aura_ai_reply_feedback").insert({
+    communication_id: communication.id,
+    draft_id: draft.id,
+    original_reply: draft.reply_text.trim(),
+    corrected_reply: reply,
+    promoted_to_example: Boolean(input.teachAi),
+    created_by: user.id,
+  })
+  if (feedbackError) return { ok: false as const, error: "The reply was sent, but its AI feedback could not be saved." }
+
+  if (input.teachAi) {
+    const { error: exampleError } = await supabase.from("aura_ai_reply_examples").upsert({
+      customer_message: communication.body.trim().slice(0, 1600),
+      approved_reply: reply,
+      language: /[\u0590-\u05ff]/.test(communication.body) ? "he" : /[áéíóúñ¿¡]/i.test(communication.body) ? "es" : "en",
+      tags: corrected ? ["manager-corrected"] : ["manager-approved"],
+      enabled: true,
+      source_draft_id: draft.id,
+      approved_by: user.id,
+    }, { onConflict: "source_draft_id" })
+    if (exampleError) return { ok: false as const, error: "The reply was sent, but the approved AI example could not be saved." }
+  }
+
+  revalidatePath("/admin/communications")
+  revalidatePath("/admin/ai-tools/sms-replies")
+  return { ok: true as const, taught: Boolean(input.teachAi) }
+}
+
 export async function saveSmsAutomationAction(input: { phone: string; mode: SmsAiMode; style: SmsAiStyle; autoCreateRequestDrafts: boolean }) {
   const { supabase, access } = await requireManagerPortalProfile()
   if (!access.customers) return { ok: false as const, error: "Customer communication access is required." }
