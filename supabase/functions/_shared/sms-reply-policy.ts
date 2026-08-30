@@ -235,10 +235,21 @@ export function smsHasNeededByTiming(value: string) {
 }
 
 export function smsHasExplicitQuantity(value: string) {
-  return /\b(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:[a-z][a-z/-]*\s+)?(?:ea|each|pcs?|pieces?|boxes?|sheets?|ft|feet|rolls?|bags?|buckets?|bundles?|cartons?|gallons?|packs?|pallets?|squares?|yards?|units?|appliances?|batts?|beams?|blocks?|cabinets?|containers?|doors?|drywall|dumpsters?|fixtures?|hvac|insulation|lumber|lvl|panels?|shingles?|studs?|thinset|tiles?|windows?)\b/i.test(value) ||
+  return /\b(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:[a-z][a-z/-]*\s+)?(?:ea|each|pcs?|pieces?|boxes?|sheets?|sheetrocks?|bricks?|ft|feet|rolls?|bags?|buckets?|bundles?|cartons?|gallons?|packs?|pallets?|squares?|yards?|units?|appliances?|batts?|beams?|blocks?|cabinets?|containers?|doors?|drywall|dumpsters?|fixtures?|hvac|insulation|lumber|lvl|panels?|shingles?|studs?|thinset|tiles?|windows?)\b/i.test(value) ||
     /\b\d+(?:\.\d+)?\s+\d+(?:\s*[-x×/]\s*\d+){1,2}\s*(?:wood|metal)?\s*(?:studs?|lumber|boards?)\b/i.test(value) ||
     /(?:^|\s)(?:אחד|אחת|שניים|שתיים|שלושה|שלוש|\d+(?:\.\d+)?)\s*(?:יחידות?|ארגזים?|לוחות?|שקים?|דלתות?|גבס)/i.test(value) ||
     /\b(?:uno|una|dos|tres|cuatro|cinco|\d+(?:\.\d+)?)\s*(?:unidades?|cajas?|paneles?|placas?|bolsas?|puertas?|yeso)\b/i.test(value);
+}
+
+export function smsAnsweredQuantityGuardReply(latestMessage: string, proposedReply: string) {
+  if (!inspectSmsQuestionStructure(proposedReply).fields.includes("quantity")) return null;
+  const sheetrock = latestMessage.match(/\b(\d{1,6})\s*(?:sheets?\s+(?:of\s+)?)?(?:sheetrocks?|drywall)\b/i)?.[1];
+  const bricks = latestMessage.match(/\b(\d{1,6})\s*bricks?\b/i)?.[1];
+  if (sheetrock && bricks) return `Got it—${sheetrock} Sheetrock sheets and ${bricks} bricks. Can you confirm 5/8 in. Sheetrock? What brick type and size?`;
+  if (smsHasExplicitQuantity(latestMessage)) return "Got it—I have the quantities. What product specifications still need to be confirmed?";
+  const standalone = latestMessage.match(/^(?:i\s+(?:need|want)\s+)?(?:about|around|like|approximately)?\s*(\d{1,6})(?:\s*(?:pcs?|pieces?|each|ea))?[.!]?$/i)?.[1];
+  if (standalone) return `Got it—${standalone}. Which item is that quantity for?`;
+  return null;
 }
 
 export function smsMaterialClarificationQuestions(value: string, options: { exactListOnly?: boolean } = {}) {
@@ -468,7 +479,7 @@ export function smsContextualQuantityAnswerReply(latestMessage: string, conversa
       ? contextFamilies[0]
       : null;
   if (!family) return null;
-  const value = latestMessage.trim().replace(/[.!]+$/, "");
+  const value = latestMessage.trim().replace(/[.!]+$/, "").replace(/^(?:i\s+(?:need|want)\s+)?(?:about|around|like|approximately)\s+/i, "");
   const measured = value.match(/^(\d{1,3}(?:,\d{3})+|\d{1,6}(?:\.\d+)?)\s*(sq\.?\s*ft|sf|square\s+feet|sheets?|bags?|boxes?|buckets?|gallons?|pcs?|pieces?|peices?|each|ea)?$/i);
   if (!measured) return null;
   const amount = Number(measured[1].replaceAll(",", ""));

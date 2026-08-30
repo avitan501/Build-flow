@@ -4,6 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
 import {
   applyAvantiaMaterialDefaults,
+  smsAnsweredQuantityGuardReply,
   classifySmsReplyIntent,
   enforceSmsQuestionLimit,
   evaluateSmsReplyGate,
@@ -1207,20 +1208,21 @@ function finalizeCustomerSmsAnalysis(params: { result: CustomerSmsAutomation; mo
     ? filterSmsExactListItems(params.result.request.items, customerTranscript)
     : params.result.request?.items;
   const quantityKnown = smsHasExplicitQuantity(customerTranscript) || (exactListOnly && Boolean(groundedExactItems?.some((item) => item.quantity === 1)));
+  const answeredQuantityGuardReply = smsAnsweredQuantityGuardReply(params.message, params.result.reply);
   const replyStep = resolveSmsMaterialReplyStep({
     isMaterialRequest: params.result.isMaterialRequest,
     hasGroundedItems: Boolean(groundedExactItems?.length),
     quantityKnown,
     addressKnown,
     neededByKnown,
-    proposedReply: params.result.reply,
+    proposedReply: answeredQuantityGuardReply || params.result.reply,
   });
   const candidateReply = replyStep === "quantity" ? smsQuantityClarificationReply(params.message)
     : replyStep === "address_and_needed_by" ? smsDeliveryDetailsQuestionReply(params.message)
     : replyStep === "address"
     ? exactListOnly ? exactListAcknowledgement(params.message, false) : addressFirstReply(params.message)
     : replyStep === "needed_by" ? neededByReply(params.message)
-      : replyStep === "complete" ? requestReadyForManagerReply(params.message) : params.result.reply;
+      : replyStep === "complete" ? requestReadyForManagerReply(params.message) : answeredQuantityGuardReply || params.result.reply;
   const reply = enforceQuestionLimit(candidateReply);
   const result = { ...params.result, reply, request: params.result.request ? { ...params.result.request, items: groundedExactItems || [] } : null };
   const intent = classifyCustomerSmsIntent(params.message, params.media, params.event, result);
@@ -4317,8 +4319,9 @@ async function handleQuoFastPollDispatch(req: Request) {
   return json({ ok: true, started: true }, 202);
 }
 
-const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v1";
-const PUBLIC_START_TEXT_MESSAGE = "Avantia Build: Reply with what you need. Example: Send me 50 sheets of Sheetrock and 45 2x4x8s. You can also send a photo, plan, product link, or quote. Reply STOP to opt out.";
+const PUBLIC_START_TEXT_TEMPLATE_VERSION = "start-material-request-v2";
+const PUBLIC_START_TEXT_WELCOME = "Welcome to Avantia Build. Reply with what you need to start your material request.";
+const PUBLIC_START_TEXT_EXAMPLE = "Example: Send me 50 sheets of Sheetrock and 45 2x4x8s. You can also send a photo, plan, product link, or quote. Reply STOP to opt out.";
 
 async function handlePublicStartByText(req: Request) {
   const payload = await req.text();
@@ -4392,13 +4395,18 @@ async function handlePublicStartByText(req: Request) {
   });
   if (!claim) return json({ error: "Please wait before requesting another text." }, 429);
   if (!claim.send) return json({ ok: true });
-  try {
-    const providerId = await sendQuoSms(phone, PUBLIC_START_TEXT_MESSAGE);
-    await sql`update public.public_start_text_requests set status = 'sent', provider_message_id = ${providerId}, updated_at = now() where id = ${claim.id}::uuid`;
-  } catch (error) {
-    await sql`update public.public_start_text_requests set status = 'failed', last_error = ${String(error instanceof Error ? error.message : "send_failed").slice(0, 500)}, updated_at = now() where id = ${claim.id}::uuid`;
-    return json({ error: "Text start is temporarily unavailable." }, 503);
-  }
+  // Start provider delivery immediately and return without making the visitor
+  // wait for two provider calls plus communication persistence. waitUntil keeps
+  // the audited delivery alive after the fast HTTP acknowledgement.
+  EdgeRuntime.waitUntil((async () => {
+    try {
+      const providerId = await sendQuoSms(phone, PUBLIC_START_TEXT_WELCOME);
+      await sendQuoSms(phone, PUBLIC_START_TEXT_EXAMPLE);
+      await sql`update public.public_start_text_requests set status = 'sent', provider_message_id = ${providerId}, updated_at = now() where id = ${claim.id}::uuid`;
+    } catch (error) {
+      await sql`update public.public_start_text_requests set status = 'failed', last_error = ${String(error instanceof Error ? error.message : "send_failed").slice(0, 500)}, updated_at = now() where id = ${claim.id}::uuid`;
+    }
+  })());
   return json({ ok: true });
 }
 

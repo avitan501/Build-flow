@@ -16,6 +16,7 @@ import {
   resolveSmsExactListPreference,
   resolveSmsMaterialReplyStep,
   smsDeliveryDetailsQuestionReply,
+  smsAnsweredQuantityGuardReply,
   smsContextualQuantityAnswerReply,
   smsCorrectionPendingQuestionReply,
   smsHasExplicitQuantity,
@@ -462,6 +463,15 @@ test("short quantities fill the field just asked instead of repeating the same q
   expect(evaluateSmsReplyGate({ message: "40", reply: metalStudReply, intent: "material_request", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
   expect(smsContextualQuantityAnswerReply("40 peices", metalStuds)).toBe("Got it—40 metal studs. What size and length? What gauge?")
   expect(smsContextualQuantityAnswerReply("500 sq ft", "Customer: I need roofing shingles\nAvantia: What color?\nCustomer: 500 sq ft")).toBeNull()
+})
+
+test("a supplied quantity can never trigger the same generic quantity question again", () => {
+  expect(smsHasExplicitQuantity("I need 45 sheetrocks and 20 bricks")).toBe(true)
+  expect(smsAnsweredQuantityGuardReply("I need 45 sheetrocks and 20 bricks", "Sure — how much do you need?")).toBe(
+    "Got it—45 Sheetrock sheets and 20 bricks. Can you confirm 5/8 in. Sheetrock? What brick type and size?",
+  )
+  expect(smsAnsweredQuantityGuardReply("I need like 40", "Sure — how much do you need?")).toBe("Got it—40. Which item is that quantity for?")
+  expect(smsAnsweredQuantityGuardReply("I need like 40", "What gauge do you need?")).toBeNull()
 })
 
 test("bare quantities keep the requested product in wood, finishing, and mixed-list continuations", () => {
