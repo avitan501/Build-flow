@@ -1,10 +1,11 @@
 import { requireManagerPortalProfile } from "@/lib/auth"
+import { canRunSmsReplyLab } from "@/lib/ai/sms-reply-lab-access"
 
 export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
   const { supabase, access } = await requireManagerPortalProfile()
-  if (!access.owner) return Response.json({ error: "Owner access is required." }, { status: 403 })
+  if (!canRunSmsReplyLab(access)) return Response.json({ error: "AI tools and customer access are required." }, { status: 403 })
   let body: { cases?: Array<{ id?: string; message?: string }> }
   try {
     body = await request.json() as { cases?: Array<{ id?: string; message?: string }> }

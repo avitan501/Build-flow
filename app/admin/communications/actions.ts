@@ -80,20 +80,23 @@ export async function completeSmsReplyDraftAction(input: { draftId: string; repl
   const correctionReasons = [...new Set((input.correctionReasons || []).filter(isSmsCorrectionReason))].slice(0, 6)
   const language = smsTrainingLanguage(communication.body)
   const intent = smsTrainingIntent(communication.body)
+  const privateSafeOriginalReply = redactSmsTrainingText(draft.reply_text.trim())
+  const privateSafeCorrectedReply = redactSmsTrainingText(reply)
   const { error: feedbackError } = await supabase.from("aura_ai_reply_feedback").insert({
     communication_id: communication.id,
     draft_id: draft.id,
-    original_reply: draft.reply_text.trim(),
-    corrected_reply: reply,
+    original_reply: privateSafeOriginalReply,
+    corrected_reply: privateSafeCorrectedReply,
     promoted_to_example: Boolean(input.teachAi),
     correction_reasons: correctionReasons,
     intent,
     language,
-    privacy_redacted: Boolean(input.teachAi),
+    privacy_redacted: true,
     learning_metadata: {
       corrected,
       reason_count: correctionReasons.length,
-      redaction_version: input.teachAi ? "sms-training-v1" : null,
+      redaction_version: "sms-training-v2",
+      source_contains_raw_customer_text: false,
     },
     created_by: user.id,
   })
@@ -101,7 +104,7 @@ export async function completeSmsReplyDraftAction(input: { draftId: string; repl
 
   if (input.teachAi) {
     const privateSafeCustomerMessage = redactSmsTrainingText(communication.body)
-    const privateSafeApprovedReply = redactSmsTrainingText(reply)
+    const privateSafeApprovedReply = privateSafeCorrectedReply
     const { error: exampleError } = await supabase.from("aura_ai_reply_examples").upsert({
       customer_message: privateSafeCustomerMessage,
       approved_reply: privateSafeApprovedReply,

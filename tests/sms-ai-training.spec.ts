@@ -39,7 +39,8 @@ test("manager-approved examples are staff-only and never learned automatically",
   expect(settingsPage).toContain("Pause")
   expect(settingsPage).toContain("Remove")
   expect(broker).toContain("loadApprovedReplyExamples")
-  expect(broker).toContain("limit 3")
+  expect(broker).toContain("limit 12")
+  expect(broker).toContain("rankSmsReplyExamples")
   expect(broker).toContain("intent in (${intent}, 'general')")
   expect(broker).toContain("Manager-approved examples are style patterns only")
   expect(broker).toContain("never override these safety rules")
@@ -193,7 +194,7 @@ test("Manager Reply Lab exercises the real reply path without sending or saving 
   expect(lab).toContain("This sandbox never sends an SMS")
   expect(lab).toContain("NO SEND")
   expect(lab).toContain("/api/admin/communications/ai-quality")
-  expect(route).toContain("if (!access.owner)")
+  expect(route).toContain("canRunSmsReplyLab(access)")
   expect(broker).toContain("noSend: true")
   expect(broker).toContain("await analyzeCustomerSms")
   const qualityFunction = broker.slice(broker.indexOf("async function evaluateCustomerSmsCases"), broker.indexOf("async function processCustomerSmsAutomation"))
@@ -202,7 +203,10 @@ test("Manager Reply Lab exercises the real reply path without sending or saving 
 })
 
 test("exact-list preference suppresses accessories and address comes before optional suggestions", async () => {
-  const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  const [broker, policy] = await Promise.all([
+    readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/_shared/sms-reply-policy.ts"), "utf8"),
+  ])
 
   expect(broker).toContain("customerRequiresExactList")
   expect(broker).toContain("exact-list-only preference enforced")
@@ -210,6 +214,6 @@ test("exact-list preference suppresses accessories and address comes before opti
   expect(broker).toContain("never suggest accessories, related items, upgrades, or additions")
   expect(broker).toContain("address requested before optional-item suggestions")
   expect(broker).toContain("What is the full delivery address?")
-  expect(broker).toContain("בלי\\s*(?:תוספות|אביזרים|הצעות)")
-  expect(broker).toContain("sin (?:extras|accesorios|sugerencias)")
+  expect(policy).toContain("בלי\\s*(?:תוספות|אביזרים|הצעות)")
+  expect(policy).toContain("sin (?:extras|accesorios|sugerencias)")
 })
