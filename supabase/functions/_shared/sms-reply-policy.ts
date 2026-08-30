@@ -244,7 +244,9 @@ export function smsProductInquiryFallbackReply(message: string, _options: { allo
   const value = message.trim();
   const standardMatch = value.match(/^(?:do\s+)?(?:you(?:\s+guys)?|u)\s+(?:sell|carry|have|source)\s+(.+?)[?.!]*$/i);
   const sheetrockGetMatch = value.match(/^(?:can|could)\s+(?:i|we)\s+(?:get|buy|order|source)\s+(.+?)[?.!]*$/i);
-  const rawProduct = (standardMatch?.[1] || (sheetrockGetMatch?.[1] && looksLikeSheetrock(sheetrockGetMatch[1]) ? sheetrockGetMatch[1] : ""))
+  const needMatch = value.match(/^(?:i|we)\s+(?:need|want|am\s+looking\s+for|are\s+looking\s+for)\s+(.+?)[?.!]*$/i);
+  const neededMaterial = needMatch?.[1] && /\b(?:sheetrock|drywall|thin\s*set|roof(?:ing)?\s+shingles?|shingles?|metal\s+studs?)\b/i.test(needMatch[1]) ? needMatch[1] : "";
+  const rawProduct = (standardMatch?.[1] || (sheetrockGetMatch?.[1] && looksLikeSheetrock(sheetrockGetMatch[1]) ? sheetrockGetMatch[1] : "") || neededMaterial)
     .trim()
     .slice(0, 80);
   if (!rawProduct) return null;
@@ -252,7 +254,14 @@ export function smsProductInquiryFallbackReply(message: string, _options: { allo
     ? "Sheetrock"
     : /thin\s*set/i.test(rawProduct)
       ? "thinset"
+      : /\b(?:roof(?:ing)?\s+shingles?|shingles?)\b/i.test(rawProduct)
+        ? "roofing shingles"
+        : /\bmetal\s+studs?\b/i.test(rawProduct)
+          ? "metal studs"
       : rawProduct;
+  if (product === "roofing shingles") return "Sure—we can help source roofing shingles.\n\nWhat shingle type and color? How many square feet do you need?";
+  if (product === "thinset") return "Sure—we can help source thinset.\n\nWhat type do you need? How many bags do you need?";
+  if (product === "metal studs") return "Sure—we can help source metal studs.\n\nWhat stud size? What gauge? How many do you need?";
   const specification = product === "Sheetrock"
     ? "Can you confirm 5/8 in.?\n\nRegular, Type X/fire-rated, or moisture-resistant?"
     : "What type do you need?";

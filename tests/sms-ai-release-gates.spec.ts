@@ -132,6 +132,14 @@ test("product inquiry fallback answers the product and asks only useful next que
   expect(unrelated).not.toContain("Sheetrock")
   expect(smsProductInquiryFallbackReply("Can I get Sherlock?")).toBeNull()
   expect(smsProductInquiryFallbackReply("Need an update on my order")).toBeNull()
+  const roofing = smsProductInquiryFallbackReply("I need roofing shingles") || ""
+  expect(smsReplyParts({ reply: roofing, deterministicProductInquiry: true })).toEqual([
+    "Sure—we can help source roofing shingles.",
+    "What shingle type and color? How many square feet do you need?",
+  ])
+  expect(inspectSmsQuestionStructure(roofing)).toMatchObject({ valid: true, questionMarks: 2 })
+  expect(smsProductInquiryFallbackReply("I need thinset")).toContain("How many bags do you need?")
+  expect(smsProductInquiryFallbackReply("I need metal studs")).toContain("What stud size? What gauge? How many do you need?")
 })
 
 test("Sheetrock follow-ups answer thickness corrections instead of repeating quantity", () => {
