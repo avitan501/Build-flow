@@ -19,7 +19,7 @@ export function showsPublicContactBar(pathname: string) {
   return PUBLIC_CONTACT_BAR_PATHS.has(pathname);
 }
 
-type SubmitState = "idle" | "submitting" | "success" | "error";
+type SubmitState = "idle" | "submitting" | "success" | "recent" | "error";
 type OpenPanel = "contact" | "demo" | null;
 
 function normalizePhoneInput(value: string) {
@@ -107,9 +107,9 @@ export function PublicContactBar() {
           idempotencyKey: crypto.randomUUID(),
         }),
       });
-      const result = (await response.json().catch(() => null)) as { error?: string } | null;
+      const result = (await response.json().catch(() => null)) as { error?: string; delivery?: "sent" | "already_sent" | "processing" } | null;
       if (!response.ok) throw new Error(result?.error || "We couldn’t start the text. Please try again.");
-      setSubmitState("success");
+      setSubmitState(result?.delivery === "already_sent" ? "recent" : "success");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "We couldn’t start the text. Please try again.");
       setSubmitState("error");
@@ -155,7 +155,7 @@ export function PublicContactBar() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className="relative z-10 flex max-h-[94svh] w-full flex-col overflow-hidden rounded-t-[1.6rem] border border-white/80 bg-[#f5f7fa] text-[#071126] shadow-[0_-22px_64px_rgba(7,17,38,0.3)] sm:max-w-[32rem] sm:rounded-[1.6rem]"
+            className="relative z-10 flex max-h-[94svh] w-full flex-col overflow-hidden rounded-t-[1.6rem] border border-white/80 bg-[#f5f7fa] text-[#071126] shadow-[0_-22px_64px_rgba(7,17,38,0.3)] sm:max-w-[38rem] sm:rounded-[1.6rem]"
           >
             <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-slate-300 sm:hidden" aria-hidden="true" />
             <header className="flex items-start justify-between gap-3 px-4 pb-2 pt-3 sm:px-5 sm:pt-4">
@@ -197,11 +197,11 @@ export function PublicContactBar() {
                   <h3 className="mt-3 text-base font-bold">Sending your text now…</h3>
                   <p className="mt-1 text-xs leading-5 text-slate-700">You can reply as soon as it arrives.</p>
                 </div>
-              ) : submitState === "success" ? (
+              ) : submitState === "success" || submitState === "recent" ? (
                 <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm" role="status">
                   <div className="flex items-center gap-3 bg-[#e9fbf5] p-4">
                     <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0d9488] text-white"><Check className="h-5 w-5" aria-hidden="true" /></span>
-                    <div><h3 className="text-base font-bold">Text sent.</h3><p className="mt-0.5 text-xs text-emerald-900">Open Messages and reply with your material list.</p></div>
+                    <div><h3 className="text-base font-bold">{submitState === "recent" ? "Text already sent." : "Text sent."}</h3><p className="mt-0.5 text-xs text-emerald-900">{submitState === "recent" ? "Check your existing Avantia conversation." : "Open Messages and reply with your material list."}</p></div>
                   </div>
                   <div className="p-4">
                     <p className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-slate-500">Example reply</p>
@@ -251,8 +251,8 @@ export function PublicContactBar() {
                   {submitState === "error" ? <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700" role="alert">{errorMessage}</p> : null}
                 </form>
               )}
-              <div className="relative mt-2 h-[46svh] min-h-72 max-h-[27rem] overflow-hidden rounded-2xl border border-white/10 bg-[#071126] shadow-[0_14px_32px_rgba(7,17,38,0.2)]">
-                <video ref={videoRef} data-testid="contact-sheet-video" className="h-full w-full object-contain" autoPlay muted loop playsInline preload="auto" poster="/videos/avantia-request-material-whatsapp-en-clear-20s-poster.jpg" aria-label="How to start an Avantia material request by text">
+              <div data-testid="contact-sheet-video-stage" className="relative mt-2 aspect-[4/5] w-full shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-[#071126] shadow-[0_14px_32px_rgba(7,17,38,0.2)] sm:aspect-[5/4]">
+                <video ref={videoRef} data-testid="contact-sheet-video" className="h-full w-full object-cover object-top" autoPlay muted loop playsInline preload="auto" poster="/videos/avantia-request-material-whatsapp-en-clear-20s-poster.jpg" aria-label="How to start an Avantia material request by text">
                   <source src="/videos/avantia-request-material-whatsapp-en-clear-20s.mp4" type="video/mp4" />
                 </video>
                 <span className="pointer-events-none absolute left-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-full bg-[#071126]/80 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-[0.12em] text-white backdrop-blur"><ClipboardList className="h-3 w-3 text-[#5eead4]" />20-sec walkthrough</span>

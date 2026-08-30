@@ -15,6 +15,8 @@ test("public contact bar opens a compact WhatsApp and text sheet", async ({ page
   await expect(dialog).toBeVisible();
   await expect(dialog.getByTestId("contact-sheet-video")).toBeVisible();
   await expect(dialog.getByTestId("contact-sheet-video")).toHaveAttribute("autoplay", "");
+  await expect(dialog.getByTestId("contact-sheet-video-stage")).toHaveClass(/aspect-\[4\/5\]/);
+  await expect(dialog.getByTestId("contact-sheet-video")).toHaveClass(/object-cover/);
   await expect(dialog.getByRole("link", { name: /Open chat/ })).toHaveAttribute(
     "href",
     /https:\/\/wa\.me\/15169088319/,
@@ -73,6 +75,23 @@ test("start-by-text shows a safe server error and remains usable", async ({ page
 
   await expect(dialog.getByRole("alert")).toHaveText("Please wait before requesting another text.");
   await expect(dialog.getByRole("button", { name: "Send text" })).toBeEnabled();
+});
+
+test("a recent starter request never pretends a second SMS was sent", async ({ page }) => {
+  await page.route("**/api/public/start-by-text", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: true, delivery: "already_sent" }),
+  }));
+  await page.goto("/");
+
+  await page.getByTestId("public-contact-bar").getByRole("button", { name: "Text me to start" }).click();
+  const dialog = page.getByRole("dialog", { name: "Start with one text." });
+  await dialog.getByLabel("Where should we text you?").fill("5165550100");
+  await dialog.getByRole("button", { name: "Send text" }).click();
+
+  await expect(dialog.getByRole("heading", { name: "Text already sent." })).toBeVisible();
+  await expect(dialog.getByText("Check your existing Avantia conversation.")).toBeVisible();
 });
 
 test("contact bar uses a strict marketing allowlist and never overlaps the mobile dock", async ({ page }) => {
