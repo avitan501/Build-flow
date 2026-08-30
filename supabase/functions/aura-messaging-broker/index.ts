@@ -8,6 +8,7 @@ import {
   enforceSmsQuestionLimit,
   evaluateSmsReplyGate,
   filterSmsExactListItems,
+  formatSmsRequestSummaryItem,
   isSmsOptOutMessage,
   looksLikeSmsMaterialRequest,
   rankSmsReplyExamples,
@@ -1983,7 +1984,7 @@ async function sha256Hex(value: string) {
 }
 
 function requestConfirmationSummary(request: NonNullable<CustomerSmsAutomation["request"]>, address: string, neededBy: string, latest: string) {
-  const items = request.items.map((item) => `• ${item.quantity || 1} ${item.unit || "each"} — ${item.name}`);
+  const items = request.items.map(formatSmsRequestSummaryItem);
   if (/\p{Script=Hebrew}/u.test(latest)) return ["סיכום הבקשה שלך:", ...items, `כתובת משלוח: ${address}`, `נדרש עד: ${neededBy}`, "נא להשיב כן כדי לאשר את הבקשה המדויקת הזאת."].join("\n").slice(0, 1600);
   if (/\b(?:hola|gracias|necesito|precio|entrega|direcci[oó]n)\b/i.test(latest)) return ["Resumen de su solicitud:", ...items, `Dirección de entrega: ${address}`, `Necesario para: ${neededBy}`, "Responda SÍ para confirmar esta solicitud exacta."].join("\n").slice(0, 1600);
   return ["Your request summary:", ...items, `Delivery address: ${address}`, `Needed by: ${neededBy}`, "Reply YES to confirm this exact request."].join("\n").slice(0, 1600);

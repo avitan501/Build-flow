@@ -8,6 +8,7 @@ import {
   classifySmsReplyIntent,
   evaluateSmsReplyGate,
   filterSmsExactListItems,
+  formatSmsRequestSummaryItem,
   inspectSmsQuestionStructure,
   isSmsOptOutMessage,
   looksLikeSmsMaterialRequest,
@@ -34,6 +35,17 @@ import {
 } from "../supabase/functions/_shared/sms-reply-policy"
 
 const root = process.cwd()
+
+test("request summaries pluralize packages and avoid repeated package wording", () => {
+  expect(formatSmsRequestSummaryItem({ name: "Benjamin Moore OC-13, eggshell, one-gallon can", quantity: 3, unit: "can" }))
+    .toBe("• 3 one-gallon cans — Benjamin Moore OC-13, eggshell")
+  expect(formatSmsRequestSummaryItem({ name: "5/8 regular Sheetrock", quantity: 25, unit: "sheet" }))
+    .toBe("• 25 sheets — 5/8 regular Sheetrock")
+  expect(formatSmsRequestSummaryItem({ name: "all-purpose joint compound", quantity: 1, unit: "bucket" }))
+    .toBe("• 1 bucket — all-purpose joint compound")
+  expect(formatSmsRequestSummaryItem({ name: "LUS28Z", quantity: 6, unit: "each" }))
+    .toBe("• 6 each — LUS28Z")
+})
 
 test("fail-closed output gate blocks multilingual prices, stock assertions, promises, and protected intents", () => {
   const unsafe = [

@@ -666,6 +666,31 @@ export function filterSmsExactListItems<T extends { name: string; quantity: numb
   });
 }
 
+const SMS_SUMMARY_UNIT_PLURALS: Record<string, string> = {
+  bag: "bags",
+  box: "boxes",
+  bucket: "buckets",
+  can: "cans",
+  carton: "cartons",
+  case: "cases",
+  pack: "packs",
+  piece: "pieces",
+  roll: "rolls",
+  sheet: "sheets",
+};
+
+/** Keeps confirmation summaries natural without changing the stored request item. */
+export function formatSmsRequestSummaryItem(item: { name: string; quantity: number; unit: string }) {
+  const quantity = Number.isFinite(item.quantity) && item.quantity > 0 ? item.quantity : 1;
+  const rawUnit = item.unit.trim() || "each";
+  const singularUnit = rawUnit.toLowerCase().replace(/s$/i, "");
+  const displayUnit = quantity === 1 ? rawUnit : SMS_SUMMARY_UNIT_PLURALS[singularUnit] || rawUnit;
+  const escapedUnit = singularUnit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const packagedName = item.name.trim().match(new RegExp(`^(.+?),\\s*((?:one|two|three|four|five|\\d+(?:\\.\\d+)?)[-\\s](?:gallon|gal|quart|qt|liter|litre|ounce|oz|pound|lb))\\s+${escapedUnit}s?$`, "i"));
+  if (packagedName) return `• ${quantity} ${packagedName[2]} ${displayUnit} — ${packagedName[1].trim()}`;
+  return `• ${quantity} ${displayUnit} — ${item.name.trim()}`;
+}
+
 function exampleTokens(value: string) {
   return new Set(value.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || []);
 }
