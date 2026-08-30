@@ -114,3 +114,16 @@ test("pg_cron dispatch reads its credential from Vault and never exposes it in t
   expect(timeoutMigration).toContain("revoke all on function public.dispatch_quo_fast_poll() from public, anon, authenticated")
   expect(timeoutMigration).not.toContain("cron.schedule")
 })
+
+test("Quo recovery dispatch is isolated from the live customer webhook worker", async () => {
+  const migration = await readFile(
+    path.join(root, "supabase/migrations/20260830145710_isolate_quo_fast_poll_worker.sql"),
+    "utf8",
+  )
+
+  expect(migration).toContain("/functions/v1/aura-quo-fast-poll-worker?mode=quo-fast-poll")
+  expect(migration).toContain("timeout_milliseconds := 5000")
+  expect(migration).not.toContain("/functions/v1/aura-messaging-broker?mode=quo-fast-poll")
+  expect(migration).toContain("quo_fast_poll_dispatch_secret")
+  expect(migration).toContain("revoke all on function public.dispatch_quo_fast_poll() from public, anon, authenticated")
+})

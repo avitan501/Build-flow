@@ -2170,6 +2170,14 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
   if (await confirmPendingSmsRequest(communicationId, phone, body)) return;
   const settings = await loadSmsAiSettings();
   const needsAiReply = settings.enabled && contact && contact.sms_ai_mode !== "off";
+  const recentExactCustomerMessages = await sql<{ body: string }[]>`
+    select body from public.aura_communications
+    where channel = 'sms' and counterparty_phone = ${phone} and direction = 'incoming'
+      and id <> ${communicationId}::uuid and body is not null and trim(body) <> ''
+      and occurred_at >= now() - interval '120 seconds'
+    order by occurred_at desc, created_at desc
+    limit 20
+  `;
   const previousCustomerMessages = await sql<{ body: string }[]>`
     select body from public.aura_communications
     where channel = 'sms' and counterparty_phone = ${phone} and direction = 'incoming'
@@ -2178,12 +2186,19 @@ async function processCustomerSmsAutomation(communicationId: string, phone: stri
     order by occurred_at desc, created_at desc
     limit 8
   `;
-  // Provider replays are already deduplicated by Quo event/activity IDs. Text
-  // similarity only catches an immediate accidental customer double-send; an
-  // explicit new-request instruction always starts a legitimate fresh flow.
-  const customerEvent = smsStartsNewMaterialRequest(body)
-    ? "message"
-    : classifyCustomerSmsEvent(body, previousCustomerMessages.map((message) => message.body));
+  // Provider replays are already deduplicated by Quo event/activity IDs. Also
+  // suppress an exact customer resend for two minutes, including an identical
+  // "New request:" message caused by a delayed Quo UI. A genuinely different
+  // new-request body still starts a fresh flow; fuzzy matching remains limited
+  // to the immediate 20-second accidental-double-send window.
+  const exactRecentDuplicate = recentExactCustomerMessages.some(
+    (message) => normalizedSmsForDuplicate(message.body) === normalizedSmsForDuplicate(body),
+  );
+  const customerEvent = exactRecentDuplicate
+    ? "duplicate"
+    : smsStartsNewMaterialRequest(body)
+      ? "message"
+      : classifyCustomerSmsEvent(body, previousCustomerMessages.map((message) => message.body));
   if (customerEvent === "duplicate") {
     await sql`
       insert into public.aura_audit_log (action, details)
