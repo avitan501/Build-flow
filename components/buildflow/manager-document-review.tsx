@@ -75,6 +75,21 @@ export function ManagerDocumentReview({
     message: string;
   } | null>(null);
   const [importingLineId, setImportingLineId] = useState<string | null>(null);
+  const suggestedDepartment = draft.suggested_department
+    ? normalizeMaterialCatalogDepartment(draft.suggested_department)
+    : "";
+  const initialRowDepartment =
+    suggestedDepartment ||
+    (draft.department !== "Test" ? draft.department : "");
+  const [rowDepartments, setRowDepartments] = useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(items.map((line) => [line.id, initialRowDepartment])),
+  );
+  const [catalogVendor, setCatalogVendor] = useState(draft.party_name);
+  const [catalogContact, setCatalogContact] = useState("");
+  const [priceIncludesDelivery, setPriceIncludesDelivery] = useState<
+    "" | "included" | "excluded" | "unknown"
+  >("");
   const [pending, startTransition] = useTransition();
   const supplierDocument = [
     "supplier_quote",
@@ -99,25 +114,18 @@ export function ManagerDocumentReview({
   const approved = document.status === "ready" || document.status === "routed";
   const catalogPricingSaved =
     document.status === "routed" && Boolean(document.supplier_id);
-  const suggestedDepartment = draft.suggested_department
-    ? normalizeMaterialCatalogDepartment(draft.suggested_department)
-    : "";
-  function catalogImportBlocker(importLines: ManagerDocumentItemRecord[]) {
-    return !canApprove
-      ? "Manager approval access is required."
-      : !importLines.length
-        ? "Select at least one product."
-        : !departmentChosen
-          ? suggestedDepartment
-            ? `Choose a department. Suggested: ${suggestedDepartment}.`
-            : "Choose a department."
-          : importLines.some((line) => line.validation_status !== "valid")
-            ? "Complete the highlighted product details."
-            : actionableWarnings.length > 0 && !acknowledgeWarnings
-              ? "Review and confirm the document notes."
-              : "";
-  }
-  const importBlocker = catalogImportBlocker(selectedLines);
+  const directImportBlocker = !selectedLines.length
+    ? "Select at least one product."
+    : !catalogVendor.trim()
+      ? "Confirm the vendor."
+      : !priceIncludesDelivery
+        ? "Confirm whether delivery is included."
+        : selectedLines.some(
+              (line) =>
+                !rowDepartments[line.id] || rowDepartments[line.id] === "Test",
+            )
+          ? "Choose a category beside each selected product."
+          : "";
 
   function run(work: () => Promise<void>) {
     setError("");
@@ -244,13 +252,30 @@ export function ManagerDocumentReview({
     });
   }
   function saveApproveAndImport(lineId?: string) {
-    const originalLines = lines;
+    const importTargets = lineId
+      ? lines.filter((line) => line.id === lineId)
+      : lines.filter((line) => line.selected);
+    const rowDepartment = lineId ? rowDepartments[lineId] : "";
     const linesForImport = lineId
-      ? lines.map((line) => ({ ...line, selected: line.id === lineId }))
+      ? lines.map((line) =>
+          line.id === lineId ? { ...line, selected: true } : line,
+        )
       : lines;
-    const blocker = catalogImportBlocker(
-      linesForImport.filter((line) => line.selected),
-    );
+    const blocker = lineId
+      ? !canApprove
+        ? "Manager approval access is required."
+        : !catalogVendor.trim()
+          ? "Confirm the vendor."
+          : !priceIncludesDelivery
+            ? "Confirm whether delivery is included."
+            : !rowDepartment || rowDepartment === "Test"
+              ? "Choose a category."
+              : !linesForImport
+                    .find((line) => line.id === lineId)
+                    ?.description.trim()
+                ? "Product name is required."
+                : ""
+      : directImportBlocker;
     if (blocker) {
       setFeedback("");
       setError(blocker);
@@ -296,77 +321,33 @@ export function ManagerDocumentReview({
         setImportingLineId(null);
         return;
       }
-      if (saved.data.warningCount > 0) {
-        const message = "Check the highlighted warning, then try again.";
-        setError(message);
-        if (lineId) setRowImportNotice({ lineId, message });
-        setImportingLineId(null);
-        router.refresh();
-        return;
-      }
-      const approvedResult = await approveManagerDocumentAction(document.id);
-      if (!approvedResult.ok) {
-        setError(approvedResult.error);
-        if (lineId)
-          setRowImportNotice({ lineId, message: approvedResult.error });
-        setImportingLineId(null);
-        router.refresh();
-        return;
-      }
-      const imported = await addManagerDocumentItemsToCatalogAction(
-        document.id,
-        lineId ? [lineId] : undefined,
-      );
-      if (!imported.ok) {
-        setError(imported.error);
-        if (lineId) setRowImportNotice({ lineId, message: imported.error });
-        setImportingLineId(null);
-        router.refresh();
-        return;
-      }
-      if (lineId) {
-        // Importing one row must not silently clear the manager's other choices.
-        // Restore the original selection and return the document to review if
-        // another selected row still needs attention.
-        const restored = await saveManagerDocumentReviewAction({
-          documentId: document.id,
-          documentType: draft.document_type,
-          title: draft.title,
-          partyName: draft.party_name,
-          documentNumber: draft.document_number,
-          documentDate: draft.document_date || "",
-          dueDate: draft.due_date || "",
-          expiresOn: draft.expires_on || "",
-          department: draft.department,
-          subtotal: draft.subtotal,
-          discount: draft.discount,
-          deliveryCharge: draft.delivery_charge,
-          taxAmount: draft.tax_amount,
-          taxPercent: draft.tax_percent,
-          total: draft.total,
-          acknowledgeWarnings,
-          evidence: draft.evidence,
-          items: originalLines.map((line) => ({
-            id: line.id,
-            description: line.description,
-            itemCode: line.item_code,
-            specification: line.specification,
-            quantity: line.quantity,
-            unit: line.unit,
-            unitPrice: line.unit_price,
-            lineTotal: line.line_total,
-            selected: line.selected,
-          })),
-        });
-        if (!restored.ok) {
-          setError(
-            "The product was imported, but the previous checkbox selection could not be restored. Reload this document.",
-          );
+      let itemCount = 0;
+      let priceCount = 0;
+      for (const target of importTargets) {
+        const imported = await addManagerDocumentItemsToCatalogAction(
+          document.id,
+          [target.id],
+          {
+            directRowImport: true,
+            catalogDepartment: rowDepartments[target.id],
+            vendorName: catalogVendor,
+            contactName: catalogContact,
+            priceIncludesDelivery: priceIncludesDelivery || "unknown",
+          },
+        );
+        if (!imported.ok) {
+          setError(imported.error);
+          if (lineId) setRowImportNotice({ lineId, message: imported.error });
+          setImportingLineId(null);
+          router.refresh();
+          return;
         }
+        itemCount += imported.data.itemCount;
+        priceCount += imported.data.priceCount;
       }
       setSelectionChanged(false);
       setFeedback(
-        `${imported.data.itemCount} selected product${imported.data.itemCount === 1 ? "" : "s"} imported to Catalog with ${imported.data.priceCount} supplier price${imported.data.priceCount === 1 ? "" : "s"}.`,
+        `${itemCount} selected product${itemCount === 1 ? "" : "s"} added to Catalog with ${priceCount} supplier price${priceCount === 1 ? "" : "s"}.`,
       );
       setImportingLineId(null);
       router.refresh();
@@ -630,7 +611,7 @@ export function ManagerDocumentReview({
                   setDraft({ ...draft, department: event.target.value });
                   setSelectionChanged(true);
                 }}
-                className="h-9 max-w-56 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"
+                className="hidden h-9 max-w-56 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold"
               >
                 {departments.map((department) => (
                   <option key={department}>{department}</option>
@@ -654,6 +635,58 @@ export function ManagerDocumentReview({
                 Clear
               </button>
             </div>
+          </div>
+          <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(10rem,1.2fr)_minmax(9rem,1fr)_minmax(10rem,1fr)_auto] sm:items-end">
+            <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              Vendor
+              <input
+                value={catalogVendor}
+                onChange={(event) => setCatalogVendor(event.target.value)}
+                placeholder="Confirm vendor"
+                className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-950"
+              />
+            </label>
+            <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              Delivery
+              <select
+                value={priceIncludesDelivery}
+                onChange={(event) =>
+                  setPriceIncludesDelivery(
+                    event.target.value as
+                      "" | "included" | "excluded" | "unknown",
+                  )
+                }
+                className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-950"
+              >
+                <option value="">Included?</option>
+                <option value="included">Included</option>
+                <option value="excluded">Not included</option>
+                <option value="unknown">Not sure</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              Contact person
+              <input
+                value={catalogContact}
+                onChange={(event) => setCatalogContact(event.target.value)}
+                placeholder="Optional"
+                className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-950"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => saveApproveAndImport()}
+              disabled={!canApprove || pending || Boolean(directImportBlocker)}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <BookOpenCheck className="h-4 w-4" />
+              {pending ? "Adding…" : `Add selected (${selectedLines.length})`}
+            </button>
+            {directImportBlocker ? (
+              <p className="text-xs font-semibold text-amber-800 sm:col-span-4">
+                {directImportBlocker}
+              </p>
+            ) : null}
           </div>
           {lines.length ? (
             <>
@@ -704,22 +737,52 @@ export function ManagerDocumentReview({
                                 In Catalog
                               </Link>
                             ) : (
-                              <button
-                                type="button"
-                                onClick={() => saveApproveAndImport(line.id)}
-                                disabled={!canApprove || pending}
-                                aria-label={`Add ${line.description || `line ${index + 1}`} to Catalog`}
-                                className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-[#0071e3] px-2.5 font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
-                              >
-                                {pending && importingLineId === line.id ? (
-                                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <BookOpenCheck className="h-3.5 w-3.5" />
-                                )}
-                                {pending && importingLineId === line.id
-                                  ? "Adding…"
-                                  : "Add to Catalog"}
-                              </button>
+                              <div className="grid w-40 gap-1.5">
+                                <label
+                                  className="text-[10px] font-bold uppercase tracking-wide text-slate-500"
+                                  htmlFor={`catalog-category-${line.id}`}
+                                >
+                                  Category
+                                </label>
+                                <select
+                                  id={`catalog-category-${line.id}`}
+                                  value={rowDepartments[line.id] || ""}
+                                  onChange={(event) =>
+                                    setRowDepartments((current) => ({
+                                      ...current,
+                                      [line.id]: event.target.value,
+                                    }))
+                                  }
+                                  className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-900"
+                                >
+                                  <option value="">Choose category</option>
+                                  {departments
+                                    .filter(
+                                      (department) => department !== "Test",
+                                    )
+                                    .map((department) => (
+                                      <option key={department}>
+                                        {department}
+                                      </option>
+                                    ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => saveApproveAndImport(line.id)}
+                                  disabled={!canApprove || pending}
+                                  aria-label={`Add ${line.description || `line ${index + 1}`} to Catalog`}
+                                  className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-md bg-[#0071e3] px-2.5 font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                  {pending && importingLineId === line.id ? (
+                                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <BookOpenCheck className="h-3.5 w-3.5" />
+                                  )}
+                                  {pending && importingLineId === line.id
+                                    ? "Adding…"
+                                    : "Add to Catalog"}
+                                </button>
+                              </div>
                             )}
                             {rowImportNotice?.lineId === line.id ? (
                               <span
@@ -859,64 +922,6 @@ export function ManagerDocumentReview({
                     ))}
                   </tbody>
                 </table>
-              </div>
-              <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-white/95 px-4 py-2 backdrop-blur">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-slate-700">
-                      {importBlocker ||
-                        `${selectedLines.length} selected · ready to import`}
-                    </p>
-                    {!departmentChosen && suggestedDepartment ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDraft({
-                            ...draft,
-                            department: suggestedDepartment,
-                          });
-                          setSelectionChanged(true);
-                          setError("");
-                        }}
-                        className="mt-1 text-xs font-bold text-[#0071e3] underline decoration-sky-300 underline-offset-2"
-                      >
-                        Use {suggestedDepartment}
-                      </button>
-                    ) : null}
-                    {departmentChosen &&
-                    actionableWarnings.length > 0 &&
-                    !acknowledgeWarnings ? (
-                      <label className="mt-1 flex items-center gap-2 text-xs font-bold text-amber-800">
-                        <input
-                          type="checkbox"
-                          checked={acknowledgeWarnings}
-                          onChange={(event) => {
-                            setAcknowledgeWarnings(event.target.checked);
-                            setError("");
-                          }}
-                          className="h-4 w-4 accent-amber-700"
-                        />
-                        I reviewed the notes
-                      </label>
-                    ) : null}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => saveApproveAndImport()}
-                    disabled={!canApprove || pending || !selectedLines.length}
-                    aria-describedby="catalog-import-status"
-                    className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <BookOpenCheck className="h-4 w-4" />
-                    {pending ? "Importing…" : "Import selected"}
-                    <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">
-                      {selectedLines.length}
-                    </span>
-                  </button>
-                </div>
-                <span id="catalog-import-status" className="sr-only">
-                  {importBlocker || "Selected products are ready to import."}
-                </span>
               </div>
             </>
           ) : (

@@ -123,7 +123,11 @@ function validateManagerDocumentFile(input: {
   fileType: string;
   fileSize: number;
 }) {
-  if (!input.fileName.trim() || !Number.isFinite(input.fileSize) || input.fileSize <= 0)
+  if (
+    !input.fileName.trim() ||
+    !Number.isFinite(input.fileSize) ||
+    input.fileSize <= 0
+  )
     return "Choose a document.";
   if (input.fileSize > MAX_FILE_SIZE)
     return "The document must be 25 MB or smaller.";
@@ -142,7 +146,10 @@ export async function prepareManagerDocumentUploadAction(input: {
   const fileError = validateManagerDocumentFile(input);
   if (fileError) return { ok: false, error: fileError };
   if (!/^[a-f0-9]{64}$/i.test(input.sourceSha256))
-    return { ok: false, error: "The document could not be verified. Try it again." };
+    return {
+      ok: false,
+      error: "The document could not be verified. Try it again.",
+    };
 
   const duplicate = await supabase
     .from("manager_documents")
@@ -172,7 +179,10 @@ export async function prepareManagerDocumentUploadAction(input: {
     .createSignedUploadUrl(filePath);
   if (error || !data?.token) {
     console.error("Manager document signed upload preparation failed", error);
-    return { ok: false, error: "The private upload could not be prepared. Try again." };
+    return {
+      ok: false,
+      error: "The private upload could not be prepared. Try again.",
+    };
   }
   return {
     ok: true,
@@ -200,21 +210,33 @@ export async function completeManagerDocumentUploadAction(input: {
     !input.filePath.startsWith(expectedPrefix) ||
     !/^[a-f0-9]{64}$/i.test(input.sourceSha256)
   )
-    return { ok: false, error: "The private upload reference is invalid. Upload it again." };
+    return {
+      ok: false,
+      error: "The private upload reference is invalid. Upload it again.",
+    };
 
   const { data, error } = await supabase.storage
     .from(MANAGER_DOCUMENT_BUCKET)
     .download(input.filePath);
   if (error || !data) {
     console.error("Manager staged document download failed", error);
-    return { ok: false, error: "The document did not finish uploading. Try again." };
+    return {
+      ok: false,
+      error: "The document did not finish uploading. Try again.",
+    };
   }
 
   try {
     if (data.size !== input.fileSize)
-      return { ok: false, error: "The document upload was incomplete. Try again." };
+      return {
+        ok: false,
+        error: "The document upload was incomplete. Try again.",
+      };
     const formData = new FormData();
-    formData.set("documentFile", new File([data], input.fileName, { type: input.fileType }));
+    formData.set(
+      "documentFile",
+      new File([data], input.fileName, { type: input.fileType }),
+    );
     formData.set("browserOcrText", input.browserOcrText ?? "");
     formData.set("intent", input.intent ?? "");
     formData.set("sourceChannel", "website_upload");
@@ -280,7 +302,8 @@ export async function uploadManagerDocumentAction(
 ): Promise<Result<{ documentId: string }>> {
   const { supabase, user } = await requireStaffProfile("suppliers");
   const file = formData.get("documentFile");
-  if (!(file instanceof File)) return { ok: false, error: "Choose a document." };
+  if (!(file instanceof File))
+    return { ok: false, error: "Choose a document." };
   const fileError = validateManagerDocumentFile({
     fileName: file.name,
     fileType: file.type,
@@ -383,14 +406,12 @@ export async function uploadManagerDocumentAction(
       error: "The file uploaded, but its document record could not be created.",
     };
   }
-  await supabase
-    .from("manager_document_events")
-    .insert({
-      document_id: documentId,
-      event_type: "uploaded",
-      summary: "Original document saved privately.",
-      created_by: user.id,
-    });
+  await supabase.from("manager_document_events").insert({
+    document_id: documentId,
+    event_type: "uploaded",
+    summary: "Original document saved privately.",
+    created_by: user.id,
+  });
 
   let extraction = null;
   let rawText = "";
@@ -417,14 +438,12 @@ export async function uploadManagerDocumentAction(
         updated_by: user.id,
       })
       .eq("id", documentId);
-    await supabase
-      .from("manager_document_events")
-      .insert({
-        document_id: documentId,
-        event_type: "error",
-        summary: "AI reading did not finish; original retained.",
-        created_by: user.id,
-      });
+    await supabase.from("manager_document_events").insert({
+      document_id: documentId,
+      event_type: "error",
+      summary: "AI reading did not finish; original retained.",
+      created_by: user.id,
+    });
     revalidatePath("/admin/documents");
     return { ok: true, data: { documentId }, message: note };
   }
@@ -492,20 +511,18 @@ export async function uploadManagerDocumentAction(
     if (itemError)
       console.error("Manager document item creation failed", itemError);
   }
-  await supabase
-    .from("manager_document_events")
-    .insert({
-      document_id: documentId,
-      event_type: "extracted",
-      summary: lowConfidence
-        ? "AI extraction completed with review flags."
-        : "AI extraction completed; human approval still required.",
-      details: {
-        item_count: extraction.items.length,
-        warning_count: extraction.warnings.length,
-      },
-      created_by: user.id,
-    });
+  await supabase.from("manager_document_events").insert({
+    document_id: documentId,
+    event_type: "extracted",
+    summary: lowConfidence
+      ? "AI extraction completed with review flags."
+      : "AI extraction completed; human approval still required.",
+    details: {
+      item_count: extraction.items.length,
+      warning_count: extraction.warnings.length,
+    },
+    created_by: user.id,
+  });
   revalidatePath("/admin/documents");
   return { ok: true, data: { documentId }, message: extractionNote };
 }
@@ -573,14 +590,12 @@ export async function approveManagerDocumentAction(
     })
     .eq("id", documentId);
   if (error) return { ok: false, error: "The document could not be approved." };
-  await supabase
-    .from("manager_document_events")
-    .insert({
-      document_id: documentId,
-      event_type: "reviewed",
-      summary: "Document approved after human review.",
-      created_by: user.id,
-    });
+  await supabase.from("manager_document_events").insert({
+    document_id: documentId,
+    event_type: "reviewed",
+    summary: "Document approved after human review.",
+    created_by: user.id,
+  });
   revalidatePath(`/admin/documents/${documentId}`);
   revalidatePath("/admin/documents");
   return {
@@ -734,8 +749,8 @@ export async function saveManagerDocumentReviewAction(input: {
       input.documentType === "catalog_price_list"
         ? "One or more selected price-list products still need a description, unit, or unit price."
         : requiresPricing
-        ? "One or more selected lines still need quantity, unit, unit price, or line total."
-        : "One or more selected lines still need a description, quantity, or unit.",
+          ? "One or more selected lines still need quantity, unit, unit price, or line total."
+          : "One or more selected lines still need a description, quantity, or unit.",
     );
   if (!input.acknowledgeWarnings) {
     const { data: document } = await supabase
@@ -775,16 +790,14 @@ export async function saveManagerDocumentReviewAction(input: {
       total,
       status: "needs_review",
       warnings: uniqueWarnings,
-      evidence: input.evidence
-        .slice(0, 200)
-        .map((entry) => ({
-          field: clean(entry.field, 100),
-          value: clean(entry.value, 500),
-          page: entry.page && entry.page > 0 ? Math.floor(entry.page) : null,
-          sourceText: clean(entry.sourceText, 1000),
-          confidence: Math.max(0, Math.min(1, Number(entry.confidence) || 0)),
-          selected: entry.selected !== false,
-        })),
+      evidence: input.evidence.slice(0, 200).map((entry) => ({
+        field: clean(entry.field, 100),
+        value: clean(entry.value, 500),
+        page: entry.page && entry.page > 0 ? Math.floor(entry.page) : null,
+        sourceText: clean(entry.sourceText, 1000),
+        confidence: Math.max(0, Math.min(1, Number(entry.confidence) || 0)),
+        selected: entry.selected !== false,
+      })),
       extraction_note:
         "Human review saved. Approve only after all highlighted values and totals are correct.",
       approved_by: null,
@@ -818,16 +831,14 @@ export async function saveManagerDocumentReviewAction(input: {
           "The document header was saved, but one line could not be updated.",
       };
   }
-  await supabase
-    .from("manager_document_events")
-    .insert({
-      document_id: input.documentId,
-      event_type: "reviewed",
-      summary: uniqueWarnings.length
-        ? `Human review saved with ${uniqueWarnings.length} warning${uniqueWarnings.length === 1 ? "" : "s"}.`
-        : "Human review saved with no remaining calculation warnings.",
-      created_by: user.id,
-    });
+  await supabase.from("manager_document_events").insert({
+    document_id: input.documentId,
+    event_type: "reviewed",
+    summary: uniqueWarnings.length
+      ? `Human review saved with ${uniqueWarnings.length} warning${uniqueWarnings.length === 1 ? "" : "s"}.`
+      : "Human review saved with no remaining calculation warnings.",
+    created_by: user.id,
+  });
   revalidatePath(`/admin/documents/${input.documentId}`);
   revalidatePath("/admin/documents");
   return {
@@ -917,26 +928,24 @@ export async function retryManagerDocumentExtractionAction(
     if (replacementError) {
       console.error("Document AI line replacement failed", replacementError);
       if (previousItems?.length)
-        await supabase
-          .from("manager_document_items")
-          .insert(
-            previousItems.map((item) => ({
-              document_id: documentId,
-              line_number: item.line_number,
-              item_code: item.item_code,
-              description: item.description,
-              specification: item.specification,
-              quantity: item.quantity,
-              unit: item.unit,
-              unit_price: item.unit_price,
-              line_total: item.line_total,
-              source_page: item.source_page,
-              source_text: item.source_text,
-              confidence: item.confidence,
-              validation_status: item.validation_status,
-              selected: item.selected,
-            })),
-          );
+        await supabase.from("manager_document_items").insert(
+          previousItems.map((item) => ({
+            document_id: documentId,
+            line_number: item.line_number,
+            item_code: item.item_code,
+            description: item.description,
+            specification: item.specification,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_price: item.unit_price,
+            line_total: item.line_total,
+            source_page: item.source_page,
+            source_text: item.source_text,
+            confidence: item.confidence,
+            validation_status: item.validation_status,
+            selected: item.selected,
+          })),
+        );
       return {
         ok: false,
         error:
@@ -982,41 +991,37 @@ export async function retryManagerDocumentExtractionAction(
       .delete()
       .eq("document_id", documentId);
     if (previousItems?.length)
-      await supabase
-        .from("manager_document_items")
-        .insert(
-          previousItems.map((item) => ({
-            document_id: documentId,
-            line_number: item.line_number,
-            item_code: item.item_code,
-            description: item.description,
-            specification: item.specification,
-            quantity: item.quantity,
-            unit: item.unit,
-            unit_price: item.unit_price,
-            line_total: item.line_total,
-            source_page: item.source_page,
-            source_text: item.source_text,
-            confidence: item.confidence,
-            validation_status: item.validation_status,
-            selected: item.selected,
-          })),
-        );
+      await supabase.from("manager_document_items").insert(
+        previousItems.map((item) => ({
+          document_id: documentId,
+          line_number: item.line_number,
+          item_code: item.item_code,
+          description: item.description,
+          specification: item.specification,
+          quantity: item.quantity,
+          unit: item.unit,
+          unit_price: item.unit_price,
+          line_total: item.line_total,
+          source_page: item.source_page,
+          source_text: item.source_text,
+          confidence: item.confidence,
+          validation_status: item.validation_status,
+          selected: item.selected,
+        })),
+      );
     return {
       ok: false,
       error:
         "The new AI summary could not be saved. The previous review was restored.",
     };
   }
-  await supabase
-    .from("manager_document_events")
-    .insert({
-      document_id: documentId,
-      event_type: "extracted",
-      summary: "Document re-read with AI.",
-      details: { item_count: extraction.items.length },
-      created_by: user.id,
-    });
+  await supabase.from("manager_document_events").insert({
+    document_id: documentId,
+    event_type: "extracted",
+    summary: "Document re-read with AI.",
+    details: { item_count: extraction.items.length },
+    created_by: user.id,
+  });
   revalidatePath(`/admin/documents/${documentId}`);
   revalidatePath("/admin/documents");
   return {
@@ -1176,15 +1181,13 @@ export async function routeManagerDocumentToSupplierPricingAction(
       updated_by: user.id,
     })
     .eq("id", documentId);
-  await supabase
-    .from("manager_document_events")
-    .insert({
-      document_id: documentId,
-      event_type: "routed",
-      summary: "Approved rows sent to supplier pricing.",
-      details: { supplier_quote_id: quoteId },
-      created_by: user.id,
-    });
+  await supabase.from("manager_document_events").insert({
+    document_id: documentId,
+    event_type: "routed",
+    summary: "Approved rows sent to supplier pricing.",
+    details: { supplier_quote_id: quoteId },
+    created_by: user.id,
+  });
   revalidatePath("/admin/documents");
   revalidatePath("/admin/supplier-quotes");
   return {
@@ -1662,20 +1665,18 @@ async function legacyAddManagerDocumentItemsToCatalogAction(
     .from("manager_documents")
     .update({ status: "routed", supplier_id: supplier.id, updated_by: user.id })
     .eq("id", documentId);
-  await supabase
-    .from("manager_document_events")
-    .insert({
-      document_id: documentId,
-      event_type: "routed",
-      summary: `${prices.length} selected price${prices.length === 1 ? "" : "s"} added to the catalog.`,
-      details: {
-        destination: "catalog",
-        supplier_id: supplier.id,
-        created_item_count: createdCount,
-        price_count: prices.length,
-      },
-      created_by: user.id,
-    });
+  await supabase.from("manager_document_events").insert({
+    document_id: documentId,
+    event_type: "routed",
+    summary: `${prices.length} selected price${prices.length === 1 ? "" : "s"} added to the catalog.`,
+    details: {
+      destination: "catalog",
+      supplier_id: supplier.id,
+      created_item_count: createdCount,
+      price_count: prices.length,
+    },
+    created_by: user.id,
+  });
   revalidatePath(`/admin/documents/${documentId}`);
   revalidatePath("/admin/documents");
   revalidatePath("/admin/catalog");
@@ -1694,6 +1695,13 @@ async function legacyAddManagerDocumentItemsToCatalogAction(
 export async function addManagerDocumentItemsToCatalogAction(
   documentId: string,
   itemIds?: string[],
+  options?: {
+    directRowImport?: boolean;
+    catalogDepartment?: string;
+    vendorName?: string;
+    contactName?: string;
+    priceIncludesDelivery?: "included" | "excluded" | "unknown";
+  },
 ): Promise<
   Result<{ itemCount: number; priceCount: number; supplierName: string | null }>
 > {
@@ -1701,7 +1709,10 @@ export async function addManagerDocumentItemsToCatalogAction(
   if (!UUID_PATTERN.test(documentId))
     return { ok: false, error: "Invalid document." };
   const requestedItemIds = itemIds
-    ? [...new Set(itemIds.filter((itemId) => UUID_PATTERN.test(itemId)))].slice(0, 200)
+    ? [...new Set(itemIds.filter((itemId) => UUID_PATTERN.test(itemId)))].slice(
+        0,
+        200,
+      )
     : null;
   if (itemIds && requestedItemIds?.length !== itemIds.length)
     return { ok: false, error: "Invalid catalog product selection." };
@@ -1726,7 +1737,10 @@ export async function addManagerDocumentItemsToCatalogAction(
       supabase.rpc("staff_load_catalog_suppliers"),
     ]);
   if (!document) return { ok: false, error: "Document not found." };
-  if (!["ready", "routed"].includes(document.status))
+  if (
+    !options?.directRowImport &&
+    !["ready", "routed"].includes(document.status)
+  )
     return {
       ok: false,
       error: "Save and approve the reviewed document first.",
@@ -1736,8 +1750,7 @@ export async function addManagerDocumentItemsToCatalogAction(
     return { ok: false, error: "Select at least one reviewed product row." };
   if (
     selected.some(
-      (item) =>
-        item.validation_status !== "valid" || !item.description.trim(),
+      (item) => item.validation_status !== "valid" || !item.description.trim(),
     )
   )
     return {
@@ -1745,12 +1758,18 @@ export async function addManagerDocumentItemsToCatalogAction(
       error: "Review the selected product line before importing.",
     };
 
-  const department = reviewedDocumentCatalogDepartment(document);
+  const department = options?.catalogDepartment
+    ? normalizeMaterialCatalogDepartment(options.catalogDepartment)
+    : reviewedDocumentCatalogDepartment(document);
+  if (!department)
+    return { ok: false, error: "Choose a category for this product." };
   const suppliers = Array.isArray(supplierRows)
     ? (supplierRows as CatalogSupplier[])
     : [];
   const detectedName =
-    document.party_name || inferSupplierName(document.raw_text);
+    clean(options?.vendorName, 160) ||
+    document.party_name ||
+    inferSupplierName(document.raw_text);
   const matchedSupplier = detectedName
     ? detectSupplierMatch(
         suppliers,
@@ -1772,6 +1791,14 @@ export async function addManagerDocumentItemsToCatalogAction(
       ? existingSupplier
         ? {
             ...existingSupplier,
+            ...(clean(options?.contactName, 120)
+              ? { contactName: clean(options?.contactName, 120) }
+              : {}),
+            ...(options?.priceIncludesDelivery === "included"
+              ? { deliveryNotes: "Quoted price includes delivery." }
+              : options?.priceIncludesDelivery === "excluded"
+                ? { deliveryNotes: "Quoted price excludes delivery." }
+                : {}),
             catalogDepartments: [
               ...new Set([
                 ...(existingSupplier.catalogDepartments ?? []),
@@ -1797,22 +1824,34 @@ export async function addManagerDocumentItemsToCatalogAction(
             catalogDepartments: [department],
             catalogEnabledDepartments: [department],
             contactLabel: "Imported document",
-            contactName: "",
+            contactName: clean(options?.contactName, 120),
             preferredDeliveryMethod: "manual",
-            deliveryNotes: "",
+            deliveryNotes:
+              options?.priceIncludesDelivery === "included"
+                ? "Quoted price includes delivery."
+                : options?.priceIncludesDelivery === "excluded"
+                  ? "Quoted price excludes delivery."
+                  : "Delivery inclusion was not confirmed.",
             notes: `Created from reviewed document ${clean(document.file_name, 180)}. Confirm contact details before outreach.`,
             address: "",
           }
       : null;
 
   const { data, error } = await supabase.rpc(
-    "staff_import_manager_document_items_to_catalog",
+    options?.directRowImport
+      ? "staff_quick_import_manager_document_item_to_catalog"
+      : "staff_import_manager_document_items_to_catalog",
     {
       p_document_id: documentId,
       p_item_ids: selected.map((item) => item.id),
       p_catalog_department: department,
       p_expected_document_updated_at: document.updated_at,
-      p_supplier: supplier,
+      p_supplier: supplier
+        ? {
+            ...supplier,
+            priceIncludesDelivery: options?.priceIncludesDelivery ?? "unknown",
+          }
+        : null,
       p_create_supplier: Boolean(supplier && !existingSupplier),
     },
   );
