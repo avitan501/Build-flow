@@ -42,6 +42,13 @@ import {
 } from "../_shared/sms-reply-policy.ts";
 import { isExplicitCustomerRequestConfirmation } from "../_shared/customer-request-confirmation.ts";
 import {
+  additionalItemPrompt,
+  additionalItemsQuestion,
+  customerFinishedMaterialList,
+  customerWantsAnotherItem,
+  deliveryAddressQuestion,
+} from "../_shared/customer-request-completion.ts";
+import {
   assessMaterialRequest,
   oneQuestionOnly,
   type AuraConfidenceLabel,
@@ -1179,6 +1186,7 @@ type PersistedSmsOrderState = {
   language: string;
   exactListOnly: boolean;
   lastAskedSlots: string[];
+  listComplete: boolean;
   slots: Record<string, string>;
   items: Array<{
     name: string;
@@ -1198,9 +1206,10 @@ async function loadPersistedSmsOrderState(
         language: string;
         exact_list_only: boolean;
         last_asked_slots: string[];
+        list_complete: boolean;
       }[]
     >`
-      select id, language, exact_list_only, last_asked_slots
+      select id, language, exact_list_only, last_asked_slots, list_complete
       from public.aura_sms_request_states
       where normalized_phone = ${phone} and status in ('collecting', 'awaiting_confirmation')
       order by updated_at desc limit 1
@@ -1233,6 +1242,7 @@ async function loadPersistedSmsOrderState(
       lastAskedSlots: Array.isArray(state.last_asked_slots)
         ? state.last_asked_slots
         : [],
+      listComplete: state.list_complete,
       slots: Object.fromEntries(
         slotRows.map((row) => [row.slot_key, row.value_text]),
       ),
@@ -1252,6 +1262,7 @@ function persistedSmsOrderStateText(state: PersistedSmsOrderState | null) {
     exactListOnly: state.exactListOnly,
     answeredFields: state.slots,
     lastAskedFields: state.lastAskedSlots,
+    listComplete: state.listComplete,
     items: state.items,
   }).slice(0, 5000);
 }
@@ -1269,6 +1280,8 @@ function askedSlotsFromReply(reply: string) {
   if (/\b(?:size|length|thickness|gauge)\b/i.test(reply))
     slots.push("specification");
   if (/\b(?:color|finish)\b/i.test(reply)) slots.push("finish");
+  if (/anything else|something else|algo m[aá]s|עוד משהו/iu.test(reply))
+    slots.push("additional_items");
   return [...new Set(slots)].slice(0, 3);
 }
 
@@ -1280,6 +1293,7 @@ async function persistSmsOrderState(params: {
   exactListOnly: boolean;
   event: CustomerSmsEvent;
   latestMessage: string;
+  listComplete: boolean;
 }) {
   if (!params.result.isMaterialRequest || !params.result.request?.items.length)
     return;
@@ -1293,8 +1307,8 @@ async function persistSmsOrderState(params: {
     if (!stateId) {
       const inserted = await transaction<{ id: string }[]>`
         insert into public.aura_sms_request_states
-          (normalized_phone, contact_id, language, exact_list_only, last_event, last_inbound_communication_id, last_asked_slots)
-        values (${params.phone}, ${params.contactId}, ${smsMessageLanguage(params.latestMessage)}, ${params.exactListOnly}, ${params.event}, ${params.communicationId}::uuid, ${askedSlotsFromReply(params.result.reply)})
+          (normalized_phone, contact_id, language, exact_list_only, list_complete, last_event, last_inbound_communication_id, last_asked_slots)
+        values (${params.phone}, ${params.contactId}, ${smsMessageLanguage(params.latestMessage)}, ${params.exactListOnly}, ${params.listComplete}, ${params.event}, ${params.communicationId}::uuid, ${askedSlotsFromReply(params.result.reply)})
         returning id
       `;
       stateId = inserted[0].id;
@@ -1304,6 +1318,7 @@ async function persistSmsOrderState(params: {
           contact_id = coalesce(${params.contactId}, contact_id),
           language = ${smsMessageLanguage(params.latestMessage)},
           exact_list_only = exact_list_only or ${params.exactListOnly},
+          list_complete = list_complete or ${params.listComplete},
           last_event = ${params.event},
           last_inbound_communication_id = ${params.communicationId}::uuid,
           last_asked_slots = ${askedSlotsFromReply(params.result.reply)},
@@ -3387,11 +3402,14 @@ async function prepareSmsRequestConfirmation(input: {
   request: NonNullable<CustomerSmsAutomation["request"]>;
   sourceCommunicationIds: string[];
   latestCustomerMessage: string;
+  listComplete: boolean;
   intelligenceReady: boolean;
   intelligenceAssessment: ReturnType<typeof smsMaterialIntelligenceAssessment>;
 }) {
   if (
     !input.request.items.length ||
+    !input.listComplete ||
+    !input.customerAddress.trim() ||
     (!SIMPLE_REQUEST_INTAKE &&
       (!input.customerAddress.trim() ||
         !input.customerNeededBy.trim() ||
@@ -4096,6 +4114,46 @@ async function processCustomerSmsAutomation(
       protectedTopic: hasForbiddenAutoReplyTopic(effectiveBody),
     });
   }
+  const previouslyAskedForMore =
+    persistedOrderState?.lastAskedSlots.includes("additional_items") === true;
+  const listComplete =
+    persistedOrderState?.listComplete === true ||
+    (previouslyAskedForMore && customerFinishedMaterialList(effectiveBody));
+  const askedForAnotherItem =
+    previouslyAskedForMore && customerWantsAnotherItem(effectiveBody);
+  const canAdvanceIntake =
+    (result.isMaterialRequest || Boolean(openDraft)) &&
+    customerEvent !== "cancellation" &&
+    clarificationQuestions.length === 0;
+  if (canAdvanceIntake && !listComplete) {
+    result.reply = askedForAnotherItem
+      ? additionalItemPrompt(effectiveBody)
+      : additionalItemsQuestion(effectiveBody);
+    result.autoSafe = true;
+    safety = evaluateSmsReplyGate({
+      message: effectiveBody,
+      reply: result.reply,
+      intent: "material_request",
+      event: preConfirmationCorrection ? "message" : customerEvent,
+      participantRole: result.participantRole || "lead",
+      modelAutoSafe: true,
+      exactListOnly,
+      protectedTopic: hasForbiddenAutoReplyTopic(effectiveBody),
+    });
+  } else if (canAdvanceIntake && listComplete && !deliveryAddressKnown) {
+    result.reply = deliveryAddressQuestion(effectiveBody);
+    result.autoSafe = true;
+    safety = evaluateSmsReplyGate({
+      message: effectiveBody,
+      reply: result.reply,
+      intent: "delivery",
+      event: preConfirmationCorrection ? "message" : customerEvent,
+      participantRole: result.participantRole || "lead",
+      modelAutoSafe: true,
+      exactListOnly,
+      protectedTopic: hasForbiddenAutoReplyTopic(effectiveBody),
+    });
+  }
   // The analyzer intentionally labels every correction RED. For an intake
   // draft that has not been confirmed yet, re-run the deterministic output
   // gate as a normal missing-detail turn. Unsafe claims still remain RED;
@@ -4144,6 +4202,7 @@ async function processCustomerSmsAutomation(
       exactListOnly,
       event: customerEvent,
       latestMessage: effectiveBody,
+      listComplete,
     });
   } catch (stateError) {
     console.error(
@@ -4247,6 +4306,8 @@ async function processCustomerSmsAutomation(
     if (
       (customerEvent !== "correction" || preConfirmationCorrection) &&
       !linkedCorrectionRequestId &&
+      listComplete &&
+      deliveryAddressKnown &&
       (SIMPLE_REQUEST_INTAKE ||
         (deliveryAddressKnown && clarificationQuestions.length === 0))
     ) {
@@ -4265,6 +4326,7 @@ async function processCustomerSmsAutomation(
         request: result.request,
         sourceCommunicationIds: sources,
         latestCustomerMessage: body,
+        listComplete,
         intelligenceReady: materialIntelligence.readyForConfirmation,
         intelligenceAssessment: materialIntelligence,
       });
