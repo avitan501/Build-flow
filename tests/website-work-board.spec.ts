@@ -179,5 +179,23 @@ test("David Dashboard keeps existing website tasks and compact add controls", as
   expect(page).toContain("source_chat_title");
   expect(page).toContain("task_key");
   expect(board).toContain('placeholder="New task"');
-  expect(board).toContain('placeholder="Add a pain to resolve"');
+  expect(board).toContain('placeholder="Problem title"');
+  expect(page).toContain("resolution_cost");
+  expect(board).toContain("How I&apos;ll resolve it");
+  expect(board).toContain('aria-label="Resolution cost"');
+  expect(board).toContain("grid-cols-[1.1fr_1.35fr_1.55fr_7.5rem_11rem]");
+  expect(board).toContain('aria-label="Rewrite pain with AI"');
+});
+
+test("pain resolution table persists the issue, resolution, and cost", async () => {
+  const [actions, migration] = await Promise.all([
+    readFile(path.join(root, "app/admin/goals-progress/website-work/actions.ts"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260831215746_add_pain_resolution_fields.sql"), "utf8"),
+  ]);
+  expect(migration).toContain("add column if not exists resolution_cost numeric(12, 2)");
+  expect(migration).toContain("resolution_cost >= 0");
+  expect(actions).toContain("summary: issue");
+  expect(actions).toContain('next_step: input.kind === "pain" ? resolution : nextStep');
+  expect(actions).toContain('resolution_cost: input.kind === "pain" ? cost : null');
+  expect(actions).toContain("{ title, summary: issue, next_step: resolution, resolution_cost: cost }");
 });

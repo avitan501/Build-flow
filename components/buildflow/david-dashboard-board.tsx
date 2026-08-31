@@ -40,9 +40,34 @@ export type DavidDashboardItem = {
   source_chat_title: string | null;
   item_kind: "task" | "pain" | "idea";
   published_to_carlos: boolean;
+  resolution_cost: number | null;
 };
 
 type EditableKind = "pain" | "idea";
+
+function PainRow({ item, pending, onRun, onRewrite, onDelete }: {
+  item: DavidDashboardItem;
+  pending: boolean;
+  onRun: (action: () => Promise<{ ok: true } | { ok: false; error: string }>, success: string) => void;
+  onRewrite: () => void;
+  onDelete: () => void;
+}) {
+  const [title, setTitle] = useState(item.title);
+  const [issue, setIssue] = useState(item.summary === "Pain David is resolving." ? "" : item.summary);
+  const [resolution, setResolution] = useState(item.next_step ?? "");
+  const [cost, setCost] = useState(item.resolution_cost == null ? "" : String(item.resolution_cost));
+  const save = () => onRun(
+    () => updateDavidDashboardItemAction({ id: item.id, title, issue, resolution, cost, kind: "pain" }),
+    "Pain updated.",
+  );
+  return <div className="grid min-w-[960px] grid-cols-[1.1fr_1.35fr_1.55fr_7.5rem_11rem] gap-2 border-t border-slate-100 px-3 py-2">
+    <input aria-label="Problem title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} className="min-h-10 rounded-md border border-slate-200 px-2.5 text-sm font-semibold outline-none focus:border-sky-400" />
+    <input aria-label="Issue" value={issue} onChange={(event) => setIssue(event.target.value)} maxLength={500} placeholder="What is wrong?" className="min-h-10 rounded-md border border-slate-200 px-2.5 text-sm outline-none focus:border-sky-400" />
+    <input aria-label="How I will resolve it" value={resolution} onChange={(event) => setResolution(event.target.value)} maxLength={500} placeholder="How will I resolve it?" className="min-h-10 rounded-md border border-slate-200 px-2.5 text-sm outline-none focus:border-sky-400" />
+    <label className="flex min-h-10 items-center rounded-md border border-slate-200 bg-white px-2 text-sm"><span className="text-slate-400">$</span><input aria-label="Resolution cost" inputMode="decimal" type="number" min="0" step="0.01" value={cost} onChange={(event) => setCost(event.target.value)} placeholder="0" className="min-w-0 flex-1 bg-transparent px-1 outline-none" /></label>
+    <div className="flex gap-1"><button type="button" disabled={pending || title.trim().length < 2} onClick={save} className="inline-flex h-10 flex-1 items-center justify-center gap-1 rounded-md bg-[#0071e3] px-2 text-xs font-bold text-white disabled:opacity-40"><Check className="h-4 w-4" />Save</button><button type="button" disabled={pending} onClick={onRewrite} aria-label="Rewrite pain with AI" title="Rewrite with AI" className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-sky-200 bg-sky-50 text-[#0066cc]"><Sparkles className="h-4 w-4" /></button><button type="button" disabled={pending} onClick={onDelete} aria-label="Delete pain" className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-rose-200 text-rose-600"><Trash2 className="h-4 w-4" /></button></div>
+  </div>;
+}
 
 const statusStyles: Record<string, string> = {
   in_progress: "bg-sky-50 text-sky-700",
@@ -167,6 +192,9 @@ export function DavidDashboardBoard({
   const [taskTitle, setTaskTitle] = useState("");
   const [taskNext, setTaskNext] = useState("");
   const [painTitle, setPainTitle] = useState("");
+  const [painIssue, setPainIssue] = useState("");
+  const [painResolution, setPainResolution] = useState("");
+  const [painCost, setPainCost] = useState("");
   const [ideaTitle, setIdeaTitle] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -214,6 +242,9 @@ export function DavidDashboardBoard({
         createDavidDashboardItemAction({
           title,
           nextStep: kind === "task" ? taskNext : "",
+          issue: kind === "pain" ? painIssue : "",
+          resolution: kind === "pain" ? painResolution : "",
+          cost: kind === "pain" ? painCost : "",
           kind,
         }),
       `${kind === "idea" ? "Idea" : kind === "pain" ? "Pain" : "Task"} added.`,
@@ -221,7 +252,12 @@ export function DavidDashboardBoard({
     if (kind === "task") {
       setTaskTitle("");
       setTaskNext("");
-    } else if (kind === "pain") setPainTitle("");
+    } else if (kind === "pain") {
+      setPainTitle("");
+      setPainIssue("");
+      setPainResolution("");
+      setPainCost("");
+    }
     else setIdeaTitle("");
   }
 
@@ -377,29 +413,18 @@ export function DavidDashboardBoard({
             {pains.length}
           </span>
         </header>
-        <div className="flex gap-2 border-b border-slate-200 bg-slate-50 p-3">
-          <input
-            value={painTitle}
-            onChange={(event) => setPainTitle(event.target.value)}
-            maxLength={160}
-            placeholder="Add a pain to resolve"
-            aria-label="Add a pain to resolve"
-            className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-sky-400"
-          />
-          <button
-            type="button"
-            disabled={pending || painTitle.trim().length < 2}
-            onClick={() => add("pain")}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white disabled:opacity-40"
-          >
-            <Plus className="h-4 w-4" />
-            Add
-          </button>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {editableRows(pains, "pain")}
+        <div className="overflow-x-auto">
+          <div className="grid min-w-[960px] grid-cols-[1.1fr_1.35fr_1.55fr_7.5rem_11rem] gap-2 bg-slate-950 px-3 py-2 text-[10px] font-bold uppercase tracking-[.08em] text-white"><span>Problem</span><span>Issue</span><span>How I&apos;ll resolve it</span><span>Cost</span><span /></div>
+          <div className="grid min-w-[960px] grid-cols-[1.1fr_1.35fr_1.55fr_7.5rem_11rem] gap-2 bg-slate-50 px-3 py-2">
+            <input value={painTitle} onChange={(event) => setPainTitle(event.target.value)} maxLength={160} placeholder="Problem title" aria-label="Add a pain to resolve" className="min-h-10 rounded-md border border-slate-300 bg-white px-2.5 text-sm outline-none focus:border-sky-400" />
+            <input value={painIssue} onChange={(event) => setPainIssue(event.target.value)} maxLength={500} placeholder="What is wrong?" aria-label="New pain issue" className="min-h-10 rounded-md border border-slate-300 bg-white px-2.5 text-sm outline-none focus:border-sky-400" />
+            <input value={painResolution} onChange={(event) => setPainResolution(event.target.value)} maxLength={500} placeholder="How will I resolve it?" aria-label="New pain resolution" className="min-h-10 rounded-md border border-slate-300 bg-white px-2.5 text-sm outline-none focus:border-sky-400" />
+            <label className="flex min-h-10 items-center rounded-md border border-slate-300 bg-white px-2 text-sm"><span className="text-slate-400">$</span><input aria-label="New pain cost" inputMode="decimal" type="number" min="0" step="0.01" value={painCost} onChange={(event) => setPainCost(event.target.value)} placeholder="0" className="min-w-0 flex-1 bg-transparent px-1 outline-none" /></label>
+            <button type="button" disabled={pending || painTitle.trim().length < 2} onClick={() => add("pain")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40"><Plus className="h-4 w-4" />Add</button>
+          </div>
+          {pains.map((item) => <PainRow key={`${item.id}-${item.updated_at}`} item={item} pending={pending} onRun={run} onRewrite={() => rewrite(item, "pain")} onDelete={() => remove(item, "pain")} />)}
           {!pains.length ? (
-            <p className="px-4 py-6 text-center text-sm text-slate-500">
+            <p className="min-w-[960px] px-4 py-6 text-center text-sm text-slate-500">
               No pains added yet.
             </p>
           ) : null}

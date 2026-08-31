@@ -21,14 +21,14 @@ export default async function AdminAiToolsPage() {
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-8 lg:px-10">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-[92rem]">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0066cc]">Manager Portal</p>
         <h1 className="mt-2 text-3xl font-bold text-slate-950">Manager Tools</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Internal tools for documents, supplier requests, material information, deliveries, and customer order paths.</p>
-        <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {tools.map((tool) => {
             const external = tool.href.startsWith("https://")
-            return <Link key={tool.href} href={tool.href} prefetch={false} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="group rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:border-sky-300 hover:shadow-md"><span className="flex items-start justify-between gap-3"><span className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-slate-950 text-white"><tool.icon className="h-5 w-5" /></span>{"badge" in tool ? <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[.08em] text-amber-800">{tool.badge}</span> : null}</span><h2 className="mt-4 text-lg font-bold text-slate-950">{tool.title}</h2><p className="mt-1 text-sm leading-6 text-slate-500">{tool.description}</p><span className="mt-4 inline-flex text-sm font-semibold text-[#0066cc]">{external ? "Open preview" : "Open tool"}</span></Link>
+            return <Link key={tool.href} href={tool.href} prefetch={false} target={external ? "_blank" : undefined} rel={external ? "noopener noreferrer" : undefined} className="group grid min-h-24 grid-cols-[2.5rem_minmax(0,1fr)_auto] items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:border-sky-300 hover:shadow-md"><span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 text-white"><tool.icon className="h-4 w-4" /></span><span className="min-w-0"><span className="flex items-center gap-2"><h2 className="truncate text-sm font-bold text-slate-950">{tool.title}</h2>{"badge" in tool ? <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[.08em] text-amber-800">{tool.badge}</span> : null}</span><span className="mt-1 line-clamp-2 block text-xs leading-5 text-slate-500">{tool.description}</span></span><span className="pt-1 text-xs font-semibold text-[#0066cc]">Open</span></Link>
           })}
         </section>
       </div>

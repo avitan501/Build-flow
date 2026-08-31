@@ -56,6 +56,9 @@ async function unlockedDavidDashboard() {
 export async function createDavidDashboardItemAction(input: {
   title: string;
   nextStep?: string;
+  issue?: string;
+  resolution?: string;
+  cost?: string;
   kind: "task" | "pain" | "idea";
   publishedToCarlos?: boolean;
 }): Promise<DavidDashboardResult> {
@@ -66,10 +69,18 @@ export async function createDavidDashboardItemAction(input: {
   const nextStep = String(input.nextStep ?? "")
     .trim()
     .replace(/\s+/g, " ");
+  const issue = String(input.issue ?? "").trim().replace(/\s+/g, " ");
+  const resolution = String(input.resolution ?? "").trim().replace(/\s+/g, " ");
+  const costText = String(input.cost ?? "").trim();
+  const cost = costText ? Number(costText) : null;
   if (title.length < 2 || title.length > 160)
     return { ok: false, error: "Enter 2 to 160 characters." };
   if (nextStep.length > 500)
     return { ok: false, error: "Keep the next step under 500 characters." };
+  if (issue.length > 500 || resolution.length > 500)
+    return { ok: false, error: "Keep each pain detail under 500 characters." };
+  if (cost !== null && (!Number.isFinite(cost) || cost < 0 || cost > 999999999.99))
+    return { ok: false, error: "Enter a valid cost." };
   if (!["task", "pain", "idea"].includes(input.kind)) {
     return { ok: false, error: "Choose a valid list." };
   }
@@ -83,11 +94,12 @@ export async function createDavidDashboardItemAction(input: {
     progress_percent: 0,
     summary:
       input.kind === "pain"
-        ? "Pain David is resolving."
+        ? issue
         : input.kind === "idea"
           ? "David's private idea."
           : "",
-    next_step: nextStep,
+    next_step: input.kind === "pain" ? resolution : nextStep,
+    resolution_cost: input.kind === "pain" ? cost : null,
     source_chat_title: "David Dashboard",
     priority: input.kind === "task" ? 1 : 2,
     sort_order: 0,
@@ -196,6 +208,9 @@ export async function setDavidTaskPublishedAction(input: {
 export async function updateDavidDashboardItemAction(input: {
   id: string;
   title: string;
+  issue?: string;
+  resolution?: string;
+  cost?: string;
   kind: "pain" | "idea";
 }): Promise<DavidDashboardResult> {
   const context = await unlockedDavidDashboard();
@@ -210,9 +225,22 @@ export async function updateDavidDashboardItemAction(input: {
   if (title.length < 2 || title.length > 160) {
     return { ok: false, error: "Enter 2 to 160 characters." };
   }
+  const issue = String(input.issue ?? "").trim().replace(/\s+/g, " ");
+  const resolution = String(input.resolution ?? "").trim().replace(/\s+/g, " ");
+  const costText = String(input.cost ?? "").trim();
+  const cost = costText ? Number(costText) : null;
+  if (issue.length > 500 || resolution.length > 500) {
+    return { ok: false, error: "Keep each pain detail under 500 characters." };
+  }
+  if (cost !== null && (!Number.isFinite(cost) || cost < 0 || cost > 999999999.99)) {
+    return { ok: false, error: "Enter a valid cost." };
+  }
+  const changes = input.kind === "pain"
+    ? { title, summary: issue, next_step: resolution, resolution_cost: cost }
+    : { title };
   const { data, error } = await context.supabase
     .from("website_work_items")
-    .update({ title })
+    .update(changes)
     .eq("id", input.id)
     .eq("item_kind", input.kind)
     .select("id")
