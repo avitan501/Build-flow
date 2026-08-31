@@ -260,6 +260,21 @@ test("prepare, supersede, and confirm serialize per customer phone", async () =>
   expect(broker.slice(confirmStart, nextAfterConfirm)).toContain(
     "pg_advisory_xact_lock(hashtextextended(${phone}, 0))",
   );
+  const confirmBody = broker.slice(confirmStart, nextAfterConfirm);
+  const lockIndex = confirmBody.indexOf(
+    "pg_advisory_xact_lock(hashtextextended(${phone}, 0))",
+  );
+  const canonicalInterveningIndex = confirmBody.indexOf(
+    "from public.aura_communications as intervening",
+    lockIndex,
+  );
+  expect(canonicalInterveningIndex).toBeGreaterThan(lockIndex);
+  expect(confirmBody.slice(canonicalInterveningIndex)).toContain(
+    "intervening.counterparty_phone = ${phone}",
+  );
+  expect(confirmBody.slice(canonicalInterveningIndex)).toContain(
+    "intervening.occurred_at <= confirmation.occurred_at",
+  );
 });
 
 test("an added item reopens completion and supersedes an unconfirmed summary", async () => {

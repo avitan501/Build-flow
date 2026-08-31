@@ -4426,6 +4426,10 @@ async function confirmPendingSmsRequest(
       join public.aura_sms_request_pending_confirmations as pending
         on pending.id = state.pending_confirmation_id
        and pending.state_id = state.id
+      join public.aura_communications as confirmation
+        on confirmation.id = ${communicationId}::uuid
+       and confirmation.direction = 'incoming'
+       and confirmation.counterparty_phone = ${phone}
       where state.id = ${pending.state_id}::uuid
         and state.status = 'awaiting_confirmation'
         and state.intake_phase = 'summary_confirmation'
@@ -4434,6 +4438,17 @@ async function confirmPendingSmsRequest(
         and pending.id = ${pending.id}::uuid
         and pending.status = 'pending'
         and pending.request_id is null
+        and pending.summary_sent_at is not null
+        and confirmation.occurred_at >= pending.summary_sent_at
+        and not exists (
+          select 1
+          from public.aura_communications as intervening
+          where intervening.direction = 'incoming'
+            and intervening.counterparty_phone = ${phone}
+            and intervening.id <> ${communicationId}::uuid
+            and intervening.occurred_at > pending.summary_sent_at
+            and intervening.occurred_at <= confirmation.occurred_at
+        )
       for update of state, pending
     `;
     if (locked[0]?.request_id) {
