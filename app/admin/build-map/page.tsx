@@ -22,17 +22,12 @@ import { EmployeeClockStatus } from "@/components/buildflow/employee-clock-statu
 import { ManagerDashboardAiSearch } from "@/components/buildflow/manager-dashboard-ai-search";
 import { ManagerNotificationControl } from "@/components/buildflow/manager-notification-control";
 import {
-  ManagerTodayTasks,
-  type ManagerTodayTask,
-} from "@/components/buildflow/manager-today-tasks";
-import {
   DAILY_WORK_SUMMARY_PREFIX,
   parseDailyWorkSummary,
 } from "@/lib/daily-work-summary";
 import { requireManagerPortalProfile } from "@/lib/auth";
 import {
   DASHBOARD_AI_HISTORY_PREFIX,
-  TODAY_TASK_PREFIX,
   parseDashboardAiHistory,
 } from "@/lib/manager-command-center";
 import {
@@ -234,28 +229,6 @@ export default async function AdminDashboardPage({
   const todaySummary = todaySummaryRow
     ? parseDailyWorkSummary(todaySummaryRow)
     : null;
-  const focusTasks: ManagerTodayTask[] = goals
-    .filter(
-      (goal) => goal.is_focus || goal.details?.startsWith(TODAY_TASK_PREFIX),
-    )
-    .filter((goal) => goal.status !== "archived")
-    .filter(
-      (goal) =>
-        goal.status === "open" ||
-        newYorkDate.format(new Date(goal.created_at)) === todayKey,
-    )
-    .sort(
-      (a, b) =>
-        Number(a.status === "completed") - Number(b.status === "completed") ||
-        b.created_at.localeCompare(a.created_at),
-    )
-    .map(({ id, title, status, created_at }) => ({
-      id,
-      title,
-      status:
-        status === "completed" ? ("completed" as const) : ("open" as const),
-      created_at,
-    }));
   const managerSections = [
     {
       title: "Customers",
@@ -355,10 +328,9 @@ export default async function AdminDashboardPage({
 
         <section
           aria-label="Today workspace"
-          className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4"
+          className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3"
         >
           <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled />
-          <ManagerTodayTasks tasks={focusTasks} />
           <Link
             href="/admin/daily-summary"
             className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 shadow-sm"
@@ -502,10 +474,10 @@ export default async function AdminDashboardPage({
             </span>
             <div className="min-w-0">
               <h2 id="targets-heading" className="font-semibold">
-                Carlos Work
+                Carlos Dashboard
               </h2>
               <p className="mt-0.5 text-xs text-slate-500">
-                One priority, clear tasks, and the next action.
+                Carlos&apos;s tasks and next actions.
               </p>
             </div>
           </header>

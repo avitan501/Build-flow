@@ -17,8 +17,8 @@ export function WebsiteWorkPinForm() {
       <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-slate-950 text-white">
         <LockKeyhole className="h-5 w-5" />
       </span>
-      <h1 className="mt-5 text-2xl font-semibold tracking-tight text-slate-950">Website work</h1>
-      <p className="mt-1 text-sm leading-6 text-slate-600">Enter the manager PIN to see the short website status board.</p>
+      <h1 className="mt-5 text-2xl font-semibold tracking-tight text-slate-950">David Dashboard</h1>
+      <p className="mt-1 text-sm leading-6 text-slate-600">Enter the manager PIN to open David&apos;s private tasks.</p>
       <label className="mt-5 grid gap-1.5 text-sm font-semibold text-slate-800">
         PIN
         <input

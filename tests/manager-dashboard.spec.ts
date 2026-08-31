@@ -8,18 +8,13 @@ import { managerPipelineStage } from "@/lib/manager-dashboard";
 const root = process.cwd();
 
 test("manager dashboard is the employee daily command center", async () => {
-  const [page, goalsPage, shell, goalActions, dashboardActions, todayTasks] =
+  const [page, goalsPage, shell, goalActions] =
     await Promise.all([
       readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
       readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
       readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
       readFile(
         path.join(root, "app/admin/goals-progress/goal-actions.ts"),
-        "utf8",
-      ),
-      readFile(path.join(root, "app/admin/build-map/actions.ts"), "utf8"),
-      readFile(
-        path.join(root, "components/buildflow/manager-today-tasks.tsx"),
         "utf8",
       ),
     ]);
@@ -35,28 +30,25 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).not.toContain("className={`h-2.5 w-2.5 shrink-0 rounded-full");
   expect(page).toContain("client_quote_status");
   expect(page).toContain('id="targets-heading" className="font-semibold">');
-  expect(page).toContain("Carlos Work");
+  expect(page).toContain("Carlos Dashboard");
   expect(page).not.toContain("<GoalDisclosure");
   expect(page).not.toContain('GoalDisclosure assignee="david"');
   expect(page).toContain("<CarlosGoalsWorkspace embedded />");
   expect(page).not.toContain('href="/admin/goals-progress#abc-supply-demo"');
   expect(goalsPage).toContain('title="Prepare ABC Demo"');
   expect(goalsPage).toContain('title="Build Supplier Relationships"');
-  expect(page).toContain("One priority, clear tasks, and the next action.");
+  expect(page).not.toContain("One priority, clear tasks, and the next action.");
   expect(page).not.toContain('assignee="david"');
   expect(page).toContain("Manager tools");
   expect(page).toContain('id="phone-notifications"');
   expect(page).not.toContain("ManagerNotificationCenter");
   expect(page).toContain("<ManagerNotificationControl settings />");
-  expect(page).toContain("ManagerTodayTasks");
-  expect(page).toContain("TODAY_TASK_PREFIX");
+  expect(page).not.toContain("ManagerTodayTasks");
+  expect(page).not.toContain("TODAY_TASK_PREFIX");
   expect(page).toContain("ManagerDashboardAiSearch");
   expect(page).toContain("Dashboard AI search");
   expect(page).toContain("EmployeeClockStatus");
   expect(page.indexOf("<ManagerDashboardAiSearch")).toBeLessThan(
-    page.indexOf('id="pipeline-heading"'),
-  );
-  expect(page.indexOf("<ManagerTodayTasks tasks")).toBeLessThan(
     page.indexOf('id="pipeline-heading"'),
   );
   expect(page).toContain("Orders &amp; Requests");
@@ -68,13 +60,10 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain("Supplier Quote Storage");
   expect(page).toContain("Quote Comparison");
   expect(page).toContain('{ href: CARLOS_MEETING_URL, label: "Google Meet" }');
+  expect(shell).toContain('label: "Manager Dashboard"');
+  expect(shell).toContain('{ href: "/admin/users", label: "Customers"');
   expect(shell).toContain(
-    '<span className="min-w-0 flex-1">Manager Dashboard</span>',
-  );
-  expect(shell).toContain('{ href: "/admin/users", label: "CRM"');
-  expect(shell).toContain('const homeHref = "/admin/build-map"');
-  expect(shell).toContain(
-    '<span className="min-w-0 flex-1">Communications</span>',
+    'label: "Communications"',
   );
   expect(shell.indexOf("Communications")).toBeGreaterThan(
     shell.indexOf("</nav>"),
@@ -83,16 +72,6 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(shell).not.toContain('label: "Manager Settings"');
   expect(shell).toContain("EmployeeActivityReporter");
   expect(goalActions).toContain('revalidatePath("/admin/build-map")');
-  expect(dashboardActions).toContain("createTodayTaskAction");
-  expect(dashboardActions).toContain("setTodayTaskCompletedAction");
-  expect(dashboardActions).toContain(
-    '.like("details", `${TODAY_TASK_PREFIX}%`)',
-  );
-  expect(todayTasks).toContain(">Focus<");
-  expect(todayTasks).toContain("Carlos&apos;s current priorities");
-  expect(todayTasks).toContain('aria-label="Add a task"');
-  expect(todayTasks).toContain("America/New_York");
-  expect(todayTasks).toContain('role="checkbox"');
 });
 
 test("request pipeline moves work through pricing, approval, and delivery", () => {

@@ -5,7 +5,6 @@ import {
   Check,
   ChevronDown,
   Plus,
-  Star,
   Trash2,
   X,
 } from "lucide-react";
@@ -16,7 +15,6 @@ import { createPortal } from "react-dom";
 import {
   createManagerGoalAction,
   deleteManagerGoalAction,
-  setManagerGoalFocusAction,
 } from "@/app/admin/goals-progress/goal-actions";
 import { ManagerGoalStatusSelect } from "@/components/buildflow/manager-goal-status-select";
 import type { ManagerGoalStatus } from "@/lib/manager-goal-status";
@@ -34,7 +32,6 @@ export function AddManagerGoal({ assignee }: { assignee: "david" | "carlos" }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
-  const [focus, setFocus] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const name = assignee === "david" ? "David" : "Carlos";
@@ -51,7 +48,6 @@ export function AddManagerGoal({ assignee }: { assignee: "david" | "carlos" }) {
         assignee,
         title,
         details,
-        focus,
       });
       if (!result.ok) {
         setError(result.error);
@@ -59,7 +55,6 @@ export function AddManagerGoal({ assignee }: { assignee: "david" | "carlos" }) {
       }
       setTitle("");
       setDetails("");
-      setFocus(false);
       setOpen(false);
     });
   }
@@ -130,16 +125,6 @@ export function AddManagerGoal({ assignee }: { assignee: "david" | "carlos" }) {
                       className="rounded-md border border-slate-300 p-3 font-normal"
                     />
                   </label>
-                  <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 text-sm font-semibold text-amber-950">
-                    <input
-                      type="checkbox"
-                      checked={focus}
-                      onChange={(event) => setFocus(event.target.checked)}
-                      className="h-4 w-4 accent-amber-500"
-                    />
-                    <Star className="h-4 w-4 text-amber-600" />
-                    Add to Focus
-                  </label>
                   {error ? (
                     <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
                       {error}
@@ -179,8 +164,6 @@ export function CustomManagerGoals({ goals }: { goals: ManagerGoalRecord[] }) {
   if (!goals.length) return null;
   const activeGoals = goals.filter((goal) => goal.status !== "archived");
   const archivedGoals = goals.filter((goal) => goal.status === "archived");
-  const focusGoals = activeGoals.filter((goal) => goal.is_focus);
-  const otherGoals = activeGoals.filter((goal) => !goal.is_focus);
 
   function run(
     action: () => Promise<{ ok: true } | { ok: false; error: string }>,
@@ -221,12 +204,6 @@ export function CustomManagerGoals({ goals }: { goals: ManagerGoalRecord[] }) {
             aria-hidden="true"
           />
           <div className="col-start-2 mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-            {goal.is_focus ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800">
-                <Star className="h-3 w-3 fill-current" />
-                Focus
-              </span>
-            ) : null}
             <ManagerGoalStatusSelect goalId={goal.id} status={goal.status} />
           </div>
         </summary>
@@ -237,25 +214,7 @@ export function CustomManagerGoals({ goals }: { goals: ManagerGoalRecord[] }) {
           <p className="mt-1 whitespace-pre-line text-xs leading-5 text-slate-600">
             {goal.details || "No next step added."}
           </p>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() =>
-                run(() =>
-                  setManagerGoalFocusAction({
-                    id: goal.id,
-                    focus: !goal.is_focus,
-                  }),
-                )
-              }
-              className={`inline-flex min-h-8 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-semibold ${goal.is_focus ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-300 bg-white text-slate-700"}`}
-            >
-              <Star
-                className={`h-3.5 w-3.5 ${goal.is_focus ? "fill-current" : ""}`}
-              />
-              {goal.is_focus ? "Remove from Focus" : "Add to Focus"}
-            </button>
+          <div className="mt-3 flex justify-end">
             <button
               type="button"
               disabled={pending}
@@ -289,29 +248,14 @@ export function CustomManagerGoals({ goals }: { goals: ManagerGoalRecord[] }) {
             Tasks
           </h3>
           <p className="mt-0.5 text-[11px] text-slate-500">
-            Focus first. Open a task for its next step.
+            Open a task for its next step.
           </p>
         </div>
         <span className="shrink-0 text-[10px] font-bold text-slate-500">
           {activeGoals.length} open
         </span>
       </header>
-      {focusGoals.length ? (
-        <div>
-          <p className="border-b border-amber-100 bg-amber-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
-            Tomorrow&apos;s focus
-          </p>
-          {focusGoals.map(goalRow)}
-        </div>
-      ) : null}
-      {otherGoals.length ? (
-        <div>
-          <p className="border-b border-slate-100 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-            Other tasks
-          </p>
-          {otherGoals.map(goalRow)}
-        </div>
-      ) : null}
+      {activeGoals.length ? <div>{activeGoals.map(goalRow)}</div> : null}
       {!activeGoals.length ? (
         <p className="px-3 py-4 text-center text-xs text-slate-500">
           No active tasks.

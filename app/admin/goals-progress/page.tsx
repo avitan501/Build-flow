@@ -7,7 +7,6 @@ import {
   ListTodo,
   PhoneCall,
   Target,
-  UserRound,
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -23,14 +22,10 @@ import {
   type OutreachLeadRecord,
 } from "@/components/buildflow/client-target-outreach";
 import {
-  AddManagerGoal,
-  CustomManagerGoals,
   type ManagerGoalRecord,
 } from "@/components/buildflow/manager-goals";
 import { ManagerGoalStatusSelect } from "@/components/buildflow/manager-goal-status-select";
 import { ManagerNotificationCenter } from "@/components/buildflow/manager-notification-center";
-import { DAILY_WORK_SUMMARY_PREFIX } from "@/lib/daily-work-summary";
-import { SUPPLIER_PARTNER_NOTES_PREFIX } from "@/lib/supplier-partners/store";
 import type {
   AffiliateActivity,
   AffiliateAttachment,
@@ -121,32 +116,6 @@ function GoalDisclosure({
       </summary>
       <div className="border-t border-slate-200 p-3 sm:p-4">{children}</div>
     </details>
-  );
-}
-
-function PersonHeader({
-  assignee,
-  description,
-}: {
-  assignee: "david" | "carlos";
-  description: string;
-}) {
-  const name = assignee === "david" ? "David" : "Carlos";
-  return (
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300 pb-3">
-      <div className="flex items-center gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-slate-950 text-white">
-          <UserRound className="h-5 w-5" />
-        </span>
-        <div>
-          <h2 id={`${assignee}-goals-title`} className="text-2xl font-semibold">
-            {name}
-          </h2>
-          <p className="text-sm text-slate-600">{description}</p>
-        </div>
-      </div>
-      <AddManagerGoal assignee={assignee} />
-    </header>
   );
 }
 
@@ -321,10 +290,10 @@ function AiTaskInbox() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">
-            Phone intake
+            Phone Intake Tasks
           </p>
           <h3 className="text-sm font-semibold text-slate-950">
-            Review messages
+            Review messages and create tasks
           </h3>
           <p className="mt-0.5 text-xs text-slate-600">
             Turn a message into a task only when action is needed.
@@ -345,7 +314,7 @@ function AiTaskInbox() {
   );
 }
 
-function WebsiteWorkBoardLink() {
+function DavidDashboardLink() {
   return (
     <Link
       href="/admin/goals-progress/website-work"
@@ -356,13 +325,13 @@ function WebsiteWorkBoardLink() {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">
-          Website
+          Private
         </span>
         <span className="block text-sm font-semibold text-slate-950">
-          Website tasks
+          David Dashboard
         </span>
         <span className="block text-[11px] text-slate-500">
-          Status, owner, and next step.
+          Tasks, publishing, and pains to resolve.
         </span>
       </span>
       <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
@@ -554,7 +523,7 @@ export async function CarlosGoalsWorkspace({
     .eq("assignee", "carlos")
     .order("status")
     .order("created_at", { ascending: false });
-  const [clientResult, goalResult, leadResult] = await Promise.all([
+  const [clientResult, goalResult, leadResult, publishedResult] = await Promise.all([
     supabase
       .from("profiles")
       .select("id,full_name,company_name,email,phone,preferred_language")
@@ -572,10 +541,20 @@ export async function CarlosGoalsWorkspace({
       .order("status")
       .order("created_at", { ascending: false })
       .returns<OutreachLeadRecord[]>(),
+    supabase
+      .from("website_work_items")
+      .select("id,title,next_step,status")
+      .eq("published_to_carlos", true)
+      .eq("item_kind", "task")
+      .not("status", "in", "(completed,superseded,archived)")
+      .order("priority")
+      .order("sort_order")
+      .returns<Array<{ id: string; title: string; next_step: string; status: string }>>(),
   ]);
   const clients = clientResult.error ? [] : (clientResult.data ?? []);
   const goals = goalResult.error ? [] : (goalResult.data ?? []);
   const leads = leadResult.error ? [] : (leadResult.data ?? []);
+  const publishedTasks = publishedResult.error ? [] : (publishedResult.data ?? []);
   const fixedStatuses = new Map<CarlosFixedGoalKey, ManagerGoalStatus>();
   for (const goal of goals) {
     const key = parseFixedGoalKey(goal.details);
@@ -583,14 +562,6 @@ export async function CarlosGoalsWorkspace({
   }
   const statusFor = (key: CarlosFixedGoalKey) =>
     fixedStatuses.get(key) ?? "open";
-  const regularGoals = goals
-    .filter(
-      (goal) =>
-        !goal.details?.startsWith(DAILY_WORK_SUMMARY_PREFIX) &&
-        !goal.details?.startsWith(SUPPLIER_PARTNER_NOTES_PREFIX) &&
-        !parseFixedGoalKey(goal.details),
-    )
-    .filter((goal) => goal.assignee === "carlos");
   const fixedGoals: Array<{ key: CarlosFixedGoalKey; content: ReactNode }> = [
     {
       key: "client-target",
@@ -651,57 +622,19 @@ export async function CarlosGoalsWorkspace({
 
   const goalsWorkspace = (
     <>
-      {embedded ? (
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-950">
-              Carlos Work
-            </h3>
-            <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
-              One priority, clear tasks, and the next action.
-            </p>
-          </div>
-          <AddManagerGoal assignee="carlos" />
-        </div>
-      ) : null}
-      <CustomManagerGoals goals={regularGoals} />
-      <section
-        className="mt-3 grid gap-2 md:grid-cols-2"
-        aria-label="Task tools"
-      >
-        <WebsiteWorkBoardLink />
-        {access.owner ? <AiTaskInbox /> : null}
+      <section className="grid gap-2" aria-label="Carlos tasks">
+        {activeFixedGoals.map((goal) => <div key={goal.key}>{goal.content}</div>)}
       </section>
-      <details
-        className="group mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white"
-        aria-labelledby="carlos-work-areas"
-      >
-        <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-3 py-2.5">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-700">
-            <Target className="h-4 w-4" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span
-              id="carlos-work-areas"
-              className="block text-sm font-semibold text-slate-950"
-            >
-              Work areas
-            </span>
-            <span className="block text-[11px] text-slate-500">
-              Clients, suppliers, programs, and demos.
-            </span>
-          </span>
-          <span className="text-[10px] font-bold text-slate-500">
-            {activeFixedGoals.length}
-          </span>
-          <ChevronDown className="h-4 w-4 text-slate-400 transition group-open:rotate-180" />
-        </summary>
-        <div className="grid gap-2 border-t border-slate-200 bg-slate-50 p-2">
-          {activeFixedGoals.map((goal) => (
-            <div key={goal.key}>{goal.content}</div>
-          ))}
-        </div>
-      </details>
+      {publishedTasks.length ? (
+        <section className="mt-3 overflow-hidden rounded-lg border border-sky-200 bg-white" aria-labelledby="published-by-david">
+          <header className="border-b border-sky-100 bg-sky-50 px-3 py-2.5">
+            <h3 id="published-by-david" className="text-xs font-bold uppercase tracking-[.12em] text-sky-800">From David</h3>
+          </header>
+          <div className="divide-y divide-slate-100">
+            {publishedTasks.map((task) => <div key={task.id} className="px-3 py-2.5"><p className="text-sm font-semibold text-slate-950">{task.title}</p>{task.next_step ? <p className="mt-0.5 text-xs text-slate-500">{task.next_step}</p> : null}</div>)}
+          </div>
+        </section>
+      ) : null}
       {archivedFixedGoals.length ? (
         <details className="group mt-3 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
           <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-xs font-semibold text-slate-600">
@@ -717,6 +650,8 @@ export async function CarlosGoalsWorkspace({
           </div>
         </details>
       ) : null}
+      {access.owner ? <div className="mt-5"><AiTaskInbox /></div> : null}
+      {access.owner ? <div className="mt-3"><DavidDashboardLink /></div> : null}
     </>
   );
 
@@ -730,20 +665,14 @@ export async function CarlosGoalsWorkspace({
             Manager Portal
           </p>
           <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">
-            Carlos Work
+            Carlos Dashboard
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            One priority, clear tasks, and the next action.
+            Carlos&apos;s tasks and next actions in one clean list.
           </p>
         </header>
 
-        <section aria-labelledby="carlos-goals-title" className="mt-7">
-          <PersonHeader
-            assignee="carlos"
-            description="Clear goals and next steps"
-          />
-          {goalsWorkspace}
-        </section>
+        <section aria-label="Carlos tasks" className="mt-7">{goalsWorkspace}</section>
       </div>
     </main>
   );

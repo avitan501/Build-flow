@@ -44,7 +44,7 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain("await requireManagerPortalProfile()");
   expect(page).toContain("async function OwnerAffiliateGoal({ status }");
   expect(page).toContain("const { supabase } = await requireAdminProfile()");
-  expect(page).toContain("Carlos Work");
+  expect(page).toContain("Carlos Dashboard");
   expect(page).toContain("Contact New Clients");
   expect(page).toContain("<AddOutreachLead />");
   expect(page).toContain("<OutreachLeadList");
@@ -53,8 +53,7 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain('title="Build Supplier Relationships"');
   expect(page).toContain("Prepare ABC Demo");
   expect(page).toContain('href="/admin/abc"');
-  expect(page).toContain("<PersonHeader");
-  expect(page).toContain('assignee="carlos"');
+  expect(page).not.toContain("<PersonHeader");
   expect(page).toContain("<AffiliateProgramTracker");
   expect(page).toContain("content: access.owner ? (");
   expect(page).toContain("<OwnerAffiliateGoal status=");
@@ -65,7 +64,8 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain('id="supplier-affiliate-program"');
   expect(page).toContain('fixedKey="supplier-affiliate-program"');
   expect(page).toContain('.from("manager_goals")');
-  expect(page).toContain("<AddManagerGoal");
+  expect(page).toContain("activeFixedGoals.map");
+  expect(page).toContain("published_to_carlos");
   expect(page).not.toContain('PersonHeader assignee="david"');
   expect(page).toContain('.eq("assignee", "carlos")');
   expect(page).not.toContain("david-goals-title");
@@ -183,23 +183,15 @@ test("manager goals are persistent, status-aware, archivable, and protected for 
   );
 });
 
-test("Carlos goals can move in and out of the compact Focus list", async () => {
-  const [page, component, actions, dashboard, focusList, migration] =
+test("Carlos dashboard removes the old Focus and Work Area duplication", async () => {
+  const [page, component, dashboard, migration] =
     await Promise.all([
       readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
       readFile(
         path.join(root, "components/buildflow/manager-goals.tsx"),
         "utf8",
       ),
-      readFile(
-        path.join(root, "app/admin/goals-progress/goal-actions.ts"),
-        "utf8",
-      ),
       readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
-      readFile(
-        path.join(root, "components/buildflow/manager-today-tasks.tsx"),
-        "utf8",
-      ),
       readFile(
         path.join(
           root,
@@ -209,14 +201,13 @@ test("Carlos goals can move in and out of the compact Focus list", async () => {
       ),
     ]);
 
-  expect(page).toContain("status,is_focus");
-  expect(component).toContain("Add to Focus");
-  expect(component).toContain("Remove from Focus");
-  expect(actions).toContain("setManagerGoalFocusAction");
-  expect(actions).toContain(".update({ is_focus: input.focus })");
-  expect(dashboard).toContain("goal.is_focus ||");
-  expect(focusList).toContain(">Focus<");
-  expect(focusList).not.toContain("Today&apos;s tasks");
+  expect(page).toContain("Carlos Dashboard");
+  expect(page).not.toContain("Work areas");
+  expect(page).not.toContain("One priority, clear tasks");
+  expect(component).not.toContain("Add to Focus");
+  expect(component).not.toContain("Remove from Focus");
+  expect(dashboard).not.toContain("goal.is_focus ||");
+  expect(dashboard).not.toContain("ManagerTodayTasks");
   expect(migration).toContain(
     "add column if not exists is_focus boolean not null default false",
   );
@@ -376,13 +367,12 @@ test("Goals and lists use collapsed disclosures to keep the page compact", async
   expect(page).toContain("<details");
   expect(page).toContain("Clients in the system");
   expect(leads).toContain('<details className="group');
-  expect(goals).toContain("focusGoals.map(goalRow)");
-  expect(goals).toContain("otherGoals.map(goalRow)");
+  expect(goals).toContain("activeGoals.map(goalRow)");
   expect(goals).toContain("grid-cols-[2rem_minmax(0,1fr)_auto]");
   expect(goals).toContain("min-h-16");
 });
 
-test("Carlos work keeps one short task summary, Focus first, and work areas collapsed", async () => {
+test("Carlos Dashboard keeps five direct tasks without Focus or Work Area wrappers", async () => {
   const [page, goals] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/manager-goals.tsx"), "utf8"),
@@ -391,13 +381,10 @@ test("Carlos work keeps one short task summary, Focus first, and work areas coll
   expect(goals).toContain("{goal.title}");
   expect(goals).toContain("Next step");
   expect(goals).toContain("text-xs leading-5");
-  expect(goals.indexOf("{focusGoals.map(goalRow)}")).toBeLessThan(
-    goals.indexOf("{otherGoals.map(goalRow)}"),
-  );
-  expect(goals).toContain("Focus first. Open a task for its next step.");
-  expect(page).toContain('aria-labelledby="carlos-work-areas"');
-  expect(page).toContain("Work areas");
-  expect(page).not.toMatch(/<details[^>]+open[^>]*aria-labelledby="carlos-work-areas"/);
+  expect(goals).not.toContain("Focus first");
+  expect(page).toContain("activeFixedGoals.map");
+  expect(page).not.toContain('aria-labelledby="carlos-work-areas"');
+  expect(page).not.toContain("Work areas");
 });
 
 test("affiliate tracker is persistent, owner-only, filterable, and setup-gated", async () => {
