@@ -3180,13 +3180,19 @@ function extractReviewMaterialLines(messages: string[]) {
     each: "each",
   };
   const materialWords =
-    /\b(?:lumber|stud|plywood|sheetrock|drywall|screw|nail|tape|compound|thinset|mortar|primer|paint|corner\s+(?:bead|bit)|cement|concrete|rebar|wire|outlet|breaker|pipe|fitting|tile|shingle|roof|door|window|cabinet|heater|insulation|siding|molding)\b/i;
+    /\b(?:lumber|studs?|plywood|sheetrock|drywall|screws?|nails?|tape|compound|thinset|mortar|primer|paint|corner\s+(?:bead|bit)|cement|concrete|rebar|wires?|outlets?|breakers?|interruptores?|pipes?|fittings?|tiles?|shingles?|roofing?|doors?|windows?|cabinets?|heaters?|insulation|siding|moldings?|yeso)\b|(?:גבס|מפסקים?|ברגים|לוחות?|צבע|בידוד|דלתות?|חלונות?)/i;
   const dimensionalMaterial =
     /\b\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?(?:\s*[x×]\s*\d+(?:\.\d+)?)?\b/i;
   return messages
     .flatMap(splitSmsMaterialClauses)
     .flatMap((rawLine) => {
-      const line = rawLine.trim().replace(/^[-*•]\s*/, "");
+      const line = rawLine
+        .trim()
+        .replace(/^[-*•]\s*/, "")
+        .replace(
+          /^(?:(?:i|we)\s+(?:need|want|would\s+like|want\s+to\s+order)|(?:please\s+)?(?:order|send)|(?:yo\s+)?(?:necesito|quiero|ordena(?:r)?)|(?:אני|אנחנו)?\s*(?:צריך|צריכה|צריכים|רוצה|רוצים|להזמין))\s+/i,
+          "",
+        );
       if (!line || line.length > 300) return [];
       const numbered = line.match(
         /^(\d+(?:\.\d+)?)\s*(pc|pcs|piece|pieces|box|boxes|sheet|sheets|bucket|buckets|bag|bags|roll|rolls|ea|each)?\s+(.+)$/i,
@@ -3436,6 +3442,7 @@ async function prepareSmsRequestConfirmation(input: {
     !input.request.items.length ||
     !input.listComplete ||
     !input.customerAddress.trim() ||
+    !input.intelligenceReady ||
     (!SIMPLE_REQUEST_INTAKE &&
       (!input.customerAddress.trim() ||
         !input.customerNeededBy.trim() ||
@@ -4356,6 +4363,84 @@ async function processCustomerSmsAutomation(
       persistedOrderState,
     );
   }
+  const latestExtractedItems = extractReviewMaterialLines([effectiveBody]);
+  const latestTurnIsMaterialRequest =
+    looksLikeSmsMaterialRequest(effectiveBody) || latestExtractedItems.length > 0;
+  // Concrete evidence in the newest customer turn wins over an older open
+  // draft. This prevents a new breaker line from being replaced by a stale
+  // lumber interpretation while retaining all previously collected items.
+  if (latestTurnIsMaterialRequest) {
+    analyzed.result.isMaterialRequest = true;
+    if (latestExtractedItems.length > 0) {
+      const canonicalPriorItems = persistedOrderState?.items?.length
+        ? persistedOrderState.items
+        : Array.isArray(openDraft?.items)
+          ? openDraft.items
+          : activeSubmittedRequest?.items || [];
+      const identity = (name: string) =>
+        name
+          .toLowerCase()
+          .replace(/\binterruptores?\b|מפסקים?|מפסקי(?:ם)?/g, "breaker")
+          .replace(/^(?:\d+(?:\.\d+)?\s*)/, "")
+          .replace(/[^a-z0-9\u0590-\u05ff]+/g, " ")
+          .trim();
+      const family = (name: string) => {
+        const normalized = identity(name);
+        if (/\bbreakers?\b/.test(normalized)) return "breaker";
+        if (/\b(?:sheetrock|drywall)\b/.test(normalized)) return "drywall";
+        if (/\bthinset\b/.test(normalized)) return "thinset";
+        if (/\blumber\b|\b\d+x\d+(?:x\d+)?\b/.test(normalized))
+          return "lumber";
+        return null;
+      };
+      const merged = canonicalPriorItems.map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        quantityExplicit:
+          "quantityExplicit" in item ? item.quantityExplicit ?? true : true,
+      }));
+      for (const incoming of [
+        ...(analyzed.result.request?.items || []),
+        ...latestExtractedItems,
+      ]) {
+        const incomingIdentity = identity(incoming.name);
+        const index = merged.findIndex(
+          (item) => identity(item.name) === incomingIdentity,
+        );
+        const incomingFamily = family(incoming.name);
+        const familyMatches = incomingFamily
+          ? merged
+              .map((item, itemIndex) => ({ item, itemIndex }))
+              .filter(({ item }) => family(item.name) === incomingFamily)
+          : [];
+        const genericFamilyUpdate =
+          index < 0 &&
+          familyMatches.length === 1 &&
+          incomingIdentity === incomingFamily;
+        if (index >= 0 || genericFamilyUpdate) {
+          const targetIndex = index >= 0 ? index : familyMatches[0].itemIndex;
+          const preserveSpecificName = genericFamilyUpdate;
+          merged[targetIndex] = {
+            ...merged[targetIndex],
+            ...incoming,
+            name: preserveSpecificName
+              ? merged[targetIndex].name
+              : incoming.name,
+          };
+        } else {
+          merged.push(incoming);
+        }
+      }
+      analyzed.result.request = analyzed.result.request
+        ? { ...analyzed.result.request, items: merged }
+        : {
+            title: "Material request from text",
+            department: "Unassigned",
+            items: merged,
+          };
+    }
+  }
   const { result, model, intent, metrics, promptVersion } = analyzed;
   if (result.request && customerEvent === "correction") {
     const previousItems = persistedOrderState?.items?.length
@@ -4388,16 +4473,36 @@ async function processCustomerSmsAutomation(
   let safety = analyzed.safety;
   // Reviewed construction rules are final output guards, not model fallbacks.
   // Even a strong semantic model must not skip a required product choice.
-  const materialIntelligence = smsMaterialIntelligenceAssessment(
-    activeCustomerText || reviewText,
+  const aggregateMaterialIntelligence = smsMaterialIntelligenceAssessment(
+    priorRequestMessage ? reviewText : activeCustomerText || reviewText,
     { exactListOnly },
   );
-  const mayAskMaterialQuestion =
-    customerEvent === "message" || preConfirmationCorrection;
+  const latestMaterialIntelligence = smsMaterialIntelligenceAssessment(
+    effectiveBody,
+    { exactListOnly },
+  );
+  const sameRuleScope =
+    latestMaterialIntelligence.matchedRules.length > 0 &&
+    latestMaterialIntelligence.matchedRules.length ===
+      aggregateMaterialIntelligence.matchedRules.length &&
+    latestMaterialIntelligence.matchedRules.every((rule) =>
+      aggregateMaterialIntelligence.matchedRules.includes(rule),
+    );
+  const questionIntelligence =
+    startsNewRequest || (latestTurnIsMaterialRequest && !sameRuleScope)
+      ? latestMaterialIntelligence
+      : aggregateMaterialIntelligence;
+  const materialIntelligence = aggregateMaterialIntelligence;
+  const isIntakeTurn =
+    (customerEvent === "message" || preConfirmationCorrection) &&
+    ["material_request", "availability", "pricing", "delivery"].includes(
+      intent,
+    );
+  const mayAskMaterialQuestion = isIntakeTurn;
   const clarificationQuestions =
     mayAskMaterialQuestion &&
     (result.isMaterialRequest || Boolean(openDraft || activeSubmittedRequest))
-      ? materialIntelligence.questions.slice(0, 1)
+      ? questionIntelligence.questions.slice(0, 1)
       : [];
   if (clarificationQuestions.length) {
     result.reply = clarificationQuestions.join(" ");
@@ -4421,6 +4526,8 @@ async function processCustomerSmsAutomation(
   const askedForAnotherItem =
     previouslyAskedForMore && customerWantsAnotherItem(effectiveBody);
   const canAdvanceIntake =
+    isIntakeTurn &&
+    materialIntelligence.readyForConfirmation &&
     (result.isMaterialRequest ||
       Boolean(openDraft || activeSubmittedRequest)) &&
     customerEvent !== "cancellation" &&
@@ -4577,8 +4684,11 @@ async function processCustomerSmsAutomation(
       latestMessage: effectiveBody,
       listComplete,
       resetListComplete:
-        activeRequestSynced &&
-        (activeUpdateKind === "item" || activeUpdateKind === "correction"),
+        (activeRequestSynced &&
+          (activeUpdateKind === "item" || activeUpdateKind === "correction")) ||
+        (latestTurnIsMaterialRequest &&
+          persistedOrderState?.listComplete === true &&
+          !customerFinishedMaterialList(effectiveBody)),
     });
   } catch (stateError) {
     console.error(
@@ -4688,8 +4798,8 @@ async function processCustomerSmsAutomation(
       !linkedCorrectionRequestId &&
       listComplete &&
       deliveryAddressKnown &&
-      (SIMPLE_REQUEST_INTAKE ||
-        (deliveryAddressKnown && clarificationQuestions.length === 0))
+      materialIntelligence.readyForConfirmation &&
+      clarificationQuestions.length === 0
     ) {
       confirmationPrepared = await prepareSmsRequestConfirmation({
         phone,

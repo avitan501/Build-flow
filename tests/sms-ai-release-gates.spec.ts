@@ -494,7 +494,9 @@ test("product inquiry fallback answers the product and asks only useful next que
 test("a new request isolates clarification from unrelated conversation history", async () => {
   const brokerSource = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
   expect(brokerSource).toMatch(/const activeCustomerText = startsNewRequest\s*\? body\s*:\s*context\.customerText \|\| body/)
-  expect(brokerSource).toMatch(/smsMaterialIntelligenceAssessment\(\s*activeCustomerText \|\| reviewText,\s*\{ exactListOnly \},?\s*\)/)
+  expect(brokerSource).toMatch(/const aggregateMaterialIntelligence = smsMaterialIntelligenceAssessment\(\s*priorRequestMessage \? reviewText : activeCustomerText \|\| reviewText/)
+  expect(brokerSource).toContain("const questionIntelligence =")
+  expect(brokerSource).toContain("const materialIntelligence = aggregateMaterialIntelligence")
   expect(brokerSource).toMatch(/const replyContext = startsNewRequest\s*\? `Customer: \$\{effectiveBody\}`/)
   expect(brokerSource).toContain("A confirmed request is a hard context boundary")
   expect(brokerSource).toContain("status = 'converted'")

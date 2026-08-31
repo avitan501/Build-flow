@@ -27,7 +27,7 @@ export function isSmsOptOutMessage(value: string) {
 }
 
 const MATERIAL_TERMS =
-  /\b(?:aggregates?|appliances?|baseboards?|batts?|blocks?|breakers?|cabinets?|cables?|cement|cladding|compound|concrete|containers?|doors?|drywal+l?|dumpsters?|ducts?|electrical|fittings?|flooring|grout|hardwood|hvac|insulation|lumber|lvl|materials?|mesh|moldings?|mortar|paint|panels?|pipes?|plumbing|plywood|primer|rebar|registers?|rolls?|roofing|sheetrock|sheets?|shingles?|siding|screws?|studs?|thinset|tiles?|tracks?|trim|valves?|vinyl|windows?|wires?|bags?|boards?|boxes?|buckets?)\b|(?:חומר(?:ים)?|לוחות?|שקים?|ארגזים?|ברגים|בידוד|גבס|רעפים|חלונות|דלתות|צבע|ריצוף|ארונות|צנרת|חשמל)|\b(?:aislamiento|azulejos?|baldosas?|bolsas?|cables?|cajas?|cemento|concreto|contenedores?|gabinetes?|material(?:es)?|paneles?|placas?|pintura|plomer[ií]a|puertas?|techo|tornillos?|tuber[ií]a|ventanas?|yeso|mortero)\b/i;
+  /\b(?:aggregates?|appliances?|baseboards?|batts?|blocks?|breakers?|cabinets?|cables?|cement|cladding|compound|concrete|containers?|doors?|drywal+l?|dumpsters?|ducts?|electrical|fittings?|flooring|grout|hardwood|hvac|insulation|lumber|lvl|materials?|mesh|moldings?|mortar|paint|panels?|pipes?|plumbing|plywood|primer|rebar|registers?|rolls?|roofing|sheetrock|sheets?|shingles?|siding|screws?|studs?|thinset|tiles?|tracks?|trim|valves?|vinyl|windows?|wires?|bags?|boards?|boxes?|buckets?)\b|(?:חומר(?:ים)?|לוחות?|שקים?|ארגזים?|ברגים|בידוד|גבס|רעפים|חלונות|דלתות|צבע|ריצוף|ארונות|צנרת|חשמל|מפסקים?|מפסקי(?:ם)?)|\b(?:aislamiento|azulejos?|baldosas?|bolsas?|cables?|cajas?|cemento|concreto|contenedores?|gabinetes?|interruptores?|material(?:es)?|paneles?|placas?|pintura|plomer[ií]a|puertas?|techo|tornillos?|tuber[ií]a|ventanas?|yeso|mortero)\b/i;
 
 export function smsReplyLanguage(value: string) {
   if (/[\u0590-\u05ff]/.test(value)) return "he";
@@ -39,6 +39,14 @@ export function smsReplyLanguage(value: string) {
   )
     return "es";
   return "en";
+}
+
+function canonicalMaterialText(value: string) {
+  return value
+    .replace(/\b(?:paneles?|placas?)\s+de\s+yeso\b|\byeso\b/gi, "drywall")
+    .replace(/(?:לוחות?\s+גבס|גבס)/g, "drywall")
+    .replace(/\binterruptores?\b/gi, "breakers")
+    .replace(/מפסקים?|מפסקי(?:ם)?/g, "breakers");
 }
 
 export function looksLikeSmsMaterialRequest(value: string) {
@@ -82,6 +90,14 @@ export function classifySmsReplyIntent(params: {
   forbiddenTopic?: boolean;
 }): SmsReplyIntent {
   const { message } = params;
+  const deliveryMention =
+    /\b(?:delivery|deliver|jobsite|address)\b|(?:משלוח|אספקה|כתובת)|\b(?:entrega|direcci[oó]n)\b/i.test(
+      message,
+    );
+  const strongMaterialIdentity =
+    /\b(?:breakers?|circuit\s+breakers?|sheetrock|drywall|thinset|lumber|plywood|osb|studs?|screws?|compound|mortar|concrete|rebar|wire|pipe|tile|shingles?)\b|(?:גבס|מפסקים?|ברגים|בטון|רעפים)|\b(?:yeso|interruptores?|mortero|concreto|tornillos?)\b/i.test(
+      message,
+    );
   if (params.event === "correction") return "correction";
   if (params.event === "cancellation") return "cancellation";
   if (params.participantRole === "supplier") return "supplier";
@@ -113,12 +129,18 @@ export function classifySmsReplyIntent(params: {
     )
   )
     return "availability";
+  // A material list can include its delivery address. The address is a field
+  // on the request, not evidence that the whole turn is merely a delivery
+  // question. Prefer the explicit request so its items are preserved.
   if (
-    /\b(?:delivery|deliver|jobsite|address)\b|(?:משלוח|אספקה|כתובת)|\b(?:entrega|direcci[oó]n)\b/i.test(
-      message,
-    )
+    (params.isMaterialRequest || looksLikeSmsMaterialRequest(message)) &&
+    (!deliveryMention ||
+      strongMaterialIdentity ||
+      smsHasFullDeliveryAddress(message) ||
+      /[;\n]/.test(message))
   )
-    return "delivery";
+    return "material_request";
+  if (deliveryMention) return "delivery";
   if (params.isMaterialRequest || looksLikeSmsMaterialRequest(message))
     return "material_request";
   if (
@@ -229,7 +251,7 @@ const REQUESTED_FIELD_PATTERNS: Array<{
   {
     field: "specification",
     pattern:
-      /\bproduct specification\b|\b(?:what|which)\s+(?:[a-z/-]+\s+){0,4}?(?:model|type|style)\b|\b(?:confirm|choose|select)\b[^?？]{0,60}\b(?:model|type|style)\b|\b(?:model|type|style)\s+(?:do|does|would|should|is|are|did)\b|\b(?:regular|type\s*x|fire[- ]rated|moisture[- ]resistant)\b[^?？]*[?？]|\bwhich\s+(?:item|product|thinset|compound|primer|paint|adhesive|mortar|concrete|lumber|stud|drywall|sheetrock|shingle|brick|block|tile)\b|\b(?:qu[eé]|cu[aá]l)\s+(?:[a-záéíóúñ/-]+\s+){0,4}?(?:modelo|tipo|estilo)\b|(?:איזה|איזו|מה)\s+(?:דגם|סוג)/i,
+      /\bproduct specification\b|\b(?:substrate|installation location|product name|model number)\b|\b(?:what|which)\s+(?:[a-z/-]+\s+){0,4}?(?:model|type|style|line|series)\b|\b(?:confirm|choose|select)\b[^?？]{0,60}\b(?:model|type|style|line|series)\b|\b(?:model|type|style|line|series)\s+(?:do|does|would|should|is|are|did)\b|\b(?:regular|type\s*x|fire[- ]rated|moisture[- ]resistant|homeline|q\s*o)\b[^?？]*[?？]|\bwhich\s+(?:item|product|thinset|compound|primer|paint|adhesive|mortar|concrete|lumber|stud|drywall|sheetrock|shingle|brick|block|tile)\b|\b(?:qu[eé]|cu[aá]l)\s+(?:[a-záéíóúñ/-]+\s+){0,4}?(?:modelo|tipo|estilo|l[ií]nea|serie)\b|\b(?:sustrato|ubicaci[oó]n de instalaci[oó]n|nombre del producto|n[uú]mero de modelo|resistente al fuego|resistente a la humedad)\b|(?:איזה|איזו|מה)\s+(?:דגם|סוג|סדרה)|(?:תשתית|מיקום ההתקנה|שם המוצר|רגיל|עמיד אש|עמיד רטיבות)/i,
   },
   {
     field: "source",
@@ -276,7 +298,7 @@ export function inspectSmsQuestionStructure(
   const subjectFor = (question: string) =>
     question
       .match(
-        /\b(?:appliances?|cabinets?|cables?|concrete|doors?|drywall|dumpsters?|flooring|hvac|insulation|lumber|moldings?|paint|pipes?|plumbing|primer|roofing|sheetrock|shingles?|siding|studs?|screws?|corner\s+bead|tape|compound|thinset|tile|trim|windows?|wires?)\b/i,
+        /\b(?:appliances?|cabinets?|cables?|concrete|doors?|drywall|dumpsters?|flooring|hvac|insulation|lumber|moldings?|paint|pipes?|plumbing|primer|roofing|sheetrock|shingles?|siding|studs?|screws?|corner\s+bead|tape|compound|thinset|tile|trim|windows?|wires?|yeso)\b|(?:גבס|מפסקים?|ברגים|לוחות?)/i,
       )?.[0]
       ?.toLowerCase()
       .replace(/\s+/g, "_") || "generic";
@@ -374,6 +396,10 @@ export function smsOutputSafetySignals(params: {
       reply,
     );
   const question = inspectSmsQuestionStructure(reply, params.knownFields);
+  const listCompletionQuestion =
+    /\bdo you need anything else(?: on this list)?\b|\banything else(?: on this list)?\b|\b(?:necesita|quieres?) (?:agregar )?algo m[aá]s\b|(?:צריך|צריכה|צריכים) להוסיף עוד משהו|(?:האם )?צריך עוד משהו/i.test(
+      reply,
+    );
   const requiresEssentialField = [
     "material_request",
     "image_or_plan",
@@ -399,6 +425,7 @@ export function smsOutputSafetySignals(params: {
   if (
     requiresEssentialField &&
     question.questionMarks > 0 &&
+    !listCompletionQuestion &&
     question.requestedFields === 0
   )
     signals.push("question is not an essential request field");
@@ -548,16 +575,16 @@ export function smsHasNeededByTiming(value: string) {
 
 export function smsHasExplicitQuantity(value: string) {
   return (
-    /\b(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand)\s*(?:[a-z][a-z/-]*\s+){0,4}?(?:ea|each|pcs?|pieces?|boxes?|sheets?|sheetrocks?|bricks?|ft|feet|foot|linear\s+ft|lf|sq\.?\s*ft|sf|rolls?|bags?|buckets?|bundles?|cans?|cartons?|gallons?|gals?|quarts?|qts?|liters?|litres?|ounces?|oz|pounds?|lbs?|packs?|pallets?|squares?|yards?|units?|appliances?|batts?|beams?|blocks?|cabinets?|containers?|doors?|drywall|dumpsters?|fixtures?|hvac|insulation|lumber|lvl|panels?|shingles?|studs?|thinset|tiles?|windows?)\b/i.test(
+    /\b(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand)\s*(?:[a-z][a-z/-]*\s+){0,4}?(?:ea|each|pcs?|pieces?|boxes?|sheets?|sheetrocks?|bricks?|breakers?|ft|feet|foot|linear\s+ft|lf|sq\.?\s*ft|sf|rolls?|bags?|buckets?|bundles?|cans?|cartons?|gallons?|gals?|quarts?|qts?|liters?|litres?|ounces?|oz|pounds?|lbs?|packs?|pallets?|squares?|yards?|units?|appliances?|batts?|beams?|blocks?|cabinets?|containers?|doors?|drywall|dumpsters?|fixtures?|hvac|insulation|lumber|lvl|panels?|shingles?|studs?|thinset|tiles?|windows?)\b/i.test(
       value,
     ) ||
     /\b\d+(?:\.\d+)?\s+\d+(?:\s*[-x×/]\s*\d+){1,2}\s*(?:wood|metal)?\s*(?:studs?|lumber|boards?)\b/i.test(
       value,
     ) ||
-    /(?:^|\s)(?:אחד|אחת|שניים|שתיים|שלושה|שלוש|\d+(?:\.\d+)?)\s*(?:יחידות?|ארגזים?|לוחות?|שקים?|דליים?|גלונים?|דלתות?|גבס)/i.test(
+    /(?:^|\s)(?:אחד|אחת|שניים|שתיים|שלושה|שלוש|\d+(?:\.\d+)?)\s*(?:יחידות?|ארגזים?|לוחות?|שקים?|דליים?|גלונים?|דלתות?|גבס|מפסקים?)/i.test(
       value,
     ) ||
-    /\b(?:uno|una|dos|tres|cuatro|cinco|\d+(?:\.\d+)?)\s*(?:unidades?|cajas?|paneles?|placas?|bolsas?|bloques?|cubetas?|galones?|puertas?|yeso)\b/i.test(
+    /\b(?:uno|una|dos|tres|cuatro|cinco|\d+(?:\.\d+)?)\s*(?:unidades?|cajas?|paneles?|placas?|bolsas?|bloques?|cubetas?|galones?|interruptores?|puertas?|yeso)\b/i.test(
       value,
     )
   );
@@ -715,6 +742,10 @@ export function smsMaterialClarificationQuestions(
   value: string,
   options: { exactListOnly?: boolean; includeAll?: boolean } = {},
 ) {
+  const replyLanguage = smsReplyLanguage(value);
+  value = canonicalMaterialText(value);
+  const localized = (english: string, spanish: string, hebrew: string) =>
+    replyLanguage === "es" ? spanish : replyLanguage === "he" ? hebrew : english;
   const questions: string[] = [];
   const sheetrockEvidence = value.replace(
     /^.*\b(?:drywall|sheetrock)\s+screws?\b.*$/gim,
@@ -730,7 +761,15 @@ export function smsMaterialClarificationQuestions(
   };
   const customerLines = value
     .split(/\r?\n/)
-    .map((line) => line.trim().replace(/^Customer:\s*/i, ""))
+    .map((line) =>
+      line
+        .trim()
+        .replace(/^Customer:\s*/i, "")
+        .replace(
+          /^(?:(?:i|we)\s+(?:need|want|would\s+like)|(?:yo\s+)?(?:necesito|quiero)|(?:אני|אנחנו)?\s*(?:צריך|צריכה|צריכים|רוצה|רוצים))\s+/i,
+          "",
+        ),
+    )
     .filter((line) => line && !/^Avantia:/i.test(line));
   const quantityClauses = splitSmsMaterialClauses(customerLines.join("\n"));
   const quantityProductPredicates: Array<(text: string) => boolean> = [
@@ -779,6 +818,9 @@ export function smsMaterialClarificationQuestions(
       // pieces and could pass the request-creation gate without a quantity.
       const quantityText = clause.replace(/\b\d+\s*\/\s*\d+\b/g, "SPEC");
       return (
+        /\b\d{1,6}\s*(?:breakers?|interruptores?)\b|(?:^|\s)\d{1,6}\s*מפסקים?/i.test(
+          quantityText,
+        ) ||
         /\b\d{1,6}\s*(?:pcs?|pieces?|each|ea|sheets?|bags?|buckets?|bundles?|cans?|gallons?|gals?|rolls?|packs?)\b/i.test(
           quantityText,
         ) || /^\s*\d{1,6}\s+/.test(quantityText)
@@ -822,14 +864,32 @@ export function smsMaterialClarificationQuestions(
   ) {
     questions.push(
       !sheetrockThickness && !hasSheetrockType
-        ? "Can we do 5/8-in. regular Sheetrock, or do you need Type X/fire-rated or moisture-resistant?"
+        ? localized(
+            "Can we do 5/8-in. regular Sheetrock, or do you need Type X/fire-rated or moisture-resistant?",
+            "¿Podemos usar panel de yeso regular de 5/8 pulg., o necesita Type X/resistente al fuego o a la humedad?",
+            "אפשר להשתמש בלוח גבס רגיל 5/8 אינץ׳, או שצריך Type X/עמיד אש או עמיד רטיבות?",
+          )
         : !sheetrockThickness
-          ? "Can we do 5/8-in. Sheetrock?"
-          : `For the ${sheetrockThickness.match(/(?:1\s*\/\s*4|3\s*\/\s*8|1\s*\/\s*2|5\s*\/\s*8)/i)?.[0]?.replace(/\s+/g, "") || sheetrockThickness}-in. Sheetrock: regular, Type X/fire-rated, or moisture-resistant?`,
+          ? localized(
+              "Can we do 5/8-in. Sheetrock?",
+              "¿Podemos usar panel de yeso de 5/8 pulg.?",
+              "אפשר להשתמש בלוח גבס 5/8 אינץ׳?",
+            )
+          : localized(
+              `For the ${sheetrockThickness.match(/(?:1\s*\/\s*4|3\s*\/\s*8|1\s*\/\s*2|5\s*\/\s*8)/i)?.[0]?.replace(/\s+/g, "") || sheetrockThickness}-in. Sheetrock: regular, Type X/fire-rated, or moisture-resistant?`,
+              `Para el panel de yeso de ${sheetrockThickness}-pulg.: ¿regular, Type X/resistente al fuego o resistente a la humedad?`,
+              `ללוח גבס ${sheetrockThickness} אינץ׳: רגיל, Type X/עמיד אש או עמיד רטיבות?`,
+            ),
     );
   }
   if (hasSheetrock && !hasProductQuantity(quantityProductPredicates[0])) {
-    questions.push("How many sheets of Sheetrock do you need?");
+    questions.push(
+      localized(
+        "How many sheets of Sheetrock do you need?",
+        "¿Cuántos paneles de yeso necesita?",
+        "כמה לוחות גבס צריך?",
+      ),
+    );
   }
 
   const cornerBit = /\bcorner\s+(?:bit|bead)\b/i;
@@ -954,8 +1014,10 @@ export function smsMaterialClarificationQuestions(
       );
     if (!hasExactThinsetProduct && !hasTile)
       questions.push("What tile type and size are you installing?");
-    if (!hasExactThinsetProduct && (!hasSubstrate || !hasLocation))
-      questions.push("What substrate and installation location is it for?");
+    if (!hasExactThinsetProduct && !hasSubstrate)
+      questions.push("What substrate is it for?");
+    else if (!hasExactThinsetProduct && !hasLocation)
+      questions.push("What installation location is it for?");
     addQuantityQuestion("thinset", "bags", quantityProductPredicates[2]);
   }
 
@@ -1153,10 +1215,26 @@ export function smsMaterialClarificationQuestions(
             : "What is the electrical panel manufacturer?",
       );
     }
-    addQuantityQuestion(
-      "breakers",
-      "breakers",
-      quantityProductPredicates[11],
+    if (!hasProductQuantity(quantityProductPredicates[11])) {
+      questions.push(
+        language === "es"
+          ? "¿Cuántos interruptores necesita?"
+          : language === "he"
+            ? "כמה מפסקים צריך?"
+            : "How many breakers do you need?",
+      );
+    }
+  }
+
+  const hasProductLink = /https?:\/\/\S+/i.test(value);
+  const textWithoutLinks = value.replace(/https?:\/\/\S+/gi, " ");
+  if (hasProductLink && !MATERIAL_TERMS.test(textWithoutLinks)) {
+    questions.push(
+      localized(
+        "What product name or model is shown in that link?",
+        "¿Qué nombre o modelo de producto aparece en ese enlace?",
+        "איזה שם מוצר או דגם מופיע בקישור?",
+      ),
     );
   }
 
@@ -1168,6 +1246,7 @@ export function smsMaterialIntelligenceAssessment(
   value: string,
   options: { exactListOnly?: boolean } = {},
 ) {
+  const canonicalValue = canonicalMaterialText(value);
   const questions = smsMaterialClarificationQuestions(value, {
     ...options,
     includeAll: true,
@@ -1228,8 +1307,11 @@ export function smsMaterialIntelligenceAssessment(
         /\b(?:circuit\s+)?breakers?\b|\binterruptores?\b/i.test(text),
       "circuit-breaker",
     ],
+    [(text: string) => /https?:\/\/\S+/i.test(text), "external-product-link"],
   ]
-    .filter(([matches]) => (matches as (text: string) => boolean)(value))
+    .filter(([matches]) =>
+      (matches as (text: string) => boolean)(canonicalValue),
+    )
     .map(([, key]) => key as string);
   const readyForConfirmation =
     matchedRules.length > 0 && questions.length === 0;
