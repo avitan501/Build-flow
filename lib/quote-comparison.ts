@@ -30,6 +30,7 @@ export type QuoteComparisonRecord = {
 export type QuoteComparisonItemRecord = {
   id: string;
   comparison_id: string;
+  source_request_item_id?: string | null;
   description: string;
   specification: string;
   quantity: number;
@@ -52,6 +53,7 @@ export type QuoteComparisonPriceRecord = {
 export type QuoteComparisonBidRecord = {
   id: string;
   comparison_id: string;
+  source_supplier_quote_id?: string | null;
   supplier_id: string;
   supplier_name_snapshot: string;
   trust_level_snapshot: SupplierTrustLevel;

@@ -364,10 +364,11 @@ export default async function OwnerMaterialRequestPage({
     const mapped = mapRequestSupplierComparison(comparisonItems, comparisonBids, {
       selectedBidId: comparison.awarded_bid_id,
       sources: comparisonBids.flatMap((bid) => {
-        const quote = comparisonQuotes.find((candidate) =>
-          bid.supplier_id === `${candidate.supplier_id}:${candidate.id}` ||
-          bid.notes.includes(candidate.quote_number || candidate.file_name),
-        );
+        const quote = bid.source_supplier_quote_id
+          ? comparisonQuotes.find(
+              (candidate) => candidate.id === bid.source_supplier_quote_id,
+            )
+          : null;
         return quote ? [{
           bidId: bid.id,
           quoteDate: quote.quote_date,

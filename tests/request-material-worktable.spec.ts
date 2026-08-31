@@ -3,9 +3,14 @@ import path from "node:path"
 
 import { expect, test } from "@playwright/test"
 
+import { comparisonItemForRequestSources } from "@/lib/request-worktable-matching"
+
 const root = process.cwd()
 const pagePath = path.join(root, "app/owner/materials/requests/[requestId]/page.tsx")
 const worktablePath = path.join(root, "components/buildflow/request-material-worktable.tsx")
+const supplierQuoteActionsPath = path.join(root, "app/admin/supplier-quotes/actions.ts")
+const documentActionsPath = path.join(root, "app/admin/documents/actions.ts")
+const migrationPath = path.join(root, "supabase/migrations/20260831154500_link_comparison_items_to_request_sources.sql")
 const managementPath = path.join(root, "components/buildflow/request-management-panel.tsx")
 
 async function source(filePath: string) {
@@ -25,6 +30,13 @@ test("review and organization are one compact three-column material work table",
   expect(worktable).toContain("<table")
   expect(worktable).toContain("Copy original")
   expect(worktable).toContain("Copy AI")
+  expect(worktable).toMatch(/<th[\s\S]*Copy original request column[\s\S]*<\/th>/)
+  expect(worktable).toMatch(/<th[\s\S]*Copy AI organized column[\s\S]*<\/th>/)
+  expect(worktable).toContain("md:sticky md:left-0")
+  expect(worktable).toContain("min-h-11")
+  expect(worktable).toContain('aria-live="polite"')
+  expect(worktable).toContain("aiCoversEverySource")
+  expect(worktable).toContain("focus-visible:ring-2")
   expect(worktable).toContain("AI organized")
   expect(worktable).toContain("overflow-x-auto")
   expect(worktable).toMatch(/Quantity/)
@@ -35,6 +47,48 @@ test("review and organization are one compact three-column material work table",
   expect(page, "steps 1 and 2 must not remain as separate expandable cards").not.toContain('title="Review client list"')
   expect(page, "steps 1 and 2 must not remain as separate expandable cards").not.toContain('title="Organize request"')
   expect(page, "original items should not be repeated below the combined table").not.toContain("Original request & files")
+})
+
+test("comparison rows preserve exact request and supplier quote provenance", async () => {
+  const [page, worktable, supplierActions, documentActions, migration] = await Promise.all([
+    source(pagePath),
+    source(worktablePath),
+    source(supplierQuoteActionsPath),
+    source(documentActionsPath),
+    source(migrationPath),
+  ])
+
+  expect(migration).toContain("source_request_item_id uuid")
+  expect(migration).toContain("quote_comparison_items_source_request_uidx")
+  expect(migration).toContain("comparison item source must belong to the same request")
+  expect(migration).toContain("source_request_item_id cannot be changed once linked")
+  expect(migration).toContain("pg_trigger_depth() > 1")
+  expect(migration.indexOf("source_request_item_id cannot be changed once linked")).toBeLessThan(
+    migration.indexOf("if new.source_request_item_id is null then\n    return new"),
+  )
+  expect(supplierActions).toContain("source_request_item_id: item.id")
+  expect(supplierActions).toContain("metadata?.ai_organized === true")
+  expect(supplierActions).toContain("const comparisonItems = organizedItems.length")
+  expect(documentActions).toContain("source_request_item_id: item.id")
+  expect(worktable).not.toContain("comparisonWords")
+  expect(page).toContain("bid.source_supplier_quote_id")
+  expect(page).not.toContain("bid.notes.includes")
+})
+
+test("supplier prices require an exact immutable request-row source", () => {
+  const exact = { id: "exact", sourceRequestItemId: "request-item" }
+  const similarTextOnly = { id: "similar", sourceRequestItemId: null }
+
+  expect(comparisonItemForRequestSources(["request-item"], [similarTextOnly, exact])?.id).toBe("exact")
+  expect(comparisonItemForRequestSources(["request-item"], [similarTextOnly])).toBeNull()
+  expect(comparisonItemForRequestSources([], [exact])).toBeNull()
+})
+
+test("an original-row price never fans out to multiple AI child rows", () => {
+  const originalPriceRow = { id: "priced-original", sourceRequestItemId: "original-row" }
+
+  expect(comparisonItemForRequestSources(["ai-child-one"], [originalPriceRow])).toBeNull()
+  expect(comparisonItemForRequestSources(["ai-child-two"], [originalPriceRow])).toBeNull()
 })
 
 test("AI controls and notes appear only on rows that are actually missing information", async () => {

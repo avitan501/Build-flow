@@ -138,21 +138,31 @@ async function ensureClientRequestComparison(input: {
         .maybeSingle<{ name: string; address: string | null }>(),
       input.supabase
         .from("quote_request_items")
-        .select("name,quantity,unit,department")
+        .select("id,name,quantity,unit,department,metadata")
         .eq("request_id", request.id)
         .order("created_at")
         .returns<
           Array<{
+            id: string;
             name: string;
             quantity: number;
             unit: string | null;
             department: string;
+            metadata: Record<string, unknown> | null;
           }>
         >(),
     ]);
   if (itemsError) throw itemsError;
+  const organizedItems = (requestItems ?? []).filter(
+    (item) => item.metadata?.ai_organized === true,
+  );
+  const comparisonItems = organizedItems.length
+    ? organizedItems
+    : (requestItems ?? []).filter(
+        (item) => item.metadata?.ai_organized !== true,
+      );
   const department = normalizeMaterialCatalogDepartment(
-    requestItems?.[0]?.department || input.fallbackDepartment,
+    comparisonItems[0]?.department || input.fallbackDepartment,
   );
   const caseNumber = request.id.replaceAll("-", "").slice(0, 8).toUpperCase();
   const { data: comparison, error: comparisonError } = await input.supabase
@@ -173,12 +183,13 @@ async function ensureClientRequestComparison(input: {
   if (comparisonError || !comparison)
     throw comparisonError || new Error("The comparison could not be created.");
 
-  if (requestItems?.length) {
+  if (comparisonItems.length) {
     const { error: seedError } = await input.supabase
       .from("quote_comparison_items")
       .insert(
-        requestItems.slice(0, 500).map((item, index) => ({
+        comparisonItems.slice(0, 500).map((item, index) => ({
           comparison_id: comparison.id,
+          source_request_item_id: item.id,
           description:
             clean(item.name, 500) || `Requested material ${index + 1}`,
           specification: clean(item.department, 1000),

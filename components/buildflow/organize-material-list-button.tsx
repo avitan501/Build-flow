@@ -37,7 +37,7 @@ export function OrganizeMaterialListButton({ requestId, refresh = false }: { req
 
   return (
     <div className="grid justify-items-start gap-2">
-      <button type="button" onClick={organize} disabled={isPending} className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">
+      <button type="button" onClick={organize} disabled={isPending} className="min-h-11 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">
         {isPending ? "Organizing..." : refresh ? "Reorganize request" : "Organize request"}
       </button>
       {error ? <p role="alert" className="max-w-sm text-xs font-semibold text-rose-700">{error}</p> : null}

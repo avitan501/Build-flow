@@ -156,11 +156,12 @@ async function ensureDocumentRequestComparison(
       .maybeSingle<{ name: string; address: string | null }>(),
     supabase
       .from("quote_request_items")
-      .select("name,quantity,unit,department,metadata")
+      .select("id,name,quantity,unit,department,metadata")
       .eq("request_id", request.id)
       .order("created_at")
       .returns<
         Array<{
+          id: string;
           name: string;
           quantity: number;
           unit: string | null;
@@ -232,6 +233,7 @@ async function ensureDocumentRequestComparison(
       .upsert(
         requestItems.slice(0, 500).map((item, index) => ({
           comparison_id: comparisonId,
+          source_request_item_id: item.id,
           description:
             clean(item.name, 500) || `Requested material ${index + 1}`,
           specification: clean(item.department, 1000),

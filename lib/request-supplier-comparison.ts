@@ -65,6 +65,7 @@ export function mapRequestSupplierComparison(
   const mappedItems: RequestSupplierComparisonItem[] = (items ?? []).map(
     (item) => ({
       id: item.id,
+      sourceRequestItemId: item.source_request_item_id,
       quantity: finiteNonNegative(item.quantity) ?? 0,
       unit: item.unit?.trim() || "each",
       description: item.description?.trim() || "Material",

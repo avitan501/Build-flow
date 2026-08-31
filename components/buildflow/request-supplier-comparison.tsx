@@ -8,6 +8,7 @@ import {
 
 export type RequestSupplierComparisonItem = {
   id: string;
+  sourceRequestItemId?: string | null;
   quantity: number;
   unit: string;
   description: string;
