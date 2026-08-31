@@ -4782,6 +4782,26 @@ async function enqueueSmsAutomation(communicationId: string) {
   `;
 }
 
+async function dispatchSmsAutomationWorker() {
+  const dispatchSecret = await secret(secretNames.smsAutomationDispatchSecret);
+  if (!dispatchSecret)
+    throw new Error("SMS automation worker is not configured");
+  const response = await fetch(
+    `${supabaseUrl}/functions/v1/aura-sms-automation-worker?mode=sms-automation-dispatch`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-sms-automation-dispatch": dispatchSecret,
+      },
+      body: JSON.stringify({ action: "drain" }),
+      signal: AbortSignal.timeout(5_000),
+    },
+  );
+  if (!response.ok)
+    throw new Error(`SMS automation dispatch failed: ${response.status}`);
+}
+
 type SmsAutomationQueueRow = {
   id: number;
   communication_id: string;
@@ -4901,7 +4921,18 @@ async function handleSmsAutomationDispatch(req: Request) {
   const suppliedSecret = req.headers.get("x-sms-automation-dispatch") || "";
   if (!expectedSecret || !constantTimeEqual(expectedSecret, suppliedSecret))
     return json({ error: "Invalid dispatch secret" }, 401);
-  return json({ ok: true, ...(await drainSmsAutomationQueue(10)) });
+  EdgeRuntime.waitUntil(
+    drainSmsAutomationQueue(1).catch(async (error) => {
+      await sql`
+        insert into public.aura_audit_log (action, details)
+        values ('sms_automation_worker_failed', ${sql.json({
+          error_code:
+            error instanceof Error ? error.message : "automation_worker_failed",
+        })})
+      `;
+    }),
+  );
+  return json({ ok: true, accepted: true }, 202);
 }
 
 async function handleQuoWebhook(req: Request) {
@@ -5113,18 +5144,15 @@ async function handleQuoWebhook(req: Request) {
         scheduleMaterialShadowAssessment(stored[0].id);
         await enqueueSmsAutomation(stored[0].id);
         EdgeRuntime.waitUntil(
-          // Claim this newly received message first. Backlog recovery remains on
-          // the durable cron worker, so an older slow AI job cannot delay the
-          // live conversation's fast path.
-          drainSmsAutomationQueue(1, stored[0].id).catch(
-            async (automationError) => {
-              await sql`
+          // The durable worker owns AI and provider delivery. The webhook
+          // isolate only persists and dispatches so acknowledgement stays fast.
+          dispatchSmsAutomationWorker().catch(async (automationError) => {
+            await sql`
               update public.aura_webhook_events
               set error_message = ${`SMS automation: ${automationError instanceof Error ? automationError.message : "failed"}`.slice(0, 500)}
               where provider = 'quo' and external_event_id = ${eventId}
             `;
-            },
-          ),
+          }),
         );
       } else if (canonicalEvents[0]?.external_event_id !== eventId) {
         await sql`
@@ -5346,13 +5374,16 @@ async function ingestPolledQuoMessage(
     values ('quo', ${pollEventId}, 'message.received', ${activityId}, ${sql.json({ provider: "quo-fast-poll", activityId, conversationId })}, null)
     on conflict (provider, external_event_id) do nothing
   `;
-  const canonical = await sql<{ external_event_id: string }[]>`
-    select external_event_id from public.aura_webhook_events
-    where provider = 'quo' and activity_id = ${activityId} and event_type = 'message.received'
-    order by created_at asc, external_event_id asc limit 1
+  const existing = await sql<{ id: string }[]>`
+    select id from public.aura_communications
+    where provider = 'quo' and external_activity_id = ${activityId}
+    limit 1
   `;
-  if (canonical[0]?.external_event_id !== pollEventId) {
-    await sql`update public.aura_webhook_events set processed_at = now() where provider = 'quo' and external_event_id = ${pollEventId}`;
+  if (existing[0]?.id) {
+    await sql`
+      update public.aura_webhook_events set processed_at = coalesce(processed_at, now())
+      where provider = 'quo' and activity_id = ${activityId} and event_type = 'message.received'
+    `;
     return false;
   }
 
@@ -5369,11 +5400,14 @@ async function ingestPolledQuoMessage(
     on conflict (provider, external_activity_id) do nothing
     returning id
   `;
-  await sql`update public.aura_webhook_events set processed_at = now() where provider = 'quo' and external_event_id = ${pollEventId}`;
+  await sql`
+    update public.aura_webhook_events set processed_at = coalesce(processed_at, now())
+    where provider = 'quo' and activity_id = ${activityId} and event_type = 'message.received'
+  `;
   if (!inserted[0]?.id) return false;
   scheduleMaterialShadowAssessment(inserted[0].id);
   await enqueueSmsAutomation(inserted[0].id);
-  await drainSmsAutomationQueue(1, inserted[0].id);
+  await dispatchSmsAutomationWorker();
   return true;
 }
 

@@ -62,6 +62,39 @@ async function validSignature(
   return constantTimeEqual(expected, suppliedDigest);
 }
 
+async function dispatchFastPoll() {
+  const secrets = await sql<{ name: string; decrypted_secret: string }[]>`
+    select name, decrypted_secret
+    from vault.decrypted_secrets
+    where name in ('project_url', 'quo_fast_poll_dispatch_secret')
+  `;
+  const values = new Map(
+    secrets.map((row) => [row.name, row.decrypted_secret] as const),
+  );
+  const projectUrl = values.get("project_url") || "";
+  const dispatchSecret = values.get("quo_fast_poll_dispatch_secret") || "";
+  if (
+    projectUrl !== "https://nprfhspwdflpqlopydmp.supabase.co" ||
+    !dispatchSecret
+  ) {
+    throw new Error("Fast poll dispatch is not configured");
+  }
+  const response = await fetch(
+    `${projectUrl}/functions/v1/aura-quo-fast-poll-worker?mode=quo-fast-poll`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-quo-fast-poll": dispatchSecret,
+      },
+      body: JSON.stringify({ source: "quo-webhook-receiver" }),
+      signal: AbortSignal.timeout(5_000),
+    },
+  );
+  if (!response.ok)
+    throw new Error(`Fast poll dispatch failed: ${response.status}`);
+}
+
 Deno.serve(async (request) => {
   if (request.method !== "POST")
     return json({ error: "Method not allowed" }, 405);
@@ -111,6 +144,17 @@ Deno.serve(async (request) => {
       ('quo', ${eventId}, ${eventType}, ${activityId}, ${sql.json(payload)}, null)
     on conflict (provider, external_event_id) do nothing
   `;
+
+  // Keep Quo's acknowledgement independent from conversation linking and AI.
+  // The dedicated poll worker picks up the new message in a separate isolate.
+  EdgeRuntime.waitUntil(
+    dispatchFastPoll().catch((error) =>
+      console.error(
+        "quo_receiver_fast_poll_failed",
+        error instanceof Error ? error.message : "unknown_error",
+      ),
+    ),
+  );
 
   return json({ ok: true, accepted: true }, 202);
 });
