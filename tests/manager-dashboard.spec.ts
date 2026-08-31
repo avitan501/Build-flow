@@ -40,9 +40,13 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).not.toContain("One priority, clear tasks, and the next action.");
   expect(page).not.toContain('assignee="david"');
   expect(page).toContain("Manager tools");
-  expect(page).toContain('id="phone-notifications"');
+  expect(page).not.toContain('id="phone-notifications"');
   expect(page).not.toContain("ManagerNotificationCenter");
   expect(page).toContain("<ManagerNotificationControl settings />");
+  expect(page).toContain('label: "David Dashboard"');
+  expect(page).toContain('label: "Payment Center"');
+  expect(page).not.toContain('title: "Payments"');
+  expect(page).toContain("grid items-start gap-3");
   expect(page).not.toContain("ManagerTodayTasks");
   expect(page).not.toContain("TODAY_TASK_PREFIX");
   expect(page).toContain("ManagerDashboardAiSearch");
@@ -52,6 +56,7 @@ test("manager dashboard is the employee daily command center", async () => {
     page.indexOf('id="pipeline-heading"'),
   );
   expect(page).toContain("Orders &amp; Requests");
+  expect(page).not.toContain('<header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">');
   expect(page).not.toContain(
     "Today&apos;s requests, targets, and tools in one place.",
   );

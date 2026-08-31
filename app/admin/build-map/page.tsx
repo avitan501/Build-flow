@@ -3,7 +3,6 @@ import {
   BadgeDollarSign,
   ChevronDown,
   ClipboardList,
-  CreditCard,
   MessageCircleQuestion,
   PhoneCall,
   Sparkles,
@@ -274,6 +273,15 @@ export default async function AdminDashboardPage({
             icon: Sparkles,
             links: [
               { href: "/admin/ai-tools", label: "All Manager Tools" },
+              ...(access.owner
+                ? [
+                    {
+                      href: "/admin/goals-progress/website-work",
+                      label: "David Dashboard",
+                    },
+                    { href: "/admin/payments", label: "Payment Center" },
+                  ]
+                : []),
               { href: CARLOS_MEETING_URL, label: "Google Meet" },
               {
                 href: "/admin/ai-tools/media-messages",
@@ -289,15 +297,6 @@ export default async function AdminDashboardPage({
                 ? [{ href: "/admin/abc", label: "ABC Private Pricing" }]
                 : []),
             ],
-          },
-        ]
-      : []),
-    ...(access.owner
-      ? [
-          {
-            title: "Payments",
-            icon: CreditCard,
-            links: [{ href: "/admin/payments", label: "Payment Center" }],
           },
         ]
       : []),
@@ -327,13 +326,26 @@ export default async function AdminDashboardPage({
         ) : null}
 
         <section aria-labelledby="pipeline-heading" className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between gap-3 px-4 py-3">
-            <div>
-              <h2 id="pipeline-heading" className="text-xl font-semibold">
-                Orders &amp; Requests
-              </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h2 id="pipeline-heading" className="text-xl font-semibold">
+                  Orders &amp; Requests
+                </h2>
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                  <strong className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-900 tabular-nums">
+                    {selectedStage
+                      ? stageCounts.get(selectedStage)
+                      : requests.length}
+                  </strong>
+                  {selectedStage
+                    ? pipelineStages.find((item) => item.id === selectedStage)
+                        ?.label
+                    : "Requests needing work"}
+                </span>
+              </div>
               <p className="mt-1 text-xs text-slate-500">
-                Open work only. Completed and cancelled requests are excluded.
+                Most recently updated first
               </p>
             </div>
             {selectedStage ? (
@@ -372,26 +384,7 @@ export default async function AdminDashboardPage({
               );
             })}
           </div>
-          <div
-          id="open-requests"
-          className="border-t border-slate-200"
-        >
-          <header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-            <div>
-              <h2 className="font-semibold">
-                {selectedStage
-                  ? pipelineStages.find((item) => item.id === selectedStage)
-                      ?.label
-                  : "Requests needing work"}
-              </h2>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Most recently updated first
-              </p>
-            </div>
-            <span className="text-sm font-semibold tabular-nums text-slate-500">
-              {selectedStage ? stageCounts.get(selectedStage) : requests.length}
-            </span>
-          </header>
+          <div id="open-requests" className="border-t border-slate-200">
           {visibleRequests.length ? (
             <div>
               {visibleRequests.map(({ request, stage: requestStage }) => {
@@ -461,7 +454,7 @@ export default async function AdminDashboardPage({
             <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
           </summary>
           <div className="border-t border-slate-200">
-            <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid items-start gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3">
               {managerSections.map((section) => {
                 const Icon = section.icon;
                 return (
@@ -491,30 +484,14 @@ export default async function AdminDashboardPage({
                           </Link>
                         );
                       })}
+                      {section.title === "Manager Tools" ? (
+                        <ManagerNotificationControl settings />
+                      ) : null}
                     </div>
                   </section>
                 );
               })}
             </div>
-            <section
-              id="phone-notifications"
-              aria-labelledby="phone-notifications-heading"
-              className="border-t border-slate-200 bg-slate-50/60"
-            >
-              <header className="px-4 pt-4">
-                <h2
-                  id="phone-notifications-heading"
-                  className="text-sm font-semibold"
-                >
-                  Phone notifications
-                </h2>
-                <p className="mt-1 text-xs text-slate-500">
-                  Manage alerts for new requests, messages, supplier quotes, and
-                  payments.
-                </p>
-              </header>
-              <ManagerNotificationControl settings />
-            </section>
           </div>
         </details>
       </div>
