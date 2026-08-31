@@ -15,6 +15,7 @@ import { loadSupplierPartnerProgress, saveSupplierPartnerProgress } from "@/lib/
 
 const inputSchema = z.object({
   slug: z.string().min(1).max(120),
+  important: z.boolean().optional(),
   status: z.enum(SUPPLIER_PARTNER_STATUSES).optional(),
   contactEmail: z.string().trim().max(240).optional(),
   followUpDate: z.string().trim().max(20).optional(),
@@ -57,6 +58,7 @@ export async function updateSupplierPartnerAction(input: SupplierPartnerUpdateIn
 
   const progress = {
     ...current,
+    ...(parsed.data.important !== undefined ? { important: parsed.data.important } : {}),
     ...(parsed.data.status ? { status: parsed.data.status } : {}),
     ...(parsed.data.contactEmail !== undefined ? { contactEmail: parsed.data.contactEmail } : {}),
     ...(parsed.data.followUpDate !== undefined ? { followUpDate: parsed.data.followUpDate } : {}),

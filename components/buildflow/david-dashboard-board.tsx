@@ -179,7 +179,6 @@ export function DavidDashboardBoard({
   const keptTaskKeys = new Set(["whatsapp-coexistence", "abc-private-pricing"]);
   const carlosFixedTaskKeys = new Set([
     "carlos-fixed-client-target",
-    "carlos-fixed-call-suppliers",
     "carlos-fixed-supplier-affiliate-program",
     "carlos-fixed-supplier-partnerships",
     "carlos-fixed-abc-supply-demo",

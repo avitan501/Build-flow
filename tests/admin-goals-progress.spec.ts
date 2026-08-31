@@ -49,7 +49,7 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain("<AddOutreachLead />");
   expect(page).toContain("<OutreachLeadList");
   expect(page).toContain("Clients in the system");
-  expect(page).toContain('title="Find Best Supplier Prices"');
+  expect(page).not.toContain('title="Find Best Supplier Prices"');
   expect(page).toContain('title="Build Supplier Relationships"');
   expect(page).toContain("Prepare ABC Demo");
   expect(page).toContain('href="/admin/abc"');
@@ -60,7 +60,7 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain('.from("affiliate_programs")');
   expect(page).toContain("<AddTargetClient />");
   expect(page).toContain("<ClientTargetCallGuide />");
-  expect(page).toContain('title="Apply for Supplier Program"');
+  expect(page).toContain('title="API, Affiliate & Partnership"');
   expect(page).toContain('id="supplier-affiliate-program"');
   expect(page).toContain('fixedKey="supplier-affiliate-program"');
   expect(page).toContain('.from("manager_goals")');
@@ -373,7 +373,7 @@ test("Goals and lists use collapsed disclosures to keep the page compact", async
   expect(goals).toContain("min-h-16");
 });
 
-test("Carlos Dashboard keeps five direct tasks without Focus or Work Area wrappers", async () => {
+test("Carlos Dashboard keeps direct tasks without Focus or Work Area wrappers", async () => {
   const [page, goals] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/manager-goals.tsx"), "utf8"),
@@ -458,7 +458,7 @@ test("Carlos has a focused top-10 supplier call list while the full research lis
   ]);
 
   expect(page).toContain("<AffiliateCallList />");
-  expect(page).toContain("Complete priority applications and follow up.");
+  expect(page).toContain("Manage supplier APIs, affiliate programs, and partnerships.");
   expect(component).toContain("Top 10 supplier priorities");
   expect(component).toContain("Direct business");
   expect(component).toContain("Network managed");

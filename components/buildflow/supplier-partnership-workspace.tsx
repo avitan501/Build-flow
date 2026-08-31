@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { Star } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
 import { sendSupplierPartnerEmailAction, updateSupplierPartnerAction } from "@/app/owner/partnerships/actions";
@@ -47,6 +48,7 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
   const [query, setQuery] = useState("");
   const [showFilter, setShowFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [importantOnly, setImportantOnly] = useState(false);
   const [notice, setNotice] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -60,9 +62,10 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
       const matchesQuery = !normalized || [partner.company, partner.products, partner.department, partner.programFinding].join(" ").toLowerCase().includes(normalized);
       const matchesShow = showFilter === "All" || partner.show === showFilter;
       const matchesStatus = statusFilter === "All" || itemProgress?.status === statusFilter;
-      return matchesQuery && matchesShow && matchesStatus;
+      const matchesImportant = !importantOnly || itemProgress?.important;
+      return matchesQuery && matchesShow && matchesStatus && matchesImportant;
     });
-  }, [partners, progress, query, showFilter, statusFilter]);
+  }, [importantOnly, partners, progress, query, showFilter, statusFilter]);
 
   const counts = useMemo(() => ({
     total: partners.length,
@@ -125,7 +128,7 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#e1b85b]">Carlos supplier desk</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">Supplier partnerships</h1>
+              <h1 className="mt-2 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">Suppliers from the Show</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Every researched company, the right call, the right ask, and the next follow-up in one place.</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -147,21 +150,28 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(26rem,0.85fr)]">
           <div className="min-w-0 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-            <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+            <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search company, material, or department" className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-sky-400 focus:bg-white" />
               <select value={showFilter} onChange={(event) => setShowFilter(event.target.value)} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium">{shows.map((show) => <option key={show}>{show}</option>)}</select>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"><option>All</option>{SUPPLIER_PARTNER_STATUSES.map((status) => <option key={status}>{status}</option>)}</select>
+              <button type="button" aria-pressed={importantOnly} onClick={() => setImportantOnly((current) => !current)} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold ${importantOnly ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-white text-slate-700"}`}><Star className={`h-4 w-4 ${importantOnly ? "fill-amber-400 text-amber-500" : "text-slate-400"}`} />Important</button>
             </div>
             <p className="mt-3 text-xs text-slate-500">Showing {filtered.length} of {partners.length}</p>
             <div className="mt-3 divide-y divide-slate-100">
               {filtered.map((partner) => {
                 const itemProgress = progress[partner.slug];
                 return (
-                  <button key={partner.slug} type="button" onClick={() => setSelectedSlug(partner.slug)} className={`flex w-full items-center gap-3 px-2 py-3 text-left transition hover:bg-slate-50 ${selected?.slug === partner.slug ? "bg-sky-50/70" : ""}`}>
-                    <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white"><Image src={partner.logoPath} alt="" fill sizes="44px" className="object-contain p-2" /></span>
-                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{partner.company}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{partner.show} · {partner.products}</span></span>
-                    <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ring-1 ring-inset ${STATUS_COLORS[itemProgress.status]}`}>{itemProgress.status}</span>
-                  </button>
+                  <div key={partner.slug} className={`flex items-center gap-2 transition hover:bg-slate-50 ${selected?.slug === partner.slug ? "bg-sky-50/70" : ""}`}>
+                    <button type="button" onClick={() => setSelectedSlug(partner.slug)} className="flex min-w-0 flex-1 items-center gap-3 px-2 py-3 text-left">
+                      <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-white"><Image src={partner.logoPath} alt="" fill sizes="44px" className="object-contain p-2" /></span>
+                      <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{partner.company}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{partner.show} · {partner.products}</span></span>
+                      <span className={`hidden shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ring-1 ring-inset sm:inline-flex ${STATUS_COLORS[itemProgress.status]}`}>{itemProgress.status}</span>
+                    </button>
+                    <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 px-2 text-xs font-semibold text-slate-600">
+                      <input type="checkbox" checked={itemProgress.important} disabled={isPending} onChange={(event) => save({ slug: partner.slug, important: event.target.checked }, event.target.checked ? `${partner.company} marked important.` : `${partner.company} removed from Important.`)} className="h-4 w-4 accent-amber-500" />
+                      <span className="hidden sm:inline">Important</span>
+                    </label>
+                  </div>
                 );
               })}
             </div>

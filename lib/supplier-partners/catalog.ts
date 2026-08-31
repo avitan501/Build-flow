@@ -64,6 +64,7 @@ export type SupplierPartnerActivity = {
 };
 
 export type SupplierPartnerProgress = {
+  important: boolean;
   status: SupplierPartnerStatus;
   contactEmail: string;
   followUpDate: string;
@@ -141,6 +142,7 @@ export function findSupplierPartner(slug: string) {
 
 export function emptySupplierPartnerProgress(partner: SupplierPartner): SupplierPartnerProgress {
   return {
+    important: false,
     status: partner.defaultStatus,
     contactEmail: "",
     followUpDate: "",

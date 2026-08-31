@@ -124,7 +124,7 @@ test("David Dashboard is owner-authenticated, PIN-gated, and publishes explicitl
   expect(broker).toContain('input.action === "rewrite_dashboard_item"');
   expect(broker).toContain("Only the owner can rewrite this item.");
   expect(broker).toContain("meaningfully different");
-  expect(goals).toContain('href="/admin/goals-progress/website-work"');
+  expect(goals).not.toContain('href="/admin/goals-progress/website-work"');
   expect(goals).not.toContain("Phone Intake Tasks");
   expect(page).toContain("Phone Intake");
   expect(page).toContain("routePhoneIntakeTaskAction");

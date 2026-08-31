@@ -14,6 +14,8 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
     deliveryPage,
     deliveryStore,
     managerShell,
+    workspace,
+    catalog,
   ] = await Promise.all([
     readFile(path.join(root, "app/owner/partnerships/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/partnerships/actions.ts"), "utf8"),
@@ -22,6 +24,8 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
     readFile(path.join(root, "app/owner/delivery-requests/page.tsx"), "utf8"),
     readFile(path.join(root, "lib/delivery-requests.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/supplier-partnership-workspace.tsx"), "utf8"),
+    readFile(path.join(root, "lib/supplier-partners/catalog.ts"), "utf8"),
   ]);
 
   expect(page).toContain('requireStaffProfile("suppliers")');
@@ -31,8 +35,8 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(store).toContain("created_by: userId");
   expect(store).not.toContain("createAdminClient");
   expect(store).not.toContain('.from("aura_tasks")');
-  expect(goalsPage).toContain("Supplier Program List");
-  expect(goalsPage).toContain('href="/owner/partnerships"');
+  expect(goalsPage).toContain("Suppliers from the Show");
+  expect(goalsPage).toContain('href: "/owner/partnerships"');
   expect(deliveryPage).toContain('requireStaffProfile("suppliers")');
   expect(deliveryPage).toContain("loadDeliveryRequests(supabase)");
   expect(deliveryStore).not.toContain("createAdminClient");
@@ -41,6 +45,11 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(page).toContain('body: { action: "status" }');
   expect(actions).toContain('action: "send_email"');
   expect(managerShell).toContain("...(access.suppliers ? [");
+  expect(actions).toContain("important: z.boolean().optional()");
+  expect(workspace).toContain("importantOnly");
+  expect(workspace).toContain("aria-pressed={importantOnly}");
+  expect(workspace).toContain('type="checkbox" checked={itemProgress.important}');
+  expect(catalog).toContain("important: false");
 });
 
 test("every Carlos supplier record has working local assets and complete links", async () => {

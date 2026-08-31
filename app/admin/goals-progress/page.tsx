@@ -2,10 +2,7 @@ import {
   Archive,
   ArrowRight,
   ChevronDown,
-  CircleDollarSign,
-  ClipboardList,
   PhoneCall,
-  Target,
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -188,8 +185,8 @@ async function OwnerAffiliateGoal({ status }: { status: ManagerGoalStatus }) {
       status={status}
       number={3}
       eyebrow="Programs"
-      title="Apply for Supplier Program"
-      description="Complete priority applications and follow up."
+      title="API, Affiliate & Partnership"
+      description="Manage supplier APIs, affiliate programs, and partnerships."
     >
       <div className="grid gap-4">
         <AffiliateCallList programs={programResult.data ?? []} />
@@ -276,31 +273,6 @@ function AbcSupplyDemoGoal({ status }: { status: ManagerGoalStatus }) {
         </Link>
       </div>
     </GoalDisclosure>
-  );
-}
-
-function DavidDashboardLink() {
-  return (
-    <Link
-      href="/admin/goals-progress/website-work"
-      className="flex min-h-16 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition hover:border-sky-300"
-    >
-      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white">
-        <ClipboardList className="h-4 w-4" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">
-          Private
-        </span>
-        <span className="block text-sm font-semibold text-slate-950">
-          David Dashboard
-        </span>
-        <span className="block text-[11px] text-slate-500">
-          Tasks, publishing, and pains to resolve.
-        </span>
-      </span>
-      <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
-    </Link>
   );
 }
 
@@ -395,64 +367,9 @@ function ClientTargetGoal({
   );
 }
 
-function SupplierPricingGoal({ status }: { status: ManagerGoalStatus }) {
-  return (
-    <GoalDisclosure
-      id="call-suppliers"
-      fixedKey="call-suppliers"
-      status={status}
-      number={2}
-      eyebrow="Supplier prices"
-      title="Find Best Supplier Prices"
-      description="Ask for best items, delivery minimum, and lead time."
-    >
-      <div className="grid gap-3 text-sm text-slate-600">
-        <p className="flex gap-2">
-          <CircleDollarSign className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-          Ask each supplier for their strongest-priced items, delivery minimum,
-          lead time, and quote expiration.
-        </p>
-        <p className="flex gap-2">
-          <Target className="mt-0.5 h-4 w-4 shrink-0 text-[#0066cc]" />
-          Enter the prices in the catalog and keep the best suppliers per
-          department.
-        </p>
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link
-          href="/owner/partnerships"
-          className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white"
-        >
-          Show supplier partnerships
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-        <Link
-          href="/admin/vendors"
-          className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white"
-        >
-          Supplier Directory
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-        <Link
-          href="/admin/catalog"
-          className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold"
-        >
-          Enter catalog prices
-        </Link>
-        <Link
-          href="/owner/delivery-requests"
-          className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-semibold"
-        >
-          Delivery requests
-        </Link>
-      </div>
-    </GoalDisclosure>
-  );
-}
-
 function SupplierPartnershipGoal({ status }: { status: ManagerGoalStatus }) {
   const lists = [
-    { label: "Supplier Program List", count: SUPPLIER_PARTNERS.length, href: "/owner/partnerships" },
+    { label: "Suppliers from the Show", count: SUPPLIER_PARTNERS.length, href: "/owner/partnerships" },
     { label: "Suppliers from Friends", count: 0, href: "/admin/vendors" },
     { label: "Suppliers from Google", count: 0, href: "/admin/vendors" },
   ];
@@ -558,10 +475,6 @@ export async function CarlosGoalsWorkspace({
       ),
     },
     {
-      key: "call-suppliers",
-      content: <SupplierPricingGoal status={statusFor("call-suppliers")} />,
-    },
-    {
       key: "supplier-affiliate-program",
       content: access.owner ? (
         <OwnerAffiliateGoal status={statusFor("supplier-affiliate-program")} />
@@ -572,8 +485,8 @@ export async function CarlosGoalsWorkspace({
           status={statusFor("supplier-affiliate-program")}
           number={3}
           eyebrow="Programs"
-          title="Apply for Supplier Program"
-          description="Complete priority applications and follow up."
+          title="API, Affiliate & Partnership"
+          description="Manage supplier APIs, affiliate programs, and partnerships."
         >
           <AffiliateCallList />
         </GoalDisclosure>
@@ -664,11 +577,6 @@ export async function CarlosGoalsWorkspace({
             ))}
           </div>
         </details>
-      ) : null}
-      {access.owner ? (
-        <div className="mt-3">
-          <DavidDashboardLink />
-        </div>
       ) : null}
     </>
   );
