@@ -464,6 +464,12 @@ test("Carlos has a focused top-10 supplier call list while the full research lis
   expect(component).toContain("Network managed");
   expect(component).toContain("Only public business contacts are shown");
   expect(component).toContain("TOP_AFFILIATE_CALL_TARGETS");
+  expect(component).toContain("program.api_status");
+  expect(component).toContain("program.next_action");
+  expect(component).toContain("program.last_contact_date");
+  expect(component).toContain("program.next_follow_up_date");
+  expect(component).toContain("All updates");
+  expect(page).toContain("activities={activityResult.data ?? []}");
   expect(data).toContain("export const TOP_AFFILIATE_CALL_TARGETS");
   expect((data.match(/trackerName:/g) ?? []).length).toBe(10);
   expect((data.match(/\btarget\(/g) ?? []).length).toBe(50);

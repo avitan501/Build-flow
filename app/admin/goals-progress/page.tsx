@@ -189,7 +189,10 @@ async function OwnerAffiliateGoal({ status }: { status: ManagerGoalStatus }) {
       description="Manage supplier APIs, affiliate programs, and partnerships."
     >
       <div className="grid gap-4">
-        <AffiliateCallList programs={programResult.data ?? []} />
+        <AffiliateCallList
+          programs={programResult.data ?? []}
+          activities={activityResult.data ?? []}
+        />
         <AffiliateProgramTracker
           programs={programResult.data ?? []}
           checklist={checklistResult.data ?? []}
