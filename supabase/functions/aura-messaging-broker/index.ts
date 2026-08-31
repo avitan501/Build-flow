@@ -4970,7 +4970,7 @@ async function handleQuoWebhook(req: Request) {
 
   await sql`
     insert into public.aura_webhook_events (provider, external_event_id, event_type, activity_id, raw_payload, error_message)
-    values ('quo', ${eventId}, ${eventType}, ${activityId}, ${JSON.stringify(payload)}::jsonb, null)
+    values ('quo', ${eventId}, ${eventType}, ${activityId}, ${sql.json(payload)}, null)
     on conflict (provider, external_event_id) do update set
       event_type = excluded.event_type,
       activity_id = excluded.activity_id,
@@ -4978,87 +4978,88 @@ async function handleQuoWebhook(req: Request) {
       error_message = null
   `;
 
-  const existing = await sql<Record<string, unknown>[]>`
+  const processAcceptedEvent = async () => {
+    const existing = await sql<Record<string, unknown>[]>`
     select * from public.aura_communications
     where provider = 'quo' and external_activity_id = ${activityId}
     limit 1
   `;
-  const current = existing[0];
-  if (!object.phoneNumberId && !current) {
-    await sql`
+    const current = existing[0];
+    if (!object.phoneNumberId && !current) {
+      await sql`
       update public.aura_webhook_events set error_message = 'Related call has not arrived yet.'
       where provider = 'quo' and external_event_id = ${eventId}
     `;
-    return json({ error: "Related call has not arrived yet" }, 409);
-  }
+      return json({ error: "Related call has not arrived yet" }, 409);
+    }
 
-  const to = eventTo;
-  const direction =
-    object.direction === "outgoing"
-      ? "outgoing"
-      : object.direction === "internal"
-        ? "internal"
-        : "incoming";
-  const counterpartyPhone =
-    normalizePhone(direction === "outgoing" ? to : object.from) ||
-    (current?.counterparty_phone as string | null) ||
-    null;
-  const businessPhone =
-    normalizePhone(direction === "outgoing" ? object.from : to) ||
-    (current?.business_phone as string | null) ||
-    null;
-  let linkedContact =
-    (await contactId(counterpartyPhone)) ||
-    (current?.contact_id as string | null) ||
-    null;
-  const occurredAt = safeIso(
-    object.createdAt,
-    payload.createdAt || new Date().toISOString(),
-  );
-  const lastEventAt = safeIso(payload.createdAt, occurredAt);
-  const completedAt = object.completedAt
-    ? safeIso(object.completedAt, lastEventAt)
-    : null;
-  const calculatedDuration = completedAt
-    ? Math.max(
-        0,
-        Math.round(
-          (new Date(completedAt).getTime() - new Date(occurredAt).getTime()) /
-            1000,
-        ),
-      )
-    : null;
-  const media = [
-    ...(object.media || []),
-    ...(object.voicemail ? [object.voicemail] : []),
-  ];
-  const summary = object.summary?.filter(Boolean).join("\n") || null;
-  const transcript =
-    object.dialogue
-      ?.filter((line) => line.content)
-      .map(
-        (line) =>
-          `${line.identifier ? `${line.identifier}: ` : ""}${line.content}`,
-      )
-      .join("\n") || null;
-  const channel = eventType.startsWith("call.") ? "call" : "sms";
-  const body = object.body?.trim() || object.text?.trim() || null;
-  const durationSeconds = Number.isFinite(object.duration)
-    ? Math.max(0, Math.round(object.duration as number))
-    : calculatedDuration;
+    const to = eventTo;
+    const direction =
+      object.direction === "outgoing"
+        ? "outgoing"
+        : object.direction === "internal"
+          ? "internal"
+          : "incoming";
+    const counterpartyPhone =
+      normalizePhone(direction === "outgoing" ? to : object.from) ||
+      (current?.counterparty_phone as string | null) ||
+      null;
+    const businessPhone =
+      normalizePhone(direction === "outgoing" ? object.from : to) ||
+      (current?.business_phone as string | null) ||
+      null;
+    let linkedContact =
+      (await contactId(counterpartyPhone)) ||
+      (current?.contact_id as string | null) ||
+      null;
+    const occurredAt = safeIso(
+      object.createdAt,
+      payload.createdAt || new Date().toISOString(),
+    );
+    const lastEventAt = safeIso(payload.createdAt, occurredAt);
+    const completedAt = object.completedAt
+      ? safeIso(object.completedAt, lastEventAt)
+      : null;
+    const calculatedDuration = completedAt
+      ? Math.max(
+          0,
+          Math.round(
+            (new Date(completedAt).getTime() - new Date(occurredAt).getTime()) /
+              1000,
+          ),
+        )
+      : null;
+    const media = [
+      ...(object.media || []),
+      ...(object.voicemail ? [object.voicemail] : []),
+    ];
+    const summary = object.summary?.filter(Boolean).join("\n") || null;
+    const transcript =
+      object.dialogue
+        ?.filter((line) => line.content)
+        .map(
+          (line) =>
+            `${line.identifier ? `${line.identifier}: ` : ""}${line.content}`,
+        )
+        .join("\n") || null;
+    const channel = eventType.startsWith("call.") ? "call" : "sms";
+    const body = object.body?.trim() || object.text?.trim() || null;
+    const durationSeconds = Number.isFinite(object.duration)
+      ? Math.max(0, Math.round(object.duration as number))
+      : calculatedDuration;
 
-  if (
-    !linkedContact &&
-    eventType === "message.received" &&
-    channel === "sms" &&
-    direction === "incoming" &&
-    counterpartyPhone &&
-    counterpartyPhone !== TRUSTED_SMS_COMMAND_PHONE
-  ) {
-    linkedContact = await ensureIncomingSmsContact(counterpartyPhone);
-  }
+    if (
+      !linkedContact &&
+      eventType === "message.received" &&
+      channel === "sms" &&
+      direction === "incoming" &&
+      counterpartyPhone &&
+      counterpartyPhone !== TRUSTED_SMS_COMMAND_PHONE
+    ) {
+      linkedContact = await ensureIncomingSmsContact(counterpartyPhone);
+    }
 
-  await sql`
+    await sql`
     insert into public.aura_communications (
       provider, channel, external_activity_id, external_conversation_id, contact_id, direction,
       counterparty_phone, business_phone, body, summary, transcript, next_steps, media, status,
@@ -5086,72 +5087,85 @@ async function handleQuoWebhook(req: Request) {
       last_event_at = greatest(excluded.last_event_at, aura_communications.last_event_at),
       updated_at = now()
   `;
-  if (
-    eventType === "message.received" &&
-    channel === "sms" &&
-    direction === "incoming" &&
-    counterpartyPhone &&
-    (body || trustedImageMedia(media).length > 0)
-  ) {
-    // Quo may emit distinct webhook event IDs for the same message activity.
-    // Select one canonical event before starting automation so a provider
-    // replay cannot dismiss drafts or send a second reply.
-    const canonicalEvents = await sql<{ external_event_id: string }[]>`
+    if (
+      eventType === "message.received" &&
+      channel === "sms" &&
+      direction === "incoming" &&
+      counterpartyPhone &&
+      (body || trustedImageMedia(media).length > 0)
+    ) {
+      // Quo may emit distinct webhook event IDs for the same message activity.
+      // Select one canonical event before starting automation so a provider
+      // replay cannot dismiss drafts or send a second reply.
+      const canonicalEvents = await sql<{ external_event_id: string }[]>`
       select external_event_id
       from public.aura_webhook_events
       where provider = 'quo' and activity_id = ${activityId} and event_type = 'message.received'
       order by created_at asc, external_event_id asc
       limit 1
     `;
-    const stored = await sql<{ id: string }[]>`
+      const stored = await sql<{ id: string }[]>`
       select id from public.aura_communications
       where provider = 'quo' and external_activity_id = ${activityId}
       limit 1
     `;
-    if (stored[0]?.id && canonicalEvents[0]?.external_event_id === eventId) {
-      scheduleMaterialShadowAssessment(stored[0].id);
-      await enqueueSmsAutomation(stored[0].id);
-      EdgeRuntime.waitUntil(
-        // Claim this newly received message first. Backlog recovery remains on
-        // the durable cron worker, so an older slow AI job cannot delay the
-        // live conversation's fast path.
-        drainSmsAutomationQueue(1, stored[0].id).catch(
-          async (automationError) => {
-            await sql`
+      if (stored[0]?.id && canonicalEvents[0]?.external_event_id === eventId) {
+        scheduleMaterialShadowAssessment(stored[0].id);
+        await enqueueSmsAutomation(stored[0].id);
+        EdgeRuntime.waitUntil(
+          // Claim this newly received message first. Backlog recovery remains on
+          // the durable cron worker, so an older slow AI job cannot delay the
+          // live conversation's fast path.
+          drainSmsAutomationQueue(1, stored[0].id).catch(
+            async (automationError) => {
+              await sql`
               update public.aura_webhook_events
               set error_message = ${`SMS automation: ${automationError instanceof Error ? automationError.message : "failed"}`.slice(0, 500)}
               where provider = 'quo' and external_event_id = ${eventId}
             `;
-          },
-        ),
-      );
-    } else if (canonicalEvents[0]?.external_event_id !== eventId) {
-      await sql`
+            },
+          ),
+        );
+      } else if (canonicalEvents[0]?.external_event_id !== eventId) {
+        await sql`
         insert into public.aura_audit_log (action, details)
         values ('sms_ai_provider_replay_suppressed', ${sql.json({ communicationId: stored[0]?.id || null, route: "canonical-quo-activity" })})
       `;
+      }
     }
-  }
-  if (
-    eventType === "message.received" &&
-    channel === "sms" &&
-    direction === "incoming" &&
-    counterpartyPhone === TRUSTED_SMS_COMMAND_PHONE &&
-    (isTrustedSmsCommand(body) || trustedImageMedia(media).length > 0)
-  ) {
-    await createTrustedSmsIntake(
-      activityId,
-      eventId,
-      body,
-      media,
-      object.conversationId || null,
-    );
-  }
-  await sql`
+    if (
+      eventType === "message.received" &&
+      channel === "sms" &&
+      direction === "incoming" &&
+      counterpartyPhone === TRUSTED_SMS_COMMAND_PHONE &&
+      (isTrustedSmsCommand(body) || trustedImageMedia(media).length > 0)
+    ) {
+      await createTrustedSmsIntake(
+        activityId,
+        eventId,
+        body,
+        media,
+        object.conversationId || null,
+      );
+    }
+    await sql`
     update public.aura_webhook_events set processed_at = now(), error_message = null
     where provider = 'quo' and external_event_id = ${eventId}
   `;
-  return json({ ok: true, duplicate: false });
+  };
+  EdgeRuntime.waitUntil(
+    processAcceptedEvent().catch(async (error) => {
+      await sql`
+        update public.aura_webhook_events
+        set error_message = ${String(error instanceof Error ? error.message : "quo_webhook_processing_failed").slice(0, 500)}
+        where provider = 'quo' and external_event_id = ${eventId}
+      `;
+    }),
+  );
+  // Quo retries when a webhook takes longer than 10 seconds. Signature
+  // verification and durable event storage are complete, so acknowledge now
+  // while contact linking and AI automation continue in the background.
+  return json({ ok: true, duplicate: false, accepted: true }, 202);
 }
 
 async function sendTwoChatWhatsApp(
