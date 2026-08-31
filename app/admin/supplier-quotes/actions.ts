@@ -1083,12 +1083,17 @@ async function createComparisonFromQuote(
     .from("quote_comparison_bids")
     .select("id")
     .eq("comparison_id", comparison.id)
-    .eq("supplier_id", bidSupplierId)
+    .eq("source_supplier_quote_id", quote.id)
     .maybeSingle<{ id: string }>();
   if (existingBid.error)
     return fail("The supplier quote column could not be checked.");
   const bidPayload = {
     comparison_id: comparison.id,
+    source_supplier_quote_id: quote.id,
+    source_vendor_name: quote.source_vendor_name || quote.supplier_name,
+    source_contact_name: quote.source_contact_name,
+    source_delivery_charge:
+      quote.source_delivery_charge ?? quote.delivery_charge,
     supplier_id: bidSupplierId,
     supplier_name_snapshot: bidName,
     trust_level_snapshot: supplier.trustLevel ?? "not-reviewed",
@@ -1113,7 +1118,47 @@ async function createComparisonFromQuote(
         .insert(bidPayload)
         .select("id")
         .single<{ id: string }>();
-  const { data: bid, error: bidError } = bidResult;
+  let bid = bidResult.data;
+  let bidError = bidResult.error;
+  if (bidError?.code === "23505") {
+    const recovered = await supabase
+      .from("quote_comparison_bids")
+      .select("id")
+      .eq("comparison_id", comparison.id)
+      .eq("source_supplier_quote_id", quote.id)
+      .maybeSingle<{ id: string }>();
+    bid = recovered.data;
+    bidError = recovered.error;
+    if (!bid && !bidError) {
+      const legacy = await supabase
+        .from("quote_comparison_bids")
+        .select("id,source_supplier_quote_id")
+        .eq("comparison_id", comparison.id)
+        .eq("supplier_id", bidSupplierId)
+        .maybeSingle<{
+          id: string;
+          source_supplier_quote_id: string | null;
+        }>();
+      if (
+        !legacy.error &&
+        legacy.data &&
+        (!legacy.data.source_supplier_quote_id ||
+          legacy.data.source_supplier_quote_id === quote.id)
+      ) {
+        const claimed = await supabase
+          .from("quote_comparison_bids")
+          .update(bidPayload)
+          .eq("id", legacy.data.id)
+          .or(
+            `source_supplier_quote_id.is.null,source_supplier_quote_id.eq.${quote.id}`,
+          )
+          .select("id")
+          .single<{ id: string }>();
+        bid = claimed.data;
+        bidError = claimed.error;
+      }
+    }
+  }
   if (bidError || !bid)
     return fail("The supplier could not be added to the comparison.");
 

@@ -110,6 +110,9 @@ export function ManagerDocumentReview({
     "purchase_order",
   ].includes(draft.document_type);
   const selectedLines = lines.filter((line) => line.selected);
+  const selectedImportLines = selectedLines.filter(
+    (line) => line.catalog_import_status !== "imported",
+  );
   const actionableWarnings = document.warnings.filter(
     (warning) => !isObsoleteSelectionSubtotalWarning(warning),
   );
@@ -125,16 +128,14 @@ export function ManagerDocumentReview({
   const approved = document.status === "ready" || document.status === "routed";
   const catalogPricingSaved =
     document.status === "routed" && Boolean(document.supplier_id);
-  const directImportBlocker = !selectedLines.length
+  const directImportBlocker = !selectedImportLines.length
     ? "Select at least one product."
-    : !catalogVendor.trim()
-      ? "Confirm the vendor."
-      : selectedLines.some(
-            (line) =>
-              !rowDepartments[line.id] || rowDepartments[line.id] === "Test",
-          )
-        ? "Choose a category beside each selected product."
-        : "";
+    : selectedImportLines.some(
+          (line) =>
+            !rowDepartments[line.id] || rowDepartments[line.id] === "Test",
+        )
+      ? "Choose a category beside each selected product."
+      : "";
 
   function run(work: () => Promise<void>) {
     setError("");
@@ -260,22 +261,22 @@ export function ManagerDocumentReview({
       router.refresh();
     });
   }
-  function importBlocker(lineId?: string) {
+  function importBlocker(lineId?: string, confirmDetails = true) {
     if (!lineId) return directImportBlocker;
     const rowDepartment = rowDepartments[lineId];
     const line = lines.find((entry) => entry.id === lineId);
     return !canApprove
       ? "Manager approval access is required."
-      : !catalogVendor.trim()
+      : confirmDetails && !catalogVendor.trim()
         ? "Confirm the vendor."
-        : !rowDepartment || rowDepartment === "Test"
+        : confirmDetails && (!rowDepartment || rowDepartment === "Test")
           ? "Choose a category."
           : !line?.description.trim()
             ? "Product name is required."
             : "";
   }
   function askDeliveryThenImport(lineId?: string) {
-    const blocker = importBlocker(lineId);
+    const blocker = importBlocker(lineId, false);
     if (blocker) {
       setFeedback("");
       setError(blocker);
@@ -294,7 +295,7 @@ export function ManagerDocumentReview({
   ) {
     const importTargets = lineId
       ? lines.filter((line) => line.id === lineId)
-      : lines.filter((line) => line.selected);
+      : selectedImportLines;
     const linesForImport = lineId
       ? lines.map((line) =>
           line.id === lineId ? { ...line, selected: true } : line,
@@ -348,29 +349,37 @@ export function ManagerDocumentReview({
       }
       let itemCount = 0;
       let priceCount = 0;
-      for (const target of importTargets) {
-        const imported = await addManagerDocumentItemsToCatalogAction(
-          document.id,
-          [target.id],
-          {
-            directRowImport: true,
-            catalogDepartment: rowDepartments[target.id],
-            vendorName: catalogVendor,
-            contactName: catalogContact,
-            deliveryMode: deliveryPrice === 0 ? "free" : "amount",
-            deliveryAmount: deliveryPrice,
-          },
+      const importDepartments = [
+        ...new Set(importTargets.map((target) => rowDepartments[target.id])),
+      ];
+      if (importDepartments.length !== 1) {
+        setError(
+          "For one safe import, selected products must use the same category. Import the other category separately.",
         );
-        if (!imported.ok) {
-          setError(imported.error);
-          if (lineId) setRowImportNotice({ lineId, message: imported.error });
-          setImportingLineId(null);
-          router.refresh();
-          return;
-        }
-        itemCount += imported.data.itemCount;
-        priceCount += imported.data.priceCount;
+        setImportingLineId(null);
+        return;
       }
+      const imported = await addManagerDocumentItemsToCatalogAction(
+        document.id,
+        importTargets.map((target) => target.id),
+        {
+          directRowImport: true,
+          catalogDepartment: importDepartments[0],
+          vendorName: catalogVendor,
+          contactName: catalogContact,
+          deliveryMode: deliveryPrice === 0 ? "free" : "amount",
+          deliveryAmount: deliveryPrice,
+        },
+      );
+      if (!imported.ok) {
+        setError(imported.error);
+        if (lineId) setRowImportNotice({ lineId, message: imported.error });
+        setImportingLineId(null);
+        router.refresh();
+        return;
+      }
+      itemCount += imported.data.itemCount;
+      priceCount += imported.data.priceCount;
       setSelectionChanged(false);
       setFeedback(
         `${itemCount} selected product${itemCount === 1 ? "" : "s"} added to Catalog with ${priceCount} supplier price${priceCount === 1 ? "" : "s"}.`,
@@ -477,7 +486,11 @@ export function ManagerDocumentReview({
     <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_19rem]">
       <div
         className="flex min-w-0 flex-col gap-3"
-        onChangeCapture={() => setSelectionChanged(true)}
+        onChangeCapture={(event) => {
+          const target = event.target as HTMLElement;
+          if (!target.closest("[data-workflow-control]"))
+            setSelectionChanged(true);
+        }}
       >
         {actionableWarnings.length ? (
           <section
@@ -665,41 +678,28 @@ export function ManagerDocumentReview({
               </button>
             </div>
           </div>
-          <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(10rem,1.2fr)_minmax(10rem,1fr)_auto] sm:items-end">
-            <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-              Vendor
-              <input
-                value={catalogVendor}
-                onChange={(event) => setCatalogVendor(event.target.value)}
-                placeholder="Confirm vendor"
-                className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-950"
-              />
-            </label>
-            <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-              Contact person
-              <input
-                value={catalogContact}
-                onChange={(event) => setCatalogContact(event.target.value)}
-                placeholder="Optional"
-                className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-950"
-              />
-            </label>
+          <div
+            data-workflow-control
+            className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-[auto_minmax(14rem,1fr)] sm:items-end"
+          >
             <button
               type="button"
               onClick={() => askDeliveryThenImport()}
-              disabled={!canApprove || pending || Boolean(directImportBlocker)}
+              disabled={!canApprove || pending || !selectedImportLines.length}
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               <BookOpenCheck className="h-4 w-4" />
-              {pending ? "Adding…" : `Add selected (${selectedLines.length})`}
+              {pending
+                ? "Adding…"
+                : `Add selected (${selectedImportLines.length})`}
             </button>
             {directImportBlocker ? (
-              <p className="text-xs font-semibold text-amber-800 sm:col-span-4">
+              <p className="text-xs font-semibold text-amber-800">
                 {directImportBlocker}
               </p>
             ) : null}
             {supplierDocument ? (
-              <div className="grid gap-2 rounded-lg border border-sky-200 bg-white p-2 sm:col-span-3 sm:grid-cols-[minmax(14rem,1fr)_auto] sm:items-end">
+              <div className="grid gap-2 rounded-lg border border-sky-200 bg-white p-2 sm:grid-cols-[minmax(14rem,1fr)_auto] sm:items-end">
                 <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
                   Request for quote compare
                   <select
@@ -743,7 +743,188 @@ export function ManagerDocumentReview({
           </div>
           {lines.length ? (
             <>
-              <div className="overflow-x-auto">
+              <div className="divide-y divide-slate-200 md:hidden">
+                {lines.map((line, index) => (
+                  <article
+                    key={line.id}
+                    className={`grid gap-3 p-4 ${line.selected ? "bg-sky-50/40" : "bg-slate-50"}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <label className="flex min-h-10 items-center gap-2 text-xs font-bold text-slate-700">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${line.description || `line ${index + 1}`} for catalog import`}
+                          checked={line.selected}
+                          onChange={(event) =>
+                            updateLine(index, {
+                              selected: event.target.checked,
+                            })
+                          }
+                          className="h-5 w-5 accent-[#0071e3]"
+                        />
+                        Select
+                      </label>
+                      <span
+                        className={`rounded-full px-2 py-1 text-[10px] font-bold ${line.validation_status === "valid" ? "bg-emerald-50 text-emerald-800" : line.validation_status === "mismatch" ? "bg-rose-50 text-rose-800" : "bg-amber-50 text-amber-800"}`}
+                      >
+                        {line.validation_status === "valid"
+                          ? "Ready"
+                          : line.validation_status === "mismatch"
+                            ? "Math mismatch"
+                            : "Review"}
+                      </span>
+                    </div>
+                    <div className="grid gap-2">
+                      <input
+                        value={line.description}
+                        aria-label={`Product name for line ${index + 1}`}
+                        onChange={(event) =>
+                          updateLine(index, { description: event.target.value })
+                        }
+                        className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm font-bold"
+                      />
+                      <input
+                        value={line.specification}
+                        aria-label={`Specification for ${line.description || `line ${index + 1}`}`}
+                        onChange={(event) =>
+                          updateLine(index, {
+                            specification: event.target.value,
+                          })
+                        }
+                        placeholder="Specification"
+                        className="min-h-10 w-full rounded-lg border border-slate-200 px-3 text-xs text-slate-600"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                        Quantity
+                        <input
+                          type="number"
+                          min="0.001"
+                          step="0.001"
+                          value={line.quantity ?? ""}
+                          aria-label={`Quantity for ${line.description || `line ${index + 1}`}`}
+                          onChange={(event) =>
+                            updateLine(index, {
+                              quantity: numberOrNull(event.target.value),
+                            })
+                          }
+                          className="h-11 rounded-lg border border-slate-300 px-3 text-sm font-semibold"
+                        />
+                      </label>
+                      <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                        Unit
+                        <input
+                          value={line.unit}
+                          aria-label={`Unit for ${line.description || `line ${index + 1}`}`}
+                          onChange={(event) =>
+                            updateLine(index, { unit: event.target.value })
+                          }
+                          className="h-11 rounded-lg border border-slate-300 px-3 text-sm font-semibold"
+                        />
+                      </label>
+                      <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                        Unit price
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={line.unit_price ?? ""}
+                          aria-label={`Unit price for ${line.description || `line ${index + 1}`}`}
+                          onChange={(event) =>
+                            updateLine(index, {
+                              unit_price: numberOrNull(event.target.value),
+                            })
+                          }
+                          className="h-11 rounded-lg border border-slate-300 px-3 text-sm font-semibold"
+                        />
+                      </label>
+                      <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                        Line total
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={line.line_total ?? ""}
+                          aria-label={`Line total for ${line.description || `line ${index + 1}`}`}
+                          onChange={(event) =>
+                            updateLine(index, {
+                              line_total: numberOrNull(event.target.value),
+                            })
+                          }
+                          className="h-11 rounded-lg border border-slate-300 px-3 text-sm font-semibold"
+                        />
+                      </label>
+                    </div>
+                    {line.catalog_import_status === "imported" &&
+                    line.matched_catalog_item_id ? (
+                      <Link
+                        href="/admin/catalog"
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-800"
+                      >
+                        <CheckCircle2 className="h-4 w-4" /> In Catalog
+                      </Link>
+                    ) : (
+                      <div data-workflow-control className="grid gap-2">
+                        <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                          Category
+                          <select
+                            value={rowDepartments[line.id] || ""}
+                            onChange={(event) =>
+                              setRowDepartments((current) => ({
+                                ...current,
+                                [line.id]: event.target.value,
+                              }))
+                            }
+                            className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-950"
+                          >
+                            <option value="">Choose category</option>
+                            {departments
+                              .filter((department) => department !== "Test")
+                              .map((department) => (
+                                <option key={department}>{department}</option>
+                              ))}
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => askDeliveryThenImport(line.id)}
+                          disabled={!canApprove || pending}
+                          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-3 text-sm font-bold text-white disabled:opacity-40"
+                        >
+                          <BookOpenCheck className="h-4 w-4" /> Add to Catalog
+                        </button>
+                      </div>
+                    )}
+                    {supplierDocument ? (
+                      <button
+                        type="button"
+                        onClick={() => routeQuote("comparison", line.id)}
+                        disabled={
+                          !canApprove ||
+                          pending ||
+                          !approved ||
+                          !comparisonRequestId ||
+                          !line.selected ||
+                          selectionChanged
+                        }
+                        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-violet-300 bg-white px-3 text-sm font-bold text-violet-800 disabled:opacity-40"
+                      >
+                        <Columns3 className="h-4 w-4" /> Add to Request Compare
+                      </button>
+                    ) : null}
+                    {rowImportNotice?.lineId === line.id ? (
+                      <p
+                        role="alert"
+                        className="text-xs font-semibold text-rose-700"
+                      >
+                        {rowImportNotice.message}
+                      </p>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[58rem] border-collapse text-left text-xs">
                   <thead className="bg-slate-950 text-white">
                     <tr>
@@ -798,6 +979,7 @@ export function ManagerDocumentReview({
                                   Category
                                 </label>
                                 <select
+                                  data-workflow-control
                                   id={`catalog-category-${line.id}`}
                                   value={rowDepartments[line.id] || ""}
                                   onChange={(event) =>
@@ -871,6 +1053,7 @@ export function ManagerDocumentReview({
                         <td className="px-3 py-3">
                           <input
                             value={line.description}
+                            aria-label={`Product name for line ${index + 1}`}
                             onChange={(event) =>
                               updateLine(index, {
                                 description: event.target.value,
@@ -886,6 +1069,7 @@ export function ManagerDocumentReview({
                               })
                             }
                             placeholder="Specification"
+                            aria-label={`Specification for ${line.description || `line ${index + 1}`}`}
                             className="mt-1 min-h-10 w-full rounded border border-slate-200 px-2 text-slate-600"
                           />
                         </td>
@@ -908,6 +1092,7 @@ export function ManagerDocumentReview({
                             min="0.001"
                             step="0.001"
                             value={line.quantity ?? ""}
+                            aria-label={`Quantity for ${line.description || `line ${index + 1}`}`}
                             onChange={(event) =>
                               updateLine(index, {
                                 quantity: numberOrNull(event.target.value),
@@ -919,6 +1104,7 @@ export function ManagerDocumentReview({
                         <td className="px-3 py-3">
                           <input
                             value={line.unit}
+                            aria-label={`Unit for ${line.description || `line ${index + 1}`}`}
                             onChange={(event) =>
                               updateLine(index, { unit: event.target.value })
                             }
@@ -931,6 +1117,7 @@ export function ManagerDocumentReview({
                             min="0"
                             step="0.01"
                             value={line.unit_price ?? ""}
+                            aria-label={`Unit price for ${line.description || `line ${index + 1}`}`}
                             onChange={(event) =>
                               updateLine(index, {
                                 unit_price: numberOrNull(event.target.value),
@@ -945,6 +1132,7 @@ export function ManagerDocumentReview({
                             min="0"
                             step="0.01"
                             value={line.line_total ?? ""}
+                            aria-label={`Line total for ${line.description || `line ${index + 1}`}`}
                             onChange={(event) =>
                               updateLine(index, {
                                 line_total: numberOrNull(event.target.value),
@@ -1402,7 +1590,7 @@ export function ManagerDocumentReview({
       {deliveryPromptTarget && typeof globalThis.document !== "undefined"
         ? createPortal(
             <div
-              className="fixed inset-0 z-[180] grid place-items-end bg-slate-950/55 p-0 sm:place-items-center sm:p-4"
+              className="fixed inset-0 z-[180] grid place-items-end overscroll-contain bg-slate-950/55 p-0 sm:place-items-center sm:p-4"
               role="dialog"
               aria-modal="true"
               aria-labelledby="delivery-question-title"
@@ -1411,7 +1599,7 @@ export function ManagerDocumentReview({
                   setDeliveryPromptTarget(null);
               }}
             >
-              <section className="w-full rounded-t-2xl bg-white shadow-2xl sm:max-w-md sm:rounded-2xl">
+              <section className="max-h-[calc(100dvh-1rem)] w-full overflow-y-auto overscroll-contain rounded-t-2xl bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl sm:max-w-md sm:rounded-2xl">
                 <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0071e3]">
@@ -1426,11 +1614,11 @@ export function ManagerDocumentReview({
                     <p className="mt-1 text-xs text-slate-500">
                       {catalogVendor} ·{" "}
                       {deliveryPromptTarget === "selected"
-                        ? selectedLines.length
+                        ? selectedImportLines.length
                         : 1}{" "}
                       product
                       {deliveryPromptTarget === "selected" &&
-                      selectedLines.length !== 1
+                      selectedImportLines.length !== 1
                         ? "s"
                         : ""}
                     </p>
@@ -1446,6 +1634,72 @@ export function ManagerDocumentReview({
                   </button>
                 </header>
                 <div className="grid gap-3 p-5">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                      Product
+                    </p>
+                    {(deliveryPromptTarget === "selected"
+                      ? selectedImportLines
+                      : lines.filter((line) => line.id === deliveryPromptTarget)
+                    ).map((line) => (
+                      <div
+                        key={line.id}
+                        className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem] sm:items-end"
+                      >
+                        <p className="text-sm font-bold leading-5 text-slate-950">
+                          {line.description || "Selected product"}
+                        </p>
+                        <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                          Category
+                          <select
+                            value={rowDepartments[line.id] || ""}
+                            onChange={(event) =>
+                              setRowDepartments((current) => ({
+                                ...current,
+                                [line.id]: event.target.value,
+                              }))
+                            }
+                            className="h-10 min-w-0 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold normal-case tracking-normal text-slate-950"
+                          >
+                            <option value="">Choose category</option>
+                            {departments
+                              .filter((department) => department !== "Test")
+                              .map((department) => (
+                                <option key={department}>{department}</option>
+                              ))}
+                          </select>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="grid gap-1 text-xs font-bold text-slate-700">
+                      Vendor
+                      <input
+                        name="catalogVendor"
+                        autoComplete="off"
+                        value={catalogVendor}
+                        onChange={(event) =>
+                          setCatalogVendor(event.target.value)
+                        }
+                        placeholder="Confirm vendor…"
+                        className="h-11 min-w-0 rounded-xl border border-slate-300 px-3 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-[#0071e3]"
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs font-bold text-slate-700">
+                      Contact person
+                      <input
+                        name="catalogContact"
+                        autoComplete="off"
+                        value={catalogContact}
+                        onChange={(event) =>
+                          setCatalogContact(event.target.value)
+                        }
+                        placeholder="Optional…"
+                        className="h-11 min-w-0 rounded-xl border border-slate-300 px-3 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-[#0071e3]"
+                      />
+                    </label>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
@@ -1473,15 +1727,16 @@ export function ManagerDocumentReview({
                           $
                         </span>
                         <input
-                          autoFocus
                           inputMode="decimal"
+                          name="deliveryAmount"
+                          autoComplete="off"
                           value={deliveryAmount}
                           onChange={(event) =>
                             setDeliveryAmount(
                               event.target.value.replace(/[^0-9.]/g, ""),
                             )
                           }
-                          placeholder="0.00"
+                          placeholder="0.00…"
                           aria-label="Delivery amount"
                           className="h-12 w-full rounded-xl border border-slate-300 pl-7 pr-3 text-base font-semibold tabular-nums"
                         />
@@ -1494,6 +1749,17 @@ export function ManagerDocumentReview({
                     type="button"
                     disabled={
                       pending ||
+                      !catalogVendor.trim() ||
+                      (deliveryPromptTarget === "selected"
+                        ? selectedImportLines
+                        : lines.filter(
+                            (line) => line.id === deliveryPromptTarget,
+                          )
+                      ).some(
+                        (line) =>
+                          !rowDepartments[line.id] ||
+                          rowDepartments[line.id] === "Test",
+                      ) ||
                       !deliveryChoice ||
                       (deliveryChoice === "amount" &&
                         (!deliveryAmount.trim() ||

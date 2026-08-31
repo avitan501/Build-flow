@@ -199,15 +199,39 @@ async function ensureDocumentRequestComparison(
     })
     .select("id")
     .single<{ id: string }>();
-  if (comparisonError || !comparison)
-    throw comparisonError || new Error("Comparison not created");
+  let comparisonId = comparison?.id ?? null;
+  let createdComparison = Boolean(comparison?.id);
+  if (comparisonError || !comparison) {
+    // The database keeps one active workspace per request. If two staff
+    // actions arrive together, reuse the winner instead of creating a second
+    // comparison or surfacing a misleading failure.
+    if (comparisonError?.code === "23505") {
+      const concurrent = await supabase
+        .from("quote_comparisons")
+        .select("id")
+        .eq("request_id", requestId)
+        .in("status", ["draft", "review"])
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle<{ id: string }>();
+      if (!concurrent.error && concurrent.data) {
+        comparisonId = concurrent.data.id;
+        createdComparison = false;
+      } else {
+        throw comparisonError;
+      }
+    } else {
+      throw comparisonError || new Error("Comparison not created");
+    }
+  }
+  if (!comparisonId) throw new Error("Comparison not created");
 
   if (requestItems.length) {
     const { error: seedError } = await supabase
       .from("quote_comparison_items")
-      .insert(
+      .upsert(
         requestItems.slice(0, 500).map((item, index) => ({
-          comparison_id: comparison.id,
+          comparison_id: comparisonId,
           description:
             clean(item.name, 500) || `Requested material ${index + 1}`,
           specification: clean(item.department, 1000),
@@ -215,13 +239,18 @@ async function ensureDocumentRequestComparison(
           unit: clean(item.unit, 40) || "each",
           sort_order: index,
         })),
+        { onConflict: "comparison_id,sort_order" },
       );
     if (seedError) {
-      await supabase.from("quote_comparisons").delete().eq("id", comparison.id);
+      if (createdComparison)
+        await supabase
+          .from("quote_comparisons")
+          .delete()
+          .eq("id", comparisonId);
       throw seedError;
     }
   }
-  return comparison.id;
+  return comparisonId;
 }
 function cleanFileName(value: string) {
   return (
@@ -514,7 +543,31 @@ export async function uploadManagerDocumentAction(
       updated_by: user.id,
     });
   if (insertError) {
-    await supabase.storage.from(MANAGER_DOCUMENT_BUCKET).remove([filePath]);
+    const losingUploadCleanup = await supabase.storage
+      .from(MANAGER_DOCUMENT_BUCKET)
+      .remove([filePath]);
+    if (losingUploadCleanup.error)
+      console.error("Manager duplicate upload cleanup failed", {
+        filePath,
+        error: losingUploadCleanup.error,
+      });
+    if (insertError.code === "23505") {
+      const concurrent = await supabase
+        .from("manager_documents")
+        .select("id")
+        .eq("source_sha256", sourceSha256)
+        .neq("status", "archived")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle<{ id: string }>();
+      if (!concurrent.error && concurrent.data)
+        return {
+          ok: true,
+          data: { documentId: concurrent.data.id },
+          message:
+            "This exact document was uploaded at the same time. Opened the saved copy.",
+        };
+    }
     console.error("Manager document record creation failed", insertError);
     return {
       ok: false,
@@ -1168,9 +1221,79 @@ export async function routeManagerDocumentToSupplierPricingAction(
     .eq("id", documentId)
     .maybeSingle<ManagerDocumentRecord>();
   if (!document) return { ok: false, error: "Document not found." };
+  if (!["ready", "routed"].includes(document.status))
+    return {
+      ok: false,
+      error:
+        "Approve the reviewed document before sending it to supplier pricing.",
+    };
   const selectedRequestId = requestId || document.request_id || "";
   if (selectedRequestId && !UUID_PATTERN.test(selectedRequestId))
     return { ok: false, error: "Choose a valid material request." };
+  if (
+    document.request_id &&
+    selectedRequestId &&
+    document.request_id !== selectedRequestId
+  )
+    return {
+      ok: false,
+      error:
+        "This document is already linked to another request. Upload it again to keep both sources separate.",
+    };
+  let selectedItemsQuery = supabase
+    .from("manager_document_items")
+    .select("*")
+    .eq("document_id", documentId)
+    .eq("selected", true);
+  if (requestedItemIds)
+    selectedItemsQuery = selectedItemsQuery.in("id", requestedItemIds);
+  const requestedRows = await selectedItemsQuery
+    .order("line_number")
+    .returns<ManagerDocumentItemRecord[]>();
+  const validatedRequestedItems = requestedRows.data ?? [];
+  if (
+    requestedRows.error ||
+    !validatedRequestedItems.length ||
+    (requestedItemIds &&
+      validatedRequestedItems.length !== requestedItemIds.length) ||
+    validatedRequestedItems.some(
+      (item) => item.validation_status !== "valid" || !item.description.trim(),
+    )
+  )
+    return {
+      ok: false,
+      error: "Review and save the exact selected product before routing it.",
+    };
+
+  let existingQuoteComparisonId: string | null = null;
+  if (document.legacy_supplier_quote_id) {
+    const existingQuote = await supabase
+      .from("supplier_quotes")
+      .select("comparison_id")
+      .eq("id", document.legacy_supplier_quote_id)
+      .maybeSingle<{ comparison_id: string | null }>();
+    if (existingQuote.error || !existingQuote.data)
+      return { ok: false, error: "The linked supplier quote was not found." };
+    existingQuoteComparisonId = existingQuote.data.comparison_id;
+    if (selectedRequestId && existingQuoteComparisonId) {
+      const existingComparison = await supabase
+        .from("quote_comparisons")
+        .select("request_id")
+        .eq("id", existingQuoteComparisonId)
+        .maybeSingle<{ request_id: string | null }>();
+      if (
+        existingComparison.error ||
+        !existingComparison.data ||
+        (existingComparison.data.request_id &&
+          existingComparison.data.request_id !== selectedRequestId)
+      )
+        return {
+          ok: false,
+          error:
+            "This supplier quote is already linked to another request. Upload it again to keep both sources separate.",
+        };
+    }
+  }
   let selectedComparisonId: string | null = null;
   if (selectedRequestId) {
     try {
@@ -1188,24 +1311,28 @@ export async function routeManagerDocumentToSupplierPricingAction(
           "The selected material request could not be opened for quote comparison.",
       };
     }
-    const linked = await supabase
-      .from("manager_documents")
-      .update({ request_id: selectedRequestId, updated_by: user.id })
-      .eq("id", documentId);
-    if (linked.error)
-      return {
-        ok: false,
-        error: "The document could not be linked to that material request.",
-      };
   }
-  if (!["ready", "routed"].includes(document.status))
-    return {
-      ok: false,
-      error:
-        "Approve the reviewed document before sending it to supplier pricing.",
-    };
   if (document.legacy_supplier_quote_id) {
     if (selectedComparisonId) {
+      const linked = await supabase.rpc(
+        "staff_link_manager_document_supplier_quote",
+        {
+          p_document_id: documentId,
+          p_quote_id: document.legacy_supplier_quote_id,
+          p_request_id: selectedRequestId,
+          p_comparison_id: selectedComparisonId,
+        },
+      );
+      const linkedResult = linked.data as {
+        ok?: boolean;
+        code?: string;
+      } | null;
+      if (linked.error || !linkedResult?.ok)
+        return {
+          ok: false,
+          error:
+            "This supplier quote is already linked to another request or comparison.",
+        };
       const { data: supplierRows } = await supabase.rpc(
         "staff_load_catalog_suppliers",
       );
@@ -1217,41 +1344,27 @@ export async function routeManagerDocumentToSupplierPricingAction(
       const quoteUpdate = await supabase
         .from("supplier_quotes")
         .update({
-          comparison_id: selectedComparisonId,
           ...(match
             ? { supplier_id: match.id, supplier_name: match.name }
             : {}),
           updated_by: user.id,
         })
-        .eq("id", document.legacy_supplier_quote_id);
-      if (quoteUpdate.error)
+        .eq("id", document.legacy_supplier_quote_id)
+        .select("id");
+      if (quoteUpdate.error || !quoteUpdate.data?.length)
         return {
           ok: false,
-          error:
-            "The existing supplier quote could not be linked to that comparison.",
+          error: "The existing supplier quote could not be refreshed.",
         };
     }
     if (requestedItemIds) {
-      const { data: requestedDocumentItems, error: requestedItemsError } =
-        await supabase
-          .from("manager_document_items")
-          .select("*")
-          .eq("document_id", documentId)
-          .eq("selected", true)
-          .in("id", requestedItemIds)
-          .returns<ManagerDocumentItemRecord[]>();
-      if (
-        requestedItemsError ||
-        requestedDocumentItems?.length !== requestedItemIds.length
-      )
-        return {
-          ok: false,
-          error: "The selected document product could not be matched.",
-        };
+      const requestedDocumentItems = validatedRequestedItems ?? [];
       const { data: existingQuoteItems, error: existingItemsError } =
         await supabase
           .from("supplier_quote_items")
-          .select("id,line_number,item_code,description")
+          .select(
+            "id,line_number,item_code,description,source_document_item_id",
+          )
           .eq("quote_id", document.legacy_supplier_quote_id)
           .order("line_number")
           .returns<
@@ -1260,6 +1373,7 @@ export async function routeManagerDocumentToSupplierPricingAction(
               line_number: number;
               item_code: string;
               description: string;
+              source_document_item_id: string | null;
             }>
           >();
       if (existingItemsError)
@@ -1273,19 +1387,30 @@ export async function routeManagerDocumentToSupplierPricingAction(
         ...(existingQuoteItems ?? []).map((item) => item.line_number),
       );
       for (const item of requestedDocumentItems) {
-        const itemCode = clean(item.item_code, 160).toLocaleLowerCase();
-        const description = clean(item.description, 500).toLocaleLowerCase();
         const matched = (existingQuoteItems ?? []).find(
-          (candidate) =>
-            (itemCode &&
-              clean(candidate.item_code, 160).toLocaleLowerCase() ===
-                itemCode) ||
-            (description &&
-              clean(candidate.description, 500).toLocaleLowerCase() ===
-                description) ||
-            candidate.line_number === item.line_number,
+          (candidate) => candidate.source_document_item_id === item.id,
         );
         if (matched) {
+          const refreshed = await supabase
+            .from("supplier_quote_items")
+            .update({
+              item_code: item.item_code,
+              description: item.description,
+              specification: item.specification,
+              quantity: item.quantity || 1,
+              unit: item.unit || "each",
+              unit_price: item.unit_price,
+              line_total: item.line_total,
+              selected: true,
+              review_status: "ready",
+            })
+            .eq("id", matched.id)
+            .eq("source_document_item_id", item.id);
+          if (refreshed.error)
+            return {
+              ok: false,
+              error: "The selected supplier pricing row could not be updated.",
+            };
           linkedIds.push(matched.id);
           continue;
         }
@@ -1294,6 +1419,7 @@ export async function routeManagerDocumentToSupplierPricingAction(
           .from("supplier_quote_items")
           .insert({
             quote_id: document.legacy_supplier_quote_id,
+            source_document_item_id: item.id,
             line_number: nextLineNumber,
             item_code: item.item_code,
             description: item.description,
@@ -1345,14 +1471,7 @@ export async function routeManagerDocumentToSupplierPricingAction(
       message: "Supplier pricing is already linked.",
     };
   }
-  const itemsQuery = supabase
-    .from("manager_document_items")
-    .select("*")
-    .eq("document_id", documentId)
-    .eq("selected", true)
-    .order("line_number");
-  const { data: items } =
-    await itemsQuery.returns<ManagerDocumentItemRecord[]>();
+  const items = validatedRequestedItems;
   if (!items?.length)
     return {
       ok: false,
@@ -1412,6 +1531,10 @@ export async function routeManagerDocumentToSupplierPricingAction(
   }
   const { error: quoteError } = await supabase.from("supplier_quotes").insert({
     id: quoteId,
+    source_document_id: document.id,
+    source_vendor_name: supplierName,
+    source_contact_name: null,
+    source_delivery_charge: document.delivery_charge,
     supplier_id: match?.id ?? null,
     supplier_name: supplierName,
     comparison_id: comparisonId,
@@ -1433,18 +1556,64 @@ export async function routeManagerDocumentToSupplierPricingAction(
     created_by: user.id,
     updated_by: user.id,
   });
+  let durableQuoteId = quoteId;
   if (quoteError) {
     await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).remove([quotePath]);
+    if (quoteError.code !== "23505")
+      return {
+        ok: false,
+        error: "The supplier pricing record could not be created.",
+      };
+    const existingQuote = await supabase
+      .from("supplier_quotes")
+      .select("id,comparison_id")
+      .eq("source_document_id", document.id)
+      .maybeSingle<{ id: string; comparison_id: string | null }>();
+    if (existingQuote.error || !existingQuote.data)
+      return {
+        ok: false,
+        error: "The supplier pricing record could not be recovered.",
+      };
+    if (
+      comparisonId &&
+      existingQuote.data.comparison_id &&
+      existingQuote.data.comparison_id !== comparisonId
+    )
+      return {
+        ok: false,
+        error: "This document is already linked to another quote comparison.",
+      };
+    durableQuoteId = existingQuote.data.id;
+  }
+
+  type RoutedQuoteItem = {
+    id: string;
+    line_number: number;
+    source_document_item_id: string | null;
+  };
+  let routedItemsResult = await supabase
+    .from("supplier_quote_items")
+    .select("id,line_number,source_document_item_id")
+    .eq("quote_id", durableQuoteId)
+    .in(
+      "source_document_item_id",
+      items.map((item) => item.id),
+    )
+    .returns<RoutedQuoteItem[]>();
+  if (routedItemsResult.error)
     return {
       ok: false,
-      error: "The supplier pricing record could not be created.",
+      error: "The saved supplier pricing rows could not be checked.",
     };
-  }
-  const { data: routedItems, error: itemsError } = await supabase
-    .from("supplier_quote_items")
-    .insert(
-      items.map((item) => ({
-        quote_id: quoteId,
+  const existingSourceIds = new Set(
+    (routedItemsResult.data ?? []).map((item) => item.source_document_item_id),
+  );
+  const missingItems = items.filter((item) => !existingSourceIds.has(item.id));
+  if (missingItems.length) {
+    const missingInsert = await supabase.from("supplier_quote_items").insert(
+      missingItems.map((item) => ({
+        quote_id: durableQuoteId,
+        source_document_item_id: item.id,
         line_number: item.line_number,
         item_code: item.item_code,
         description: item.description,
@@ -1456,48 +1625,66 @@ export async function routeManagerDocumentToSupplierPricingAction(
         selected: true,
         review_status: "ready",
       })),
-    )
-    .select("id,line_number")
-    .returns<Array<{ id: string; line_number: number }>>();
-  if (itemsError || routedItems?.length !== items.length) {
-    console.error("Routed supplier quote item creation failed", itemsError);
-    await supabase.from("supplier_quotes").delete().eq("id", quoteId);
-    await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).remove([quotePath]);
+    );
+    if (missingInsert.error && missingInsert.error.code !== "23505") {
+      console.error(
+        "Routed supplier quote item recovery failed",
+        missingInsert.error,
+      );
+      return {
+        ok: false,
+        error: "The reviewed rows could not be prepared. Reload and try again.",
+      };
+    }
+    routedItemsResult = await supabase
+      .from("supplier_quote_items")
+      .select("id,line_number,source_document_item_id")
+      .eq("quote_id", durableQuoteId)
+      .in(
+        "source_document_item_id",
+        items.map((item) => item.id),
+      )
+      .returns<RoutedQuoteItem[]>();
+  }
+  const routedItems = routedItemsResult.data ?? [];
+  if (routedItemsResult.error || routedItems.length !== items.length)
     return {
       ok: false,
-      error: "The reviewed rows could not be prepared. Nothing was routed.",
+      error:
+        "Supplier pricing is still finishing this document. Reload and try again.",
+    };
+  const linkedDocument = await supabase.rpc(
+    "staff_link_manager_document_supplier_quote",
+    {
+      p_document_id: documentId,
+      p_quote_id: durableQuoteId,
+      p_request_id: selectedRequestId || document.request_id,
+      p_comparison_id: comparisonId,
+    },
+  );
+  const linkedDocumentResult = linkedDocument.data as {
+    ok?: boolean;
+    code?: string;
+  } | null;
+  if (linkedDocument.error || !linkedDocumentResult?.ok) {
+    return {
+      ok: false,
+      error:
+        "This document was routed at the same time. Reload to see the saved supplier quote.",
     };
   }
-  await supabase
-    .from("manager_documents")
-    .update({
-      status: "routed",
-      legacy_supplier_quote_id: quoteId,
-      updated_by: user.id,
-    })
-    .eq("id", documentId);
-  await supabase.from("manager_document_events").insert({
-    document_id: documentId,
-    event_type: "routed",
-    summary: "Approved rows sent to supplier pricing.",
-    details: { supplier_quote_id: quoteId },
-    created_by: user.id,
-  });
   revalidatePath("/admin/documents");
   revalidatePath("/admin/supplier-quotes");
   return {
     ok: true,
     data: {
-      quoteId,
-      itemIds: (routedItems ?? [])
+      quoteId: durableQuoteId,
+      itemIds: routedItems
         .filter(
           (item) =>
             !requestedItemIds ||
-            items.some(
-              (source) =>
-                requestedItemIds.includes(source.id) &&
-                source.line_number === item.line_number,
-            ),
+            (item.source_document_item_id &&
+              requestedItemIds.includes(item.source_document_item_id)),
         )
         .map((item) => item.id),
     },

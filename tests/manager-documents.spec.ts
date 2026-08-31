@@ -169,12 +169,27 @@ test("document center preserves originals while allowing direct catalog row impo
   expect(review).toContain("deliveryAmount");
   expect(review).not.toContain("Confirm whether delivery is included.");
   expect(review).toContain("directRowImport: true");
-  expect(review).toContain("catalogDepartment: rowDepartments[target.id]");
+  expect(review).toContain("importTargets.map((target) => target.id)");
+  expect(review).toContain("catalogDepartment: importDepartments[0]");
+  expect(review).toContain("importDepartments.length !== 1");
   expect(review).toContain("Confirm the vendor.");
   expect(review).toContain("Contact person");
   expect(actions).toContain("requestedItemIds");
   expect(actions).toContain('selectedItemsQuery.in("id", requestedItemIds)');
-  expect(review).toContain("Boolean(directImportBlocker)");
+  expect(review).toContain("selectedImportLines");
+  expect(review).toContain("data-workflow-control");
+  expect(review).toContain('className="divide-y divide-slate-200 md:hidden"');
+  expect(review).toContain('className="hidden overflow-x-auto md:block"');
+  expect(
+    review.indexOf('className="divide-y divide-slate-200 md:hidden"'),
+  ).toBeLessThan(review.indexOf('className="hidden overflow-x-auto md:block"'));
+  expect(review.match(/min-w-\[58rem\]/g)).toHaveLength(1);
+  expect(review).toContain("Confirm & add to Catalog");
+  expect(review).toContain("catalogVendor.trim()");
+  expect(review).toContain('name="catalogVendor"');
+  expect(review).toContain('name="catalogContact"');
+  expect(review).toContain('name="deliveryAmount"');
+  expect(review).toContain("max-h-[calc(100dvh-1rem)]");
   expect(review).toContain("Select all");
   expect(review).toContain("Clear");
   expect(review).toContain("selectionChanged");
@@ -203,10 +218,15 @@ test("document center preserves originals while allowing direct catalog row impo
   expect(review).toContain("routed.data.itemIds");
   expect(actions).toContain("itemIds: linkedItems.map((item) => item.id)");
   expect(actions).toContain('["ready", "routed"].includes(document.status)');
-  expect(actions).toMatch(
-    /\.select\("id(?:,line_number)?"\)\s*\.returns<Array<\{ id: string(?:; line_number: number)? \}>>\(\)/,
+  expect(actions).toContain(
+    '.select("id,line_number,source_document_item_id")',
   );
-  expect(actions).toContain("Nothing was routed");
+  expect(actions).toContain(".returns<RoutedQuoteItem[]>()");
+  expect(actions).toContain(
+    "Supplier pricing is still finishing this document",
+  );
+  expect(actions).toContain("const missingItems = items.filter");
+  expect(actions).toContain("durableQuoteId");
   expect(upload).toContain("Upload once");
   expect(upload).toContain("uploadToSignedUrl");
   expect(upload).toContain("The upload stopped before the document opened");
@@ -246,6 +266,16 @@ test("a reviewed document can be linked directly to a request quote comparison",
   expect(review).toContain('routeQuote("comparison", line.id)');
   expect(review).toContain("comparisonRequestId || undefined");
   expect(review).toContain("lineId ? [lineId] : undefined");
+  expect(actions).toContain(
+    'selectedItemsQuery = selectedItemsQuery.in("id", requestedItemIds)',
+  );
+  expect(actions).toContain(
+    "validatedRequestedItems.length !== requestedItemIds.length",
+  );
+  expect(actions).toMatch(
+    /if \(!\["ready", "routed"\]\.includes\(document\.status\)\)[\s\S]*?const selectedRequestId/,
+  );
+  expect(actions).toContain("already linked to another request");
   expect(actions).toContain("selectedComparisonId");
   expect(actions).toContain("requestedItemIds");
   expect(actions).toContain("line_number: item.line_number");
@@ -253,9 +283,108 @@ test("a reviewed document can be linked directly to a request quote comparison",
   expect(actions).toContain("linkedIds.push(inserted.id)");
   expect(review).toContain("!line.selected");
   expect(actions).toContain("comparison_id: selectedComparisonId");
+  expect(
+    actions.indexOf("const requestedRows = await selectedItemsQuery"),
+  ).toBeLessThan(
+    actions.indexOf("let selectedComparisonId: string | null = null"),
+  );
+  const routeStart = actions.indexOf(
+    "export async function routeManagerDocumentToSupplierPricingAction",
+  );
+  const validationFailure = actions.indexOf(
+    'error: "Review and save the exact selected product before routing it."',
+    routeStart,
+  );
+  const comparisonMutation = actions.indexOf(
+    "selectedComparisonId = await ensureDocumentRequestComparison(",
+    routeStart,
+  );
+  expect(validationFailure).toBeGreaterThan(routeStart);
+  expect(validationFailure).toBeLessThan(comparisonMutation);
+  expect(review).toContain("lineId ? [lineId] : undefined");
+  expect(review).toContain("Add to Request Compare");
   expect(worktable).toContain("Original request");
   expect(worktable).toContain("Missing info / AI notes");
   expect(worktable).toContain("supplierColumns.map");
+});
+
+test("document catalog routing is capability-scoped and one comparison stays active per request", async () => {
+  const [migration, actions, review] = await Promise.all([
+    readFile(
+      path.join(
+        root,
+        "supabase/migrations/20260831142500_harden_document_catalog_routing.sql",
+      ),
+      "utf8",
+    ),
+    readFile(path.join(root, "app/admin/documents/actions.ts"), "utf8"),
+    readFile(
+      path.join(root, "components/buildflow/manager-document-review.tsx"),
+      "utf8",
+    ),
+  ]);
+
+  expect(migration).toContain("quote_comparisons_one_active_per_request_idx");
+  expect(migration).toContain("where request_id is not null");
+  expect(migration).toContain("status in ('draft', 'review')");
+  expect(migration).toContain("private.has_staff_capability('suppliers')");
+  expect(migration).toContain("material_catalog_items_suppliers_all");
+  expect(migration).toContain("material_catalog_supplier_prices_suppliers_all");
+  expect(migration).toContain(
+    "material_catalog_item_departments_suppliers_all",
+  );
+
+  // One quick-import RPC owns the complete selected row set. The action accepts
+  // 1..200 unique UUIDs, and rejects duplicates, invalid IDs, and >200 inputs
+  // because the normalized length must still equal the caller's input length.
+  expect(actions).toContain(
+    "...new Set(itemIds.filter((itemId) => UUID_PATTERN.test(itemId)))",
+  );
+  expect(actions).toContain(".slice(\n        0,\n        200,");
+  expect(actions).toContain("requestedItemIds?.length !== itemIds.length");
+  expect(actions).toContain('selectedItemsQuery.in("id", requestedItemIds)');
+  expect(actions).toContain(
+    '"staff_quick_import_manager_document_item_to_catalog"',
+  );
+  expect(actions).toContain("p_item_ids: selected.map((item) => item.id)");
+  expect(review).toContain("importTargets.map((target) => target.id)");
+  expect(review).not.toMatch(
+    /for \(const target of importTargets\)[\s\S]*?addManagerDocumentItemsToCatalogAction/,
+  );
+
+  // Stable source identities and immutable snapshots make retries idempotent.
+  expect(migration).toContain("supplier_quotes_source_document_uidx");
+  expect(migration).toContain("on public.supplier_quotes (source_document_id)");
+  expect(migration).toContain("supplier_quote_items_source_document_item_uidx");
+  expect(migration).toContain(
+    "on public.supplier_quote_items (source_document_item_id)",
+  );
+  expect(migration).toContain(
+    "material_catalog_prices_source_document_item_idx",
+  );
+  expect(migration).toContain(
+    "protect_supplier_quote_source_provenance_trigger",
+  );
+  expect(migration).toContain("protect_supplier_quote_item_source_trigger");
+  expect(migration).toContain("protect_quote_comparison_bid_source_trigger");
+
+  // The server rejects a quote when even one row is missing exact provenance
+  // or belongs to another document; one valid row cannot mask mixed sources.
+  expect(migration).toContain("mixed_or_missing_source_items");
+  expect(migration).toContain("quote_item.source_document_item_id is null");
+  expect(migration).toContain("document_item.document_id <> p_document_id");
+
+  // Linking, routed status, and its audit event commit together and retries do
+  // not duplicate the event.
+  expect(migration).toContain("status = 'routed'");
+  expect(migration).toContain("Approved rows sent to supplier pricing.");
+  expect(migration).toContain("where not exists (");
+  expect(migration).toContain(
+    "existing_event.details ->> 'supplier_quote_id' = p_quote_id::text",
+  );
+  expect(actions).not.toContain(
+    '.update({ status: "routed", updated_by: user.id })',
+  );
 });
 
 test("document intelligence keeps evidence and catches line and total mismatches", () => {
