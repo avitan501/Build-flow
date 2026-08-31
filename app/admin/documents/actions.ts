@@ -66,6 +66,19 @@ type StaffSupabase = Awaited<
   ReturnType<typeof requireStaffProfile>
 >["supabase"];
 
+type DocumentAiDiagnostic = {
+  stage: "edge";
+  code: string;
+  upstreamStatus: number | null;
+  requestId: string | null;
+};
+
+class DocumentAiInvocationError extends Error {
+  constructor(readonly diagnostic: DocumentAiDiagnostic) {
+    super("Protected document AI service unavailable");
+  }
+}
+
 function managerDocumentAiInvoker(
   supabase: StaffSupabase,
 ): ManagerDocumentAiInvoker {
@@ -74,7 +87,31 @@ function managerDocumentAiInvoker(
       "manager-document-ocr",
       { body: input },
     );
-    if (error) throw error;
+    if (error) {
+      const diagnostic: DocumentAiDiagnostic = {
+        stage: "edge",
+        code: "edge_unavailable",
+        upstreamStatus: null,
+        requestId: null,
+      };
+      const context = (error as { context?: unknown }).context;
+      if (context instanceof Response) {
+        try {
+          const payload = (await context.clone().json()) as Record<
+            string,
+            unknown
+          >;
+          diagnostic.code = clean(payload.code, 80) || diagnostic.code;
+          diagnostic.upstreamStatus = Number.isInteger(payload.upstreamStatus)
+            ? Number(payload.upstreamStatus)
+            : null;
+          diagnostic.requestId = clean(payload.requestId, 120) || null;
+        } catch {
+          // The generic code is intentionally safer than persisting a provider body.
+        }
+      }
+      throw new DocumentAiInvocationError(diagnostic);
+    }
     return data;
   };
 }
@@ -90,16 +127,29 @@ async function runDocumentExtraction(
       rawText,
       managerDocumentAiInvoker(supabase),
     );
-    if (edgeResult) return edgeResult;
+    if (edgeResult) return { extraction: edgeResult, diagnostic: null };
   } catch (error) {
-    console.error("Protected document AI service unavailable", error);
+    const diagnostic =
+      error instanceof DocumentAiInvocationError
+        ? error.diagnostic
+        : {
+            stage: "edge" as const,
+            code: "edge_unavailable",
+            upstreamStatus: null,
+            requestId: null,
+          };
+    console.error("Protected document AI service unavailable", diagnostic);
+    return { extraction: null, diagnostic };
   }
-  try {
-    return await extractManagerDocument(file, rawText);
-  } catch (error) {
-    console.error("Document AI server fallback unavailable", error);
-    return null;
-  }
+  return {
+    extraction: null,
+    diagnostic: {
+      stage: "edge" as const,
+      code: "empty_result",
+      upstreamStatus: null,
+      requestId: null,
+    },
+  };
 }
 
 function clean(value: unknown, max: number) {
@@ -490,6 +540,7 @@ export async function uploadManagerDocumentAction(
   }
 
   const documentId = crypto.randomUUID();
+  const extractionLeaseToken = crypto.randomUUID();
   const filePath = `${user.id}/${documentId}/${cleanFileName(file.name)}`;
   const { error: storageError } = await supabase.storage
     .from(MANAGER_DOCUMENT_BUCKET)
@@ -536,6 +587,7 @@ export async function uploadManagerDocumentAction(
       source_sha256: sourceSha256,
       extraction_note:
         "Original document saved privately. AI classification is in progress.",
+      extraction_lease_token: extractionLeaseToken,
       suggested_actions: intent ? [intent] : [],
       source_channel: sourceChannel,
       source_label: sourceLabel,
@@ -584,13 +636,16 @@ export async function uploadManagerDocumentAction(
   });
 
   let extraction = null;
+  let extractionDiagnostic: DocumentAiDiagnostic | null = null;
   let rawText = "";
   try {
     rawText = await readableText(
       file,
       String(formData.get("browserOcrText") ?? ""),
     );
-    extraction = await runDocumentExtraction(supabase, file, rawText);
+    const result = await runDocumentExtraction(supabase, file, rawText);
+    extraction = result.extraction;
+    extractionDiagnostic = result.diagnostic;
   } catch (error) {
     console.error("Manager document AI extraction failed", error);
   }
@@ -598,101 +653,96 @@ export async function uploadManagerDocumentAction(
   if (!extraction) {
     const note =
       "The original document is safe. AI could not classify it yet; use Re-read with AI. Nothing was sent to another part of Avantia.";
-    await supabase
+    const { data: releasedDocument } = await supabase
       .from("manager_documents")
       .update({
         status: "error",
         raw_text: rawText,
         extraction_note: note,
         warnings: ["Automatic reading did not finish."],
+        extraction_lease_token: null,
         updated_by: user.id,
       })
-      .eq("id", documentId);
-    await supabase.from("manager_document_events").insert({
-      document_id: documentId,
-      event_type: "error",
-      summary: "AI reading did not finish; original retained.",
-      created_by: user.id,
-    });
+      .eq("id", documentId)
+      .eq("status", "processing")
+      .eq("extraction_lease_token", extractionLeaseToken)
+      .select("id")
+      .maybeSingle<{ id: string }>();
+    if (releasedDocument)
+      await supabase.from("manager_document_events").insert({
+        document_id: documentId,
+        event_type: "error",
+        summary: "AI reading did not finish; original retained.",
+        details: extractionDiagnostic ?? { stage: "edge", code: "unknown" },
+        created_by: user.id,
+      });
     revalidatePath("/admin/documents");
     return { ok: true, data: { documentId }, message: note };
   }
 
-  const lowConfidence =
-    extraction.classificationConfidence < 0.85 ||
-    extraction.items.some((item) => item.validationStatus !== "valid") ||
-    extraction.warnings.length > 0;
   const extractionNote = `${extraction.items.length} line item${extraction.items.length === 1 ? "" : "s"} found. Review the highlighted evidence and totals before choosing a destination.`;
-  const { error: updateError } = await supabase
-    .from("manager_documents")
-    .update({
-      document_type: extraction.documentType,
-      status: "needs_review",
-      title:
-        extraction.title || file.name.replace(/\.[^.]+$/, "").slice(0, 240),
-      party_name: extraction.partyName,
-      document_number: extraction.documentNumber,
-      document_date: extraction.documentDate || null,
-      due_date: extraction.dueDate || null,
-      expires_on: extraction.expiresOn || null,
-      department,
-      suggested_department: normalizeMaterialCatalogDepartment(
-        extraction.department,
-      ),
-      currency: extraction.currency,
-      subtotal: extraction.subtotal,
-      discount: extraction.discount,
-      delivery_charge: extraction.deliveryCharge,
-      tax_amount: extraction.taxAmount,
-      tax_percent: extraction.taxPercent,
-      total: extraction.total,
-      raw_text: rawText,
-      classification_confidence: extraction.classificationConfidence,
-      extraction_note: extractionNote,
-      evidence: extraction.evidence,
-      warnings: extraction.warnings,
-      suggested_actions: extraction.suggestedActions,
-      updated_by: user.id,
-    })
-    .eq("id", documentId);
-  if (updateError)
-    console.error("Manager document extraction update failed", updateError);
-  if (extraction.items.length) {
-    const { error: itemError } = await supabase
-      .from("manager_document_items")
-      .insert(
-        extraction.items.map((item, index) => ({
-          document_id: documentId,
-          line_number: index + 1,
-          item_code: item.itemCode,
-          description: item.description,
-          specification: item.specification,
-          quantity: item.quantity,
-          unit: item.unit,
-          unit_price: item.unitPrice,
-          line_total: item.lineTotal,
-          source_page: item.page,
-          source_text: item.sourceText,
-          confidence: item.confidence,
-          validation_status: item.validationStatus,
-          selected: true,
-        })),
-      );
-    if (itemError)
-      console.error("Manager document item creation failed", itemError);
-  }
-  await supabase.from("manager_document_events").insert({
-    document_id: documentId,
-    event_type: "extracted",
-    summary: lowConfidence
-      ? "AI extraction completed with review flags."
-      : "AI extraction completed; human approval still required.",
-    details: {
-      item_count: extraction.items.length,
-      warning_count: extraction.warnings.length,
+  const { error: applyError } = await supabase.rpc(
+    "staff_apply_manager_document_extraction",
+    {
+      p_document_id: documentId,
+      p_lease_token: extractionLeaseToken,
+      p_document: {
+        document_type: extraction.documentType,
+        title:
+          extraction.title || file.name.replace(/\.[^.]+$/, "").slice(0, 240),
+        party_name: extraction.partyName,
+        document_number: extraction.documentNumber,
+        document_date: extraction.documentDate || null,
+        due_date: extraction.dueDate || null,
+        expires_on: extraction.expiresOn || null,
+        suggested_department: normalizeMaterialCatalogDepartment(
+          extraction.department,
+        ),
+        currency: extraction.currency,
+        subtotal: extraction.subtotal,
+        discount: extraction.discount,
+        delivery_charge: extraction.deliveryCharge,
+        tax_amount: extraction.taxAmount,
+        tax_percent: extraction.taxPercent,
+        total: extraction.total,
+        raw_text: rawText,
+        classification_confidence: extraction.classificationConfidence,
+        evidence: extraction.evidence,
+        warnings: extraction.warnings,
+        suggested_actions: extraction.suggestedActions,
+      },
+      p_items: extraction.items.map((item) => ({
+        item_code: item.itemCode,
+        description: item.description,
+        specification: item.specification,
+        quantity: item.quantity,
+        unit: item.unit,
+        unit_price: item.unitPrice,
+        line_total: item.lineTotal,
+        source_page: item.page,
+        source_text: item.sourceText,
+        confidence: item.confidence,
+        validation_status: item.validationStatus,
+      })),
     },
-    created_by: user.id,
-  });
+  );
+  if (applyError) {
+    console.error("Atomic manager document extraction failed", applyError);
+    const note =
+      "The original document is safe. AI read it, but the review could not be saved; use Re-read with AI.";
+    await supabase
+      .from("manager_documents")
+      .update({
+        status: "error",
+        raw_text: rawText,
+        extraction_note: note,
+        extraction_lease_token: null,
+        updated_by: user.id,
+      })
+      .eq("id", documentId)
+      .eq("extraction_lease_token", extractionLeaseToken);
+    return { ok: true, data: { documentId }, message: note };
+  }
   revalidatePath("/admin/documents");
   return { ok: true, data: { documentId }, message: extractionNote };
 }
@@ -1033,6 +1083,7 @@ export async function retryManagerDocumentExtractionAction(
     .eq("id", documentId)
     .maybeSingle<ManagerDocumentRecord>();
   if (!document) return { ok: false, error: "Document not found." };
+  const savedDocument = document;
   const { data: previousItems } = await supabase
     .from("manager_document_items")
     .select("*")
@@ -1045,158 +1096,156 @@ export async function retryManagerDocumentExtractionAction(
       error:
         "This document already has reviewed lines. Confirm replacement before re-reading with AI.",
     };
+  const staleBefore = new Date(Date.now() - 2 * 60_000).toISOString();
+  const extractionLeaseToken = crypto.randomUUID();
+  const { data: claimedDocument, error: claimError } = await supabase
+    .from("manager_documents")
+    .update({
+      status: "processing",
+      extraction_note: "Reading the saved original with AI…",
+      extraction_lease_token: extractionLeaseToken,
+      updated_by: user.id,
+    })
+    .eq("id", documentId)
+    .or(`status.neq.processing,updated_at.lt.${staleBefore}`)
+    .select("id")
+    .maybeSingle<{ id: string }>();
+  if (claimError || !claimedDocument)
+    return {
+      ok: false,
+      error: "This document is already being read. Refresh in a moment.",
+    };
+
+  async function retryFailure(
+    error: string,
+    diagnostic: DocumentAiDiagnostic | null = null,
+  ) {
+    const keepPreviousReview = Boolean(previousItems?.length);
+    const savedNote = keepPreviousReview
+      ? savedDocument.extraction_note
+      : "Saved securely — the AI service could not finish. Re-read is safe and will not create a duplicate.";
+    const { data: releasedDocument } = await supabase
+      .from("manager_documents")
+      .update({
+        status: keepPreviousReview ? savedDocument.status : "error",
+        extraction_note: savedNote,
+        warnings: keepPreviousReview
+          ? savedDocument.warnings
+          : [
+              ...new Set([
+                ...(savedDocument.warnings ?? []),
+                "The latest AI reading did not finish.",
+              ]),
+            ],
+        extraction_lease_token: null,
+        updated_by: user.id,
+      })
+      .eq("id", documentId)
+      .eq("status", "processing")
+      .eq("extraction_lease_token", extractionLeaseToken)
+      .select("id")
+      .maybeSingle<{ id: string }>();
+    if (!releasedDocument)
+      return {
+        ok: false as const,
+        error:
+          "A newer AI reading is already in progress. Refresh in a moment.",
+      };
+    await supabase.from("manager_document_events").insert({
+      document_id: documentId,
+      event_type: "error",
+      summary: "AI re-read did not finish; saved original retained.",
+      details: {
+        recoverable: true,
+        ...(diagnostic ?? {}),
+      },
+      created_by: user.id,
+    });
+    revalidatePath(`/admin/documents/${documentId}`);
+    revalidatePath("/admin/documents");
+    return { ok: false as const, error };
+  }
   const { data: blob, error: downloadError } = await supabase.storage
-    .from(document.storage_bucket)
-    .download(document.file_path);
+    .from(savedDocument.storage_bucket)
+    .download(savedDocument.file_path);
   if (downloadError || !blob)
-    return { ok: false, error: "The saved original could not be opened." };
-  const file = new File([blob], document.file_name, {
-    type: document.mime_type,
+    return retryFailure("The saved original could not be opened.");
+  const file = new File([blob], savedDocument.file_name, {
+    type: savedDocument.mime_type,
   });
   let extraction;
+  let extractionDiagnostic: DocumentAiDiagnostic | null = null;
   try {
-    extraction = await runDocumentExtraction(supabase, file, document.raw_text);
+    const result = await runDocumentExtraction(
+      supabase,
+      file,
+      savedDocument.raw_text,
+    );
+    extraction = result.extraction;
+    extractionDiagnostic = result.diagnostic;
   } catch (error) {
     console.error("Document retry failed", error);
     extraction = null;
   }
   if (!extraction)
-    return {
-      ok: false,
-      error: "AI could not finish reading it yet. The original is still safe.",
-    };
-  const { error: deleteError } = await supabase
-    .from("manager_document_items")
-    .delete()
-    .eq("document_id", documentId);
-  if (deleteError)
-    return {
-      ok: false,
-      error: "The current review could not be preserved for replacement.",
-    };
-  if (extraction.items.length) {
-    const { error: replacementError } = await supabase
-      .from("manager_document_items")
-      .insert(
-        extraction.items.map((item, index) => ({
-          document_id: documentId,
-          line_number: index + 1,
-          item_code: item.itemCode,
-          description: item.description,
-          specification: item.specification,
-          quantity: item.quantity,
-          unit: item.unit,
-          unit_price: item.unitPrice,
-          line_total: item.lineTotal,
-          source_page: item.page,
-          source_text: item.sourceText,
-          confidence: item.confidence,
-          validation_status: item.validationStatus,
-          selected: true,
-        })),
-      );
-    if (replacementError) {
-      console.error("Document AI line replacement failed", replacementError);
-      if (previousItems?.length)
-        await supabase.from("manager_document_items").insert(
-          previousItems.map((item) => ({
-            document_id: documentId,
-            line_number: item.line_number,
-            item_code: item.item_code,
-            description: item.description,
-            specification: item.specification,
-            quantity: item.quantity,
-            unit: item.unit,
-            unit_price: item.unit_price,
-            line_total: item.line_total,
-            source_page: item.source_page,
-            source_text: item.source_text,
-            confidence: item.confidence,
-            validation_status: item.validation_status,
-            selected: item.selected,
-          })),
-        );
-      return {
-        ok: false,
-        error:
-          "The new AI reading could not replace the lines. The previous review was restored.",
-      };
-    }
+    return retryFailure(
+      "AI could not finish reading it yet. The original is saved; re-read is safe.",
+      extractionDiagnostic,
+    );
+  const { data: appliedItemCount, error: applyError } = await supabase.rpc(
+    "staff_apply_manager_document_extraction",
+    {
+      p_document_id: documentId,
+      p_lease_token: extractionLeaseToken,
+      p_document: {
+        document_type: extraction.documentType,
+        title: extraction.title || savedDocument.title,
+        party_name: extraction.partyName,
+        document_number: extraction.documentNumber,
+        document_date: extraction.documentDate || null,
+        due_date: extraction.dueDate || null,
+        expires_on: extraction.expiresOn || null,
+        suggested_department: normalizeMaterialCatalogDepartment(
+          extraction.department,
+        ),
+        currency: extraction.currency,
+        subtotal: extraction.subtotal,
+        discount: extraction.discount,
+        delivery_charge: extraction.deliveryCharge,
+        tax_amount: extraction.taxAmount,
+        tax_percent: extraction.taxPercent,
+        total: extraction.total,
+        classification_confidence: extraction.classificationConfidence,
+        evidence: extraction.evidence,
+        warnings: extraction.warnings,
+        suggested_actions: extraction.suggestedActions,
+      },
+      p_items: extraction.items.map((item) => ({
+        item_code: item.itemCode,
+        description: item.description,
+        specification: item.specification,
+        quantity: item.quantity,
+        unit: item.unit,
+        unit_price: item.unitPrice,
+        line_total: item.lineTotal,
+        source_page: item.page,
+        source_text: item.sourceText,
+        confidence: item.confidence,
+        validation_status: item.validationStatus,
+      })),
+    },
+  );
+  if (applyError) {
+    console.error("Atomic document AI replacement failed", applyError);
+    return retryFailure(
+      "The new AI reading could not be saved. The previous review was preserved.",
+    );
   }
-  const { error: updateError } = await supabase
-    .from("manager_documents")
-    .update({
-      document_type: extraction.documentType,
-      status: "needs_review",
-      title: extraction.title || document.title,
-      party_name: extraction.partyName,
-      document_number: extraction.documentNumber,
-      document_date: extraction.documentDate || null,
-      due_date: extraction.dueDate || null,
-      expires_on: extraction.expiresOn || null,
-      department: document.department || INTAKE_DEPARTMENT,
-      suggested_department: normalizeMaterialCatalogDepartment(
-        extraction.department,
-      ),
-      currency: extraction.currency,
-      subtotal: extraction.subtotal,
-      discount: extraction.discount,
-      delivery_charge: extraction.deliveryCharge,
-      tax_amount: extraction.taxAmount,
-      tax_percent: extraction.taxPercent,
-      total: extraction.total,
-      classification_confidence: extraction.classificationConfidence,
-      extraction_note: `${extraction.items.length} lines found on the latest AI read. Review before approval.`,
-      evidence: extraction.evidence,
-      warnings: extraction.warnings,
-      suggested_actions: extraction.suggestedActions,
-      approved_by: null,
-      approved_at: null,
-      updated_by: user.id,
-    })
-    .eq("id", documentId);
-  if (updateError) {
-    await supabase
-      .from("manager_document_items")
-      .delete()
-      .eq("document_id", documentId);
-    if (previousItems?.length)
-      await supabase.from("manager_document_items").insert(
-        previousItems.map((item) => ({
-          document_id: documentId,
-          line_number: item.line_number,
-          item_code: item.item_code,
-          description: item.description,
-          specification: item.specification,
-          quantity: item.quantity,
-          unit: item.unit,
-          unit_price: item.unit_price,
-          line_total: item.line_total,
-          source_page: item.source_page,
-          source_text: item.source_text,
-          confidence: item.confidence,
-          validation_status: item.validation_status,
-          selected: item.selected,
-        })),
-      );
-    return {
-      ok: false,
-      error:
-        "The new AI summary could not be saved. The previous review was restored.",
-    };
-  }
-  await supabase.from("manager_document_events").insert({
-    document_id: documentId,
-    event_type: "extracted",
-    summary: "Document re-read with AI.",
-    details: { item_count: extraction.items.length },
-    created_by: user.id,
-  });
   revalidatePath(`/admin/documents/${documentId}`);
   revalidatePath("/admin/documents");
   return {
     ok: true,
-    data: { itemCount: extraction.items.length },
+    data: { itemCount: Number(appliedItemCount ?? extraction.items.length) },
     message: "Latest AI reading is ready for review.",
   };
 }

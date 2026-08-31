@@ -120,7 +120,7 @@ test("document center preserves originals while allowing direct catalog row impo
   expect(departmentMigration).toContain("suggested_department");
   expect(departmentMigration).toContain("set department = 'Test'");
   expect(actions.indexOf(`.from(MANAGER_DOCUMENT_BUCKET).upload`)).toBeLessThan(
-    actions.indexOf("extraction = await runDocumentExtraction"),
+    actions.indexOf("const result = await runDocumentExtraction"),
   );
   expect(actions).toContain("sourceSha256");
   expect(actions).toContain("This exact document is already in Documents");
@@ -425,6 +425,65 @@ test("document intelligence keeps charges and tax out of product rows", () => {
     expect(isManagerDocumentChargeLine(charge)).toBeTruthy();
   }
   expect(isManagerDocumentChargeLine("White Oak flooring")).toBeFalsy();
+});
+
+test("document AI failure recovery is bounded, diagnosable, and atomic", async () => {
+  const [edge, actions, intelligence, migration] = await Promise.all([
+    readFile(
+      path.join(root, "supabase/functions/manager-document-ocr/index.ts"),
+      "utf8",
+    ),
+    readFile(path.join(root, "app/admin/documents/actions.ts"), "utf8"),
+    readFile(path.join(root, "lib/manager-document-intelligence.ts"), "utf8"),
+    readFile(
+      path.join(
+        root,
+        "supabase/migrations/20260831171000_atomic_manager_document_extraction.sql",
+      ),
+      "utf8",
+    ),
+  ]);
+
+  expect(edge).toContain("safeOpenAiError");
+  expect(edge).toContain("upstreamStatus");
+  expect(edge).toContain("requestId");
+  expect(edge).toContain("content, 28_000");
+  expect(edge).toContain("20_000,");
+  expect(edge).toContain("![401, 403, 429].includes");
+  expect(edge).toContain("(extraction.upstreamStatus ?? 0) >= 500");
+  expect(edge).toContain("(extraction.upstreamStatus ?? 0) <= 599");
+  expect(edge).not.toContain("attempt <= 2");
+
+  expect(actions).toContain("DocumentAiInvocationError");
+  expect(actions).toContain("context.clone().json()");
+  expect(actions).toContain("updated_at.lt.${staleBefore}");
+  expect(actions).toContain("extractionLeaseToken = crypto.randomUUID()");
+  expect(actions).toContain(
+    '.eq("extraction_lease_token", extractionLeaseToken)',
+  );
+  expect(actions).toContain("p_lease_token: extractionLeaseToken");
+  expect(actions).toContain("staff_apply_manager_document_extraction");
+  expect(actions).toContain("...(diagnostic ?? {})");
+  expect(actions).not.toContain("Document AI server fallback unavailable");
+  expect(intelligence).toContain('apiKey?.startsWith("sk-")');
+  expect(intelligence).toContain("apiKey.length < 30");
+
+  expect(migration).toContain("for update");
+  expect(migration).toContain("extraction_lease_token uuid");
+  expect(migration).toContain(
+    "v_document.extraction_lease_token is distinct from p_lease_token",
+  );
+  expect(migration).toContain("extraction_lease_token = null");
+  expect(migration).toContain("v_existing_count > 0 and v_incoming_count = 0");
+  expect(
+    actions.match(/staff_apply_manager_document_extraction/g),
+  ).toHaveLength(2);
+  expect(migration).toContain("delete from public.manager_document_items");
+  expect(migration).toContain("insert into public.manager_document_items");
+  expect(migration).toContain("update public.manager_documents set");
+  expect(migration).toContain("status = 'needs_review'");
+  expect(migration).toContain("security definer");
+  expect(migration).toContain("private.has_staff_capability('suppliers')");
 });
 
 test("choosing one catalog product does not keep the obsolete partial-subtotal warning", () => {
