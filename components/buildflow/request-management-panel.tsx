@@ -2,13 +2,14 @@
 
 import { CalendarClock, ChevronDown, Download, FileText, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, Route, Send, Trash2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useMemo, useState, useTransition } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
 import { previewRequestClientQuoteAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestWorkflowStepAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
 import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
+import { OPEN_REQUEST_CLIENT_CONTACT_EVENT } from "@/components/buildflow/request-client-contact"
 import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
@@ -100,6 +101,7 @@ export function RequestManagementPanel({
   const [deliveryWindowHours, setDeliveryWindowHours] = useState("2")
   const [deliveryAddress, setDeliveryAddress] = useState(projectAddress)
   const [clientReplyDone, setClientReplyDone] = useState(clientReplyCompleted)
+  const [contactOpen, setContactOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
   const [quoteNumber, setQuoteNumber] = useState(() => `AVA-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${requestId.slice(0, 4).toUpperCase()}`)
   const [issueDate] = useState(() => new Date().toLocaleDateString("en-US"))
@@ -116,6 +118,10 @@ export function RequestManagementPanel({
   const [ach, setAch] = useState({ bankName: "", accountOwner: "", routingNumber: "", accountNumber: "" })
   const [quoteFeedback, setQuoteFeedback] = useState("")
   const [pending, startTransition] = useTransition()
+  const pendingRef = useRef(pending)
+  const contactDialogRef = useRef<HTMLElement | null>(null)
+  const quoteDialogRef = useRef<HTMLElement | null>(null)
+  const contactTriggerRef = useRef<HTMLElement | null>(null)
   const routeDepartment = departments.length === 1 ? departments[0] : departments.length > 1 ? "Multiple departments" : "Others"
   const availableSuppliers = useMemo(() => [...suppliers].sort((left, right) => left.name.localeCompare(right.name)), [suppliers])
 
@@ -124,6 +130,10 @@ export function RequestManagementPanel({
   const deliveryWindowHoursNumber = Number(deliveryWindowHours)
   const deliveryWindowEnd = useMemo(() => deliveryWindowEndTime(deliveryWindowStart, deliveryWindowHoursNumber), [deliveryWindowHoursNumber, deliveryWindowStart])
   const deliveryWindowReady = Boolean(deliveryDate && deliveryWindowStart && deliveryWindowEnd && deliveryAddress.trim() && deliveryWindowHoursNumber >= 0.5 && deliveryWindowHoursNumber <= 12)
+
+  useEffect(() => {
+    pendingRef.current = pending
+  }, [pending])
   const clientMessage = useMemo(() => {
     const greetingText = greeting === "hello" ? `Hello ${client.name || "there"},` : greeting === "morning" ? `Good morning ${firstName},` : greeting === "afternoon" ? `Good afternoon ${firstName},` : `Hi ${firstName},`
     const selectedText = REPLY_BLOCKS.filter((block) => block.id === replyBlock).flatMap((block) => {
@@ -138,6 +148,108 @@ export function RequestManagementPanel({
     })
     return [greetingText, "", ...selectedText, ...(replyNote.trim() ? [replyNote.trim()] : []), "", `Request: ${requestTitle}`, "", "Thank you,", "Avantia Build"].join("\n")
   }, [client.name, deliveryAddress, deliveryDate, deliveryWindowEnd, deliveryWindowHoursNumber, deliveryWindowStart, firstName, greeting, missingQuestions, replyBlock, replyNote, requestTitle])
+
+  useEffect(() => {
+    function openContact() {
+      contactTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      setContactOpen(true)
+    }
+    window.addEventListener(OPEN_REQUEST_CLIENT_CONTACT_EVENT, openContact)
+    return () => window.removeEventListener(OPEN_REQUEST_CLIENT_CONTACT_EVENT, openContact)
+  }, [])
+
+  useEffect(() => {
+    if (!contactOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    const focusFrame = window.requestAnimationFrame(() => {
+      contactDialogRef.current?.querySelector<HTMLElement>("button, input, select, textarea, a[href]")?.focus()
+    })
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !pendingRef.current) {
+        setContactOpen(false)
+        window.setTimeout(() => contactTriggerRef.current?.focus(), 0)
+        return
+      }
+      if (event.key !== "Tab") return
+      const focusable = Array.from(
+        contactDialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      )
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable.at(-1)
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => {
+      window.cancelAnimationFrame(focusFrame)
+      window.removeEventListener("keydown", onKeyDown)
+      document.body.style.overflow = previousOverflow
+    }
+  }, [contactOpen])
+
+  useEffect(() => {
+    if (!quoteOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    const focusFrame = window.requestAnimationFrame(() => {
+      quoteDialogRef.current?.querySelector<HTMLElement>("button, input, select, textarea, a[href]")?.focus()
+    })
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !pendingRef.current) {
+        setQuoteOpen(false)
+        setContactOpen(true)
+        return
+      }
+      if (event.key !== "Tab") return
+      const focusable = Array.from(
+        quoteDialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      )
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable.at(-1)
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => {
+      window.cancelAnimationFrame(focusFrame)
+      window.removeEventListener("keydown", onKeyDown)
+      document.body.style.overflow = previousOverflow
+    }
+  }, [quoteOpen])
+
+  function closeContact() {
+    if (pending) return
+    setContactOpen(false)
+    window.setTimeout(() => contactTriggerRef.current?.focus(), 0)
+  }
+
+  function openQuote() {
+    setContactOpen(false)
+    setQuoteOpen(true)
+  }
+
+  function closeQuote() {
+    if (pending) return
+    setQuoteOpen(false)
+    setContactOpen(true)
+  }
 
   function toggleSupplier(supplierId: string) {
     setSupplierIds((current) => current.includes(supplierId) ? current.filter((id) => id !== supplierId) : [...current, supplierId])
@@ -351,9 +463,14 @@ export function RequestManagementPanel({
         </div>
       </details>
 
-      <details id="contact-client" open={currentStage === "approval" || currentStage === "delivery"} className={workflowStepCardClass()}>
-        <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-4"><span><span className="block text-[10px] font-bold uppercase tracking-[.12em] text-[#0066cc]">Available at every stage</span><span className="block text-base font-bold">Contact client</span></span><span className="text-xs font-semibold text-slate-500">{replyComplete ? "Client contacted" : "Message, estimate, or delivery"}</span></summary>
-        <div className="border-t border-slate-200 p-4">
+      {contactOpen && typeof document !== "undefined" ? createPortal(
+        <div className="fixed inset-0 z-[145] flex items-end justify-center bg-slate-950/55 sm:items-center sm:p-5" role="dialog" aria-modal="true" aria-labelledby="request-client-contact-title" onMouseDown={(event) => { if (event.currentTarget === event.target) closeContact() }}>
+          <section ref={contactDialogRef} id="request-client-contact-dialog" className="flex max-h-[94dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+            <header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+              <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#0066cc]">Available at every stage</p><h2 id="request-client-contact-title" className="truncate text-lg font-bold">Contact client</h2><p className="text-xs text-slate-500">{replyComplete ? "Client contacted · send another update when needed" : "Message, estimate, or delivery"}</p></div>
+              <button type="button" onClick={closeContact} disabled={pending} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white disabled:opacity-40" aria-label="Close contact client"><X className="h-4 w-4" /></button>
+            </header>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
           <RelatedEmailTimeline title="Client email" emails={clientEmails} />
           <div>
             {missingQuestions.length ? <p className="mt-1 text-xs font-semibold text-amber-700">{missingQuestions.length} missing details can be added to the reply automatically.</p> : null}
@@ -396,16 +513,18 @@ export function RequestManagementPanel({
               {deliveryMethod === "email" ? <button type="button" onClick={sendClientEmail} disabled={pending || !client.email} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-[#17304f] px-4 text-sm font-bold text-white disabled:opacity-50"><Send className="h-4 w-4" />{pending ? "Sending..." : "Send email"}</button> : deliveryMethod === "whatsapp" ? <button type="button" onClick={sendClientWhatsApp} disabled={pending || !client.phone || Boolean(attachment)} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-[#17304f] px-4 text-sm font-bold text-white disabled:opacity-45"><MessageCircle className="h-4 w-4" />{pending ? "Sending..." : "Send WhatsApp"}</button> : <button type="button" onClick={sendClientText} disabled={pending || !client.phone} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-[#17304f] px-4 text-sm font-bold text-white disabled:opacity-50"><MessageSquareText className="h-4 w-4" />{pending ? "Preparing..." : attachment ? "Open Q U O with file" : "Send Q U O text"}</button>}
               {client.phone ? <a href={`tel:${client.phone}`} className={`${actionClass} min-h-12 border-[#cda548] text-[#17304f]`}><Phone className="h-4 w-4" />Call client</a> : null}
             </div>
-            <button type="button" onClick={() => setQuoteOpen(true)} className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#0071e3] bg-sky-50 px-4 text-sm font-bold text-[#0066cc]"><FileText className="h-4 w-4" />Create and send estimate</button>
+            {feedback ? <p className={`mt-3 rounded-lg border px-4 py-3 text-sm font-semibold ${feedbackError ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`} role="status">{feedback}</p> : null}
+            <button type="button" onClick={openQuote} className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#0071e3] bg-sky-50 px-4 text-sm font-bold text-[#0066cc]"><FileText className="h-4 w-4" />Create and send estimate</button>
           </div>
 
-        </div>
-      </details>
-      {feedback ? <p className={`mt-4 rounded-lg border px-4 py-3 text-sm font-semibold ${feedbackError ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`} role="status">{feedback}</p> : null}
+            </div>
+          </section>
+        </div>, document.body) : null}
+      {feedback && !contactOpen ? <p className={`mt-4 rounded-lg border px-4 py-3 text-sm font-semibold ${feedbackError ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`} role="status">{feedback}</p> : null}
 
-      {quoteOpen && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[150] grid place-items-center overflow-y-auto bg-slate-950/55 p-2 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="request-quote-title" onMouseDown={(event) => { if (event.currentTarget === event.target && !pending) setQuoteOpen(false) }}>
-        <section className="flex max-h-[96dvh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
-          <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#0066cc]">Avantia Build estimate</p><h2 id="request-quote-title" className="mt-0.5 text-xl font-bold">Create client quote</h2><p className="mt-0.5 text-xs text-slate-500">Review the PDF, then send it by email or text.</p></div><button type="button" onClick={() => setQuoteOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200" aria-label="Close"><X className="h-4 w-4" /></button></header>
+      {quoteOpen && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[150] grid place-items-center overflow-y-auto bg-slate-950/55 p-2 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="request-quote-title" onMouseDown={(event) => { if (event.currentTarget === event.target) closeQuote() }}>
+        <section ref={quoteDialogRef} className="flex max-h-[96dvh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+          <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#0066cc]">Avantia Build estimate</p><h2 id="request-quote-title" className="mt-0.5 text-xl font-bold">Create client quote</h2><p className="mt-0.5 text-xs text-slate-500">Review the PDF, then send it by email or text.</p></div><button type="button" onClick={closeQuote} disabled={pending} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 disabled:opacity-40" aria-label="Close"><X className="h-4 w-4" /></button></header>
           <div className="overflow-y-auto p-4">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <label className="grid gap-1 text-xs font-bold">Estimate code<input value={quoteNumber} onChange={(event) => setQuoteNumber(event.target.value)} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>

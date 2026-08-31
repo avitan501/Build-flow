@@ -492,8 +492,11 @@ test("request workspace keeps pricing steps and makes client contact globally av
     "Supplier answers and prices will appear beside each item",
   );
   expect(management).not.toContain("step={4}");
-  expect(management).toContain("Available at every stage");
-  expect(management).toContain('id="contact-client"');
+  expect(management).not.toContain('id="contact-client"');
+  expect(management).toContain('id="request-client-contact-dialog"');
+  expect(management).toContain("OPEN_REQUEST_CLIENT_CONTACT_EVENT");
+  expect(management).toContain('role="dialog"');
+  expect(management).toContain('aria-modal="true"');
   expect(management).toContain("Schedule delivery");
   expect(management).toContain("Window length (hours)");
   expect(management).toContain("Delivery window: Between");

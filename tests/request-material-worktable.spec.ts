@@ -12,6 +12,7 @@ const supplierQuoteActionsPath = path.join(root, "app/admin/supplier-quotes/acti
 const documentActionsPath = path.join(root, "app/admin/documents/actions.ts")
 const migrationPath = path.join(root, "supabase/migrations/20260831154500_link_comparison_items_to_request_sources.sql")
 const managementPath = path.join(root, "components/buildflow/request-management-panel.tsx")
+const clientContactPath = path.join(root, "components/buildflow/request-client-contact.tsx")
 
 async function source(filePath: string) {
   try {
@@ -118,13 +119,40 @@ test("supplier quotes extend the same item grid as side-by-side comparison colum
 })
 
 test("client contact is available at the request header and does not consume step four", async () => {
-  const [page, management] = await Promise.all([source(pagePath), source(managementPath)])
+  const [page, management, contact] = await Promise.all([
+    source(pagePath),
+    source(managementPath),
+    source(clientContactPath),
+  ])
 
-  expect(page).toMatch(/Contact client|Message client/)
+  expect(page).toContain("<RequestClientContact />")
   expect(page).toMatch(/mailto:|tel:|MessageSquareText|Mail|Phone/)
   expect(management).not.toContain("step={4}")
   expect(management).not.toContain('title="Contact client"')
-  expect(management, "the same contact composer may be reused, but it belongs above the workflow").toMatch(/ClientContact|Contact client|Message client/)
+  expect(management).not.toContain('<details id="contact-client"')
+  expect(contact).toContain("OPEN_REQUEST_CLIENT_CONTACT_EVENT")
+  expect(contact).toContain('aria-haspopup="dialog"')
+  expect(contact).toContain('aria-controls="request-client-contact-dialog"')
+  expect(management).toContain("window.addEventListener(OPEN_REQUEST_CLIENT_CONTACT_EVENT")
+  expect(management).toContain('id="request-client-contact-dialog"')
+  expect(management).toContain('role="dialog"')
+  expect(management).toContain('aria-modal="true"')
+  expect(management).toContain('event.key === "Escape"')
+  expect(management).toContain('event.key !== "Tab"')
+  expect(management).toContain("contactTriggerRef.current?.focus()")
+  expect(management).toContain("pendingRef.current = pending")
+  expect(management).toContain("}, [contactOpen])")
+  expect(management).toContain("setContactOpen(false)\n    setQuoteOpen(true)")
+  expect(management).toContain("setQuoteOpen(false)\n    setContactOpen(true)")
+  expect(management).toContain("ref={quoteDialogRef}")
+  expect(management).toContain("{feedback && !contactOpen ?")
+  expect(management).toMatch(/role="status">\{feedback\}<\/p>[\s\S]*Create and send estimate/)
+  expect(management).toContain("RelatedEmailTimeline title=\"Client email\"")
+  expect(management).toContain("sendClientEmail")
+  expect(management).toContain("sendClientWhatsApp")
+  expect(management).toContain("sendClientText")
+  expect(management).toContain("saveDeliverySchedule")
+  expect(management).toContain("Create and send estimate")
 })
 
 test("missing-question generation preserves answers and never asks an answered question twice", async () => {

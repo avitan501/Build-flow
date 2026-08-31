@@ -466,7 +466,7 @@ export default async function OwnerMaterialRequestPage({
                   {profile?.phone ? <a href={`tel:${profile.phone}`} className="hover:text-[#0066cc]">{profile.phone}</a> : null}
                 </div>
               </div>
-              <RequestClientContact clientName={profile?.full_name || "Client"} phone={profile?.phone || ""} requestTitle={request.title} />
+              <RequestClientContact />
             </div>
           </div>
         </header>
