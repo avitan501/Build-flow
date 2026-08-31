@@ -60,13 +60,6 @@ type RequestItem = {
   answers: unknown;
   metadata: Record<string, unknown> | null;
 };
-type LegacyAnswer = {
-  questionId?: string;
-  label?: string;
-  value?: string;
-  question?: string;
-  answer?: string;
-};
 type SupplierPackage = {
   id: string;
   department: string;
@@ -93,12 +86,6 @@ type ComparisonRecord = Pick<
   | "awarded_bid_id"
   | "updated_at"
 >;
-
-function legacyAnswers(value: unknown): LegacyAnswer[] {
-  return Array.isArray(value)
-    ? value.filter((answer): answer is LegacyAnswer => Boolean(answer) && typeof answer === "object")
-    : [];
-}
 
 function zipCodeFromAddress(address: string | null | undefined) {
   return address?.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || "11516";
@@ -498,78 +485,13 @@ export default async function OwnerMaterialRequestPage({
           organizationCompletedLabel={organizationCompletedLabel}
           supplierComparisons={supplierComparisonTables}
         />
-        {originalItems.length || signedFiles.length || (responses ?? []).length ? (
+        {signedFiles.length || (responses ?? []).length ? (
           <details
             className="mt-2 rounded-lg border border-slate-200 bg-white"
           >
-            <summary className="cursor-pointer px-4 py-3 text-sm font-bold">Original request & files · {originalItems.length} items · {signedFiles.length} files</summary>
+            <summary className="cursor-pointer px-4 py-3 text-sm font-bold">Files &amp; answers · {signedFiles.length} files</summary>
             <div className="border-t border-slate-200 p-4">
-              <p className="text-sm text-slate-500">
-                The customer’s original notes, selections, and files remain
-                unchanged.
-              </p>
-              <div className="mt-4 divide-y divide-slate-100">
-                {originalItems.length ? (
-                  originalItems.map((item) => {
-                    const itemAnswers = legacyAnswers(item.answers);
-                    const requestDetails =
-                      typeof item.metadata?.request_details === "string"
-                        ? item.metadata.request_details.trim()
-                        : "";
-                    return (
-                      <article
-                        key={item.id}
-                        className="py-4 first:pt-0 last:pb-0"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <h3 className="font-bold">{item.name}</h3>
-                            <p className="mt-1 text-sm text-slate-500">
-                              {item.department} ·{" "}
-                              {item.item_type.replaceAll("_", " ")}
-                            </p>
-                          </div>
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold">
-                            {item.quantity} {item.unit || "each"}
-                          </span>
-                        </div>
-                        {requestDetails ? (
-                          <div className="mt-3 whitespace-pre-wrap rounded-lg bg-sky-50 px-4 py-3 text-sm leading-6 text-slate-800">
-                            {requestDetails}
-                          </div>
-                        ) : null}
-                        {itemAnswers.length ? (
-                          <dl className="mt-3 grid gap-2">
-                            {itemAnswers
-                              .filter((answer) =>
-                                Boolean(answer.value || answer.answer),
-                              )
-                              .map((answer, index) => (
-                                <div
-                                  key={`${answer.questionId || answer.question || index}`}
-                                  className="grid gap-1 rounded-lg bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(12rem,.8fr)_1.2fr]"
-                                >
-                                  <dt className="text-sm font-semibold text-slate-600">
-                                    {answer.label ||
-                                      answer.question ||
-                                      "Question"}
-                                  </dt>
-                                  <dd className="text-sm font-semibold text-slate-950">
-                                    {answer.value || answer.answer}
-                                  </dd>
-                                </div>
-                              ))}
-                          </dl>
-                        ) : null}
-                      </article>
-                    );
-                  })
-                ) : (
-                  <p className="text-sm text-slate-500">
-                    No request items found.
-                  </p>
-                )}
-              </div>
+              <p className="text-sm text-slate-500">The original items and AI copy are already together in the table above.</p>
               {(responses ?? []).map((response) => {
                 const responseFiles = signedFiles.filter(
                   (file) => file.material_response_id === response.id,

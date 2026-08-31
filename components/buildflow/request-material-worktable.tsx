@@ -83,20 +83,30 @@ export function RequestMaterialWorktable({
 }) {
   const [savedItems, setSavedItems] = useState<Record<string, ReviewableMaterialItem>>({})
   const [priceItemId, setPriceItemId] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<"original" | "ai" | null>(null)
+  const sourceItems = originalItems
   const baseItems = organizedItems.length ? organizedItems : originalItems
   const items = baseItems.map((item) => savedItems[item.id] ?? item)
+  const originalById = new Map(sourceItems.map((item) => [item.id, item]))
+  const seenSourceIds = new Set<string>()
+  const rows = items.map((item, itemIndex) => {
+    const sourceItemId = typeof item.metadata?.source_item_id === "string" ? item.metadata.source_item_id : ""
+    const sourceItem = originalById.get(sourceItemId) ?? sourceItems[itemIndex] ?? item
+    const showSource = !seenSourceIds.has(sourceItem.id)
+    seenSourceIds.add(sourceItem.id)
+    return { item, sourceItem, showSource }
+  })
   const supplierColumns = supplierComparisons.flatMap((comparison) =>
     comparison.suppliers.map((supplier) => ({ comparison, supplier })),
   )
 
-  async function copyList() {
+  async function copyList(kind: "original" | "ai") {
     try {
-      await navigator.clipboard.writeText(copyText(items))
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
+      await navigator.clipboard.writeText(copyText(kind === "original" ? sourceItems : items))
+      setCopied(kind)
+      window.setTimeout(() => setCopied(null), 1600)
     } catch {
-      setCopied(false)
+      setCopied(null)
     }
   }
 
@@ -109,7 +119,8 @@ export function RequestMaterialWorktable({
           <p className="text-xs text-slate-500">Quantity, item details, and only the information still missing.</p>
         </div>
         <div className="flex flex-wrap items-start gap-2">
-          {items.length ? <button type="button" onClick={copyList} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700">{copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}{copied ? "Copied" : "Copy"}</button> : null}
+          {sourceItems.length ? <button type="button" onClick={() => copyList("original")} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-bold text-slate-700">{copied === "original" ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}{copied === "original" ? "Copied" : "Copy original"}</button> : null}
+          {items.length ? <button type="button" onClick={() => copyList("ai")} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 text-xs font-bold text-[#0066cc]">{copied === "ai" ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}{copied === "ai" ? "Copied" : "Copy AI"}</button> : null}
           {organizationStatus !== "processing" ? <OrganizeMaterialListButton requestId={requestId} refresh={organizedItems.length > 0} /> : <span className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-sky-50 px-3 text-xs font-bold text-sky-800"><Sparkles className="h-4 w-4 animate-pulse" />Generating AI…</span>}
         </div>
       </div>
@@ -118,11 +129,12 @@ export function RequestMaterialWorktable({
 
       {items.length ? (
         <div className="overflow-x-auto overscroll-x-contain" tabIndex={0} aria-label="Scrollable request, AI, and supplier comparison">
-          <table className="w-full table-fixed border-collapse text-left" style={{ minWidth: `${500 + Math.max(supplierColumns.length, 1) * 220}px` }}>
+          <table className="w-full table-fixed border-collapse text-left" style={{ minWidth: `${680 + Math.max(supplierColumns.length, 1) * 200}px` }}>
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-[.08em] text-slate-500">
-                <th className="sticky left-0 z-20 w-60 bg-slate-50 px-3 py-2.5 shadow-[6px_0_10px_-10px_rgba(15,23,42,.35)]"><span className="sr-only">Item details · </span>Original request</th>
-                <th className="w-64 px-3 py-2.5">Missing info / AI notes</th>
+                <th className="sticky left-0 z-20 w-56 bg-slate-50 px-3 py-2.5 shadow-[6px_0_10px_-10px_rgba(15,23,42,.35)]">Original request · Quantity &amp; item</th>
+                <th className="w-56 border-l border-slate-200 px-3 py-2.5">AI organized</th>
+                <th className="w-56 border-l border-slate-200 px-3 py-2.5">Missing info / notes</th>
                 {supplierColumns.length ? supplierColumns.map(({ comparison, supplier }) => (
                   <th key={`${comparison.id}-${supplier.id}`} className="w-56 border-l border-slate-200 px-3 py-2.5 normal-case tracking-normal text-slate-800">
                     <a href={comparison.href} className="block truncate text-xs font-bold text-[#0066cc]">{supplier.name}</a>
@@ -132,7 +144,7 @@ export function RequestMaterialWorktable({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {items.map((item) => {
+              {rows.map(({ item, sourceItem, showSource }) => {
                 const status = materialReviewStatus(item)
                 const reasons = materialReviewReasons(item)
                 const missing = status !== "ready" && reasons.length > 0
@@ -140,13 +152,16 @@ export function RequestMaterialWorktable({
                 return (
                   <tr key={item.id} className="align-top">
                     <td className="sticky left-0 z-10 bg-white px-3 py-3 shadow-[6px_0_10px_-10px_rgba(15,23,42,.35)]">
+                      {showSource ? <><p className="text-sm font-extrabold tabular-nums text-slate-950">{materialQuantity(sourceItem)} <span className="text-xs font-semibold text-slate-500">{materialSalesUnit(sourceItem)}</span></p><p className="text-sm font-bold text-slate-950">{sourceItem.name}</p>{itemDetails(sourceItem) ? <p className="mt-0.5 text-xs leading-5 text-slate-500">{itemDetails(sourceItem)}</p> : null}</> : <p className="text-xs font-semibold text-slate-400">Same original item</p>}
+                    </td>
+                    <td className="border-l border-slate-100 px-3 py-3">
                       <p className="text-sm font-extrabold tabular-nums text-slate-950">{materialQuantity(item)} <span className="text-xs font-semibold text-slate-500">{materialSalesUnit(item)}</span></p>
                       <p className="text-sm font-bold text-slate-950">{item.name}</p>
                       {itemDetails(item) ? <p className="mt-0.5 text-xs leading-5 text-slate-500">{itemDetails(item)}</p> : null}
                       <button type="button" onClick={() => setPriceItemId(priceOpen ? null : item.id)} className="mt-1 inline-flex min-h-7 items-center gap-1 text-xs font-bold text-[#0066cc]"><Search className="h-3.5 w-3.5" />Online prices</button>
                       {priceOpen ? <MaterialPriceCheck requestId={requestId} query={materialSearchQuery(item)} department={item.department} defaultZipCode={defaultZipCode} onClose={() => setPriceItemId(null)} /> : null}
                     </td>
-                    <td className={`px-3 py-3 ${missing ? "bg-amber-50/70" : ""}`}>
+                    <td className={`border-l border-slate-100 px-3 py-3 ${missing ? "bg-amber-50/70" : ""}`}>
                       {missing ? (
                         <div>
                           <div className="flex flex-wrap gap-1">{reasons.map((reason) => <span key={reason} className="rounded bg-white px-2 py-1 text-xs font-bold text-rose-700 ring-1 ring-rose-100">{reason}</span>)}</div>

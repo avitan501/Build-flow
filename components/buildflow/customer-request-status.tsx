@@ -1,43 +1,40 @@
 "use client"
 
-import { BadgeDollarSign, Check, ClipboardList, MessageCircleQuestion, Truck } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
 import { updateRequestStatusAction } from "@/app/preview-admin/workflow-actions"
 import { MaterialRequestAssigneeControl } from "@/components/buildflow/material-request-assignee-control"
-import { quoteRequestProgressIndex, type QuoteRequestStatus } from "@/lib/quote-requests"
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
+import type { QuoteRequestStatus } from "@/lib/quote-requests"
 
 const stages: Array<{ status: QuoteRequestStatus; label: string }> = [
-  { status: "draft", label: "Request Created" },
-  { status: "submitted", label: "Under Review" },
-  { status: "in_review", label: "Waiting for Client Approval" },
-  { status: "quoted", label: "Payment Received · Waiting for Supplier Delivery" },
-  { status: "closed", label: "Request Completed" },
+  { status: "draft", label: "Request created" },
+  { status: "submitted", label: "Review request" },
+  { status: "in_review", label: "Supplier pricing / Client approval" },
+  { status: "quoted", label: "Payment & delivery" },
+  { status: "closed", label: "Completed" },
 ]
 
 const nextAction: Record<QuoteRequestStatus, string> = {
-  draft: "Submit the request for review",
-  submitted: "Review and confirm the material list",
-  in_review: "Prepare pricing and wait for client approval",
-  quoted: "Coordinate supplier delivery",
-  closed: "No action required",
+  draft: "Submit for review",
+  submitted: "Confirm the material list",
+  in_review: "Finish pricing or client approval",
+  quoted: "Coordinate delivery",
+  closed: "Complete",
 }
 
-const workflowStages = [
-  { id: "received", label: "Review request", icon: ClipboardList, tone: "border-amber-200 bg-amber-50 text-amber-700" },
-  { id: "pricing", label: "Supplier pricing", icon: BadgeDollarSign, tone: "border-sky-200 bg-sky-50 text-sky-700" },
-  { id: "approval", label: "Client approval", icon: MessageCircleQuestion, tone: "border-violet-200 bg-violet-50 text-violet-700" },
-  { id: "delivery", label: "Payment & delivery", icon: Truck, tone: "border-emerald-200 bg-emerald-50 text-emerald-700" },
-] as const
+const stageTone: Record<ManagerPipelineStage, string> = {
+  received: "border-amber-300 bg-amber-50 text-amber-900",
+  pricing: "border-sky-300 bg-sky-50 text-sky-900",
+  approval: "border-violet-300 bg-violet-50 text-violet-900",
+  delivery: "border-emerald-300 bg-emerald-50 text-emerald-900",
+}
 
 export function CustomerRequestStatus({ requestId, status, currentStage, updatedAt, assignee }: { requestId: string; status: QuoteRequestStatus; currentStage: ManagerPipelineStage; updatedAt: string; assignee: string }) {
   const router = useRouter()
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const currentIndex = quoteRequestProgressIndex(status)
-  const workflowIndex = workflowStages.findIndex((stage) => stage.id === currentStage)
 
   function updateStatus(nextStatus: QuoteRequestStatus) {
     if (nextStatus === status) return
@@ -51,20 +48,21 @@ export function CustomerRequestStatus({ requestId, status, currentStage, updated
   }
 
   return (
-    <section className="mt-3 rounded-lg border border-slate-200 bg-white p-3" aria-labelledby="request-status-heading">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066cc]">Manager workflow</p>
-        <h2 id="request-status-heading" className="mt-0.5 text-base font-bold">Request status</h2>
-        <p className="mt-0.5 text-xs font-semibold text-slate-600">Next: {nextAction[status]}</p>
+    <section className="mt-2 rounded-lg border border-slate-200 bg-white p-2.5" aria-labelledby="request-status-heading">
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
+        <label className="grid gap-1">
+          <span id="request-status-heading" className="text-[10px] font-bold uppercase tracking-[.12em] text-slate-500">Request status</span>
+          <select aria-label="Change request status" value={status} disabled={isPending} onChange={(event) => updateStatus(event.target.value as QuoteRequestStatus)} className={`min-h-10 w-full rounded-md border px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-[#0071e3] disabled:opacity-60 ${stageTone[currentStage]}`}>
+            {stages.map((stage) => <option key={stage.status} value={stage.status}>{stage.label}</option>)}
+          </select>
+        </label>
+        <MaterialRequestAssigneeControl requestId={requestId} assignee={assignee} compact />
+        <div className="flex items-end justify-between gap-4 text-[10px] text-slate-500 sm:block">
+          <p><span className="font-bold text-slate-700">Next:</span> {nextAction[status]}</p>
+          <p className="whitespace-nowrap">Updated {new Date(updatedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
         </div>
-        <div className="grid min-w-40 grid-cols-[minmax(0,1fr)_auto] items-end gap-3"><MaterialRequestAssigneeControl requestId={requestId} assignee={assignee} compact /><dl className="text-xs text-slate-500"><div><dt>Updated</dt><dd className="whitespace-nowrap font-semibold text-slate-800">{new Date(updatedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</dd></div></dl></div>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-        {workflowStages.map((stage, index) => { const Icon = stage.icon; const active = stage.id === currentStage; const complete = index < workflowIndex; return <div key={stage.id} className={`flex min-h-12 items-center gap-2 rounded-md border px-2.5 ${active ? stage.tone : "border-slate-200 bg-white text-slate-500"}`} aria-current={active ? "step" : undefined}><span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border ${complete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : active ? stage.tone : "border-slate-200 bg-slate-50"}`}>{complete ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}</span><span className="text-xs font-bold leading-4">{stage.label}</span></div> })}
-      </div>
-      <details className="mt-2 text-xs text-slate-500"><summary className="cursor-pointer font-semibold text-[#0066cc]">Change request status</summary><div className="mt-2 flex flex-wrap gap-1.5">{stages.map((stage, index) => { const active = stage.status === status; const complete = index < currentIndex; return <button key={stage.status} type="button" disabled={isPending} onClick={() => updateStatus(stage.status)} aria-pressed={active} className={`inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-left text-[11px] font-semibold disabled:opacity-60 ${active ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-700"}`}>{complete ? <Check className="h-3 w-3" /> : null}{stage.label}</button> })}</div></details>
-      {message ? <p role="status" className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">{message}</p> : null}
+      {message ? <p role="status" className="mt-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-900">{message}</p> : null}
     </section>
   )
 }

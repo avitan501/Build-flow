@@ -23,13 +23,18 @@ test("review and organization are one compact three-column material work table",
   expect(page, "the request page should render the combined work table").toContain("RequestMaterialWorktable")
   expect(worktable, "the combined work table component is required").not.toBe("")
   expect(worktable).toContain("<table")
+  expect(worktable).toContain("Copy original")
+  expect(worktable).toContain("Copy AI")
+  expect(worktable).toContain("AI organized")
+  expect(worktable).toContain("overflow-x-auto")
   expect(worktable).toMatch(/Quantity/)
-  expect(worktable).toMatch(/Item details/)
+  expect(worktable).toMatch(/Item details|AI organized/)
   expect(worktable).toMatch(/Missing info|AI notes/)
   expect(worktable).toContain("<tbody")
 
   expect(page, "steps 1 and 2 must not remain as separate expandable cards").not.toContain('title="Review client list"')
   expect(page, "steps 1 and 2 must not remain as separate expandable cards").not.toContain('title="Organize request"')
+  expect(page, "original items should not be repeated below the combined table").not.toContain("Original request & files")
 })
 
 test("AI controls and notes appear only on rows that are actually missing information", async () => {
