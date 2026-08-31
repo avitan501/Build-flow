@@ -4381,6 +4381,7 @@ async function processCustomerSmsAutomation(
         name
           .toLowerCase()
           .replace(/\binterruptores?\b|מפסקים?|מפסקי(?:ם)?/g, "breaker")
+          .replace(/\bbreakers\b/g, "breaker")
           .replace(/^(?:\d+(?:\.\d+)?\s*)/, "")
           .replace(/[^a-z0-9\u0590-\u05ff]+/g, " ")
           .trim();
