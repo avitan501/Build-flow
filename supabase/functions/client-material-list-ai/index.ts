@@ -3,7 +3,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "npm:@supabase/supabase-js@2.57.4"
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js"
 
-import { detectExplicitQuantityUnit, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, verifiedThickness } from "./material-list-normalization.ts"
+import { detectExplicitQuantityUnit, dimensionalLumberNeedsType, fastenerNeedsLength, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, verifiedThickness } from "./material-list-normalization.ts"
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -99,6 +99,12 @@ Treat department labels such as "Siding list", "Framing materials", "Electrical 
 Recognize standard fastener nomenclature. For example, 3\" x .120, 3\" x 120, or 3 in x 120 on a coil framing nail means a 3-inch nail with a 0.120-inch shank diameter. Likewise, 2\" x .099 or 2\" x 099 means a 2-inch nail with a 0.099-inch shank. Preserve these as length and shank specifications and do not ask what 120 or 099 means when the item is clearly a nail or fastener.
 
 For siding, a panel-area quantity such as "40 squares siding" is not a complete siding order. Unless the source explicitly requests panels only, mark the row missing when any required ordering detail is absent: material/manufacturer, profile, color, waste allowance, starter-strip linear feet, outside-corner count/height/post size, inside-corner count/height/post size, J-channel/opening-trim linear feet/profile, or the inclusion/exclusion of house wrap, soffit, fascia, insulation, and fasteners. Never calculate perimeter, corners, or opening trim from siding squares alone.
+
+For dimensional wood lumber or wood studs, dimensions and quantity alone are not enough. If the source does not state a lumber type, species, treatment, or grade (for example regular SPF, Douglas Fir, pressure-treated, kiln-dried, or an explicit grade), mark the row missing and use the single reason "Lumber type is missing". Never silently convert generic 2x4x8 lumber into a specific wood product.
+
+For screws, nails, fasteners, or anchors, quantity and package alone are not enough. If the source does not state an explicit fastener length, mark the row missing and use the single reason "Fastener length is missing". Preserve any type, application, gauge, diameter, head, coating, and model already provided.
+
+Never repeat or ask for a value already provided in the original item, request details, answers, or source text. For each incomplete item, return only the single missing blocker that most directly prevents an orderable match; do not produce a questionnaire or ask optional questions.
 
 Assign reviewStatus precisely:
 - ready: the product identity, quantity, sales unit, and every ordering specification explicitly present in the source are clear. Do not require a dimension or thickness when that field does not apply to the product.
@@ -271,9 +277,11 @@ Deno.serve(async (request: Request) => {
         .filter((reason) => !quantityWasDefaulted || !/\bquantity\b/i.test(reason))
         .filter((reason) => !unitWasDefaulted || !/\b(?:sales?\s+unit|selling\s+unit|unit\s+(?:is\s+)?missing)\b/i.test(reason))
       const missingThickness = materialRequiresThickness(item.name) && !thickness
+      const missingLumberType = dimensionalLumberNeedsType(item.name, [sourceText, proposedDimensions, details].filter(Boolean).join(" "))
+      const missingFastenerLength = fastenerNeedsLength(item.name, [sourceText, proposedDimensions, details].filter(Boolean).join(" "))
       const allReviewReasonsResolved = Boolean((detected || fastenerDimensions) && originalReviewReasons.length && reviewReasons.length === 0)
       const aiReviewStatus = allReviewReasonsResolved && item.reviewStatus !== "ready" ? "ready" : item.reviewStatus
-      const reviewStatus = missingThickness ? "missing" : reviewReasons.length ? (aiReviewStatus === "missing" ? "missing" : "check") : "ready"
+      const reviewStatus = missingThickness || missingLumberType || missingFastenerLength ? "missing" : reviewReasons.length ? (aiReviewStatus === "missing" ? "missing" : "check") : "ready"
       return {
         request_id: source.request_id,
         project_id: source.project_id,
@@ -301,6 +309,8 @@ Deno.serve(async (request: Request) => {
           review_reasons: [
             ...reviewReasons,
             ...(missingThickness && !reviewReasons.some((reason) => /thickness/i.test(reason)) ? ["Thickness is missing"] : []),
+            ...(missingLumberType && !reviewReasons.some((reason) => /\b(?:lumber|wood)\s+(?:type|species|grade)|\btreatment\b/i.test(reason)) ? ["Lumber type is missing"] : []),
+            ...(missingFastenerLength && !reviewReasons.some((reason) => /\b(?:fastener|screw|nail|anchor)?\s*length\b/i.test(reason)) ? ["Fastener length is missing"] : []),
           ].slice(0, 5),
           needs_review: reviewStatus !== "ready",
         },

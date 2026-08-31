@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status";
 import { OrganizeMaterialListButton } from "@/components/buildflow/organize-material-list-button";
 import { OrganizedMaterialList } from "@/components/buildflow/organized-material-list";
+import { RequestClientContact } from "@/components/buildflow/request-client-contact";
+import { RequestMaterialWorktable, type RequestWorktableComparison } from "@/components/buildflow/request-material-worktable";
 import {
   RequestManagementPanel,
   type RequestComparisonSummary,
@@ -27,6 +29,7 @@ import {
   type QuoteComparisonRecord,
 } from "@/lib/quote-comparison";
 import { managerPipelineStage } from "@/lib/manager-dashboard";
+import { mapRequestSupplierComparison } from "@/lib/request-supplier-comparison";
 import type { RelatedEmailItem } from "@/components/buildflow/related-email-timeline";
 
 type RequestDetails = {
@@ -81,18 +84,16 @@ type ComparisonRecord = Pick<
   | "status"
   | "client_quote_status"
   | "quote_number"
+  | "awarded_bid_id"
   | "updated_at"
 >;
 
 const workflowStepCardClass =
-  "group relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:border-slate-300 hover:shadow-[0_12px_30px_rgba(15,23,42,0.08)]";
+  "group relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]";
 
 function legacyAnswers(value: unknown): LegacyAnswer[] {
   return Array.isArray(value)
-    ? value.filter(
-        (answer): answer is LegacyAnswer =>
-          Boolean(answer) && typeof answer === "object",
-      )
+    ? value.filter((answer): answer is LegacyAnswer => Boolean(answer) && typeof answer === "object")
     : [];
 }
 
@@ -177,7 +178,7 @@ export default async function OwnerMaterialRequestPage({
     supabase
       .from("quote_comparisons")
       .select(
-        "id,request_id,title,status,client_quote_status,quote_number,updated_at",
+        "id,request_id,title,status,client_quote_status,quote_number,awarded_bid_id,updated_at",
       )
       .eq("request_id", requestId)
       .order("updated_at", { ascending: false })
@@ -344,6 +345,25 @@ export default async function OwnerMaterialRequestPage({
       })),
     };
   });
+  const supplierComparisonTables: RequestWorktableComparison[] = (
+    comparisons ?? []
+  ).map((comparison) => {
+    const comparisonItems = (comparisonItemsResult.data ?? []).filter(
+      (item) => item.comparison_id === comparison.id,
+    );
+    const comparisonBids = (comparisonBidsResult.data ?? []).filter(
+      (bid) => bid.comparison_id === comparison.id,
+    );
+    const mapped = mapRequestSupplierComparison(comparisonItems, comparisonBids, {
+      selectedBidId: comparison.awarded_bid_id,
+    });
+    return {
+      id: comparison.id,
+      title: comparison.title,
+      href: `/admin/quote-comparison/${comparison.id}`,
+      ...mapped,
+    };
+  });
   const step1Complete = workflowOverrides.get(1) ?? true;
   const step2Complete = workflowOverrides.get(2) ?? organizedItems.length > 0;
   const { data: requestEmailLinks } = await supabase
@@ -419,14 +439,15 @@ export default async function OwnerMaterialRequestPage({
                 </p>
               ) : null}
             </div>
-            <div className="min-w-0 border-t border-slate-100 pt-2 text-sm sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
-              <p className="font-bold text-slate-950">
-                {profile?.full_name || "Client"}
-              </p>
-              <div className="flex flex-wrap gap-x-3 text-xs text-slate-500">
-                {clientEmail ? <span>{clientEmail}</span> : null}
-                {profile?.phone ? <span>{profile.phone}</span> : null}
+            <div className="flex min-w-0 items-center gap-3 border-t border-slate-100 pt-2 text-sm sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-slate-950">{profile?.full_name || "Client"}</p>
+                <div className="flex flex-wrap gap-x-3 text-xs text-slate-500">
+                  {clientEmail ? <a href={`mailto:${clientEmail}`} className="truncate hover:text-[#0066cc]">{clientEmail}</a> : null}
+                  {profile?.phone ? <a href={`tel:${profile.phone}`} className="hover:text-[#0066cc]">{profile.phone}</a> : null}
+                </div>
               </div>
+              <RequestClientContact clientName={profile?.full_name || "Client"} phone={profile?.phone || ""} requestTitle={request.title} />
             </div>
           </div>
         </header>
@@ -437,7 +458,25 @@ export default async function OwnerMaterialRequestPage({
           updatedAt={request.updated_at}
           assignee={request.manager_assignee}
         />
-        <div className="mt-3 grid gap-2">
+        <RequestMaterialWorktable
+          requestId={request.id}
+          originalItems={originalItems}
+          organizedItems={organizedItems}
+          defaultZipCode={zipCodeFromAddress(request.projects?.address)}
+          organizationStatus={organizationStatus}
+          organizationCompletedLabel={organizationCompletedLabel}
+          supplierComparisons={supplierComparisonTables}
+        />
+        {signedFiles.length || (responses ?? []).length ? (
+          <details className="mt-2 rounded-lg border border-slate-200 bg-white">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-bold">Original request & files · {signedFiles.length}</summary>
+            <div className="flex flex-wrap gap-2 border-t border-slate-100 p-3">
+              {signedFiles.map((file) => file.url ? <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="rounded-md border border-slate-200 px-3 py-2 text-xs font-bold text-[#0066cc]">{file.file_name}</a> : <span key={file.id} className="text-xs">{file.file_name}</span>)}
+              {(responses ?? []).map((response) => <span key={response.id} className="rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold">{response.category_name_snapshot} · {response.status}</span>)}
+            </div>
+          </details>
+        ) : null}
+        <div className="hidden" aria-hidden="true">
           <details
             open={currentStage === "received"}
             className={`order-2 ${workflowStepCardClass}`}
@@ -445,7 +484,7 @@ export default async function OwnerMaterialRequestPage({
             <RequestWorkflowStepHeader
               requestId={request.id}
               step={2}
-              title="Organize request"
+              title="AI review"
               detail={
                 organizedItems.length
                   ? `${organizedItems.length} organized item${organizedItems.length === 1 ? "" : "s"}`
@@ -507,7 +546,7 @@ export default async function OwnerMaterialRequestPage({
             <RequestWorkflowStepHeader
               requestId={request.id}
               step={1}
-              title="Review client list"
+              title="Original list"
               detail={`${originalItems.length} item${originalItems.length === 1 ? "" : "s"} · ${signedFiles.length} file${signedFiles.length === 1 ? "" : "s"}`}
               status={step1Complete ? "complete" : "active"}
               icon="review"

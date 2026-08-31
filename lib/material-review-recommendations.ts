@@ -33,6 +33,8 @@ export function materialReviewRecommendation(item: ReviewableMaterialItem): Mate
   const isCementBoard = /\b(?:cement\s+board|wonderboard)\b/.test(name)
   const isDrywallScrew = /\b(?:(?:drywall|sheetrock)\s+)?screws?\b/.test(name)
   const isSheetMaterial = isDrywallBoard || isCementBoard || /\b(?:plywood|osb)\b/.test(name)
+  const isDimensionalLumber = /\b(?:lumber|studs?|framing\s+boards?)\b/.test(name)
+    && !/\b(?:metal|steel|plywood|osb|lvl|engineered|glulam|drywall|sheetrock|gypsum|cement\s+board|wonderboard)\b/.test(name)
   const choices: MaterialReviewRecommendation["choices"] = []
 
   if (isDrywallBoard) {
@@ -82,10 +84,24 @@ export function materialReviewRecommendation(item: ReviewableMaterialItem): Mate
     })
   }
 
+  if (isDimensionalLumber) {
+    choices.push({
+      field: "productType",
+      label: "Lumber type",
+      options: [
+        option("Regular SPF", 65),
+        option("Douglas Fir", 18),
+        option("Pressure-treated", 15),
+        option("Other / confirm", 2),
+      ],
+      recommended: "Regular SPF",
+    })
+  }
+
   const resolvesAllReasons = reasons.every((reason) =>
     (/quantity/i.test(reason) && materialQuantity(item) > 0)
     || (/thickness/i.test(reason) && hasChoice(choices, "thickness"))
-    || (/\b(?:type|grade)\b/i.test(reason) && hasChoice(choices, "productType"))
+    || (/\b(?:type|species|grade|treatment)\b/i.test(reason) && hasChoice(choices, "productType"))
     || (/\b(?:screw\s+)?length\b/i.test(reason) && (hasChoice(choices, "screwLength") || hasChoice(choices, "dimensions")))
     || (/\b(?:size|dimensions?|width)\b/i.test(reason) && hasChoice(choices, "dimensions"))
     || (/\bunit\b/i.test(reason) && Boolean(materialSalesUnit(item)))

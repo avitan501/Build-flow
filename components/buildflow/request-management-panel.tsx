@@ -1,7 +1,6 @@
 "use client"
 
-import { CalendarClock, ChevronDown, Download, ExternalLink, FileText, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, Route, Send, Trash2, X } from "lucide-react"
-import Link from "next/link"
+import { CalendarClock, ChevronDown, Download, FileText, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, Route, Send, Trash2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
@@ -322,14 +321,13 @@ export function RequestManagementPanel({
   const pricingComplete = step3CompletedOverride ?? supplierQuoteCount > 0
   const pricingStatus = pricingComplete ? "complete" : currentStage === "pricing" ? "active" : "upcoming"
   const replyComplete = step4CompletedOverride ?? clientReplyDone
-  const replyStatus = replyComplete ? "complete" : currentStage === "approval" || currentStage === "delivery" || pricingComplete ? "active" : "upcoming"
 
   return (
     <div className="grid gap-2">
       <details open={currentStage === "pricing"} className={workflowStepCardClass()}>
         <RequestWorkflowStepHeader requestId={requestId} step={3} title="Get supplier pricing" detail={supplierQuoteCount ? `${supplierQuoteCount} supplier quote${supplierQuoteCount === 1 ? "" : "s"} received` : packages.length ? `${packages.length} supplier request${packages.length === 1 ? "" : "s"} sent` : "No supplier prices received yet"} status={pricingStatus} icon="pricing" />
         <div className="border-t border-slate-200 p-4">
-          {comparisons.length ? <div className="mb-3 grid gap-2">{comparisons.map((comparison) => <article key={comparison.id} className="rounded-md border border-slate-200 bg-slate-50 p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-bold">{comparison.title}</h3><p className="mt-0.5 text-xs text-slate-500">{comparison.bids.length ? `${comparison.bids.length} supplier response${comparison.bids.length === 1 ? "" : "s"}` : "Waiting for supplier response"}</p></div><Link href={`/admin/quote-comparison/${comparison.id}`} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-[#0066cc]">Compare <ExternalLink className="h-3.5 w-3.5" /></Link></div>{comparison.bids.length ? <div className="mt-2 divide-y divide-slate-200 border-t border-slate-200">{comparison.bids.map((bid) => <div key={bid.id} className="flex items-center justify-between gap-3 py-2 text-xs"><span className="min-w-0 truncate font-semibold">{bid.supplierName}{bid.recommended ? " · Best match" : ""}</span><span className="shrink-0 text-right"><strong className="block text-sm tabular-nums">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(bid.landedTotal)}</strong><span className="text-slate-500">{bid.pricedItemCount}/{bid.itemCount} items</span></span></div>)}</div> : null}</article>)}</div> : <p className="mb-3 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">Supplier answers and prices will appear here after a quote is linked to this request.</p>}
+          {comparisons.length ? <p className="mb-3 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">Supplier prices are shown beside each request item in the table above.</p> : <p className="mb-3 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">Supplier answers and prices will appear beside each item after a quote is linked.</p>}
 
           <RelatedEmailTimeline title="Supplier email" emails={supplierEmails} />
 
@@ -353,8 +351,8 @@ export function RequestManagementPanel({
         </div>
       </details>
 
-      <details open={currentStage === "approval" || currentStage === "delivery"} className={workflowStepCardClass()}>
-        <RequestWorkflowStepHeader requestId={requestId} step={4} title="Contact client" detail={replyComplete ? "Client contacted" : "Send an update, estimate, or delivery window"} status={replyStatus} icon="reply" />
+      <details id="contact-client" open={currentStage === "approval" || currentStage === "delivery"} className={workflowStepCardClass()}>
+        <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-4"><span><span className="block text-[10px] font-bold uppercase tracking-[.12em] text-[#0066cc]">Available at every stage</span><span className="block text-base font-bold">Contact client</span></span><span className="text-xs font-semibold text-slate-500">{replyComplete ? "Client contacted" : "Message, estimate, or delivery"}</span></summary>
         <div className="border-t border-slate-200 p-4">
           <RelatedEmailTimeline title="Client email" emails={clientEmails} />
           <div>

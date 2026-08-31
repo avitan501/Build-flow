@@ -155,7 +155,7 @@ test("catalog search removes obsolete quantity notes and scores specification ma
 })
 
 test("client material lists are organized securely in the background", async () => {
-  const [requestAction, publicIntake, aiFunction, ownerPage, ownerActions, organizerButton, organizedList, reviewEditor, priceCheck, supplierDraft, priceRoute, messagingBroker] = await Promise.all([
+  const [requestAction, publicIntake, aiFunction, ownerPage, ownerActions, organizerButton, organizedList, worktable, reviewEditor, priceCheck, supplierDraft, priceRoute, messagingBroker] = await Promise.all([
     readFile(path.join(root, "app/request-quote/actions.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/public-quote-intake/index.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/client-material-list-ai/index.ts"), "utf8"),
@@ -163,6 +163,7 @@ test("client material lists are organized securely in the background", async () 
     readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/organize-material-list-button.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/organized-material-list.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/request-material-worktable.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-review-editor.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/material-price-check.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/[requestId]/supplier-request/page.tsx"), "utf8"),
@@ -204,20 +205,20 @@ test("client material lists are organized securely in the background", async () 
   expect(aiFunction).toContain("existing.length && !force")
   expect(aiFunction).toContain("previous_organized_items_replace_failed")
   expect(aiFunction).toContain('.insert(rows).select("id")')
-  expect(ownerPage).toContain("step={1}")
-  expect(ownerPage).toContain("Review client list")
-  expect(ownerPage).toContain("step={2}")
-  expect(ownerPage).toContain("Organize request")
-  expect(ownerPage).toContain("workflowStepCardClass")
-  expect(ownerPage).toContain("Confirmed material list")
-  expect(ownerPage.indexOf("<CustomerRequestStatus")).toBeLessThan(ownerPage.indexOf('className="mt-3 grid gap-2"'))
-  expect(ownerPage).toContain('open={currentStage === "received" && organizedItems.length === 0}')
+  expect(ownerPage).toContain("RequestMaterialWorktable")
+  expect(ownerPage).not.toContain('title="Review client list"')
+  expect(ownerPage).not.toContain('title="Organize request"')
+  expect(ownerPage.indexOf("<CustomerRequestStatus")).toBeLessThan(ownerPage.indexOf("<RequestMaterialWorktable"))
   expect(ownerPage).toContain('comparisons={comparisonSummaries}')
+  expect(ownerPage).toContain('supplierComparisons={supplierComparisonTables}')
   expect(ownerPage).toContain('quote_comparison_bids')
   expect(ownerPage).toContain('updatedAt={request.updated_at}')
   expect(ownerPage).toContain("OrganizedMaterialList")
   expect(ownerPage).toContain("refresh={organizedItems.length > 0}")
-  expect(ownerPage).toContain("Last review:")
+  expect(worktable).toContain("Last AI review:")
+  expect(worktable).toContain("<table")
+  expect(worktable).toContain("Missing info / AI notes")
+  expect(worktable).toContain("RequestSupplierComparison")
   expect(organizedList).toContain("divide-y divide-slate-200")
   expect(organizedList).not.toContain("md:grid-cols-2")
   expect(organizedList).not.toContain("<table")
@@ -274,7 +275,7 @@ test("client material lists are organized securely in the background", async () 
   expect(supplierDraft).toContain("preferredRequestMaterialSources")
 })
 
-test("request workspace uses the same colored four-step workflow as the dashboard", async () => {
+test("request workspace keeps pricing steps and makes client contact globally available", async () => {
   const [dashboard, status, management] = await Promise.all([
     readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/customer-request-status.tsx"), "utf8"),
@@ -293,8 +294,10 @@ test("request workspace uses the same colored four-step workflow as the dashboar
   expect(management).toContain("Recommended suppliers")
   expect(management).toContain("Contact {supplierIds.length")
   expect(management).toContain('id="supplier-routing"')
-  expect(management).toContain("Supplier answers and prices will appear here")
-  expect(management).toContain("step={4}")
+  expect(management).toContain("Supplier answers and prices will appear beside each item")
+  expect(management).not.toContain("step={4}")
+  expect(management).toContain("Available at every stage")
+  expect(management).toContain('id="contact-client"')
   expect(management).toContain("Schedule delivery")
   expect(management).toContain("Window length (hours)")
   expect(management).toContain("Delivery window: Between")
@@ -337,6 +340,31 @@ test("organized rows use safe order defaults without showing false missing error
   expect(materialReviewReasons(waterHeater)).toEqual([])
   expect(materialReviewStatus(waterHeater)).toBe("ready")
   expect(materialReviewRecommendation(waterHeater).choices).toEqual([])
+})
+
+test("generic dimensional lumber requires one short lumber-type choice", () => {
+  const lumber = {
+    id: "lumber-generic",
+    name: "Wood lumber 2x4x8",
+    department: "Framing",
+    quantity: 100,
+    unit: "each",
+    metadata: { review_status: "missing", review_reasons: ["Lumber type is missing"] },
+  }
+  const recommendation = materialReviewRecommendation(lumber)
+  expect(recommendation.resolvesAllReasons).toBe(true)
+  expect(recommendation.choices).toHaveLength(1)
+  expect(recommendation.choices[0]).toMatchObject({
+    field: "productType",
+    label: "Lumber type",
+    recommended: "Regular SPF",
+  })
+  expect(recommendation.choices[0].options.map((entry) => entry.value)).toEqual([
+    "Regular SPF",
+    "Douglas Fir",
+    "Pressure-treated",
+    "Other / confirm",
+  ])
 })
 
 test("supplier detection matches the directory or keeps the name read from the invoice", async () => {
@@ -393,8 +421,8 @@ test("catalog Exa search is staff-only, cached, and keeps results out of the cat
   expect(search).toContain("numResults: 18")
   expect(search).toContain("excludeDomains")
   expect(search).toContain("Google Shopping")
-  expect(catalog).toContain("Prepare catalog item")
-  expect(catalog).toContain("Nothing is saved until you approve it")
+  expect(catalog).toContain(">Complete</button>")
+  expect(catalog).toContain("Review each source before saving.")
   expect(catalog).toContain("/api/admin/catalog/exa-search")
 })
 

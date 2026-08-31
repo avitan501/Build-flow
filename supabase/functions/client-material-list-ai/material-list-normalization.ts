@@ -85,3 +85,25 @@ export function materialRequiresThickness(name: string) {
   if (/\b(?:screws?|nails?|fasteners?|anchors?)\b/i.test(name)) return false
   return /\b(?:drywall|sheetrock|gypsum|greenboard|blueboard|cement\s+board|wonderboard|plywood|osb)\b/i.test(name)
 }
+
+export function dimensionalLumberNeedsType(name: string, sourceText: string) {
+  const product = `${name} ${sourceText}`.toLowerCase().replace(/\s+/g, " ")
+  const dimensionalLumber = /\b(?:lumber|studs?|framing\s+boards?)\b/.test(product)
+    || (/\bwood(?:en)?\b/.test(product) && /\b\d+\s*[x×]\s*\d+(?:\s*[x×]\s*\d+)?\b/.test(product))
+  if (!dimensionalLumber) return false
+  if (/\b(?:metal|steel)\s+(?:studs?|framing)\b|\b(?:plywood|osb|lvl|engineered\s+lumber|glulam|drywall|sheetrock|gypsum|cement\s+board|wonderboard)\b/.test(product)) return false
+  const hasType = /\b(?:regular(?:\s+(?:spf|lumber|wood))?|spf|spruce(?:-pine-fir)?|doug(?:las)?\s+fir|hem(?:lock)?[- ]fir|southern\s+yellow\s+pine|syp|cedar|redwood|pressure[- ]treated|treated|pt\s+lumber|kiln[- ]dried|kd\s+lumber|fire[- ]retardant|frt|stud\s+grade|construction\s+grade|select\s+structural|no\.?\s*[123]|#[123])\b/.test(product)
+  return !hasType
+}
+
+export function fastenerNeedsLength(name: string, sourceText: string) {
+  if (!/\b(?:screws?|nails?|fasteners?|anchors?)\b/i.test(name)) return false
+  const product = `${name} ${sourceText}`
+    .toLowerCase()
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/\s+/g, " ")
+  if (recognizedFastenerDimensions(name, product)) return false
+  const hasLength = /\b\d+(?:[- ]\d+\/\d+|\s*\/\s*\d+|\.\d+)?\s*(?:"|in(?:\.|ch(?:es)?)?)\b/i.test(product)
+    || /\b\d+(?:\.\d+)?\s*(?:mm|cm)\b/i.test(product)
+  return !hasLength
+}

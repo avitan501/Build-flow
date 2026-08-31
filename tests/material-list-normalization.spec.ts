@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { detectExplicitQuantityUnit, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, verifiedThickness } from "../supabase/functions/client-material-list-ai/material-list-normalization"
+import { detectExplicitQuantityUnit, dimensionalLumberNeedsType, fastenerNeedsLength, materialRequiresThickness, recognizedFastenerDimensions, removeResolvedFastenerReasons, removeResolvedQuantityUnitReasons, verifiedThickness } from "../supabase/functions/client-material-list-ai/material-list-normalization"
 
 const sidingFormats = [
   "14 squares of siding",
@@ -26,6 +26,25 @@ test("recognizes common singular and plural construction units", () => {
 
 test("keeps a leading lumber count separate from 2x4x8 dimensions", () => {
   expect(detectExplicitQuantityUnit("50 pieces — wood lumber 2x4x8")).toMatchObject({ quantity: 50, unit: "pieces" })
+})
+
+test("does not mark generic dimensional lumber ready without its lumber type", () => {
+  expect(dimensionalLumberNeedsType("Wood lumber", "100 pieces 2x4x8")).toBe(true)
+  expect(dimensionalLumberNeedsType("2x4x8 studs", "100 each")).toBe(true)
+  expect(dimensionalLumberNeedsType("2x4x8 studs", "100 regular SPF studs")).toBe(false)
+  expect(dimensionalLumberNeedsType("2x4x8 pressure-treated lumber", "100 pieces")).toBe(false)
+  expect(dimensionalLumberNeedsType("Douglas Fir 2x4x8", "100 pieces")).toBe(false)
+  expect(dimensionalLumberNeedsType("Metal studs", "100 pieces 3-5/8 x 10 ft")).toBe(false)
+  expect(dimensionalLumberNeedsType("1/2 in. plywood", "20 sheets 4x8")).toBe(false)
+  expect(dimensionalLumberNeedsType("12x24 porcelain tile", "50 boxes")).toBe(false)
+  expect(dimensionalLumberNeedsType("1/2 in. cement board", "20 sheets 3x5")).toBe(false)
+})
+
+test("does not mark fasteners ready without a length", () => {
+  expect(fastenerNeedsLength("Drywall screws", "1 box")).toBe(true)
+  expect(fastenerNeedsLength("Drywall screws", "1 box 1-1/4 in.")).toBe(false)
+  expect(fastenerNeedsLength("Coil framing nails", '4 boxes 3" x .120')).toBe(false)
+  expect(fastenerNeedsLength("Wood lumber", "100 pieces 2x4x8")).toBe(false)
 })
 
 test("removes only redundant quantity and unit review reasons", () => {
