@@ -40,6 +40,8 @@ export type MaterialSourceDocumentation = {
 export type MaterialSourceDefinition = {
   id:
     | "handoff"
+    | "home_depot_official"
+    | "lowes_official"
     | "authorized_supplier"
     | "dds"
     | "idea_connector"
@@ -100,6 +102,12 @@ export const MATERIAL_SOURCE_REGISTRY = [
     priceRule: "No Handoff price, availability, or source claim is allowed until official API access is contractually authorized and a live response is timestamped.",
     documentation: [
       {
+        title: "Does Handoff have an API?",
+        publisher: "Handoff Help Center",
+        url: "https://help.handoff.ai/en/articles/9778505-does-handoff-have-an-api",
+        supports: "Handoff explicitly states that it does not currently offer an API and directs users to its support channel for integration needs.",
+      },
+      {
         title: "Handoff AI Estimating",
         publisher: "Handoff",
         url: "https://www.handoff.ai/",
@@ -114,10 +122,62 @@ export const MATERIAL_SOURCE_REGISTRY = [
     ],
   },
   {
+    id: "home_depot_official",
+    name: "The Home Depot official affiliate feed",
+    tier: 1,
+    providerPriority: 2,
+    access: "requires_supplier_authorization",
+    liveAccessConfirmed: false,
+    enabledByDefault: false,
+    requiresServerCredentials: true,
+    capabilities: ["product_identity", "technical_specifications", "images", "public_price"],
+    maximumConfidence: "Exact Match",
+    licenseOrAccessRequirement: "Avantia must be accepted into The Home Depot Affiliate Program through Impact and receive permission and credentials for the official daily product data feed.",
+    safeUse: "Ingest only the licensed feed delivered to Avantia. Preserve the Home Depot item identifier, feed timestamp, product URL, and applicable program terms. Do not scrape homedepot.com.",
+    priceRule: "A feed price is a dated public observation only. It is not proof of local store stock, private Pro pricing, delivery, or the final customer price.",
+    documentation: [
+      {
+        title: "The Home Depot Affiliate Program FAQs",
+        publisher: "The Home Depot",
+        url: "https://www.homedepot.com/c/SF_MS_Affiliate_Program_FAQs",
+        supports: "Documents application approval through Impact and the official daily product data feed available to accepted affiliates.",
+      },
+    ],
+  },
+  {
+    id: "lowes_official",
+    name: "Lowe's Product Catalog API",
+    tier: 1,
+    providerPriority: 3,
+    access: "requires_supplier_authorization",
+    liveAccessConfirmed: false,
+    enabledByDefault: false,
+    requiresServerCredentials: true,
+    capabilities: ["product_identity", "technical_specifications", "images", "alternatives", "public_price", "private_price", "availability"],
+    maximumConfidence: "Exact Match",
+    licenseOrAccessRequirement: "Avantia must register its organization in the Lowe's Developer Hub, obtain an approved app, X-Client-Id and bearer-token access, and subscribe to the Product Catalog capabilities it is permitted to use.",
+    safeUse: "Use only the documented Lowe's partner endpoints with server-side credentials. Preserve omni item ID, store or ZIP context, retrieval time, and PDP URL. Never pass customer email for contract pricing without specific authorization and manager approval.",
+    priceRule: "A Lowe's price or inventory result is current only for its returned store or location and checked timestamp. Contract pricing stays manager-only and cannot be exposed to customers automatically.",
+    documentation: [
+      {
+        title: "Lowe's Developer Hub",
+        publisher: "Lowe's",
+        url: "https://developer.lowes.com/",
+        supports: "Documents partner onboarding, app credentials, product catalog, pricing, inventory, and production-readiness review.",
+      },
+      {
+        title: "Lowe's Product Catalog",
+        publisher: "Lowe's Developer Hub",
+        url: "https://developer.lowes.com/portal/business-components/Product%20Catalog/",
+        supports: "Documents product search and detail capabilities, location-aware pricing and inventory, authentication headers, and file feeds.",
+      },
+    ],
+  },
+  {
     id: "authorized_supplier",
     name: "Authorized direct supplier integration",
     tier: 1,
-    providerPriority: 2,
+    providerPriority: 4,
     access: "requires_supplier_authorization",
     liveAccessConfirmed: false,
     enabledByDefault: false,
@@ -133,7 +193,7 @@ export const MATERIAL_SOURCE_REGISTRY = [
     id: "dds",
     name: "DDS Unified Product Content API",
     tier: 2,
-    providerPriority: 3,
+    providerPriority: 5,
     access: "requires_contract",
     liveAccessConfirmed: false,
     enabledByDefault: false,
@@ -156,7 +216,7 @@ export const MATERIAL_SOURCE_REGISTRY = [
     id: "idea_connector",
     name: "IDEA Connector",
     tier: 2,
-    providerPriority: 4,
+    providerPriority: 6,
     access: "requires_contract",
     liveAccessConfirmed: false,
     enabledByDefault: false,
@@ -179,7 +239,7 @@ export const MATERIAL_SOURCE_REGISTRY = [
     id: "tra_ser",
     name: "Trimble TRA-SER",
     tier: 2,
-    providerPriority: 5,
+    providerPriority: 7,
     access: "requires_contract",
     liveAccessConfirmed: false,
     enabledByDefault: false,
@@ -202,7 +262,7 @@ export const MATERIAL_SOURCE_REGISTRY = [
     id: "official_manufacturer",
     name: "Official manufacturer product data",
     tier: 3,
-    providerPriority: 6,
+    providerPriority: 8,
     access: "public_reference",
     liveAccessConfirmed: false,
     enabledByDefault: true,
@@ -218,7 +278,7 @@ export const MATERIAL_SOURCE_REGISTRY = [
     id: "etim",
     name: "ETIM",
     tier: 4,
-    providerPriority: 7,
+    providerPriority: 9,
     access: "public_reference",
     liveAccessConfirmed: true,
     enabledByDefault: true,
@@ -247,7 +307,7 @@ export const MATERIAL_SOURCE_REGISTRY = [
     id: "unspsc",
     name: "UNSPSC / UNGM reference",
     tier: 4,
-    providerPriority: 8,
+    providerPriority: 10,
     access: "public_reference",
     liveAccessConfirmed: true,
     enabledByDefault: true,
@@ -276,7 +336,7 @@ export const MATERIAL_SOURCE_REGISTRY = [
     id: "approved_supplier_document",
     name: "Manager-approved supplier document",
     tier: 5,
-    providerPriority: 9,
+    providerPriority: 11,
     access: "manager_approved_document",
     liveAccessConfirmed: true,
     enabledByDefault: true,
@@ -292,7 +352,7 @@ export const MATERIAL_SOURCE_REGISTRY = [
     id: "avantia_history",
     name: "Avantia request and purchase history",
     tier: 5,
-    providerPriority: 10,
+    providerPriority: 12,
     access: "internal_aggregate",
     liveAccessConfirmed: true,
     enabledByDefault: true,
@@ -311,28 +371,28 @@ export const MATERIAL_EVIDENCE_CONFIDENCE_RULES = [
     claim: "exact_product",
     confidence: "Exact Match",
     minimumEvidence: "An exact manufacturer part number, model, SKU, or UPC from a current authorized product record or manager-approved source document.",
-    eligibleSourceIds: ["authorized_supplier", "dds", "idea_connector", "official_manufacturer", "approved_supplier_document"],
+    eligibleSourceIds: ["home_depot_official", "lowes_official", "authorized_supplier", "dds", "idea_connector", "official_manufacturer", "approved_supplier_document"],
     neverProves: "Application compatibility, code compliance, stock, delivery, or customer intent without the relevant independent confirmation.",
   },
   {
     claim: "likely_product",
     confidence: "Likely Match",
     minimumEvidence: "Known critical attributes match a sourced candidate, but at least one non-safety discriminator or exact identifier remains unconfirmed.",
-    eligibleSourceIds: ["handoff", "authorized_supplier", "dds", "idea_connector", "tra_ser", "official_manufacturer", "approved_supplier_document"],
+    eligibleSourceIds: ["handoff", "home_depot_official", "lowes_official", "authorized_supplier", "dds", "idea_connector", "tra_ser", "official_manufacturer", "approved_supplier_document"],
     neverProves: "That the candidate is the product the customer intended or that substitution is safe.",
   },
   {
     claim: "industry_common",
     confidence: "Common Industry Default",
     minimumEvidence: "Corroborated classification/manufacturer/supplier evidence plus a reviewed rationale; one catalog position or model output is insufficient.",
-    eligibleSourceIds: ["dds", "idea_connector", "tra_ser", "official_manufacturer", "etim", "approved_supplier_document"],
+    eligibleSourceIds: ["home_depot_official", "lowes_official", "dds", "idea_connector", "tra_ser", "official_manufacturer", "etim", "approved_supplier_document"],
     neverProves: "That the common choice is correct for this job, jurisdiction, assembly, or customer.",
   },
   {
     claim: "local_common",
     confidence: "Common Local Choice",
     minimumEvidence: "Repeated, recent observations across more than one authorized local supplier or branch, with location and checked dates retained.",
-    eligibleSourceIds: ["authorized_supplier", "approved_supplier_document", "avantia_history"],
+    eligibleSourceIds: ["home_depot_official", "lowes_official", "authorized_supplier", "approved_supplier_document", "avantia_history"],
     neverProves: "Current inventory or that a local common choice meets project specifications.",
   },
   {
@@ -361,5 +421,5 @@ export function sourcesWithCapability(capability: MaterialSourceCapability) {
 export function sourceMaySupplyDatedPriceObservation(source: MaterialSourceDefinition) {
   if (!source.liveAccessConfirmed) return false;
   if (!source.capabilities.includes("public_price") && !source.capabilities.includes("private_price")) return false;
-  return source.id === "approved_supplier_document";
+  return ["home_depot_official", "lowes_official", "authorized_supplier", "approved_supplier_document"].includes(source.id);
 }

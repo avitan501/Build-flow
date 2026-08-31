@@ -204,7 +204,7 @@ test("document center preserves originals while allowing direct catalog row impo
   expect(actions).toContain("itemIds: linkedItems.map((item) => item.id)");
   expect(actions).toContain('["ready", "routed"].includes(document.status)');
   expect(actions).toMatch(
-    /\.select\("id"\)\s*\.returns<Array<\{ id: string \}>>\(\)/,
+    /\.select\("id(?:,line_number)?"\)\s*\.returns<Array<\{ id: string(?:; line_number: number)? \}>>\(\)/,
   );
   expect(actions).toContain("Nothing was routed");
   expect(upload).toContain("Upload once");
@@ -223,18 +223,35 @@ test("document center preserves originals while allowing direct catalog row impo
 
 test("a reviewed document can be linked directly to a request quote comparison", async () => {
   const [detailPage, review, actions, worktable] = await Promise.all([
-    readFile(path.join(root, "app/admin/documents/[documentId]/page.tsx"), "utf8"),
-    readFile(path.join(root, "components/buildflow/manager-document-review.tsx"), "utf8"),
+    readFile(
+      path.join(root, "app/admin/documents/[documentId]/page.tsx"),
+      "utf8",
+    ),
+    readFile(
+      path.join(root, "components/buildflow/manager-document-review.tsx"),
+      "utf8",
+    ),
     readFile(path.join(root, "app/admin/documents/actions.ts"), "utf8"),
-    readFile(path.join(root, "components/buildflow/request-material-worktable.tsx"), "utf8"),
+    readFile(
+      path.join(root, "components/buildflow/request-material-worktable.tsx"),
+      "utf8",
+    ),
   ]);
 
   expect(detailPage).toContain('from("quote_requests")');
   expect(detailPage).toContain("requests={requests}");
   expect(review).toContain("Request for quote compare");
   expect(review).toContain("Add to Quote Compare");
+  expect(review).toContain("Add to Compare");
+  expect(review).toContain('routeQuote("comparison", line.id)');
   expect(review).toContain("comparisonRequestId || undefined");
+  expect(review).toContain("lineId ? [lineId] : undefined");
   expect(actions).toContain("selectedComparisonId");
+  expect(actions).toContain("requestedItemIds");
+  expect(actions).toContain("line_number: item.line_number");
+  expect(actions).toContain("existingQuoteItems");
+  expect(actions).toContain("linkedIds.push(inserted.id)");
+  expect(review).toContain("!line.selected");
   expect(actions).toContain("comparison_id: selectedComparisonId");
   expect(worktable).toContain("Original request");
   expect(worktable).toContain("Missing info / AI notes");

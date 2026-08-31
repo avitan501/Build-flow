@@ -12,13 +12,13 @@ function unavailable<T>(): ProviderResult<T> {
     code: "provider_disabled",
     provider: "handoff",
     message:
-      "Handoff Universal Catalog access is disabled until Handoff grants official server-to-server credentials and licensed API documentation.",
+      "Handoff is disabled because Handoff's official help center states that no API is currently available. Use its support channel if Avantia wants to request future partner access.",
   };
 }
 
 export class HandoffProvider implements MaterialProductProvider {
   readonly id = "handoff";
-  // Handoff currently has no public, licensed endpoint contract. Keep the
+  // Handoff officially states that it currently has no API. Keep the
   // adapter visibly unavailable even if somebody accidentally adds a flag.
   readonly enabled = false;
 

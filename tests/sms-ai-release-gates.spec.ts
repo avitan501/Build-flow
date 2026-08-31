@@ -405,7 +405,7 @@ test("broker-created request progression replies are gated independently from mo
   expect(brokerSource).toContain("if (draftCandidate && startsNewRequest) {")
   expect(brokerSource).toContain("if (!explicitConfirmation) {")
   expect(brokerSource).toContain("clarificationQuestions.length === 0")
-  expect(brokerSource).toMatch(/if \(\s*openDraft\s*&&\s*customerEvent === "message"\s*&&\s*!analyzed\.result\.isMaterialRequest\s*\)/)
+  expect(brokerSource).toMatch(/if \(\s*\(openDraft \|\| activeSubmittedRequest\)\s*&&\s*customerEvent === "message"\s*&&\s*!analyzed\.result\.isMaterialRequest\s*\)/)
   expect(brokerSource).toContain("the structured draft advances instead of falling back")
   expect(brokerSource).toContain('if (customerEvent === "correction") {')
   expect(brokerSource).toMatch(/const preConfirmationCorrection\s*=\s*customerEvent === "correction"\s*&&\s*Boolean\(openDraft\)/)

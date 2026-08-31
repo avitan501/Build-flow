@@ -1,6 +1,8 @@
 import "server-only";
 
 import { HandoffProvider } from "@/lib/aura/material-providers/handoff";
+import { HomeDepotOfficialProvider } from "@/lib/aura/material-providers/home-depot";
+import { LowesOfficialProvider } from "@/lib/aura/material-providers/lowes";
 import type {
   MaterialProductProvider,
   ProviderLocation,
@@ -12,14 +14,25 @@ import {
   materialSourceById,
 } from "@/lib/material-intelligence/source-registry";
 
-const providers: MaterialProductProvider[] = [new HandoffProvider()];
+const providers: MaterialProductProvider[] = [
+  new HandoffProvider(),
+  new HomeDepotOfficialProvider(),
+  new LowesOfficialProvider(),
+];
+
+function providerPolicyId(provider: MaterialProductProvider) {
+  if (provider.id === "handoff") return "handoff" as const;
+  if (provider.id === "home_depot_official") return "home_depot_official" as const;
+  if (provider.id === "lowes_official") return "lowes_official" as const;
+  return "authorized_supplier" as const;
+}
 
 export function materialProviderStatus() {
   return providers.map((provider) => ({
     id: provider.id,
     enabled:
       provider.enabled &&
-      materialSourceById(provider.id === "handoff" ? "handoff" : "authorized_supplier")?.liveAccessConfirmed === true,
+      materialSourceById(providerPolicyId(provider))?.liveAccessConfirmed === true,
   }));
 }
 
@@ -28,9 +41,9 @@ export async function searchAuthorizedMaterialProviders(
   location?: ProviderLocation,
 ): Promise<ProviderResult<ProviderProduct[]>> {
   const active = providers.filter((provider) => {
-    const policy = materialSourceById(
-      provider.id === "handoff" ? "handoff" : "authorized_supplier",
-    );
+    const policy = materialSourceById(providerPolicyId(provider));
+    // Both the runtime adapter and reviewed source policy must be enabled. An
+    // environment variable alone can never turn an unapproved provider live.
     return provider.enabled && policy?.liveAccessConfirmed === true;
   });
   if (!active.length)

@@ -396,7 +396,7 @@ export function ManagerDocumentReview({
       router.push(`/admin/supplier-quotes/${result.data.quoteId}`);
     });
   }
-  function routeQuote(destination: "comparison" | "client") {
+  function routeQuote(destination: "comparison" | "client", lineId?: string) {
     if (selectionChanged) {
       setError("Save and approve the edited review before routing it.");
       return;
@@ -405,6 +405,7 @@ export function ManagerDocumentReview({
       const routed = await routeManagerDocumentToSupplierPricingAction(
         document.id,
         comparisonRequestId || undefined,
+        lineId ? [lineId] : undefined,
       );
       if (!routed.ok) {
         setError(routed.error);
@@ -703,23 +704,40 @@ export function ManagerDocumentReview({
                   Request for quote compare
                   <select
                     value={comparisonRequestId}
-                    onChange={(event) => setComparisonRequestId(event.target.value)}
+                    onChange={(event) =>
+                      setComparisonRequestId(event.target.value)
+                    }
                     className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-950"
                   >
                     <option value="">Choose a material request</option>
-                    {requests.map((request) => <option key={request.id} value={request.id}>{request.label}</option>)}
+                    {requests.map((request) => (
+                      <option key={request.id} value={request.id}>
+                        {request.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <button
                   type="button"
                   onClick={() => routeQuote("comparison")}
-                  disabled={!canApprove || pending || !approved || !selectedLines.length || !comparisonRequestId || selectionChanged}
+                  disabled={
+                    !canApprove ||
+                    pending ||
+                    !approved ||
+                    !selectedLines.length ||
+                    !comparisonRequestId ||
+                    selectionChanged
+                  }
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-violet-700 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Columns3 className="h-4 w-4" />
                   Add to Quote Compare
                 </button>
-                {selectionChanged ? <p className="text-[11px] font-semibold text-amber-800 sm:col-span-2">Save and approve the changed selection first.</p> : null}
+                {selectionChanged ? (
+                  <p className="text-[11px] font-semibold text-amber-800 sm:col-span-2">
+                    Save and approve the changed selection first.
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -826,6 +844,27 @@ export function ManagerDocumentReview({
                               >
                                 {rowImportNotice.message}
                               </span>
+                            ) : null}
+                            {supplierDocument ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  routeQuote("comparison", line.id)
+                                }
+                                disabled={
+                                  !canApprove ||
+                                  pending ||
+                                  !approved ||
+                                  !comparisonRequestId ||
+                                  !line.selected ||
+                                  selectionChanged
+                                }
+                                aria-label={`Add ${line.description || `line ${index + 1}`} to Quote Compare`}
+                                className="inline-flex min-h-10 w-40 items-center justify-center gap-1.5 rounded-md border border-violet-300 bg-white px-2.5 font-bold text-violet-800 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                <Columns3 className="h-3.5 w-3.5" />
+                                Add to Compare
+                              </button>
                             ) : null}
                           </div>
                         </td>

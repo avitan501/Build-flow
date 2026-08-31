@@ -10,7 +10,7 @@ import {
 } from "../lib/material-intelligence/source-registry";
 
 test("unlicensed providers fail closed and do not claim live access", () => {
-  for (const id of ["handoff", "authorized_supplier", "dds", "idea_connector", "tra_ser"] as const) {
+  for (const id of ["handoff", "home_depot_official", "lowes_official", "authorized_supplier", "dds", "idea_connector", "tra_ser"] as const) {
     const source = materialSourceById(id);
     expect(source).toBeTruthy();
     expect(source?.enabledByDefault).toBe(false);
@@ -74,7 +74,19 @@ test("default registry contains only controlled public or internal evidence", ()
     "avantia_history",
   ]);
   expect(sourcesWithCapability("private_price").map((source) => source.id)).toEqual([
+    "lowes_official",
     "authorized_supplier",
     "approved_supplier_document",
   ]);
+});
+
+test("official retailer paths retain their real external approval boundary", () => {
+  const homeDepot = materialSourceById("home_depot_official")!;
+  const lowes = materialSourceById("lowes_official")!;
+  const handoff = materialSourceById("handoff")!;
+  expect(homeDepot.documentation[0]?.url).toContain("homedepot.com");
+  expect(homeDepot.licenseOrAccessRequirement).toContain("Impact");
+  expect(lowes.documentation.some((entry) => entry.url === "https://developer.lowes.com/")).toBe(true);
+  expect(lowes.licenseOrAccessRequirement).toContain("X-Client-Id");
+  expect(handoff.documentation.some((entry) => entry.supports.includes("does not currently offer an API"))).toBe(true);
 });

@@ -42,6 +42,7 @@ import {
 } from "../_shared/sms-reply-policy.ts";
 import { isExplicitCustomerRequestConfirmation } from "../_shared/customer-request-confirmation.ts";
 import {
+  activeRequestUpdateReply,
   additionalItemPrompt,
   additionalItemsQuestion,
   customerFinishedMaterialList,
@@ -1209,10 +1210,15 @@ async function loadPersistedSmsOrderState(
         list_complete: boolean;
       }[]
     >`
-      select id, language, exact_list_only, last_asked_slots, list_complete
-      from public.aura_sms_request_states
-      where normalized_phone = ${phone} and status in ('collecting', 'awaiting_confirmation')
-      order by updated_at desc limit 1
+      select state.id, state.language, state.exact_list_only, state.last_asked_slots, state.list_complete
+      from public.aura_sms_request_states as state
+      left join public.quote_requests as request on request.id = state.created_request_id
+      where state.normalized_phone = ${phone}
+        and (
+          state.status in ('collecting', 'awaiting_confirmation')
+          or (state.status = 'confirmed' and request.status <> 'closed')
+        )
+      order by state.updated_at desc limit 1
     `;
     const state = states[0];
     if (!state) return null;
@@ -1294,14 +1300,20 @@ async function persistSmsOrderState(params: {
   event: CustomerSmsEvent;
   latestMessage: string;
   listComplete: boolean;
+  resetListComplete?: boolean;
 }) {
   if (!params.result.isMaterialRequest || !params.result.request?.items.length)
     return;
   await sql.begin(async (transaction) => {
     const rows = await transaction<{ id: string }[]>`
-      select id from public.aura_sms_request_states
-      where normalized_phone = ${params.phone} and status in ('collecting', 'awaiting_confirmation')
-      order by updated_at desc limit 1 for update
+      select state.id from public.aura_sms_request_states as state
+      left join public.quote_requests as request on request.id = state.created_request_id
+      where state.normalized_phone = ${params.phone}
+        and (
+          state.status in ('collecting', 'awaiting_confirmation')
+          or (state.status = 'confirmed' and request.status <> 'closed')
+        )
+      order by state.updated_at desc limit 1 for update of state
     `;
     let stateId = rows[0]?.id;
     if (!stateId) {
@@ -1318,7 +1330,10 @@ async function persistSmsOrderState(params: {
           contact_id = coalesce(${params.contactId}, contact_id),
           language = ${smsMessageLanguage(params.latestMessage)},
           exact_list_only = exact_list_only or ${params.exactListOnly},
-          list_complete = list_complete or ${params.listComplete},
+          list_complete = case
+            when ${params.resetListComplete === true} then false
+            else list_complete or ${params.listComplete}
+          end,
           last_event = ${params.event},
           last_inbound_communication_id = ${params.communicationId}::uuid,
           last_asked_slots = ${askedSlotsFromReply(params.result.reply)},
@@ -2509,7 +2524,9 @@ async function loadDraftCommonMaterialDefinitions() {
       compatibilityBlockers: Array.isArray(row.compatibility_blockers)
         ? row.compatibility_blockers.map(String)
         : [],
-      synonyms: [...new Set([...(row.search_synonyms || []), ...(row.aliases || [])])],
+      synonyms: [
+        ...new Set([...(row.search_synonyms || []), ...(row.aliases || [])]),
+      ],
       commonUnit: row.common_unit || "each",
       commonUse: row.common_use || "",
       region: row.regional_relevance,
@@ -2551,7 +2568,13 @@ async function runMaterialShadowAssessment(communicationId: string) {
   const target = targets[0];
   if (!target) return;
   const messages = await sql<
-    { id: string; direction: string; body: string | null; occurred_at: string; created_at: string }[]
+    {
+      id: string;
+      direction: string;
+      body: string | null;
+      occurred_at: string;
+      created_at: string;
+    }[]
   >`
     select id, direction, body, occurred_at, created_at
     from public.aura_communications
@@ -2594,12 +2617,13 @@ async function runMaterialShadowAssessment(communicationId: string) {
   const recognized = definitions.find(
     (entry) => entry.definition.key === assessment.commonMaterialKey,
   );
-  const sources = recognized?.definition.evidenceSources.map((source) => ({
-    publisher: source.publisher,
-    sourceUrl: source.sourceUrl || null,
-    supportsClaim: source.supportsClaim,
-    verifiedAt: source.verifiedAt || null,
-  })) || [];
+  const sources =
+    recognized?.definition.evidenceSources.map((source) => ({
+      publisher: source.publisher,
+      sourceUrl: source.sourceUrl || null,
+      supportsClaim: source.supportsClaim,
+      verifiedAt: source.verifiedAt || null,
+    })) || [];
   await sql`
     insert into public.aura_material_shadow_assessments (
       communication_id, contact_id, normalized_phone, channel,
@@ -3491,20 +3515,18 @@ async function smsCustomerProfile(phone: string, name: string) {
       !/^\+?[0-9 ()-]+$/.test(currentName)
         ? currentName
         : phone);
-    const saved = await admin
-      .from("profiles")
-      .upsert(
-        {
-          id: authUsers[0].id,
-          email: authUsers[0].email || "",
-          full_name: fullName,
-          phone,
-          role: "client",
-          approval_status: "pending",
-          is_active: true,
-        },
-        { onConflict: "id" },
-      );
+    const saved = await admin.from("profiles").upsert(
+      {
+        id: authUsers[0].id,
+        email: authUsers[0].email || "",
+        full_name: fullName,
+        phone,
+        role: "client",
+        approval_status: "pending",
+        is_active: true,
+      },
+      { onConflict: "id" },
+    );
     if (saved.error) throw new Error("customer_profile_update_failed");
     return authUsers[0].id;
   }
@@ -3551,20 +3573,18 @@ async function smsCustomerProfile(phone: string, name: string) {
     if (raced[0]) return raced[0].id;
     throw new Error("customer_profile_creation_failed");
   }
-  const saved = await admin
-    .from("profiles")
-    .upsert(
-      {
-        id: created.data.user.id,
-        email: "",
-        full_name: name,
-        phone,
-        role: "client",
-        approval_status: "pending",
-        is_active: true,
-      },
-      { onConflict: "id" },
-    );
+  const saved = await admin.from("profiles").upsert(
+    {
+      id: created.data.user.id,
+      email: "",
+      full_name: name,
+      phone,
+      role: "client",
+      approval_status: "pending",
+      is_active: true,
+    },
+    { onConflict: "id" },
+  );
   if (saved.error) throw new Error("customer_profile_creation_failed");
   return created.data.user.id;
 }
@@ -3809,6 +3829,224 @@ async function confirmPendingSmsRequest(
   return result;
 }
 
+type ActiveSubmittedSmsRequest = {
+  stateId: string;
+  requestId: string;
+  projectId: string;
+  ownerId: string;
+  title: string;
+  status: string;
+  customerName: string;
+  customerAddress: string;
+  originalMessage: string;
+  sourceCommunicationIds: string[];
+  exactListOnly: boolean;
+  deliveryAddressKnown: boolean;
+  items: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    unit: string;
+    department: string;
+  }>;
+};
+
+async function loadActiveSubmittedSmsRequest(
+  phone: string,
+): Promise<ActiveSubmittedSmsRequest | null> {
+  const rows = await sql<
+    {
+      state_id: string;
+      request_id: string;
+      project_id: string;
+      owner_id: string;
+      title: string;
+      status: string;
+      customer_name: string | null;
+      customer_address: string | null;
+      original_message: string | null;
+      source_communication_ids: string[] | null;
+      exact_list_only: boolean | null;
+      delivery_address_known: boolean | null;
+    }[]
+  >`
+    select state.id as state_id, request.id as request_id,
+      request.project_id, request.owner_id, request.title, request.status,
+      draft.customer_name, coalesce(access.delivery_address, project.address, draft.customer_address) as customer_address,
+      draft.original_message, draft.source_communication_ids,
+      state.exact_list_only, (coalesce(access.delivery_address, project.address, draft.customer_address) is not null) as delivery_address_known
+    from public.aura_sms_request_states as state
+    join public.quote_requests as request on request.id = state.created_request_id
+    join public.projects as project on project.id = request.project_id
+    left join public.customer_request_portal_access as access on access.request_id = request.id
+    left join lateral (
+      select customer_name, customer_address, original_message, source_communication_ids
+      from public.aura_sms_request_drafts
+      where created_request_id = request.id
+      order by updated_at desc limit 1
+    ) as draft on true
+    where state.normalized_phone = ${phone}
+      and state.status = 'confirmed'
+      and request.status <> 'closed'
+    order by state.updated_at desc limit 1
+  `;
+  const active = rows[0];
+  if (!active) return null;
+  const items = await sql<
+    {
+      id: string;
+      name: string;
+      quantity: number;
+      unit: string;
+      department: string;
+    }[]
+  >`
+    select id, name, quantity::float8 as quantity, unit, department
+    from public.quote_request_items
+    where request_id = ${active.request_id}::uuid
+    order by created_at, id
+  `;
+  return {
+    stateId: active.state_id,
+    requestId: active.request_id,
+    projectId: active.project_id,
+    ownerId: active.owner_id,
+    title: active.title,
+    status: active.status,
+    customerName: active.customer_name || phone,
+    customerAddress: active.customer_address || "",
+    originalMessage: active.original_message || "",
+    sourceCommunicationIds: Array.isArray(active.source_communication_ids)
+      ? active.source_communication_ids
+      : [],
+    exactListOnly: active.exact_list_only === true,
+    deliveryAddressKnown: active.delivery_address_known === true,
+    items,
+  };
+}
+
+function normalizedRequestItemName(name: string) {
+  return name
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+async function syncActiveSubmittedSmsRequest(input: {
+  active: ActiveSubmittedSmsRequest;
+  communicationId: string;
+  phone: string;
+  customerEvent: CustomerSmsEvent;
+  customerAddress: string | null;
+  request: NonNullable<CustomerSmsAutomation["request"]>;
+  sourceCommunicationIds: string[];
+}) {
+  return sql.begin(async (transaction) => {
+    const locked = await transaction<{ id: string; status: string }[]>`
+      select id, status from public.quote_requests
+      where id = ${input.active.requestId}::uuid for update
+    `;
+    if (!locked[0] || locked[0].status === "closed") return false;
+    const existing = await transaction<
+      {
+        id: string;
+        name: string;
+        quantity: number;
+        unit: string;
+      }[]
+    >`
+      select id, name, quantity::float8 as quantity, unit
+      from public.quote_request_items
+      where request_id = ${input.active.requestId}::uuid
+      order by created_at, id
+      for update
+    `;
+    const byName = new Map(
+      existing.map((item) => [normalizedRequestItemName(item.name), item]),
+    );
+    const alignCorrectionByOrdinal =
+      input.customerEvent === "correction" &&
+      existing.length === input.request.items.length;
+    for (const [index, item] of input.request.items.slice(0, 50).entries()) {
+      const matched =
+        byName.get(normalizedRequestItemName(item.name)) ||
+        (alignCorrectionByOrdinal ? existing[index] : undefined);
+      if (matched) {
+        await transaction`
+          update public.quote_request_items set
+            name = ${String(item.name).slice(0, 300)},
+            department = ${input.request.department.slice(0, 100)},
+            quantity = ${Number(item.quantity) || 1},
+            unit = ${String(item.unit || "each").slice(0, 40)},
+            qualification_status = 'pending',
+            metadata = coalesce(metadata, '{}'::jsonb) || ${sql.json({
+              customer_sms_update: true,
+              latest_source_communication_id: input.communicationId,
+            })},
+            updated_at = now()
+          where id = ${matched.id}::uuid
+        `;
+      } else {
+        await transaction`
+          insert into public.quote_request_items
+            (request_id, project_id, owner_id, name, department, item_type, quantity, unit, unit_price, qualification_status, metadata)
+          values (
+            ${input.active.requestId}::uuid, ${input.active.projectId}::uuid,
+            ${input.active.ownerId}::uuid, ${String(item.name).slice(0, 300)},
+            ${input.request.department.slice(0, 100)}, 'custom_priced',
+            ${Number(item.quantity) || 1}, ${String(item.unit || "each").slice(0, 40)},
+            0, 'pending', ${sql.json({
+              created_from_customer_sms_update: true,
+              source_communication_id: input.communicationId,
+            })}
+          )
+        `;
+      }
+    }
+    if (input.customerAddress?.trim()) {
+      await transaction`
+        update public.customer_request_portal_access
+        set delivery_address = ${input.customerAddress.trim().slice(0, 500)}, updated_at = now()
+        where request_id = ${input.active.requestId}::uuid
+      `;
+    }
+    await transaction`
+      update public.quote_requests set updated_at = now()
+      where id = ${input.active.requestId}::uuid
+    `;
+    await transaction`
+      update public.aura_sms_request_drafts set
+        customer_address = coalesce(${input.customerAddress?.trim() || null}, customer_address),
+        title = ${input.request.title.slice(0, 180)},
+        department = ${input.request.department.slice(0, 100)},
+        items = ${sql.json(input.request.items)},
+        source_communication_ids = ${sql.json(input.sourceCommunicationIds)},
+        review_note = 'Customer updated the submitted request by SMS. Review the changed values.',
+        updated_at = now()
+      where created_request_id = ${input.active.requestId}::uuid
+    `;
+    await transaction`
+      insert into public.aura_communication_links
+        (communication_id, entity_type, entity_id, entity_label, link_source, confidence)
+      values (
+        ${input.communicationId}::uuid, 'material_request', ${input.active.requestId},
+        ${input.request.title.slice(0, 180)}, 'automatic', 1
+      )
+      on conflict (communication_id, entity_type, entity_id) do nothing
+    `;
+    await transaction`
+      insert into public.aura_audit_log (action, details)
+      values ('sms_customer_updated_open_request', ${sql.json({
+        communicationId: input.communicationId,
+        requestId: input.active.requestId,
+        event: input.customerEvent,
+        itemCount: input.request.items.length,
+      })})
+    `;
+    return true;
+  });
+}
+
 async function processCustomerSmsAutomation(
   communicationId: string,
   phone: string,
@@ -3839,7 +4077,7 @@ async function processCustomerSmsAutomation(
       and source_communication_id <> ${communicationId}::uuid
       and status in ('pending', 'processing')
   `;
-  const startsNewRequest = smsStartsNewMaterialRequest(body);
+  const explicitlyStartsNewRequest = smsStartsNewMaterialRequest(body);
   if (isSmsOptOutMessage(body)) {
     await sql`
       update public.aura_sms_request_pending_confirmations
@@ -3869,6 +4107,13 @@ async function processCustomerSmsAutomation(
     `;
   }
   if (await confirmPendingSmsRequest(communicationId, phone, body)) return;
+  // A customer-confirmed request remains the active SMS request until a
+  // manager explicitly changes the quote request status to `closed`. Even an
+  // explicit "new request" message is appended to that request while it is
+  // open, so a customer cannot accidentally create duplicate requests.
+  const activeSubmittedRequest = await loadActiveSubmittedSmsRequest(phone);
+  const startsNewRequest =
+    explicitlyStartsNewRequest && !activeSubmittedRequest;
   const settings = await loadSmsAiSettings();
   const needsAiReply =
     settings.enabled && contact && contact.sms_ai_mode !== "off";
@@ -3972,18 +4217,27 @@ async function processCustomerSmsAutomation(
     customerEvent === "correction" && Boolean(openDraft);
   const exactListOnly = resolveSmsExactListPreference({
     storedContact: contact?.exact_list_only,
-    storedDraft: openDraft?.exact_list_only,
+    storedDraft:
+      openDraft?.exact_list_only || activeSubmittedRequest?.exactListOnly,
     latestMessage: body,
   });
   const deliveryAddressKnown = resolveSmsDeliveryAddressKnown({
-    storedDraft: openDraft?.delivery_address_known,
+    storedDraft:
+      openDraft?.delivery_address_known ||
+      activeSubmittedRequest?.deliveryAddressKnown,
     latestMessage: body,
     startsNewRequest,
   });
   if (exactListOnly && !contact?.exact_list_only && contact?.id) {
     await sql`update public.aura_contacts set exact_list_only = true where id = ${contact.id}::uuid`;
   }
-  if (!needsAiReply && !likelyMaterialList(body) && !openDraft) return;
+  if (
+    !needsAiReply &&
+    !likelyMaterialList(body) &&
+    !openDraft &&
+    !activeSubmittedRequest
+  )
+    return;
   const context = await smsConversationContext(phone);
   if (inferredParticipantRole(context.customerText || body) === "supplier") {
     await sql`
@@ -3998,8 +4252,10 @@ async function processCustomerSmsAutomation(
   const activeCustomerText = startsNewRequest
     ? body
     : context.customerText || body;
-  const reviewText = openDraft?.original_message
-    ? `${openDraft.original_message}\n${body}`
+  const priorRequestMessage =
+    openDraft?.original_message || activeSubmittedRequest?.originalMessage;
+  const reviewText = priorRequestMessage
+    ? `${priorRequestMessage}\n${body}`
     : activeCustomerText;
   const effectiveBody = body.trim() || "[Image attached]";
   const replyContext = startsNewRequest
@@ -4045,7 +4301,7 @@ async function processCustomerSmsAutomation(
   // full conversation so the structured draft advances instead of falling back
   // or confirming stale item details.
   if (
-    openDraft &&
+    (openDraft || activeSubmittedRequest) &&
     customerEvent === "message" &&
     !analyzed.result.isMaterialRequest
   ) {
@@ -4064,22 +4320,26 @@ async function processCustomerSmsAutomation(
   }
   const { result, model, intent, metrics, promptVersion } = analyzed;
   if (result.request && customerEvent === "correction") {
-    const previousItems =
-      persistedOrderState?.items?.length
-        ? persistedOrderState.items.map((item) => ({
+    const previousItems = persistedOrderState?.items?.length
+      ? persistedOrderState.items.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          quantityExplicit: true,
+        }))
+      : Array.isArray(openDraft?.items)
+        ? openDraft.items.map((item) => ({
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            quantityExplicit: item.quantityExplicit ?? true,
+          }))
+        : activeSubmittedRequest?.items.map((item) => ({
             name: item.name,
             quantity: item.quantity,
             unit: item.unit,
             quantityExplicit: true,
-          }))
-        : Array.isArray(openDraft?.items)
-          ? openDraft.items.map((item) => ({
-              name: item.name,
-              quantity: item.quantity,
-              unit: item.unit,
-              quantityExplicit: item.quantityExplicit ?? true,
-            }))
-          : [];
+          })) || [];
     result.request.items = mergeSmsCorrectionItems(
       previousItems,
       result.request.items,
@@ -4097,7 +4357,8 @@ async function processCustomerSmsAutomation(
   const mayAskMaterialQuestion =
     customerEvent === "message" || preConfirmationCorrection;
   const clarificationQuestions =
-    mayAskMaterialQuestion && (result.isMaterialRequest || Boolean(openDraft))
+    mayAskMaterialQuestion &&
+    (result.isMaterialRequest || Boolean(openDraft || activeSubmittedRequest))
       ? materialIntelligence.questions.slice(0, 1)
       : [];
   if (clarificationQuestions.length) {
@@ -4122,7 +4383,8 @@ async function processCustomerSmsAutomation(
   const askedForAnotherItem =
     previouslyAskedForMore && customerWantsAnotherItem(effectiveBody);
   const canAdvanceIntake =
-    (result.isMaterialRequest || Boolean(openDraft)) &&
+    (result.isMaterialRequest ||
+      Boolean(openDraft || activeSubmittedRequest)) &&
     customerEvent !== "cancellation" &&
     clarificationQuestions.length === 0;
   if (canAdvanceIntake && !listComplete) {
@@ -4186,6 +4448,63 @@ async function processCustomerSmsAutomation(
     `;
     return;
   }
+  let activeRequestSynced = false;
+  let activeUpdateKind: "item" | "correction" | "address" | null = null;
+  if (
+    activeSubmittedRequest &&
+    customerEvent !== "cancellation" &&
+    !customerFinishedMaterialList(effectiveBody) &&
+    !customerWantsAnotherItem(effectiveBody) &&
+    (result.request || result.customerAddress)
+  ) {
+    const activeUpdateRequest =
+      result.request ||
+      ({
+        title: activeSubmittedRequest.title,
+        department:
+          activeSubmittedRequest.items[0]?.department || "General conditions",
+        items: activeSubmittedRequest.items.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          quantityExplicit: true,
+        })),
+      } satisfies NonNullable<CustomerSmsAutomation["request"]>);
+    const activeSources = await activeSmsRequestSourceIds(
+      phone,
+      communicationId,
+      activeSubmittedRequest.sourceCommunicationIds,
+    );
+    activeRequestSynced = await syncActiveSubmittedSmsRequest({
+      active: activeSubmittedRequest,
+      communicationId,
+      phone,
+      customerEvent,
+      customerAddress: result.customerAddress,
+      request: activeUpdateRequest,
+      sourceCommunicationIds: activeSources,
+    });
+    if (activeRequestSynced && clarificationQuestions.length === 0) {
+      activeUpdateKind =
+        result.customerAddress && !likelyMaterialList(body)
+          ? "address"
+          : customerEvent === "correction"
+            ? "correction"
+            : "item";
+      result.reply = activeRequestUpdateReply(effectiveBody, activeUpdateKind);
+      result.autoSafe = true;
+      safety = evaluateSmsReplyGate({
+        message: effectiveBody,
+        reply: result.reply,
+        intent: "greeting",
+        event: "message",
+        participantRole: result.participantRole || "lead",
+        modelAutoSafe: true,
+        exactListOnly,
+        protectedTopic: hasForbiddenAutoReplyTopic(effectiveBody),
+      });
+    }
+  }
   const modelAutoSafe = result.autoSafe;
   result.autoSafe = safety.gateAutoSafe;
   result.safetyReason =
@@ -4203,6 +4522,9 @@ async function processCustomerSmsAutomation(
       event: customerEvent,
       latestMessage: effectiveBody,
       listComplete,
+      resetListComplete:
+        activeRequestSynced &&
+        (activeUpdateKind === "item" || activeUpdateKind === "correction"),
     });
   } catch (stateError) {
     console.error(
@@ -4210,7 +4532,10 @@ async function processCustomerSmsAutomation(
       stateError instanceof Error ? stateError.message : "unknown error",
     );
   }
-  if (result.isMaterialRequest || Boolean(openDraft)) {
+  if (
+    result.isMaterialRequest ||
+    Boolean(openDraft || activeSubmittedRequest)
+  ) {
     try {
       await sql`
         insert into public.aura_material_intelligence_evaluations
@@ -4270,6 +4595,7 @@ async function processCustomerSmsAutomation(
   if (
     result.isMaterialRequest &&
     result.request &&
+    !activeSubmittedRequest &&
     settings.autoCreateRequestDrafts &&
     (contact?.auto_create_request_drafts ?? true)
   ) {
@@ -4331,6 +4657,12 @@ async function processCustomerSmsAutomation(
         intelligenceAssessment: materialIntelligence,
       });
     }
+  }
+  if (activeRequestSynced) {
+    // The request itself is already submitted. Customer additions and
+    // corrections stay attached to it until a manager closes it; they never
+    // create another confirmation or request.
+    confirmationPrepared = false;
   }
   if (confirmationPrepared) return;
   if (!needsAiReply) return;

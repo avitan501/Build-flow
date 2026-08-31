@@ -130,19 +130,59 @@ async function ensureDocumentRequestComparison(
     .from("quote_requests")
     .select("id,title,project_id,owner_id")
     .eq("id", requestId)
-    .maybeSingle<{ id: string; title: string; project_id: string; owner_id: string }>();
-  if (requestError || !request) throw requestError || new Error("Request not found");
+    .maybeSingle<{
+      id: string;
+      title: string;
+      project_id: string;
+      owner_id: string;
+    }>();
+  if (requestError || !request)
+    throw requestError || new Error("Request not found");
 
-  const [{ data: profile }, { data: project }, { data: allItems, error: itemsError }] = await Promise.all([
-    supabase.from("profiles").select("full_name,email").eq("id", request.owner_id).maybeSingle<{ full_name: string | null; email: string | null }>(),
-    supabase.from("projects").select("name,address").eq("id", request.project_id).maybeSingle<{ name: string; address: string | null }>(),
-    supabase.from("quote_request_items").select("name,quantity,unit,department,metadata").eq("request_id", request.id).order("created_at").returns<Array<{ name: string; quantity: number; unit: string | null; department: string; metadata: Record<string, unknown> | null }>>(),
+  const [
+    { data: profile },
+    { data: project },
+    { data: allItems, error: itemsError },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name,email")
+      .eq("id", request.owner_id)
+      .maybeSingle<{ full_name: string | null; email: string | null }>(),
+    supabase
+      .from("projects")
+      .select("name,address")
+      .eq("id", request.project_id)
+      .maybeSingle<{ name: string; address: string | null }>(),
+    supabase
+      .from("quote_request_items")
+      .select("name,quantity,unit,department,metadata")
+      .eq("request_id", request.id)
+      .order("created_at")
+      .returns<
+        Array<{
+          name: string;
+          quantity: number;
+          unit: string | null;
+          department: string;
+          metadata: Record<string, unknown> | null;
+        }>
+      >(),
   ]);
   if (itemsError) throw itemsError;
-  const organized = (allItems ?? []).filter((item) => item.metadata?.ai_organized === true);
-  const requestItems = organized.length ? organized : (allItems ?? []).filter((item) => item.metadata?.ai_organized !== true);
-  const department = normalizeMaterialCatalogDepartment(requestItems[0]?.department || fallbackDepartment);
-  const clientName = clean(profile?.full_name || profile?.email || "Client", 200);
+  const organized = (allItems ?? []).filter(
+    (item) => item.metadata?.ai_organized === true,
+  );
+  const requestItems = organized.length
+    ? organized
+    : (allItems ?? []).filter((item) => item.metadata?.ai_organized !== true);
+  const department = normalizeMaterialCatalogDepartment(
+    requestItems[0]?.department || fallbackDepartment,
+  );
+  const clientName = clean(
+    profile?.full_name || profile?.email || "Client",
+    200,
+  );
   const caseNumber = request.id.replaceAll("-", "").slice(0, 8).toUpperCase();
   const { data: comparison, error: comparisonError } = await supabase
     .from("quote_comparisons")
@@ -159,19 +199,23 @@ async function ensureDocumentRequestComparison(
     })
     .select("id")
     .single<{ id: string }>();
-  if (comparisonError || !comparison) throw comparisonError || new Error("Comparison not created");
+  if (comparisonError || !comparison)
+    throw comparisonError || new Error("Comparison not created");
 
   if (requestItems.length) {
-    const { error: seedError } = await supabase.from("quote_comparison_items").insert(
-      requestItems.slice(0, 500).map((item, index) => ({
-        comparison_id: comparison.id,
-        description: clean(item.name, 500) || `Requested material ${index + 1}`,
-        specification: clean(item.department, 1000),
-        quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 1,
-        unit: clean(item.unit, 40) || "each",
-        sort_order: index,
-      })),
-    );
+    const { error: seedError } = await supabase
+      .from("quote_comparison_items")
+      .insert(
+        requestItems.slice(0, 500).map((item, index) => ({
+          comparison_id: comparison.id,
+          description:
+            clean(item.name, 500) || `Requested material ${index + 1}`,
+          specification: clean(item.department, 1000),
+          quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 1,
+          unit: clean(item.unit, 40) || "each",
+          sort_order: index,
+        })),
+      );
     if (seedError) {
       await supabase.from("quote_comparisons").delete().eq("id", comparison.id);
       throw seedError;
@@ -1105,10 +1149,19 @@ export async function retryManagerDocumentExtractionAction(
 export async function routeManagerDocumentToSupplierPricingAction(
   documentId: string,
   requestId?: string,
+  itemIds?: string[],
 ): Promise<Result<{ quoteId: string; itemIds: string[] }>> {
   const { supabase, user } = await requireStaffProfile("suppliers");
   if (!UUID_PATTERN.test(documentId))
     return { ok: false, error: "Invalid document." };
+  const requestedItemIds = itemIds
+    ? [...new Set(itemIds.filter((itemId) => UUID_PATTERN.test(itemId)))].slice(
+        0,
+        200,
+      )
+    : null;
+  if (itemIds && requestedItemIds?.length !== itemIds.length)
+    return { ok: false, error: "Invalid quote product selection." };
   const { data: document } = await supabase
     .from("manager_documents")
     .select("*")
@@ -1129,14 +1182,21 @@ export async function routeManagerDocumentToSupplierPricingAction(
       );
     } catch (error) {
       console.error("Document request comparison link failed", error);
-      return { ok: false, error: "The selected material request could not be opened for quote comparison." };
+      return {
+        ok: false,
+        error:
+          "The selected material request could not be opened for quote comparison.",
+      };
     }
     const linked = await supabase
       .from("manager_documents")
       .update({ request_id: selectedRequestId, updated_by: user.id })
       .eq("id", documentId);
     if (linked.error)
-      return { ok: false, error: "The document could not be linked to that material request." };
+      return {
+        ok: false,
+        error: "The document could not be linked to that material request.",
+      };
   }
   if (!["ready", "routed"].includes(document.status))
     return {
@@ -1146,7 +1206,9 @@ export async function routeManagerDocumentToSupplierPricingAction(
     };
   if (document.legacy_supplier_quote_id) {
     if (selectedComparisonId) {
-      const { data: supplierRows } = await supabase.rpc("staff_load_catalog_suppliers");
+      const { data: supplierRows } = await supabase.rpc(
+        "staff_load_catalog_suppliers",
+      );
       const match = detectSupplierMatch(
         Array.isArray(supplierRows) ? (supplierRows as CatalogSupplier[]) : [],
         document.party_name,
@@ -1156,12 +1218,111 @@ export async function routeManagerDocumentToSupplierPricingAction(
         .from("supplier_quotes")
         .update({
           comparison_id: selectedComparisonId,
-          ...(match ? { supplier_id: match.id, supplier_name: match.name } : {}),
+          ...(match
+            ? { supplier_id: match.id, supplier_name: match.name }
+            : {}),
           updated_by: user.id,
         })
         .eq("id", document.legacy_supplier_quote_id);
       if (quoteUpdate.error)
-        return { ok: false, error: "The existing supplier quote could not be linked to that comparison." };
+        return {
+          ok: false,
+          error:
+            "The existing supplier quote could not be linked to that comparison.",
+        };
+    }
+    if (requestedItemIds) {
+      const { data: requestedDocumentItems, error: requestedItemsError } =
+        await supabase
+          .from("manager_document_items")
+          .select("*")
+          .eq("document_id", documentId)
+          .eq("selected", true)
+          .in("id", requestedItemIds)
+          .returns<ManagerDocumentItemRecord[]>();
+      if (
+        requestedItemsError ||
+        requestedDocumentItems?.length !== requestedItemIds.length
+      )
+        return {
+          ok: false,
+          error: "The selected document product could not be matched.",
+        };
+      const { data: existingQuoteItems, error: existingItemsError } =
+        await supabase
+          .from("supplier_quote_items")
+          .select("id,line_number,item_code,description")
+          .eq("quote_id", document.legacy_supplier_quote_id)
+          .order("line_number")
+          .returns<
+            Array<{
+              id: string;
+              line_number: number;
+              item_code: string;
+              description: string;
+            }>
+          >();
+      if (existingItemsError)
+        return {
+          ok: false,
+          error: "The linked supplier pricing rows could not be loaded.",
+        };
+      const linkedIds: string[] = [];
+      let nextLineNumber = Math.max(
+        0,
+        ...(existingQuoteItems ?? []).map((item) => item.line_number),
+      );
+      for (const item of requestedDocumentItems) {
+        const itemCode = clean(item.item_code, 160).toLocaleLowerCase();
+        const description = clean(item.description, 500).toLocaleLowerCase();
+        const matched = (existingQuoteItems ?? []).find(
+          (candidate) =>
+            (itemCode &&
+              clean(candidate.item_code, 160).toLocaleLowerCase() ===
+                itemCode) ||
+            (description &&
+              clean(candidate.description, 500).toLocaleLowerCase() ===
+                description) ||
+            candidate.line_number === item.line_number,
+        );
+        if (matched) {
+          linkedIds.push(matched.id);
+          continue;
+        }
+        nextLineNumber += 1;
+        const { data: inserted, error: insertError } = await supabase
+          .from("supplier_quote_items")
+          .insert({
+            quote_id: document.legacy_supplier_quote_id,
+            line_number: nextLineNumber,
+            item_code: item.item_code,
+            description: item.description,
+            specification: item.specification,
+            quantity: item.quantity || 1,
+            unit: item.unit || "each",
+            unit_price: item.unit_price,
+            line_total: item.line_total,
+            selected: true,
+            review_status: "ready",
+          })
+          .select("id")
+          .single<{ id: string }>();
+        if (insertError || !inserted)
+          return {
+            ok: false,
+            error:
+              "The selected product could not be added to supplier pricing.",
+          };
+        linkedIds.push(inserted.id);
+      }
+      return {
+        ok: true,
+        data: {
+          quoteId: document.legacy_supplier_quote_id,
+          itemIds: linkedIds,
+        },
+        message: "Supplier pricing is already linked.",
+      };
     }
     const { data: linkedItems, error: linkedItemsError } = await supabase
       .from("supplier_quote_items")
@@ -1184,13 +1345,14 @@ export async function routeManagerDocumentToSupplierPricingAction(
       message: "Supplier pricing is already linked.",
     };
   }
-  const { data: items } = await supabase
+  const itemsQuery = supabase
     .from("manager_document_items")
     .select("*")
     .eq("document_id", documentId)
     .eq("selected", true)
-    .order("line_number")
-    .returns<ManagerDocumentItemRecord[]>();
+    .order("line_number");
+  const { data: items } =
+    await itemsQuery.returns<ManagerDocumentItemRecord[]>();
   if (!items?.length)
     return {
       ok: false,
@@ -1243,7 +1405,8 @@ export async function routeManagerDocumentToSupplierPricingAction(
       console.error("Document request comparison creation failed", error);
       return {
         ok: false,
-        error: "The quote was reviewed, but could not be linked to its material request.",
+        error:
+          "The quote was reviewed, but could not be linked to its material request.",
       };
     }
   }
@@ -1280,9 +1443,9 @@ export async function routeManagerDocumentToSupplierPricingAction(
   const { data: routedItems, error: itemsError } = await supabase
     .from("supplier_quote_items")
     .insert(
-      items.map((item, index) => ({
+      items.map((item) => ({
         quote_id: quoteId,
-        line_number: index + 1,
+        line_number: item.line_number,
         item_code: item.item_code,
         description: item.description,
         specification: item.specification,
@@ -1294,8 +1457,8 @@ export async function routeManagerDocumentToSupplierPricingAction(
         review_status: "ready",
       })),
     )
-    .select("id")
-    .returns<Array<{ id: string }>>();
+    .select("id,line_number")
+    .returns<Array<{ id: string; line_number: number }>>();
   if (itemsError || routedItems?.length !== items.length) {
     console.error("Routed supplier quote item creation failed", itemsError);
     await supabase.from("supplier_quotes").delete().eq("id", quoteId);
@@ -1324,7 +1487,20 @@ export async function routeManagerDocumentToSupplierPricingAction(
   revalidatePath("/admin/supplier-quotes");
   return {
     ok: true,
-    data: { quoteId, itemIds: (routedItems ?? []).map((item) => item.id) },
+    data: {
+      quoteId,
+      itemIds: (routedItems ?? [])
+        .filter(
+          (item) =>
+            !requestedItemIds ||
+            items.some(
+              (source) =>
+                requestedItemIds.includes(source.id) &&
+                source.line_number === item.line_number,
+            ),
+        )
+        .map((item) => item.id),
+    },
     message: "Reviewed rows are ready in supplier pricing.",
   };
 }
