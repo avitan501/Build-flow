@@ -188,7 +188,7 @@ async function OwnerAffiliateGoal({ status }: { status: ManagerGoalStatus }) {
       status={status}
       number={3}
       eyebrow="Programs"
-      title="Apply to Supplier Programs"
+      title="Apply for Supplier Program"
       description="Complete priority applications and follow up."
     >
       <div className="grid gap-4">
@@ -572,7 +572,7 @@ export async function CarlosGoalsWorkspace({
           status={statusFor("supplier-affiliate-program")}
           number={3}
           eyebrow="Programs"
-          title="Apply to Supplier Programs"
+          title="Apply for Supplier Program"
           description="Complete priority applications and follow up."
         >
           <AffiliateCallList />

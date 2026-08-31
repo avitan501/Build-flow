@@ -60,7 +60,7 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain('.from("affiliate_programs")');
   expect(page).toContain("<AddTargetClient />");
   expect(page).toContain("<ClientTargetCallGuide />");
-  expect(page).toContain('title="Apply to Supplier Programs"');
+  expect(page).toContain('title="Apply for Supplier Program"');
   expect(page).toContain('id="supplier-affiliate-program"');
   expect(page).toContain('fixedKey="supplier-affiliate-program"');
   expect(page).toContain('.from("manager_goals")');

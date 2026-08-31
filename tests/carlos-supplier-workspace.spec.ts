@@ -31,7 +31,8 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(store).toContain("created_by: userId");
   expect(store).not.toContain("createAdminClient");
   expect(store).not.toContain('.from("aura_tasks")');
-  expect(goalsPage).toContain("SUPPLIER_PARTNER_NOTES_PREFIX");
+  expect(goalsPage).toContain("Supplier Program List");
+  expect(goalsPage).toContain('href="/owner/partnerships"');
   expect(deliveryPage).toContain('requireStaffProfile("suppliers")');
   expect(deliveryPage).toContain("loadDeliveryRequests(supabase)");
   expect(deliveryStore).not.toContain("createAdminClient");
