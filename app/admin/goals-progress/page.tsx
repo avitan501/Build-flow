@@ -21,9 +21,7 @@ import {
   OutreachLeadList,
   type OutreachLeadRecord,
 } from "@/components/buildflow/client-target-outreach";
-import {
-  type ManagerGoalRecord,
-} from "@/components/buildflow/manager-goals";
+import { type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { ManagerGoalStatusSelect } from "@/components/buildflow/manager-goal-status-select";
 import { ManagerNotificationCenter } from "@/components/buildflow/manager-notification-center";
 import type {
@@ -523,38 +521,55 @@ export async function CarlosGoalsWorkspace({
     .eq("assignee", "carlos")
     .order("status")
     .order("created_at", { ascending: false });
-  const [clientResult, goalResult, leadResult, publishedResult] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id,full_name,company_name,email,phone,preferred_language")
-      .eq("role", "client")
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(5)
-      .returns<ClientTarget[]>(),
-    goalsQuery.returns<ManagerGoalRecord[]>(),
-    supabase
-      .from("manager_outreach_leads")
-      .select(
-        "id,full_name,company_name,email,phone,notes,status,relationship_level,preferred_language",
-      )
-      .order("status")
-      .order("created_at", { ascending: false })
-      .returns<OutreachLeadRecord[]>(),
-    supabase
-      .from("website_work_items")
-      .select("id,title,next_step,status")
-      .eq("published_to_carlos", true)
-      .eq("item_kind", "task")
-      .not("status", "in", "(completed,superseded,archived)")
-      .order("priority")
-      .order("sort_order")
-      .returns<Array<{ id: string; title: string; next_step: string; status: string }>>(),
-  ]);
+  const [clientResult, goalResult, leadResult, publishedResult] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id,full_name,company_name,email,phone,preferred_language")
+        .eq("role", "client")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(5)
+        .returns<ClientTarget[]>(),
+      goalsQuery.returns<ManagerGoalRecord[]>(),
+      supabase
+        .from("manager_outreach_leads")
+        .select(
+          "id,full_name,company_name,email,phone,notes,status,relationship_level,preferred_language",
+        )
+        .order("status")
+        .order("created_at", { ascending: false })
+        .returns<OutreachLeadRecord[]>(),
+      supabase
+        .from("website_work_items")
+        .select("id,task_key,title,next_step,status,source_chat_title")
+        .eq("published_to_carlos", true)
+        .eq("item_kind", "task")
+        .not("status", "in", "(completed,superseded,archived)")
+        .order("priority")
+        .order("sort_order")
+        .returns<
+          Array<{
+            id: string;
+            task_key: string;
+            title: string;
+            next_step: string;
+            status: string;
+            source_chat_title: string | null;
+          }>
+        >(),
+    ]);
   const clients = clientResult.error ? [] : (clientResult.data ?? []);
   const goals = goalResult.error ? [] : (goalResult.data ?? []);
   const leads = leadResult.error ? [] : (leadResult.data ?? []);
-  const publishedTasks = publishedResult.error ? [] : (publishedResult.data ?? []);
+  const publishedTasks = publishedResult.error
+    ? []
+    : (publishedResult.data ?? []).filter(
+        (task) =>
+          task.task_key === "whatsapp-coexistence" ||
+          task.task_key === "abc-private-pricing" ||
+          task.source_chat_title === "David Dashboard",
+      );
   const fixedStatuses = new Map<CarlosFixedGoalKey, ManagerGoalStatus>();
   for (const goal of goals) {
     const key = parseFixedGoalKey(goal.details);
@@ -622,16 +637,45 @@ export async function CarlosGoalsWorkspace({
 
   const goalsWorkspace = (
     <>
-      <section className="grid gap-2" aria-label="Carlos tasks">
-        {activeFixedGoals.map((goal) => <div key={goal.key}>{goal.content}</div>)}
+      <section
+        className="grid gap-2 md:grid-cols-2 xl:grid-cols-3"
+        aria-label="Carlos tasks"
+      >
+        {activeFixedGoals.map((goal) => (
+          <div
+            key={goal.key}
+            className="min-w-0 has-[>details[open]]:md:col-span-2 has-[>details[open]]:xl:col-span-3"
+          >
+            {goal.content}
+          </div>
+        ))}
       </section>
       {publishedTasks.length ? (
-        <section className="mt-3 overflow-hidden rounded-lg border border-sky-200 bg-white" aria-labelledby="published-by-david">
+        <section
+          className="mt-3 overflow-hidden rounded-lg border border-sky-200 bg-white"
+          aria-labelledby="published-by-david"
+        >
           <header className="border-b border-sky-100 bg-sky-50 px-3 py-2.5">
-            <h3 id="published-by-david" className="text-xs font-bold uppercase tracking-[.12em] text-sky-800">From David</h3>
+            <h3
+              id="published-by-david"
+              className="text-xs font-bold uppercase tracking-[.12em] text-sky-800"
+            >
+              From David
+            </h3>
           </header>
           <div className="divide-y divide-slate-100">
-            {publishedTasks.map((task) => <div key={task.id} className="px-3 py-2.5"><p className="text-sm font-semibold text-slate-950">{task.title}</p>{task.next_step ? <p className="mt-0.5 text-xs text-slate-500">{task.next_step}</p> : null}</div>)}
+            {publishedTasks.map((task) => (
+              <div key={task.id} className="px-3 py-2.5">
+                <p className="text-sm font-semibold text-slate-950">
+                  {task.title}
+                </p>
+                {task.next_step ? (
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {task.next_step}
+                  </p>
+                ) : null}
+              </div>
+            ))}
           </div>
         </section>
       ) : null}
@@ -643,15 +687,23 @@ export async function CarlosGoalsWorkspace({
             <span>{archivedFixedGoals.length}</span>
             <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" />
           </summary>
-          <div className="grid gap-2 border-t border-slate-200 p-2">
+          <div className="grid gap-2 border-t border-slate-200 p-2 md:grid-cols-2 xl:grid-cols-3">
             {archivedFixedGoals.map((goal) => (
               <div key={goal.key}>{goal.content}</div>
             ))}
           </div>
         </details>
       ) : null}
-      {access.owner ? <div className="mt-5"><AiTaskInbox /></div> : null}
-      {access.owner ? <div className="mt-3"><DavidDashboardLink /></div> : null}
+      {access.owner ? (
+        <div className="mt-5">
+          <AiTaskInbox />
+        </div>
+      ) : null}
+      {access.owner ? (
+        <div className="mt-3">
+          <DavidDashboardLink />
+        </div>
+      ) : null}
     </>
   );
 
@@ -672,7 +724,9 @@ export async function CarlosGoalsWorkspace({
           </p>
         </header>
 
-        <section aria-label="Carlos tasks" className="mt-7">{goalsWorkspace}</section>
+        <section aria-label="Carlos tasks" className="mt-7">
+          {goalsWorkspace}
+        </section>
       </div>
     </main>
   );

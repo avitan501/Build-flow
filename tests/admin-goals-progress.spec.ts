@@ -65,7 +65,12 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain('fixedKey="supplier-affiliate-program"');
   expect(page).toContain('.from("manager_goals")');
   expect(page).toContain("activeFixedGoals.map");
+  expect(page).toContain("md:grid-cols-2 xl:grid-cols-3");
+  expect(page).toContain("has-[>details[open]]:md:col-span-2");
   expect(page).toContain("published_to_carlos");
+  expect(page).toContain('task.task_key === "whatsapp-coexistence"');
+  expect(page).toContain('task.task_key === "abc-private-pricing"');
+  expect(page).toContain('task.source_chat_title === "David Dashboard"');
   expect(page).not.toContain('PersonHeader assignee="david"');
   expect(page).toContain('.eq("assignee", "carlos")');
   expect(page).not.toContain("david-goals-title");
@@ -184,22 +189,18 @@ test("manager goals are persistent, status-aware, archivable, and protected for 
 });
 
 test("Carlos dashboard removes the old Focus and Work Area duplication", async () => {
-  const [page, component, dashboard, migration] =
-    await Promise.all([
-      readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
-      readFile(
-        path.join(root, "components/buildflow/manager-goals.tsx"),
-        "utf8",
+  const [page, component, dashboard, migration] = await Promise.all([
+    readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/manager-goals.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
+    readFile(
+      path.join(
+        root,
+        "supabase/migrations/20260828170000_add_manager_goal_focus.sql",
       ),
-      readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
-      readFile(
-        path.join(
-          root,
-          "supabase/migrations/20260828170000_add_manager_goal_focus.sql",
-        ),
-        "utf8",
-      ),
-    ]);
+      "utf8",
+    ),
+  ]);
 
   expect(page).toContain("Carlos Dashboard");
   expect(page).not.toContain("Work areas");
