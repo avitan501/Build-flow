@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Activity, BadgeDollarSign, BarChart3, BookOpenCheck, Bot, Calculator, Clapperboard, FilePenLine, Files, ListTree, MapPinned, PanelsTopLeft, SearchCheck, Store, Video } from "lucide-react"
+import { Activity, BadgeDollarSign, BarChart3, BookMarked, BookOpenCheck, Bot, Calculator, Clapperboard, FilePenLine, Files, ListTree, MapPinned, PanelsTopLeft, SearchCheck, Store, Video } from "lucide-react"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 
@@ -14,6 +14,7 @@ export default async function AdminAiToolsPage() {
     { href: "/admin/ai-tools/media-messages", title: "Media & Messages", description: "Preview approved videos and pages, copy exact wording, and open a safe editable communication draft.", icon: Clapperboard },
     ...(access.customers ? [{ href: "/admin/ai-tools/sms-replies", title: "AI Reply Settings", description: "Set the default voice, safe automatic replies, and material-request review behavior for customer texts.", icon: Bot }] : []),
     ...(access.owner ? [{ href: "/admin/ai-tools/construction-knowledge", title: "Construction Knowledge", description: "Review the stable construction facts the customer AI may use in replies.", icon: BookOpenCheck, badge: "Owner" }] : []),
+    ...(access.owner ? [{ href: "/admin/ai-tools/internal-library", title: "Internal Aura Library", description: "Retrieve operating playbooks and trusted-source rules. Internal only—never sent to customers.", icon: BookMarked, badge: "Private" }] : []),
     ...(access.suppliers ? [{ href: "/admin/documents", title: "Documents", description: "Upload once, let AI prepare the details, then review and choose the correct destination.", icon: Files }] : []),
     { href: "/admin/ai-tools/jobsite-delivery", title: "Jobsite Delivery", description: "Plan routes and loads, estimate delivery cost, and manage every request through completion.", icon: MapPinned },
     { href: "/admin/ai-tools/estimate-converter", title: "Beat Estimate Converter", description: "Remove company and client identity and prepare an Avantia proposal request.", icon: FilePenLine },
