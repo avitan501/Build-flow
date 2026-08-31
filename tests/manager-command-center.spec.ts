@@ -90,7 +90,7 @@ test("approved staff use a compact manager workspace without owner-only controls
   expect(shell).not.toContain('{ href: "/owner/aura", label: "Aura Communications"')
   expect(shell).not.toContain("Customer Website")
   expect(shell).not.toContain("Quick Access")
-  expect(shell).toContain('>Communications</span>')
+  expect(shell).toContain('link={{ href: "/admin/communications", label: "Communications", shortLabel: "Communication"')
   expect(settings).toContain("Connection credentials and owner delivery tests remain restricted to David.")
   expect(settings).toContain("checkCommunicationConnectionsAction")
   expect(traffic).toContain('requireStaffProfile("traffic")')
