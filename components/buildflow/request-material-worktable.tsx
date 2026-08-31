@@ -86,11 +86,11 @@ export function RequestMaterialWorktable({
 
       {items.length ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[680px] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[620px] table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-[.08em] text-slate-500">
-                <th className="w-28 px-3 py-2.5">Quantity</th>
-                <th className="px-3 py-2.5">Item details</th>
+                <th className="sticky left-0 z-20 w-20 bg-slate-50 px-3 py-2.5">Quantity</th>
+                <th className="sticky left-20 z-20 w-52 bg-slate-50 px-3 py-2.5">Item details</th>
                 <th className="w-[42%] px-3 py-2.5">Missing info / AI notes</th>
               </tr>
             </thead>
@@ -102,8 +102,8 @@ export function RequestMaterialWorktable({
                 const priceOpen = priceItemId === item.id
                 return (
                   <tr key={item.id} className="align-top">
-                    <td className="px-3 py-3 text-sm font-bold tabular-nums text-slate-950">{materialQuantity(item)} <span className="text-xs font-semibold text-slate-500">{materialSalesUnit(item)}</span></td>
-                    <td className="px-3 py-3">
+                    <td className="sticky left-0 z-10 bg-white px-3 py-3 text-sm font-bold tabular-nums text-slate-950">{materialQuantity(item)} <span className="text-xs font-semibold text-slate-500">{materialSalesUnit(item)}</span></td>
+                    <td className="sticky left-20 z-10 bg-white px-3 py-3 shadow-[6px_0_10px_-10px_rgba(15,23,42,.35)]">
                       <p className="text-sm font-bold text-slate-950">{item.name}</p>
                       {itemDetails(item) ? <p className="mt-0.5 text-xs leading-5 text-slate-500">{itemDetails(item)}</p> : null}
                       <button type="button" onClick={() => setPriceItemId(priceOpen ? null : item.id)} className="mt-1 inline-flex min-h-7 items-center gap-1 text-xs font-bold text-[#0066cc]"><Search className="h-3.5 w-3.5" />Online prices</button>
@@ -130,7 +130,7 @@ export function RequestMaterialWorktable({
       {supplierComparisons.map((comparison) => (
         <div key={comparison.id} className="border-t border-slate-200 p-3 sm:p-4">
           <div className="mb-2 flex items-center justify-between gap-3"><h3 className="text-sm font-bold">{comparison.title}</h3><a href={comparison.href} className="text-xs font-bold text-[#0066cc]">Full comparison</a></div>
-          <RequestSupplierComparison items={comparison.items} suppliers={comparison.suppliers} />
+          <RequestSupplierComparison headingId={`supplier-comparison-${comparison.id}`} items={comparison.items} suppliers={comparison.suppliers} />
         </div>
       ))}
     </section>

@@ -7,13 +7,19 @@ import type {
   ProviderProduct,
   ProviderResult,
 } from "@/lib/aura/material-providers/types";
+import {
+  enabledMaterialSources,
+  materialSourceById,
+} from "@/lib/material-intelligence/source-registry";
 
 const providers: MaterialProductProvider[] = [new HandoffProvider()];
 
 export function materialProviderStatus() {
   return providers.map((provider) => ({
     id: provider.id,
-    enabled: provider.enabled,
+    enabled:
+      provider.enabled &&
+      materialSourceById(provider.id === "handoff" ? "handoff" : "authorized_supplier")?.liveAccessConfirmed === true,
   }));
 }
 
@@ -21,14 +27,19 @@ export async function searchAuthorizedMaterialProviders(
   query: string,
   location?: ProviderLocation,
 ): Promise<ProviderResult<ProviderProduct[]>> {
-  const active = providers.filter((provider) => provider.enabled);
+  const active = providers.filter((provider) => {
+    const policy = materialSourceById(
+      provider.id === "handoff" ? "handoff" : "authorized_supplier",
+    );
+    return provider.enabled && policy?.liveAccessConfirmed === true;
+  });
   if (!active.length)
     return {
       ok: false,
       code: "manager_review",
       provider: "none",
       message:
-        "No authorized external catalog provider is enabled. Use the Common Materials Map and route exact product verification to a manager.",
+        `No authorized external catalog provider is enabled. Use ${enabledMaterialSources().map((source) => source.name).join(", ")} as evidence and route exact product verification to a manager.`,
     };
   for (const provider of active) {
     const result = await provider.searchProducts(query, location);

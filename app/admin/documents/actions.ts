@@ -108,6 +108,77 @@ function clean(value: unknown, max: number) {
     .replace(/\s+/g, " ")
     .slice(0, max);
 }
+
+async function ensureDocumentRequestComparison(
+  supabase: StaffSupabase,
+  userId: string,
+  requestId: string,
+  fallbackDepartment: string,
+) {
+  const existing = await supabase
+    .from("quote_comparisons")
+    .select("id")
+    .eq("request_id", requestId)
+    .in("status", ["draft", "review"])
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (existing.error) throw existing.error;
+  if (existing.data) return existing.data.id;
+
+  const { data: request, error: requestError } = await supabase
+    .from("quote_requests")
+    .select("id,title,project_id,owner_id")
+    .eq("id", requestId)
+    .maybeSingle<{ id: string; title: string; project_id: string; owner_id: string }>();
+  if (requestError || !request) throw requestError || new Error("Request not found");
+
+  const [{ data: profile }, { data: project }, { data: allItems, error: itemsError }] = await Promise.all([
+    supabase.from("profiles").select("full_name,email").eq("id", request.owner_id).maybeSingle<{ full_name: string | null; email: string | null }>(),
+    supabase.from("projects").select("name,address").eq("id", request.project_id).maybeSingle<{ name: string; address: string | null }>(),
+    supabase.from("quote_request_items").select("name,quantity,unit,department,metadata").eq("request_id", request.id).order("created_at").returns<Array<{ name: string; quantity: number; unit: string | null; department: string; metadata: Record<string, unknown> | null }>>(),
+  ]);
+  if (itemsError) throw itemsError;
+  const organized = (allItems ?? []).filter((item) => item.metadata?.ai_organized === true);
+  const requestItems = organized.length ? organized : (allItems ?? []).filter((item) => item.metadata?.ai_organized !== true);
+  const department = normalizeMaterialCatalogDepartment(requestItems[0]?.department || fallbackDepartment);
+  const clientName = clean(profile?.full_name || profile?.email || "Client", 200);
+  const caseNumber = request.id.replaceAll("-", "").slice(0, 8).toUpperCase();
+  const { data: comparison, error: comparisonError } = await supabase
+    .from("quote_comparisons")
+    .insert({
+      project_id: request.project_id,
+      request_id: request.id,
+      created_by: userId,
+      title: `Case #${caseNumber} · ${request.title}`.slice(0, 160),
+      department,
+      job_address: clean(project?.address || project?.name || "", 500),
+      client_id: request.owner_id,
+      client_name_snapshot: clientName,
+      client_email_snapshot: clean(profile?.email, 320),
+    })
+    .select("id")
+    .single<{ id: string }>();
+  if (comparisonError || !comparison) throw comparisonError || new Error("Comparison not created");
+
+  if (requestItems.length) {
+    const { error: seedError } = await supabase.from("quote_comparison_items").insert(
+      requestItems.slice(0, 500).map((item, index) => ({
+        comparison_id: comparison.id,
+        description: clean(item.name, 500) || `Requested material ${index + 1}`,
+        specification: clean(item.department, 1000),
+        quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 1,
+        unit: clean(item.unit, 40) || "each",
+        sort_order: index,
+      })),
+    );
+    if (seedError) {
+      await supabase.from("quote_comparisons").delete().eq("id", comparison.id);
+      throw seedError;
+    }
+  }
+  return comparison.id;
+}
 function cleanFileName(value: string) {
   return (
     value
@@ -1116,10 +1187,29 @@ export async function routeManagerDocumentToSupplierPricingAction(
     document.party_name ||
     inferSupplierName(document.raw_text) ||
     "Supplier needs review";
+  let comparisonId: string | null = null;
+  if (document.request_id) {
+    try {
+      comparisonId = await ensureDocumentRequestComparison(
+        supabase,
+        user.id,
+        document.request_id,
+        document.department,
+      );
+    } catch (error) {
+      await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).remove([quotePath]);
+      console.error("Document request comparison creation failed", error);
+      return {
+        ok: false,
+        error: "The quote was reviewed, but could not be linked to its material request.",
+      };
+    }
+  }
   const { error: quoteError } = await supabase.from("supplier_quotes").insert({
     id: quoteId,
     supplier_id: match?.id ?? null,
     supplier_name: supplierName,
+    comparison_id: comparisonId,
     quote_number: document.document_number,
     department: normalizeMaterialCatalogDepartment(document.department),
     quote_date: document.document_date,

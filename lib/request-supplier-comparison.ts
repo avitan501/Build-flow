@@ -81,8 +81,9 @@ export function mapRequestSupplierComparison(
         sourceLabelFromNotes(bid.notes || "") ||
         "Supplier quote";
       const quoteDate = source?.quoteDate?.trim() || null;
-      const checkedAt =
-        source?.checkedAt?.trim() || quoteDate || bid.updated_at || bid.created_at;
+      // A database update is not evidence of when a supplier checked a price.
+      // Keep the date unknown unless the source or quote explicitly provides it.
+      const checkedAt = source?.checkedAt?.trim() || quoteDate || null;
       const prices: RequestSupplierComparisonPrice[] = (
         bid.quote_comparison_prices ?? []
       )
@@ -106,7 +107,7 @@ export function mapRequestSupplierComparison(
         name: bid.supplier_name_snapshot?.trim() || "Supplier",
         prices,
         deliveryCharge,
-        deliveryLabel: deliveryCharge > 0 ? null : "Free delivery",
+        deliveryLabel: null,
         quoteDate,
         sourceLabel,
         sourceUrl: safeHttpUrl(source?.sourceUrl),

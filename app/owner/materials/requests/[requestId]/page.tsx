@@ -1,15 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status";
-import { OrganizeMaterialListButton } from "@/components/buildflow/organize-material-list-button";
-import { OrganizedMaterialList } from "@/components/buildflow/organized-material-list";
 import { RequestClientContact } from "@/components/buildflow/request-client-contact";
 import { RequestMaterialWorktable, type RequestWorktableComparison } from "@/components/buildflow/request-material-worktable";
 import {
   RequestManagementPanel,
   type RequestComparisonSummary,
 } from "@/components/buildflow/request-management-panel";
-import { RequestWorkflowStepHeader } from "@/components/buildflow/request-workflow-step-header";
 import { requireStaffProfile } from "@/lib/auth";
 import { contactEmailForDisplay } from "@/lib/auth-phone";
 import { normalizeMaterialCatalogDepartment } from "@/lib/material-catalog";
@@ -76,6 +73,15 @@ type SupplierPackage = {
   supplier_id: string | null;
   status: string;
 };
+type LinkedSupplierQuote = {
+  id: string;
+  comparison_id: string | null;
+  supplier_id: string | null;
+  quote_number: string | null;
+  quote_date: string | null;
+  file_name: string;
+  file_path: string;
+};
 type ComparisonRecord = Pick<
   QuoteComparisonRecord,
   | "id"
@@ -87,9 +93,6 @@ type ComparisonRecord = Pick<
   | "awarded_bid_id"
   | "updated_at"
 >;
-
-const workflowStepCardClass =
-  "group relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]";
 
 function legacyAnswers(value: unknown): LegacyAnswer[] {
   return Array.isArray(value)
@@ -241,7 +244,7 @@ export default async function OwnerMaterialRequestPage({
   const answers = answersResult.data ?? [];
   const clientEmail = contactEmailForDisplay(profile?.email);
   const comparisonIds = (comparisons ?? []).map((comparison) => comparison.id);
-  const [comparisonItemsResult, comparisonBidsResult] = comparisonIds.length
+  const [comparisonItemsResult, comparisonBidsResult, supplierQuotesResult] = comparisonIds.length
     ? await Promise.all([
         supabase
           .from("quote_comparison_items")
@@ -255,11 +258,25 @@ export default async function OwnerMaterialRequestPage({
           .in("comparison_id", comparisonIds)
           .order("created_at")
           .returns<QuoteComparisonBidRecord[]>(),
+        supabase
+          .from("supplier_quotes")
+          .select("id,comparison_id,supplier_id,quote_number,quote_date,file_name,file_path")
+          .in("comparison_id", comparisonIds)
+          .returns<LinkedSupplierQuote[]>(),
       ])
     : [
         { data: [] as QuoteComparisonItemRecord[] },
         { data: [] as QuoteComparisonBidRecord[] },
+        { data: [] as LinkedSupplierQuote[] },
       ];
+  const supplierQuoteSources = await Promise.all(
+    (supplierQuotesResult.data ?? []).map(async (quote) => ({
+      ...quote,
+      sourceUrl: quote.file_path
+        ? (await supabase.storage.from("supplier-quotes").createSignedUrl(quote.file_path, 1800)).data?.signedUrl ?? null
+        : null,
+    })),
+  );
   const signedFiles = await Promise.all(
     (attachments ?? []).map(async (file) => ({
       ...file,
@@ -354,8 +371,24 @@ export default async function OwnerMaterialRequestPage({
     const comparisonBids = (comparisonBidsResult.data ?? []).filter(
       (bid) => bid.comparison_id === comparison.id,
     );
+    const comparisonQuotes = supplierQuoteSources.filter(
+      (quote) => quote.comparison_id === comparison.id,
+    );
     const mapped = mapRequestSupplierComparison(comparisonItems, comparisonBids, {
       selectedBidId: comparison.awarded_bid_id,
+      sources: comparisonBids.flatMap((bid) => {
+        const quote = comparisonQuotes.find((candidate) =>
+          bid.supplier_id === `${candidate.supplier_id}:${candidate.id}` ||
+          bid.notes.includes(candidate.quote_number || candidate.file_name),
+        );
+        return quote ? [{
+          bidId: bid.id,
+          quoteDate: quote.quote_date,
+          sourceLabel: quote.quote_number || quote.file_name,
+          sourceUrl: quote.sourceUrl,
+          checkedAt: quote.quote_date,
+        }] : [];
+      }),
     });
     return {
       id: comparison.id,
@@ -364,8 +397,6 @@ export default async function OwnerMaterialRequestPage({
       ...mapped,
     };
   });
-  const step1Complete = workflowOverrides.get(1) ?? true;
-  const step2Complete = workflowOverrides.get(2) ?? organizedItems.length > 0;
   const { data: requestEmailLinks } = await supabase
     .from("aura_communication_links")
     .select("communication_id")
@@ -467,90 +498,11 @@ export default async function OwnerMaterialRequestPage({
           organizationCompletedLabel={organizationCompletedLabel}
           supplierComparisons={supplierComparisonTables}
         />
-        {signedFiles.length || (responses ?? []).length ? (
-          <details className="mt-2 rounded-lg border border-slate-200 bg-white">
-            <summary className="cursor-pointer px-4 py-3 text-sm font-bold">Original request & files · {signedFiles.length}</summary>
-            <div className="flex flex-wrap gap-2 border-t border-slate-100 p-3">
-              {signedFiles.map((file) => file.url ? <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="rounded-md border border-slate-200 px-3 py-2 text-xs font-bold text-[#0066cc]">{file.file_name}</a> : <span key={file.id} className="text-xs">{file.file_name}</span>)}
-              {(responses ?? []).map((response) => <span key={response.id} className="rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold">{response.category_name_snapshot} · {response.status}</span>)}
-            </div>
-          </details>
-        ) : null}
-        <div className="hidden" aria-hidden="true">
+        {originalItems.length || signedFiles.length || (responses ?? []).length ? (
           <details
-            open={currentStage === "received"}
-            className={`order-2 ${workflowStepCardClass}`}
+            className="mt-2 rounded-lg border border-slate-200 bg-white"
           >
-            <RequestWorkflowStepHeader
-              requestId={request.id}
-              step={2}
-              title="AI review"
-              detail={
-                organizedItems.length
-                  ? `${organizedItems.length} organized item${organizedItems.length === 1 ? "" : "s"}`
-                  : "Create a clean material list"
-              }
-              status={step2Complete ? "complete" : "active"}
-              icon="organize"
-            />
-            <div className="border-t border-slate-200 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm text-slate-500">
-                    Create a structured copy without changing the original
-                    request.
-                  </p>
-                  {organizationCompletedLabel ? (
-                    <p className="mt-1 text-xs font-semibold text-slate-400">
-                      Last review: {organizationCompletedLabel} ET
-                    </p>
-                  ) : null}
-                </div>
-                {organizationStatus !== "processing" ? (
-                  <OrganizeMaterialListButton
-                    requestId={request.id}
-                    refresh={organizedItems.length > 0}
-                  />
-                ) : null}
-              </div>
-              {organizedItems.length ? (
-                <div className="mt-4 border-t border-slate-200 pt-3">
-                  <h3 className="text-sm font-bold">Confirmed material list</h3>
-                  <OrganizedMaterialList
-                    requestId={request.id}
-                    items={organizedItems}
-                    defaultZipCode={zipCodeFromAddress(
-                      request.projects?.address,
-                    )}
-                  />
-                </div>
-              ) : (
-                <div
-                  className={`mt-4 rounded-lg px-4 py-3 text-sm font-semibold ${organizationStatus === "failed" ? "bg-rose-50 text-rose-800" : organizationStatus === "plan_requires_takeoff" ? "bg-amber-50 text-amber-800" : "bg-sky-50 text-sky-800"}`}
-                >
-                  {organizationStatus === "processing"
-                    ? "The material list is being organized."
-                    : organizationStatus === "failed"
-                      ? "Automatic organization needs another attempt."
-                      : organizationStatus === "plan_requires_takeoff"
-                        ? "This appears to be a plan and requires a takeoff before materials can be listed."
-                        : "The original request is saved. Select Organize request to create the material chart."}
-                </div>
-              )}
-            </div>
-          </details>
-          <details
-            open={currentStage === "received" && organizedItems.length === 0}
-            className={`order-1 ${workflowStepCardClass}`}
-          >
-            <RequestWorkflowStepHeader
-              requestId={request.id}
-              step={1}
-              title="Original list"
-              detail={`${originalItems.length} item${originalItems.length === 1 ? "" : "s"} · ${signedFiles.length} file${signedFiles.length === 1 ? "" : "s"}`}
-              status={step1Complete ? "complete" : "active"}
-              icon="review"
-            />
+            <summary className="cursor-pointer px-4 py-3 text-sm font-bold">Original request & files · {originalItems.length} items · {signedFiles.length} files</summary>
             <div className="border-t border-slate-200 p-4">
               <p className="text-sm text-slate-500">
                 The customer’s original notes, selections, and files remain
@@ -722,7 +674,7 @@ export default async function OwnerMaterialRequestPage({
               ) : null}
             </div>
           </details>
-        </div>
+        ) : null}
         <div className="mt-2">
           <RequestManagementPanel
             requestId={request.id}

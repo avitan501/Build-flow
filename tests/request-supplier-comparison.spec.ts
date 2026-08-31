@@ -97,13 +97,13 @@ test("maps stored request items and supplier quote cells", () => {
   ]);
 });
 
-test("uses stored source label and update timestamp without inventing quote metadata", () => {
+test("uses stored source label without treating a database update as a quote date", () => {
   const result = mapRequestSupplierComparison([item], [bid]);
   expect(result.suppliers[0]).toMatchObject({
     sourceLabel: "Q-1042",
     sourceUrl: null,
     quoteDate: null,
-    checkedAt: "2026-08-31T15:00:00.000Z",
+    checkedAt: null,
   });
 });
 
@@ -145,7 +145,7 @@ test("preserves unavailable and missing prices without turning them into zero", 
     ],
   );
   expect(result.suppliers[0].deliveryCharge).toBe(0);
-  expect(result.suppliers[0].deliveryLabel).toBe("Free delivery");
+  expect(result.suppliers[0].deliveryLabel).toBeNull();
   expect(result.suppliers[0].prices[0]).toMatchObject({
     unitPrice: null,
     available: false,

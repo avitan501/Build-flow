@@ -45,6 +45,7 @@ export type RequestSupplierComparisonProps = {
   emptyMessage?: string;
   onSelectSupplier?: (supplierId: string) => void;
   className?: string;
+  headingId?: string;
 };
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -103,6 +104,7 @@ export function RequestSupplierComparison({
   emptyMessage = "Add a supplier quote to compare it beside the request.",
   onSelectSupplier,
   className = "",
+  headingId = "supplier-comparison-title",
 }: RequestSupplierComparisonProps) {
   const pricesBySupplier = new Map(
     suppliers.map((supplier) => [
@@ -135,10 +137,10 @@ export function RequestSupplierComparison({
   const columns = `minmax(15rem, 1.25fr) repeat(${Math.max(suppliers.length, 1)}, minmax(13rem, 1fr))`;
 
   return (
-    <section className={`overflow-hidden border border-slate-200 bg-white shadow-sm ${className}`} aria-labelledby="supplier-comparison-title">
+    <section className={`overflow-hidden border border-slate-200 bg-white shadow-sm ${className}`} aria-labelledby={headingId}>
       <div className="flex flex-wrap items-end justify-between gap-2 border-b border-slate-200 px-4 py-3">
         <div>
-          <h2 id="supplier-comparison-title" className="text-sm font-extrabold tracking-tight text-slate-950">Request and supplier quotes</h2>
+          <h2 id={headingId} className="text-sm font-extrabold tracking-tight text-slate-950">Request and supplier quotes</h2>
           <p className="mt-0.5 text-[11px] leading-4 text-slate-500">Same quantities. Supplier prices stay beside each item.</p>
         </div>
         <span className="text-[11px] font-bold tabular-nums text-slate-500">{items.length} item{items.length === 1 ? "" : "s"} · {suppliers.length} supplier{suppliers.length === 1 ? "" : "s"}</span>
@@ -234,7 +236,7 @@ export function RequestSupplierComparison({
               });
               return (
                 <div key={supplier.id} className="border-r border-t border-slate-200 bg-slate-100 px-4 py-3 last:border-r-0">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800"><Truck className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />{supplier.deliveryLabel || (delivery > 0 ? `${money(delivery, currency)} delivery` : "Free delivery")}</div>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800"><Truck className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />{supplier.deliveryLabel || (delivery > 0 ? `${money(delivery, currency)} delivery` : "Delivery not stated")}</div>
                   <div className="mt-1.5">{sourceLink(supplier.sourceLabel || "Supplier quote", supplier.sourceUrl)}</div>
                   {onSelectSupplier ? (
                     <button
