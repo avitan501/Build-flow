@@ -3460,17 +3460,48 @@ async function prepareSmsRequestConfirmation(input: {
       intelligenceAssessment: input.intelligenceAssessment,
     }),
   );
+  const summaryMessageHash = await sha256Hex(summary);
   const pending = await sql.begin(async (transaction) => {
     await transaction`select pg_advisory_xact_lock(hashtextextended(${input.phone}, 0))`;
     const same = await transaction<
       { id: string; summary_sent_at: string | null }[]
     >`
       select id, summary_sent_at from public.aura_sms_request_pending_confirmations
-      where normalized_phone = ${input.phone} and summary_hash = ${summaryHash} and status = 'pending'
+      where normalized_phone = ${input.phone} and summary_hash = ${summaryHash} and status in ('pending', 'send_failed')
       limit 1
     `;
-    if (same[0])
-      return { id: same[0].id, alreadySent: Boolean(same[0].summary_sent_at) };
+    if (same[0]) {
+      const existingOutbox = await transaction<{ id: string }[]>`
+        select id from public.aura_sms_outbox where pending_confirmation_id = ${same[0].id}::uuid limit 1
+      `;
+      if (existingOutbox[0])
+        return { id: same[0].id, alreadySent: Boolean(same[0].summary_sent_at) };
+      // Pre-outbox rows can have an unknown historical delivery outcome. Do
+      // not backfill or replace them automatically; a manager must resolve it.
+      return { id: same[0].id, alreadySent: true };
+    }
+    const unresolved = await transaction<{ id: string }[]>`
+      select pending.id
+      from public.aura_sms_request_pending_confirmations pending
+      join public.aura_sms_outbox outbox on outbox.pending_confirmation_id = pending.id
+      where pending.normalized_phone = ${input.phone}
+        and pending.status = 'pending'
+        and outbox.status in ('sending', 'ambiguous', 'reconciling', 'needs_review')
+      limit 1
+    `;
+    if (unresolved[0]) {
+      // A prior summary may already be in the provider. Do not send a newer
+      // snapshot until reconciliation proves the first outcome.
+      return { id: unresolved[0].id, alreadySent: true };
+    }
+    await transaction`
+      update public.aura_sms_outbox outbox set status = 'cancelled', lock_token = null, locked_at = null,
+        last_error_code = 'confirmation_superseded', last_error = 'A newer customer correction replaced this summary.'
+      from public.aura_sms_request_pending_confirmations pending
+      where outbox.pending_confirmation_id = pending.id
+        and pending.normalized_phone = ${input.phone} and pending.status = 'pending'
+        and outbox.status in ('pending', 'claimed', 'retry_wait')
+    `;
     await transaction`update public.aura_sms_request_pending_confirmations set status = 'superseded', updated_at = now() where normalized_phone = ${input.phone} and status = 'pending'`;
     const inserted = await transaction<{ id: string }[]>`
       insert into public.aura_sms_request_pending_confirmations
@@ -3478,21 +3509,22 @@ async function prepareSmsRequestConfirmation(input: {
       values (${input.phone}, ${input.customerName.slice(0, 160)}, ${input.customerAddress.slice(0, 500)}, ${input.request.title.slice(0, 180)}, ${input.request.department.slice(0, 100)}, ${sql.json(input.request.items)}, ${input.sourceCommunicationIds}::uuid[], ${input.customerNeededBy.trim().slice(0, 160)}, ${summary}, ${summaryHash}, ${sql.json(input.intelligenceAssessment)}, ${input.intelligenceReady})
       returning id
     `;
+    await transaction`
+      insert into public.aura_sms_outbox
+        (dedupe_key, message_kind, pending_confirmation_id, normalized_phone, message_body, message_hash)
+      values (${`confirmation:${inserted[0].id}:0`}, 'confirmation_summary', ${inserted[0].id}::uuid,
+        ${input.phone}, ${summary}, ${summaryMessageHash})
+      on conflict (dedupe_key) do nothing
+    `;
     return { id: inserted[0].id, alreadySent: false };
   });
   if (pending.alreadySent) return true;
-  try {
-    const providerMessageId = await sendQuoSms(input.phone, summary);
-    const sent = await sql<{ id: string }[]>`
-      select id from public.aura_communications
-      where provider = 'quo' and external_activity_id = ${providerMessageId}
-      limit 1
-    `;
-    await sql`update public.aura_sms_request_pending_confirmations set summary_communication_id = ${sent[0]?.id || null}::uuid, summary_sent_at = now(), updated_at = now() where id = ${pending.id}::uuid`;
-  } catch (error) {
-    await sql`update public.aura_sms_request_pending_confirmations set status = 'send_failed', updated_at = now() where id = ${pending.id}::uuid`;
-    throw error;
-  }
+  await dispatchSmsOutboxWorker().catch((error) =>
+    console.error(
+      "sms_outbox_dispatch_failed",
+      error instanceof Error ? error.message : "unknown error",
+    ),
+  );
   return true;
 }
 
@@ -4703,74 +4735,61 @@ async function processCustomerSmsAutomation(
     latestRows[0].direction !== "incoming"
   )
     return;
-  const replyDrafts = await sql<{ id: string }[]>`
-    insert into public.aura_sms_reply_drafts
-      (communication_id, contact_id, counterparty_phone, reply_text, decision, safety_reason, ai_model,
-       intent, safety_level, safety_signals, model_auto_safe, gate_auto_safe, latency_ms,
-       input_tokens, output_tokens, estimated_cost_usd, prompt_version)
-    values (${communicationId}::uuid, ${contact?.id || null}, ${phone}, ${result.reply}, ${safety.level === "red" ? "blocked" : "draft"}, ${result.safetyReason}, ${model},
-      ${intent}, ${safety.level}, ${sql.json(safety.signals)}, ${modelAutoSafe}, ${safety.gateAutoSafe}, ${metrics.latencyMs},
-      ${metrics.inputTokens}, ${metrics.outputTokens}, ${metrics.estimatedCostUsd}, ${promptVersion})
-    on conflict (communication_id) do nothing
-    returning id
-  `;
-  if (shouldAuto && replyDrafts[0]?.id) {
-    const replyParts = smsReplyParts({
-      reply: result.reply,
-      deterministicProductInquiry: model === "deterministic-product-inquiry",
-      exactListOnly,
-    });
-    let sentPartCount = 0;
-    try {
-      let initialOutgoingExternalId = "";
-      for (const replyPart of replyParts) {
-        initialOutgoingExternalId = await sendQuoSms(phone, replyPart);
-        sentPartCount += 1;
-      }
-      await sql`
-        update public.aura_sms_reply_drafts
-        set decision = 'auto_sent', updated_at = now()
-        where id = ${replyDrafts[0].id}::uuid
-      `;
-      if (
-        smsUnansweredFollowUpEligible({
+  const replyParts = shouldAuto
+    ? smsReplyParts({
+        reply: result.reply,
+        deterministicProductInquiry: model === "deterministic-product-inquiry",
+        exactListOnly,
+      })
+    : [];
+  const partHashes = await Promise.all(replyParts.map(sha256Hex));
+  const followUpPrompt =
+    shouldAuto &&
+    smsUnansweredFollowUpEligible({
+      originalMessage: body,
+      questionReply: result.reply,
+      intent,
+      event: customerEvent,
+      participantRole: result.participantRole,
+      safetyLevel: safety.level,
+      gateAutoSafe: safety.gateAutoSafe,
+    })
+      ? smsUnansweredFollowUpText({
           originalMessage: body,
           questionReply: result.reply,
-          intent,
-          event: customerEvent,
-          participantRole: result.participantRole,
-          safetyLevel: safety.level,
-          gateAutoSafe: safety.gateAutoSafe,
         })
-      ) {
-        const followUpText = smsUnansweredFollowUpText({
-          originalMessage: body,
-          questionReply: result.reply,
-        });
-        try {
-          await sql`
-            insert into public.aura_sms_unanswered_followups
-              (source_communication_id, contact_id, counterparty_phone, initial_outgoing_external_id, prompt_text, due_at)
-            values (${communicationId}::uuid, ${contact?.id || null}, ${phone}, ${initialOutgoingExternalId}, ${followUpText}, now() + interval '10 minutes')
-            on conflict (source_communication_id) do nothing
-          `;
-        } catch (error) {
-          console.error(
-            "sms_unanswered_followup_schedule_failed",
-            error instanceof Error ? error.message : "unknown error",
-          );
-        }
-      }
-    } catch (error) {
-      await sql`
-        update public.aura_sms_reply_drafts
-        set decision = 'send_failed',
-          safety_reason = ${`${sentPartCount ? `Partial delivery: ${sentPartCount} of ${replyParts.length} SMS parts sent. ` : ""}Q U O delivery failed: ${error instanceof Error ? error.message : "unknown error"}`.slice(0, 300)},
-          updated_at = now()
-        where id = ${replyDrafts[0].id}::uuid
+      : null;
+  const replyDrafts = await sql.begin(async (transaction) => {
+    const inserted = await transaction<{ id: string }[]>`
+      insert into public.aura_sms_reply_drafts
+        (communication_id, contact_id, counterparty_phone, reply_text, decision, safety_reason, ai_model,
+         intent, safety_level, safety_signals, model_auto_safe, gate_auto_safe, latency_ms,
+         input_tokens, output_tokens, estimated_cost_usd, prompt_version, follow_up_prompt)
+      values (${communicationId}::uuid, ${contact?.id || null}, ${phone}, ${result.reply}, ${safety.level === "red" ? "blocked" : shouldAuto ? "auto_queued" : "draft"}, ${result.safetyReason}, ${model},
+        ${intent}, ${safety.level}, ${sql.json(safety.signals)}, ${modelAutoSafe}, ${safety.gateAutoSafe}, ${metrics.latencyMs},
+        ${metrics.inputTokens}, ${metrics.outputTokens}, ${metrics.estimatedCostUsd}, ${promptVersion}, ${followUpPrompt})
+      on conflict (communication_id) do nothing returning id
+    `;
+    if (!inserted[0] || !shouldAuto) return inserted;
+    for (let index = 0; index < replyParts.length; index += 1) {
+      await transaction`
+        insert into public.aura_sms_outbox
+          (dedupe_key, message_kind, reply_draft_id, source_communication_id, part_index, part_count,
+           normalized_phone, message_body, message_hash)
+        values (${`reply:${inserted[0].id}:${index}`}, 'auto_reply', ${inserted[0].id}::uuid,
+          ${communicationId}::uuid, ${index}, ${replyParts.length}, ${phone}, ${replyParts[index]}, ${partHashes[index]})
+        on conflict (dedupe_key) do nothing
       `;
-      throw error;
     }
+    return inserted;
+  });
+  if (shouldAuto && replyDrafts[0]?.id) {
+    await dispatchSmsOutboxWorker().catch((error) =>
+      console.error(
+        "sms_outbox_dispatch_failed",
+        error instanceof Error ? error.message : "unknown error",
+      ),
+    );
   }
 }
 
@@ -4800,6 +4819,25 @@ async function dispatchSmsAutomationWorker() {
   );
   if (!response.ok)
     throw new Error(`SMS automation dispatch failed: ${response.status}`);
+}
+
+async function dispatchSmsOutboxWorker() {
+  const dispatchSecret = await secret(secretNames.smsAutomationDispatchSecret);
+  if (!dispatchSecret) throw new Error("SMS outbox worker is not configured");
+  const response = await fetch(
+    `${supabaseUrl}/functions/v1/aura-sms-outbox-worker?mode=sms-outbox-dispatch`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-sms-automation-dispatch": dispatchSecret,
+      },
+      body: JSON.stringify({ action: "drain" }),
+      signal: AbortSignal.timeout(5_000),
+    },
+  );
+  if (!response.ok)
+    throw new Error(`SMS outbox dispatch failed: ${response.status}`);
 }
 
 type SmsAutomationQueueRow = {
@@ -4928,6 +4966,24 @@ async function handleSmsAutomationDispatch(req: Request) {
         values ('sms_automation_worker_failed', ${sql.json({
           error_code:
             error instanceof Error ? error.message : "automation_worker_failed",
+        })})
+      `;
+    }),
+  );
+  return json({ ok: true, accepted: true }, 202);
+}
+
+async function handleSmsOutboxDispatch(req: Request) {
+  const expectedSecret = await secret(secretNames.smsAutomationDispatchSecret);
+  const suppliedSecret = req.headers.get("x-sms-automation-dispatch") || "";
+  if (!expectedSecret || !constantTimeEqual(expectedSecret, suppliedSecret))
+    return json({ error: "Invalid dispatch secret" }, 401);
+  EdgeRuntime.waitUntil(
+    processAuraSmsOutbox(1).catch(async (error) => {
+      await sql`
+        insert into public.aura_audit_log (action, details)
+        values ('sms_outbox_worker_failed', ${sql.json({
+          error_code: error instanceof Error ? error.message : "sms_outbox_worker_failed",
         })})
       `;
     }),
@@ -5337,6 +5393,351 @@ async function sendQuoSms(toValue: unknown, bodyValue: unknown) {
     status: result.data.status || "queued",
   });
   return result.data.id;
+}
+
+type SmsOutboxRow = {
+  id: string;
+  message_kind: "auto_reply" | "confirmation_summary";
+  reply_draft_id: string | null;
+  pending_confirmation_id: string | null;
+  source_communication_id: string | null;
+  part_index: number;
+  part_count: number;
+  normalized_phone: string;
+  message_body: string;
+  message_hash: string;
+  lock_token: string;
+  attempt_count: number;
+  reconcile_attempt_count: number;
+  send_started_at: string | null;
+};
+
+async function finalizeSmsOutboxParent(outboxId: string) {
+  const rows = await sql<
+    { reply_draft_id: string | null; pending_confirmation_id: string | null }[]
+  >`select reply_draft_id, pending_confirmation_id from public.aura_sms_outbox where id = ${outboxId}::uuid limit 1`;
+  const row = rows[0];
+  if (!row) return;
+  if (row.pending_confirmation_id) {
+    const sent = await sql<{ outgoing_communication_id: string | null }[]>`
+      select outgoing_communication_id from public.aura_sms_outbox
+      where pending_confirmation_id = ${row.pending_confirmation_id}::uuid and status = 'sent'
+      order by part_index desc limit 1
+    `;
+    if (sent[0]?.outgoing_communication_id) {
+      await sql`
+        update public.aura_sms_request_pending_confirmations
+        set summary_communication_id = ${sent[0].outgoing_communication_id}::uuid,
+            summary_sent_at = coalesce(summary_sent_at, now()), updated_at = now()
+        where id = ${row.pending_confirmation_id}::uuid and status = 'pending'
+      `;
+      return;
+    }
+    const terminal = await sql<{ failed: boolean }[]>`
+      select exists(
+        select 1 from public.aura_sms_outbox
+        where pending_confirmation_id = ${row.pending_confirmation_id}::uuid and status = 'dead_letter'
+      ) as failed
+    `;
+    if (terminal[0]?.failed) {
+      await sql`
+        update public.aura_sms_request_pending_confirmations
+        set status = 'send_failed', updated_at = now()
+        where id = ${row.pending_confirmation_id}::uuid and status = 'pending' and summary_sent_at is null
+      `;
+    }
+    return;
+  }
+  if (!row.reply_draft_id) return;
+  const states = await sql<{ status: string; part_count: number }[]>`
+    select status, part_count from public.aura_sms_outbox
+    where reply_draft_id = ${row.reply_draft_id}::uuid order by part_index
+  `;
+  if (states.length && states.every((item) => item.status === "sent")) {
+    await sql`update public.aura_sms_reply_drafts set decision = 'auto_sent', updated_at = now() where id = ${row.reply_draft_id}::uuid`;
+    const followUp = await sql<
+      {
+        communication_id: string;
+        contact_id: string | null;
+        counterparty_phone: string;
+        follow_up_prompt: string | null;
+        provider_message_id: string | null;
+      }[]
+    >`
+      select draft.communication_id, draft.contact_id, draft.counterparty_phone, draft.follow_up_prompt,
+        (select provider_message_id from public.aura_sms_outbox
+         where reply_draft_id = draft.id and status = 'sent'
+         order by part_index desc limit 1) as provider_message_id
+      from public.aura_sms_reply_drafts draft where draft.id = ${row.reply_draft_id}::uuid limit 1
+    `;
+    if (followUp[0]?.follow_up_prompt && followUp[0].provider_message_id) {
+      await sql`
+        insert into public.aura_sms_unanswered_followups
+          (source_communication_id, contact_id, counterparty_phone, initial_outgoing_external_id, prompt_text, due_at)
+        values (${followUp[0].communication_id}::uuid, ${followUp[0].contact_id}, ${followUp[0].counterparty_phone},
+          ${followUp[0].provider_message_id}, ${followUp[0].follow_up_prompt}, now() + interval '10 minutes')
+        on conflict (source_communication_id) do nothing
+      `;
+    }
+  } else if (
+    states.some((item) =>
+      ["ambiguous", "reconciling", "needs_review"].includes(item.status),
+    )
+  ) {
+    await sql`update public.aura_sms_reply_drafts set decision = 'send_ambiguous', safety_reason = 'Delivery needs reconciliation; Aura did not send a duplicate.', updated_at = now() where id = ${row.reply_draft_id}::uuid`;
+  } else if (states.some((item) => item.status === "dead_letter")) {
+    await sql`update public.aura_sms_reply_drafts set decision = 'send_failed', safety_reason = 'Q U O rejected the message before acceptance.', updated_at = now() where id = ${row.reply_draft_id}::uuid`;
+  } else if (
+    states.some((item) =>
+      ["pending", "claimed", "retry_wait", "sending"].includes(item.status),
+    )
+  ) {
+    await sql`update public.aura_sms_reply_drafts set decision = 'auto_queued', updated_at = now() where id = ${row.reply_draft_id}::uuid and decision in ('send_ambiguous', 'auto_queued')`;
+  }
+}
+
+async function markSmsOutboxSent(
+  row: SmsOutboxRow,
+  providerId: string,
+  providerStatus: string,
+  providerFrom: string,
+) {
+  const communicationId = await storeCommunication({
+    provider: "quo",
+    channel: "sms",
+    externalId: providerId,
+    direction: "outgoing",
+    counterpartyPhone: row.normalized_phone,
+    businessPhone: providerFrom,
+    body: row.message_body,
+    status: providerStatus || "queued",
+  });
+  await sql`
+    update public.aura_sms_outbox
+    set status = 'sent', provider_from = ${providerFrom}, provider_message_id = ${providerId},
+        outgoing_communication_id = ${communicationId}::uuid, provider_accepted_at = now(), sent_at = now(),
+        lock_token = null, locked_at = null, last_error = null, last_error_code = null, updated_at = now()
+    where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid and status in ('sending', 'reconciling')
+  `;
+  await finalizeSmsOutboxParent(row.id);
+}
+
+async function reconcileSmsOutbox(row: SmsOutboxRow) {
+  const config = await quoConfig();
+  const webhook = await quoWebhookConfig();
+  if (!config || !webhook || !row.send_started_at)
+    throw new Error("sms_outbox_reconciliation_not_configured");
+  const createdAfter = new Date(
+    new Date(row.send_started_at).getTime() - 60_000,
+  ).toISOString();
+  const url = new URL("https://api.openphone.com/v1/messages");
+  url.searchParams.set("phoneNumberId", webhook.phoneNumberId);
+  url.searchParams.set("participants", row.normalized_phone);
+  url.searchParams.set("createdAfter", createdAfter);
+  const response = await fetch(url, {
+    headers: { Authorization: config.apiKey },
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok)
+    throw new Error(`sms_outbox_reconciliation_http_${response.status}`);
+  const payload = (await response.json()) as {
+    data?: Array<{
+      id?: string;
+      direction?: string;
+      text?: string;
+      content?: string;
+      createdAt?: string;
+      status?: string;
+      to?: string[];
+    }>;
+  };
+  const matches = (payload.data || []).filter((message) => {
+    const body = String(message.text || message.content || "").trim();
+    const to = (message.to || []).map(normalizePhone);
+    const created = Date.parse(message.createdAt || "");
+    const started = Date.parse(row.send_started_at || "");
+    return (
+      message.direction === "outgoing" &&
+      body === row.message_body &&
+      to.includes(row.normalized_phone) &&
+      Number.isFinite(created) &&
+      created >= started &&
+      created - started <= 10 * 60_000 &&
+      /^AC[A-Za-z0-9_-]+$/.test(message.id || "")
+    );
+  });
+  if (matches.length === 1 && matches[0].id) {
+    await markSmsOutboxSent(
+      row,
+      matches[0].id,
+      matches[0].status || "queued",
+      config.from,
+    );
+    return true;
+  }
+  const nextStatus = matches.length > 1 || row.reconcile_attempt_count >= 2
+    ? "needs_review"
+    : "ambiguous";
+  await sql`
+    update public.aura_sms_outbox
+    set status = ${nextStatus}, reconcile_attempt_count = reconcile_attempt_count + 1,
+        reconcile_after = case when ${nextStatus} = 'ambiguous' then now() + interval '2 minutes' else null end,
+        lock_token = null, locked_at = null,
+        last_error_code = ${matches.length > 1 ? "multiple_matches" : "no_match_yet"},
+        last_error = 'Delivery could not yet be proven. No duplicate was sent.', updated_at = now()
+    where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid and status = 'reconciling'
+  `;
+  await finalizeSmsOutboxParent(row.id);
+  return false;
+}
+
+async function processAuraSmsOutbox(limit = 1) {
+  const unfinishedParents = await sql<{ id: string }[]>`
+    select outbox.id from public.aura_sms_outbox outbox
+    left join public.aura_sms_reply_drafts draft on draft.id = outbox.reply_draft_id
+    left join public.aura_sms_request_pending_confirmations pending on pending.id = outbox.pending_confirmation_id
+    where outbox.status in ('sent', 'dead_letter', 'ambiguous', 'reconciling', 'needs_review') and (
+      (outbox.reply_draft_id is not null and (
+        (outbox.status = 'sent' and draft.decision <> 'auto_sent')
+        or (outbox.status in ('ambiguous','reconciling','needs_review') and draft.decision <> 'send_ambiguous')
+        or (outbox.status = 'dead_letter' and draft.decision <> 'send_failed')
+      ))
+      or (outbox.pending_confirmation_id is not null and (
+        (outbox.status = 'sent' and pending.summary_sent_at is null)
+        or (outbox.status = 'dead_letter' and pending.status <> 'send_failed')
+      ))
+    )
+    order by outbox.sent_at nulls last limit 10
+  `;
+  for (const parent of unfinishedParents) await finalizeSmsOutboxParent(parent.id);
+  await sql`
+    update public.aura_sms_outbox set status = 'ambiguous', lock_token = null, locked_at = null,
+      reconcile_after = now(), last_error_code = 'stale_sending',
+      last_error = 'The worker stopped after send began. Reconciliation is required; no duplicate was sent.'
+    where status = 'sending' and locked_at < now() - interval '2 minutes'
+  `;
+  await sql`
+    update public.aura_sms_outbox set status = 'retry_wait', lock_token = null, locked_at = null, available_at = now()
+    where status = 'claimed' and locked_at < now() - interval '1 minute'
+  `;
+  await sql`
+    update public.aura_sms_outbox
+    set status = case when reconcile_attempt_count >= 2 then 'needs_review' else 'ambiguous' end,
+      reconcile_attempt_count = reconcile_attempt_count + 1, lock_token = null, locked_at = null,
+      reconcile_after = case when reconcile_attempt_count >= 2 then null else now() end,
+      last_error_code = 'stale_reconciliation',
+      last_error = 'Reconciliation stopped before resolution; no duplicate was sent.'
+    where status = 'reconciling' and locked_at < now() - interval '2 minutes'
+  `;
+  let processed = 0;
+  while (processed < Math.max(1, Math.min(limit, 5))) {
+    const token = crypto.randomUUID();
+    const rows = await sql<SmsOutboxRow[]>`
+      with candidate as (
+        select outbox.id from public.aura_sms_outbox outbox
+        where (
+          (outbox.status in ('pending','retry_wait') and outbox.available_at <= now())
+          or (outbox.status = 'ambiguous' and coalesce(outbox.reconcile_after, now()) <= now())
+        )
+        and not exists (
+          select 1 from public.aura_sms_outbox prior
+          where prior.reply_draft_id = outbox.reply_draft_id
+            and prior.part_index < outbox.part_index and prior.status <> 'sent'
+        )
+        order by case when outbox.status = 'ambiguous' then 0 else 1 end, outbox.created_at
+        for update skip locked limit 1
+      )
+      update public.aura_sms_outbox outbox
+      set status = case when outbox.status = 'ambiguous' then 'reconciling' else 'claimed' end,
+          lock_token = ${token}::uuid, locked_at = now(), updated_at = now()
+      from candidate where outbox.id = candidate.id
+      returning outbox.id, outbox.message_kind, outbox.reply_draft_id, outbox.pending_confirmation_id,
+        outbox.source_communication_id, outbox.part_index, outbox.part_count, outbox.normalized_phone,
+        outbox.message_body, outbox.message_hash, outbox.lock_token, outbox.attempt_count,
+        outbox.reconcile_attempt_count, outbox.send_started_at
+    `;
+    const row = rows[0];
+    if (!row) break;
+    processed += 1;
+    const current = await sql<{ status: string }[]>`
+      select coalesce((select status from public.aura_sms_outbox where id = ${row.id}::uuid), 'missing') as status
+    `;
+    if (current[0]?.status === "reconciling") {
+      try {
+        await reconcileSmsOutbox(row);
+      } catch {
+        await sql`
+          update public.aura_sms_outbox
+          set status = case when reconcile_attempt_count >= 2 then 'needs_review' else 'ambiguous' end,
+            reconcile_attempt_count = reconcile_attempt_count + 1,
+            lock_token = null, locked_at = null,
+            reconcile_after = case when reconcile_attempt_count >= 2 then null else now() + interval '2 minutes' end,
+            last_error_code = 'reconcile_error',
+            last_error = 'Reconciliation is temporarily unavailable; no duplicate was sent.'
+          where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid
+        `;
+        await finalizeSmsOutboxParent(row.id);
+      }
+      continue;
+    }
+    const eligible = row.reply_draft_id
+      ? await sql<{ allowed: boolean }[]>`
+          select exists(select 1 from public.aura_sms_reply_drafts where id = ${row.reply_draft_id}::uuid and decision = 'auto_queued') as allowed
+        `
+      : await sql<{ allowed: boolean }[]>`
+          select exists(select 1 from public.aura_sms_request_pending_confirmations where id = ${row.pending_confirmation_id}::uuid and status = 'pending' and summary_sent_at is null) as allowed
+        `;
+    if (!eligible[0]?.allowed) {
+      await sql`update public.aura_sms_outbox set status = 'cancelled', lock_token = null, locked_at = null, last_error_code = 'parent_not_eligible', last_error = 'The source record is no longer eligible for sending.' where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid and status = 'claimed'`;
+      continue;
+    }
+    if (row.attempt_count >= 6) {
+      await sql`update public.aura_sms_outbox set status = 'dead_letter', lock_token = null, locked_at = null, last_error_code = 'attempt_limit', last_error = 'Safe retry limit reached.' where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid and status = 'claimed'`;
+      await finalizeSmsOutboxParent(row.id);
+      continue;
+    }
+    const config = await quoConfig();
+    if (!config) {
+      await sql`update public.aura_sms_outbox set status = 'dead_letter', lock_token = null, locked_at = null, last_error_code = 'not_configured', last_error = 'Text messaging is not connected.' where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid`;
+      await finalizeSmsOutboxParent(row.id);
+      continue;
+    }
+    const sending = await sql<{ id: string }[]>`
+      update public.aura_sms_outbox set status = 'sending', send_started_at = now(),
+        provider_from = ${config.from}, attempt_count = attempt_count + 1, updated_at = now()
+      where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid and status = 'claimed'
+      returning id
+    `;
+    if (!sending[0]) continue;
+    try {
+      const response = await fetch("https://api.openphone.com/v1/messages", {
+        method: "POST",
+        headers: { Authorization: config.apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ content: row.message_body, from: config.from, to: [row.normalized_phone] }),
+        signal: AbortSignal.timeout(8_000),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        data?: { id?: string; status?: string };
+        message?: string;
+      };
+      if (response.status === 202 && result.data?.id) {
+        await markSmsOutboxSent(row, result.data.id, result.data.status || "queued", config.from);
+      } else if (response.status === 429) {
+        const retryAfter = Math.max(5, Math.min(300, Number(response.headers.get("retry-after")) || 10));
+        await sql`update public.aura_sms_outbox set status = 'retry_wait', available_at = now() + (${retryAfter}::text || ' seconds')::interval, lock_token = null, locked_at = null, last_http_status = 429, last_error_code = 'rate_limited', last_error = 'Provider rate limit; safe retry scheduled.' where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid and status = 'sending'`;
+      } else if ([400, 401, 402, 403, 404, 422].includes(response.status)) {
+        await sql`update public.aura_sms_outbox set status = 'dead_letter', lock_token = null, locked_at = null, last_http_status = ${response.status}, last_error_code = 'provider_rejected', last_error = ${String(result.message || "Provider rejected the message before acceptance.").slice(0, 500)} where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid and status = 'sending'`;
+        await finalizeSmsOutboxParent(row.id);
+      } else {
+        await sql`update public.aura_sms_outbox set status = 'ambiguous', reconcile_after = now() + interval '30 seconds', lock_token = null, locked_at = null, last_http_status = ${response.status}, last_error_code = 'ambiguous_provider_response', last_error = 'Provider acceptance is unknown; no duplicate will be sent.' where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid and status = 'sending'`;
+        await finalizeSmsOutboxParent(row.id);
+      }
+    } catch {
+      await sql`update public.aura_sms_outbox set status = 'ambiguous', reconcile_after = now() + interval '30 seconds', lock_token = null, locked_at = null, last_error_code = 'transport_unknown', last_error = 'Connection ended after send began; no duplicate will be sent.' where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid and status = 'sending'`;
+      await finalizeSmsOutboxParent(row.id);
+    }
+  }
+  return processed;
 }
 
 type QuoPolledMessage = {
@@ -7171,6 +7572,16 @@ Deno.serve(async (req: Request) => {
   ) {
     try {
       return await handleSmsAutomationDispatch(req);
+    } catch {
+      return json({ error: "Processing failed" }, 500);
+    }
+  }
+  if (
+    req.method === "POST" &&
+    url.searchParams.get("mode") === "sms-outbox-dispatch"
+  ) {
+    try {
+      return await handleSmsOutboxDispatch(req);
     } catch {
       return json({ error: "Processing failed" }, 500);
     }
