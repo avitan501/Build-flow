@@ -5,15 +5,20 @@ import path from "node:path"
 const root = process.cwd()
 
 test("construction knowledge has one owner-only workspace and one existing store", async () => {
-  const [toolsPage, knowledgePage, actions, smsPage] = await Promise.all([
+  const [toolsPage, auraPage, knowledgePage, actions, smsPage] = await Promise.all([
     readFile(path.join(root, "app/admin/ai-tools/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/ai-tools/aura/page.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/ai-tools/construction-knowledge/page.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/ai-tools/construction-knowledge/actions.ts"), "utf8"),
     readFile(path.join(root, "app/admin/ai-tools/sms-replies/page.tsx"), "utf8"),
   ])
 
-  expect(toolsPage).toContain("/admin/ai-tools/construction-knowledge")
-  expect(toolsPage).toContain("Construction Knowledge")
+  expect(toolsPage).toContain("/admin/ai-tools/aura")
+  expect(toolsPage).toContain("Aura AI")
+  expect(auraPage).toContain("/admin/ai-tools/construction-knowledge")
+  expect(auraPage).toContain("Construction Knowledge")
+  expect(auraPage).toContain("/admin/ai-tools/internal-library")
+  expect(auraPage).toContain("/admin/ai-tools/sms-replies")
   expect(knowledgePage).toContain("!access.aiTools || !access.owner")
   expect(knowledgePage).toContain('from("aura_ai_reply_knowledge")')
   expect(knowledgePage).toContain("updateConstructionKnowledgeAction")

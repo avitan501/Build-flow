@@ -1,8 +1,6 @@
 import {
   ArrowRight,
   BadgeDollarSign,
-  BarChart3,
-  CalendarDays,
   ChevronDown,
   ClipboardList,
   CreditCard,
@@ -249,7 +247,6 @@ export default async function AdminDashboardPage({
           : []),
         { href: QUO_INBOX_URL, label: "Calls & Messages" },
         { href: WHATSAPP_URL, label: "WhatsApp" },
-        { href: CARLOS_MEETING_URL, label: "Google Meet" },
         { href: "/admin/daily-summary", label: "Daily Work Summary" },
       ],
     },
@@ -277,34 +274,21 @@ export default async function AdminDashboardPage({
             icon: Sparkles,
             links: [
               { href: "/admin/ai-tools", label: "All Manager Tools" },
+              { href: CARLOS_MEETING_URL, label: "Google Meet" },
               {
                 href: "/admin/ai-tools/media-messages",
                 label: "Media & Messages",
               },
-              {
-                href: "https://build-flow-wfl3-1fe6nc1cr-avitanneto-1804s-projects.vercel.app",
-                label: "New Homepage Preview",
-              },
+              ...(access.traffic
+                ? [{ href: "/admin/traffic", label: "Website Traffic" }]
+                : []),
               ...(access.suppliers
                 ? [{ href: "/admin/documents", label: "Documents" }]
                 : []),
-              {
-                href: "/admin/ai-tools/jobsite-delivery",
-                label: "Jobsite Delivery",
-              },
               ...(access.owner
                 ? [{ href: "/admin/abc", label: "ABC Private Pricing" }]
                 : []),
             ],
-          },
-        ]
-      : []),
-    ...(access.traffic
-      ? [
-          {
-            title: "Website Traffic",
-            icon: BarChart3,
-            links: [{ href: "/admin/traffic", label: "Open Website Traffic" }],
           },
         ]
       : []),
@@ -322,28 +306,15 @@ export default async function AdminDashboardPage({
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-9">
       <div className="mx-auto max-w-7xl">
-        <header className="border-b border-slate-200 pb-3">
+        <header className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-slate-200 pb-3">
           <h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1>
-        </header>
-
-        <section
-          aria-label="Today workspace"
-          className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3"
-        >
-          <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled />
-          <Link
-            href="/admin/daily-summary"
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 shadow-sm"
-          >
-            <CalendarDays className="h-4 w-4 text-[#0071e3]" />
-            Daily summary
-          </Link>
           <EmployeeClockStatus
             compact
             checkInAt={todaySummary?.checkInAt ?? null}
             checkOutAt={todaySummary?.checkOutAt ?? null}
           />
-        </section>
+          <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled compact />
+        </header>
 
         {!pipelineAvailable ? (
           <p
@@ -355,8 +326,8 @@ export default async function AdminDashboardPage({
           </p>
         ) : null}
 
-        <section aria-labelledby="pipeline-heading" className="mt-5">
-          <div className="flex items-center justify-between gap-3">
+        <section aria-labelledby="pipeline-heading" className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
             <div>
               <h2 id="pipeline-heading" className="text-xl font-semibold">
                 Orders &amp; Requests
@@ -374,14 +345,14 @@ export default async function AdminDashboardPage({
               </Link>
             ) : null}
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-px border-t border-slate-200 bg-slate-200 lg:grid-cols-4">
             {pipelineStages.map((item) => {
               const Icon = item.icon;
               return (
                 <Link
                   key={item.id}
                   href={`/admin/build-map?stage=${item.id}#open-requests`}
-                  className="flex min-h-24 items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:shadow-sm"
+                  className="flex min-h-20 items-center gap-3 bg-white p-3 transition hover:bg-slate-50"
                 >
                   <span
                     className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border ${pipelineTone[item.id]}`}
@@ -401,11 +372,9 @@ export default async function AdminDashboardPage({
               );
             })}
           </div>
-        </section>
-
-        <section
+          <div
           id="open-requests"
-          className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+          className="border-t border-slate-200"
         >
           <header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
             <div>
@@ -465,6 +434,7 @@ export default async function AdminDashboardPage({
               No open requests in this stage.
             </p>
           )}
+          </div>
         </section>
 
         <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -472,14 +442,7 @@ export default async function AdminDashboardPage({
             <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white">
               <UserRound className="h-4 w-4" />
             </span>
-            <div className="min-w-0">
-              <h2 id="targets-heading" className="font-semibold">
-                Carlos Dashboard
-              </h2>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Carlos&apos;s tasks and next actions.
-              </p>
-            </div>
+            <h2 id="targets-heading" className="font-semibold">Carlos Dashboard</h2>
           </header>
           <CarlosGoalsWorkspace embedded />
         </section>

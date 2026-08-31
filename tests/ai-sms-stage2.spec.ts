@@ -62,7 +62,7 @@ test("phone AI stays concise and never fills optional details with guesses", () 
   expect(broker).toContain("candidate.summary.trim().slice(0, 180)");
 });
 
-test("Carlos Dashboard contains phone intake without the old Focus duplication", () => {
+test("Phone intake is flat inside David Dashboard and absent from Carlos", () => {
   const goals = readFileSync(
     path.join(root, "app/admin/goals-progress/page.tsx"),
     "utf8",
@@ -75,12 +75,19 @@ test("Carlos Dashboard contains phone intake without the old Focus duplication",
     path.join(root, "app/owner/ai-inbox/page.tsx"),
     "utf8",
   );
+  const david = readFileSync(
+    path.join(root, "app/admin/goals-progress/website-work/page.tsx"),
+    "utf8",
+  );
 
   expect(goals).toContain("Carlos Dashboard");
-  expect(goals).toContain("Phone Intake Tasks");
+  expect(goals).not.toContain("Phone Intake Tasks");
   expect(goals).not.toContain("Work areas");
-  expect(goals).toContain('href="/owner/ai-inbox"');
-  expect(goals).toContain("ManagerNotificationCenter");
+  expect(david).toContain("Phone Intake");
+  expect(david).toContain("To David");
+  expect(david).toContain("To Carlos");
+  expect(david).toContain("deletePhoneIntakeAction");
+  expect(david).not.toContain("ManagerNotificationCenter");
   expect(dashboard).not.toContain('label: "AI Phone Inbox"');
   expect(inbox).toContain('href="/admin/goals-progress"');
   expect(inbox).not.toContain("Supplier details were not included");

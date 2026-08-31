@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import {
@@ -90,9 +91,10 @@ function PrivateItemRow({
           className="min-h-10 min-w-0 flex-1 rounded-lg border border-sky-300 bg-white px-3 text-sm outline-none ring-2 ring-sky-100"
         />
       ) : (
-        <p className="min-w-0 flex-1 text-sm font-medium leading-5 text-slate-800">
-          {item.title}
-        </p>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium leading-5 text-slate-800">{item.title}</p>
+          {item.next_step?.startsWith("/") ? <Link href={item.next_step} className="mt-0.5 inline-flex text-xs font-semibold text-[#0066cc]">Open</Link> : null}
+        </div>
       )}
       <div className="flex shrink-0 items-center gap-1">
         {editing ? (

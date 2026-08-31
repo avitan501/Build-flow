@@ -32,7 +32,7 @@ async function preparePhoto(file: File) {
   return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" })
 }
 
-export function ManagerDashboardAiSearch({ initialHistory, enabled }: { initialHistory: DashboardAiHistoryItem[]; enabled: boolean }) {
+export function ManagerDashboardAiSearch({ initialHistory, enabled, compact = false }: { initialHistory: DashboardAiHistoryItem[]; enabled: boolean; compact?: boolean }) {
   const [query, setQuery] = useState("")
   const [answer, setAnswer] = useState("")
   const [history, setHistory] = useState(initialHistory)
@@ -81,12 +81,12 @@ export function ManagerDashboardAiSearch({ initialHistory, enabled }: { initialH
     })
   }
 
-  return <details className="group min-w-0 [&[open]]:col-span-2 sm:[&[open]]:col-span-4">
-    <summary className="flex min-h-12 w-full cursor-pointer list-none items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 shadow-sm hover:border-slate-400">
-      <Plus className="h-4 w-4 text-[#0071e3] group-open:hidden" />
+  return <details className={`group min-w-0 ${compact ? "[&[open]]:col-span-3" : "[&[open]]:col-span-2 sm:[&[open]]:col-span-4"}`}>
+    <summary className={`flex min-h-10 cursor-pointer list-none items-center justify-center gap-2 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-800 shadow-sm hover:border-slate-400 ${compact ? "h-10 w-10 px-0" : "min-h-12 w-full px-3"}`} title="Orders & Requests AI">
+      <Plus className={`h-4 w-4 text-[#0071e3] group-open:hidden ${compact ? "hidden" : ""}`} />
       <X className="hidden h-4 w-4 text-slate-500 group-open:block" />
       <Sparkles className="h-3.5 w-3.5" />
-      <span id="dashboard-ai-title">Ask AI</span>
+      <span id="dashboard-ai-title" className={compact ? "sr-only" : ""}>Orders &amp; Requests AI</span>
     </summary>
     <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-slate-500">Ask about construction, clients, requests, quotes, suppliers, goals, or an attached photo.</p><button type="button" onClick={() => setHistoryOpen((open) => !open)} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 px-2.5 text-[11px] font-semibold"><History className="h-3.5 w-3.5" />History</button></div>

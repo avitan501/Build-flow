@@ -4,7 +4,6 @@ import {
   ChevronDown,
   CircleDollarSign,
   ClipboardList,
-  ListTodo,
   PhoneCall,
   Target,
 } from "lucide-react";
@@ -23,7 +22,6 @@ import {
 } from "@/components/buildflow/client-target-outreach";
 import { type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { ManagerGoalStatusSelect } from "@/components/buildflow/manager-goal-status-select";
-import { ManagerNotificationCenter } from "@/components/buildflow/manager-notification-center";
 import type {
   AffiliateActivity,
   AffiliateAttachment,
@@ -39,6 +37,7 @@ import {
   type CarlosFixedGoalKey,
   type ManagerGoalStatus,
 } from "@/lib/manager-goal-status";
+import { SUPPLIER_PARTNERS } from "@/lib/supplier-partners/catalog";
 
 type ClientTarget = {
   id: string;
@@ -280,39 +279,6 @@ function AbcSupplyDemoGoal({ status }: { status: ManagerGoalStatus }) {
   );
 }
 
-function AiTaskInbox() {
-  return (
-    <section className="overflow-hidden rounded-lg border border-sky-200 bg-[#f7fbff] shadow-sm">
-      <div className="flex flex-wrap items-center gap-3 px-3 py-3 sm:px-4">
-        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#0066cc] text-white">
-          <ListTodo className="h-4 w-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">
-            Phone Intake Tasks
-          </p>
-          <h3 className="text-sm font-semibold text-slate-950">
-            Review messages and create tasks
-          </h3>
-          <p className="mt-0.5 text-xs text-slate-600">
-            Turn a message into a task only when action is needed.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ManagerNotificationCenter />
-          <Link
-            href="/owner/ai-inbox"
-            className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-xs font-semibold text-white"
-          >
-            Open inbox
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function DavidDashboardLink() {
   return (
     <Link
@@ -485,6 +451,11 @@ function SupplierPricingGoal({ status }: { status: ManagerGoalStatus }) {
 }
 
 function SupplierPartnershipGoal({ status }: { status: ManagerGoalStatus }) {
+  const lists = [
+    { label: "Supplier Program List", count: SUPPLIER_PARTNERS.length, href: "/owner/partnerships" },
+    { label: "Suppliers from Friends", count: 0, href: "/admin/vendors" },
+    { label: "Suppliers from Google", count: 0, href: "/admin/vendors" },
+  ];
   return (
     <GoalDisclosure
       id="supplier-partnerships"
@@ -495,17 +466,9 @@ function SupplierPartnershipGoal({ status }: { status: ManagerGoalStatus }) {
       title="Build Supplier Relationships"
       description="Contact suppliers and record the next follow-up."
     >
-      <p className="text-sm leading-6 text-slate-600">
-        Open Carlos&apos;s supplier workspace to contact researched companies
-        and track every next step.
-      </p>
-      <Link
-        href="/owner/partnerships"
-        className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-semibold text-white"
-      >
-        Open Supplier Partnerships
-        <ArrowRight className="h-4 w-4" />
-      </Link>
+      <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+        {lists.map((list, index) => <Link key={list.label} href={list.href} className="flex min-h-11 items-center gap-3 border-b border-slate-100 px-3 text-sm last:border-b-0 hover:bg-slate-50"><span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-xs font-bold text-slate-600">{index + 1}</span><span className="min-w-0 flex-1 font-semibold">{list.label}</span><span className="text-xs tabular-nums text-slate-500">{list.count}</span><ArrowRight className="h-4 w-4 text-slate-400" /></Link>)}
+      </div>
     </GoalDisclosure>
   );
 }
@@ -703,11 +666,6 @@ export async function CarlosGoalsWorkspace({
         </details>
       ) : null}
       {access.owner ? (
-        <div className="mt-5">
-          <AiTaskInbox />
-        </div>
-      ) : null}
-      {access.owner ? (
         <div className="mt-3">
           <DavidDashboardLink />
         </div>
@@ -727,9 +685,6 @@ export async function CarlosGoalsWorkspace({
           <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">
             Carlos Dashboard
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Carlos&apos;s tasks and next actions in one clean list.
-          </p>
         </header>
 
         <section aria-label="Carlos tasks" className="mt-7">

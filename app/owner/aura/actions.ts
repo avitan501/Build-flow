@@ -699,6 +699,7 @@ export async function reviewTrustedSmsIntakeAction(formData: FormData) {
     });
     revalidatePath("/owner/ai-inbox");
     revalidatePath("/owner/aura");
+    revalidatePath("/admin/goals-progress/website-work");
     return;
   } catch {
     // Keep the website-side AI path as a safe fallback when the broker is temporarily unavailable.
@@ -742,6 +743,7 @@ export async function reviewTrustedSmsIntakeAction(formData: FormData) {
   });
   revalidatePath("/owner/ai-inbox");
   revalidatePath("/owner/aura");
+  revalidatePath("/admin/goals-progress/website-work");
 }
 
 export async function cancelAuraIntakeAction(formData: FormData) {

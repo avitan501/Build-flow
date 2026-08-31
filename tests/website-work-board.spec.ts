@@ -125,10 +125,10 @@ test("David Dashboard is owner-authenticated, PIN-gated, and publishes explicitl
   expect(broker).toContain("Only the owner can rewrite this item.");
   expect(broker).toContain("meaningfully different");
   expect(goals).toContain('href="/admin/goals-progress/website-work"');
-  expect(goals).toContain("Phone Intake Tasks");
-  expect(goals.indexOf("Phone Intake Tasks")).toBeLessThan(
-    goals.indexOf("David Dashboard"),
-  );
+  expect(goals).not.toContain("Phone Intake Tasks");
+  expect(page).toContain("Phone Intake");
+  expect(page).toContain("routePhoneIntakeTaskAction");
+  expect(page).toContain("deletePhoneIntakeAction");
   expect(board).toContain("Show Carlos");
   expect(board.match(/Show Carlos/g)?.length).toBeGreaterThanOrEqual(2);
   expect(visibilityMigration).toContain("carlos-fixed-client-target");

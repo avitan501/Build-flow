@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { requireManagerPortalProfile } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   createWebsiteWorkToken,
   WEBSITE_WORK_COOKIE,
@@ -14,6 +15,26 @@ import {
 
 export type WebsiteWorkUnlockState = { error: string | null };
 export type DavidDashboardResult = { ok: true } | { ok: false; error: string };
+
+function validUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function intakeTaskText(proposal: Record<string, unknown>, message: string) {
+  const tasks = Array.isArray(proposal.tasks) ? proposal.tasks : [];
+  const firstTask = tasks[0] && typeof tasks[0] === "object"
+    ? tasks[0] as { title?: unknown; notes?: unknown }
+    : null;
+  const summary = typeof proposal.summary === "string" ? proposal.summary.trim() : "";
+  const title = typeof firstTask?.title === "string" && firstTask.title.trim()
+    ? firstTask.title.trim()
+    : summary || message.trim() || "Review phone instruction";
+  const notes = typeof firstTask?.notes === "string" ? firstTask.notes.trim() : "";
+  return {
+    title: title.replace(/\s+/g, " ").slice(0, 160),
+    nextStep: (notes || message).trim().slice(0, 500),
+  };
+}
 
 function refreshDashboards() {
   revalidatePath("/admin/goals-progress");
@@ -77,6 +98,77 @@ export async function createDavidDashboardItemAction(input: {
   if (error) return { ok: false, error: "The item could not be added." };
   refreshDashboards();
   return { ok: true };
+}
+
+export async function routePhoneIntakeTaskAction(formData: FormData) {
+  const context = await unlockedDavidDashboard();
+  if (!context) return;
+  const intakeId = String(formData.get("intakeId") ?? "").trim();
+  const destination = String(formData.get("destination") ?? "david");
+  if (!validUuid(intakeId) || !["david", "carlos"].includes(destination)) {
+    throw new Error("Choose a valid phone task.");
+  }
+  const admin = createAdminClient();
+  const { data: intake, error: readError } = await admin
+    .from("aura_intakes")
+    .select("message_text,proposal,status")
+    .eq("id", intakeId)
+    .eq("source", "sms")
+    .eq("sender_phone", "+13475675077")
+    .maybeSingle<{ message_text: string | null; proposal: Record<string, unknown> | null; status: string }>();
+  if (readError || !intake || !["pending", "needs_follow_up", "failed"].includes(intake.status)) {
+    throw new Error("This phone task is no longer waiting for approval.");
+  }
+  const task = intakeTaskText(intake.proposal ?? {}, intake.message_text ?? "");
+  const { error: insertError } = await context.supabase.from("website_work_items").insert({
+    task_key: `phone-intake-${intakeId}`,
+    title: task.title,
+    category: "phone_intake",
+    status: "open",
+    assigned_agent: destination === "carlos" ? "Carlos" : "David",
+    progress_percent: 0,
+    summary: "Approved phone intake task.",
+    next_step: task.nextStep,
+    source_chat_title: "Phone Intake",
+    priority: 1,
+    sort_order: 0,
+    item_kind: "task",
+    published_to_carlos: destination === "carlos",
+  });
+  if (insertError && insertError.code !== "23505") {
+    throw new Error("The phone task could not be added.");
+  }
+  await admin.from("aura_intakes").update({ status: "confirmed" }).eq("id", intakeId);
+  await admin.from("aura_audit_log").insert({
+    intake_id: intakeId,
+    actor_user_id: context.user.id,
+    action: "intake_routed_to_dashboard",
+    details: { destination },
+  });
+  refreshDashboards();
+}
+
+export async function deletePhoneIntakeAction(formData: FormData) {
+  const context = await unlockedDavidDashboard();
+  if (!context) return;
+  const intakeId = String(formData.get("intakeId") ?? "").trim();
+  if (!validUuid(intakeId)) throw new Error("Choose a valid phone task.");
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("aura_intakes")
+    .update({ status: "cancelled" })
+    .eq("id", intakeId)
+    .eq("source", "sms")
+    .eq("sender_phone", "+13475675077")
+    .in("status", ["pending", "needs_follow_up", "failed"]);
+  if (error) throw new Error("The phone task could not be deleted.");
+  await admin.from("aura_audit_log").insert({
+    intake_id: intakeId,
+    actor_user_id: context.user.id,
+    action: "intake_cancelled",
+    details: { source: "david_dashboard" },
+  });
+  refreshDashboards();
 }
 
 export async function setDavidTaskPublishedAction(input: {
