@@ -6,7 +6,7 @@ import { useState } from "react"
 import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
 import { MaterialReviewEditor } from "@/components/buildflow/material-review-editor"
 import { OrganizeMaterialListButton } from "@/components/buildflow/organize-material-list-button"
-import { RequestSupplierComparison, type RequestSupplierComparisonItem, type RequestSupplierComparisonSupplier } from "@/components/buildflow/request-supplier-comparison"
+import { type RequestSupplierComparisonItem, type RequestSupplierComparisonSupplier } from "@/components/buildflow/request-supplier-comparison"
 import { cleanMaterialRequestDetails, materialQuantity, materialReviewReasons, materialReviewStatus, materialSalesUnit, materialSearchQuery, type ReviewableMaterialItem } from "@/lib/client-material-review"
 
 export type RequestWorktableComparison = {
@@ -35,6 +35,35 @@ function copyText(items: ReviewableMaterialItem[]) {
   ].filter(Boolean).join(" | ")).join("\n")
 }
 
+function comparisonWords(value: string) {
+  return new Set(value.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter((word) => word.length > 1))
+}
+
+function matchingComparisonItem(item: ReviewableMaterialItem, candidates: RequestSupplierComparisonItem[]) {
+  const requestText = `${item.name} ${itemDetails(item)}`.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ")
+  const requestWords = comparisonWords(requestText)
+  return candidates
+    .map((candidate) => {
+      const candidateText = `${candidate.description} ${candidate.specification || ""}`.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ")
+      if (candidateText === requestText) return { candidate, score: 10 }
+      if (candidateText.includes(requestText) || requestText.includes(candidateText)) return { candidate, score: 5 }
+      const candidateWords = comparisonWords(candidateText)
+      const overlap = [...candidateWords].filter((word) => requestWords.has(word)).length
+      return { candidate, score: overlap / Math.max(candidateWords.size, requestWords.size, 1) }
+    })
+    .sort((left, right) => right.score - left.score)[0]?.candidate ?? null
+}
+
+function price(value: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
+}
+
+function quoteDate(value?: string | null) {
+  if (!value) return "Date not provided"
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
 export function RequestMaterialWorktable({
   requestId,
   originalItems,
@@ -57,6 +86,9 @@ export function RequestMaterialWorktable({
   const [copied, setCopied] = useState(false)
   const baseItems = organizedItems.length ? organizedItems : originalItems
   const items = baseItems.map((item) => savedItems[item.id] ?? item)
+  const supplierColumns = supplierComparisons.flatMap((comparison) =>
+    comparison.suppliers.map((supplier) => ({ comparison, supplier })),
+  )
 
   async function copyList() {
     try {
@@ -85,13 +117,18 @@ export function RequestMaterialWorktable({
       {organizationCompletedLabel ? <p className="border-b border-slate-100 px-4 py-1.5 text-[10px] font-semibold text-slate-400">Last AI review: {organizationCompletedLabel} ET</p> : null}
 
       {items.length ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[620px] table-fixed border-collapse text-left">
+        <div className="overflow-x-auto overscroll-x-contain" tabIndex={0} aria-label="Scrollable request, AI, and supplier comparison">
+          <table className="w-full table-fixed border-collapse text-left" style={{ minWidth: `${500 + Math.max(supplierColumns.length, 1) * 220}px` }}>
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-[.08em] text-slate-500">
-                <th className="sticky left-0 z-20 w-20 bg-slate-50 px-3 py-2.5">Quantity</th>
-                <th className="sticky left-20 z-20 w-52 bg-slate-50 px-3 py-2.5">Item details</th>
-                <th className="w-[42%] px-3 py-2.5">Missing info / AI notes</th>
+                <th className="sticky left-0 z-20 w-60 bg-slate-50 px-3 py-2.5 shadow-[6px_0_10px_-10px_rgba(15,23,42,.35)]"><span className="sr-only">Item details · </span>Original request</th>
+                <th className="w-64 px-3 py-2.5">Missing info / AI notes</th>
+                {supplierColumns.length ? supplierColumns.map(({ comparison, supplier }) => (
+                  <th key={`${comparison.id}-${supplier.id}`} className="w-56 border-l border-slate-200 px-3 py-2.5 normal-case tracking-normal text-slate-800">
+                    <a href={comparison.href} className="block truncate text-xs font-bold text-[#0066cc]">{supplier.name}</a>
+                    <span className="mt-0.5 block truncate text-[9px] font-semibold uppercase tracking-wide text-slate-400">{quoteDate(supplier.quoteDate || supplier.checkedAt)} · {supplier.deliveryLabel || (Number(supplier.deliveryCharge) > 0 ? `${price(Number(supplier.deliveryCharge))} delivery` : "Delivery not stated")}</span>
+                  </th>
+                )) : <th className="w-56 border-l border-slate-200 px-3 py-2.5">Supplier quote</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -102,8 +139,8 @@ export function RequestMaterialWorktable({
                 const priceOpen = priceItemId === item.id
                 return (
                   <tr key={item.id} className="align-top">
-                    <td className="sticky left-0 z-10 bg-white px-3 py-3 text-sm font-bold tabular-nums text-slate-950">{materialQuantity(item)} <span className="text-xs font-semibold text-slate-500">{materialSalesUnit(item)}</span></td>
-                    <td className="sticky left-20 z-10 bg-white px-3 py-3 shadow-[6px_0_10px_-10px_rgba(15,23,42,.35)]">
+                    <td className="sticky left-0 z-10 bg-white px-3 py-3 shadow-[6px_0_10px_-10px_rgba(15,23,42,.35)]">
+                      <p className="text-sm font-extrabold tabular-nums text-slate-950">{materialQuantity(item)} <span className="text-xs font-semibold text-slate-500">{materialSalesUnit(item)}</span></p>
                       <p className="text-sm font-bold text-slate-950">{item.name}</p>
                       {itemDetails(item) ? <p className="mt-0.5 text-xs leading-5 text-slate-500">{itemDetails(item)}</p> : null}
                       <button type="button" onClick={() => setPriceItemId(priceOpen ? null : item.id)} className="mt-1 inline-flex min-h-7 items-center gap-1 text-xs font-bold text-[#0066cc]"><Search className="h-3.5 w-3.5" />Online prices</button>
@@ -117,6 +154,14 @@ export function RequestMaterialWorktable({
                         </div>
                       ) : <span aria-label="No missing information — Ready" className="sr-only">Ready</span>}
                     </td>
+                    {supplierColumns.length ? supplierColumns.map(({ comparison, supplier }) => {
+                      const comparisonItem = matchingComparisonItem(item, comparison.items)
+                      const observation = comparisonItem ? supplier.prices.find((entry) => entry.itemId === comparisonItem.id) : null
+                      const available = Boolean(observation && observation.available !== false && observation.unitPrice !== null)
+                      return <td key={`${comparison.id}-${supplier.id}`} className="border-l border-slate-100 px-3 py-3 align-top">
+                        {available ? <div><p className="text-base font-extrabold tabular-nums text-slate-950">{price(Number(observation?.unitPrice))}</p><p className="text-[10px] font-semibold text-slate-500">per {observation?.unit || comparisonItem?.unit || materialSalesUnit(item)}</p>{observation?.notes ? <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-500">{observation.notes}</p> : null}</div> : <div><p className="text-xs font-bold text-amber-800">Not quoted</p><p className="mt-0.5 text-[10px] text-slate-500">No matched price yet</p></div>}
+                      </td>
+                    }) : <td className="border-l border-slate-100 px-3 py-3"><p className="text-xs font-bold text-slate-500">No supplier quote yet</p><p className="mt-0.5 text-[10px] text-slate-400">Add one from Documents</p></td>}
                   </tr>
                 )
               })}
@@ -127,12 +172,7 @@ export function RequestMaterialWorktable({
         <p className="px-4 py-8 text-center text-sm font-semibold text-slate-500">No request items found.</p>
       )}
 
-      {supplierComparisons.map((comparison) => (
-        <div key={comparison.id} className="border-t border-slate-200 p-3 sm:p-4">
-          <div className="mb-2 flex items-center justify-between gap-3"><h3 className="text-sm font-bold">{comparison.title}</h3><a href={comparison.href} className="text-xs font-bold text-[#0066cc]">Full comparison</a></div>
-          <RequestSupplierComparison headingId={`supplier-comparison-${comparison.id}`} items={comparison.items} suppliers={comparison.suppliers} />
-        </div>
-      ))}
+      {supplierComparisons.length ? <div className="flex flex-wrap gap-2 border-t border-slate-200 bg-slate-50 px-3 py-2 sm:px-4">{supplierComparisons.map((comparison) => <a key={comparison.id} href={comparison.href} className="text-xs font-bold text-[#0066cc]">Open full comparison · {comparison.title}</a>)}</div> : null}
     </section>
   )
 }

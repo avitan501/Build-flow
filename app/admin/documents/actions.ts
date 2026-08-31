@@ -1104,6 +1104,7 @@ export async function retryManagerDocumentExtractionAction(
 
 export async function routeManagerDocumentToSupplierPricingAction(
   documentId: string,
+  requestId?: string,
 ): Promise<Result<{ quoteId: string; itemIds: string[] }>> {
   const { supabase, user } = await requireStaffProfile("suppliers");
   if (!UUID_PATTERN.test(documentId))
@@ -1114,6 +1115,29 @@ export async function routeManagerDocumentToSupplierPricingAction(
     .eq("id", documentId)
     .maybeSingle<ManagerDocumentRecord>();
   if (!document) return { ok: false, error: "Document not found." };
+  const selectedRequestId = requestId || document.request_id || "";
+  if (selectedRequestId && !UUID_PATTERN.test(selectedRequestId))
+    return { ok: false, error: "Choose a valid material request." };
+  let selectedComparisonId: string | null = null;
+  if (selectedRequestId) {
+    try {
+      selectedComparisonId = await ensureDocumentRequestComparison(
+        supabase,
+        user.id,
+        selectedRequestId,
+        document.department,
+      );
+    } catch (error) {
+      console.error("Document request comparison link failed", error);
+      return { ok: false, error: "The selected material request could not be opened for quote comparison." };
+    }
+    const linked = await supabase
+      .from("manager_documents")
+      .update({ request_id: selectedRequestId, updated_by: user.id })
+      .eq("id", documentId);
+    if (linked.error)
+      return { ok: false, error: "The document could not be linked to that material request." };
+  }
   if (!["ready", "routed"].includes(document.status))
     return {
       ok: false,
@@ -1121,6 +1145,24 @@ export async function routeManagerDocumentToSupplierPricingAction(
         "Approve the reviewed document before sending it to supplier pricing.",
     };
   if (document.legacy_supplier_quote_id) {
+    if (selectedComparisonId) {
+      const { data: supplierRows } = await supabase.rpc("staff_load_catalog_suppliers");
+      const match = detectSupplierMatch(
+        Array.isArray(supplierRows) ? (supplierRows as CatalogSupplier[]) : [],
+        document.party_name,
+        document.raw_text,
+      );
+      const quoteUpdate = await supabase
+        .from("supplier_quotes")
+        .update({
+          comparison_id: selectedComparisonId,
+          ...(match ? { supplier_id: match.id, supplier_name: match.name } : {}),
+          updated_by: user.id,
+        })
+        .eq("id", document.legacy_supplier_quote_id);
+      if (quoteUpdate.error)
+        return { ok: false, error: "The existing supplier quote could not be linked to that comparison." };
+    }
     const { data: linkedItems, error: linkedItemsError } = await supabase
       .from("supplier_quote_items")
       .select("id")
@@ -1187,8 +1229,8 @@ export async function routeManagerDocumentToSupplierPricingAction(
     document.party_name ||
     inferSupplierName(document.raw_text) ||
     "Supplier needs review";
-  let comparisonId: string | null = null;
-  if (document.request_id) {
+  let comparisonId: string | null = selectedComparisonId;
+  if (!comparisonId && document.request_id) {
     try {
       comparisonId = await ensureDocumentRequestComparison(
         supabase,

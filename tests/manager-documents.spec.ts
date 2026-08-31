@@ -221,6 +221,26 @@ test("document center preserves originals while allowing direct catalog row impo
   expect(edgeFunction).toContain("can_manage_suppliers");
 });
 
+test("a reviewed document can be linked directly to a request quote comparison", async () => {
+  const [detailPage, review, actions, worktable] = await Promise.all([
+    readFile(path.join(root, "app/admin/documents/[documentId]/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/manager-document-review.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/documents/actions.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/request-material-worktable.tsx"), "utf8"),
+  ]);
+
+  expect(detailPage).toContain('from("quote_requests")');
+  expect(detailPage).toContain("requests={requests}");
+  expect(review).toContain("Request for quote compare");
+  expect(review).toContain("Add to Quote Compare");
+  expect(review).toContain("comparisonRequestId || undefined");
+  expect(actions).toContain("selectedComparisonId");
+  expect(actions).toContain("comparison_id: selectedComparisonId");
+  expect(worktable).toContain("Original request");
+  expect(worktable).toContain("Missing info / AI notes");
+  expect(worktable).toContain("supplierColumns.map");
+});
+
 test("document intelligence keeps evidence and catches line and total mismatches", () => {
   const item = {
     description: "Water heater",

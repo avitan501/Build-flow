@@ -57,12 +57,14 @@ export function ManagerDocumentReview({
   items,
   documentUrl,
   departments,
+  requests,
   canApprove,
 }: {
   document: ManagerDocumentRecord;
   items: ManagerDocumentItemRecord[];
   documentUrl: string;
   departments: string[];
+  requests: Array<{ id: string; label: string }>;
   canApprove: boolean;
 }) {
   const router = useRouter();
@@ -89,6 +91,9 @@ export function ManagerDocumentReview({
   );
   const [catalogVendor, setCatalogVendor] = useState(draft.party_name);
   const [catalogContact, setCatalogContact] = useState("");
+  const [comparisonRequestId, setComparisonRequestId] = useState(
+    document.request_id || "",
+  );
   const [deliveryPromptTarget, setDeliveryPromptTarget] = useState<
     string | "selected" | null
   >(null);
@@ -399,6 +404,7 @@ export function ManagerDocumentReview({
     run(async () => {
       const routed = await routeManagerDocumentToSupplierPricingAction(
         document.id,
+        comparisonRequestId || undefined,
       );
       if (!routed.ok) {
         setError(routed.error);
@@ -690,6 +696,31 @@ export function ManagerDocumentReview({
               <p className="text-xs font-semibold text-amber-800 sm:col-span-4">
                 {directImportBlocker}
               </p>
+            ) : null}
+            {supplierDocument ? (
+              <div className="grid gap-2 rounded-lg border border-sky-200 bg-white p-2 sm:col-span-3 sm:grid-cols-[minmax(14rem,1fr)_auto] sm:items-end">
+                <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  Request for quote compare
+                  <select
+                    value={comparisonRequestId}
+                    onChange={(event) => setComparisonRequestId(event.target.value)}
+                    className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-950"
+                  >
+                    <option value="">Choose a material request</option>
+                    {requests.map((request) => <option key={request.id} value={request.id}>{request.label}</option>)}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => routeQuote("comparison")}
+                  disabled={!canApprove || pending || !approved || !selectedLines.length || !comparisonRequestId || selectionChanged}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-violet-700 px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Columns3 className="h-4 w-4" />
+                  Add to Quote Compare
+                </button>
+                {selectionChanged ? <p className="text-[11px] font-semibold text-amber-800 sm:col-span-2">Save and approve the changed selection first.</p> : null}
+              </div>
             ) : null}
           </div>
           {lines.length ? (

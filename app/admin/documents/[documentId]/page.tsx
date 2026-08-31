@@ -13,11 +13,21 @@ export default async function ManagerDocumentPage({ params }: { params: Promise<
   const { documentId } = await params
   if (!UUID_PATTERN.test(documentId)) notFound()
   const { supabase, access } = await requireManagerPortalProfile()
-  const [{ data: document }, { data: items }] = await Promise.all([
+  const [{ data: document }, { data: items }, { data: requestRows }] = await Promise.all([
     supabase.from("manager_documents").select("*").eq("id", documentId).maybeSingle<ManagerDocumentRecord>(),
     supabase.from("manager_document_items").select("*").eq("document_id", documentId).order("line_number").returns<ManagerDocumentItemRecord[]>(),
+    supabase.from("quote_requests").select("id,title,public_number,owner_id,status").not("status", "in", '("completed","cancelled")').order("updated_at", { ascending: false }).limit(200).returns<Array<{ id: string; title: string; public_number: number; owner_id: string; status: string }>>(),
   ])
   if (!document) notFound()
+  const ownerIds = [...new Set((requestRows ?? []).map((request) => request.owner_id))]
+  const { data: owners } = ownerIds.length
+    ? await supabase.from("profiles").select("id,full_name,email").in("id", ownerIds).returns<Array<{ id: string; full_name: string | null; email: string | null }>>()
+    : { data: [] }
+  const ownerById = new Map((owners ?? []).map((owner) => [owner.id, owner]))
+  const requests = (requestRows ?? []).map((request) => ({
+    id: request.id,
+    label: `#${request.public_number} · ${request.title} · ${ownerById.get(request.owner_id)?.full_name || ownerById.get(request.owner_id)?.email || "Client"}`,
+  }))
   const { data: signed } = await supabase.storage.from(document.storage_bucket).createSignedUrl(document.file_path, 900)
-  return <main className="min-h-screen bg-[#f5f5f7] px-4 pb-20 pt-6 text-slate-950 sm:px-8 lg:px-10"><div className="mx-auto max-w-7xl"><Link href="/admin/documents" className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-[#0071e3]"><ArrowLeft className="h-4 w-4" />Documents</Link><header className="mt-3 border-b border-slate-200 pb-5"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.06em] text-slate-600">{managerDocumentTypeLabel(document.document_type)}</span><span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.06em] text-slate-600">{managerDocumentStatusLabel(document.status)}</span><span className="text-xs font-semibold text-slate-500">Classification {confidenceLabel(document.classification_confidence)}</span></div><h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{document.title || document.file_name}</h1><p className="mt-2 text-sm text-slate-600">{document.extraction_note}</p></header><div className="mt-5"><ManagerDocumentReview key={document.updated_at} document={document} items={items ?? []} documentUrl={signed?.signedUrl ?? ""} departments={materialCatalogDepartmentOptions(["Test", document.suggested_department])} canApprove={access.owner || access.operationsManager} /></div></div></main>
+  return <main className="min-h-screen bg-[#f5f5f7] px-4 pb-20 pt-6 text-slate-950 sm:px-8 lg:px-10"><div className="mx-auto max-w-7xl"><Link href="/admin/documents" className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-[#0071e3]"><ArrowLeft className="h-4 w-4" />Documents</Link><header className="mt-3 border-b border-slate-200 pb-5"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.06em] text-slate-600">{managerDocumentTypeLabel(document.document_type)}</span><span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[.06em] text-slate-600">{managerDocumentStatusLabel(document.status)}</span><span className="text-xs font-semibold text-slate-500">Classification {confidenceLabel(document.classification_confidence)}</span></div><h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{document.title || document.file_name}</h1><p className="mt-2 text-sm text-slate-600">{document.extraction_note}</p></header><div className="mt-5"><ManagerDocumentReview key={document.updated_at} document={document} items={items ?? []} documentUrl={signed?.signedUrl ?? ""} departments={materialCatalogDepartmentOptions(["Test", document.suggested_department])} requests={requests} canApprove={access.owner || access.operationsManager} /></div></div></main>
 }
