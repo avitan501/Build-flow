@@ -6,10 +6,11 @@ import { expect, test } from "@playwright/test"
 const root = process.cwd()
 
 test("direct checkout removes project selection and preserves manager request details", async () => {
-  const [button, actions, ownerDetail] = await Promise.all([
+  const [button, actions, ownerDetail, worktable] = await Promise.all([
     readFile(path.join(root, "components/buildflow/add-to-project-button.tsx"), "utf8"),
     readFile(path.join(root, "app/projects/quote-request-actions.ts"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/[requestId]/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/request-material-worktable.tsx"), "utf8"),
   ])
 
   expect(button).not.toContain("Choose a project")
@@ -19,8 +20,10 @@ test("direct checkout removes project selection and preserves manager request de
   expect(actions).toContain("ensureDirectRequestProject")
   expect(actions).toContain('DIRECT_REQUEST_PROJECT_NAME = "Material Requests"')
   expect(ownerDetail).toContain('answers,metadata')
-  expect(ownerDetail).toContain("Review client list")
-  expect(ownerDetail).toContain("request_details")
+  expect(ownerDetail).toContain("RequestMaterialWorktable")
+  expect(ownerDetail).not.toContain('title="Review client list"')
+  expect(worktable).toContain("metadata.request_details")
+  expect(worktable).toContain("itemDetails(sourceItem)")
   expect(ownerDetail).toContain("answer_display_snapshot")
   expect(ownerDetail).toContain('const { supabase } = await requireStaffProfile("customers")')
   expect(ownerDetail).not.toContain("createAdminClient")
@@ -135,8 +138,8 @@ test("manager reply composer supports templates attachments email and text", asy
   expect(panel).toContain("REPLY_BLOCKS")
   expect(panel).toContain("Ask for missing details")
   expect(panel).toContain("To finish pricing, please confirm:")
-  expect(panel).toContain("step={4}")
-  expect(panel).toContain('open={currentStage === "approval" || currentStage === "delivery"}')
+  expect(panel).not.toContain("step={4}")
+  expect(panel).not.toContain('title="Contact client"')
   expect(panel).not.toContain("lg:grid-cols-2")
   expect(panel).toContain("Good morning")
   expect(panel).toContain(">Greeting<select")

@@ -12,7 +12,7 @@ test("customer portal keeps a semantic, mobile-first information hierarchy", asy
 
   expect(pageSource).toContain("<main");
   expect(pageSource).toMatch(/<h1[^>]*>[^<]+<\/h1>/);
-  expect(pageSource).toMatch(/<h2[^>]*>Material requests<\/h2>/);
+  expect(pageSource).toMatch(/<h2[^>]*>\{openedRequest \? "Your request" : "Material requests"\}<\/h2>/);
   expect(pageSource).toContain("<article");
   expect(pageSource).toContain("<details");
   expect(pageSource).toContain("<summary");

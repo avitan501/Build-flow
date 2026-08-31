@@ -24,10 +24,12 @@ test("manager status controls keep paid delivery and completion separate", async
     readFile(path.join(process.cwd(), "app/preview-admin/workflow-actions.ts"), "utf8"),
   ])
 
-  for (const source of [requestStatus, workflowManager]) {
-    expect(source).toContain("Payment Received · Waiting for Supplier Delivery")
-    expect(source).toContain("Request Completed")
-  }
+  expect(requestStatus).toContain('{ status: "quoted", label: "Payment & delivery" }')
+  expect(requestStatus).toContain('{ status: "closed", label: "Completed" }')
+  expect(requestStatus).toContain('quoted: "Coordinate delivery"')
+  expect(requestStatus).toContain('window.confirm("Mark this request completed?')
+  expect(workflowManager).toContain("Payment Received · Waiting for Supplier Delivery")
+  expect(workflowManager).toContain("Request Completed")
   expect(workflowManager).toContain('<option value="closed">Request Completed</option>')
   expect(workflowActions).toContain('quoted: "Payment received; waiting for supplier delivery"')
   expect(workflowActions).toContain('requireStaffProfile("customers")')

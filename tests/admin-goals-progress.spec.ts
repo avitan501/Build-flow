@@ -23,7 +23,9 @@ test("Goals and Client Target stay in the dashboard instead of manager navigatio
   expect(shell).not.toContain('label: "Supplier Pricing"');
   expect(shell).not.toContain("Customer Website");
   expect(shell).not.toContain("Quick Access");
-  expect(shell).toContain(">Communications</span>");
+  expect(shell).toContain(
+    'link={{ href: "/admin/communications", label: "Communications", shortLabel: "Communication"',
+  );
   expect(shell).not.toContain('label: "Tasks"');
   expect(shell).not.toContain('label: "Quotes & Orders"');
   expect(shell).not.toContain('label: "Tasks & Daily Summary"');
@@ -378,6 +380,24 @@ test("Goals and lists use collapsed disclosures to keep the page compact", async
   expect(goals).toContain("otherGoals.map(goalRow)");
   expect(goals).toContain("grid-cols-[2rem_minmax(0,1fr)_auto]");
   expect(goals).toContain("min-h-16");
+});
+
+test("Carlos work keeps one short task summary, Focus first, and work areas collapsed", async () => {
+  const [page, goals] = await Promise.all([
+    readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/manager-goals.tsx"), "utf8"),
+  ]);
+
+  expect(goals).toContain("{goal.title}");
+  expect(goals).toContain("Next step");
+  expect(goals).toContain("text-xs leading-5");
+  expect(goals.indexOf("{focusGoals.map(goalRow)}")).toBeLessThan(
+    goals.indexOf("{otherGoals.map(goalRow)}"),
+  );
+  expect(goals).toContain("Focus first. Open a task for its next step.");
+  expect(page).toContain('aria-labelledby="carlos-work-areas"');
+  expect(page).toContain("Work areas");
+  expect(page).not.toMatch(/<details[^>]+open[^>]*aria-labelledby="carlos-work-areas"/);
 });
 
 test("affiliate tracker is persistent, owner-only, filterable, and setup-gated", async () => {
