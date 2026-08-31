@@ -82,12 +82,14 @@ test("cinematic homepage presents Construction Concierge clearly", async ({
     (page.viewportSize()?.width ?? 1280) < 640
       ? heroMobileVideo
       : heroDesktopVideo;
-  await activeHeroVideo.evaluate((video) => {
+  await activeHeroVideo.evaluate((video: HTMLVideoElement) => {
     video.currentTime = 12.4;
     video.dispatchEvent(new Event("timeupdate"));
   });
   await expect
-    .poll(() => activeHeroVideo.evaluate((video) => video.currentTime))
+    .poll(() =>
+      activeHeroVideo.evaluate((video: HTMLVideoElement) => video.currentTime),
+    )
     .toBeLessThan(1.5);
   await expect(
     homepageHeader.getByRole("button", { name: "Ver página en español" }),

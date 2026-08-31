@@ -41,9 +41,19 @@ test("twenty common new-home orders are recognized without another quantity ques
 })
 
 test("new-home coverage does not invent code or assembly clarifications", () => {
+  const expectedBlockers = new Map<string, string[]>([
+    ["25 squares roofing shingles", ["What shingle type and color do you need?"]],
+    ["12 windows", ["What window size and operating type do you need?"]],
+    ["40 insulation batts", ["What insulation type and R-value do you need?"]],
+    ["100 drywall sheets", ["Can we do 5/8-in. regular Sheetrock, or do you need Type X/fire-rated or moisture-resistant?"]],
+    ["10 gallons paint", ["What paint color do you need?"]],
+    ["24 interior doors", ["What door size and type do you need: interior, exterior, prehung, or slab?"]],
+    ["1 dumpster, 20 yard container", ["What material or debris is going into it?"]],
+  ])
   for (const message of COMMON_NEW_HOME_ORDERS) {
-    const expected = message === "10 gallons paint" ? ["What paint color, and which finish: flat, eggshell, satin, or semi-gloss?"] : []
-    expect(smsMaterialClarificationQuestions(message), message).toEqual(expected)
+    expect(smsMaterialClarificationQuestions(message), message).toEqual(
+      expectedBlockers.get(message) || [],
+    )
   }
 
   expect(smsMaterialClarificationQuestions("20 drywall 4x8x1/2")).toEqual([

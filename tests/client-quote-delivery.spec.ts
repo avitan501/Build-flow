@@ -40,7 +40,7 @@ test("client quote email is branded and excludes internal pricing", async () => 
 
     expect(result).toEqual({ status: "sent", providerId: "email-test-id" });
     expect(requestBody).not.toBeNull();
-    const body = requestBody as Record<string, unknown>;
+    const body = requestBody as unknown as Record<string, unknown>;
     expect(body.from).toContain("office@build.avantiap.com");
     expect(body.reply_to).toBe("office@build.avantiap.com");
     expect(body.subject).toContain("ABQ-TEST");

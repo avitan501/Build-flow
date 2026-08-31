@@ -12,6 +12,7 @@ import {
   formatSmsRequestSummaryItem,
   isSmsOptOutMessage,
   looksLikeSmsMaterialRequest,
+  mergeSmsCorrectionItems,
   rankSmsReplyExamples,
   resolveSmsDeliveryAddressKnown,
   resolveSmsExactListPreference,
@@ -23,7 +24,6 @@ import {
   smsHasExplicitQuantity,
   smsHasNeededByTiming,
   smsMaterialIntelligenceAssessment,
-  smsMaterialClarificationQuestions,
   smsMessagesAfterConfirmedRequest,
   smsNeededByTimingValue,
   smsProductInquiryFallbackReply,
@@ -33,6 +33,7 @@ import {
   smsSheetrockSpecificationFollowUpReply,
   smsShortMaterialAnswerReply,
   smsStartsNewMaterialRequest,
+  splitSmsMaterialClauses,
   smsUnknownContextFallback,
   smsUnansweredFollowUpCancellationReason,
   smsUnansweredFollowUpEligible,
@@ -3142,7 +3143,7 @@ function extractReviewMaterialLines(messages: string[]) {
   const dimensionalMaterial =
     /\b\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?(?:\s*[x×]\s*\d+(?:\.\d+)?)?\b/i;
   return messages
-    .flatMap((message) => message.split(/\r?\n|;/))
+    .flatMap(splitSmsMaterialClauses)
     .flatMap((rawLine) => {
       const line = rawLine.trim().replace(/^[-*•]\s*/, "");
       if (!line || line.length > 300) return [];
@@ -3917,9 +3918,15 @@ async function processCustomerSmsAutomation(
       source_communication_ids: string[];
       exact_list_only: boolean;
       delivery_address_known: boolean;
+      items: Array<{
+        name: string;
+        quantity: number;
+        unit: string;
+        quantityExplicit?: boolean;
+      }>;
     }[]
   >`
-    select id, original_message, customer_name, customer_address, source_communication_ids, exact_list_only, delivery_address_known
+    select id, original_message, customer_name, customer_address, source_communication_ids, exact_list_only, delivery_address_known, items
     from public.aura_sms_request_drafts
     where sender_phone = ${phone} and status = 'new' and draft_kind = 'create'
     order by created_at desc limit 1
@@ -4038,6 +4045,30 @@ async function processCustomerSmsAutomation(
     );
   }
   const { result, model, intent, metrics, promptVersion } = analyzed;
+  if (result.request && customerEvent === "correction") {
+    const previousItems =
+      persistedOrderState?.items?.length
+        ? persistedOrderState.items.map((item) => ({
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            quantityExplicit: true,
+          }))
+        : Array.isArray(openDraft?.items)
+          ? openDraft.items.map((item) => ({
+              name: item.name,
+              quantity: item.quantity,
+              unit: item.unit,
+              quantityExplicit: item.quantityExplicit ?? true,
+            }))
+          : [];
+    result.request.items = mergeSmsCorrectionItems(
+      previousItems,
+      result.request.items,
+      effectiveBody,
+      customerEvent,
+    );
+  }
   let safety = analyzed.safety;
   // Reviewed construction rules are final output guards, not model fallbacks.
   // Even a strong semantic model must not skip a required product choice.
@@ -4045,9 +4076,11 @@ async function processCustomerSmsAutomation(
     activeCustomerText || reviewText,
     { exactListOnly },
   );
+  const mayAskMaterialQuestion =
+    customerEvent === "message" || preConfirmationCorrection;
   const clarificationQuestions =
-    result.isMaterialRequest || Boolean(openDraft)
-      ? materialIntelligence.questions
+    mayAskMaterialQuestion && (result.isMaterialRequest || Boolean(openDraft))
+      ? materialIntelligence.questions.slice(0, 1)
       : [];
   if (clarificationQuestions.length) {
     result.reply = clarificationQuestions.join(" ");

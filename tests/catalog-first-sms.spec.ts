@@ -15,7 +15,7 @@ test("SMS grounding gives the reviewed Avantia catalog priority over constructio
 
   expect(grounding).toContain("Catalog match")
   expect(grounding).toContain("Fact")
-  expect(grounding).toContain("return [...products, ...facts]")
+  expect(grounding).toMatch(/\[\.\.\.products,\s+\.\.\.facts\]/)
 })
 
 test("SMS catalog evidence includes reviewed products, prefers recent verified supplier evidence, and never claims live price or stock", async () => {
@@ -26,7 +26,9 @@ test("SMS catalog evidence includes reviewed products, prefers recent verified s
   expect(broker).toContain("current_date - interval '60 days'")
   expect(broker).toContain("left join lateral")
   expect(broker).toContain("item.name ilike any(${patterns}::text[])")
-  expect(broker).toContain('[/\\b(?:sheet\\s*rock|sheetroc+k?|sheetrok|sherlock|drywall)\\b/i, ["sheetrock", "drywall"]]')
+  expect(broker).toMatch(
+    /\/\\b\(\?:sheet\\s\*rock\|sheetroc\+k\?\|sheetrok\|sherlock\|drywall\)\\b\/i,\s+\["sheetrock", "drywall"\]/,
+  )
   expect(broker).toContain("This match does not confirm current price or live stock")
   expect(broker).toContain("Exact price, availability, and delivery still require manager confirmation")
 

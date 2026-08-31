@@ -23,7 +23,7 @@ test("communications offers guarded per-contact AI modes and fast contact tags",
   for (const kind of ["customer", "lead", "supplier"]) expect(actions).toContain(`"${kind}"`)
   expect(actions).not.toContain("phoneLoginEmailForPhone")
   expect(actions).toContain("findPhoneAuthUser")
-  expect(actions).toContain("createUser({ phone, phone_confirm: true")
+  expect(actions).toMatch(/createUser\(\{\s+phone,\s+phone_confirm: true/)
   expect(actions).toContain("staff_upsert_supplier_directory_entry")
 })
 
@@ -100,7 +100,7 @@ test("material lists from texts enter a review queue before becoming requests", 
   expect(page).toContain("customer_name")
   expect(actions).toContain("staff_create_client_request")
   expect(actions).toContain('status: "converted"')
-  expect(communicationActions).toContain('quickTagPhoneContactAction({ phone, kind: "customer"')
-  expect(communicationActions).toContain('rpc("staff_create_client_request"')
+  expect(communicationActions).toMatch(/quickTagPhoneContactAction\(\{\s+phone,\s+kind: "customer"/)
+  expect(communicationActions).toMatch(/\.rpc\(\s+"staff_create_client_request"/)
   expect(createCustomer).toContain('approval_status: "pending"')
 })

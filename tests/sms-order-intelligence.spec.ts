@@ -177,5 +177,5 @@ test("a question about the previous product image reuses vision instead of askin
   for (const message of references) expect(smsReferencesPriorAttachment(message), message).toBe(true)
   expect(broker).toContain("recentImageMedia: activeOrdered")
   expect(broker).toContain("smsReferencesPriorAttachment(effectiveBody)")
-  expect(broker).toContain("settings, analysisMedia, customerEvent")
+  expect(broker).toMatch(/settings,\s+analysisMedia,\s+customerEvent/)
 })

@@ -12,6 +12,7 @@ import {
   inspectSmsQuestionStructure,
   isSmsOptOutMessage,
   looksLikeSmsMaterialRequest,
+  mergeSmsCorrectionItems,
   resolveSmsDeliveryAddressKnown,
   resolveSmsExactListPreference,
   resolveSmsMaterialReplyStep,
@@ -32,6 +33,7 @@ import {
   smsSheetrockSpecificationFollowUpReply,
   smsShortMaterialAnswerReply,
   smsStartsNewMaterialRequest,
+  splitSmsMaterialClauses,
   smsUnknownContextFallback,
   smsUnansweredFollowUpCancellationReason,
   smsUnansweredFollowUpEligible,
@@ -287,6 +289,86 @@ Matching tape
   expect(applyAvantiaMaterialDefaults([{ name: "Metal 2x4x8 studs", quantity: 50, unit: "pieces" }], `${list}\nUse metal studs.`)[0].name).toBe("Metal 2x4x8 studs")
 })
 
+test("mixed contractor lists preserve every item and do not confuse screw length with drywall thickness", () => {
+  const clauses = splitSmsMaterialClauses(
+    "1,000 pc drywall screws 1-1/4, 1 roll matching tape and 1 bucket all-purpose compound, 1 bucket primer",
+  )
+  expect(clauses).toEqual([
+    "1,000 pc drywall screws 1-1/4",
+    "1 roll matching tape",
+    "1 bucket all-purpose compound",
+    "1 bucket primer",
+  ])
+  expect(
+    smsMaterialClarificationQuestions(
+      "1,000 pc drywall screws 1-1/4, 1 roll matching tape and 1 bucket all-purpose compound",
+    ),
+  ).toEqual([])
+  expect(
+    smsMaterialClarificationQuestions(
+      "1,000 pc drywall screws 1-1/4\n25 sheets 5/8 regular Sheetrock 4x8",
+    ),
+  ).toEqual([])
+})
+
+test("breaker compatibility asks the one panel blocker in the customer language", () => {
+  expect(
+    smsMaterialClarificationQuestions(
+      "Necesito 10 interruptores Square D de 20A de un polo",
+    ),
+  ).toEqual(["¿Qué línea de Square D necesita: Homeline o QO?"])
+  expect(
+    smsMaterialClarificationQuestions("10 Square D Homeline 20A single-pole breakers"),
+  ).toEqual([])
+  expect(smsMaterialClarificationQuestions("I need 4 circuit breakers")).toEqual([
+    "What is the electrical panel manufacturer?",
+  ])
+})
+
+test("quantity corrections merge into canonical items without deleting known specifications", () => {
+  const previous = [
+    {
+      name: "5/8-in. regular 4x8 Sheetrock",
+      quantity: 25,
+      unit: "sheets",
+      quantityExplicit: true,
+    },
+  ]
+  expect(
+    mergeSmsCorrectionItems(
+      previous,
+      [{ name: "Sheetrock", quantity: 30, unit: "sheets", quantityExplicit: true }],
+      "I wrote 25, make it 30",
+      "correction",
+    ),
+  ).toEqual([
+    {
+      name: "5/8-in. regular 4x8 Sheetrock",
+      quantity: 30,
+      unit: "sheets",
+      quantityExplicit: true,
+    },
+  ])
+  expect(
+    mergeSmsCorrectionItems(previous, [], "Please cancel", "cancellation"),
+  ).toEqual([])
+  expect(
+    mergeSmsCorrectionItems(
+      previous,
+      [{ name: "4x12 Sheetrock", quantity: 1, unit: "sheets", quantityExplicit: false }],
+      "Change it to 4x12 sheets",
+      "correction",
+    ),
+  ).toEqual([
+    {
+      name: "5/8-in. regular 4x12 Sheetrock",
+      quantity: 25,
+      unit: "sheets",
+      quantityExplicit: true,
+    },
+  ])
+})
+
 test("paint replies understand brand, color, code, and finish without repeating the same question", () => {
   const base = "Customer: I need 5 gallons of paint"
   const cases = [
@@ -328,6 +410,10 @@ test("broker-created request progression replies are gated independently from mo
   expect(brokerSource).toContain('if (customerEvent === "correction") {')
   expect(brokerSource).toMatch(/const preConfirmationCorrection\s*=\s*customerEvent === "correction"\s*&&\s*Boolean\(openDraft\)/)
   expect(brokerSource).toContain('event: preConfirmationCorrection ? "message" : customerEvent')
+  expect(brokerSource).toContain('const mayAskMaterialQuestion =')
+  expect(brokerSource).toContain('customerEvent === "message" || preConfirmationCorrection')
+  expect(brokerSource).toContain('mergeSmsCorrectionItems(')
+  expect(brokerSource).toContain('select id, original_message, customer_name, customer_address, source_communication_ids, exact_list_only, delivery_address_known, items')
   expect(brokerSource).toContain('if (preConfirmationCorrection) {')
   expect(brokerSource).toContain('only a concise, non-committal next question can pass automatically')
   expect(brokerSource).toMatch(/\(customerEvent !== "correction" \|\| preConfirmationCorrection\)/)

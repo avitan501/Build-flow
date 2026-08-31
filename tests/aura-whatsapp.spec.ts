@@ -188,7 +188,7 @@ test("lead and customer actions offer confirmed WhatsApp video attachments", asy
     "avantia-why-contractors-hire-us-en-slow.mp4",
   ];
 
-  expect(contactActions).toContain("Send video");
+  expect(contactActions).toContain("Send a Video");
   expect(contactActions).toContain("Confirm send");
   expect(actions).toContain("sendAuraVideoAction");
   expect(actions).toContain('type: "video/mp4"');

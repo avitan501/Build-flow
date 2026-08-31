@@ -5,14 +5,14 @@ import { expect, test } from "@playwright/test"
 
 const root = process.cwd()
 
-test("manager WhatsApp shortcut opens the internal filtered communication log", async () => {
+test("manager communications shortcut opens the unified internal log", async () => {
   const [shell, page, workspace] = await Promise.all([
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/communications/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8"),
   ])
 
-  expect(shell).toContain("/admin/communications?channel=whatsapp")
+  expect(shell).toContain('href: "/admin/communications"')
   expect(page).toContain("initialChannelFilter")
   expect(page).toContain('requestedChannel === "email-list"')
   expect(workspace).toContain("useState(initialChannelFilter)")

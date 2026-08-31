@@ -585,25 +585,154 @@ export function smsAnsweredQuantityGuardReply(
   return null;
 }
 
+export function splitSmsMaterialClauses(value: string) {
+  return value
+    .split(/\r?\n|;/)
+    .flatMap((line) =>
+      line
+        // Preserve thousands separators such as 1,000 while accepting the
+        // comma/"and" lists contractors commonly send from a phone.
+        .split(/,(?!\d)|\s+(?:and|plus|y|e)\s+(?=(?:\d|[a-z]))/i)
+        .map((clause) => clause.trim())
+        .filter(Boolean),
+    );
+}
+
+type SmsRequestItem = {
+  name: string;
+  quantity: number;
+  unit: string;
+  quantityExplicit: boolean;
+};
+
+function materialIdentityTokens(value: string) {
+  const ignored = new Set([
+    "a",
+    "an",
+    "and",
+    "box",
+    "each",
+    "in",
+    "of",
+    "piece",
+    "pieces",
+    "the",
+  ]);
+  return new Set(
+    value
+      .toLowerCase()
+      .match(/[a-z]+|\d+x\d+(?:x\d+)?/g)
+      ?.filter((token) => token.length > 1 && !ignored.has(token)) || [],
+  );
+}
+
+function materialIdentityScore(left: string, right: string) {
+  const leftTokens = materialIdentityTokens(left);
+  const rightTokens = materialIdentityTokens(right);
+  if (!leftTokens.size || !rightTokens.size) return 0;
+  const overlap = [...leftTokens].filter((token) => rightTokens.has(token));
+  return overlap.length / Math.max(leftTokens.size, rightTokens.size);
+}
+
+function mergeCorrectedMaterialName(existing: string, candidate: string) {
+  const correctedDimensions = candidate.match(
+    /\b\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?(?:\s*[x×]\s*\d+(?:\.\d+)?)?\b/i,
+  )?.[0];
+  if (!correctedDimensions) return existing;
+  const existingDimensions =
+    /\b\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?(?:\s*[x×]\s*\d+(?:\.\d+)?)?\b/i;
+  return existingDimensions.test(existing)
+    ? existing.replace(existingDimensions, correctedDimensions)
+    : `${existing} ${correctedDimensions}`.trim();
+}
+
+export function mergeSmsCorrectionItems(
+  previous: SmsRequestItem[],
+  incoming: SmsRequestItem[],
+  latestMessage: string,
+  event: "message" | "duplicate" | "correction" | "cancellation",
+) {
+  if (event !== "correction" || previous.length === 0) return incoming;
+  const quantityCorrectionEvidence = latestMessage
+    .replace(
+      /\b\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?(?:\s*[x×]\s*\d+(?:\.\d+)?)?\b/gi,
+      "SPEC",
+    )
+    .replace(/\b\d+\s*[- ]\s*\d+\s*\/\s*\d+\b|\b\d+\s*\/\s*\d+\b/g, "SPEC");
+  const correctionNumbers = [
+    ...quantityCorrectionEvidence.matchAll(
+      /\b(?:make it|change (?:it|that)(?:\s+to)?|instead of|not|(?:i\s+)?(?:wrote|said))\s+(\d+(?:,\d{3})*(?:\.\d+)?)\b/gi,
+    ),
+  ].map((match) => match[1].replaceAll(",", ""));
+  const correctedQuantity = correctionNumbers.at(-1);
+
+  if (previous.length === 1 && correctedQuantity) {
+    return [
+      {
+        ...previous[0],
+        quantity: Number(correctedQuantity),
+        quantityExplicit: true,
+      },
+    ];
+  }
+  if (!incoming.length) return previous;
+
+  const merged = previous.map((item) => ({ ...item }));
+  const minimumIdentityScore =
+    previous.length === 1 && incoming.length === 1 ? 0.2 : 0.34;
+  for (const candidate of incoming) {
+    let bestIndex = -1;
+    let bestScore = 0;
+    for (const [index, existing] of merged.entries()) {
+      const score = materialIdentityScore(existing.name, candidate.name);
+      if (score > bestScore) {
+        bestIndex = index;
+        bestScore = score;
+      }
+    }
+    if (bestIndex >= 0 && bestScore >= minimumIdentityScore) {
+      const existing = merged[bestIndex];
+      merged[bestIndex] = {
+        ...existing,
+        name: mergeCorrectedMaterialName(existing.name, candidate.name),
+        quantity: candidate.quantityExplicit
+          ? candidate.quantity
+          : existing.quantity,
+        unit: candidate.quantityExplicit
+          ? candidate.unit || existing.unit
+          : existing.unit,
+        quantityExplicit:
+          existing.quantityExplicit || candidate.quantityExplicit,
+      };
+    } else {
+      merged.push({ ...candidate });
+    }
+  }
+  return merged;
+}
+
 export function smsMaterialClarificationQuestions(
   value: string,
-  options: { exactListOnly?: boolean } = {},
+  options: { exactListOnly?: boolean; includeAll?: boolean } = {},
 ) {
   const questions: string[] = [];
-  const textAfter = (pattern: RegExp) => {
-    const match = pattern.exec(value);
-    return match ? value.slice((match.index || 0) + match[0].length) : "";
+  const sheetrockEvidence = value.replace(
+    /^.*\b(?:drywall|sheetrock)\s+screws?\b.*$/gim,
+    (line) =>
+      line.replace(
+        /\b\d+\s*[- ]\s*\d+\s*\/\s*\d+\b|\b\d+\s*\/\s*\d+\b/g,
+        "SCREW-SPEC",
+      ),
+  );
+  const textAfter = (pattern: RegExp, source = value) => {
+    const match = pattern.exec(source);
+    return match ? source.slice((match.index || 0) + match[0].length) : "";
   };
   const customerLines = value
     .split(/\r?\n/)
     .map((line) => line.trim().replace(/^Customer:\s*/i, ""))
     .filter((line) => line && !/^Avantia:/i.test(line));
-  const quantityClauses = customerLines.flatMap((line) =>
-    line
-      .split(/\s+(?:and|plus)\s+|[,;]/i)
-      .map((clause) => clause.trim())
-      .filter(Boolean),
-  );
+  const quantityClauses = splitSmsMaterialClauses(customerLines.join("\n"));
   const quantityProductPredicates: Array<(text: string) => boolean> = [
     (text) =>
       looksLikeSheetrock(text) ||
@@ -629,6 +758,7 @@ export function smsMaterialClarificationQuestions(
       /\b(?:drywall|sheetrock)\s+screws?\b|\bscrews?\b[^\n]{0,30}\b(?:drywall|sheetrock)\b/i.test(
         text,
       ),
+    (text) => /\b(?:circuit\s+)?breakers?\b|\binterruptores?\b/i.test(text),
   ];
   const quantityProductCount = quantityProductPredicates.filter((predicate) =>
     predicate(value),
@@ -665,9 +795,9 @@ export function smsMaterialClarificationQuestions(
   if (
     !options.exactListOnly &&
     !postListAnswer &&
-    halfInchSheetrock.test(value) &&
+    halfInchSheetrock.test(sheetrockEvidence) &&
     !/\b(?:keep|confirm(?:ed)?|yes|use|make|change|actually)?\s*(?:1\s*\/\s*2|5\s*\/\s*8)\b/i.test(
-      textAfter(halfInchSheetrock),
+      textAfter(halfInchSheetrock, sheetrockEvidence),
     )
   ) {
     questions.push(
@@ -675,19 +805,19 @@ export function smsMaterialClarificationQuestions(
     );
   }
   const hasSheetrock =
-    looksLikeSheetrock(value) ||
-    /\bsheet\s*rock\b|\bdrywall(?!\s+screws?)\b/i.test(value);
+    looksLikeSheetrock(sheetrockEvidence) ||
+    /\bsheet\s*rock\b|\bdrywall(?!\s+screws?)\b/i.test(sheetrockEvidence);
   const sheetrockThickness =
-    value.match(
+    sheetrockEvidence.match(
       /\b(?:1\s*\/\s*4|3\s*\/\s*8|1\s*\/\s*2|5\s*\/\s*8)\s*(?:in(?:ch(?:es)?)?\.?|["”])?/i,
     )?.[0] || "";
   const hasSheetrockType =
     /\b(?:regular|type\s*x|fire[- ]?rated|moisture[- ]?resistant|mold[- ]?resistant|green\s*board|purple\s*board)\b/i.test(
-      value,
+      sheetrockEvidence,
     );
   if (
     hasSheetrock &&
-    !halfInchSheetrock.test(value) &&
+    !halfInchSheetrock.test(sheetrockEvidence) &&
     (!sheetrockThickness || !hasSheetrockType)
   ) {
     questions.push(
@@ -733,16 +863,6 @@ export function smsMaterialClarificationQuestions(
     .filter((line) => line && !/^Avantia:/i.test(line))
     .map((line) => line.replace(/^Customer:\s*/i, ""))
     .join("\n");
-  const paintMatch = paint.exec(paintCustomerEvidence);
-  const paintAnswer = paintMatch
-    ? paintCustomerEvidence.slice(paintMatch.index || 0)
-    : "";
-  const latestCustomerLine =
-    paintCustomerEvidence
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .at(-1) || "";
   const paintBrandMatch =
     paintCustomerEvidence.match(
       /\b(?:sherm(?:a|e)n[- ]?willi(?:am|ams)?|sherwin[- ]?williams?|benjamin\s+moore|behr|ppg)\b/i,
@@ -1004,14 +1124,54 @@ export function smsMaterialClarificationQuestions(
     );
   }
 
-  return [...new Set(questions)].slice(0, 1);
+  const breaker = /\b(?:circuit\s+)?breakers?\b|\binterruptores?\b/i.test(
+    value,
+  );
+  if (breaker) {
+    const squareD = /\bsquare\s*d\b/i.test(value);
+    const hasSquareDLine = /\b(?:homeline|q\s*o)\b/i.test(value);
+    const hasPanelBrand =
+      squareD ||
+      /\b(?:siemens|eaton|cutler[- ]hammer|ge|general\s+electric|leviton|federal\s+pacific)\b/i.test(
+        value,
+      );
+    const language = smsReplyLanguage(value);
+    if (squareD && !hasSquareDLine) {
+      questions.push(
+        language === "es"
+          ? "¿Qué línea de Square D necesita: Homeline o QO?"
+          : language === "he"
+            ? "איזו סדרת Square D צריך: Homeline או QO?"
+            : "Which Square D line do you need: Homeline or QO?",
+      );
+    } else if (!hasPanelBrand) {
+      questions.push(
+        language === "es"
+          ? "¿Qué marca tiene el panel eléctrico?"
+          : language === "he"
+            ? "מה יצרן לוח החשמל?"
+            : "What is the electrical panel manufacturer?",
+      );
+    }
+    addQuantityQuestion(
+      "breakers",
+      "breakers",
+      quantityProductPredicates[11],
+    );
+  }
+
+  const uniqueQuestions = [...new Set(questions)];
+  return options.includeAll ? uniqueQuestions : uniqueQuestions.slice(0, 1);
 }
 
 export function smsMaterialIntelligenceAssessment(
   value: string,
   options: { exactListOnly?: boolean } = {},
 ) {
-  const questions = smsMaterialClarificationQuestions(value, options);
+  const questions = smsMaterialClarificationQuestions(value, {
+    ...options,
+    includeAll: true,
+  });
   const matchedRules = [
     [
       (text: string) =>
@@ -1062,6 +1222,11 @@ export function smsMaterialIntelligenceAssessment(
           text,
         ),
       "drywall-fastener",
+    ],
+    [
+      (text: string) =>
+        /\b(?:circuit\s+)?breakers?\b|\binterruptores?\b/i.test(text),
+      "circuit-breaker",
     ],
   ]
     .filter(([matches]) => (matches as (text: string) => boolean)(value))
