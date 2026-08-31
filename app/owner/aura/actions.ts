@@ -83,6 +83,7 @@ export async function sendAuraMessageAction(input: {
   supplierName?: string;
   materialRequestId?: string;
   materialRequestTitle?: string;
+  sourceCommunicationId?: string;
 }): Promise<SendAuraMessageResult> {
   const { supabase, access } = await requireManagerPortalProfile();
   if (!access.customers)
@@ -125,6 +126,7 @@ export async function sendAuraMessageAction(input: {
           action: "send_whatsapp",
           to: phone,
           message,
+          sourceCommunicationId: input.sourceCommunicationId,
         });
       } catch (error) {
         brokerError = error;

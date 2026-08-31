@@ -445,6 +445,9 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     const messageChannel = channel
     const sentDraftId = messageChannel === "sms" ? activeDraftId : null
     const teachSentReply = Boolean(sentDraftId && teachAi)
+    const sourceCommunicationId = activeConversation
+      ? [...activeConversation.messages].reverse().find((item) => item.direction === "incoming" && (item.channel === "sms" || item.channel === "whatsapp"))?.id
+      : undefined
     setFeedback(null)
     startTransition(async () => {
       if (messageChannel === "sms" && attachment) {
@@ -465,7 +468,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         if (attachmentInputRef.current) attachmentInputRef.current.value = ""
         return
       }
-      const result = await sendAuraMessageAction({ channel: messageChannel, recipient, subject, message })
+      const result = await sendAuraMessageAction({ channel: messageChannel, recipient, subject, message, sourceCommunicationId })
       if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return }
       if (sentDraftId) {
         const completed = await completeSmsReplyDraftAction({ draftId: sentDraftId, reply: message, teachAi: teachSentReply, correctionReasons })

@@ -57,6 +57,12 @@ import {
   type AuraConfidenceLabel,
   type CommonMaterialDefinition,
 } from "../_shared/aura-material-shadow.ts";
+import {
+  deliveredQuestionRetryAllowed,
+  questionSlotsFromReply,
+  requestCommunicationDeliveryTransition,
+  type RequestCommunicationDeliveryStatus,
+} from "../_shared/request-communication-state.ts";
 
 const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, {
   max: 1,
@@ -674,7 +680,18 @@ async function storeCommunication(input: {
       ${input.mailboxAddress || null}, ${input.messageId || null}, ${input.inReplyTo || null}
     )
     on conflict (provider, external_activity_id) do update set
-      status = excluded.status,
+      status = case
+        when public.aura_communications.status = 'read' then 'read'
+        when public.aura_communications.status = 'delivered' and excluded.status <> 'read'
+          then 'delivered'
+        when public.aura_communications.status = 'failed'
+          and excluded.status in ('queued', 'sent', 'accepted') then 'failed'
+        else excluded.status
+      end,
+      direction = coalesce(excluded.direction, public.aura_communications.direction),
+      counterparty_phone = coalesce(excluded.counterparty_phone, public.aura_communications.counterparty_phone),
+      business_phone = coalesce(excluded.business_phone, public.aura_communications.business_phone),
+      contact_id = coalesce(excluded.contact_id, public.aura_communications.contact_id),
       body = coalesce(excluded.body, public.aura_communications.body),
       summary = coalesce(excluded.summary, public.aura_communications.summary),
       transcript = coalesce(excluded.transcript, public.aura_communications.transcript),
@@ -985,6 +1002,11 @@ async function handleTwilioWebhook(req: Request) {
       media,
     });
     scheduleMaterialShadowAssessment(communicationId);
+    await linkIncomingCommunicationToRequestState(
+      from,
+      communicationId,
+      "whatsapp",
+    );
   } else {
     await sql`
       update public.aura_communications set status = ${status}, last_event_at = now(), updated_at = now()
@@ -1081,11 +1103,49 @@ async function handleTwoChatWebhook(req: Request) {
   };
   const receiptStatus = payload.event ? receiptStatuses[payload.event] : null;
   if (receiptStatus && payload.message_uuid) {
-    await sql`
+    const updated = await sql<
+      { id: string; counterparty_phone: string; body: string | null }[]
+    >`
       update public.aura_communications
-      set status = ${receiptStatus}, last_event_at = now(), updated_at = now()
+      set status = case
+        when status = 'read' then 'read'
+        when status = 'delivered' and ${receiptStatus} <> 'read' then 'delivered'
+        when status = 'failed' and ${receiptStatus} in ('sent', 'accepted') then 'failed'
+        else ${receiptStatus}
+      end, last_event_at = now(), updated_at = now()
       where provider = 'whatsapp' and external_activity_id = ${payload.message_uuid}
+      returning id, counterparty_phone, body
     `;
+    if (!updated[0]) {
+      const placeholderId = await storeCommunication({
+        provider: "whatsapp",
+        channel: "whatsapp",
+        externalId: payload.message_uuid,
+        direction: "outgoing",
+        body: null,
+        status: receiptStatus,
+      });
+      if (["delivered", "read", "failed"].includes(receiptStatus))
+        await markRequestCommunicationDelivery(
+          placeholderId,
+          receiptStatus as "delivered" | "read" | "failed",
+        );
+      return json({ ok: true, pendingSendReconciliation: true });
+    }
+    if (receiptStatus === "sent" && updated[0]?.counterparty_phone)
+      await linkOutgoingCommunicationAccepted(
+        updated[0].counterparty_phone,
+        updated[0].id,
+        "whatsapp",
+      );
+    if (
+      updated[0]?.id &&
+      ["delivered", "read", "failed"].includes(receiptStatus)
+    )
+      await markRequestCommunicationDelivery(
+        updated[0].id,
+        receiptStatus as "delivered" | "read" | "failed",
+      );
     return json({ ok: true });
   }
 
@@ -1113,8 +1173,20 @@ async function handleTwoChatWebhook(req: Request) {
     media: message.media,
     occurredAt: message.occurredAt,
   });
-  if (direction === "incoming")
+  if (direction === "incoming") {
     scheduleMaterialShadowAssessment(communicationId);
+    await linkIncomingCommunicationToRequestState(
+      message.remotePhone,
+      communicationId,
+      "whatsapp",
+    );
+  } else {
+    await linkOutgoingCommunicationAccepted(
+      message.remotePhone,
+      communicationId,
+      "whatsapp",
+    );
+  }
   return json({ ok: true });
 }
 
@@ -1189,7 +1261,14 @@ type PersistedSmsOrderState = {
   language: string;
   exactListOnly: boolean;
   lastAskedSlots: string[];
+  questionAttempts: Record<string, number>;
   listComplete: boolean;
+  crossChannelMemory: Array<{
+    channel: "sms" | "whatsapp";
+    direction: "incoming" | "outgoing";
+    body: string;
+    occurredAt: string;
+  }>;
   slots: Record<string, string>;
   items: Array<{
     name: string;
@@ -1209,10 +1288,12 @@ async function loadPersistedSmsOrderState(
         language: string;
         exact_list_only: boolean;
         last_asked_slots: string[];
+        question_attempts: Record<string, number>;
         list_complete: boolean;
       }[]
     >`
-      select state.id, state.language, state.exact_list_only, state.last_asked_slots, state.list_complete
+      select state.id, state.language, state.exact_list_only, state.last_asked_slots,
+        state.question_attempts, state.list_complete
       from public.aura_sms_request_states as state
       left join public.quote_requests as request on request.id = state.created_request_id
       where state.normalized_phone = ${phone}
@@ -1224,7 +1305,7 @@ async function loadPersistedSmsOrderState(
     `;
     const state = states[0];
     if (!state) return null;
-    const [slotRows, itemRows] = await Promise.all([
+    const [slotRows, itemRows, communicationRows] = await Promise.all([
       sql<{ slot_key: string; value_text: string }[]>`
         select slot_key, value_text from public.aura_sms_request_state_slots
         where state_id = ${state.id}::uuid and status in ('observed', 'confirmed')
@@ -1242,6 +1323,25 @@ async function loadPersistedSmsOrderState(
         where state_id = ${state.id}::uuid and status = 'active'
         order by ordinal
       `,
+      sql<
+        {
+          channel: "sms" | "whatsapp";
+          direction: "incoming" | "outgoing";
+          body: string;
+          occurred_at: string;
+        }[]
+      >`
+        select communication.channel, communication.direction,
+          communication.body, ledger.occurred_at::text
+        from public.aura_request_state_communications as ledger
+        join public.aura_communications as communication
+          on communication.id = ledger.communication_id
+        where ledger.state_id = ${state.id}::uuid
+          and communication.body is not null
+          and length(trim(communication.body)) > 0
+        order by ledger.occurred_at desc, ledger.id desc
+        limit 60
+      `,
     ]);
     return {
       id: state.id,
@@ -1250,7 +1350,17 @@ async function loadPersistedSmsOrderState(
       lastAskedSlots: Array.isArray(state.last_asked_slots)
         ? state.last_asked_slots
         : [],
+      questionAttempts:
+        state.question_attempts && typeof state.question_attempts === "object"
+          ? state.question_attempts
+          : {},
       listComplete: state.list_complete,
+      crossChannelMemory: communicationRows.reverse().map((row) => ({
+        channel: row.channel,
+        direction: row.direction,
+        body: row.body.slice(0, 160),
+        occurredAt: row.occurred_at,
+      })),
       slots: Object.fromEntries(
         slotRows.map((row) => [row.slot_key, row.value_text]),
       ),
@@ -1265,32 +1375,220 @@ async function loadPersistedSmsOrderState(
 
 function persistedSmsOrderStateText(state: PersistedSmsOrderState | null) {
   if (!state) return "No persisted order state exists yet.";
-  return JSON.stringify({
+  const base = {
     language: state.language,
     exactListOnly: state.exactListOnly,
-    answeredFields: state.slots,
+    answeredFields: Object.fromEntries(
+      Object.entries(state.slots)
+        .slice(0, 20)
+        .map(([key, value]) => [key, String(value).slice(0, 200)]),
+    ),
     lastAskedFields: state.lastAskedSlots,
+    deliveredQuestionAttempts: Object.fromEntries(
+      Object.entries(state.questionAttempts).slice(0, 20),
+    ),
     listComplete: state.listComplete,
-    items: state.items,
-  }).slice(0, 5000);
+    items: state.items.slice(0, 30).map((item) => ({
+      name: item.name.slice(0, 180),
+      quantity: item.quantity,
+      unit: item.unit.slice(0, 40),
+      specifications: item.specifications,
+    })),
+  };
+  // Retain the newest messages while keeping the serialized context valid.
+  // Cutting a finished JSON string can invalidate it and drops newest turns.
+  const memory = state.crossChannelMemory.slice(-60);
+  let serialized = JSON.stringify({ ...base, crossChannelMemory: memory });
+  while (serialized.length > 12_000 && memory.length > 1) {
+    memory.shift();
+    serialized = JSON.stringify({ ...base, crossChannelMemory: memory });
+  }
+  if (serialized.length <= 12_000) return serialized;
+  return JSON.stringify({
+    ...base,
+    items: base.items.slice(0, 10).map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+      unit: item.unit,
+    })),
+    crossChannelMemory: memory.slice(-1),
+    contextTruncated: true,
+  });
 }
 
 function askedSlotsFromReply(reply: string) {
-  const slots: string[] = [];
-  if (/\b(?:how many|how much|quantity)\b/i.test(reply)) slots.push("quantity");
-  if (/\b(?:full )?(?:delivery )?address\b/i.test(reply))
-    slots.push("delivery_address");
-  if (
-    /\b(?:when|needed by|need (?:it|this|them) by|delivery date)\b/i.test(reply)
-  )
-    slots.push("needed_by");
-  if (/\b(?:type|kind)\b/i.test(reply)) slots.push("type");
-  if (/\b(?:size|length|thickness|gauge)\b/i.test(reply))
-    slots.push("specification");
-  if (/\b(?:color|finish)\b/i.test(reply)) slots.push("finish");
-  if (/anything else|something else|algo m[aá]s|עוד משהו/iu.test(reply))
-    slots.push("additional_items");
-  return [...new Set(slots)].slice(0, 3);
+  return questionSlotsFromReply(reply);
+}
+
+async function linkIncomingCommunicationToRequestState(
+  phone: string,
+  communicationId: string,
+  channel: "sms" | "whatsapp",
+) {
+  await sql.begin(async (transaction) => {
+    const states = await transaction<
+      { id: string; last_asked_slots: string[]; body: string | null }[]
+    >`
+      select state.id, state.last_asked_slots, communication.body
+      from public.aura_sms_request_states as state
+      left join public.quote_requests as request on request.id = state.created_request_id
+      left join public.aura_communications as communication
+        on communication.id = ${communicationId}::uuid
+      where state.normalized_phone = ${phone}
+        and (
+          state.status in ('collecting', 'awaiting_confirmation')
+          or (state.status = 'confirmed' and request.status <> 'closed')
+        )
+      order by state.updated_at desc limit 1 for update of state
+    `;
+    const state = states[0];
+    const stateId = state?.id;
+    if (!stateId) return;
+    const substantiveAnswer =
+      Boolean(state.body?.trim()) &&
+      !/^(?:i don'?t know|not sure|no se|no sé|לא יודע|לא יודעת)[.!\s]*$/iu.test(
+        state.body || "",
+      );
+    const answeredSlots =
+      substantiveAnswer && Array.isArray(state.last_asked_slots)
+        ? state.last_asked_slots.slice(0, 3)
+        : [];
+    const inserted = await transaction<{ id: number }[]>`
+      insert into public.aura_request_state_communications
+        (state_id, communication_id, channel, direction, delivery_status, answered_slots, occurred_at)
+      select ${stateId}::uuid, communication.id, ${channel}, 'incoming', 'received', ${answeredSlots}, communication.occurred_at
+      from public.aura_communications as communication
+      where communication.id = ${communicationId}::uuid
+      on conflict (communication_id) do nothing
+      returning id
+    `;
+    if (!inserted[0]) return;
+    await transaction`
+      update public.aura_sms_request_states set
+        last_inbound_communication_id = ${communicationId}::uuid,
+        state_version = state_version + 1
+      where id = ${stateId}::uuid
+    `;
+  });
+}
+
+async function linkOutgoingCommunicationAccepted(
+  _phone: string,
+  communicationId: string,
+  channel: "sms" | "whatsapp",
+  sourceCommunicationId: string | null = null,
+) {
+  // Never attach a delayed outgoing message to whichever request happens to
+  // be latest for a phone. Request-state messages require exact provenance.
+  if (!sourceCommunicationId) return;
+  const linked = await sql.begin(async (transaction) => {
+    const states = await transaction<{ id: string }[]>`
+      select state.id from public.aura_sms_request_states as state
+      left join public.quote_requests as request on request.id = state.created_request_id
+      where state.id = coalesce((
+          select source_ledger.state_id
+          from public.aura_request_state_communications as source_ledger
+          where source_ledger.communication_id = ${sourceCommunicationId}::uuid
+          limit 1
+        ), (
+          select exact_state.id from public.aura_sms_request_states as exact_state
+          where exact_state.last_inbound_communication_id = ${sourceCommunicationId}::uuid
+          order by exact_state.updated_at desc limit 1
+        ))
+        and (
+          state.status in ('collecting', 'awaiting_confirmation')
+          or (state.status = 'confirmed' and request.status <> 'closed')
+        )
+      order by state.updated_at desc limit 1 for update of state
+    `;
+    const stateId = states[0]?.id;
+    if (!stateId) return false;
+    await transaction`
+      insert into public.aura_request_state_communications
+        (state_id, communication_id, channel, direction, delivery_status, occurred_at)
+      select ${stateId}::uuid, communication.id, ${channel}, 'outgoing', 'accepted', communication.occurred_at
+      from public.aura_communications as communication
+      where communication.id = ${communicationId}::uuid
+      on conflict (communication_id) do nothing
+    `;
+    return true;
+  });
+  if (!linked) return;
+  const current = await sql<{ status: string | null }[]>`
+    select status from public.aura_communications
+    where id = ${communicationId}::uuid limit 1
+  `;
+  const status = current[0]?.status;
+  if (status && ["delivered", "read", "failed"].includes(status))
+    await markRequestCommunicationDelivery(
+      communicationId,
+      status as "delivered" | "read" | "failed",
+    );
+}
+
+async function markRequestCommunicationDelivery(
+  communicationId: string,
+  deliveryStatus: "delivered" | "read" | "failed",
+) {
+  await sql.begin(async (transaction) => {
+    const rows = await transaction<
+      {
+        ledger_id: number;
+        state_id: string;
+        delivery_status: string;
+        body: string | null;
+        question_attempts: Record<string, number>;
+      }[]
+    >`
+      select ledger.id as ledger_id, ledger.state_id, ledger.delivery_status,
+        communication.body, state.question_attempts
+      from public.aura_request_state_communications as ledger
+      join public.aura_communications as communication
+        on communication.id = ledger.communication_id
+      join public.aura_sms_request_states as state on state.id = ledger.state_id
+      where ledger.communication_id = ${communicationId}::uuid
+        and ledger.direction = 'outgoing'
+      limit 1 for update of ledger, state
+    `;
+    const row = rows[0];
+    if (!row) return;
+    const transition = requestCommunicationDeliveryTransition(
+      row.delivery_status as RequestCommunicationDeliveryStatus,
+      deliveryStatus,
+    );
+    if (!transition.countQuestion) {
+      if (transition.status !== row.delivery_status)
+        await transaction`
+          update public.aura_request_state_communications
+          set delivery_status = ${transition.status}
+          where id = ${row.ledger_id}
+        `;
+      return;
+    }
+    const askedSlots = askedSlotsFromReply(row.body || "");
+    const attempts =
+      row.question_attempts && typeof row.question_attempts === "object"
+        ? { ...row.question_attempts }
+        : {};
+    for (const slot of askedSlots)
+      attempts[slot] = Math.max(0, Number(attempts[slot]) || 0) + 1;
+    await transaction`
+      update public.aura_request_state_communications set
+        delivery_status = ${transition.status}, asked_slots = ${askedSlots}
+      where id = ${row.ledger_id}
+    `;
+    await transaction`
+      update public.aura_sms_request_states set
+        last_outbound_communication_id = ${communicationId}::uuid,
+        last_asked_slots = case
+          when cardinality(${askedSlots}::text[]) > 0 then ${askedSlots}
+          else last_asked_slots
+        end,
+        question_attempts = ${sql.json(attempts)},
+        state_version = state_version + 1
+      where id = ${row.state_id}::uuid
+    `;
+  });
 }
 
 async function persistSmsOrderState(params: {
@@ -1303,6 +1601,7 @@ async function persistSmsOrderState(params: {
   latestMessage: string;
   listComplete: boolean;
   resetListComplete?: boolean;
+  startsNewRequest?: boolean;
 }) {
   if (!params.result.isMaterialRequest || !params.result.request?.items.length)
     return;
@@ -1318,14 +1617,16 @@ async function persistSmsOrderState(params: {
       order by state.updated_at desc limit 1 for update of state
     `;
     let stateId = rows[0]?.id;
+    let stateCreated = false;
     if (!stateId) {
       const inserted = await transaction<{ id: string }[]>`
         insert into public.aura_sms_request_states
-          (normalized_phone, contact_id, language, exact_list_only, list_complete, last_event, last_inbound_communication_id, last_asked_slots)
-        values (${params.phone}, ${params.contactId}, ${smsMessageLanguage(params.latestMessage)}, ${params.exactListOnly}, ${params.listComplete}, ${params.event}, ${params.communicationId}::uuid, ${askedSlotsFromReply(params.result.reply)})
+          (normalized_phone, contact_id, language, exact_list_only, list_complete, last_event, last_inbound_communication_id)
+        values (${params.phone}, ${params.contactId}, ${smsMessageLanguage(params.latestMessage)}, ${params.exactListOnly}, ${params.listComplete}, ${params.event}, ${params.communicationId}::uuid)
         returning id
       `;
       stateId = inserted[0].id;
+      stateCreated = true;
     } else {
       await transaction`
         update public.aura_sms_request_states set
@@ -1338,9 +1639,39 @@ async function persistSmsOrderState(params: {
           end,
           last_event = ${params.event},
           last_inbound_communication_id = ${params.communicationId}::uuid,
-          last_asked_slots = ${askedSlotsFromReply(params.result.reply)},
           state_version = state_version + 1
         where id = ${stateId}::uuid
+      `;
+    }
+
+    await transaction`
+      insert into public.aura_request_state_communications
+        (state_id, communication_id, channel, direction, delivery_status, occurred_at)
+      select ${stateId}::uuid, communication.id, 'sms', 'incoming', 'received', communication.occurred_at
+      from public.aura_communications as communication
+      where communication.id = ${params.communicationId}::uuid
+      on conflict (communication_id) do nothing
+    `;
+    if (stateCreated && !params.startsNewRequest) {
+      await transaction`
+        insert into public.aura_request_state_communications
+          (state_id, communication_id, channel, direction, delivery_status, occurred_at)
+        select ${stateId}::uuid, recent.id, recent.channel, 'incoming', 'received', recent.occurred_at
+        from (
+          select communication.id, communication.channel, communication.occurred_at
+          from public.aura_communications as communication
+          join public.aura_communications as current
+            on current.id = ${params.communicationId}::uuid
+          where communication.counterparty_phone = ${params.phone}
+            and communication.channel in ('sms', 'whatsapp')
+            and communication.direction = 'incoming'
+            and communication.id <> ${params.communicationId}::uuid
+            and communication.occurred_at <= current.occurred_at
+            and communication.occurred_at >= current.occurred_at - interval '6 hours'
+          order by communication.occurred_at desc, communication.created_at desc
+          limit 60
+        ) as recent
+        on conflict (communication_id) do nothing
       `;
     }
 
@@ -3468,6 +3799,8 @@ async function prepareSmsRequestConfirmation(input: {
     }),
   );
   const summaryMessageHash = await sha256Hex(summary);
+  const summarySourceCommunicationId =
+    input.sourceCommunicationIds.at(-1) || null;
   const pending = await sql.begin(async (transaction) => {
     await transaction`select pg_advisory_xact_lock(hashtextextended(${input.phone}, 0))`;
     const same = await transaction<
@@ -3482,7 +3815,10 @@ async function prepareSmsRequestConfirmation(input: {
         select id from public.aura_sms_outbox where pending_confirmation_id = ${same[0].id}::uuid limit 1
       `;
       if (existingOutbox[0])
-        return { id: same[0].id, alreadySent: Boolean(same[0].summary_sent_at) };
+        return {
+          id: same[0].id,
+          alreadySent: Boolean(same[0].summary_sent_at),
+        };
       // Pre-outbox rows can have an unknown historical delivery outcome. Do
       // not backfill or replace them automatically; a manager must resolve it.
       return { id: same[0].id, alreadySent: true };
@@ -3518,9 +3854,10 @@ async function prepareSmsRequestConfirmation(input: {
     `;
     await transaction`
       insert into public.aura_sms_outbox
-        (dedupe_key, message_kind, pending_confirmation_id, normalized_phone, message_body, message_hash)
+        (dedupe_key, message_kind, pending_confirmation_id, source_communication_id,
+         normalized_phone, message_body, message_hash)
       values (${`confirmation:${inserted[0].id}:0`}, 'confirmation_summary', ${inserted[0].id}::uuid,
-        ${input.phone}, ${summary}, ${summaryMessageHash})
+        ${summarySourceCommunicationId}::uuid, ${input.phone}, ${summary}, ${summaryMessageHash})
       on conflict (dedupe_key) do nothing
     `;
     return { id: inserted[0].id, alreadySent: false };
@@ -4365,7 +4702,8 @@ async function processCustomerSmsAutomation(
   }
   const latestExtractedItems = extractReviewMaterialLines([effectiveBody]);
   const latestTurnIsMaterialRequest =
-    looksLikeSmsMaterialRequest(effectiveBody) || latestExtractedItems.length > 0;
+    looksLikeSmsMaterialRequest(effectiveBody) ||
+    latestExtractedItems.length > 0;
   // Concrete evidence in the newest customer turn wins over an older open
   // draft. This prevents a new breaker line from being replaced by a stale
   // lumber interpretation while retaining all previously collected items.
@@ -4390,8 +4728,7 @@ async function processCustomerSmsAutomation(
         if (/\bbreakers?\b/.test(normalized)) return "breaker";
         if (/\b(?:sheetrock|drywall)\b/.test(normalized)) return "drywall";
         if (/\bthinset\b/.test(normalized)) return "thinset";
-        if (/\blumber\b|\b\d+x\d+(?:x\d+)?\b/.test(normalized))
-          return "lumber";
+        if (/\blumber\b|\b\d+x\d+(?:x\d+)?\b/.test(normalized)) return "lumber";
         return null;
       };
       const merged = canonicalPriorItems.map((item) => ({
@@ -4399,7 +4736,7 @@ async function processCustomerSmsAutomation(
         quantity: item.quantity,
         unit: item.unit,
         quantityExplicit:
-          "quantityExplicit" in item ? item.quantityExplicit ?? true : true,
+          "quantityExplicit" in item ? (item.quantityExplicit ?? true) : true,
       }));
       for (const incoming of [
         ...(analyzed.result.request?.items || []),
@@ -4474,8 +4811,20 @@ async function processCustomerSmsAutomation(
   let safety = analyzed.safety;
   // Reviewed construction rules are final output guards, not model fallbacks.
   // Even a strong semantic model must not skip a required product choice.
-  const aggregateMaterialIntelligence = smsMaterialIntelligenceAssessment(
+  const durableCrossChannelText = startsNewRequest
+    ? ""
+    : persistedOrderState?.crossChannelMemory
+        .filter((entry) => entry.direction === "incoming")
+        .map((entry) => entry.body)
+        .join("\n") || "";
+  const aggregateIntelligenceText = [
     priorRequestMessage ? reviewText : activeCustomerText || reviewText,
+    durableCrossChannelText,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const aggregateMaterialIntelligence = smsMaterialIntelligenceAssessment(
+    aggregateIntelligenceText,
     { exactListOnly },
   );
   const latestMaterialIntelligence = smsMaterialIntelligenceAssessment(
@@ -4500,11 +4849,39 @@ async function processCustomerSmsAutomation(
       intent,
     );
   const mayAskMaterialQuestion = isIntakeTurn;
-  const clarificationQuestions =
+  const candidateClarificationQuestions =
     mayAskMaterialQuestion &&
     (result.isMaterialRequest || Boolean(openDraft || activeSubmittedRequest))
       ? questionIntelligence.questions.slice(0, 1)
       : [];
+  const candidateQuestionSlots =
+    candidateClarificationQuestions.flatMap(askedSlotsFromReply);
+  const deliveredQuestionLimitReached = !deliveredQuestionRetryAllowed(
+    persistedOrderState?.questionAttempts,
+    candidateQuestionSlots,
+  );
+  const clarificationQuestions = deliveredQuestionLimitReached
+    ? []
+    : candidateClarificationQuestions;
+  if (deliveredQuestionLimitReached) {
+    result.reply =
+      smsReplyLanguage(effectiveBody) === "es"
+        ? "Gracias. Nuestro equipo revisará este detalle."
+        : smsReplyLanguage(effectiveBody) === "he"
+          ? "תודה. הצוות שלנו יבדוק את הפרט הזה."
+          : "Thanks. Our team will review this detail.";
+    result.autoSafe = false;
+    safety = evaluateSmsReplyGate({
+      message: effectiveBody,
+      reply: result.reply,
+      intent: "material_request",
+      event: preConfirmationCorrection ? "message" : customerEvent,
+      participantRole: result.participantRole || "lead",
+      modelAutoSafe: false,
+      exactListOnly,
+      protectedTopic: hasForbiddenAutoReplyTopic(effectiveBody),
+    });
+  }
   if (clarificationQuestions.length) {
     result.reply = clarificationQuestions.join(" ");
     result.autoSafe = true;
@@ -4697,6 +5074,7 @@ async function processCustomerSmsAutomation(
         (activeRequestSynced &&
           (activeUpdateKind === "item" || activeUpdateKind === "correction")) ||
         addedMaterialAfterCompletion,
+      startsNewRequest,
     });
   } catch (stateError) {
     console.error(
@@ -5101,7 +5479,8 @@ async function handleSmsOutboxDispatch(req: Request) {
       await sql`
         insert into public.aura_audit_log (action, details)
         values ('sms_outbox_worker_failed', ${sql.json({
-          error_code: error instanceof Error ? error.message : "sms_outbox_worker_failed",
+          error_code:
+            error instanceof Error ? error.message : "sms_outbox_worker_failed",
         })})
       `;
     }),
@@ -5249,6 +5628,8 @@ async function handleQuoWebhook(req: Request) {
         .join("\n") || null;
     const channel = eventType.startsWith("call.") ? "call" : "sms";
     const body = object.body?.trim() || object.text?.trim() || null;
+    const communicationStatus =
+      eventType === "message.delivered" ? "delivered" : object.status || null;
     const durationSeconds = Number.isFinite(object.duration)
       ? Math.max(0, Math.round(object.duration as number))
       : calculatedDuration;
@@ -5264,7 +5645,7 @@ async function handleQuoWebhook(req: Request) {
       linkedContact = await ensureIncomingSmsContact(counterpartyPhone);
     }
 
-    await sql`
+    const storedCommunications = await sql<{ id: string }[]>`
     insert into public.aura_communications (
       provider, channel, external_activity_id, external_conversation_id, contact_id, direction,
       counterparty_phone, business_phone, body, summary, transcript, next_steps, media, status,
@@ -5272,7 +5653,7 @@ async function handleQuoWebhook(req: Request) {
     ) values (
       'quo', ${channel}, ${activityId}, ${object.conversationId || null}, ${linkedContact || (current?.contact_id as string | null) || null}, ${direction},
       ${counterpartyPhone}, ${businessPhone}, ${body}, ${summary}, ${transcript},
-      ${sql.json(object.nextSteps || [])}, ${sql.json(media)}, ${object.status || null},
+      ${sql.json(object.nextSteps || [])}, ${sql.json(media)}, ${communicationStatus},
       ${durationSeconds}, ${occurredAt}, ${lastEventAt}
     )
     on conflict (provider, external_activity_id) do update set
@@ -5287,11 +5668,28 @@ async function handleQuoWebhook(req: Request) {
       transcript = coalesce(excluded.transcript, aura_communications.transcript),
       next_steps = case when excluded.next_steps = '[]'::jsonb then aura_communications.next_steps else excluded.next_steps end,
       media = case when excluded.media = '[]'::jsonb then aura_communications.media else excluded.media end,
-      status = coalesce(excluded.status, aura_communications.status),
+      status = case
+        when aura_communications.status = 'read' then 'read'
+        when aura_communications.status = 'delivered' and excluded.status <> 'read'
+          then 'delivered'
+        when aura_communications.status = 'failed'
+          and excluded.status in ('queued', 'sent', 'accepted') then 'failed'
+        else coalesce(excluded.status, aura_communications.status)
+      end,
       duration_seconds = coalesce(excluded.duration_seconds, aura_communications.duration_seconds),
       last_event_at = greatest(excluded.last_event_at, aura_communications.last_event_at),
       updated_at = now()
+    returning id
   `;
+    if (
+      eventType === "message.delivered" &&
+      direction === "outgoing" &&
+      storedCommunications[0]?.id
+    )
+      await markRequestCommunicationDelivery(
+        storedCommunications[0].id,
+        "delivered",
+      );
     if (
       eventType === "message.received" &&
       channel === "sms" &&
@@ -5374,6 +5772,7 @@ async function sendTwoChatWhatsApp(
   toValue: unknown,
   bodyValue: unknown,
   mediaUrlValue?: unknown,
+  sourceCommunicationIdValue?: unknown,
 ) {
   const config = await activeTwoChatWhatsAppConfig();
   if (!config)
@@ -5387,6 +5786,13 @@ async function sendTwoChatWhatsApp(
     typeof mediaUrlValue === "string" &&
     /^https:\/\/build\.avantiap\.com\/[a-z0-9/_\-.]+$/i.test(mediaUrlValue)
       ? mediaUrlValue
+      : null;
+  const sourceCommunicationId =
+    typeof sourceCommunicationIdValue === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      sourceCommunicationIdValue,
+    )
+      ? sourceCommunicationIdValue
       : null;
   if (!to || (!body && !mediaUrl))
     throw new Error("Enter a valid WhatsApp number and message.");
@@ -5417,7 +5823,7 @@ async function sendTwoChatWhatsApp(
       result.message || `2Chat returned HTTP ${response.status}.`,
     );
   }
-  await storeCommunication({
+  const communicationId = await storeCommunication({
     provider: "whatsapp",
     channel: "whatsapp",
     externalId: result.message_uuid,
@@ -5435,6 +5841,12 @@ async function sendTwoChatWhatsApp(
         ]
       : [],
   });
+  await linkOutgoingCommunicationAccepted(
+    to,
+    communicationId,
+    "whatsapp",
+    sourceCommunicationId,
+  );
   return result.message_uuid;
 }
 
@@ -5630,13 +6042,21 @@ async function markSmsOutboxSent(
     body: row.message_body,
     status: providerStatus || "queued",
   });
-  await sql`
+  await linkOutgoingCommunicationAccepted(
+    row.normalized_phone,
+    communicationId,
+    "sms",
+    row.source_communication_id,
+  );
+  const marked = await sql<{ id: string }[]>`
     update public.aura_sms_outbox
     set status = 'sent', provider_from = ${providerFrom}, provider_message_id = ${providerId},
         outgoing_communication_id = ${communicationId}::uuid, provider_accepted_at = now(), sent_at = now(),
         lock_token = null, locked_at = null, last_error = null, last_error_code = null, updated_at = now()
     where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid and status in ('sending', 'reconciling')
+    returning id
   `;
+  if (!marked[0]) return;
   await finalizeSmsOutboxParent(row.id);
 }
 
@@ -5693,9 +6113,10 @@ async function reconcileSmsOutbox(row: SmsOutboxRow) {
     );
     return true;
   }
-  const nextStatus = matches.length > 1 || row.reconcile_attempt_count >= 2
-    ? "needs_review"
-    : "ambiguous";
+  const nextStatus =
+    matches.length > 1 || row.reconcile_attempt_count >= 2
+      ? "needs_review"
+      : "ambiguous";
   await sql`
     update public.aura_sms_outbox
     set status = ${nextStatus}, reconcile_attempt_count = reconcile_attempt_count + 1,
@@ -5727,7 +6148,8 @@ async function processAuraSmsOutbox(limit = 1) {
     )
     order by outbox.sent_at nulls last limit 10
   `;
-  for (const parent of unfinishedParents) await finalizeSmsOutboxParent(parent.id);
+  for (const parent of unfinishedParents)
+    await finalizeSmsOutboxParent(parent.id);
   await sql`
     update public.aura_sms_outbox set status = 'ambiguous', lock_token = null, locked_at = null,
       reconcile_after = now(), last_error_code = 'stale_sending',
@@ -5830,8 +6252,15 @@ async function processAuraSmsOutbox(limit = 1) {
     try {
       const response = await fetch("https://api.openphone.com/v1/messages", {
         method: "POST",
-        headers: { Authorization: config.apiKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ content: row.message_body, from: config.from, to: [row.normalized_phone] }),
+        headers: {
+          Authorization: config.apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content: row.message_body,
+          from: config.from,
+          to: [row.normalized_phone],
+        }),
         signal: AbortSignal.timeout(8_000),
       });
       const result = (await response.json().catch(() => ({}))) as {
@@ -5839,9 +6268,17 @@ async function processAuraSmsOutbox(limit = 1) {
         message?: string;
       };
       if (response.status === 202 && result.data?.id) {
-        await markSmsOutboxSent(row, result.data.id, result.data.status || "queued", config.from);
+        await markSmsOutboxSent(
+          row,
+          result.data.id,
+          result.data.status || "queued",
+          config.from,
+        );
       } else if (response.status === 429) {
-        const retryAfter = Math.max(5, Math.min(300, Number(response.headers.get("retry-after")) || 10));
+        const retryAfter = Math.max(
+          5,
+          Math.min(300, Number(response.headers.get("retry-after")) || 10),
+        );
         await sql`update public.aura_sms_outbox set status = 'retry_wait', available_at = now() + (${retryAfter}::text || ' seconds')::interval, lock_token = null, locked_at = null, last_http_status = 429, last_error_code = 'rate_limited', last_error = 'Provider rate limit; safe retry scheduled.' where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid and status = 'sending'`;
       } else if ([400, 401, 402, 403, 404, 422].includes(response.status)) {
         await sql`update public.aura_sms_outbox set status = 'dead_letter', lock_token = null, locked_at = null, last_http_status = ${response.status}, last_error_code = 'provider_rejected', last_error = ${String(result.message || "Provider rejected the message before acceptance.").slice(0, 500)} where id = ${row.id}::uuid and lock_token = ${row.lock_token}::uuid and status = 'sending'`;
@@ -8541,6 +8978,7 @@ Deno.serve(async (req: Request) => {
         input.to,
         input.message,
         input.mediaUrl,
+        input.sourceCommunicationId,
       );
       return json({ ok: true, id });
     }
