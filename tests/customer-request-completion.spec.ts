@@ -12,7 +12,11 @@ import {
   deliveryAddressQuestion,
   managerRequestAcceptsCustomerUpdates,
 } from "../supabase/functions/_shared/customer-request-completion";
-import { evaluateSmsReplyGate } from "../supabase/functions/_shared/sms-reply-policy";
+import {
+  evaluateSmsReplyGate,
+  resolveSmsDeliveryAddressKnown,
+  smsHasFullDeliveryAddress,
+} from "../supabase/functions/_shared/sms-reply-policy";
 
 const root = process.cwd();
 
@@ -112,6 +116,90 @@ test("15 anonymized multilingual continuation variants keep one open request", (
   ]);
   for (const question of blockerQuestions)
     expect(question.match(/\?/g)).toHaveLength(1);
+});
+
+test("natural English, Spanish, and Hebrew replies explicitly finish the list", () => {
+  const terminalReplies = [
+    "No",
+    "No thanks",
+    "No, thank you",
+    "No, that's all",
+    "No, deliver to 123 Main Street, Cedarhurst, NY 11516",
+    "No más",
+    "Nada más",
+    "No, gracias",
+    "No, eso es todo",
+    "No, entregar a Calle Mayor 10, Madrid",
+    "לא",
+    "לא תודה",
+    "לא, זה הכל",
+    "זה הכל",
+    "לא, לשלוח לרחוב הרצל 10 תל אביב",
+  ];
+  for (const reply of terminalReplies)
+    expect.soft(customerFinishedMaterialList(reply), reply).toBe(true);
+
+  const nonTerminalReplies = [
+    "Yes",
+    "Sí",
+    "כן",
+    "No idea which size",
+    "No address yet",
+    "I need no more than 10",
+    "No sé cuál",
+    "לא יודע איזה סוג",
+  ];
+  for (const reply of nonTerminalReplies)
+    expect.soft(customerFinishedMaterialList(reply), reply).toBe(false);
+});
+
+test("full delivery address detection is strict and resets at a new request", () => {
+  const completeAddresses = [
+    "Deliver to 123 Main Street, Cedarhurst, NY 11516",
+    "Enviar a Calle Mayor 10, Miami, FL 33101",
+    "לשלוח לרחוב הרצל 10, Brooklyn, NY 11201",
+  ];
+  for (const address of completeAddresses)
+    expect(smsHasFullDeliveryAddress(address), address).toBe(true);
+
+  const incompleteAddresses = [
+    "Cedarhurst, NY 11516",
+    "Main Street",
+    "Madrid 28001",
+    "רחוב הרצל",
+    "same address",
+  ];
+  for (const address of incompleteAddresses)
+    expect(smsHasFullDeliveryAddress(address), address).toBe(false);
+
+  expect(
+    resolveSmsDeliveryAddressKnown({
+      storedDraft: true,
+      latestMessage: "New request: 10 sheets",
+      startsNewRequest: true,
+    }),
+  ).toBe(false);
+  expect(
+    resolveSmsDeliveryAddressKnown({
+      storedDraft: false,
+      latestMessage: "No, deliver to 123 Main Street, Cedarhurst, NY 11516",
+    }),
+  ).toBe(true);
+});
+
+test("short yes replies request an item while short no replies request an address", () => {
+  for (const reply of ["Yes", "Sí", "כן"])
+    expect(customerWantsAnotherItem(reply), reply).toBe(true);
+  for (const reply of ["No", "No más", "לא תודה"])
+    expect(customerWantsAnotherItem(reply), reply).toBe(false);
+
+  expect(deliveryAddressQuestion("No thanks")).toBe(
+    "What is the full delivery address?",
+  );
+  expect(deliveryAddressQuestion("No, gracias")).toBe(
+    "¿Cuál es la dirección de entrega completa?",
+  );
+  expect(deliveryAddressQuestion("לא תודה")).toBe("מה כתובת המשלוח המלאה?");
 });
 
 test("submitted request updates stay on the same request in every supported language", async () => {

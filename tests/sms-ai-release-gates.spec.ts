@@ -403,7 +403,9 @@ test("broker-created request progression replies are gated independently from mo
   expect(brokerSource).toContain('smsStartsNewMaterialRequest(body)\n      ? "message"')
   expect(brokerSource).not.toContain("occurred_at >= now() - interval '10 minutes'")
   expect(brokerSource).toContain("if (draftCandidate && startsNewRequest) {")
-  expect(brokerSource).toContain("if (!explicitConfirmation) {")
+  expect(brokerSource).toContain("if (!explicitConfirmation)")
+  expect(brokerSource).toContain("A customer response replaced this confirmation summary.")
+  expect(brokerSource).toContain("supersedeSmsConfirmationForCustomerChange(")
   expect(brokerSource).toContain("clarificationQuestions.length === 0")
   expect(brokerSource).toMatch(/if \(\s*\(openDraft \|\| activeSubmittedRequest\)\s*&&\s*customerEvent === "message"\s*&&\s*!analyzed\.result\.isMaterialRequest\s*\)/)
   expect(brokerSource).toContain("the structured draft advances instead of falling back")
@@ -424,7 +426,7 @@ test("broker-created request progression replies are gated independently from mo
   expect(brokerSource).toMatch(/const neededBy\s*=\s*pending\.needed_by_text\?\.trim\(\)\s*\|\|\s*smsNeededByTimingValue\(pending\.summary_text\)/)
   expect(brokerSource).toContain('manager_notes) values')
   expect(brokerSource).toContain('Needed by: ${neededBy}')
-  expect(brokerSource).toMatch(/!input\.request\.items\.length\s*\|\|\s*!input\.listComplete\s*\|\|\s*!input\.customerAddress\.trim\(\)/)
+  expect(brokerSource).toMatch(/!input\.request\.items\.length\s*\|\|\s*!input\.listComplete\s*\|\|\s*!smsHasFullDeliveryAddress\(input\.customerAddress\)/)
   expect(brokerSource).toMatch(/!SIMPLE_REQUEST_INTAKE[\s\S]*?!input\.intelligenceReady/)
   expect(brokerSource).toContain("`Needed by: ${neededBy}`")
   expect(brokerSource).toContain("async function activeSmsRequestSourceIds")
@@ -802,8 +804,10 @@ test("exact-list preference persists beyond the 24-message context window", () =
   expect(resolveSmsExactListPreference({ storedContact: true, conversationText: truncatedWindow, latestMessage: "Any update?" })).toBe(true)
   expect(resolveSmsExactListPreference({ storedContact: false, storedDraft: true, conversationText: truncatedWindow })).toBe(true)
   expect(resolveSmsExactListPreference({ conversationText: `${oldInstruction}\n${newerMessages}` })).toBe(true)
-  expect(resolveSmsDeliveryAddressKnown({ latestMessage: "Calle Sol 55" })).toBe(true)
-  expect(resolveSmsDeliveryAddressKnown({ latestMessage: "רחוב הרצל 10" })).toBe(true)
+  expect(resolveSmsDeliveryAddressKnown({ latestMessage: "Calle Sol 55" })).toBe(false)
+  expect(resolveSmsDeliveryAddressKnown({ latestMessage: "רחוב הרצל 10" })).toBe(false)
+  expect(resolveSmsDeliveryAddressKnown({ latestMessage: "Calle Sol 55, Miami, FL 33101" })).toBe(true)
+  expect(resolveSmsDeliveryAddressKnown({ latestMessage: "רחוב הרצל 10, Brooklyn, NY 11201" })).toBe(true)
 })
 
 test("delivery-address state belongs to one active request and resets for a second job", () => {
@@ -811,7 +815,8 @@ test("delivery-address state belongs to one active request and resets for a seco
   expect(smsStartsNewMaterialRequest("New job: 10 doors")).toBe(true)
   expect(resolveSmsDeliveryAddressKnown({ storedDraft: true, latestMessage: "New job: 10 doors", startsNewRequest: true })).toBe(false)
   expect(resolveSmsDeliveryAddressKnown({ storedDraft: false, latestMessage: "10 doors" })).toBe(false)
-  expect(resolveSmsDeliveryAddressKnown({ storedDraft: true, latestMessage: "New job at 18 Main St", startsNewRequest: true })).toBe(true)
+  expect(resolveSmsDeliveryAddressKnown({ storedDraft: true, latestMessage: "New job at 18 Main St", startsNewRequest: true })).toBe(false)
+  expect(resolveSmsDeliveryAddressKnown({ storedDraft: true, latestMessage: "New job at 18 Main Street, Cedarhurst, NY 11516", startsNewRequest: true })).toBe(true)
 })
 
 test("exact-list item provenance removes model-added accessories before persistence", () => {

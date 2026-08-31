@@ -2,9 +2,21 @@ export function customerFinishedMaterialList(message: string) {
   const normalized = message
     .trim()
     .toLowerCase()
-    .replace(/[.!?]+$/g, "")
+    .replace(/[!?]+$/g, "")
     .trim();
-  return /^(?:no|nope|done|finished|nothing else|that'?s all|that is all|all set|no more|לא|לא תודה|זה הכל|סיימתי|אין עוד|no m[aá]s|nada m[aá]s|eso es todo|termin[eé])$/iu.test(
+  if (
+    /^(?:no|nope|no[,. ]+thanks|no[,. ]+thank you|no[,. ]+that'?s all|no[,. ]+that is all|done|finished|nothing else|that'?s all|that is all|all set|no more)(?:[,. ]+(?:please )?(?:deliver|delivery|ship|send)\b[\s\S]*)?$/iu.test(
+      normalized,
+    )
+  )
+    return true;
+  if (
+    /^(?:לא|לא[,. ]+תודה|לא[,. ]+זה הכל|זה הכל|סיימתי|אין עוד)(?:[,. ]+(?:משלוח|לשלוח|שלחו|לכתובת)[\s\S]*)?$/iu.test(
+      normalized,
+    )
+  )
+    return true;
+  return /^(?:no|no m[aá]s|nada m[aá]s|no[,. ]+gracias|no[,. ]+eso es todo|eso es todo|termin[eé])(?:[,. ]+(?:entrega|entregar|env[ií]e|direcci[oó]n)\b[\s\S]*)?$/iu.test(
     normalized,
   );
 }

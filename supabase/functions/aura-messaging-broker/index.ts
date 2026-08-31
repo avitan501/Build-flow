@@ -22,6 +22,7 @@ import {
   smsCorrectionPendingQuestionReply,
   smsReplyLanguage,
   smsHasExplicitQuantity,
+  smsHasFullDeliveryAddress,
   smsHasNeededByTiming,
   smsMaterialIntelligenceAssessment,
   smsMessagesAfterConfirmedRequest,
@@ -1427,13 +1428,31 @@ async function linkIncomingCommunicationToRequestState(
 ) {
   await sql.begin(async (transaction) => {
     const states = await transaction<
-      { id: string; last_asked_slots: string[]; body: string | null }[]
+      {
+        id: string;
+        last_asked_slots: string[];
+        question_attempts: Record<string, number>;
+        body: string | null;
+        outgoing_ledger_id: number | null;
+        outgoing_delivery_status: RequestCommunicationDeliveryStatus | null;
+        outgoing_body: string | null;
+      }[]
     >`
-      select state.id, state.last_asked_slots, communication.body
+      select state.id, state.last_asked_slots, state.question_attempts,
+        communication.body, latest_outgoing.ledger_id as outgoing_ledger_id,
+        latest_outgoing.delivery_status as outgoing_delivery_status,
+        latest_outgoing.body as outgoing_body
       from public.aura_sms_request_states as state
       left join public.quote_requests as request on request.id = state.created_request_id
       left join public.aura_communications as communication
         on communication.id = ${communicationId}::uuid
+      left join lateral (
+        select ledger.id as ledger_id, ledger.delivery_status, outgoing.body
+        from public.aura_request_state_communications as ledger
+        join public.aura_communications as outgoing on outgoing.id = ledger.communication_id
+        where ledger.state_id = state.id and ledger.direction = 'outgoing'
+        order by ledger.occurred_at desc, ledger.id desc limit 1
+      ) as latest_outgoing on true
       where state.normalized_phone = ${phone}
         and (
           state.status in ('collecting', 'awaiting_confirmation')
@@ -1449,10 +1468,33 @@ async function linkIncomingCommunicationToRequestState(
       !/^(?:i don'?t know|not sure|no se|no sé|לא יודע|לא יודעת)[.!\s]*$/iu.test(
         state.body || "",
       );
-    const answeredSlots =
-      substantiveAnswer && Array.isArray(state.last_asked_slots)
+    const provenAskedSlots =
+      Array.isArray(state.last_asked_slots) && state.last_asked_slots.length
         ? state.last_asked_slots.slice(0, 3)
-        : [];
+        : askedSlotsFromReply(state.outgoing_body || "");
+    const answeredSlots = substantiveAnswer ? provenAskedSlots : [];
+    const attempts =
+      state.question_attempts && typeof state.question_attempts === "object"
+        ? { ...state.question_attempts }
+        : {};
+    if (state.outgoing_ledger_id && state.outgoing_delivery_status) {
+      const transition = requestCommunicationDeliveryTransition(
+        state.outgoing_delivery_status,
+        "delivered",
+      );
+      if (transition.countQuestion)
+        for (const slot of provenAskedSlots)
+          attempts[slot] = Math.max(0, Number(attempts[slot]) || 0) + 1;
+      await transaction`
+        update public.aura_request_state_communications set
+          delivery_status = ${transition.status},
+          asked_slots = case
+            when cardinality(${provenAskedSlots}::text[]) > 0 then ${provenAskedSlots}
+            else asked_slots
+          end
+        where id = ${state.outgoing_ledger_id}
+      `;
+    }
     const inserted = await transaction<{ id: number }[]>`
       insert into public.aura_request_state_communications
         (state_id, communication_id, channel, direction, delivery_status, answered_slots, occurred_at)
@@ -1466,6 +1508,11 @@ async function linkIncomingCommunicationToRequestState(
     await transaction`
       update public.aura_sms_request_states set
         last_inbound_communication_id = ${communicationId}::uuid,
+        last_asked_slots = case
+          when cardinality(${provenAskedSlots}::text[]) > 0 then ${provenAskedSlots}
+          else last_asked_slots
+        end,
+        question_attempts = ${sql.json(attempts)},
         state_version = state_version + 1
       where id = ${stateId}::uuid
     `;
@@ -1602,9 +1649,25 @@ async function persistSmsOrderState(params: {
   listComplete: boolean;
   resetListComplete?: boolean;
   startsNewRequest?: boolean;
+  intelligenceReady: boolean;
 }) {
   if (!params.result.isMaterialRequest || !params.result.request?.items.length)
     return;
+  const canonicalAddress =
+    [params.result.customerAddress, params.latestMessage].find(
+      (candidate) =>
+        typeof candidate === "string" && smsHasFullDeliveryAddress(candidate),
+    ) || "";
+  const fullAddress = Boolean(canonicalAddress);
+  const intakePhase = !params.intelligenceReady
+    ? "items"
+    : !params.listComplete
+      ? "additional_items"
+      : !fullAddress
+        ? "delivery_address"
+        : "summary_confirmation";
+  const completedListNow =
+    params.listComplete && customerFinishedMaterialList(params.latestMessage);
   await sql.begin(async (transaction) => {
     const rows = await transaction<{ id: string }[]>`
       select state.id from public.aura_sms_request_states as state
@@ -1621,8 +1684,14 @@ async function persistSmsOrderState(params: {
     if (!stateId) {
       const inserted = await transaction<{ id: string }[]>`
         insert into public.aura_sms_request_states
-          (normalized_phone, contact_id, language, exact_list_only, list_complete, last_event, last_inbound_communication_id)
-        values (${params.phone}, ${params.contactId}, ${smsMessageLanguage(params.latestMessage)}, ${params.exactListOnly}, ${params.listComplete}, ${params.event}, ${params.communicationId}::uuid)
+          (normalized_phone, contact_id, language, exact_list_only, list_complete,
+           intake_phase, list_completion_communication_id, list_completed_at,
+           last_event, last_inbound_communication_id)
+        values (${params.phone}, ${params.contactId}, ${smsMessageLanguage(params.latestMessage)},
+          ${params.exactListOnly}, ${params.listComplete}, ${intakePhase},
+          ${completedListNow ? params.communicationId : null}::uuid,
+          ${completedListNow ? new Date().toISOString() : null},
+          ${params.event}, ${params.communicationId}::uuid)
         returning id
       `;
       stateId = inserted[0].id;
@@ -1636,6 +1705,18 @@ async function persistSmsOrderState(params: {
           list_complete = case
             when ${params.resetListComplete === true} then false
             else list_complete or ${params.listComplete}
+          end,
+          intake_phase = ${intakePhase},
+          list_completion_communication_id = case
+            when ${params.resetListComplete === true} then null
+            when list_completion_communication_id is null and ${completedListNow}
+              then ${params.communicationId}::uuid
+            else list_completion_communication_id
+          end,
+          list_completed_at = case
+            when ${params.resetListComplete === true} then null
+            when list_completed_at is null and ${completedListNow} then now()
+            else list_completed_at
           end,
           last_event = ${params.event},
           last_inbound_communication_id = ${params.communicationId}::uuid,
@@ -1691,8 +1772,8 @@ async function persistSmsOrderState(params: {
     const observedSlots: Array<[string, string]> = [];
     if (params.result.customerName)
       observedSlots.push(["customer_name", params.result.customerName]);
-    if (params.result.customerAddress)
-      observedSlots.push(["delivery_address", params.result.customerAddress]);
+    if (canonicalAddress)
+      observedSlots.push(["delivery_address", canonicalAddress]);
     const neededBy = smsNeededByTimingValue(params.latestMessage);
     if (neededBy) observedSlots.push(["needed_by", neededBy]);
     observedSlots.push(
@@ -3772,7 +3853,7 @@ async function prepareSmsRequestConfirmation(input: {
   if (
     !input.request.items.length ||
     !input.listComplete ||
-    !input.customerAddress.trim() ||
+    !smsHasFullDeliveryAddress(input.customerAddress) ||
     !input.intelligenceReady ||
     (!SIMPLE_REQUEST_INTAKE &&
       (!input.customerAddress.trim() ||
@@ -3801,33 +3882,114 @@ async function prepareSmsRequestConfirmation(input: {
   const summaryMessageHash = await sha256Hex(summary);
   const summarySourceCommunicationId =
     input.sourceCommunicationIds.at(-1) || null;
+  if (!summarySourceCommunicationId) return false;
   const pending = await sql.begin(async (transaction) => {
     await transaction`select pg_advisory_xact_lock(hashtextextended(${input.phone}, 0))`;
-    const same = await transaction<
-      { id: string; summary_sent_at: string | null }[]
+    const states = await transaction<
+      {
+        id: string;
+        list_completion_communication_id: string;
+        request_title: string;
+        department: string;
+        items: Array<{ name: string; quantity: number; unit: string }>;
+      }[]
     >`
-      select id, summary_sent_at from public.aura_sms_request_pending_confirmations
-      where normalized_phone = ${input.phone} and summary_hash = ${summaryHash} and status in ('pending', 'send_failed')
+      select state.id, state.list_completion_communication_id,
+        title.value_text as request_title, department.value_text as department,
+        canonical_items.items
+      from public.aura_sms_request_states as state
+      join public.aura_request_state_communications as source
+        on source.state_id = state.id
+       and source.communication_id = ${summarySourceCommunicationId}::uuid
+       and source.direction = 'incoming'
+      join public.aura_request_state_communications as completion
+        on completion.state_id = state.id
+       and completion.communication_id = state.list_completion_communication_id
+       and completion.direction = 'incoming'
+      join public.aura_sms_request_state_slots as address
+        on address.state_id = state.id
+       and address.slot_key = 'delivery_address'
+       and address.status in ('observed', 'confirmed')
+      join public.aura_sms_request_state_slots as title
+        on title.state_id = state.id and title.slot_key = 'request_title'
+       and title.status in ('observed', 'confirmed')
+      join public.aura_sms_request_state_slots as department
+        on department.state_id = state.id and department.slot_key = 'department'
+       and department.status in ('observed', 'confirmed')
+      join lateral (
+        select jsonb_agg(jsonb_build_object(
+          'name', item.name, 'quantity', item.quantity, 'unit', item.unit
+        ) order by item.ordinal) as items
+        from public.aura_sms_request_state_items as item
+        where item.state_id = state.id and item.status = 'active'
+        having count(*) > 0
+      ) as canonical_items on true
+      where state.normalized_phone = ${input.phone}
+        and state.status in ('collecting', 'awaiting_confirmation')
+        and state.intake_phase in ('delivery_address', 'summary_confirmation')
+        and state.list_complete = true
+        and state.list_completion_communication_id is not null
+        and state.created_request_id is null
+        and trim(address.value_text) = ${input.customerAddress.trim()}
+      limit 1
+      for update of state
+    `;
+    const state = states[0];
+    if (!state) return null;
+    const canonicalSnapshot = JSON.stringify({
+      title: state.request_title.trim(),
+      department: state.department.trim(),
+      items: state.items.map((item) => ({
+        name: item.name.trim(),
+        quantity: Number(item.quantity),
+        unit: item.unit.trim(),
+      })),
+    });
+    const requestedSnapshot = JSON.stringify({
+      title: input.request.title.trim(),
+      department: input.request.department.trim(),
+      items: input.request.items.map((item) => ({
+        name: item.name.trim(),
+        quantity: Number(item.quantity),
+        unit: item.unit.trim(),
+      })),
+    });
+    if (canonicalSnapshot !== requestedSnapshot) return null;
+    const same = await transaction<
+      { id: string; status: string; summary_sent_at: string | null }[]
+    >`
+      select id, status, summary_sent_at from public.aura_sms_request_pending_confirmations
+      where state_id = ${state.id}::uuid and summary_hash = ${summaryHash}
+        and status in ('pending', 'send_failed')
       limit 1
     `;
     if (same[0]) {
-      const existingOutbox = await transaction<{ id: string }[]>`
+      if (same[0].status === "send_failed") {
+        await transaction`
+          update public.aura_sms_request_pending_confirmations
+          set status = 'superseded', updated_at = now()
+          where id = ${same[0].id}::uuid and state_id = ${state.id}::uuid
+            and status = 'send_failed'
+        `;
+      } else {
+        const existingOutbox = await transaction<{ id: string }[]>`
         select id from public.aura_sms_outbox where pending_confirmation_id = ${same[0].id}::uuid limit 1
       `;
-      if (existingOutbox[0])
-        return {
-          id: same[0].id,
-          alreadySent: Boolean(same[0].summary_sent_at),
-        };
-      // Pre-outbox rows can have an unknown historical delivery outcome. Do
-      // not backfill or replace them automatically; a manager must resolve it.
-      return { id: same[0].id, alreadySent: true };
+        if (existingOutbox[0])
+          return {
+            id: same[0].id,
+            alreadySent: Boolean(same[0].summary_sent_at),
+          };
+        // Pre-outbox rows can have an unknown historical delivery outcome. Do
+        // not backfill or replace them automatically; a manager must resolve it.
+        return { id: same[0].id, alreadySent: true };
+      }
     }
     const unresolved = await transaction<{ id: string }[]>`
       select pending.id
       from public.aura_sms_request_pending_confirmations pending
       join public.aura_sms_outbox outbox on outbox.pending_confirmation_id = pending.id
-      where pending.normalized_phone = ${input.phone}
+      where pending.state_id = ${state.id}::uuid
         and pending.status = 'pending'
         and outbox.status in ('sending', 'ambiguous', 'reconciling', 'needs_review')
       limit 1
@@ -3842,14 +4004,23 @@ async function prepareSmsRequestConfirmation(input: {
         last_error_code = 'confirmation_superseded', last_error = 'A newer customer correction replaced this summary.'
       from public.aura_sms_request_pending_confirmations pending
       where outbox.pending_confirmation_id = pending.id
-        and pending.normalized_phone = ${input.phone} and pending.status = 'pending'
+        and pending.state_id = ${state.id}::uuid and pending.status = 'pending'
         and outbox.status in ('pending', 'claimed', 'retry_wait')
     `;
-    await transaction`update public.aura_sms_request_pending_confirmations set status = 'superseded', updated_at = now() where normalized_phone = ${input.phone} and status = 'pending'`;
+    await transaction`update public.aura_sms_request_pending_confirmations set status = 'superseded', updated_at = now() where state_id = ${state.id}::uuid and status = 'pending'`;
     const inserted = await transaction<{ id: string }[]>`
       insert into public.aura_sms_request_pending_confirmations
-        (normalized_phone, customer_name, customer_address, title, department, items, source_communication_ids, needed_by_text, summary_text, summary_hash, intelligence_assessment, intelligence_ready)
-      values (${input.phone}, ${input.customerName.slice(0, 160)}, ${input.customerAddress.slice(0, 500)}, ${input.request.title.slice(0, 180)}, ${input.request.department.slice(0, 100)}, ${sql.json(input.request.items)}, ${input.sourceCommunicationIds}::uuid[], ${input.customerNeededBy.trim().slice(0, 160)}, ${summary}, ${summaryHash}, ${sql.json(input.intelligenceAssessment)}, ${input.intelligenceReady})
+        (state_id, list_completion_communication_id, normalized_phone, customer_name,
+         customer_address, title, department, items, source_communication_ids,
+         needed_by_text, summary_text, summary_hash, intelligence_assessment,
+         intelligence_ready)
+      values (${state.id}::uuid, ${state.list_completion_communication_id}::uuid,
+        ${input.phone}, ${input.customerName.slice(0, 160)},
+        ${input.customerAddress.slice(0, 500)}, ${input.request.title.slice(0, 180)},
+        ${input.request.department.slice(0, 100)}, ${sql.json(input.request.items)},
+        ${input.sourceCommunicationIds}::uuid[],
+        ${input.customerNeededBy.trim().slice(0, 160)}, ${summary}, ${summaryHash},
+        ${sql.json(input.intelligenceAssessment)}, ${input.intelligenceReady})
       returning id
     `;
     await transaction`
@@ -3860,8 +4031,16 @@ async function prepareSmsRequestConfirmation(input: {
         ${summarySourceCommunicationId}::uuid, ${input.phone}, ${summary}, ${summaryMessageHash})
       on conflict (dedupe_key) do nothing
     `;
+    await transaction`
+      update public.aura_sms_request_states set
+        status = 'awaiting_confirmation', intake_phase = 'summary_confirmation',
+        pending_confirmation_id = ${inserted[0].id}::uuid,
+        state_version = state_version + 1, updated_at = now()
+      where id = ${state.id}::uuid and status = 'collecting'
+    `;
     return { id: inserted[0].id, alreadySent: false };
   });
+  if (!pending) return false;
   if (pending.alreadySent) return true;
   await dispatchSmsOutboxWorker().catch((error) =>
     console.error(
@@ -3870,6 +4049,64 @@ async function prepareSmsRequestConfirmation(input: {
     ),
   );
   return true;
+}
+
+async function supersedeSmsConfirmationForCustomerChange(
+  phone: string,
+  reason: string,
+  cancelState = false,
+) {
+  await sql.begin(async (transaction) => {
+    await transaction`select pg_advisory_xact_lock(hashtextextended(${phone}, 0))`;
+    const rows = await transaction<{ state_id: string; pending_id: string }[]>`
+      select state.id as state_id, pending.id as pending_id
+      from public.aura_sms_request_states as state
+      join public.aura_sms_request_pending_confirmations as pending
+        on pending.id = state.pending_confirmation_id
+       and pending.state_id = state.id
+      where state.normalized_phone = ${phone}
+        and state.status = 'awaiting_confirmation'
+        and pending.status in ('pending', 'send_failed')
+      limit 1
+      for update of state, pending
+    `;
+    const row = rows[0];
+    if (!row) return;
+    await transaction`
+      update public.aura_sms_outbox set
+        status = 'cancelled', lock_token = null, locked_at = null,
+        last_error_code = 'confirmation_superseded',
+        last_error = ${reason.slice(0, 500)}
+      where pending_confirmation_id = ${row.pending_id}::uuid
+        and status in ('pending', 'claimed', 'retry_wait')
+    `;
+    await transaction`
+      update public.aura_sms_request_pending_confirmations set
+        status = 'superseded', updated_at = now()
+      where id = ${row.pending_id}::uuid and state_id = ${row.state_id}::uuid
+        and status in ('pending', 'send_failed')
+    `;
+    await transaction`
+      update public.aura_sms_request_states as state set
+        status = ${cancelState ? "cancelled" : "collecting"},
+        intake_phase = case
+          when ${cancelState} then 'items'
+          when state.list_complete = false then 'items'
+          when not exists (
+            select 1 from public.aura_sms_request_state_slots as address
+            where address.state_id = state.id
+              and address.slot_key = 'delivery_address'
+              and address.status in ('observed', 'confirmed')
+          ) then 'delivery_address'
+          else 'summary_confirmation'
+        end,
+        pending_confirmation_id = null,
+        closed_at = case when ${cancelState} then now() else null end,
+        state_version = state_version + 1, updated_at = now()
+      where state.id = ${row.state_id}::uuid
+        and state.pending_confirmation_id = ${row.pending_id}::uuid
+    `;
+  });
 }
 
 async function smsCustomerProfile(phone: string, name: string) {
@@ -4101,18 +4338,78 @@ async function confirmPendingSmsRequest(
       summary_text: string;
       intelligence_ready: boolean;
       intelligence_assessment: { questions?: string[] } | null;
+      state_id: string;
+      list_completion_communication_id: string | null;
     }[]
   >`
-    select id, customer_name, customer_address, title, department, items, source_communication_ids, request_id, needed_by_text, summary_text, intelligence_ready, intelligence_assessment
-    from public.aura_sms_request_pending_confirmations where normalized_phone = ${phone} and status = 'pending' and summary_sent_at is not null order by summary_sent_at desc limit 1
+    select pending.id, pending.customer_name, pending.customer_address,
+      pending.title, pending.department, pending.items,
+      pending.source_communication_ids, pending.request_id,
+      pending.needed_by_text, pending.summary_text,
+      pending.intelligence_ready, pending.intelligence_assessment,
+      state.id as state_id, pending.list_completion_communication_id
+    from public.aura_sms_request_states as state
+    join public.aura_sms_request_pending_confirmations as pending
+      on pending.id = state.pending_confirmation_id
+     and pending.state_id = state.id
+    join public.aura_communications as confirmation
+      on confirmation.id = ${communicationId}::uuid
+     and confirmation.direction = 'incoming'
+     and confirmation.counterparty_phone = ${phone}
+    where state.normalized_phone = ${phone}
+      and state.status = 'awaiting_confirmation'
+      and state.intake_phase = 'summary_confirmation'
+      and state.list_complete = true
+      and state.list_completion_communication_id = pending.list_completion_communication_id
+      and pending.normalized_phone = ${phone}
+      and pending.status = 'pending'
+      and pending.request_id is null
+      and pending.summary_sent_at is not null
+      and confirmation.occurred_at >= pending.summary_sent_at
+      and not exists (
+        select 1
+        from public.aura_request_state_communications as intervening
+        where intervening.state_id = state.id
+          and intervening.direction = 'incoming'
+          and intervening.communication_id <> ${communicationId}::uuid
+          and intervening.occurred_at > pending.summary_sent_at
+          and intervening.occurred_at <= confirmation.occurred_at
+      )
+    limit 1
   `;
   const pending = pendingRows[0];
   if (!pending) return null;
   const neededBy =
     pending.needed_by_text?.trim() ||
     smsNeededByTimingValue(pending.summary_text);
-  if (!neededBy && !SIMPLE_REQUEST_INTAKE) {
-    await sql`update public.aura_sms_request_pending_confirmations set status = 'superseded', updated_at = now() where id = ${pending.id}::uuid and status = 'pending'`;
+  if (
+    !pending.intelligence_ready ||
+    !Array.isArray(pending.items) ||
+    pending.items.length === 0 ||
+    !pending.list_completion_communication_id ||
+    !smsHasFullDeliveryAddress(pending.customer_address) ||
+    (!neededBy && !SIMPLE_REQUEST_INTAKE)
+  ) {
+    await sql.begin(async (transaction) => {
+      await transaction`
+        update public.aura_sms_request_pending_confirmations
+        set status = 'superseded', updated_at = now()
+        where id = ${pending.id}::uuid and state_id = ${pending.state_id}::uuid
+          and status = 'pending'
+      `;
+      await transaction`
+        update public.aura_sms_request_states set
+          status = 'collecting',
+          intake_phase = case
+            when list_complete = false or ${pending.intelligence_ready} = false then 'items'
+            else 'delivery_address'
+          end,
+          pending_confirmation_id = null,
+          state_version = state_version + 1, updated_at = now()
+        where id = ${pending.state_id}::uuid
+          and pending_confirmation_id = ${pending.id}::uuid
+      `;
+    });
     return null;
   }
   const customerId = await smsCustomerProfile(
@@ -4120,9 +4417,25 @@ async function confirmPendingSmsRequest(
     pending.customer_name || phone,
   );
   const result = await sql.begin(async (transaction) => {
+    await transaction`select pg_advisory_xact_lock(hashtextextended(${phone}, 0))`;
     const locked = await transaction<
       { id: string; status: string; request_id: string | null }[]
-    >`select id, status, request_id from public.aura_sms_request_pending_confirmations where id = ${pending.id}::uuid for update`;
+    >`
+      select pending.id, pending.status, pending.request_id
+      from public.aura_sms_request_states as state
+      join public.aura_sms_request_pending_confirmations as pending
+        on pending.id = state.pending_confirmation_id
+       and pending.state_id = state.id
+      where state.id = ${pending.state_id}::uuid
+        and state.status = 'awaiting_confirmation'
+        and state.intake_phase = 'summary_confirmation'
+        and state.list_complete = true
+        and state.list_completion_communication_id = pending.list_completion_communication_id
+        and pending.id = ${pending.id}::uuid
+        and pending.status = 'pending'
+        and pending.request_id is null
+      for update of state, pending
+    `;
     if (locked[0]?.request_id) {
       const existing = await transaction<
         { id: string; public_number: number }[]
@@ -4197,8 +4510,11 @@ async function confirmPendingSmsRequest(
     await transaction`
       update public.aura_sms_request_states
       set status = 'confirmed', created_request_id = ${requests[0].id}::uuid,
-          pending_confirmation_id = null, closed_at = now(), updated_at = now()
-      where normalized_phone = ${phone} and status in ('collecting', 'awaiting_confirmation')
+          intake_phase = 'manager_review', pending_confirmation_id = null,
+          closed_at = null, state_version = state_version + 1, updated_at = now()
+      where id = ${pending.state_id}::uuid
+        and status = 'awaiting_confirmation'
+        and pending_confirmation_id = ${pending.id}::uuid
     `;
     return requests[0];
   });
@@ -4461,11 +4777,11 @@ async function processCustomerSmsAutomation(
   `;
   const explicitlyStartsNewRequest = smsStartsNewMaterialRequest(body);
   if (isSmsOptOutMessage(body)) {
-    await sql`
-      update public.aura_sms_request_pending_confirmations
-      set status = 'superseded', updated_at = now()
-      where normalized_phone = ${phone} and status = 'pending'
-    `;
+    await supersedeSmsConfirmationForCustomerChange(
+      phone,
+      "Customer opted out before confirmation.",
+      true,
+    );
     if (contact?.id) {
       await sql`update public.aura_contacts set sms_ai_mode = 'off' where id = ${contact.id}::uuid`;
       await sql`
@@ -4481,14 +4797,12 @@ async function processCustomerSmsAutomation(
     return;
   }
   const explicitConfirmation = isExplicitCustomerRequestConfirmation(body);
-  if (!explicitConfirmation) {
-    await sql`
-      update public.aura_sms_request_pending_confirmations
-      set status = 'superseded', updated_at = now()
-      where normalized_phone = ${phone} and status = 'pending'
-    `;
-  }
   if (await confirmPendingSmsRequest(communicationId, phone, body)) return;
+  if (!explicitConfirmation)
+    await supersedeSmsConfirmationForCustomerChange(
+      phone,
+      "A customer response replaced this confirmation summary.",
+    );
   // A customer-confirmed request remains the active SMS request until a
   // manager explicitly changes the quote request status to `closed`. Even an
   // explicit "new request" message is appended to that request while it is
@@ -4540,20 +4854,6 @@ async function processCustomerSmsAutomation(
     `;
     return;
   }
-  if (customerEvent === "cancellation") {
-    await sql`
-      update public.aura_sms_request_pending_confirmations
-      set status = 'superseded', updated_at = now()
-      where normalized_phone = ${phone} and status = 'pending'
-    `;
-  }
-  if (customerEvent === "correction") {
-    await sql`
-      update public.aura_sms_request_pending_confirmations
-      set status = 'superseded', updated_at = now()
-      where normalized_phone = ${phone} and status = 'pending'
-    `;
-  }
   const openDrafts = await sql<
     {
       id: string;
@@ -4603,7 +4903,7 @@ async function processCustomerSmsAutomation(
       openDraft?.exact_list_only || activeSubmittedRequest?.exactListOnly,
     latestMessage: body,
   });
-  const deliveryAddressKnown = resolveSmsDeliveryAddressKnown({
+  const deliveryAddressHintKnown = resolveSmsDeliveryAddressKnown({
     storedDraft:
       openDraft?.delivery_address_known ||
       activeSubmittedRequest?.deliveryAddressKnown,
@@ -4675,7 +4975,7 @@ async function processCustomerSmsAutomation(
           analysisMedia,
           customerEvent,
           exactListOnly,
-          deliveryAddressKnown,
+          deliveryAddressHintKnown,
           persistedOrderState,
         );
   // A terse answer can look unrelated in isolation even though it completes an
@@ -4696,7 +4996,7 @@ async function processCustomerSmsAutomation(
       analysisMedia,
       customerEvent,
       exactListOnly,
-      deliveryAddressKnown,
+      deliveryAddressHintKnown,
       persistedOrderState,
     );
   }
@@ -4780,6 +5080,17 @@ async function processCustomerSmsAutomation(
     }
   }
   const { result, model, intent, metrics, promptVersion } = analyzed;
+  const confirmedDeliveryAddress =
+    [
+      result.customerAddress,
+      openDraft?.customer_address,
+      activeSubmittedRequest?.customerAddress,
+      effectiveBody,
+    ].find(
+      (candidate) =>
+        typeof candidate === "string" && smsHasFullDeliveryAddress(candidate),
+    ) || "";
+  const deliveryAddressKnown = Boolean(confirmedDeliveryAddress);
   if (result.request && customerEvent === "correction") {
     const previousItems = persistedOrderState?.items?.length
       ? persistedOrderState.items.map((item) => ({
@@ -4896,8 +5207,17 @@ async function processCustomerSmsAutomation(
       protectedTopic: hasForbiddenAutoReplyTopic(effectiveBody),
     });
   }
+  const latestProvenOutgoingQuestion = persistedOrderState?.crossChannelMemory
+    .slice()
+    .reverse()
+    .find((entry) => entry.direction === "outgoing")?.body;
+  // The customer's reply itself proves receipt even when the provider's
+  // delivery callback arrives a few milliseconds later.
   const previouslyAskedForMore =
-    persistedOrderState?.lastAskedSlots.includes("additional_items") === true;
+    persistedOrderState?.lastAskedSlots.includes("additional_items") === true ||
+    askedSlotsFromReply(latestProvenOutgoingQuestion || "").includes(
+      "additional_items",
+    );
   const listComplete =
     persistedOrderState?.listComplete === true ||
     (previouslyAskedForMore && customerFinishedMaterialList(effectiveBody));
@@ -4908,8 +5228,11 @@ async function processCustomerSmsAutomation(
   const effectiveListComplete = listComplete && !addedMaterialAfterCompletion;
   const askedForAnotherItem =
     previouslyAskedForMore && customerWantsAnotherItem(effectiveBody);
+  const completionContinuation =
+    previouslyAskedForMore &&
+    (customerFinishedMaterialList(effectiveBody) || askedForAnotherItem);
   const canAdvanceIntake =
-    isIntakeTurn &&
+    (isIntakeTurn || completionContinuation) &&
     materialIntelligence.readyForConfirmation &&
     (result.isMaterialRequest ||
       Boolean(openDraft || activeSubmittedRequest)) &&
@@ -5075,6 +5398,9 @@ async function processCustomerSmsAutomation(
           (activeUpdateKind === "item" || activeUpdateKind === "correction")) ||
         addedMaterialAfterCompletion,
       startsNewRequest,
+      intelligenceReady:
+        materialIntelligence.readyForConfirmation &&
+        clarificationQuestions.length === 0,
     });
   } catch (stateError) {
     console.error(
@@ -5161,21 +5487,22 @@ async function processCustomerSmsAutomation(
         update public.aura_sms_request_drafts set
           contact_id = coalesce(${contact?.id || null}, contact_id),
           customer_name = ${result.customerName || openDraft.customer_name || contact?.full_name || phone},
-          customer_address = ${result.customerAddress || openDraft.customer_address || null},
+          customer_address = ${confirmedDeliveryAddress || result.customerAddress || openDraft.customer_address || null},
           title = ${result.request.title}, department = ${result.request.department},
           items = ${sql.json(result.request.items)}, original_message = ${reviewText.slice(0, 4000)},
           exact_list_only = ${exactListOnly},
           delivery_address_known = ${deliveryAddressKnown},
           intelligence_assessment = ${sql.json(materialIntelligence)},
           intelligence_ready = ${materialIntelligence.readyForConfirmation},
+          list_complete = ${effectiveListComplete},
           source_communication_ids = ${sql.json(sources)}, review_note = 'New text reviewed by AI — confirm the updated details.', ai_model = ${model}
         where id = ${openDraft.id}::uuid
       `;
     } else {
       await sql`
         insert into public.aura_sms_request_drafts
-          (communication_id, contact_id, sender_phone, customer_name, customer_address, title, department, items, original_message, exact_list_only, delivery_address_known, intelligence_assessment, intelligence_ready, draft_kind, created_request_id, source_communication_ids, review_note, ai_model)
-        values (${communicationId}::uuid, ${contact?.id || null}, ${phone}, ${result.customerName || contact?.full_name || phone}, ${result.customerAddress}, ${result.request.title}, ${result.request.department}, ${sql.json(result.request.items)}, ${body.slice(0, 4000)}, ${exactListOnly}, ${deliveryAddressKnown}, ${sql.json(materialIntelligence)}, ${materialIntelligence.readyForConfirmation}, ${customerEvent === "correction" && linkedCorrectionRequestId ? "update" : "create"}, ${linkedCorrectionRequestId}, ${sql.json([communicationId])}, ${customerEvent === "correction" ? "AI detected a correction. Review every changed value before applying it." : "AI found a material request. Review before creating it."}, ${model})
+          (communication_id, contact_id, sender_phone, customer_name, customer_address, title, department, items, original_message, exact_list_only, delivery_address_known, intelligence_assessment, intelligence_ready, list_complete, draft_kind, created_request_id, source_communication_ids, review_note, ai_model)
+        values (${communicationId}::uuid, ${contact?.id || null}, ${phone}, ${result.customerName || contact?.full_name || phone}, ${confirmedDeliveryAddress || result.customerAddress}, ${result.request.title}, ${result.request.department}, ${sql.json(result.request.items)}, ${body.slice(0, 4000)}, ${exactListOnly}, ${deliveryAddressKnown}, ${sql.json(materialIntelligence)}, ${materialIntelligence.readyForConfirmation}, ${effectiveListComplete}, ${customerEvent === "correction" && linkedCorrectionRequestId ? "update" : "create"}, ${linkedCorrectionRequestId}, ${sql.json([communicationId])}, ${customerEvent === "correction" ? "AI detected a correction. Review every changed value before applying it." : "AI found a material request. Review before creating it."}, ${model})
         on conflict (communication_id) do nothing
       `;
     }
@@ -5194,8 +5521,7 @@ async function processCustomerSmsAutomation(
           openDraft?.customer_name ||
           contact?.full_name ||
           phone,
-        customerAddress:
-          result.customerAddress || openDraft?.customer_address || "",
+        customerAddress: confirmedDeliveryAddress,
         // Use only the active request text. The broader conversation can
         // contain a date from an older order and must not leak into this one.
         customerNeededBy: smsNeededByTimingValue(reviewText) || "",
@@ -5970,11 +6296,37 @@ async function finalizeSmsOutboxParent(outboxId: string) {
       ) as failed
     `;
     if (terminal[0]?.failed) {
-      await sql`
-        update public.aura_sms_request_pending_confirmations
-        set status = 'send_failed', updated_at = now()
-        where id = ${row.pending_confirmation_id}::uuid and status = 'pending' and summary_sent_at is null
+      const phoneRows = await sql<{ normalized_phone: string }[]>`
+        select normalized_phone
+        from public.aura_sms_request_pending_confirmations
+        where id = ${row.pending_confirmation_id}::uuid
+        limit 1
       `;
+      const phone = phoneRows[0]?.normalized_phone;
+      if (phone)
+        await sql.begin(async (transaction) => {
+          await transaction`select pg_advisory_xact_lock(hashtextextended(${phone}, 0))`;
+          const failed = await transaction<{ state_id: string }[]>`
+            update public.aura_sms_request_pending_confirmations as pending
+            set status = 'send_failed', updated_at = now()
+            from public.aura_sms_request_states as state
+            where pending.id = ${row.pending_confirmation_id}::uuid
+              and pending.status = 'pending'
+              and pending.summary_sent_at is null
+              and state.id = pending.state_id
+              and state.pending_confirmation_id = pending.id
+            returning state.id as state_id
+          `;
+          if (failed[0])
+            await transaction`
+              update public.aura_sms_request_states set
+                status = 'collecting', intake_phase = 'summary_confirmation',
+                pending_confirmation_id = null,
+                state_version = state_version + 1, updated_at = now()
+              where id = ${failed[0].state_id}::uuid
+                and pending_confirmation_id = ${row.pending_confirmation_id}::uuid
+            `;
+        });
     }
     return;
   }

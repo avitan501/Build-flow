@@ -84,15 +84,8 @@ export async function convertSmsRequestDraftAction(formData: FormData) {
   const id = String(formData.get("draftId") || "").trim()
   const customerId = String(formData.get("customerId") || "").trim()
   if (!/^[0-9a-f-]{36}$/i.test(id) || !/^[0-9a-f-]{36}$/i.test(customerId)) throw new Error("Choose a customer for this text request.")
-  const { supabase } = await requireStaffProfile("customers")
-  const { data: draft } = await supabase.from("aura_sms_request_drafts").select("id,title,department,items,original_message,status").eq("id", id).eq("status", "new").maybeSingle<{ id: string; title: string; department: string; items: Array<{ name: string; quantity: number; unit: string }>; original_message: string | null; status: string }>()
-  if (!draft || !Array.isArray(draft.items) || !draft.items.length) throw new Error("This text request is no longer waiting for review.")
-  const { data: requestId, error } = await supabase.rpc("staff_create_client_request", { p_customer_id: customerId, p_department: draft.department, p_title: draft.title, p_lines: draft.items, p_notes: `Original client text: ${draft.original_message || ""}`.slice(0, 4000) })
-  if (error || typeof requestId !== "string") throw new Error("The material request could not be created.")
-  const completed = await supabase.from("aura_sms_request_drafts").update({ status: "converted", created_request_id: requestId }).eq("id", id).eq("status", "new")
-  if (completed.error) throw new Error("The request was created, but the text draft could not be closed.")
-  revalidatePath("/owner/materials/requests")
-  revalidatePath(`/owner/materials/requests/${requestId}`)
+  await requireStaffProfile("customers")
+  throw new Error("Send the latest summary to the customer and wait for their YES. The confirmed SMS flow creates the request safely.")
 }
 
 export type RequestClientQuoteInput = {

@@ -168,13 +168,15 @@ export function smsRequiresExactList(value: string) {
 
 export function smsHasFullDeliveryAddress(value: string) {
   return (
-    /\b\d{1,6}\s+[a-z0-9.'-]+(?:\s+[a-z0-9.'-]+){0,5}\s+(?:st(?:reet)?|ave(?:nue)?|rd|road|blvd|boulevard|dr(?:ive)?|ln|lane|ct|court|way|pkwy|parkway)\b/i.test(
+    /\b\d{1,6}\s+[a-z0-9.'-]+(?:\s+[a-z0-9.'-]+){0,5}\s+(?:st(?:reet)?|ave(?:nue)?|rd|road|blvd|boulevard|dr(?:ive)?|ln|lane|ct|court|way|pkwy|parkway)\b[^\n]{0,100}\b[a-z.'-]+(?:\s+[a-z.'-]+){0,4},?\s+[a-z]{2}\s+\d{5}(?:-\d{4})?\b/i.test(
       value,
     ) ||
-    /\b(?:calle|avenida|camino|ruta)\s+[\p{L}0-9.'-]+(?:\s+[\p{L}0-9.'-]+){0,5}\s+\d{1,6}\b/iu.test(
+    /\b(?:calle|avenida|camino|ruta)\s+[\p{L}0-9.'-]+(?:\s+[\p{L}0-9.'-]+){0,5}\s+\d{1,6}\b[^\n]{0,100}\b[\p{L}.'-]+(?:\s+[\p{L}.'-]+){0,4},?\s+[a-z]{2}\s+\d{5}(?:-\d{4})?\b/iu.test(
       value,
     ) ||
-    /(?:רחוב\s+[\p{L}"׳״'-]+(?:\s+[\p{L}"׳״'-]+){0,4}\s+\d{1,5})/u.test(value)
+    /(?:רחוב\s+[\p{L}"׳״'-]+(?:\s+[\p{L}"׳״'-]+){0,4}\s+\d{1,5})[^\n]{0,100}\b[A-Z]{2}\s+\d{5}(?:-\d{4})?\b/u.test(
+      value,
+    )
   );
 }
 
@@ -613,16 +615,14 @@ export function smsAnsweredQuantityGuardReply(
 }
 
 export function splitSmsMaterialClauses(value: string) {
-  return value
-    .split(/\r?\n|;/)
-    .flatMap((line) =>
-      line
-        // Preserve thousands separators such as 1,000 while accepting the
-        // comma/"and" lists contractors commonly send from a phone.
-        .split(/,(?!\d)|\s+(?:and|plus|y|e)\s+(?=(?:\d|[a-z]))/i)
-        .map((clause) => clause.trim())
-        .filter(Boolean),
-    );
+  return value.split(/\r?\n|;/).flatMap((line) =>
+    line
+      // Preserve thousands separators such as 1,000 while accepting the
+      // comma/"and" lists contractors commonly send from a phone.
+      .split(/,(?!\d)|\s+(?:and|plus|y|e)\s+(?=(?:\d|[a-z]))/i)
+      .map((clause) => clause.trim())
+      .filter(Boolean),
+  );
 }
 
 type SmsRequestItem = {
@@ -745,7 +745,11 @@ export function smsMaterialClarificationQuestions(
   const replyLanguage = smsReplyLanguage(value);
   value = canonicalMaterialText(value);
   const localized = (english: string, spanish: string, hebrew: string) =>
-    replyLanguage === "es" ? spanish : replyLanguage === "he" ? hebrew : english;
+    replyLanguage === "es"
+      ? spanish
+      : replyLanguage === "he"
+        ? hebrew
+        : english;
   const questions: string[] = [];
   const sheetrockEvidence = value.replace(
     /^.*\b(?:drywall|sheetrock)\s+screws?\b.*$/gim,
@@ -823,7 +827,8 @@ export function smsMaterialClarificationQuestions(
         ) ||
         /\b\d{1,6}\s*(?:pcs?|pieces?|each|ea|sheets?|bags?|buckets?|bundles?|cans?|gallons?|gals?|rolls?|packs?)\b/i.test(
           quantityText,
-        ) || /^\s*\d{1,6}\s+/.test(quantityText)
+        ) ||
+        /^\s*\d{1,6}\s+/.test(quantityText)
       );
     });
 
@@ -1769,8 +1774,7 @@ export function smsReplyParts(params: {
 }
 
 export function smsDeliveryDetailsQuestionReply(message: string) {
-  if (/[\u0590-\u05ff]/.test(message))
-    return "מה כתובת המשלוח המלאה?";
+  if (/[\u0590-\u05ff]/.test(message)) return "מה כתובת המשלוח המלאה?";
   if (smsReplyLanguage(message) === "es")
     return "¿Cuál es la dirección completa de entrega?";
   return "What’s the full delivery address?";
