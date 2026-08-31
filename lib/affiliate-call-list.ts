@@ -195,7 +195,7 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     priority: "A",
     programUrl: "https://affiliate-program.amazon.com/",
     programStatus: "Official program",
-    currentSituation: "The Associates profile and Store ID are active, but Amazon's final account review happens only after three qualifying purchases. Tax and payment setup must also be complete.",
+    currentSituation: "The account is active. The Aug 30 dashboard shows 9 clicks, 0 orders and $0 earnings. Amazon still requires the tax interview, payment setup and three qualifying purchases before final account review.",
     contactMethods: [
       { label: "Associates support", detail: "Account contact form", href: "https://affiliate-program.amazon.com/home/contact", type: "form" },
       { label: "Associates Central", detail: "Open account", href: "https://affiliate-program.amazon.com/home", type: "form" },
@@ -217,7 +217,7 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     priority: "A",
     programUrl: "https://affiliates.walmart.com/",
     programStatus: "Official program",
-    currentSituation: "The website affiliate application was received Aug 17 and is still awaiting a decision. The follow-up is due now.",
+    currentSituation: "The website affiliate application was received Aug 17 and is still awaiting a decision. A status follow-up was sent to Walmart Affiliate Support on Aug 31; no decision email is verified yet.",
     contactMethods: [
       { label: "Affiliate support", detail: "affiliates-help-ext@wal-mart.com", href: "mailto:affiliates-help-ext@wal-mart.com", type: "email" },
       { label: "Affiliate portal", detail: "Open application account", href: "https://affiliates.walmart.com/", type: "form" },
@@ -239,7 +239,7 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     priority: "A",
     programUrl: "https://www.ferguson.com/content/pro-services/",
     programStatus: "Official program",
-    currentSituation: "A direct affiliate inquiry was sent Aug 24 with no verified reply yet. A second route is available through Ferguson customer support and the professional sales line.",
+    currentSituation: "A direct affiliate inquiry was sent Aug 24 and followed up Aug 31 after Impact approved AvantiaBuild's publisher account. No Ferguson reply is verified yet; customer support and professional sales remain the backup routes.",
     contactMethods: [
       { label: "Affiliate team", detail: "bld-affiliateteam@ferguson.com", href: "mailto:bld-affiliateteam@ferguson.com", type: "email" },
       { label: "Customer support", detail: "customer.support@ferguson.com", href: "mailto:customer.support@ferguson.com", type: "email" },
@@ -262,7 +262,7 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     priority: "A",
     programUrl: "https://www.bldr.com/contact/contact-us",
     programStatus: "Confirm by phone",
-    currentSituation: "Several online cases produced automated replies, most recently case 00714195. There is no verified human partnership or trade-account contact yet.",
+    currentSituation: "Customer Service was emailed Aug 23, and several online cases produced automated replies, most recently case 00714195 on Aug 25. There is still no verified human partnership or trade-account contact, so the next route is the support line or a local branch.",
     contactMethods: [
       { label: "myBLDR support", detail: "844-487-8625", href: "tel:+18444878625", type: "phone" },
       { label: "Contact form", detail: "Reference case 00714195", href: "https://www.bldr.com/contact/contact-us", type: "form" },
@@ -285,7 +285,7 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     priority: "A",
     programUrl: "https://www.acehardware.com/affiliates",
     programStatus: "Official program",
-    currentSituation: "AvantiaBuild's Impact publisher account is approved, but Ace requires its own separate brand application before tracked Ace links can be created.",
+    currentSituation: "AvantiaBuild's Impact publisher account is approved, but Ace requires its own separate brand application. The Ace affiliate team was followed up on Aug 31 for the direct campaign link; no reply is verified yet.",
     contactMethods: [
       { label: "Affiliate help", detail: "866-290-5334", href: "tel:+18662905334", type: "phone" },
       { label: "Ace application", detail: "Apply to the Ace campaign", href: "https://www.acehardware.com/affiliates", type: "form" },

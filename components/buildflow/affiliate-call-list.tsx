@@ -358,11 +358,16 @@ export function AffiliateCallList({
                     {target.category}
                   </p>
                 </div>
-                <span
-                  className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold ${statusStyle(savedStatus)}`}
-                >
-                  {savedStatus ?? "Not saved"}
-                </span>
+                <div className="shrink-0 text-right">
+                  <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                    2 · Status
+                  </p>
+                  <span
+                    className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${statusStyle(savedStatus)}`}
+                  >
+                    {savedStatus ?? "Not saved"}
+                  </span>
+                </div>
               </div>
 
               <div className="mt-4 grid gap-4">
