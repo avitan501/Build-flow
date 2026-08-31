@@ -4524,6 +4524,11 @@ async function processCustomerSmsAutomation(
   const listComplete =
     persistedOrderState?.listComplete === true ||
     (previouslyAskedForMore && customerFinishedMaterialList(effectiveBody));
+  const addedMaterialAfterCompletion =
+    latestTurnIsMaterialRequest &&
+    persistedOrderState?.listComplete === true &&
+    !customerFinishedMaterialList(effectiveBody);
+  const effectiveListComplete = listComplete && !addedMaterialAfterCompletion;
   const askedForAnotherItem =
     previouslyAskedForMore && customerWantsAnotherItem(effectiveBody);
   const canAdvanceIntake =
@@ -4533,7 +4538,7 @@ async function processCustomerSmsAutomation(
       Boolean(openDraft || activeSubmittedRequest)) &&
     customerEvent !== "cancellation" &&
     clarificationQuestions.length === 0;
-  if (canAdvanceIntake && !listComplete) {
+  if (canAdvanceIntake && !effectiveListComplete) {
     result.reply = askedForAnotherItem
       ? additionalItemPrompt(effectiveBody)
       : additionalItemsQuestion(effectiveBody);
@@ -4548,7 +4553,11 @@ async function processCustomerSmsAutomation(
       exactListOnly,
       protectedTopic: hasForbiddenAutoReplyTopic(effectiveBody),
     });
-  } else if (canAdvanceIntake && listComplete && !deliveryAddressKnown) {
+  } else if (
+    canAdvanceIntake &&
+    effectiveListComplete &&
+    !deliveryAddressKnown
+  ) {
     result.reply = deliveryAddressQuestion(effectiveBody);
     result.autoSafe = true;
     safety = evaluateSmsReplyGate({
@@ -4683,13 +4692,11 @@ async function processCustomerSmsAutomation(
       exactListOnly,
       event: customerEvent,
       latestMessage: effectiveBody,
-      listComplete,
+      listComplete: effectiveListComplete,
       resetListComplete:
         (activeRequestSynced &&
           (activeUpdateKind === "item" || activeUpdateKind === "correction")) ||
-        (latestTurnIsMaterialRequest &&
-          persistedOrderState?.listComplete === true &&
-          !customerFinishedMaterialList(effectiveBody)),
+        addedMaterialAfterCompletion,
     });
   } catch (stateError) {
     console.error(
@@ -4797,7 +4804,7 @@ async function processCustomerSmsAutomation(
     if (
       (customerEvent !== "correction" || preConfirmationCorrection) &&
       !linkedCorrectionRequestId &&
-      listComplete &&
+      effectiveListComplete &&
       deliveryAddressKnown &&
       materialIntelligence.readyForConfirmation &&
       clarificationQuestions.length === 0
@@ -4817,7 +4824,7 @@ async function processCustomerSmsAutomation(
         request: result.request,
         sourceCommunicationIds: sources,
         latestCustomerMessage: body,
-        listComplete,
+        listComplete: effectiveListComplete,
         intelligenceReady: materialIntelligence.readyForConfirmation,
         intelligenceAssessment: materialIntelligence,
       });
