@@ -459,19 +459,29 @@ test("Carlos has a focused top-10 supplier call list while the full research lis
 
   expect(page).toContain("<AffiliateCallList />");
   expect(page).toContain("Manage supplier APIs, affiliate programs, and partnerships.");
-  expect(component).toContain("Top 10 supplier priorities");
+  expect(component).toContain("Top 10 supplier programs");
+  expect(component).toContain("1 · Supplier");
+  expect(component).toContain("2 · Status");
+  expect(component).toContain("3 · Contact");
+  expect(component).toContain("4 · Current situation");
+  expect(component).toContain("5 · Next step");
   expect(component).toContain("Direct business");
   expect(component).toContain("Network managed");
-  expect(component).toContain("Only public business contacts are shown");
+  expect(component).toContain("Contact routes are public business contacts");
   expect(component).toContain("TOP_AFFILIATE_CALL_TARGETS");
-  expect(component).toContain("program.api_status");
-  expect(component).toContain("program.next_action");
+  expect(component).toContain("program?.api_status");
+  expect(component).toContain("program?.next_action");
   expect(component).toContain("program.last_contact_date");
   expect(component).toContain("program.next_follow_up_date");
-  expect(component).toContain("All updates");
+  expect(component).toContain("Full history");
   expect(page).toContain("activities={activityResult.data ?? []}");
   expect(data).toContain("export const TOP_AFFILIATE_CALL_TARGETS");
   expect((data.match(/trackerName:/g) ?? []).length).toBe(10);
+  expect((data.match(/currentSituation:/g) ?? []).length).toBe(10);
+  expect((data.match(/contactMethods:/g) ?? []).length).toBe(10);
+  expect(data).toContain("allie.smith@cj.com");
+  expect(data).toContain("publisher.growth@impact.com");
+  expect(data).toContain("affiliatesmanager@acmetools.com");
   expect((data.match(/\btarget\(/g) ?? []).length).toBe(50);
 
   const companies = [...data.matchAll(/target\(\d+, "([^"]+)"/g)].map(

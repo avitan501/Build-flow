@@ -1,71 +1,428 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ExternalLink, Mail, MessageSquareText, Phone, Search } from "lucide-react";
+import {
+  ExternalLink,
+  Mail,
+  MessageSquareText,
+  Phone,
+  Search,
+} from "lucide-react";
 
-import { TOP_AFFILIATE_CALL_TARGETS } from "@/lib/affiliate-call-list";
-import type { AffiliateActivity, AffiliateProgram } from "@/lib/affiliate-tracker";
+import {
+  TOP_AFFILIATE_CALL_TARGETS,
+  type AffiliateCallTarget,
+} from "@/lib/affiliate-call-list";
+import {
+  STATUS_STYLES,
+  type AffiliateActivity,
+  type AffiliateProgram,
+  type AffiliateStatus,
+} from "@/lib/affiliate-tracker";
 
 function shortDate(value: string | null) {
   if (!value) return "—";
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+    : new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+      }).format(date);
 }
 
-export function AffiliateCallList({ programs = [], activities = [] }: { programs?: AffiliateProgram[]; activities?: AffiliateActivity[] }) {
+function statusStyle(status: AffiliateStatus | undefined) {
+  return status
+    ? STATUS_STYLES[status]
+    : "border-slate-200 bg-slate-100 text-slate-600";
+}
+
+function contactMethods(
+  target: AffiliateCallTarget,
+): NonNullable<AffiliateCallTarget["contactMethods"]> {
+  if (target.contactMethods?.length) return target.contactMethods;
+  return [
+    {
+      label: target.contactLabel ?? target.phone,
+      detail: target.askFor,
+      href: target.contactHref ?? target.phoneHref,
+      type: target.contactType ?? "phone",
+    },
+  ];
+}
+
+function ContactLinks({ target }: { target: AffiliateCallTarget }) {
+  return (
+    <div className="space-y-1.5">
+      {contactMethods(target).map((contact) => {
+        const Icon =
+          contact.type === "email"
+            ? Mail
+            : contact.type === "form"
+              ? MessageSquareText
+              : Phone;
+        const opensNewTab = contact.type === "form";
+        return (
+          <a
+            key={`${contact.label}-${contact.href}`}
+            href={contact.href}
+            target={opensNewTab ? "_blank" : undefined}
+            rel={opensNewTab ? "noopener noreferrer" : undefined}
+            className="group flex min-h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-left transition hover:border-[#0071e3] hover:bg-blue-50"
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0 text-[#0071e3]" />
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold text-slate-900">
+                {contact.label}
+              </span>
+              <span className="block truncate text-[10px] text-slate-500 group-hover:text-slate-700">
+                {contact.detail}
+              </span>
+            </span>
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
+function UpdateHistory({
+  program,
+  activities,
+}: {
+  program: AffiliateProgram | undefined;
+  activities: AffiliateActivity[];
+}) {
+  if (!program || (!program.notes && !activities.length)) return null;
+  return (
+    <details className="mt-2 border-t border-slate-200 pt-2">
+      <summary className="cursor-pointer text-[11px] font-semibold text-[#0066cc]">
+        Full history ({activities.length})
+      </summary>
+      {program.notes ? (
+        <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-600">
+          {program.notes}
+        </p>
+      ) : null}
+      {activities.length ? (
+        <div className="mt-2 divide-y divide-slate-200">
+          {activities.map((activity) => (
+            <div key={activity.id} className="py-2">
+              <p className="text-xs font-semibold text-slate-800">
+                {activity.title}
+              </p>
+              {activity.details ? (
+                <p className="mt-0.5 text-xs leading-5 text-slate-600">
+                  {activity.details}
+                </p>
+              ) : null}
+              <p className="mt-0.5 text-[10px] text-slate-400">
+                {shortDate(activity.activity_date)}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </details>
+  );
+}
+
+export function AffiliateCallList({
+  programs = [],
+  activities = [],
+}: {
+  programs?: AffiliateProgram[];
+  activities?: AffiliateActivity[];
+}) {
   const [query, setQuery] = useState("");
   const [priority, setPriority] = useState<"All" | "A" | "B" | "C">("All");
-  const [contactLevel, setContactLevel] = useState<"All" | "Dedicated team" | "Direct business" | "Pro or sales team" | "Network managed">("All");
-  const programsByName = useMemo(() => new Map(programs.map((program) => [program.supplier_name.toLowerCase(), program])), [programs]);
+  const [contactLevel, setContactLevel] = useState<
+    | "All"
+    | "Dedicated team"
+    | "Direct business"
+    | "Pro or sales team"
+    | "Network managed"
+  >("All");
+  const programsByName = useMemo(
+    () =>
+      new Map(
+        programs.map((program) => [
+          program.supplier_name.toLowerCase(),
+          program,
+        ]),
+      ),
+    [programs],
+  );
   const activitiesByProgram = useMemo(() => {
     const grouped = new Map<string, AffiliateActivity[]>();
-    for (const activity of activities) grouped.set(activity.program_id, [...(grouped.get(activity.program_id) ?? []), activity]);
+    for (const activity of activities) {
+      grouped.set(activity.program_id, [
+        ...(grouped.get(activity.program_id) ?? []),
+        activity,
+      ]);
+    }
     return grouped;
   }, [activities]);
   const filtered = TOP_AFFILIATE_CALL_TARGETS.filter((target) => {
     const search = query.trim().toLowerCase();
-    return (priority === "All" || target.priority === priority)
-      && (contactLevel === "All" || target.contactLevel === contactLevel)
-      && (!search || `${target.company} ${target.category} ${target.phone} ${target.askFor} ${target.callRoute}`.toLowerCase().includes(search));
+    const searchableContacts = contactMethods(target)
+      .map((contact) => `${contact.label} ${contact.detail}`)
+      .join(" ");
+    return (
+      (priority === "All" || target.priority === priority) &&
+      (contactLevel === "All" || target.contactLevel === contactLevel) &&
+      (!search ||
+        `${target.company} ${target.category} ${target.phone} ${target.askFor} ${target.callRoute} ${target.currentSituation ?? ""} ${searchableContacts}`
+          .toLowerCase()
+          .includes(search))
+    );
   });
 
-  return <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-    <div className="border-b border-slate-200 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Carlos call list</p><h3 className="mt-1 text-lg font-semibold">Top 10 supplier priorities</h3><p className="mt-1 text-sm text-slate-600">One focused list with the current status, the right department, and the next move.</p></div>
-        <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold text-white">{filtered.length} calls</span>
-      </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_12rem]">
-        <label className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search company, category, or phone" className="h-10 w-full rounded-md border border-slate-300 pl-9 pr-3 text-sm" /></label>
-        <select value={priority} onChange={(event) => setPriority(event.target.value as typeof priority)} className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"><option>All</option><option>A</option><option>B</option><option>C</option></select>
-        <select value={contactLevel} onChange={(event) => setContactLevel(event.target.value as typeof contactLevel)} className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"><option>All</option><option>Dedicated team</option><option>Direct business</option><option>Pro or sales team</option><option>Network managed</option></select>
-      </div>
-    </div>
-    <div className="divide-y divide-slate-100">
-      {filtered.map((target) => {
-        const program = programsByName.get((target.trackerName ?? target.company).toLowerCase());
-        const savedStatus = program?.affiliate_status;
-        const programActivities = program ? activitiesByProgram.get(program.id) ?? [] : [];
-        const ContactIcon = target.contactType === "email" ? Mail : target.contactType === "form" ? MessageSquareText : Phone;
-        return <article key={target.rank} className="grid gap-3 p-3 sm:grid-cols-[2.25rem_minmax(0,1fr)_auto] sm:items-start">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-xs font-bold text-slate-700">{target.rank}</span>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2"><h4 className="font-semibold">{target.company}</h4><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${target.priority === "A" ? "bg-emerald-100 text-emerald-800" : target.priority === "B" ? "bg-sky-100 text-sky-800" : "bg-slate-100 text-slate-600"}`}>Priority {target.priority}</span><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">{target.contactLevel}</span>{savedStatus ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">{savedStatus}</span> : null}</div>
-            <p className="mt-0.5 text-xs text-slate-500">{target.category}</p>
-            {program ? <div className="mt-2 rounded-md border border-slate-200 bg-slate-50/80 p-2.5">
-              <div className="grid gap-x-4 gap-y-1 text-[11px] text-slate-600 sm:grid-cols-3"><p><strong className="text-slate-800">API:</strong> {program.api_status || "No update"}</p><p><strong className="text-slate-800">Last contact:</strong> {shortDate(program.last_contact_date)}</p><p><strong className="text-slate-800">Next follow-up:</strong> {shortDate(program.next_follow_up_date)}</p></div>
-              <p className="mt-1.5 text-xs leading-5 text-slate-700"><strong>Next:</strong> {program.next_action || "No next action recorded."}</p>
-              <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-500"><span>Applied {shortDate(program.application_date)}</span><span>Verified {shortDate(program.last_verified_date)}</span><span>Updated {shortDate(program.updated_at)}</span></div>
-              {(program.notes || programActivities.length) ? <details className="mt-2 border-t border-slate-200 pt-2"><summary className="cursor-pointer text-[11px] font-semibold text-[#0066cc]">All updates ({programActivities.length})</summary>{program.notes ? <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-600">{program.notes}</p> : null}{programActivities.length ? <div className="mt-2 divide-y divide-slate-200">{programActivities.map((activity) => <div key={activity.id} className="py-2"><p className="text-xs font-semibold text-slate-800">{activity.title}</p>{activity.details ? <p className="mt-0.5 text-xs leading-5 text-slate-600">{activity.details}</p> : null}<p className="mt-0.5 text-[10px] text-slate-400">{shortDate(activity.activity_date)}</p></div>)}</div> : null}</details> : null}
-            </div> : <p className="mt-2 text-[11px] font-medium text-slate-400">No saved supplier update yet.</p>}
-            <p className="mt-2 text-xs"><strong>Ask for:</strong> {target.askFor}</p><p className="mt-1 text-xs leading-5 text-slate-600"><strong>Call route:</strong> {target.callRoute}</p>
+  return (
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-[#f8fafc] shadow-[0_12px_34px_rgba(15,23,42,0.06)]">
+      <div className="border-b border-slate-200 bg-white p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0066cc]">
+              Supplier affiliate worklist
+            </p>
+            <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">
+              Top 10 supplier programs
+            </h3>
+            <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">
+              Status, direct contacts, current situation, and the next move in
+              one place. Use a second route whenever email is waiting.
+            </p>
           </div>
-          <div className="flex gap-2 sm:justify-end"><a href={target.contactHref ?? target.phoneHref} target={target.contactType === "form" ? "_blank" : undefined} rel={target.contactType === "form" ? "noopener noreferrer" : undefined} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md bg-[#0071e3] px-3 text-sm font-semibold text-white sm:flex-none"><ContactIcon className="h-4 w-4" />{target.contactLabel ?? target.phone}</a><a href={target.programUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${target.company} program page`} className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 text-slate-700"><ExternalLink className="h-4 w-4" /></a></div>
-        </article>;
-      })}
-    </div>
-    <p className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500">Only public business contacts are shown. “Network managed” means the retailer decides through its affiliate platform, not through a store employee.</p>
-  </section>;
+          <span className="rounded-full bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white">
+            {filtered.length} suppliers
+          </span>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_12rem]">
+          <label className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search supplier, email, phone, or next step"
+              className="h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-[#0071e3] focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+          <select
+            aria-label="Filter by priority"
+            value={priority}
+            onChange={(event) =>
+              setPriority(event.target.value as typeof priority)
+            }
+            className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"
+          >
+            <option>All</option>
+            <option>A</option>
+            <option>B</option>
+            <option>C</option>
+          </select>
+          <select
+            aria-label="Filter by contact route"
+            value={contactLevel}
+            onChange={(event) =>
+              setContactLevel(event.target.value as typeof contactLevel)
+            }
+            className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"
+          >
+            <option>All</option>
+            <option>Dedicated team</option>
+            <option>Direct business</option>
+            <option>Pro or sales team</option>
+            <option>Network managed</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="min-w-[1180px] table-fixed border-collapse text-left">
+          <thead>
+            <tr className="border-b border-slate-300 bg-slate-100/90 text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500">
+              <th className="w-[18%] px-4 py-3">1 · Supplier</th>
+              <th className="w-[11%] px-3 py-3">2 · Status</th>
+              <th className="w-[22%] px-3 py-3">3 · Contact</th>
+              <th className="w-[27%] px-3 py-3">4 · Current situation</th>
+              <th className="w-[22%] px-3 py-3">5 · Next step</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200 bg-white">
+            {filtered.map((target) => {
+              const program = programsByName.get(
+                (target.trackerName ?? target.company).toLowerCase(),
+              );
+              const savedStatus = program?.affiliate_status;
+              const programActivities = program
+                ? activitiesByProgram.get(program.id) ?? []
+                : [];
+              return (
+                <tr key={target.rank} className="align-top hover:bg-slate-50/70">
+                  <td className="px-4 py-4">
+                    <div className="flex items-start gap-2.5">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-950 text-[11px] font-bold text-white">
+                        {target.rank}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-semibold leading-5 text-slate-950">
+                          {target.company}
+                        </p>
+                        <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                          {target.category}
+                        </p>
+                        <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                          Priority {target.priority} · {target.contactLevel}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-4">
+                    <span
+                      className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusStyle(savedStatus)}`}
+                    >
+                      {savedStatus ?? "Not saved"}
+                    </span>
+                    <p className="mt-2 text-[10px] leading-4 text-slate-500">
+                      Verified {shortDate(program?.last_verified_date ?? null)}
+                    </p>
+                  </td>
+                  <td className="px-3 py-4">
+                    <ContactLinks target={target} />
+                  </td>
+                  <td className="px-3 py-4">
+                    <p className="text-xs leading-5 text-slate-700">
+                      {target.currentSituation ??
+                        program?.api_status ??
+                        "No current situation recorded."}
+                    </p>
+                    {program ? (
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-500">
+                        <span>Last contact {shortDate(program.last_contact_date)}</span>
+                        <span>Follow-up {shortDate(program.next_follow_up_date)}</span>
+                      </div>
+                    ) : null}
+                    <UpdateHistory
+                      program={program}
+                      activities={programActivities}
+                    />
+                  </td>
+                  <td className="px-3 py-4">
+                    <p className="text-xs font-medium leading-5 text-slate-800">
+                      {program?.next_action || target.callRoute}
+                    </p>
+                    <p className="mt-2 text-[11px] leading-4 text-slate-500">
+                      <strong className="text-slate-700">Ask for:</strong>{" "}
+                      {target.askFor}
+                    </p>
+                    <a
+                      href={target.programUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-md bg-[#0071e3] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#005bb8]"
+                    >
+                      Open program <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="divide-y divide-slate-200 bg-white lg:hidden">
+        {filtered.map((target) => {
+          const program = programsByName.get(
+            (target.trackerName ?? target.company).toLowerCase(),
+          );
+          const savedStatus = program?.affiliate_status;
+          const programActivities = program
+            ? activitiesByProgram.get(program.id) ?? []
+            : [];
+          return (
+            <article key={target.rank} className="p-4">
+              <div className="flex items-start gap-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-950 text-xs font-bold text-white">
+                  {target.rank}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    1 · Supplier
+                  </p>
+                  <h4 className="mt-0.5 font-semibold text-slate-950">
+                    {target.company}
+                  </h4>
+                  <p className="mt-1 text-xs leading-4 text-slate-500">
+                    {target.category}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold ${statusStyle(savedStatus)}`}
+                >
+                  {savedStatus ?? "Not saved"}
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-4">
+                <div>
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    3 · Contact information
+                  </p>
+                  <ContactLinks target={target} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    4 · Current situation
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-700">
+                    {target.currentSituation ??
+                      program?.api_status ??
+                      "No current situation recorded."}
+                  </p>
+                  {program ? (
+                    <p className="mt-2 text-[10px] text-slate-500">
+                      Last contact {shortDate(program.last_contact_date)} · Next
+                      follow-up {shortDate(program.next_follow_up_date)} ·
+                      Verified {shortDate(program.last_verified_date)}
+                    </p>
+                  ) : null}
+                  <UpdateHistory
+                    program={program}
+                    activities={programActivities}
+                  />
+                </div>
+                <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0066cc]">
+                    5 · Next step
+                  </p>
+                  <p className="mt-1 text-xs font-medium leading-5 text-slate-800">
+                    {program?.next_action || target.callRoute}
+                  </p>
+                  <p className="mt-2 text-[11px] leading-4 text-slate-600">
+                    <strong>Ask for:</strong> {target.askFor}
+                  </p>
+                  <a
+                    href={target.programUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-md bg-[#0071e3] px-3 py-2 text-sm font-semibold text-white"
+                  >
+                    Open program <ExternalLink className="h-4 w-4" />
+                  </a>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <p className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500">
+        Contact routes are public business contacts or verified addresses from
+        supplier replies. “Network managed” means the retailer makes the
+        decision inside its affiliate platform, not at a local store.
+      </p>
+    </section>
+  );
 }

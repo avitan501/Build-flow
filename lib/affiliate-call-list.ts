@@ -14,6 +14,13 @@ export type AffiliateCallTarget = {
   contactLabel?: string;
   contactHref?: string;
   contactType?: "phone" | "email" | "form";
+  contactMethods?: Array<{
+    label: string;
+    detail: string;
+    href: string;
+    type: "phone" | "email" | "form";
+  }>;
+  currentSituation?: string;
 };
 
 type TargetOptions = Pick<AffiliateCallTarget, "askFor" | "callRoute" | "contactLevel"> & {
@@ -120,6 +127,11 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     priority: "A",
     programUrl: "https://apidocs.abcsupply.com/api-overview/",
     programStatus: "Official program",
+    currentSituation: "Sandbox and certification work are active. Production still depends on an authorized ABC customer account, New York branch access, and a complete account-to-price workflow.",
+    contactMethods: [
+      { label: "API support", detail: "Official support page", href: "https://apidocs.abcsupply.com/support/", type: "form" },
+      { label: "Customer support", detail: "800-226-1280", href: "tel:+18002261280", type: "phone" },
+    ],
   },
   {
     rank: 2,
@@ -131,12 +143,18 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     contactHref: "tel:+18445694776",
     contactType: "phone",
     askFor: "Pro Service Desk, then Creator or developer escalation",
-    callRoute: "Ask for the website-publisher path and the owner of the pending Developer Hub review.",
+    callRoute: "Wait for the CJ affiliate team reply, then use the exact Lowe's website-publisher application they provide.",
     contactLevel: "Dedicated team",
     category: "Building materials, tools, appliances and home improvement",
     priority: "A",
-    programUrl: "https://www.lowes.com/l/creator/joinlowescreator",
+    programUrl: "https://www.cj.com/publisher",
     programStatus: "Official program",
+    currentSituation: "Creator Care replied on Aug 31: the social Creator program is not the right fit for a website-only publisher. They referred AvantiaBuild to Lowe's traditional affiliate team at CJ, and that team has been emailed.",
+    contactMethods: [
+      { label: "Lowe's CJ team", detail: "Allie Smith + 2 contacts", href: "mailto:allie.smith@cj.com?cc=kailie.stevens@cj.com,emily.hausen@cj.com", type: "email" },
+      { label: "Pro desk", detail: "844-569-4776", href: "tel:+18445694776", type: "phone" },
+      { label: "CJ publisher", detail: "Open publisher application", href: "https://www.cj.com/publisher", type: "form" },
+    ],
   },
   {
     rank: 3,
@@ -148,12 +166,18 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     contactHref: "tel:+18004663337",
     contactType: "phone",
     askFor: "Pro support or affiliate-program escalation",
-    callRoute: "The Impact application is already under review; ask only if no decision arrives by the follow-up date.",
+    callRoute: "Monitor the Impact application and the Aug 31 support escalation. If no answer arrives, reply to Impact Support with account 7653928 and campaign 8154.",
     contactLevel: "Network managed",
     category: "Building materials, tools, appliances and home improvement",
     priority: "A",
     programUrl: "https://www.homedepot.com/c/SF_MS_The_Home_Depot_Affiliate_Program",
     programStatus: "Official program",
+    currentSituation: "Impact approved AvantiaBuild as a publisher. The separate Home Depot campaign application was received Aug 27 and remains under review. Impact Support was emailed Aug 31 for routing to the Home Depot reviewer.",
+    contactMethods: [
+      { label: "Impact Support", detail: "publisher.growth@impact.com", href: "mailto:publisher.growth@impact.com", type: "email" },
+      { label: "Affiliate page", detail: "Home Depot application", href: "https://www.homedepot.com/c/SF_MS_The_Home_Depot_Affiliate_Program", type: "form" },
+      { label: "Customer care", detail: "800-466-3337", href: "tel:+18004663337", type: "phone" },
+    ],
   },
   {
     rank: 4,
@@ -171,6 +195,11 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     priority: "A",
     programUrl: "https://affiliate-program.amazon.com/",
     programStatus: "Official program",
+    currentSituation: "The Associates profile and Store ID are active, but Amazon's final account review happens only after three qualifying purchases. Tax and payment setup must also be complete.",
+    contactMethods: [
+      { label: "Associates support", detail: "Account contact form", href: "https://affiliate-program.amazon.com/home/contact", type: "form" },
+      { label: "Associates Central", detail: "Open account", href: "https://affiliate-program.amazon.com/home", type: "form" },
+    ],
   },
   {
     rank: 5,
@@ -182,12 +211,17 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     contactHref: "mailto:affiliates-help-ext@wal-mart.com",
     contactType: "email",
     askFor: "Walmart Affiliates Team",
-    callRoute: "The website affiliate application is under review. Email only after the follow-up date if no decision arrives.",
+    callRoute: "Send the due application follow-up, then use the affiliate portal contact route if no decision arrives.",
     contactLevel: "Dedicated team",
     category: "Home improvement, tools, appliances and general merchandise",
     priority: "A",
     programUrl: "https://affiliates.walmart.com/",
     programStatus: "Official program",
+    currentSituation: "The website affiliate application was received Aug 17 and is still awaiting a decision. The follow-up is due now.",
+    contactMethods: [
+      { label: "Affiliate support", detail: "affiliates-help-ext@wal-mart.com", href: "mailto:affiliates-help-ext@wal-mart.com", type: "email" },
+      { label: "Affiliate portal", detail: "Open application account", href: "https://affiliates.walmart.com/", type: "form" },
+    ],
   },
   {
     rank: 6,
@@ -199,12 +233,18 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     contactHref: "tel:+18882221785",
     contactType: "phone",
     askFor: "Professional sales or affiliate partnerships",
-    callRoute: "Ask for the Impact campaign owner and a direct application invitation for AvantiaBuild.",
+    callRoute: "Follow up with the affiliate team, then ask Ferguson customer support to route AvantiaBuild to the Ferguson Home / Build.com affiliate owner in Impact.",
     contactLevel: "Dedicated team",
     category: "Plumbing, HVAC, kitchen, bath and mechanical supplies",
     priority: "A",
     programUrl: "https://www.ferguson.com/content/pro-services/",
     programStatus: "Official program",
+    currentSituation: "A direct affiliate inquiry was sent Aug 24 with no verified reply yet. A second route is available through Ferguson customer support and the professional sales line.",
+    contactMethods: [
+      { label: "Affiliate team", detail: "bld-affiliateteam@ferguson.com", href: "mailto:bld-affiliateteam@ferguson.com", type: "email" },
+      { label: "Customer support", detail: "customer.support@ferguson.com", href: "mailto:customer.support@ferguson.com", type: "email" },
+      { label: "Professional sales", detail: "888-222-1785", href: "tel:+18882221785", type: "phone" },
+    ],
   },
   {
     rank: 7,
@@ -222,15 +262,21 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     priority: "A",
     programUrl: "https://www.bldr.com/contact/contact-us",
     programStatus: "Confirm by phone",
+    currentSituation: "Several online cases produced automated replies, most recently case 00714195. There is no verified human partnership or trade-account contact yet.",
+    contactMethods: [
+      { label: "myBLDR support", detail: "844-487-8625", href: "tel:+18444878625", type: "phone" },
+      { label: "Contact form", detail: "Reference case 00714195", href: "https://www.bldr.com/contact/contact-us", type: "form" },
+      { label: "Local branch", detail: "Find Long Island location", href: "https://www.bldr.com/locations", type: "form" },
+    ],
   },
   {
     rank: 8,
     company: "Ace Hardware",
     trackerName: "Ace Hardware",
-    phone: "888-827-4223",
-    phoneHref: "tel:+18888274223",
-    contactLabel: "888-827-4223",
-    contactHref: "tel:+18888274223",
+    phone: "866-290-5334",
+    phoneHref: "tel:+18662905334",
+    contactLabel: "866-290-5334",
+    contactHref: "tel:+18662905334",
     contactType: "phone",
     askFor: "Impact affiliate-program manager",
     callRoute: "The publisher account is approved; submit the separate Ace brand application in Impact.",
@@ -239,6 +285,12 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     priority: "A",
     programUrl: "https://www.acehardware.com/affiliates",
     programStatus: "Official program",
+    currentSituation: "AvantiaBuild's Impact publisher account is approved, but Ace requires its own separate brand application before tracked Ace links can be created.",
+    contactMethods: [
+      { label: "Affiliate help", detail: "866-290-5334", href: "tel:+18662905334", type: "phone" },
+      { label: "Ace application", detail: "Apply to the Ace campaign", href: "https://www.acehardware.com/affiliates", type: "form" },
+      { label: "Impact Support", detail: "publisher.growth@impact.com", href: "mailto:publisher.growth@impact.com", type: "email" },
+    ],
   },
   {
     rank: 9,
@@ -250,12 +302,18 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     contactHref: "tel:+18773452263",
     contactType: "phone",
     askFor: "Affiliate partnership contact",
-    callRoute: "Ask sales to route AvantiaBuild to the employee responsible for the Impact affiliate campaign.",
+    callRoute: "Apply directly to Acme Tools in Impact. If the campaign does not appear, email the Acme affiliate manager with AvantiaBuild's Impact account ID.",
     contactLevel: "Pro or sales team",
     category: "Professional power tools, outdoor equipment and jobsite gear",
     priority: "A",
     programUrl: "https://www.acmetools.com/affiliates.html",
     programStatus: "Official program",
+    currentSituation: "No verified Acme application has been submitted yet. Acme publishes a direct Impact application and a named affiliate-manager email.",
+    contactMethods: [
+      { label: "Affiliate manager", detail: "affiliatesmanager@acmetools.com", href: "mailto:affiliatesmanager@acmetools.com", type: "email" },
+      { label: "Impact application", detail: "Apply to Acme Tools", href: "http://app.impact.com/campaign-campaign-info-v2/Acme-Tools.brand", type: "form" },
+      { label: "Customer service", detail: "877-345-2263", href: "tel:+18773452263", type: "phone" },
+    ],
   },
   {
     rank: 10,
@@ -273,5 +331,10 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     priority: "A",
     programUrl: "https://www.thertastore.com/partner-with-us",
     programStatus: "Official program",
+    currentSituation: "The partner-program route is identified, but no approval is recorded yet. This is a direct cabinet partnership rather than a general retailer affiliate application.",
+    contactMethods: [
+      { label: "Partner team", detail: "877-992-2246", href: "tel:+18779922246", type: "phone" },
+      { label: "Partner form", detail: "Open partner application", href: "https://www.thertastore.com/partner-with-us", type: "form" },
+    ],
   },
 ];
