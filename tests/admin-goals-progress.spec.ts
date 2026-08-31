@@ -68,9 +68,9 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain("md:grid-cols-2 xl:grid-cols-3");
   expect(page).toContain("has-[>details[open]]:md:col-span-2");
   expect(page).toContain("published_to_carlos");
-  expect(page).toContain('task.task_key === "whatsapp-coexistence"');
-  expect(page).toContain('task.task_key === "abc-private-pricing"');
-  expect(page).toContain('task.source_chat_title === "David Dashboard"');
+  expect(page).toContain("carlosFixedTaskKeys");
+  expect(page).toContain("publishedTaskKeys");
+  expect(page).toContain("visibleFixedGoals");
   expect(page).not.toContain('PersonHeader assignee="david"');
   expect(page).toContain('.eq("assignee", "carlos")');
   expect(page).not.toContain("david-goals-title");

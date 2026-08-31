@@ -72,7 +72,7 @@ export default async function DavidDashboardPage() {
               </div>
             </div>
             <p className="mt-2 text-sm text-slate-600">
-              Private until you choose Publish to Carlos.
+              Every task stays here. Show Carlos controls his dashboard.
             </p>
           </div>
           <form action={lockWebsiteWorkAction}>

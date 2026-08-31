@@ -14,6 +14,7 @@ test("David Dashboard is owner-authenticated, PIN-gated, and publishes explicitl
     dashboardMigration,
     policyOptimization,
     ideasMigration,
+    visibilityMigration,
     broker,
     goals,
     board,
@@ -59,6 +60,13 @@ test("David Dashboard is owner-authenticated, PIN-gated, and publishes explicitl
       path.join(
         root,
         "supabase/migrations/20260831191020_add_david_dashboard_ideas.sql",
+      ),
+      "utf8",
+    ),
+    readFile(
+      path.join(
+        root,
+        "supabase/migrations/20260831195433_add_carlos_visibility_controls.sql",
       ),
       "utf8",
     ),
@@ -121,7 +129,15 @@ test("David Dashboard is owner-authenticated, PIN-gated, and publishes explicitl
   expect(goals.indexOf("Phone Intake Tasks")).toBeLessThan(
     goals.indexOf("David Dashboard"),
   );
-  expect(board).toContain("Publish to Carlos");
+  expect(board).toContain("Show Carlos");
+  expect(board.match(/Show Carlos/g)?.length).toBeGreaterThanOrEqual(2);
+  expect(visibilityMigration).toContain("carlos-fixed-client-target");
+  expect(visibilityMigration).toContain("carlos-fixed-call-suppliers");
+  expect(visibilityMigration).toContain(
+    "carlos-fixed-supplier-affiliate-program",
+  );
+  expect(visibilityMigration).toContain("carlos-fixed-supplier-partnerships");
+  expect(visibilityMigration).toContain("carlos-fixed-abc-supply-demo");
   expect(board).toContain("Pain I&apos;m Resolving");
   expect(board).toContain("AI Task Archive");
   expect(board).toContain("Ideas");

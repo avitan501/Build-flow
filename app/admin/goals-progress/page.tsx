@@ -34,6 +34,7 @@ import type {
 } from "@/lib/affiliate-tracker";
 import { requireAdminProfile, requireManagerPortalProfile } from "@/lib/auth";
 import {
+  CARLOS_FIXED_GOALS,
   fixedGoalKey as parseFixedGoalKey,
   type CarlosFixedGoalKey,
   type ManagerGoalStatus,
@@ -562,14 +563,18 @@ export async function CarlosGoalsWorkspace({
   const clients = clientResult.error ? [] : (clientResult.data ?? []);
   const goals = goalResult.error ? [] : (goalResult.data ?? []);
   const leads = leadResult.error ? [] : (leadResult.data ?? []);
-  const publishedTasks = publishedResult.error
+  const carlosFixedTaskKeys = new Set(
+    Object.keys(CARLOS_FIXED_GOALS).map((key) => `carlos-fixed-${key}`),
+  );
+  const allPublishedTasks = publishedResult.error
     ? []
-    : (publishedResult.data ?? []).filter(
-        (task) =>
-          task.task_key === "whatsapp-coexistence" ||
-          task.task_key === "abc-private-pricing" ||
-          task.source_chat_title === "David Dashboard",
-      );
+    : (publishedResult.data ?? []);
+  const publishedTaskKeys = new Set(
+    allPublishedTasks.map((task) => task.task_key),
+  );
+  const publishedTasks = allPublishedTasks.filter(
+    (task) => !carlosFixedTaskKeys.has(task.task_key),
+  );
   const fixedStatuses = new Map<CarlosFixedGoalKey, ManagerGoalStatus>();
   for (const goal of goals) {
     const key = parseFixedGoalKey(goal.details);
@@ -628,10 +633,13 @@ export async function CarlosGoalsWorkspace({
         ]
       : []),
   ];
-  const activeFixedGoals = fixedGoals.filter(
+  const visibleFixedGoals = fixedGoals.filter((goal) =>
+    publishedTaskKeys.has(`carlos-fixed-${goal.key}`),
+  );
+  const activeFixedGoals = visibleFixedGoals.filter(
     (goal) => statusFor(goal.key) !== "archived",
   );
-  const archivedFixedGoals = fixedGoals.filter(
+  const archivedFixedGoals = visibleFixedGoals.filter(
     (goal) => statusFor(goal.key) === "archived",
   );
 
