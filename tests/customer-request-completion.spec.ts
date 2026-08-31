@@ -5,10 +5,12 @@ import { expect, test } from "@playwright/test";
 
 import {
   activeRequestUpdateReply,
+  activeRequestUpdateKind,
   additionalItemsQuestion,
   customerFinishedMaterialList,
   customerWantsAnotherItem,
   deliveryAddressQuestion,
+  managerRequestAcceptsCustomerUpdates,
 } from "../supabase/functions/_shared/customer-request-completion";
 import { evaluateSmsReplyGate } from "../supabase/functions/_shared/sms-reply-policy";
 
@@ -36,6 +38,82 @@ test("material intake asks for more items and address before confirmation", asyn
   expect(broker).toContain("!input.customerAddress.trim()");
 });
 
+test("15 anonymized multilingual continuation variants keep one open request", () => {
+  const updateCases = [
+    [
+      "EN address",
+      { event: "message", hasAddress: true, looksLikeMaterialList: false },
+      "address",
+    ],
+    [
+      "ES address",
+      { event: "message", hasAddress: true, looksLikeMaterialList: false },
+      "address",
+    ],
+    [
+      "HE address",
+      { event: "message", hasAddress: true, looksLikeMaterialList: false },
+      "address",
+    ],
+    [
+      "EN correction",
+      { event: "correction", hasAddress: false, looksLikeMaterialList: true },
+      "correction",
+    ],
+    [
+      "ES correction",
+      { event: "correction", hasAddress: false, looksLikeMaterialList: true },
+      "correction",
+    ],
+    [
+      "HE correction",
+      { event: "correction", hasAddress: false, looksLikeMaterialList: true },
+      "correction",
+    ],
+    [
+      "EN addition",
+      { event: "message", hasAddress: false, looksLikeMaterialList: true },
+      "item",
+    ],
+    [
+      "ES addition",
+      { event: "message", hasAddress: false, looksLikeMaterialList: true },
+      "item",
+    ],
+    [
+      "HE addition",
+      { event: "message", hasAddress: false, looksLikeMaterialList: true },
+      "item",
+    ],
+  ] as const;
+  expect(updateCases).toHaveLength(9);
+  for (const [, input, expected] of updateCases)
+    expect(activeRequestUpdateKind(input)).toBe(expected);
+
+  expect(customerFinishedMaterialList("No")).toBe(true);
+  expect(customerFinishedMaterialList("That's all")).toBe(true);
+  expect(customerFinishedMaterialList("No más")).toBe(true);
+  expect(customerFinishedMaterialList("זה הכל")).toBe(true);
+
+  expect(managerRequestAcceptsCustomerUpdates("submitted")).toBe(true);
+  expect(managerRequestAcceptsCustomerUpdates("in_review")).toBe(true);
+  expect(managerRequestAcceptsCustomerUpdates("quoted")).toBe(true);
+  expect(managerRequestAcceptsCustomerUpdates("closed")).toBe(false);
+
+  const blockerQuestions = [
+    deliveryAddressQuestion("No"),
+    deliveryAddressQuestion("No más"),
+    deliveryAddressQuestion("לא תודה"),
+  ];
+  expect(blockerQuestions).toEqual([
+    "What is the full delivery address?",
+    "¿Cuál es la dirección de entrega completa?",
+    "מה כתובת המשלוח המלאה?",
+  ]);
+  for (const question of blockerQuestions)
+    expect(question.match(/\?/g)).toHaveLength(1);
+});
+
 test("submitted request updates stay on the same request in every supported language", async () => {
   expect(activeRequestUpdateReply("add 4 boxes of screws", "item")).toBe(
     "The item was added to the same request for review. Do you need anything else?",
@@ -49,11 +127,17 @@ test("submitted request updates stay on the same request in every supported lang
   expect(activeRequestUpdateReply("agrega 5 cajas", "item")).toBe(
     "El artículo se agregó a la misma solicitud para revisión. ¿Necesita agregar algo más?",
   );
+  expect(
+    activeRequestUpdateReply("corrige la cantidad a 20", "correction"),
+  ).toBe(
+    "La corrección se agregó a la misma solicitud para revisión. ¿Necesita cambiar algo más?",
+  );
   for (const [message, update] of [
     ["add 4 boxes of screws", "item"],
     ["change it to 20", "correction"],
     ["הכתובת היא 10 Main St", "address"],
     ["agrega 5 cajas", "item"],
+    ["corrige la cantidad a 20", "correction"],
   ] as const) {
     expect(
       evaluateSmsReplyGate({
@@ -65,6 +149,9 @@ test("submitted request updates stay on the same request in every supported lang
         modelAutoSafe: true,
       }),
     ).toMatchObject({ level: "green", gateAutoSafe: true });
+    expect(activeRequestUpdateReply(message, update).match(/\?/g)).toHaveLength(
+      1,
+    );
   }
 
   const broker = await readFile(
@@ -81,6 +168,11 @@ test("submitted request updates stay on the same request in every supported lang
   expect(broker).toContain("sms_customer_updated_open_request");
   expect(broker).toContain("!activeSubmittedRequest &&");
   expect(broker).toContain("resetListComplete:");
+  expect(broker).toContain("syncItems: !addressOnlyUpdate");
+  expect(broker).toContain("if (input.syncItems) {");
+  expect(broker).toContain(
+    "activeRequestSynced && clarificationQuestions.length > 0",
+  );
   expect(broker).toContain(
     "when ${params.resetListComplete === true} then false",
   );

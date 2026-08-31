@@ -43,11 +43,13 @@ import {
 import { isExplicitCustomerRequestConfirmation } from "../_shared/customer-request-confirmation.ts";
 import {
   activeRequestUpdateReply,
+  activeRequestUpdateKind,
   additionalItemPrompt,
   additionalItemsQuestion,
   customerFinishedMaterialList,
   customerWantsAnotherItem,
   deliveryAddressQuestion,
+  managerRequestAcceptsCustomerUpdates,
 } from "../_shared/customer-request-completion.ts";
 import {
   assessMaterialRequest,
@@ -3940,13 +3942,15 @@ async function syncActiveSubmittedSmsRequest(input: {
   customerAddress: string | null;
   request: NonNullable<CustomerSmsAutomation["request"]>;
   sourceCommunicationIds: string[];
+  syncItems: boolean;
 }) {
   return sql.begin(async (transaction) => {
     const locked = await transaction<{ id: string; status: string }[]>`
       select id, status from public.quote_requests
       where id = ${input.active.requestId}::uuid for update
     `;
-    if (!locked[0] || locked[0].status === "closed") return false;
+    if (!locked[0] || !managerRequestAcceptsCustomerUpdates(locked[0].status))
+      return false;
     const existing = await transaction<
       {
         id: string;
@@ -3961,18 +3965,19 @@ async function syncActiveSubmittedSmsRequest(input: {
       order by created_at, id
       for update
     `;
-    const byName = new Map(
-      existing.map((item) => [normalizedRequestItemName(item.name), item]),
-    );
-    const alignCorrectionByOrdinal =
-      input.customerEvent === "correction" &&
-      existing.length === input.request.items.length;
-    for (const [index, item] of input.request.items.slice(0, 50).entries()) {
-      const matched =
-        byName.get(normalizedRequestItemName(item.name)) ||
-        (alignCorrectionByOrdinal ? existing[index] : undefined);
-      if (matched) {
-        await transaction`
+    if (input.syncItems) {
+      const byName = new Map(
+        existing.map((item) => [normalizedRequestItemName(item.name), item]),
+      );
+      const alignCorrectionByOrdinal =
+        input.customerEvent === "correction" &&
+        existing.length === input.request.items.length;
+      for (const [index, item] of input.request.items.slice(0, 50).entries()) {
+        const matched =
+          byName.get(normalizedRequestItemName(item.name)) ||
+          (alignCorrectionByOrdinal ? existing[index] : undefined);
+        if (matched) {
+          await transaction`
           update public.quote_request_items set
             name = ${String(item.name).slice(0, 300)},
             department = ${input.request.department.slice(0, 100)},
@@ -3985,9 +3990,9 @@ async function syncActiveSubmittedSmsRequest(input: {
             })},
             updated_at = now()
           where id = ${matched.id}::uuid
-        `;
-      } else {
-        await transaction`
+          `;
+        } else {
+          await transaction`
           insert into public.quote_request_items
             (request_id, project_id, owner_id, name, department, item_type, quantity, unit, unit_price, qualification_status, metadata)
           values (
@@ -4000,7 +4005,8 @@ async function syncActiveSubmittedSmsRequest(input: {
               source_communication_id: input.communicationId,
             })}
           )
-        `;
+          `;
+        }
       }
     }
     if (input.customerAddress?.trim()) {
@@ -4475,6 +4481,12 @@ async function processCustomerSmsAutomation(
       communicationId,
       activeSubmittedRequest.sourceCommunicationIds,
     );
+    activeUpdateKind = activeRequestUpdateKind({
+      event: customerEvent,
+      hasAddress: Boolean(result.customerAddress),
+      looksLikeMaterialList: likelyMaterialList(body),
+    });
+    const addressOnlyUpdate = activeUpdateKind === "address";
     activeRequestSynced = await syncActiveSubmittedSmsRequest({
       active: activeSubmittedRequest,
       communicationId,
@@ -4483,20 +4495,30 @@ async function processCustomerSmsAutomation(
       customerAddress: result.customerAddress,
       request: activeUpdateRequest,
       sourceCommunicationIds: activeSources,
+      syncItems: !addressOnlyUpdate,
     });
     if (activeRequestSynced && clarificationQuestions.length === 0) {
-      activeUpdateKind =
-        result.customerAddress && !likelyMaterialList(body)
-          ? "address"
-          : customerEvent === "correction"
-            ? "correction"
-            : "item";
       result.reply = activeRequestUpdateReply(effectiveBody, activeUpdateKind);
       result.autoSafe = true;
       safety = evaluateSmsReplyGate({
         message: effectiveBody,
         reply: result.reply,
         intent: "greeting",
+        event: "message",
+        participantRole: result.participantRole || "lead",
+        modelAutoSafe: true,
+        exactListOnly,
+        protectedTopic: hasForbiddenAutoReplyTopic(effectiveBody),
+      });
+    } else if (activeRequestSynced && clarificationQuestions.length > 0) {
+      // A submitted request update remains manager-reviewable, but its single
+      // missing blocker is safe to ask immediately so the conversation does
+      // not stall after a customer correction.
+      result.autoSafe = true;
+      safety = evaluateSmsReplyGate({
+        message: effectiveBody,
+        reply: result.reply,
+        intent: "material_request",
         event: "message",
         participantRole: result.participantRole || "lead",
         modelAutoSafe: true,

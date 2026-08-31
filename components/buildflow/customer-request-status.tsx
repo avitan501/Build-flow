@@ -38,6 +38,7 @@ export function CustomerRequestStatus({ requestId, status, currentStage, updated
 
   function updateStatus(nextStatus: QuoteRequestStatus) {
     if (nextStatus === status) return
+    if (nextStatus === "closed" && !window.confirm("Mark this request completed? The customer can no longer add items to this request.")) return
     startTransition(async () => {
       setMessage(null)
       const result = await updateRequestStatusAction({ requestId, status: nextStatus })

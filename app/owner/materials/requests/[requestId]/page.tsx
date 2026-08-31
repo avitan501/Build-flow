@@ -489,7 +489,7 @@ export default async function OwnerMaterialRequestPage({
           <details
             className="mt-2 rounded-lg border border-slate-200 bg-white"
           >
-            <summary className="cursor-pointer px-4 py-3 text-sm font-bold">Files &amp; answers · {signedFiles.length} files</summary>
+            <summary className="cursor-pointer px-4 py-3 text-sm font-bold">Files &amp; answers · {signedFiles.length} files · {answers.length} answers</summary>
             <div className="border-t border-slate-200 p-4">
               <p className="text-sm text-slate-500">The original items and AI copy are already together in the table above.</p>
               {(responses ?? []).map((response) => {
