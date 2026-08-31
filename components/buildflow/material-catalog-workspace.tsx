@@ -2524,8 +2524,13 @@ export function MaterialCatalogWorkspace({
                     >
                       {priceEditor.item.name}
                     </h2>
-                    <p className="text-xs text-slate-500">
-                      {priceEditor.supplier.name}
+                    <p className="mt-1 text-xs font-semibold text-slate-600">
+                      Vendor: {priceEditor.supplier.name}
+                      {initialPriceMap.get(
+                        cellKey(priceEditor.item.id, priceEditor.supplier.id),
+                      )?.source_document_date
+                        ? ` · Quote date: ${initialPriceMap.get(cellKey(priceEditor.item.id, priceEditor.supplier.id))?.source_document_date}`
+                        : ""}
                     </p>
                   </div>
                   <button
@@ -2673,7 +2678,7 @@ export function MaterialCatalogWorkspace({
                         cellKey(priceEditor.item.id, priceEditor.supplier.id),
                       )?.source_document_id ? (
                         <div className="sm:col-span-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-950">
-                          <p className="font-bold">Original source saved</p>
+                          <p className="font-bold">Vendor quote source</p>
                           <p className="mt-1">
                             {
                               initialPriceMap.get(

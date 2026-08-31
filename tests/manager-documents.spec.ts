@@ -161,12 +161,16 @@ test("document center preserves originals while allowing direct catalog row impo
   expect(review).toMatch(/<h2[^>]*>\s*Items\s*<\/h2>/);
   expect(review).toContain("Add selected (");
   expect(review).toContain("Add to Catalog");
-  expect(review).toContain("saveApproveAndImport(line.id)");
+  expect(review).toContain("askDeliveryThenImport(line.id)");
   expect(review).toContain("Choose category");
+  expect(review).toContain("How is delivery priced?");
+  expect(review).toContain("Free delivery");
+  expect(review).toContain("Delivery amount");
+  expect(review).toContain("deliveryAmount");
+  expect(review).not.toContain("Confirm whether delivery is included.");
   expect(review).toContain("directRowImport: true");
   expect(review).toContain("catalogDepartment: rowDepartments[target.id]");
   expect(review).toContain("Confirm the vendor.");
-  expect(review).toContain("Confirm whether delivery is included.");
   expect(review).toContain("Contact person");
   expect(actions).toContain("requestedItemIds");
   expect(actions).toContain('selectedItemsQuery.in("id", requestedItemIds)');

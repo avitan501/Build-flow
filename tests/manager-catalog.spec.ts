@@ -40,7 +40,6 @@ test("manager navigation is compact and keeps one communication center at the bo
   expect(aiTools).toContain('title: "Google Meet"')
   expect(aiTools).toContain('add=buildavantiap%40gmail.com')
 })
-
 test("installation catalog shows real product identity and keeps internal notes editable", async () => {
   const [page, workspace, actions, catalog, migration] = await Promise.all([
     readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
@@ -126,6 +125,9 @@ test("manager catalog is protected, seeded, editable, and supplier based", async
   expect(workspace).toContain("Package quantity")
   expect(workspace).toContain("Manufacturer model")
   expect(workspace).toContain("Price details")
+  expect(workspace).toContain("Vendor:")
+  expect(workspace).toContain("Quote date:")
+  expect(workspace).toContain("Vendor quote source")
   expect(workspace).toContain("Top prices")
   expect(workspace).toContain(".slice(0, 3)")
   expect(workspace).toContain("source_document_id")

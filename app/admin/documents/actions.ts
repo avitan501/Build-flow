@@ -1700,7 +1700,8 @@ export async function addManagerDocumentItemsToCatalogAction(
     catalogDepartment?: string;
     vendorName?: string;
     contactName?: string;
-    priceIncludesDelivery?: "included" | "excluded" | "unknown";
+    deliveryMode?: "free" | "amount";
+    deliveryAmount?: number;
   },
 ): Promise<
   Result<{ itemCount: number; priceCount: number; supplierName: string | null }>
@@ -1716,6 +1717,20 @@ export async function addManagerDocumentItemsToCatalogAction(
     : null;
   if (itemIds && requestedItemIds?.length !== itemIds.length)
     return { ok: false, error: "Invalid catalog product selection." };
+  const deliveryAmount = Number(options?.deliveryAmount);
+  if (
+    options?.directRowImport &&
+    (!options.deliveryMode ||
+      !Number.isFinite(deliveryAmount) ||
+      deliveryAmount < 0 ||
+      deliveryAmount > 1_000_000 ||
+      (options.deliveryMode === "free" && deliveryAmount !== 0) ||
+      (options.deliveryMode === "amount" && deliveryAmount === 0))
+  )
+    return {
+      ok: false,
+      error: "Choose free delivery or enter the delivery amount.",
+    };
 
   let selectedItemsQuery = supabase
     .from("manager_document_items")
@@ -1794,11 +1809,14 @@ export async function addManagerDocumentItemsToCatalogAction(
             ...(clean(options?.contactName, 120)
               ? { contactName: clean(options?.contactName, 120) }
               : {}),
-            ...(options?.priceIncludesDelivery === "included"
-              ? { deliveryNotes: "Quoted price includes delivery." }
-              : options?.priceIncludesDelivery === "excluded"
-                ? { deliveryNotes: "Quoted price excludes delivery." }
-                : {}),
+            ...(options?.deliveryMode
+              ? {
+                  deliveryNotes:
+                    options.deliveryMode === "free"
+                      ? "Free delivery."
+                      : `Delivery fee: $${deliveryAmount.toFixed(2)}.`,
+                }
+              : {}),
             catalogDepartments: [
               ...new Set([
                 ...(existingSupplier.catalogDepartments ?? []),
@@ -1827,11 +1845,11 @@ export async function addManagerDocumentItemsToCatalogAction(
             contactName: clean(options?.contactName, 120),
             preferredDeliveryMethod: "manual",
             deliveryNotes:
-              options?.priceIncludesDelivery === "included"
-                ? "Quoted price includes delivery."
-                : options?.priceIncludesDelivery === "excluded"
-                  ? "Quoted price excludes delivery."
-                  : "Delivery inclusion was not confirmed.",
+              options?.deliveryMode === "free"
+                ? "Free delivery."
+                : options?.deliveryMode === "amount"
+                  ? `Delivery fee: $${deliveryAmount.toFixed(2)}.`
+                  : "Delivery was not confirmed.",
             notes: `Created from reviewed document ${clean(document.file_name, 180)}. Confirm contact details before outreach.`,
             address: "",
           }
@@ -1849,7 +1867,8 @@ export async function addManagerDocumentItemsToCatalogAction(
       p_supplier: supplier
         ? {
             ...supplier,
-            priceIncludesDelivery: options?.priceIncludesDelivery ?? "unknown",
+            deliveryMode: options?.deliveryMode ?? null,
+            deliveryAmount: options?.deliveryAmount ?? null,
           }
         : null,
       p_create_supplier: Boolean(supplier && !existingSupplier),

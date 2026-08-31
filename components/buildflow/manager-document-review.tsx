@@ -12,11 +12,13 @@ import {
   Save,
   Send,
   ShieldCheck,
+  Truck,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 
 import {
   addManagerDocumentItemsToCatalogAction,
@@ -87,9 +89,13 @@ export function ManagerDocumentReview({
   );
   const [catalogVendor, setCatalogVendor] = useState(draft.party_name);
   const [catalogContact, setCatalogContact] = useState("");
-  const [priceIncludesDelivery, setPriceIncludesDelivery] = useState<
-    "" | "included" | "excluded" | "unknown"
-  >("");
+  const [deliveryPromptTarget, setDeliveryPromptTarget] = useState<
+    string | "selected" | null
+  >(null);
+  const [deliveryChoice, setDeliveryChoice] = useState<"" | "free" | "amount">(
+    "",
+  );
+  const [deliveryAmount, setDeliveryAmount] = useState("");
   const [pending, startTransition] = useTransition();
   const supplierDocument = [
     "supplier_quote",
@@ -118,14 +124,12 @@ export function ManagerDocumentReview({
     ? "Select at least one product."
     : !catalogVendor.trim()
       ? "Confirm the vendor."
-      : !priceIncludesDelivery
-        ? "Confirm whether delivery is included."
-        : selectedLines.some(
-              (line) =>
-                !rowDepartments[line.id] || rowDepartments[line.id] === "Test",
-            )
-          ? "Choose a category beside each selected product."
-          : "";
+      : selectedLines.some(
+            (line) =>
+              !rowDepartments[line.id] || rowDepartments[line.id] === "Test",
+          )
+        ? "Choose a category beside each selected product."
+        : "";
 
   function run(work: () => Promise<void>) {
     setError("");
@@ -251,31 +255,47 @@ export function ManagerDocumentReview({
       router.refresh();
     });
   }
-  function saveApproveAndImport(lineId?: string) {
+  function importBlocker(lineId?: string) {
+    if (!lineId) return directImportBlocker;
+    const rowDepartment = rowDepartments[lineId];
+    const line = lines.find((entry) => entry.id === lineId);
+    return !canApprove
+      ? "Manager approval access is required."
+      : !catalogVendor.trim()
+        ? "Confirm the vendor."
+        : !rowDepartment || rowDepartment === "Test"
+          ? "Choose a category."
+          : !line?.description.trim()
+            ? "Product name is required."
+            : "";
+  }
+  function askDeliveryThenImport(lineId?: string) {
+    const blocker = importBlocker(lineId);
+    if (blocker) {
+      setFeedback("");
+      setError(blocker);
+      if (lineId) setRowImportNotice({ lineId, message: blocker });
+      return;
+    }
+    setError("");
+    setRowImportNotice(null);
+    setDeliveryChoice("");
+    setDeliveryAmount("");
+    setDeliveryPromptTarget(lineId ?? "selected");
+  }
+  function saveApproveAndImport(
+    lineId: string | undefined,
+    deliveryPrice: number,
+  ) {
     const importTargets = lineId
       ? lines.filter((line) => line.id === lineId)
       : lines.filter((line) => line.selected);
-    const rowDepartment = lineId ? rowDepartments[lineId] : "";
     const linesForImport = lineId
       ? lines.map((line) =>
           line.id === lineId ? { ...line, selected: true } : line,
         )
       : lines;
-    const blocker = lineId
-      ? !canApprove
-        ? "Manager approval access is required."
-        : !catalogVendor.trim()
-          ? "Confirm the vendor."
-          : !priceIncludesDelivery
-            ? "Confirm whether delivery is included."
-            : !rowDepartment || rowDepartment === "Test"
-              ? "Choose a category."
-              : !linesForImport
-                    .find((line) => line.id === lineId)
-                    ?.description.trim()
-                ? "Product name is required."
-                : ""
-      : directImportBlocker;
+    const blocker = importBlocker(lineId);
     if (blocker) {
       setFeedback("");
       setError(blocker);
@@ -332,7 +352,8 @@ export function ManagerDocumentReview({
             catalogDepartment: rowDepartments[target.id],
             vendorName: catalogVendor,
             contactName: catalogContact,
-            priceIncludesDelivery: priceIncludesDelivery || "unknown",
+            deliveryMode: deliveryPrice === 0 ? "free" : "amount",
+            deliveryAmount: deliveryPrice,
           },
         );
         if (!imported.ok) {
@@ -349,6 +370,7 @@ export function ManagerDocumentReview({
       setFeedback(
         `${itemCount} selected product${itemCount === 1 ? "" : "s"} added to Catalog with ${priceCount} supplier price${priceCount === 1 ? "" : "s"}.`,
       );
+      setDeliveryPromptTarget(null);
       setImportingLineId(null);
       router.refresh();
     });
@@ -636,7 +658,7 @@ export function ManagerDocumentReview({
               </button>
             </div>
           </div>
-          <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(10rem,1.2fr)_minmax(9rem,1fr)_minmax(10rem,1fr)_auto] sm:items-end">
+          <div className="grid gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-[minmax(10rem,1.2fr)_minmax(10rem,1fr)_auto] sm:items-end">
             <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
               Vendor
               <input
@@ -645,24 +667,6 @@ export function ManagerDocumentReview({
                 placeholder="Confirm vendor"
                 className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-950"
               />
-            </label>
-            <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-              Delivery
-              <select
-                value={priceIncludesDelivery}
-                onChange={(event) =>
-                  setPriceIncludesDelivery(
-                    event.target.value as
-                      "" | "included" | "excluded" | "unknown",
-                  )
-                }
-                className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-950"
-              >
-                <option value="">Included?</option>
-                <option value="included">Included</option>
-                <option value="excluded">Not included</option>
-                <option value="unknown">Not sure</option>
-              </select>
             </label>
             <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
               Contact person
@@ -675,7 +679,7 @@ export function ManagerDocumentReview({
             </label>
             <button
               type="button"
-              onClick={() => saveApproveAndImport()}
+              onClick={() => askDeliveryThenImport()}
               disabled={!canApprove || pending || Boolean(directImportBlocker)}
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-[#0071e3] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -768,7 +772,7 @@ export function ManagerDocumentReview({
                                 </select>
                                 <button
                                   type="button"
-                                  onClick={() => saveApproveAndImport(line.id)}
+                                  onClick={() => askDeliveryThenImport(line.id)}
                                   disabled={!canApprove || pending}
                                   aria-label={`Add ${line.description || `line ${index + 1}`} to Catalog`}
                                   className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-md bg-[#0071e3] px-2.5 font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
@@ -1325,6 +1329,130 @@ export function ManagerDocumentReview({
           </div>
         )}
       </aside>
+      {deliveryPromptTarget && typeof globalThis.document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[180] grid place-items-end bg-slate-950/55 p-0 sm:place-items-center sm:p-4"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delivery-question-title"
+              onMouseDown={(event) => {
+                if (event.currentTarget === event.target && !pending)
+                  setDeliveryPromptTarget(null);
+              }}
+            >
+              <section className="w-full rounded-t-2xl bg-white shadow-2xl sm:max-w-md sm:rounded-2xl">
+                <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0071e3]">
+                      Delivery
+                    </p>
+                    <h2
+                      id="delivery-question-title"
+                      className="mt-1 text-xl font-bold text-slate-950"
+                    >
+                      How is delivery priced?
+                    </h2>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {catalogVendor} ·{" "}
+                      {deliveryPromptTarget === "selected"
+                        ? selectedLines.length
+                        : 1}{" "}
+                      product
+                      {deliveryPromptTarget === "selected" &&
+                      selectedLines.length !== 1
+                        ? "s"
+                        : ""}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryPromptTarget(null)}
+                    disabled={pending}
+                    aria-label="Close delivery question"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-lg font-semibold text-slate-600 disabled:opacity-40"
+                  >
+                    ×
+                  </button>
+                </header>
+                <div className="grid gap-3 p-5">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeliveryChoice("free");
+                        setDeliveryAmount("");
+                      }}
+                      className={`min-h-14 rounded-xl border px-3 text-sm font-bold ${deliveryChoice === "free" ? "border-[#0071e3] bg-sky-50 text-[#005ebd] ring-1 ring-[#0071e3]" : "border-slate-300 bg-white text-slate-800"}`}
+                    >
+                      Free delivery
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeliveryChoice("amount")}
+                      className={`min-h-14 rounded-xl border px-3 text-sm font-bold ${deliveryChoice === "amount" ? "border-[#0071e3] bg-sky-50 text-[#005ebd] ring-1 ring-[#0071e3]" : "border-slate-300 bg-white text-slate-800"}`}
+                    >
+                      Delivery fee
+                    </button>
+                  </div>
+                  {deliveryChoice === "amount" ? (
+                    <label className="grid gap-1 text-xs font-bold text-slate-700">
+                      Delivery amount
+                      <span className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500">
+                          $
+                        </span>
+                        <input
+                          autoFocus
+                          inputMode="decimal"
+                          value={deliveryAmount}
+                          onChange={(event) =>
+                            setDeliveryAmount(
+                              event.target.value.replace(/[^0-9.]/g, ""),
+                            )
+                          }
+                          placeholder="0.00"
+                          aria-label="Delivery amount"
+                          className="h-12 w-full rounded-xl border border-slate-300 pl-7 pr-3 text-base font-semibold tabular-nums"
+                        />
+                      </span>
+                    </label>
+                  ) : null}
+                </div>
+                <footer className="border-t border-slate-200 bg-slate-50 px-5 py-4 sm:rounded-b-2xl">
+                  <button
+                    type="button"
+                    disabled={
+                      pending ||
+                      !deliveryChoice ||
+                      (deliveryChoice === "amount" &&
+                        (!deliveryAmount.trim() ||
+                          !Number.isFinite(Number(deliveryAmount)) ||
+                          Number(deliveryAmount) <= 0))
+                    }
+                    onClick={() =>
+                      saveApproveAndImport(
+                        deliveryPromptTarget === "selected"
+                          ? undefined
+                          : deliveryPromptTarget,
+                        deliveryChoice === "free" ? 0 : Number(deliveryAmount),
+                      )
+                    }
+                    className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0071e3] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {pending ? (
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Truck className="h-4 w-4" />
+                    )}
+                    {pending ? "Adding…" : "Confirm & add to Catalog"}
+                  </button>
+                </footer>
+              </section>
+            </div>,
+            globalThis.document.body,
+          )
+        : null}
     </div>
   );
 }
