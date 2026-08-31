@@ -111,7 +111,10 @@ function GoalDisclosure({
             </p>
           ) : null}
         </div>
-        <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true" />
+        <ChevronDown
+          className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180"
+          aria-hidden="true"
+        />
         <span className="col-start-2 mt-1 flex items-center">
           <ManagerGoalStatusSelect fixedKey={fixedKey} status={status} />
         </span>
@@ -217,9 +220,9 @@ async function OwnerAffiliateGoal({ status }: { status: ManagerGoalStatus }) {
       fixedKey="supplier-affiliate-program"
       status={status}
       number={3}
-      eyebrow="Supplier program"
-      title="Supplier Affiliate Program"
-      description="Top 10 priority suppliers · Current status and next action."
+      eyebrow="Programs"
+      title="Apply to Supplier Programs"
+      description="Complete priority applications and follow up."
     >
       <div className="grid gap-4">
         <AffiliateCallList programs={programResult.data ?? []} />
@@ -254,9 +257,9 @@ function AbcSupplyDemoGoal({ status }: { status: ManagerGoalStatus }) {
       fixedKey="abc-supply-demo"
       status={status}
       number={5}
-      eyebrow="Supplier pricing"
-      title="ABC Supply Demo"
-      description="ABC certification workflow and private customer pricing."
+      eyebrow="ABC"
+      title="Prepare ABC Demo"
+      description="Finish branch, product, price, and demo checks."
     >
       <div className="grid gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm">
@@ -311,19 +314,20 @@ function AbcSupplyDemoGoal({ status }: { status: ManagerGoalStatus }) {
 
 function AiTaskInbox() {
   return (
-    <section className="mt-3 overflow-hidden rounded-lg border border-sky-200 bg-[#f7fbff] shadow-sm">
+    <section className="overflow-hidden rounded-lg border border-sky-200 bg-[#f7fbff] shadow-sm">
       <div className="flex flex-wrap items-center gap-3 px-3 py-3 sm:px-4">
         <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#0066cc] text-white">
           <ListTodo className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">
-            Phone task intake
+            Phone intake
           </p>
-          <h3 className="text-sm font-semibold text-slate-950">Phone messages</h3>
+          <h3 className="text-sm font-semibold text-slate-950">
+            Review messages
+          </h3>
           <p className="mt-0.5 text-xs text-slate-600">
-            Review only messages that need an action. Nothing is saved until
-            you confirm it.
+            Turn a message into a task only when action is needed.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -332,7 +336,7 @@ function AiTaskInbox() {
             href="/owner/ai-inbox"
             className="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-950 px-4 text-xs font-semibold text-white"
           >
-            Review phone inbox
+            Open inbox
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -345,10 +349,22 @@ function WebsiteWorkBoardLink() {
   return (
     <Link
       href="/admin/goals-progress/website-work"
-      className="mt-3 flex min-h-16 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition hover:border-sky-300"
+      className="flex min-h-16 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition hover:border-sky-300"
     >
-      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white"><ClipboardList className="h-4 w-4" /></span>
-      <span className="min-w-0 flex-1"><span className="block text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">Website delivery</span><span className="block text-sm font-semibold text-slate-950">Website work board</span><span className="block text-[11px] text-slate-500">Open tasks, status, owner, and next step.</span></span>
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white">
+        <ClipboardList className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">
+          Website
+        </span>
+        <span className="block text-sm font-semibold text-slate-950">
+          Website tasks
+        </span>
+        <span className="block text-[11px] text-slate-500">
+          Status, owner, and next step.
+        </span>
+      </span>
       <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
     </Link>
   );
@@ -371,9 +387,9 @@ function ClientTargetGoal({
       fixedKey="client-target"
       status={status}
       number={1}
-      eyebrow="Outreach"
-      title="Client Target"
-      description="Leads to contact and active clients in one place."
+      eyebrow="Clients"
+      title="Contact New Clients"
+      description="Call new leads and record the next step."
     >
       <div className="flex flex-wrap gap-2">
         {canManageClients ? (
@@ -452,9 +468,9 @@ function SupplierPricingGoal({ status }: { status: ManagerGoalStatus }) {
       fixedKey="call-suppliers"
       status={status}
       number={2}
-      eyebrow="Purchasing"
-      title="Call Supplier"
-      description="Find what each supplier sells cheaper than anyone else."
+      eyebrow="Supplier prices"
+      title="Find Best Supplier Prices"
+      description="Ask for best items, delivery minimum, and lead time."
     >
       <div className="grid gap-3 text-sm text-slate-600">
         <p className="flex gap-2">
@@ -507,9 +523,9 @@ function SupplierPartnershipGoal({ status }: { status: ManagerGoalStatus }) {
       fixedKey="supplier-partnerships"
       status={status}
       number={4}
-      eyebrow="Supplier relationships"
-      title="Supplier Partnership"
-      description="Show contacts, outreach drafts, follow-ups, and partnership progress."
+      eyebrow="Partnerships"
+      title="Build Supplier Relationships"
+      description="Contact suppliers and record the next follow-up."
     >
       <p className="text-sm leading-6 text-slate-600">
         Open Carlos&apos;s supplier workspace to contact researched companies
@@ -601,9 +617,9 @@ export async function CarlosGoalsWorkspace({
           fixedKey="supplier-affiliate-program"
           status={statusFor("supplier-affiliate-program")}
           number={3}
-          eyebrow="Supplier program"
-          title="Supplier Affiliate Program"
-          description="Top 10 priority suppliers with current status and next action."
+          eyebrow="Programs"
+          title="Apply to Supplier Programs"
+          description="Complete priority applications and follow up."
         >
           <AffiliateCallList />
         </GoalDisclosure>
@@ -637,24 +653,55 @@ export async function CarlosGoalsWorkspace({
     <>
       {embedded ? (
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div><h3 className="text-sm font-semibold text-slate-950">Carlos work</h3><p className="mt-0.5 text-[11px] leading-4 text-slate-500">Focus first, then one-time tasks, phone messages, and ongoing work areas.</p></div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-950">
+              Carlos Work
+            </h3>
+            <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
+              One priority, clear tasks, and the next action.
+            </p>
+          </div>
           <AddManagerGoal assignee="carlos" />
         </div>
       ) : null}
       <CustomManagerGoals goals={regularGoals} />
-      <WebsiteWorkBoardLink />
-      {access.owner ? <AiTaskInbox /> : null}
-      <section className="mt-4" aria-labelledby="carlos-work-areas">
-        <div className="mb-2">
-          <h3 id="carlos-work-areas" className="text-xs font-bold uppercase tracking-[.12em] text-slate-700">Ongoing work areas</h3>
-          <p className="mt-0.5 text-xs text-slate-500">Reference sections, not extra tasks. Open one only when Carlos is working in that area.</p>
-        </div>
-        <div className="grid gap-2">
-        {activeFixedGoals.map((goal) => (
-          <div key={goal.key}>{goal.content}</div>
-        ))}
-        </div>
+      <section
+        className="mt-3 grid gap-2 md:grid-cols-2"
+        aria-label="Task tools"
+      >
+        <WebsiteWorkBoardLink />
+        {access.owner ? <AiTaskInbox /> : null}
       </section>
+      <details
+        className="group mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white"
+        aria-labelledby="carlos-work-areas"
+      >
+        <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-3 py-2.5">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-700">
+            <Target className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span
+              id="carlos-work-areas"
+              className="block text-sm font-semibold text-slate-950"
+            >
+              Work areas
+            </span>
+            <span className="block text-[11px] text-slate-500">
+              Clients, suppliers, programs, and demos.
+            </span>
+          </span>
+          <span className="text-[10px] font-bold text-slate-500">
+            {activeFixedGoals.length}
+          </span>
+          <ChevronDown className="h-4 w-4 text-slate-400 transition group-open:rotate-180" />
+        </summary>
+        <div className="grid gap-2 border-t border-slate-200 bg-slate-50 p-2">
+          {activeFixedGoals.map((goal) => (
+            <div key={goal.key}>{goal.content}</div>
+          ))}
+        </div>
+      </details>
       {archivedFixedGoals.length ? (
         <details className="group mt-3 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
           <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-xs font-semibold text-slate-600">
@@ -682,16 +729,18 @@ export async function CarlosGoalsWorkspace({
           <p className="text-[11px] font-semibold uppercase text-[#0066cc]">
             Manager Portal
           </p>
-          <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Carlos Focus</h1>
+          <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">
+            Carlos Work
+          </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Focus, active tasks, phone intake, and supplier work areas in one place.
+            One priority, clear tasks, and the next action.
           </p>
         </header>
 
         <section aria-labelledby="carlos-goals-title" className="mt-7">
           <PersonHeader
             assignee="carlos"
-            description="Tasks, clients, suppliers, and follow-up work"
+            description="Clear goals and next steps"
           />
           {goalsWorkspace}
         </section>

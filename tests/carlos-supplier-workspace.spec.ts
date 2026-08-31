@@ -6,7 +6,15 @@ import { expect, test } from "@playwright/test";
 const root = process.cwd();
 
 test("Carlos supplier workspace uses staff access and persistent manager goals", async () => {
-  const [page, actions, store, goalsPage, deliveryPage, deliveryStore, managerShell] = await Promise.all([
+  const [
+    page,
+    actions,
+    store,
+    goalsPage,
+    deliveryPage,
+    deliveryStore,
+    managerShell,
+  ] = await Promise.all([
     readFile(path.join(root, "app/owner/partnerships/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/partnerships/actions.ts"), "utf8"),
     readFile(path.join(root, "lib/supplier-partners/store.ts"), "utf8"),
@@ -28,15 +36,20 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(deliveryPage).toContain("loadDeliveryRequests(supabase)");
   expect(deliveryStore).not.toContain("createAdminClient");
   expect(managerShell).not.toContain('href: "/owner/partnerships"');
-  expect(goalsPage).toContain('title="Supplier Partnership"');
+  expect(goalsPage).toContain('title="Build Supplier Relationships"');
   expect(page).toContain('body: { action: "status" }');
   expect(actions).toContain('action: "send_email"');
   expect(managerShell).toContain("...(access.suppliers ? [");
 });
 
 test("every Carlos supplier record has working local assets and complete links", async () => {
-  const rows = JSON.parse(await readFile(path.join(root, "data/supplier-partners.json"), "utf8")) as Array<Record<string, string>>;
-  const catalog = await readFile(path.join(root, "lib/supplier-partners/catalog.ts"), "utf8");
+  const rows = JSON.parse(
+    await readFile(path.join(root, "data/supplier-partners.json"), "utf8"),
+  ) as Array<Record<string, string>>;
+  const catalog = await readFile(
+    path.join(root, "lib/supplier-partners/catalog.ts"),
+    "utf8",
+  );
   const logoOverrides: Record<string, string> = {
     "prime-lumber-and-home-center": "prime-lumber-home-center",
     "central-jersey-screw-and-bolt": "central-jersey-screw-bolt",
@@ -58,7 +71,15 @@ test("every Carlos supplier record has working local assets and complete links",
       .replace(/[’']/g, "")
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
-    await expect(access(path.join(root, "public/images/supplier-partners", `${logoOverrides[slug] || slug}.png`))).resolves.toBeUndefined();
+    await expect(
+      access(
+        path.join(
+          root,
+          "public/images/supplier-partners",
+          `${logoOverrides[slug] || slug}.png`,
+        ),
+      ),
+    ).resolves.toBeUndefined();
   }
 
   expect(catalog).toContain("/images/supplier-partners/");
@@ -66,7 +87,9 @@ test("every Carlos supplier record has working local assets and complete links",
   expect(catalog).toContain("emailBody");
 });
 
-test("signed-out visitors are redirected away from Carlos pages", async ({ page }) => {
+test("signed-out visitors are redirected away from Carlos pages", async ({
+  page,
+}) => {
   await page.goto("/owner/partnerships");
   await expect(page).toHaveURL(/\/login\?next=%2Fowner%2Fpartnerships/);
 

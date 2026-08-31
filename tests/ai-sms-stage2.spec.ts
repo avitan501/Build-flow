@@ -76,8 +76,8 @@ test("Carlos Focus contains the owner AI intake and the dashboard no longer dupl
     "utf8",
   );
 
-  expect(goals).toContain("Carlos Focus");
-  expect(goals).toContain("Phone task intake");
+  expect(goals).toContain("Carlos Work");
+  expect(goals).toContain("Phone intake");
   expect(goals).toContain('href="/owner/ai-inbox"');
   expect(goals).toContain("ManagerNotificationCenter");
   expect(dashboard).not.toContain('label: "AI Phone Inbox"');

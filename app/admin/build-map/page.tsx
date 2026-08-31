@@ -43,7 +43,8 @@ import {
 const QUO_INBOX_URL =
   "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
 const WHATSAPP_URL = "https://web.whatsapp.com/";
-const CARLOS_MEETING_URL = "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Avantia%20Build%20meeting%20with%20Carlos&details=Avantia%20Build%20manager%20meeting&add=buildavantiap%40gmail.com";
+const CARLOS_MEETING_URL =
+  "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Avantia%20Build%20meeting%20with%20Carlos&details=Avantia%20Build%20manager%20meeting&add=buildavantiap%40gmail.com";
 
 type RequestRow = {
   id: string;
@@ -303,7 +304,10 @@ export default async function AdminDashboardPage({
             icon: Sparkles,
             links: [
               { href: "/admin/ai-tools", label: "All Manager Tools" },
-              { href: "/admin/ai-tools/media-messages", label: "Media & Messages" },
+              {
+                href: "/admin/ai-tools/media-messages",
+                label: "Media & Messages",
+              },
               {
                 href: "https://build-flow-wfl3-1fe6nc1cr-avitanneto-1804s-projects.vercel.app",
                 label: "New Homepage Preview",
@@ -493,10 +497,16 @@ export default async function AdminDashboardPage({
 
         <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white">
           <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
-            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white"><UserRound className="h-4 w-4" /></span>
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white">
+              <UserRound className="h-4 w-4" />
+            </span>
             <div className="min-w-0">
-              <h2 id="targets-heading" className="font-semibold">Carlos Focus</h2>
-              <p className="mt-0.5 text-xs text-slate-500">Tomorrow&apos;s focus first, then active tasks and work areas.</p>
+              <h2 id="targets-heading" className="font-semibold">
+                Carlos Work
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                One priority, clear tasks, and the next action.
+              </p>
             </div>
           </header>
           <CarlosGoalsWorkspace embedded />
