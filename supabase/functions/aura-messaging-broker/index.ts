@@ -6719,6 +6719,9 @@ async function ingestPolledQuoMessage(
         : "";
   const media = quoPolledMedia(message);
   const counterpartyPhone = normalizePhone(message.from);
+  const isTrustedIntake =
+    isTrustedSmsCommandPhone(counterpartyPhone) &&
+    (isTrustedSmsCommand(body) || trustedImageMedia(media).length > 0);
   if (
     !/^AC[A-Za-z0-9_-]+$/.test(activityId) ||
     message.direction !== "incoming" ||
@@ -6742,12 +6745,16 @@ async function ingestPolledQuoMessage(
     limit 1
   `;
   if (existing[0]?.id) {
-    if (isTrustedSmsCommandPhone(counterpartyPhone)) {
+    if (isTrustedIntake) {
       await createTrustedSmsIntake(
         activityId,
         pollEventId,
         body || existing[0].body,
-        media.length ? media : Array.isArray(existing[0].media) ? existing[0].media : [],
+        media.length
+          ? media
+          : Array.isArray(existing[0].media)
+            ? existing[0].media
+            : [],
         conversationId,
         counterpartyPhone,
       );
@@ -6780,7 +6787,7 @@ async function ingestPolledQuoMessage(
   scheduleMaterialShadowAssessment(inserted[0].id);
   await enqueueSmsAutomation(inserted[0].id);
   await dispatchSmsAutomationWorker();
-  if (isTrustedSmsCommandPhone(counterpartyPhone)) {
+  if (isTrustedIntake) {
     await createTrustedSmsIntake(
       activityId,
       pollEventId,
@@ -6877,7 +6884,17 @@ async function pollRecentQuoMessagesOnce() {
       if (
         !activityId ||
         (storedIds.has(activityId) &&
-          !isTrustedSmsCommandPhone(normalizePhone(message.from)))
+          !(
+            isTrustedSmsCommandPhone(normalizePhone(message.from)) &&
+            (isTrustedSmsCommand(
+              typeof message.text === "string"
+                ? message.text
+                : typeof message.body === "string"
+                  ? message.body
+                  : "",
+            ) ||
+              trustedImageMedia(quoPolledMedia(message)).length > 0)
+          ))
       )
         continue;
       if (
