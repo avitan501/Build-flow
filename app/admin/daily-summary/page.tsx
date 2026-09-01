@@ -1,3 +1,6 @@
+import { ArrowLeft } from "lucide-react"
+import Link from "next/link"
+
 import { DailyWorkSummaryForm } from "@/components/buildflow/daily-work-summary"
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { DAILY_WORK_SUMMARY_PREFIX, parseDailyWorkSummary } from "@/lib/daily-work-summary"
@@ -31,7 +34,7 @@ export default async function DailySummaryPage() {
 
   return <main className="min-h-screen bg-[#f5f5f7] px-4 py-6 text-slate-950 sm:px-6 lg:px-10 lg:py-10">
     <div className="mx-auto max-w-5xl">
-      <header className="border-b border-slate-200 pb-5"><p className="text-[11px] font-semibold uppercase text-[#0066cc]">Manager Portal</p><h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Daily Work Summary</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Carlos records what he completed each day and what still needs follow-up.</p></header>
+      <header className="border-b border-slate-200 pb-5"><Link href="/admin/build-map" className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-[#0066cc]"><ArrowLeft className="h-4 w-4" />Carlos Dashboard</Link><h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Time Log &amp; Daily Summary</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Clock in, clock out, review hours, and save the day&apos;s work.</p></header>
       <div className="mt-5"><DailyWorkSummaryForm summaries={summaries} /></div>
     </div>
   </main>

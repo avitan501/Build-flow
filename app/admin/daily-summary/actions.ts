@@ -38,6 +38,7 @@ async function findDailySummary(supabase: Awaited<ReturnType<typeof requireManag
 
 function revalidateDailySummary() {
   revalidatePath("/admin/daily-summary")
+  revalidatePath("/admin/build-map")
   revalidatePath("/admin/goals-progress")
 }
 

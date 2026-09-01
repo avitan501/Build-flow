@@ -20,7 +20,7 @@ function displayDate(value: string) {
 
 function displayTime(value: string | null | undefined) {
   if (!value) return "Not recorded"
-  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(value))
+  return new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date(value))
 }
 
 function workedTime(checkInAt: string | null | undefined, checkOutAt: string | null | undefined) {
@@ -145,7 +145,10 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
     <aside className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       <header className="border-b border-slate-200 p-4"><h2 className="text-sm font-semibold">Recent summaries</h2><p className="mt-1 text-xs text-slate-500">Choose a date to review or update it.</p></header>
       <div className="max-h-[34rem] overflow-y-auto">
-        {summaries.length ? summaries.map((summary) => <button key={summary.id} type="button" onClick={() => selectDate(summary.date)} className={`flex w-full items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50 ${selectedDate === summary.date ? "bg-sky-50" : ""}`}><span><span className="block text-sm font-semibold">{displayDate(summary.date)}</span><span className="mt-0.5 block text-xs text-slate-500">{summary.completed ? "Work recorded" : "Open items only"}</span></span><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${summary.open ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{summary.open ? "Open" : "Complete"}</span></button>) : <p className="p-4 text-sm leading-6 text-slate-500">No daily summaries yet. Carlos can save today&apos;s first update.</p>}
+        {summaries.length ? summaries.map((summary) => {
+          const hours = workedTime(summary.checkInAt, summary.checkOutAt)
+          return <button key={summary.id} type="button" onClick={() => selectDate(summary.date)} className={`flex w-full items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50 ${selectedDate === summary.date ? "bg-sky-50" : ""}`}><span><span className="block text-sm font-semibold">{displayDate(summary.date)}</span><span className="mt-0.5 block text-xs text-slate-500">{hours ?? (summary.checkInAt ? "Clocked in" : summary.completed ? "Work recorded" : "Open items only")}</span></span><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${summary.open || (summary.checkInAt && !summary.checkOutAt) ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{summary.checkInAt && !summary.checkOutAt ? "Working" : summary.open ? "Open" : "Complete"}</span></button>
+        }) : <p className="p-4 text-sm leading-6 text-slate-500">No daily summaries yet. Carlos can save today&apos;s first update.</p>}
       </div>
     </aside>
   </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import { Clock3 } from "lucide-react"
+import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 
 function elapsedLabel(start: string, currentTime: number, end?: string | null) {
@@ -29,9 +30,9 @@ export function EmployeeClockStatus({ checkInAt, checkOutAt, compact = false }: 
     return `Carlos clocked in · ${elapsedLabel(checkInAt, currentTime)}`
   }, [checkInAt, checkOutAt, currentTime])
 
-  return <span className={`inline-flex min-h-12 items-center gap-2 rounded-md border px-3 text-xs font-semibold ${compact ? "w-full justify-center" : ""} ${active ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-600"}`}>
+  return <Link href="/admin/daily-summary" aria-label="Open Carlos time log and daily summary" title="Open time log" className={`inline-flex min-h-12 items-center gap-2 rounded-md border px-3 text-xs font-semibold transition hover:border-[#0071e3] hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 ${compact ? "w-full justify-center" : ""} ${active ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-600"}`}>
     <Clock3 className="h-4 w-4" />
     <span className={`h-2 w-2 rounded-full ${active ? "bg-emerald-500" : "bg-slate-300"}`} />
     <span className={compact ? "truncate" : ""}>{label}</span>
-  </span>
+  </Link>
 }

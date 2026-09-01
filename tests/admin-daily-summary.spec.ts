@@ -28,6 +28,8 @@ test("daily summaries persist by date in protected manager data", async () => {
   expect(component).toContain("Still open")
   expect(component).toContain('type="date"')
   expect(component).toContain("Recent summaries")
+  expect(component).toContain('timeZone: "America/New_York"')
+  expect(component).toContain('summary.checkInAt, summary.checkOutAt')
   expect(component).toContain("Check in")
   expect(component).toContain("Check out")
   expect(component).toContain("Hours")
@@ -40,6 +42,7 @@ test("daily summaries persist by date in protected manager data", async () => {
   expect(actions).toContain("await requireManagerPortalProfile()")
   expect(actions).toContain("recordDailyAttendanceAction")
   expect(actions).toContain('timeZone: "America/New_York"')
+  expect(actions).toContain('revalidatePath("/admin/build-map")')
   expect(actions).toContain("current?.checkInAt")
   expect(actions).toContain("current?.checkOutAt")
   expect(actions).toContain("uploadDailyProblemPhotoAction")
@@ -51,6 +54,18 @@ test("daily summaries persist by date in protected manager data", async () => {
   expect(helper).toContain('DAILY_WORK_SUMMARY_PREFIX = "daily_work_summary:"')
   expect(helper).toContain("problemAttachments")
   expect(goalsPage).toContain("!goal.details?.startsWith(DAILY_WORK_SUMMARY_PREFIX)")
+})
+
+test("dashboard clock opens Carlos time log instead of looking like a dead button", async () => {
+  const [clock, page] = await Promise.all([
+    readFile(path.join(root, "components/buildflow/employee-clock-status.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/daily-summary/page.tsx"), "utf8"),
+  ])
+
+  expect(clock).toContain('href="/admin/daily-summary"')
+  expect(clock).toContain('aria-label="Open Carlos time log and daily summary"')
+  expect(page).toContain('href="/admin/build-map"')
+  expect(page).toContain("Time Log &amp; Daily Summary")
 })
 
 test("lead controls remain readable and independently scrollable on phones", async () => {
