@@ -477,7 +477,11 @@ test("Carlos has one compact deduplicated supplier network while the research li
   expect(page).toContain("requireManagerPortalProfile");
   expect(component).toContain("Sells / departments");
   expect(component).toContain("What to ask");
-  expect(component).toContain('"Show", "Friends", "Google", "Nearby"');
+  for (const source of ["Show", "Friends", "Google", "Nearby"]) {
+    expect(component).toContain(`"${source}"`);
+  }
+  expect(component).toContain("CHANNEL_DESCRIPTIONS");
+  expect(component).toContain("Direct catalog, stock, or pricing connection");
   expect(component).toContain("SUPPLIER_NETWORK_CHANNELS.map");
   expect(component).toContain("min-h-11");
   expect(network).toContain("function canonicalName");
