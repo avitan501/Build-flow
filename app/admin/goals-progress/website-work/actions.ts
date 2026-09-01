@@ -145,7 +145,7 @@ export async function routePhoneIntakeTaskAction(formData: FormData) {
     progress_percent: 0,
     summary: itemKind === "idea" ? "David's private idea." : "Approved phone intake task.",
     next_step: task.nextStep,
-    source_chat_title: "Phone Intake",
+    source_chat_title: "David Dashboard",
     priority: 1,
     sort_order: 0,
     item_kind: itemKind,

@@ -38,7 +38,7 @@ function PhoneIntakeList({ intakes }: { intakes: PhoneIntake[] }) {
         <Bot className="h-4 w-4 text-[#0066cc]" />
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold">Phone Intake</h2>
-          <p className="mt-0.5 text-[11px] text-sky-700">Text “ADD …” from 347-567-5077. Use “ADD IDEA …” for Ideas.</p>
+          <p className="mt-0.5 text-[11px] text-sky-700">“ADD …” texts and photos from 347-567-5077 go straight to David Tasks. Use “ADD IDEA …” for Ideas; other record types wait here for review.</p>
         </div>
         <span className="text-xs font-semibold text-sky-700">{intakes.length}</span>
       </header>

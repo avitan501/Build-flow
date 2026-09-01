@@ -22,6 +22,11 @@ test("trusted phone intake reads screenshots and safely joins follow-up messages
   expect(broker).toContain('"idea" | "material_request"');
   expect(broker).toContain("ADD IDEA must use recordType idea");
   expect(broker).toContain('commandType === "idea"');
+  expect(broker).toContain("quoPolledMedia(message)");
+  expect(broker).toContain("createTrustedSmsIntake(");
+  expect(broker).toContain("autoRouteTrustedSmsToDavid");
+  expect(broker).toContain("intake_auto_routed_to_david");
+  expect(broker).toContain("'David Dashboard'");
 });
 
 test("supplier screenshots remain drafts until the owner approves them", () => {
@@ -95,6 +100,7 @@ test("Phone intake is flat inside David Dashboard and absent from Carlos", () =>
   expect(david).toContain("TRUSTED_OWNER_SMS_PHONES");
   expect(david).toContain("ADD IDEA");
   expect(david).toContain("347-567-5077");
+  expect(david).toContain("go straight to David Tasks");
   expect(david).toContain('value="david"');
   expect(david).not.toContain("ManagerNotificationCenter");
   expect(dashboard).not.toContain('label: "AI Phone Inbox"');
@@ -111,4 +117,18 @@ test("ADD IDEA routes to David's Ideas list while Carlos receives a task", async
   expect(actions).toContain('destination === "david" && recordType === "idea"');
   expect(actions).toContain('item_kind: itemKind');
   expect(actions).toContain('published_to_carlos: destination === "carlos"');
+  expect(actions).toContain('source_chat_title: "David Dashboard"');
+});
+
+test("phone intake is an allowed canonical dashboard category", () => {
+  const migration = readFileSync(
+    path.join(
+      root,
+      "supabase/migrations/20260901234403_allow_phone_intake_dashboard_items.sql",
+    ),
+    "utf8",
+  );
+
+  expect(migration).toContain("'phone_intake'");
+  expect(migration).toContain("website_work_items_category_check");
 });

@@ -6674,13 +6674,36 @@ type QuoPolledMessage = {
   id?: string;
   from?: string;
   to?: string[];
+  body?: string;
   text?: string;
   direction?: string;
   status?: string;
   createdAt?: string;
   updatedAt?: string;
   phoneNumberId?: string;
+  media?: TrustedSmsMedia[];
+  attachments?: Array<{
+    url?: string;
+    type?: string;
+    contentType?: string;
+    content_type?: string;
+    name?: string;
+    filename?: string;
+  }>;
 };
+
+function quoPolledMedia(message: QuoPolledMessage) {
+  return [
+    ...(Array.isArray(message.media) ? message.media : []),
+    ...(Array.isArray(message.attachments)
+      ? message.attachments.map((item) => ({
+          url: item.url,
+          type: item.type || item.contentType || item.content_type,
+          name: item.name || item.filename,
+        }))
+      : []),
+  ];
+}
 
 async function ingestPolledQuoMessage(
   message: QuoPolledMessage,
@@ -6688,12 +6711,18 @@ async function ingestPolledQuoMessage(
   businessPhone: string,
 ) {
   const activityId = typeof message.id === "string" ? message.id.trim() : "";
-  const body = typeof message.text === "string" ? message.text.trim() : "";
+  const body =
+    typeof message.text === "string"
+      ? message.text.trim()
+      : typeof message.body === "string"
+        ? message.body.trim()
+        : "";
+  const media = quoPolledMedia(message);
   const counterpartyPhone = normalizePhone(message.from);
   if (
     !/^AC[A-Za-z0-9_-]+$/.test(activityId) ||
     message.direction !== "incoming" ||
-    !body ||
+    (!body && trustedImageMedia(media).length === 0) ||
     !counterpartyPhone ||
     counterpartyPhone === businessPhone
   )
@@ -6705,12 +6734,24 @@ async function ingestPolledQuoMessage(
     values ('quo', ${pollEventId}, 'message.received', ${activityId}, ${sql.json({ provider: "quo-fast-poll", activityId, conversationId })}, null)
     on conflict (provider, external_event_id) do nothing
   `;
-  const existing = await sql<{ id: string }[]>`
-    select id from public.aura_communications
+  const existing = await sql<
+    Array<{ id: string; body: string | null; media: TrustedSmsMedia[] | null }>
+  >`
+    select id, body, media from public.aura_communications
     where provider = 'quo' and external_activity_id = ${activityId}
     limit 1
   `;
   if (existing[0]?.id) {
+    if (isTrustedSmsCommandPhone(counterpartyPhone)) {
+      await createTrustedSmsIntake(
+        activityId,
+        pollEventId,
+        body || existing[0].body,
+        media.length ? media : Array.isArray(existing[0].media) ? existing[0].media : [],
+        conversationId,
+        counterpartyPhone,
+      );
+    }
     await sql`
       update public.aura_webhook_events set processed_at = coalesce(processed_at, now())
       where provider = 'quo' and activity_id = ${activityId} and event_type = 'message.received'
@@ -6725,7 +6766,7 @@ async function ingestPolledQuoMessage(
       counterparty_phone, business_phone, body, media, status, occurred_at, last_event_at
     ) values (
       'quo', 'sms', ${activityId}, ${conversationId}, ${contactId}, 'incoming',
-      ${counterpartyPhone}, ${businessPhone}, ${body}, '[]'::jsonb, ${message.status || "received"},
+      ${counterpartyPhone}, ${businessPhone}, ${body || null}, ${sql.json(media)}, ${message.status || "received"},
       ${safeIso(message.createdAt, new Date().toISOString())}, ${safeIso(message.updatedAt, message.createdAt || new Date().toISOString())}
     )
     on conflict (provider, external_activity_id) do nothing
@@ -6739,6 +6780,16 @@ async function ingestPolledQuoMessage(
   scheduleMaterialShadowAssessment(inserted[0].id);
   await enqueueSmsAutomation(inserted[0].id);
   await dispatchSmsAutomationWorker();
+  if (isTrustedSmsCommandPhone(counterpartyPhone)) {
+    await createTrustedSmsIntake(
+      activityId,
+      pollEventId,
+      body || null,
+      media,
+      conversationId,
+      counterpartyPhone,
+    );
+  }
   return true;
 }
 
@@ -6823,7 +6874,12 @@ async function pollRecentQuoMessagesOnce() {
     for (const message of incoming) {
       const activityId =
         typeof message.id === "string" ? message.id.trim() : "";
-      if (!activityId || storedIds.has(activityId)) continue;
+      if (
+        !activityId ||
+        (storedIds.has(activityId) &&
+          !isTrustedSmsCommandPhone(normalizePhone(message.from)))
+      )
+        continue;
       if (
         await ingestPolledQuoMessage(message, conversation.id || null, api.from)
       )
@@ -7631,6 +7687,57 @@ async function trustedSmsProposal(body: string, media: TrustedSmsMedia[] = []) {
   }
 }
 
+function trustedSmsDashboardTask(
+  proposal: TrustedSmsProposal,
+  messageText: string,
+) {
+  const firstTask = proposal.tasks[0];
+  const title = (
+    firstTask?.title?.trim() ||
+    proposal.summary.trim() ||
+    messageText.trim() ||
+    "Review phone instruction"
+  )
+    .replace(/\s+/g, " ")
+    .slice(0, 160);
+  const nextStep = (firstTask?.notes?.trim() || messageText.trim())
+    .slice(0, 500);
+  return { title, nextStep };
+}
+
+async function autoRouteTrustedSmsToDavid(
+  intakeId: string,
+  proposal: TrustedSmsProposal,
+  messageText: string,
+) {
+  if (proposal.recordType !== "task" && proposal.recordType !== "idea")
+    return false;
+  const task = trustedSmsDashboardTask(proposal, messageText);
+  const itemKind = proposal.recordType === "idea" ? "idea" : "task";
+  await sql`
+    insert into public.website_work_items (
+      task_key, title, category, status, assigned_agent, progress_percent,
+      summary, next_step, source_chat_title, priority, sort_order,
+      item_kind, published_to_carlos
+    ) values (
+      ${`phone-intake-${intakeId}`}, ${task.title}, 'phone_intake', 'open', 'David', 0,
+      ${itemKind === "idea" ? "David's private idea from Phone Intake." : "Added automatically from David's trusted phone."},
+      ${task.nextStep}, 'David Dashboard', 1, 0, ${itemKind}, false
+    )
+    on conflict (task_key) do nothing
+  `;
+  await sql`
+    update public.aura_intakes
+    set status = 'confirmed', error_message = null
+    where id = ${intakeId}::uuid and status in ('pending', 'needs_follow_up', 'failed')
+  `;
+  await sql`
+    insert into public.aura_audit_log (intake_id, actor_user_id, action, details)
+    values (${intakeId}::uuid, null, 'intake_auto_routed_to_david', ${sql.json({ itemKind, source: "trusted_owner_sms" })})
+  `;
+  return true;
+}
+
 async function createTrustedSmsIntake(
   activityId: string,
   eventId: string,
@@ -7709,6 +7816,7 @@ async function createTrustedSmsIntake(
       insert into public.aura_audit_log (intake_id, actor_user_id, action, details)
       values (${prior.id}::uuid, null, 'sms_message_joined', ${sql.json({ eventId, activityId, imageCount: images.length, reviewRequired: true })})
     `;
+    await autoRouteTrustedSmsToDavid(prior.id, proposal, combinedText);
     return;
   }
   const code = crypto
@@ -7730,6 +7838,7 @@ async function createTrustedSmsIntake(
     insert into public.aura_audit_log (intake_id, actor_user_id, action, details)
     values (${rows[0].id}, null, 'sms_command_received', ${sql.json({ eventId, activityId, imageCount: images.length, reviewRequired: true })})
   `;
+  await autoRouteTrustedSmsToDavid(rows[0].id, proposal, messageText);
 }
 
 const dashboardAiModels = {
