@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Star } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { Folder, Star } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { sendSupplierPartnerEmailAction, updateSupplierPartnerAction } from "@/app/owner/partnerships/actions";
 import {
@@ -44,11 +44,12 @@ function cleanPhone(phone: string) {
 
 export function SupplierPartnershipWorkspace({ partners, initialProgress, emailSendingReady }: Props) {
   const [progress, setProgress] = useState(initialProgress);
-  const [selectedSlug, setSelectedSlug] = useState(partners[0]?.slug || "");
+  const firstImportant = partners.find((partner) => initialProgress[partner.slug]?.important);
+  const [selectedSlug, setSelectedSlug] = useState(firstImportant?.slug || partners[0]?.slug || "");
   const [query, setQuery] = useState("");
   const [showFilter, setShowFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [importantOnly, setImportantOnly] = useState(false);
+  const [supplierFolder, setSupplierFolder] = useState<"important" | "other">("important");
   const [notice, setNotice] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -62,13 +63,21 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
       const matchesQuery = !normalized || [partner.company, partner.products, partner.department, partner.programFinding].join(" ").toLowerCase().includes(normalized);
       const matchesShow = showFilter === "All" || partner.show === showFilter;
       const matchesStatus = statusFilter === "All" || itemProgress?.status === statusFilter;
-      const matchesImportant = !importantOnly || itemProgress?.important;
-      return matchesQuery && matchesShow && matchesStatus && matchesImportant;
+      const matchesFolder = supplierFolder === "important" ? itemProgress?.important : !itemProgress?.important;
+      return matchesQuery && matchesShow && matchesStatus && matchesFolder;
     });
-  }, [importantOnly, partners, progress, query, showFilter, statusFilter]);
+  }, [partners, progress, query, showFilter, statusFilter, supplierFolder]);
+
+  useEffect(() => {
+    if (filtered.length && !filtered.some((partner) => partner.slug === selectedSlug)) {
+      setSelectedSlug(filtered[0].slug);
+    }
+  }, [filtered, selectedSlug]);
 
   const counts = useMemo(() => ({
     total: partners.length,
+    important: partners.filter((partner) => progress[partner.slug]?.important).length,
+    other: partners.filter((partner) => !progress[partner.slug]?.important).length,
     action: partners.filter((partner) => ["Call needed", "Research ready", "Email drafted"].includes(progress[partner.slug]?.status)).length,
     active: partners.filter((partner) => ["Applied", "In progress", "Follow-up"].includes(progress[partner.slug]?.status)).length,
     won: partners.filter((partner) => ["Approved", "Set up"].includes(progress[partner.slug]?.status)).length,
@@ -150,13 +159,32 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(26rem,0.85fr)]">
           <div className="min-w-0 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-            <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
+            <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1.5">
+              <button
+                type="button"
+                aria-pressed={supplierFolder === "important"}
+                onClick={() => setSupplierFolder("important")}
+                className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold transition ${supplierFolder === "important" ? "bg-white text-slate-950 shadow-sm" : "text-slate-600 hover:text-slate-950"}`}
+              >
+                <Star className="h-4 w-4 fill-amber-400 text-amber-500" />
+                Important Suppliers ({counts.important})
+              </button>
+              <button
+                type="button"
+                aria-pressed={supplierFolder === "other"}
+                onClick={() => setSupplierFolder("other")}
+                className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold transition ${supplierFolder === "other" ? "bg-white text-slate-950 shadow-sm" : "text-slate-600 hover:text-slate-950"}`}
+              >
+                <Folder className="h-4 w-4" />
+                Other Suppliers ({counts.other})
+              </button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search company, material, or department" className="min-h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-sky-400 focus:bg-white" />
               <select value={showFilter} onChange={(event) => setShowFilter(event.target.value)} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium">{shows.map((show) => <option key={show}>{show}</option>)}</select>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"><option>All</option>{SUPPLIER_PARTNER_STATUSES.map((status) => <option key={status}>{status}</option>)}</select>
-              <button type="button" aria-pressed={importantOnly} onClick={() => setImportantOnly((current) => !current)} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold ${importantOnly ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-white text-slate-700"}`}><Star className={`h-4 w-4 ${importantOnly ? "fill-amber-400 text-amber-500" : "text-slate-400"}`} />Important</button>
             </div>
-            <p className="mt-3 text-xs text-slate-500">Showing {filtered.length} of {partners.length}</p>
+            <p className="mt-3 text-xs text-slate-500">Showing {filtered.length} {supplierFolder === "important" ? "important" : "other"} suppliers</p>
             <div className="mt-3 divide-y divide-slate-100">
               {filtered.map((partner) => {
                 const itemProgress = progress[partner.slug];
@@ -174,6 +202,7 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
                   </div>
                 );
               })}
+              {!filtered.length ? <div className="px-3 py-10 text-center text-sm text-slate-500">No suppliers in this folder match the current filters.</div> : null}
             </div>
           </div>
 

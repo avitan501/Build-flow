@@ -46,8 +46,9 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(actions).toContain('action: "send_email"');
   expect(managerShell).toContain("...(access.suppliers ? [");
   expect(actions).toContain("important: z.boolean().optional()");
-  expect(workspace).toContain("importantOnly");
-  expect(workspace).toContain("aria-pressed={importantOnly}");
+  expect(workspace).toContain('useState<"important" | "other">("important")');
+  expect(workspace).toContain("Important Suppliers ({counts.important})");
+  expect(workspace).toContain("Other Suppliers ({counts.other})");
   expect(workspace).toContain('type="checkbox" checked={itemProgress.important}');
   expect(catalog).toContain("important: false");
 });
