@@ -2,13 +2,10 @@
 
 import {
   ArrowRight,
-  Check,
   CheckCircle2,
   ChevronDown,
   Circle,
-  Copy,
   Minus,
-  Phone,
   Plus,
   Store,
   Quote,
@@ -30,12 +27,6 @@ import {
   type QuoteGrowthMetricRecord,
   type QuoteGrowthPeriod,
 } from "@/lib/david-quote-growth";
-
-const CARLOS_SCRIPT = "Hi, this is Carlos from Avantia Build. We help contractors compare material quotes and delivery options. If you have a current supplier quote or material list, send it to us and we'll check whether another supplier can offer a better overall option. There's no obligation. What materials are you buying this week?";
-const UPLOAD_REPLY = "I'll text you the upload link. You can send a PDF, screenshot, or photo of the quote.";
-const SUPPLIER_SCRIPT = "Hi, this is Carlos with Avantia Build. We have local contractors buying construction materials, and we need a supplier we can send quote requests to. Who handles contractor quotes at your company?";
-const SUPPLIER_RIGHT_PERSON = "When we have a job that matches what you sell, can I email you the material list for pricing and delivery availability?";
-const SUPPLIER_PERMISSION = "Great. What is the best email, which materials should we contact you for, and where do you deliver?";
 
 function MetricRow({
   definition,
@@ -130,11 +121,6 @@ function TrackerPanel({
   );
 }
 
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  return <button type="button" onClick={async () => { await navigator.clipboard.writeText(text); setCopied(true); window.setTimeout(() => setCopied(false), 1600); }} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700">{copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}{copied ? "Copied" : "Copy"}</button>;
-}
-
 export function DavidQuoteGrowthTracker({
   dailyRecords,
   campaignRecords,
@@ -199,34 +185,12 @@ export function DavidQuoteGrowthTracker({
         ))}
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-[0_12px_32px_rgba(15,23,42,.04)]">
-        <header className="flex items-center gap-3 border-b border-amber-100 bg-amber-50 px-4 py-3"><Store className="h-4 w-4 text-amber-600" /><div><h2 className="text-sm font-bold">Supplier call script</h2><p className="text-xs text-slate-500">Use before the contractor calls.</p></div></header>
-        <div className="grid gap-3 p-4 lg:grid-cols-3">
-          {[
-            { label: "Opening", text: SUPPLIER_SCRIPT },
-            { label: "Simple question", text: SUPPLIER_RIGHT_PERSON },
-            { label: "Get the details", text: SUPPLIER_PERMISSION },
-          ].map((item) => <div key={item.label} className="flex flex-col rounded-xl bg-slate-50 p-4"><p className="text-[10px] font-bold uppercase tracking-[.15em] text-amber-700">{item.label}</p><p className="mt-2 flex-1 text-sm leading-6 text-slate-700">{item.text}</p><div className="mt-3"><CopyButton text={item.text} /></div></div>)}
-        </div>
-        <div className="border-t border-slate-100 px-4 py-3 text-xs text-slate-600"><strong>Record:</strong> contact name · email · trade · delivery area · minimum · contractor pricing</div>
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3"><Users className="h-4 w-4 text-[#0878d1]" /><h2 className="text-sm font-bold">Contractors: start with</h2></header>
+        <ol className="divide-y divide-slate-100">
+          {["Contractors who already know David", "Previous Avantia customers", "Friend, foreman and architect referrals", "Local contractors with a current quote", "Small local quote-check ad"].map((source, index) => <li key={source} className="flex gap-3 px-4 py-3 text-sm text-slate-700"><span className="font-bold tabular-nums text-slate-400">{index + 1}</span><span>{source}</span></li>)}
+        </ol>
       </section>
-
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,.9fr)]">
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3"><Phone className="h-4 w-4 text-[#0878d1]" /><h2 className="text-sm font-bold">Contractor call script</h2></header>
-          <div className="grid gap-3 p-4">
-            <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm leading-6 text-slate-700">{CARLOS_SCRIPT}</p><div className="mt-3"><CopyButton text={CARLOS_SCRIPT} /></div></div>
-            <div className="rounded-xl border border-sky-100 bg-sky-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-sky-700">If interested</p><p className="mt-1 text-sm leading-6 text-slate-700">{UPLOAD_REPLY}</p><div className="mt-3"><CopyButton text={UPLOAD_REPLY} /></div></div>
-          </div>
-        </section>
-
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3"><Users className="h-4 w-4 text-[#0878d1]" /><h2 className="text-sm font-bold">Contractors: start with</h2></header>
-          <ol className="divide-y divide-slate-100">
-            {["Contractors who already know David", "Previous Avantia customers", "Friend, foreman and architect referrals", "Local contractors with a current quote", "Small local quote-check ad"].map((source, index) => <li key={source} className="flex gap-3 px-4 py-3 text-sm text-slate-700"><span className="font-bold tabular-nums text-slate-400">{index + 1}</span><span>{source}</span></li>)}
-          </ol>
-        </section>
-      </div>
 
       <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3"><Quote className="h-4 w-4 text-[#0878d1]" /><span className="min-w-0 flex-1 text-sm font-bold">Operating rules</span><ChevronDown className="h-4 w-4 text-slate-400 transition group-open:rotate-180" /></summary>

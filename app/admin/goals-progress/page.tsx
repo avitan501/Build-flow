@@ -12,6 +12,10 @@ import { AffiliateProgramTracker } from "@/components/buildflow/affiliate-progra
 import { AffiliateCallList } from "@/components/buildflow/affiliate-call-list";
 import { ClientTargetCallGuide } from "@/components/buildflow/client-target-call-guide";
 import {
+  ApiAffiliateCallScript,
+  SupplierRelationshipScripts,
+} from "@/components/buildflow/carlos-outreach-scripts";
+import {
   AddOutreachLead,
   ClientLanguageSelect,
   OutreachLeadList,
@@ -189,6 +193,7 @@ async function OwnerAffiliateGoal({ status }: { status: ManagerGoalStatus }) {
       description="Manage supplier APIs, affiliate programs, and partnerships."
     >
       <div className="grid gap-4">
+        <ApiAffiliateCallScript />
         <AffiliateCallList
           programs={programResult.data ?? []}
           activities={activityResult.data ?? []}
@@ -386,6 +391,7 @@ function SupplierPartnershipGoal({ status }: { status: ManagerGoalStatus }) {
       title="Build Supplier Relationships"
       description="Contact suppliers and record the next follow-up."
     >
+      <SupplierRelationshipScripts />
       <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
         {lists.map((list, index) => <Link key={list.label} href={list.href} className="flex min-h-11 items-center gap-3 border-b border-slate-100 px-3 text-sm last:border-b-0 hover:bg-slate-50"><span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-xs font-bold text-slate-600">{index + 1}</span><span className="min-w-0 flex-1 font-semibold">{list.label}</span><span className="text-xs tabular-nums text-slate-500">{list.count}</span><ArrowRight className="h-4 w-4 text-slate-400" /></Link>)}
       </div>
@@ -491,6 +497,7 @@ export async function CarlosGoalsWorkspace({
           title="API, Affiliate & Partnership"
           description="Manage supplier APIs, affiliate programs, and partnerships."
         >
+          <ApiAffiliateCallScript />
           <AffiliateCallList />
         </GoalDisclosure>
       ),

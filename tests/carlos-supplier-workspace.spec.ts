@@ -16,6 +16,7 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
     managerShell,
     workspace,
     catalog,
+    scripts,
   ] = await Promise.all([
     readFile(path.join(root, "app/owner/partnerships/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/partnerships/actions.ts"), "utf8"),
@@ -26,6 +27,7 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/supplier-partnership-workspace.tsx"), "utf8"),
     readFile(path.join(root, "lib/supplier-partners/catalog.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/carlos-outreach-scripts.tsx"), "utf8"),
   ]);
 
   expect(page).toContain('requireStaffProfile("suppliers")');
@@ -42,6 +44,13 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(deliveryStore).not.toContain("createAdminClient");
   expect(managerShell).not.toContain('href: "/owner/partnerships"');
   expect(goalsPage).toContain('title="Build Supplier Relationships"');
+  expect(goalsPage).toContain("<SupplierRelationshipScripts />");
+  expect(goalsPage.match(/<ApiAffiliateCallScript \/>/g)?.length).toBe(2);
+  expect(scripts).toContain("Supplier call");
+  expect(scripts).toContain("Contractor call");
+  expect(scripts).toContain("API, affiliate & partnership call");
+  expect(scripts).toContain("Who handles API access, affiliate partnerships, or contractor programs");
+  expect(scripts).toContain("product catalog API, affiliate program, or partner account");
   expect(page).toContain('body: { action: "status" }');
   expect(actions).toContain('action: "send_email"');
   expect(managerShell).toContain("...(access.suppliers ? [");

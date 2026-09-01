@@ -219,8 +219,8 @@ test("David quote challenge is private, persistent, and action focused", async (
   expect(page).toContain('if (!context.access.owner) redirect');
   expect(tracker).toContain("Beat Your Material Quote");
   expect(tracker).toContain("Collect 20 real quotes");
-  expect(tracker).toContain("Supplier call script");
-  expect(tracker).toContain("Contractor call script");
+  expect(tracker).not.toContain("Supplier call script");
+  expect(tracker).not.toContain("Contractor call script");
   expect(tracker).toContain("Call 5 suppliers first");
   expect(tracker).toContain("Then call 20 contractors");
   expect(tracker).toContain("updateQuoteGrowthMetricAction");
