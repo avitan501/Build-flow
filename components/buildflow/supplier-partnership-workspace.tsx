@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Folder, Star } from "lucide-react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { sendSupplierPartnerEmailAction, updateSupplierPartnerAction } from "@/app/owner/partnerships/actions";
 import {
@@ -53,8 +53,6 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
   const [notice, setNotice] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  const selected = partners.find((partner) => partner.slug === selectedSlug) || partners[0];
-  const selectedProgress = selected ? progress[selected.slug] : null;
   const shows = useMemo(() => ["All", ...Array.from(new Set(partners.map((partner) => partner.show)))], [partners]);
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -68,11 +66,8 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
     });
   }, [partners, progress, query, showFilter, statusFilter, supplierFolder]);
 
-  useEffect(() => {
-    if (filtered.length && !filtered.some((partner) => partner.slug === selectedSlug)) {
-      setSelectedSlug(filtered[0].slug);
-    }
-  }, [filtered, selectedSlug]);
+  const selected = filtered.find((partner) => partner.slug === selectedSlug) || filtered[0];
+  const selectedProgress = selected ? progress[selected.slug] : null;
 
   const counts = useMemo(() => ({
     total: partners.length,
