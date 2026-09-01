@@ -21,6 +21,7 @@ export type AffiliateCallTarget = {
     type: "phone" | "email" | "form";
   }>;
   currentSituation?: string;
+  statusLabel?: string;
 };
 
 type TargetOptions = Pick<AffiliateCallTarget, "askFor" | "callRoute" | "contactLevel"> & {
@@ -143,7 +144,7 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     contactHref: "tel:+18445694776",
     contactType: "phone",
     askFor: "Pro Service Desk, then Creator or developer escalation",
-    callRoute: "Wait for the CJ affiliate team reply, then use the exact Lowe's website-publisher application they provide.",
+    callRoute: "Wait for the CJ team’s response. Follow up after one week if unanswered.",
     contactLevel: "Dedicated team",
     category: "Building materials, tools, appliances and home improvement",
     priority: "A",
@@ -172,7 +173,8 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     priority: "A",
     programUrl: "https://www.homedepot.com/c/SF_MS_The_Home_Depot_Affiliate_Program",
     programStatus: "Official program",
-    currentSituation: "Impact approved AvantiaBuild as a publisher. The separate Home Depot campaign application was received Aug 27 and remains under review. Impact Support was emailed Aug 31 for routing to the Home Depot reviewer.",
+    statusLabel: "Applied — Not Approved",
+    currentSituation: "AvantiaBuild’s Impact publisher account 7653928 is approved, but Home Depot requires separate brand approval. Campaign 8154 / brand 1213441 was received Aug 27 and remains under review. Impact Support was emailed Aug 31. There is no separate Home Depot affiliate login.",
     contactMethods: [
       { label: "Impact Support", detail: "publisher.growth@impact.com", href: "mailto:publisher.growth@impact.com", type: "email" },
       { label: "Affiliate page", detail: "Home Depot application", href: "https://www.homedepot.com/c/SF_MS_The_Home_Depot_Affiliate_Program", type: "form" },
@@ -211,7 +213,7 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     contactHref: "mailto:affiliates-help-ext@wal-mart.com",
     contactType: "email",
     askFor: "Walmart Affiliates Team",
-    callRoute: "Send the due application follow-up, then use the affiliate portal contact route if no decision arrives.",
+    callRoute: "Wait for Walmart Affiliate Support. The portal may still require an email or phone verification code.",
     contactLevel: "Dedicated team",
     category: "Home improvement, tools, appliances and general merchandise",
     priority: "A",
@@ -233,7 +235,7 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     contactHref: "tel:+18882221785",
     contactType: "phone",
     askFor: "Professional sales or affiliate partnerships",
-    callRoute: "Follow up with the affiliate team, then ask Ferguson customer support to route AvantiaBuild to the Ferguson Home / Build.com affiliate owner in Impact.",
+    callRoute: "Wait for the affiliate team. If unanswered, use Ferguson customer support and professional sales as alternate routes.",
     contactLevel: "Dedicated team",
     category: "Plumbing, HVAC, kitchen, bath and mechanical supplies",
     priority: "A",
@@ -279,7 +281,7 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     contactHref: "tel:+18662905334",
     contactType: "phone",
     askFor: "Impact affiliate-program manager",
-    callRoute: "The publisher account is approved; submit the separate Ace brand application in Impact.",
+    callRoute: "Wait for Ace’s direct campaign link or open the separate Ace campaign inside Impact.",
     contactLevel: "Network managed",
     category: "Hardware, paint, tools, plumbing and local-store products",
     priority: "A",
@@ -325,13 +327,13 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     contactHref: "tel:+18779922246",
     contactType: "phone",
     askFor: "Partner-program representative",
-    callRoute: "Ask for the cabinet partner program and the correct Impact application path for AvantiaBuild.",
+    callRoute: "Open the cabinet partner form or call the partner team. Record the application only after a submission confirmation exists.",
     contactLevel: "Pro or sales team",
     category: "Ready-to-assemble kitchen and bathroom cabinets",
     priority: "A",
     programUrl: "https://www.thertastore.com/partner-with-us",
     programStatus: "Official program",
-    currentSituation: "The partner-program route is identified, but no approval is recorded yet. This is a direct cabinet partnership rather than a general retailer affiliate application.",
+    currentSituation: "The official partner route is identified, but no submitted application or approval is verified.",
     contactMethods: [
       { label: "Partner team", detail: "877-992-2246", href: "tel:+18779922246", type: "phone" },
       { label: "Partner form", detail: "Open partner application", href: "https://www.thertastore.com/partner-with-us", type: "form" },

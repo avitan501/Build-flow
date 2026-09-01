@@ -282,7 +282,7 @@ export function AffiliateCallList({
                     <span
                       className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusStyle(savedStatus)}`}
                     >
-                      {savedStatus ?? "Not saved"}
+                      {target.statusLabel ?? savedStatus ?? "Not saved"}
                     </span>
                     <p className="mt-2 text-[10px] leading-4 text-slate-500">
                       Verified {shortDate(program?.last_verified_date ?? null)}
@@ -365,7 +365,7 @@ export function AffiliateCallList({
                   <span
                     className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${statusStyle(savedStatus)}`}
                   >
-                    {savedStatus ?? "Not saved"}
+                    {target.statusLabel ?? savedStatus ?? "Not saved"}
                   </span>
                 </div>
               </div>
