@@ -132,6 +132,10 @@ export async function routePhoneIntakeTaskAction(formData: FormData) {
     throw new Error("This phone task is no longer waiting for approval.");
   }
   const task = intakeTaskText(intake.proposal ?? {}, intake.message_text ?? "");
+  const recordType = typeof intake.proposal?.recordType === "string"
+    ? intake.proposal.recordType
+    : "task";
+  const itemKind = destination === "david" && recordType === "idea" ? "idea" : "task";
   const { error: insertError } = await context.supabase.from("website_work_items").insert({
     task_key: `phone-intake-${intakeId}`,
     title: task.title,
@@ -139,12 +143,12 @@ export async function routePhoneIntakeTaskAction(formData: FormData) {
     status: "open",
     assigned_agent: destination === "carlos" ? "Carlos" : "David",
     progress_percent: 0,
-    summary: "Approved phone intake task.",
+    summary: itemKind === "idea" ? "David's private idea." : "Approved phone intake task.",
     next_step: task.nextStep,
     source_chat_title: "Phone Intake",
     priority: 1,
     sort_order: 0,
-    item_kind: "task",
+    item_kind: itemKind,
     published_to_carlos: destination === "carlos",
   });
   if (insertError && insertError.code !== "23505") {

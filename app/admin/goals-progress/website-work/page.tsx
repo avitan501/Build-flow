@@ -36,7 +36,10 @@ function PhoneIntakeList({ intakes }: { intakes: PhoneIntake[] }) {
     <section className="overflow-hidden rounded-xl border border-sky-200 bg-white shadow-sm">
       <header className="flex items-center gap-3 border-b border-sky-100 bg-sky-50 px-4 py-3">
         <Bot className="h-4 w-4 text-[#0066cc]" />
-        <h2 className="min-w-0 flex-1 text-sm font-bold">Phone Intake</h2>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-bold">Phone Intake</h2>
+          <p className="mt-0.5 text-[11px] text-sky-700">Text “ADD …” from 347-567-5077. Use “ADD IDEA …” for Ideas.</p>
+        </div>
         <span className="text-xs font-semibold text-sky-700">{intakes.length}</span>
       </header>
       <div className="divide-y divide-slate-100">

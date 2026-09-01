@@ -19,6 +19,9 @@ test("trusted phone intake reads screenshots and safely joins follow-up messages
   expect(broker).toContain("trustedImageMedia(media).length > 0");
   expect(broker).toContain('"+15169398484"');
   expect(broker).toContain("isTrustedSmsCommandPhone(counterpartyPhone)");
+  expect(broker).toContain('"idea" | "material_request"');
+  expect(broker).toContain("ADD IDEA must use recordType idea");
+  expect(broker).toContain('commandType === "idea"');
 });
 
 test("supplier screenshots remain drafts until the owner approves them", () => {
@@ -90,8 +93,22 @@ test("Phone intake is flat inside David Dashboard and absent from Carlos", () =>
   expect(david).toContain("To Carlos");
   expect(david).toContain("deletePhoneIntakeAction");
   expect(david).toContain("TRUSTED_OWNER_SMS_PHONES");
+  expect(david).toContain("ADD IDEA");
+  expect(david).toContain("347-567-5077");
+  expect(david).toContain('value="david"');
   expect(david).not.toContain("ManagerNotificationCenter");
   expect(dashboard).not.toContain('label: "AI Phone Inbox"');
   expect(inbox).toContain('href="/admin/goals-progress"');
   expect(inbox).not.toContain("Supplier details were not included");
+});
+
+test("ADD IDEA routes to David's Ideas list while Carlos receives a task", async () => {
+  const actions = readFileSync(
+    path.join(root, "app/admin/goals-progress/website-work/actions.ts"),
+    "utf8",
+  );
+
+  expect(actions).toContain('destination === "david" && recordType === "idea"');
+  expect(actions).toContain('item_kind: itemKind');
+  expect(actions).toContain('published_to_carlos: destination === "carlos"');
 });
