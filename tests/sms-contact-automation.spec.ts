@@ -43,7 +43,7 @@ test("incoming client SMS automation keeps conversational context and blocks sen
     expect(isSmsOptOutMessage(phrase), phrase).toBe(true)
   }
   expect(broker).toContain("forbiddenAuto")
-  expect(broker).toContain("phone === TRUSTED_SMS_COMMAND_PHONE")
+  expect(broker).toContain("isTrustedSmsCommandPhone(phone)")
   expect(broker).toContain("likelyMaterialList")
   expect(broker).toContain("store: false")
   expect(broker).toContain("quality_check_sms_ai")

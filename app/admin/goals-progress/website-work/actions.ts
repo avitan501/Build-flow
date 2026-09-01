@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { requireManagerPortalProfile } from "@/lib/auth";
+import { isTrustedOwnerSmsPhone } from "@/lib/aura/trusted-owner-phones";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   createWebsiteWorkToken,
@@ -123,12 +124,11 @@ export async function routePhoneIntakeTaskAction(formData: FormData) {
   const admin = createAdminClient();
   const { data: intake, error: readError } = await admin
     .from("aura_intakes")
-    .select("message_text,proposal,status")
+    .select("message_text,proposal,status,sender_phone")
     .eq("id", intakeId)
     .eq("source", "sms")
-    .eq("sender_phone", "+13475675077")
-    .maybeSingle<{ message_text: string | null; proposal: Record<string, unknown> | null; status: string }>();
-  if (readError || !intake || !["pending", "needs_follow_up", "failed"].includes(intake.status)) {
+    .maybeSingle<{ message_text: string | null; proposal: Record<string, unknown> | null; status: string; sender_phone: string }>();
+  if (readError || !intake || !isTrustedOwnerSmsPhone(intake.sender_phone) || !["pending", "needs_follow_up", "failed"].includes(intake.status)) {
     throw new Error("This phone task is no longer waiting for approval.");
   }
   const task = intakeTaskText(intake.proposal ?? {}, intake.message_text ?? "");
@@ -171,7 +171,6 @@ export async function deletePhoneIntakeAction(formData: FormData) {
     .update({ status: "cancelled" })
     .eq("id", intakeId)
     .eq("source", "sms")
-    .eq("sender_phone", "+13475675077")
     .in("status", ["pending", "needs_follow_up", "failed"]);
   if (error) throw new Error("The phone task could not be deleted.");
   await admin.from("aura_audit_log").insert({

@@ -15,6 +15,7 @@ import {
 } from "@/components/buildflow/david-dashboard-board";
 import { WebsiteWorkPinForm } from "@/components/buildflow/website-work-pin-form";
 import { requireManagerPortalProfile } from "@/lib/auth";
+import { TRUSTED_OWNER_SMS_PHONES } from "@/lib/aura/trusted-owner-phones";
 import { createClient } from "@/lib/supabase/server";
 import {
   verifyWebsiteWorkToken,
@@ -95,7 +96,7 @@ export default async function DavidDashboardPage() {
       .from("aura_intakes")
       .select("id,message_text,proposal,status,ai_model,created_at")
       .eq("source", "sms")
-      .eq("sender_phone", "+13475675077")
+      .in("sender_phone", [...TRUSTED_OWNER_SMS_PHONES])
       .in("status", ["pending", "needs_follow_up", "failed"])
       .order("created_at", { ascending: false })
       .limit(30)

@@ -17,6 +17,8 @@ test("trusted phone intake reads screenshots and safely joins follow-up messages
   expect(broker).toContain("prior.missing_count > 0");
   expect(broker).toContain("continuation");
   expect(broker).toContain("trustedImageMedia(media).length > 0");
+  expect(broker).toContain('"+15169398484"');
+  expect(broker).toContain("isTrustedSmsCommandPhone(counterpartyPhone)");
 });
 
 test("supplier screenshots remain drafts until the owner approves them", () => {
@@ -87,6 +89,7 @@ test("Phone intake is flat inside David Dashboard and absent from Carlos", () =>
   expect(david).toContain("To David");
   expect(david).toContain("To Carlos");
   expect(david).toContain("deletePhoneIntakeAction");
+  expect(david).toContain("TRUSTED_OWNER_SMS_PHONES");
   expect(david).not.toContain("ManagerNotificationCenter");
   expect(dashboard).not.toContain('label: "AI Phone Inbox"');
   expect(inbox).toContain('href="/admin/goals-progress"');

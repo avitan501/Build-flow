@@ -6,8 +6,7 @@ import {
   confirmAuraIntakeByCode,
   createAuraIntake,
 } from "@/lib/aura/intake";
-
-const OWNER_ADD_PHONE = process.env.AURA_OWNER_ADD_PHONE || "+13475675077";
+import { isTrustedOwnerSmsPhone } from "@/lib/aura/trusted-owner-phones";
 
 export async function processAuraOwnerCommand(input: {
   from: string;
@@ -15,7 +14,7 @@ export async function processAuraOwnerCommand(input: {
   externalMessageId: string;
   rawPayload: unknown;
 }) {
-  if (input.from !== OWNER_ADD_PHONE || !input.body || !input.externalMessageId) return null;
+  if (!isTrustedOwnerSmsPhone(input.from) || !input.body || !input.externalMessageId) return null;
 
   const confirmation = /^(CONFIRM|CANCEL)\s+([A-Z0-9]{4,12})$/i.exec(input.body);
   if (confirmation) {

@@ -95,7 +95,14 @@ const STAFF_EMAILS = new Set([
   "info@fivetownsbuilders.com",
 ]);
 const TWO_CHAT_BUSINESS_PHONE = "+13479378665";
-const TRUSTED_SMS_COMMAND_PHONE = "+13475675077";
+const TRUSTED_SMS_COMMAND_PHONES = new Set([
+  "+13475675077",
+  "+15169398484",
+]);
+
+function isTrustedSmsCommandPhone(phone: string | null | undefined) {
+  return Boolean(phone && TRUSTED_SMS_COMMAND_PHONES.has(phone));
+}
 
 const secretNames = {
   twilioSid: "aura_twilio_account_sid",
@@ -4777,7 +4784,7 @@ async function processCustomerSmsAutomation(
 ) {
   if (
     (!body.trim() && trustedImageMedia(media).length === 0) ||
-    phone === TRUSTED_SMS_COMMAND_PHONE
+    isTrustedSmsCommandPhone(phone)
   )
     return;
   // A customer response always supersedes reminders from an older turn. Run
@@ -5981,7 +5988,7 @@ async function handleQuoWebhook(req: Request) {
       channel === "sms" &&
       direction === "incoming" &&
       counterpartyPhone &&
-      counterpartyPhone !== TRUSTED_SMS_COMMAND_PHONE
+      !isTrustedSmsCommandPhone(counterpartyPhone)
     ) {
       linkedContact = await ensureIncomingSmsContact(counterpartyPhone);
     }
@@ -6078,7 +6085,7 @@ async function handleQuoWebhook(req: Request) {
       eventType === "message.received" &&
       channel === "sms" &&
       direction === "incoming" &&
-      counterpartyPhone === TRUSTED_SMS_COMMAND_PHONE &&
+      isTrustedSmsCommandPhone(counterpartyPhone) &&
       (isTrustedSmsCommand(body) || trustedImageMedia(media).length > 0)
     ) {
       await createTrustedSmsIntake(
@@ -6087,6 +6094,7 @@ async function handleQuoWebhook(req: Request) {
         body,
         media,
         object.conversationId || null,
+        counterpartyPhone,
       );
     }
     await sql`
@@ -7626,6 +7634,7 @@ async function createTrustedSmsIntake(
   body: string | null,
   media: TrustedSmsMedia[] = [],
   conversationId: string | null = null,
+  senderPhone: string,
 ) {
   const externalMessageId = `quo:${activityId}`;
   const existing = await sql<
@@ -7645,7 +7654,7 @@ async function createTrustedSmsIntake(
     select id, message_text, raw_payload,
       jsonb_array_length(coalesce(proposal -> 'missingInformation', '[]'::jsonb))::int as missing_count
     from public.aura_intakes
-    where source = 'sms' and sender_phone = ${TRUSTED_SMS_COMMAND_PHONE}
+    where source = 'sms' and sender_phone = ${senderPhone}
       and status in ('pending', 'needs_follow_up')
       and external_message_id <> ${externalMessageId}
       and created_at >= now() - interval '5 minutes'
@@ -7706,7 +7715,7 @@ async function createTrustedSmsIntake(
     .toUpperCase();
   const rows = await sql<{ id: string }[]>`
     insert into public.aura_intakes (source, external_message_id, sender_phone, message_type, message_text, raw_payload, proposal, status, confirmation_code, ai_model)
-    values ('sms', ${externalMessageId}, ${TRUSTED_SMS_COMMAND_PHONE}, ${images.length ? "image" : "text"}, ${messageText}, ${sql.json({ provider: "quo", eventId, activityId, conversationId, media, messageParts: [messagePart] })}, ${sql.json(proposal)}, ${intakeStatus}, ${code}, ${model})
+    values ('sms', ${externalMessageId}, ${senderPhone}, ${images.length ? "image" : "text"}, ${messageText}, ${sql.json({ provider: "quo", eventId, activityId, conversationId, media, messageParts: [messagePart] })}, ${sql.json(proposal)}, ${intakeStatus}, ${code}, ${model})
     on conflict (external_message_id) where external_message_id is not null do update set
       message_text = excluded.message_text,
       proposal = case when aura_intakes.status = 'confirmed' then aura_intakes.proposal else excluded.proposal end,
@@ -8647,7 +8656,7 @@ Deno.serve(async (req: Request) => {
       const rows = await sql<{ record_type: string }[]>`
         select proposal ->> 'recordType' as record_type
         from public.aura_intakes
-        where id = ${intakeId}::uuid and source = 'sms' and sender_phone = ${TRUSTED_SMS_COMMAND_PHONE}
+        where id = ${intakeId}::uuid and source = 'sms' and sender_phone in ('+13475675077', '+15169398484')
         limit 1
       `;
       if (!rows[0]) return json({ error: "AI Inbox item not found." }, 404);
@@ -8688,7 +8697,7 @@ Deno.serve(async (req: Request) => {
         update public.aura_intakes
         set status = 'confirmed', confirmed_at = now(), confirmed_by = ${manager.user.id}::uuid, error_message = null,
             proposal = jsonb_set(proposal, '{result}', ${sql.json({ entityType: "supplier", id: supplierId })}, true)
-        where id = ${intakeId}::uuid and source = 'sms' and sender_phone = ${TRUSTED_SMS_COMMAND_PHONE}
+        where id = ${intakeId}::uuid and source = 'sms' and sender_phone in ('+13475675077', '+15169398484')
           and proposal ->> 'recordType' = 'supplier' and status in ('pending', 'needs_follow_up')
         returning id
       `;
@@ -8717,7 +8726,7 @@ Deno.serve(async (req: Request) => {
       const rows = intakeId
         ? await sql<{ id: string }[]>`
         update public.aura_intakes set status = 'failed', error_message = 'Creating approved material request'
-        where id = ${intakeId}::uuid and source = 'sms' and sender_phone = ${TRUSTED_SMS_COMMAND_PHONE}
+        where id = ${intakeId}::uuid and source = 'sms' and sender_phone in ('+13475675077', '+15169398484')
           and proposal ->> 'recordType' = 'material_request' and status in ('pending', 'needs_follow_up')
         returning id
       `
@@ -8813,7 +8822,7 @@ Deno.serve(async (req: Request) => {
       >`
         select id, message_text, status, raw_payload
         from public.aura_intakes
-        where id = ${intakeId}::uuid and source = 'sms' and sender_phone = ${TRUSTED_SMS_COMMAND_PHONE}
+        where id = ${intakeId}::uuid and source = 'sms' and sender_phone in ('+13475675077', '+15169398484')
         limit 1
       `;
       const intake = rows[0];

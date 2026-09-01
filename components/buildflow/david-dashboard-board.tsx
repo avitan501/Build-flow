@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import {
   createDavidDashboardItemAction,
@@ -45,10 +45,9 @@ export type DavidDashboardItem = {
 
 type EditableKind = "pain" | "idea";
 
-function PainRow({ item, pending, onRun, onRewrite, onDelete }: {
+function PainRow({ item, pending, onRewrite, onDelete }: {
   item: DavidDashboardItem;
   pending: boolean;
-  onRun: (action: () => Promise<{ ok: true } | { ok: false; error: string }>, success: string) => void;
   onRewrite: () => void;
   onDelete: () => void;
 }) {
@@ -56,16 +55,42 @@ function PainRow({ item, pending, onRun, onRewrite, onDelete }: {
   const [issue, setIssue] = useState(item.summary === "Pain David is resolving." ? "" : item.summary);
   const [resolution, setResolution] = useState(item.next_step ?? "");
   const [cost, setCost] = useState(item.resolution_cost == null ? "" : String(item.resolution_cost));
-  const save = () => onRun(
-    () => updateDavidDashboardItemAction({ id: item.id, title, issue, resolution, cost, kind: "pain" }),
-    "Pain updated.",
-  );
+  const [dirty, setDirty] = useState(false);
+  const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
+  const [saving, startSaving] = useTransition();
+  const versionRef = useRef(0);
+
+  function change(setter: (value: string) => void, value: string) {
+    setter(value);
+    versionRef.current += 1;
+    setDirty(true);
+    setSaveState("saving");
+  }
+
+  useEffect(() => {
+    if (!dirty || title.trim().length < 2) return;
+    const version = versionRef.current;
+    const timer = window.setTimeout(() => {
+      startSaving(async () => {
+        const result = await updateDavidDashboardItemAction({ id: item.id, title, issue, resolution, cost, kind: "pain" });
+        if (version !== versionRef.current) return;
+        if (!result.ok) {
+          setSaveState("error");
+          return;
+        }
+        setDirty(false);
+        setSaveState("saved");
+      });
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [cost, dirty, issue, item.id, resolution, title]);
+
   return <div className="grid min-w-[960px] grid-cols-[1.1fr_1.35fr_1.55fr_7.5rem_11rem] gap-2 border-t border-slate-100 px-3 py-2">
-    <input aria-label="Problem title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} className="min-h-10 rounded-md border border-slate-200 px-2.5 text-sm font-semibold outline-none focus:border-sky-400" />
-    <input aria-label="Issue" value={issue} onChange={(event) => setIssue(event.target.value)} maxLength={500} placeholder="What is wrong?" className="min-h-10 rounded-md border border-slate-200 px-2.5 text-sm outline-none focus:border-sky-400" />
-    <input aria-label="How I will resolve it" value={resolution} onChange={(event) => setResolution(event.target.value)} maxLength={500} placeholder="How will I resolve it?" className="min-h-10 rounded-md border border-slate-200 px-2.5 text-sm outline-none focus:border-sky-400" />
-    <label className="flex min-h-10 items-center rounded-md border border-slate-200 bg-white px-2 text-sm"><span className="text-slate-400">$</span><input aria-label="Resolution cost" inputMode="decimal" type="number" min="0" step="0.01" value={cost} onChange={(event) => setCost(event.target.value)} placeholder="0" className="min-w-0 flex-1 bg-transparent px-1 outline-none" /></label>
-    <div className="flex gap-1"><button type="button" disabled={pending || title.trim().length < 2} onClick={save} className="inline-flex h-10 flex-1 items-center justify-center gap-1 rounded-md bg-[#0071e3] px-2 text-xs font-bold text-white disabled:opacity-40"><Check className="h-4 w-4" />Save</button><button type="button" disabled={pending} onClick={onRewrite} aria-label="Rewrite pain with AI" title="Rewrite with AI" className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-sky-200 bg-sky-50 text-[#0066cc]"><Sparkles className="h-4 w-4" /></button><button type="button" disabled={pending} onClick={onDelete} aria-label="Delete pain" className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-rose-200 text-rose-600"><Trash2 className="h-4 w-4" /></button></div>
+    <input aria-label="Problem title" value={title} onChange={(event) => change(setTitle, event.target.value)} maxLength={160} className="min-h-10 rounded-md border border-slate-200 px-2.5 text-sm font-semibold outline-none focus:border-sky-400" />
+    <input aria-label="Issue" value={issue} onChange={(event) => change(setIssue, event.target.value)} maxLength={500} placeholder="What is wrong?" className="min-h-10 rounded-md border border-slate-200 px-2.5 text-sm outline-none focus:border-sky-400" />
+    <input aria-label="How I will resolve it" value={resolution} onChange={(event) => change(setResolution, event.target.value)} maxLength={500} placeholder="How will I resolve it?" className="min-h-10 rounded-md border border-slate-200 px-2.5 text-sm outline-none focus:border-sky-400" />
+    <label className="flex min-h-10 items-center rounded-md border border-slate-200 bg-white px-2 text-sm"><span className="text-slate-400">$</span><input aria-label="Resolution cost" inputMode="decimal" type="number" min="0" step="0.01" value={cost} onChange={(event) => change(setCost, event.target.value)} placeholder="0" className="min-w-0 flex-1 bg-transparent px-1 outline-none" /></label>
+    <div className="flex items-center justify-end gap-1"><span role="status" className={`mr-auto text-[10px] font-semibold ${saveState === "error" ? "text-rose-600" : "text-slate-400"}`}>{saving || saveState === "saving" ? "Saving…" : saveState === "error" ? "Try again" : "Saved"}</span><button type="button" disabled={pending || saving} onClick={onRewrite} aria-label="Rewrite pain with AI" title="Rewrite with AI" className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-sky-200 bg-sky-50 text-[#0066cc]"><Sparkles className="h-4 w-4" /></button><button type="button" disabled={pending || saving} onClick={onDelete} aria-label="Delete pain" className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-rose-200 text-rose-600"><Trash2 className="h-4 w-4" /></button></div>
   </div>;
 }
 
@@ -422,7 +447,7 @@ export function DavidDashboardBoard({
             <label className="flex min-h-10 items-center rounded-md border border-slate-300 bg-white px-2 text-sm"><span className="text-slate-400">$</span><input aria-label="New pain cost" inputMode="decimal" type="number" min="0" step="0.01" value={painCost} onChange={(event) => setPainCost(event.target.value)} placeholder="0" className="min-w-0 flex-1 bg-transparent px-1 outline-none" /></label>
             <button type="button" disabled={pending || painTitle.trim().length < 2} onClick={() => add("pain")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40"><Plus className="h-4 w-4" />Add</button>
           </div>
-          {pains.map((item) => <PainRow key={`${item.id}-${item.updated_at}`} item={item} pending={pending} onRun={run} onRewrite={() => rewrite(item, "pain")} onDelete={() => remove(item, "pain")} />)}
+          {pains.map((item) => <PainRow key={`${item.id}-${item.updated_at}`} item={item} pending={pending} onRewrite={() => rewrite(item, "pain")} onDelete={() => remove(item, "pain")} />)}
           {!pains.length ? (
             <p className="min-w-[960px] px-4 py-6 text-center text-sm text-slate-500">
               No pains added yet.

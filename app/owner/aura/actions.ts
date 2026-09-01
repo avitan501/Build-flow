@@ -22,6 +22,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url";
 import { addAuraCommunicationLinks } from "@/lib/aura/email-links";
 import { extractAuraProposal } from "@/lib/aura/intake";
+import { isTrustedOwnerSmsPhone } from "@/lib/aura/trusted-owner-phones";
 
 function requireUuid(value: FormDataEntryValue | null) {
   const id = typeof value === "string" ? value.trim() : "";
@@ -721,7 +722,7 @@ export async function reviewTrustedSmsIntakeAction(formData: FormData) {
     );
   if (
     intake.source !== "sms" ||
-    intake.sender_phone !== "+13475675077" ||
+    !isTrustedOwnerSmsPhone(intake.sender_phone) ||
     !intake.message_text ||
     !["pending", "needs_follow_up", "failed"].includes(intake.status)
   )

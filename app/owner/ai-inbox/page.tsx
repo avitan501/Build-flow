@@ -14,6 +14,7 @@ import {
 import Link from "next/link";
 
 import { requireOwnerAccess } from "@/lib/owner-access";
+import { TRUSTED_OWNER_SMS_PHONES } from "@/lib/aura/trusted-owner-phones";
 
 import {
   cancelAuraIntakeAction,
@@ -255,7 +256,7 @@ export default async function AiInboxPage({
         "id,message_text,proposal,status,ai_model,created_at,updated_at,raw_payload",
       )
       .eq("source", "sms")
-      .eq("sender_phone", "+13475675077")
+      .in("sender_phone", [...TRUSTED_OWNER_SMS_PHONES])
       .order("created_at", { ascending: false })
       .limit(100),
     supabase

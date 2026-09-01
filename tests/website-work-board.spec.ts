@@ -139,6 +139,8 @@ test("David Dashboard is owner-authenticated, PIN-gated, and publishes explicitl
   expect(visibilityMigration).toContain("carlos-fixed-supplier-partnerships");
   expect(visibilityMigration).toContain("carlos-fixed-abc-supply-demo");
   expect(board).toContain("Pain I&apos;m Resolving");
+  expect(board).toContain("Saving…");
+  expect(board).not.toContain(">Save</button><button type=\"button\" disabled={pending} onClick={onRewrite}");
   expect(board).toContain("AI Task Archive");
   expect(board).toContain("Ideas");
   expect(board).toContain("Rewrite with AI");
