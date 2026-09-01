@@ -62,8 +62,15 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(networkPage).toContain("loadSupplierNetworkOptions");
   expect(networkActions).toContain('requireStaffProfile("suppliers")');
   expect(networkActions).toContain("SUPPLIER_NETWORK_CHANNELS");
+  expect(networkActions).toContain(
+    'stage: z.enum(["approved", "contact", "more"])',
+  );
+  expect(networkActions).toContain("note: z.string().trim().max(2000)");
+  expect(networkActions).toContain("hidden: z.boolean()");
   expect(networkOptions).toContain('.from("manager_goals")');
   expect(networkOptions).toContain("supplier_network_options_v1:");
+  expect(networkOptions).toContain("SupplierNetworkOverride");
+  expect(networkOptions).toContain("parsed.hidden");
   expect(goalsPage).not.toContain(
     'count: SUPPLIER_PARTNERS.length, href: "/owner/partnerships"',
   );

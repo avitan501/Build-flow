@@ -11,7 +11,7 @@ import { loadSupplierNetworkOptions } from "@/lib/supplier-network-options";
 
 export default async function SupplierNetworkPage() {
   const { supabase, access } = await requireManagerPortalProfile();
-  const [progress, programResult, channelOverrides] = await Promise.all([
+  const [progress, programResult, overrides] = await Promise.all([
     loadSupplierPartnerProgress(supabase).catch(() => ({})),
     access.owner
       ? supabase
@@ -27,7 +27,7 @@ export default async function SupplierNetworkPage() {
     programs: programResult.data ?? [],
     partners: SUPPLIER_PARTNERS,
     progress,
-    channelOverrides,
+    overrides,
   });
 
   return (

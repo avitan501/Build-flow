@@ -18,6 +18,14 @@ export type SupplierNetworkChannel = (typeof SUPPLIER_NETWORK_CHANNELS)[number];
 export type SupplierNetworkStage = "approved" | "contact" | "more";
 export type SupplierNetworkSource = "Show" | "Friends" | "Google" | "Nearby";
 
+export type SupplierNetworkOverride = {
+  channels?: SupplierNetworkChannel[];
+  stage?: SupplierNetworkStage;
+  status?: string;
+  note?: string;
+  hidden?: boolean;
+};
+
 export type SupplierNetworkRow = {
   key: string;
   name: string;
@@ -30,6 +38,8 @@ export type SupplierNetworkRow = {
   phoneHref: string;
   link: string;
   status: string;
+  note: string;
+  hidden: boolean;
 };
 
 function canonicalName(value: string) {
@@ -174,6 +184,8 @@ function mergeRow(
       incoming.stage === "contact" || incoming.stage === "approved"
         ? incoming.status
         : current.status,
+    note: current.note || incoming.note,
+    hidden: current.hidden || incoming.hidden,
   });
 }
 
@@ -181,7 +193,7 @@ export function buildSupplierNetwork(input: {
   programs?: AffiliateProgram[];
   partners: SupplierPartner[];
   progress: Record<string, SupplierPartnerProgress>;
-  channelOverrides?: Record<string, SupplierNetworkChannel[]>;
+  overrides?: Record<string, SupplierNetworkOverride>;
 }) {
   const rows = new Map<string, SupplierNetworkRow>();
 
@@ -201,6 +213,8 @@ export function buildSupplierNetwork(input: {
       phoneHref: target.phoneHref,
       link: target.programUrl,
       status: "Research ready",
+      note: "",
+      hidden: false,
     });
   }
 
@@ -218,6 +232,8 @@ export function buildSupplierNetwork(input: {
       phoneHref: "",
       link: program.application_url,
       status: program.affiliate_status,
+      note: "",
+      hidden: false,
     });
   }
 
@@ -244,12 +260,22 @@ export function buildSupplierNetwork(input: {
       phoneHref: `tel:${partner.phone.replace(/[^0-9+]/g, "")}`,
       link: partner.programUrl || partner.website,
       status: itemProgress.status,
+      note: "",
+      hidden: false,
     });
   }
 
-  for (const [key, channels] of Object.entries(input.channelOverrides ?? {})) {
+  for (const [key, override] of Object.entries(input.overrides ?? {})) {
     const row = rows.get(key);
-    if (row) rows.set(key, { ...row, channels });
+    if (!row) continue;
+    rows.set(key, {
+      ...row,
+      channels: override.channels ?? row.channels,
+      stage: override.stage ?? row.stage,
+      status: override.status ?? row.status,
+      note: override.note ?? row.note,
+      hidden: override.hidden ?? row.hidden,
+    });
   }
 
   return [...rows.values()].sort((a, b) => {

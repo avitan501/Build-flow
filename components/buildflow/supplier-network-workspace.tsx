@@ -1,13 +1,22 @@
 "use client";
 
-import { ExternalLink, Phone, Search, X } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import {
+  ExternalLink,
+  MoreHorizontal,
+  Phone,
+  RotateCcw,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 
-import { updateSupplierNetworkOptionsAction } from "@/app/admin/supplier-network/actions";
+import { updateSupplierNetworkRowAction } from "@/app/admin/supplier-network/actions";
 
 import {
   SUPPLIER_NETWORK_CHANNELS,
   type SupplierNetworkChannel,
+  type SupplierNetworkOverride,
   type SupplierNetworkRow,
   type SupplierNetworkSource,
   type SupplierNetworkStage,
@@ -46,6 +55,25 @@ const STAGES: Array<{ key: SupplierNetworkStage; label: string }> = [
   { key: "more", label: "More suppliers" },
 ];
 
+const STATUS_OPTIONS = [
+  "Not contacted",
+  "Research ready",
+  "Contacted",
+  "Waiting for reply",
+  "In Progress",
+  "Applied",
+  "Approved",
+  "Paused",
+  "Not a fit",
+] as const;
+
+type SupplierNetworkView = SupplierNetworkStage | "hidden";
+
+const VIEWS: Array<{ key: SupplierNetworkView; label: string }> = [
+  ...STAGES,
+  { key: "hidden", label: "Hidden" },
+];
+
 const SOURCES: SupplierNetworkSource[] = [
   "Show",
   "Friends",
@@ -58,75 +86,120 @@ export function SupplierNetworkWorkspace({
 }: {
   rows: SupplierNetworkRow[];
 }) {
-  const [stage, setStage] = useState<SupplierNetworkStage>("contact");
+  const [stage, setStage] = useState<SupplierNetworkView>("contact");
   const [source, setSource] = useState<SupplierNetworkSource | "All">("All");
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<{
     key: string;
-    mode: "details" | "options";
+    mode: "actions" | "options";
   } | null>(null);
-  const [channelSelections, setChannelSelections] = useState<
-    Record<string, SupplierNetworkChannel[]>
-  >(() => Object.fromEntries(rows.map((row) => [row.key, row.channels])));
+  const [rowEdits, setRowEdits] = useState<
+    Record<string, Required<SupplierNetworkOverride>>
+  >(() =>
+    Object.fromEntries(
+      rows.map((row) => [
+        row.key,
+        {
+          channels: row.channels,
+          stage: row.stage,
+          status: row.status,
+          note: row.note,
+          hidden: row.hidden,
+        },
+      ]),
+    ),
+  );
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
 
-  function toggleChannel(
+  const currentEdit = useCallback(
+    (row: SupplierNetworkRow) =>
+      rowEdits[row.key] ?? {
+        channels: row.channels,
+        stage: row.stage,
+        status: row.status,
+        note: row.note,
+        hidden: row.hidden,
+      },
+    [rowEdits],
+  );
+
+  function saveRow(
     row: SupplierNetworkRow,
-    channel: SupplierNetworkChannel,
+    next: Required<SupplierNetworkOverride>,
+    previous = currentEdit(row),
   ) {
-    const current = channelSelections[row.key] ?? row.channels;
-    const next = current.includes(channel)
-      ? current.filter((item) => item !== channel)
-      : [...current, channel];
-    setChannelSelections((value) => ({ ...value, [row.key]: next }));
+    setRowEdits((value) => ({ ...value, [row.key]: next }));
     setSaveError(null);
     startSaving(async () => {
-      const result = await updateSupplierNetworkOptionsAction({
+      const result = await updateSupplierNetworkRowAction({
         key: row.key,
         supplierName: row.name,
-        channels: next,
+        ...next,
       });
       if (!result.ok) {
-        setChannelSelections((value) => ({ ...value, [row.key]: current }));
+        setRowEdits((value) => ({ ...value, [row.key]: previous }));
         setSaveError(result.error);
       }
     });
   }
 
+  function toggleChannel(
+    row: SupplierNetworkRow,
+    channel: SupplierNetworkChannel,
+  ) {
+    const current = currentEdit(row);
+    const channels = current.channels.includes(channel)
+      ? current.channels.filter((item) => item !== channel)
+      : [...current.channels, channel];
+    saveRow(row, { ...current, channels }, current);
+  }
+
   const stageCounts = useMemo(
     () =>
       Object.fromEntries(
-        STAGES.map((item) => [
+        VIEWS.map((item) => [
           item.key,
-          rows.filter((row) => row.stage === item.key).length,
+          rows.filter((row) => {
+            const edit = currentEdit(row);
+            return item.key === "hidden"
+              ? edit.hidden
+              : !edit.hidden && edit.stage === item.key;
+          }).length,
         ]),
       ),
-    [rows],
+    [currentEdit, rows],
   );
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
-    return rows.filter(
-      (row) =>
-        row.stage === stage &&
+    return rows.filter((row) => {
+      const edit = currentEdit(row);
+      return (
+        (stage === "hidden"
+          ? edit.hidden
+          : !edit.hidden && edit.stage === stage) &&
         (source === "All" || row.sources.includes(source)) &&
         (!search ||
-          `${row.name} ${row.departments} ${row.ask}`
+          `${row.name} ${row.departments} ${row.ask} ${edit.note}`
             .toLowerCase()
-            .includes(search)),
-    );
-  }, [query, rows, source, stage]);
+            .includes(search))
+      );
+    });
+  }, [currentEdit, query, rows, source, stage]);
 
   return (
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-slate-50 p-1.5">
-        {STAGES.map((item) => (
+        {VIEWS.map((item) => (
           <button
             key={item.key}
             type="button"
             onClick={() => {
               setStage(item.key);
+              setSource("All");
               setExpanded(null);
+              setDeleteConfirm(null);
             }}
             className={`h-8 rounded-md px-2.5 text-[11px] font-semibold ${stage === item.key ? "bg-slate-950 text-white" : "bg-white text-slate-600 hover:bg-slate-100"}`}
           >
@@ -185,10 +258,11 @@ export function SupplierNetworkWorkspace({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.map((row) => {
+              const edit = currentEdit(row);
               const open = expanded?.key === row.key;
               const optionsOpen = open && expanded.mode === "options";
-              const selectedChannels =
-                channelSelections[row.key] ?? row.channels;
+              const actionsOpen = open && expanded.mode === "actions";
+              const selectedChannels = edit.channels;
               return (
                 <tr
                   key={row.key}
@@ -242,21 +316,22 @@ export function SupplierNetworkWorkspace({
                         {row.ask}
                       </span>
                       <span className="truncate px-2 text-[9px] font-semibold text-slate-500">
-                        {row.status}
+                        {edit.status}
                       </span>
                       <button
                         type="button"
                         onClick={() =>
                           setExpanded(
-                            open && !optionsOpen
+                            actionsOpen
                               ? null
-                              : { key: row.key, mode: "details" },
+                              : { key: row.key, mode: "actions" },
                           )
                         }
-                        className="mx-auto inline-flex h-8 w-8 items-center justify-center rounded text-xs font-bold text-[#0066cc] hover:bg-sky-50"
-                        aria-label={`Open ${row.name}`}
+                        className={`mx-auto inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${actionsOpen ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-[#0066cc] hover:bg-sky-50"}`}
+                        aria-label={`Actions for ${row.name}`}
+                        aria-expanded={actionsOpen}
                       >
-                        {open && !optionsOpen ? "−" : "+"}
+                        <MoreHorizontal className="h-4 w-4" />
                       </button>
                     </div>
                     {optionsOpen ? (
@@ -292,43 +367,160 @@ export function SupplierNetworkWorkspace({
                           </p>
                         ) : null}
                       </div>
-                    ) : open ? (
-                      <div className="grid gap-2 border-t border-sky-100 bg-sky-50/50 px-2 py-2 sm:grid-cols-[8rem_1fr_auto] sm:items-center">
-                        <div className="flex flex-wrap gap-1">
-                          {row.sources.map((item) => (
-                            <span
-                              key={item}
-                              className="rounded bg-white px-1.5 py-1 text-[9px] font-bold text-slate-500 ring-1 ring-slate-200"
+                    ) : actionsOpen ? (
+                      <div className="border-t border-sky-100 bg-sky-50/50 px-2 py-2">
+                        {edit.hidden ? (
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-semibold text-slate-600">
+                              This supplier is hidden from the working lists.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                saveRow(row, { ...edit, hidden: false })
+                              }
+                              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-slate-950 px-3 text-[10px] font-bold text-white"
                             >
-                              {item}
-                            </span>
-                          ))}
+                              <RotateCcw className="h-3.5 w-3.5" /> Restore
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="grid gap-2 lg:grid-cols-[10rem_11rem_minmax(14rem,1fr)_auto] lg:items-end">
+                            <label className="grid gap-1 text-[9px] font-bold uppercase tracking-wide text-slate-500">
+                              Move to
+                              <select
+                                value={edit.stage}
+                                onChange={(event) =>
+                                  saveRow(row, {
+                                    ...edit,
+                                    stage: event.target
+                                      .value as SupplierNetworkStage,
+                                  })
+                                }
+                                className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold normal-case text-slate-900 outline-none focus:border-[#0071e3]"
+                              >
+                                {STAGES.map((item) => (
+                                  <option key={item.key} value={item.key}>
+                                    {item.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="grid gap-1 text-[9px] font-bold uppercase tracking-wide text-slate-500">
+                              Status
+                              <select
+                                value={edit.status}
+                                onChange={(event) =>
+                                  saveRow(row, {
+                                    ...edit,
+                                    status: event.target.value,
+                                  })
+                                }
+                                className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold normal-case text-slate-900 outline-none focus:border-[#0071e3]"
+                              >
+                                {!STATUS_OPTIONS.includes(
+                                  edit.status as (typeof STATUS_OPTIONS)[number],
+                                ) ? (
+                                  <option value={edit.status}>
+                                    {edit.status}
+                                  </option>
+                                ) : null}
+                                {STATUS_OPTIONS.map((item) => (
+                                  <option key={item} value={item}>
+                                    {item}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="grid gap-1 text-[9px] font-bold uppercase tracking-wide text-slate-500">
+                              Note
+                              <textarea
+                                value={edit.note}
+                                onChange={(event) =>
+                                  setRowEdits((value) => ({
+                                    ...value,
+                                    [row.key]: {
+                                      ...edit,
+                                      note: event.target.value,
+                                    },
+                                  }))
+                                }
+                                onBlur={() => saveRow(row, currentEdit(row))}
+                                placeholder="Write a short note…"
+                                rows={1}
+                                className="min-h-9 resize-y rounded-md border border-slate-200 bg-white px-2 py-2 text-xs font-medium normal-case text-slate-900 outline-none focus:border-[#0071e3]"
+                              />
+                            </label>
+                            <div className="flex items-center gap-1 lg:justify-end">
+                              {row.phoneHref ? (
+                                <a
+                                  href={row.phoneHref}
+                                  className="inline-flex h-8 items-center gap-1 rounded-md bg-slate-950 px-2 text-[10px] font-bold text-white"
+                                >
+                                  <Phone className="h-3 w-3" />
+                                  {row.phone}
+                                </a>
+                              ) : null}
+                              {row.link ? (
+                                <a
+                                  href={row.link}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#0066cc]"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  Program
+                                </a>
+                              ) : null}
+                              {deleteConfirm === row.key ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeleteConfirm(null)}
+                                    className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-600"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDeleteConfirm(null);
+                                      saveRow(row, { ...edit, hidden: true });
+                                    }}
+                                    className="inline-flex h-8 items-center gap-1 rounded-md bg-rose-600 px-2 text-[10px] font-bold text-white"
+                                  >
+                                    <Trash2 className="h-3 w-3" /> Erase
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteConfirm(row.key)}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-rose-200 bg-white text-rose-600"
+                                  aria-label={`Erase ${row.name}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        <div className="mt-2 flex items-start justify-between gap-3 border-t border-sky-100 pt-2">
+                          <p className="line-clamp-2 text-[10px] leading-4 text-slate-600">
+                            <strong>Ask:</strong> {row.ask}
+                          </p>
+                          <span className="shrink-0 text-[9px] font-semibold text-slate-500">
+                            {saving ? "Saving…" : "Saved automatically"}
+                          </span>
                         </div>
-                        <p className="text-xs leading-5 text-slate-700">
-                          <strong>Say / ask:</strong> {row.ask}
-                        </p>
-                        <div className="flex gap-1">
-                          {row.phoneHref ? (
-                            <a
-                              href={row.phoneHref}
-                              className="inline-flex h-8 items-center gap-1 rounded-md bg-slate-950 px-2 text-[10px] font-bold text-white"
-                            >
-                              <Phone className="h-3 w-3" />
-                              {row.phone}
-                            </a>
-                          ) : null}
-                          {row.link ? (
-                            <a
-                              href={row.link}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#0066cc]"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                              Program
-                            </a>
-                          ) : null}
-                        </div>
+                        {saveError ? (
+                          <p
+                            className="mt-1 text-[10px] font-semibold text-rose-700"
+                            role="alert"
+                          >
+                            {saveError}
+                          </p>
+                        ) : null}
                       </div>
                     ) : null}
                   </td>

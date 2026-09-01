@@ -488,8 +488,15 @@ test("Carlos has one compact deduplicated supplier network while the research li
   expect(component).toContain("CHANNEL_DESCRIPTIONS");
   expect(component).toContain("Direct catalog, stock, or pricing connection");
   expect(component).toContain("Choose options for");
-  expect(component).toContain("updateSupplierNetworkOptionsAction");
+  expect(component).toContain("updateSupplierNetworkRowAction");
   expect(component).toContain("Saved automatically");
+  expect(component).toContain("Actions for");
+  expect(component).toContain("Move to");
+  expect(component).toContain("Write a short note");
+  expect(component).toContain("Waiting for reply");
+  expect(component).toContain('label: "Hidden"');
+  expect(component).toContain("Restore");
+  expect(component).toContain("deleteConfirm === row.key");
   expect(component).toContain("SUPPLIER_NETWORK_CHANNELS.map");
   expect(component).toContain("min-h-11");
   expect(network).toContain("function canonicalName");
