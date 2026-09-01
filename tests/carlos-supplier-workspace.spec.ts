@@ -61,6 +61,9 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(workspace).toContain('useState<"important" | "other">("important")');
   expect(workspace).toContain("Important Suppliers ({counts.important})");
   expect(workspace).toContain("Other Suppliers ({counts.other})");
+  expect(workspace).toContain('const importantPartners = partners.filter((partner) => progress[partner.slug]?.important)');
+  expect(workspace).toContain('["Important suppliers", counts.total]');
+  expect(workspace).not.toContain('["Companies", counts.total]');
   expect(workspace).toContain('type="checkbox" checked={itemProgress.important}');
   expect(catalog).toContain("important: false");
 });

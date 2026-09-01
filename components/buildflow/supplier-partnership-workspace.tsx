@@ -69,14 +69,17 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
   const selected = filtered.find((partner) => partner.slug === selectedSlug) || filtered[0];
   const selectedProgress = selected ? progress[selected.slug] : null;
 
-  const counts = useMemo(() => ({
-    total: partners.length,
-    important: partners.filter((partner) => progress[partner.slug]?.important).length,
-    other: partners.filter((partner) => !progress[partner.slug]?.important).length,
-    action: partners.filter((partner) => ["Call needed", "Research ready", "Email drafted"].includes(progress[partner.slug]?.status)).length,
-    active: partners.filter((partner) => ["Applied", "In progress", "Follow-up"].includes(progress[partner.slug]?.status)).length,
-    won: partners.filter((partner) => ["Approved", "Set up"].includes(progress[partner.slug]?.status)).length,
-  }), [partners, progress]);
+  const counts = useMemo(() => {
+    const importantPartners = partners.filter((partner) => progress[partner.slug]?.important);
+    return {
+      total: importantPartners.length,
+      important: importantPartners.length,
+      other: partners.length - importantPartners.length,
+      action: importantPartners.filter((partner) => ["Call needed", "Research ready", "Email drafted"].includes(progress[partner.slug]?.status)).length,
+      active: importantPartners.filter((partner) => ["Applied", "In progress", "Follow-up"].includes(progress[partner.slug]?.status)).length,
+      won: importantPartners.filter((partner) => ["Approved", "Set up"].includes(progress[partner.slug]?.status)).length,
+    };
+  }, [partners, progress]);
 
   function save(input: Parameters<typeof updateSupplierPartnerAction>[0], successMessage: string) {
     setNotice("");
@@ -142,7 +145,7 @@ export function SupplierPartnershipWorkspace({ partners, initialProgress, emailS
             </div>
           </div>
           <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {[["Companies", counts.total], ["Ready for Carlos", counts.action], ["Applied / follow-up", counts.active], ["Approved / set up", counts.won]].map(([label, value]) => (
+            {[["Important suppliers", counts.total], ["Ready for Carlos", counts.action], ["Applied / follow-up", counts.active], ["Approved / set up", counts.won]].map(([label, value]) => (
               <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.07] p-4"><div className="text-2xl font-semibold">{value}</div><div className="mt-1 text-xs text-slate-300">{label}</div></div>
             ))}
           </div>
