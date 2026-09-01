@@ -39,22 +39,38 @@ function canonicalName(value: string) {
     .replace(/lowe['’]s creator|lowe['’]s pro/g, "lowes")
     .replace(/build\.com \/ ferguson home|ferguson home/g, "ferguson")
     .replace(/abc supply api \/ integration partnership/g, "abc supply")
-    .replace(/builders firstsource \/ mybldr \(trade account\)/g, "builders firstsource")
+    .replace(
+      /builders firstsource \/ mybldr \(trade account\)/g,
+      "builders firstsource",
+    )
     .replace(/u\.s\. electrical services \/ lade/g, "us electrical services")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
   return normalized;
 }
 
-function addChannel(channels: Set<SupplierNetworkChannel>, channel: SupplierNetworkChannel, when: boolean) {
+function addChannel(
+  channels: Set<SupplierNetworkChannel>,
+  channel: SupplierNetworkChannel,
+  when: boolean,
+) {
   if (when) channels.add(channel);
 }
 
 function programChannels(program: AffiliateProgram): SupplierNetworkChannel[] {
-  const text = `${program.supplier_name} ${program.affiliate_network} ${program.published_commission} ${program.next_action} ${program.api_status}`.toLowerCase();
+  const text =
+    `${program.supplier_name} ${program.affiliate_network} ${program.published_commission} ${program.next_action} ${program.api_status}`.toLowerCase();
   const channels = new Set<SupplierNetworkChannel>();
-  addChannel(channels, "API", program.api_status !== "Not Started" || text.includes("api"));
-  addChannel(channels, "Affiliate", Boolean(program.affiliate_network) || text.includes("affiliate"));
+  addChannel(
+    channels,
+    "API",
+    program.api_status !== "Not Started" || text.includes("api"),
+  );
+  addChannel(
+    channels,
+    "Affiliate",
+    Boolean(program.affiliate_network) || text.includes("affiliate"),
+  );
   addChannel(channels, "Partner", text.includes("partner"));
   addChannel(channels, "Referral", text.includes("referral"));
   addChannel(channels, "Trade", text.includes("trade") || text.includes("pro"));
@@ -65,46 +81,99 @@ function programChannels(program: AffiliateProgram): SupplierNetworkChannel[] {
 function callTargetChannels(text: string): SupplierNetworkChannel[] {
   const value = text.toLowerCase();
   const channels = new Set<SupplierNetworkChannel>();
-  addChannel(channels, "API", value.includes("api") || value.includes("product feed"));
-  addChannel(channels, "Affiliate", value.includes("affiliate") || value.includes("impact") || value.includes("awin") || value.includes("cj"));
+  addChannel(
+    channels,
+    "API",
+    value.includes("api") || value.includes("product feed"),
+  );
+  addChannel(
+    channels,
+    "Affiliate",
+    value.includes("affiliate") ||
+      value.includes("impact") ||
+      value.includes("awin") ||
+      value.includes("cj"),
+  );
   addChannel(channels, "Partner", value.includes("partner"));
   addChannel(channels, "Referral", value.includes("referral"));
-  addChannel(channels, "Trade", value.includes("trade") || value.includes("contractor") || value.includes("pro"));
-  addChannel(channels, "Resale", /resell|wholesale|bulk|drop.?ship/.test(value));
+  addChannel(
+    channels,
+    "Trade",
+    value.includes("trade") ||
+      value.includes("contractor") ||
+      value.includes("pro"),
+  );
+  addChannel(
+    channels,
+    "Resale",
+    /resell|wholesale|bulk|drop.?ship/.test(value),
+  );
   return [...channels];
 }
 
-function programStage(status: AffiliateProgram["affiliate_status"]): SupplierNetworkStage {
+function programStage(
+  status: AffiliateProgram["affiliate_status"],
+): SupplierNetworkStage {
   if (status === "Approved" || status === "Set Up") return "approved";
-  if (status === "Applied" || status === "In Progress" || status === "Waitlisted") return "contact";
+  if (
+    status === "Applied" ||
+    status === "In Progress" ||
+    status === "Waitlisted"
+  )
+    return "contact";
   return "more";
 }
 
-function partnerStage(status: SupplierPartnerProgress["status"]): SupplierNetworkStage {
+function partnerStage(
+  status: SupplierPartnerProgress["status"],
+): SupplierNetworkStage {
   if (status === "Approved" || status === "Set up") return "approved";
-  if (["Email drafted", "Applied", "In progress", "Follow-up"].includes(status)) return "contact";
+  if (["Email drafted", "Applied", "In progress", "Follow-up"].includes(status))
+    return "contact";
   return "more";
 }
 
-function mergeRow(map: Map<string, SupplierNetworkRow>, incoming: SupplierNetworkRow) {
+function mergeRow(
+  map: Map<string, SupplierNetworkRow>,
+  incoming: SupplierNetworkRow,
+) {
   const current = map.get(incoming.key);
   if (!current) {
     map.set(incoming.key, incoming);
     return;
   }
-  const stageRank: Record<SupplierNetworkStage, number> = { more: 0, contact: 1, approved: 2 };
+  const stageRank: Record<SupplierNetworkStage, number> = {
+    more: 0,
+    contact: 1,
+    approved: 2,
+  };
   map.set(incoming.key, {
     ...current,
-    name: current.name.length <= incoming.name.length ? current.name : incoming.name,
-    departments: current.departments.length >= incoming.departments.length ? current.departments : incoming.departments,
+    name:
+      current.name.length <= incoming.name.length
+        ? current.name
+        : incoming.name,
+    departments:
+      current.departments.length >= incoming.departments.length
+        ? current.departments
+        : incoming.departments,
     channels: Array.from(new Set([...current.channels, ...incoming.channels])),
     sources: Array.from(new Set([...current.sources, ...incoming.sources])),
-    stage: stageRank[incoming.stage] > stageRank[current.stage] ? incoming.stage : current.stage,
-    ask: incoming.stage === "contact" || incoming.stage === "approved" ? incoming.ask : current.ask || incoming.ask,
+    stage:
+      stageRank[incoming.stage] > stageRank[current.stage]
+        ? incoming.stage
+        : current.stage,
+    ask:
+      incoming.stage === "contact" || incoming.stage === "approved"
+        ? incoming.ask
+        : current.ask || incoming.ask,
     phone: current.phone || incoming.phone,
     phoneHref: current.phoneHref || incoming.phoneHref,
     link: current.link || incoming.link,
-    status: incoming.stage === "contact" || incoming.stage === "approved" ? incoming.status : current.status,
+    status:
+      incoming.stage === "contact" || incoming.stage === "approved"
+        ? incoming.status
+        : current.status,
   });
 }
 
@@ -112,6 +181,7 @@ export function buildSupplierNetwork(input: {
   programs?: AffiliateProgram[];
   partners: SupplierPartner[];
   progress: Record<string, SupplierPartnerProgress>;
+  channelOverrides?: Record<string, SupplierNetworkChannel[]>;
 }) {
   const rows = new Map<string, SupplierNetworkRow>();
 
@@ -121,7 +191,9 @@ export function buildSupplierNetwork(input: {
       key,
       name: target.company,
       departments: target.category,
-      channels: callTargetChannels(`${target.askFor} ${target.callRoute} ${target.programStatus}`),
+      channels: callTargetChannels(
+        `${target.askFor} ${target.callRoute} ${target.programStatus}`,
+      ),
       stage: "more",
       sources: ["Google"],
       ask: target.recommendedScript || `${target.askFor}. ${target.callRoute}`,
@@ -158,7 +230,13 @@ export function buildSupplierNetwork(input: {
       key,
       name: partner.company,
       departments: partner.products,
-      channels: Array.from(new Set(["Partner" as const, "Trade" as const, ...callTargetChannels(text)])),
+      channels: Array.from(
+        new Set([
+          "Partner" as const,
+          "Trade" as const,
+          ...callTargetChannels(text),
+        ]),
+      ),
       stage: partnerStage(itemProgress.status),
       sources: ["Show"],
       ask: partner.bestAsk || partner.callScript,
@@ -169,8 +247,19 @@ export function buildSupplierNetwork(input: {
     });
   }
 
+  for (const [key, channels] of Object.entries(input.channelOverrides ?? {})) {
+    const row = rows.get(key);
+    if (row) rows.set(key, { ...row, channels });
+  }
+
   return [...rows.values()].sort((a, b) => {
-    const stageRank: Record<SupplierNetworkStage, number> = { approved: 0, contact: 1, more: 2 };
-    return stageRank[a.stage] - stageRank[b.stage] || a.name.localeCompare(b.name);
+    const stageRank: Record<SupplierNetworkStage, number> = {
+      approved: 0,
+      contact: 1,
+      more: 2,
+    };
+    return (
+      stageRank[a.stage] - stageRank[b.stage] || a.name.localeCompare(b.name)
+    );
   });
 }

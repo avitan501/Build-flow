@@ -19,6 +19,8 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
     catalog,
     scripts,
     affiliateCalls,
+    networkActions,
+    networkOptions,
   ] = await Promise.all([
     readFile(path.join(root, "app/owner/partnerships/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/partnerships/actions.ts"), "utf8"),
@@ -28,10 +30,21 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
     readFile(path.join(root, "app/owner/delivery-requests/page.tsx"), "utf8"),
     readFile(path.join(root, "lib/delivery-requests.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
-    readFile(path.join(root, "components/buildflow/supplier-partnership-workspace.tsx"), "utf8"),
+    readFile(
+      path.join(
+        root,
+        "components/buildflow/supplier-partnership-workspace.tsx",
+      ),
+      "utf8",
+    ),
     readFile(path.join(root, "lib/supplier-partners/catalog.ts"), "utf8"),
-    readFile(path.join(root, "components/buildflow/carlos-outreach-scripts.tsx"), "utf8"),
+    readFile(
+      path.join(root, "components/buildflow/carlos-outreach-scripts.tsx"),
+      "utf8",
+    ),
     readFile(path.join(root, "lib/affiliate-call-list.ts"), "utf8"),
+    readFile(path.join(root, "app/admin/supplier-network/actions.ts"), "utf8"),
+    readFile(path.join(root, "lib/supplier-network-options.ts"), "utf8"),
   ]);
 
   expect(page).toContain('requireStaffProfile("suppliers")');
@@ -46,7 +59,14 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(networkPage).toContain("SupplierNetworkWorkspace");
   expect(networkPage).toContain("buildSupplierNetwork");
   expect(networkPage).toContain("loadSupplierPartnerProgress");
-  expect(goalsPage).not.toContain('count: SUPPLIER_PARTNERS.length, href: "/owner/partnerships"');
+  expect(networkPage).toContain("loadSupplierNetworkOptions");
+  expect(networkActions).toContain('requireStaffProfile("suppliers")');
+  expect(networkActions).toContain("SUPPLIER_NETWORK_CHANNELS");
+  expect(networkOptions).toContain('.from("manager_goals")');
+  expect(networkOptions).toContain("supplier_network_options_v1:");
+  expect(goalsPage).not.toContain(
+    'count: SUPPLIER_PARTNERS.length, href: "/owner/partnerships"',
+  );
   expect(networkPage).toContain("SUPPLIER_PARTNERS");
   expect(deliveryPage).toContain('requireStaffProfile("suppliers")');
   expect(deliveryPage).toContain("loadDeliveryRequests(supabase)");
@@ -59,16 +79,21 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(scripts).toContain("Contractor call");
   expect(scripts).toContain("export function ContractorCallScript()");
   expect(scripts).toContain("HighlightedScript");
-  expect(scripts).toContain('bg-sky-100 text-sky-950');
-  expect(scripts).toContain('bg-amber-100 text-amber-950');
-  expect(scripts).toContain('bg-emerald-100 text-emerald-950');
+  expect(scripts).toContain("bg-sky-100 text-sky-950");
+  expect(scripts).toContain("bg-amber-100 text-amber-950");
+  expect(scripts).toContain("bg-emerald-100 text-emerald-950");
   expect(scripts).toContain('<details className="group overflow-hidden');
-  const supplierScriptSection = scripts.split("export function SupplierRelationshipScripts()")[1]?.split("export function ContractorCallScript()")[0] ?? "";
+  const supplierScriptSection =
+    scripts
+      .split("export function SupplierRelationshipScripts()")[1]
+      ?.split("export function ContractorCallScript()")[0] ?? "";
   expect(supplierScriptSection).not.toContain('title="Contractor call"');
   expect(goalsPage).not.toContain("ApiAffiliateCallScript");
   expect((affiliateCalls.match(/recommendedScript:/g) ?? []).length).toBe(10);
   expect((affiliateCalls.match(/termsFit:/g) ?? []).length).toBe(10);
-  expect(affiliateCalls).toContain("third-party aggregator integration for mutual ABC customers");
+  expect(affiliateCalls).toContain(
+    "third-party aggregator integration for mutual ABC customers",
+  );
   expect(affiliateCalls).toContain("traditional Lowe's affiliate team at CJ");
   expect(page).toContain('body: { action: "status" }');
   expect(actions).toContain('action: "send_email"');
@@ -77,10 +102,14 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(workspace).toContain('useState<"important" | "other">("important")');
   expect(workspace).toContain("Important Suppliers ({counts.important})");
   expect(workspace).toContain("Other Suppliers ({counts.other})");
-  expect(workspace).toContain('const importantPartners = partners.filter((partner) => progress[partner.slug]?.important)');
+  expect(workspace).toContain(
+    "const importantPartners = partners.filter((partner) => progress[partner.slug]?.important)",
+  );
   expect(workspace).toContain('["Important suppliers", counts.total]');
   expect(workspace).not.toContain('["Companies", counts.total]');
-  expect(workspace).toContain('type="checkbox" checked={itemProgress.important}');
+  expect(workspace).toContain(
+    'type="checkbox" checked={itemProgress.important}',
+  );
   expect(catalog).toContain("important: false");
 });
 

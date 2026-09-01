@@ -39,7 +39,10 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
       "utf8",
     ),
     readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
-    readFile(path.join(root, "components/buildflow/manager-goal-priority-select.tsx"), "utf8"),
+    readFile(
+      path.join(root, "components/buildflow/manager-goal-priority-select.tsx"),
+      "utf8",
+    ),
   ]);
 
   expect(page).toContain("await requireManagerPortalProfile()");
@@ -61,9 +64,9 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain("<ClientTargetCallGuide />");
   expect(page).not.toContain('title="API, Affiliate & Partnership"');
   expect(page).toContain("<GoalNumber>2</GoalNumber>");
-  expect(page).toContain('number={3}');
-  expect(page).not.toContain('number={4}');
-  expect(page).not.toContain('number={5}');
+  expect(page).toContain("number={3}");
+  expect(page).not.toContain("number={4}");
+  expect(page).not.toContain("number={5}");
   expect(page).toContain("<ManagerGoalPrioritySelect");
   expect(page).toContain('priorityFor("client-target")');
   expect(actions).toContain("setFixedManagerGoalPriorityAction");
@@ -309,7 +312,9 @@ test("outreach leads remain separate from clients and store relationship level a
   expect(
     actions.match(/supabase\.from\("manager_outreach_leads"\)/g)?.length,
   ).toBe(5);
-  expect(actions).toContain("export async function updateOutreachLeadRelationshipAction");
+  expect(actions).toContain(
+    "export async function updateOutreachLeadRelationshipAction",
+  );
   expect(actions).toContain('error: "Enter a valid phone number."');
   expect(actions).toContain("relationship_level: relationshipLevel");
   expect(actions).toContain("preferred_language: preferredLanguage");
@@ -482,6 +487,9 @@ test("Carlos has one compact deduplicated supplier network while the research li
   }
   expect(component).toContain("CHANNEL_DESCRIPTIONS");
   expect(component).toContain("Direct catalog, stock, or pricing connection");
+  expect(component).toContain("Choose options for");
+  expect(component).toContain("updateSupplierNetworkOptionsAction");
+  expect(component).toContain("Saved automatically");
   expect(component).toContain("SUPPLIER_NETWORK_CHANNELS.map");
   expect(component).toContain("min-h-11");
   expect(network).toContain("function canonicalName");
