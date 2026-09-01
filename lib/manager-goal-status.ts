@@ -4,7 +4,7 @@ export const SYSTEM_GOAL_STATUS_PREFIX = "system_goal_status:"
 
 export const CARLOS_FIXED_GOALS = {
   "client-target": "Client Target",
-  "supplier-affiliate-program": "API, Affiliate & Partnership",
+  "supplier-affiliate-program": "Build Supplier Network",
   "supplier-partnerships": "Supplier Partnership",
   "abc-supply-demo": "ABC Supply Demo",
 } as const

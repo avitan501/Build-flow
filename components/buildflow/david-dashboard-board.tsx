@@ -226,14 +226,17 @@ export function DavidDashboardBoard({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const tasks = items.filter((item) => item.item_kind === "task");
+  const tasks = items.filter(
+    (item) =>
+      item.item_kind === "task" &&
+      item.task_key !== "carlos-fixed-supplier-partnerships",
+  );
   const pains = items.filter((item) => item.item_kind === "pain");
   const ideas = items.filter((item) => item.item_kind === "idea");
   const keptTaskKeys = new Set(["whatsapp-coexistence", "abc-private-pricing"]);
   const carlosFixedTaskKeys = new Set([
     "carlos-fixed-client-target",
     "carlos-fixed-supplier-affiliate-program",
-    "carlos-fixed-supplier-partnerships",
     "carlos-fixed-abc-supply-demo",
   ]);
   const davidTasks = tasks.filter(
