@@ -1,15 +1,20 @@
 "use client"
 
-import { Plus, Trash2, UserPlus, X } from "lucide-react"
+import { Paperclip, Plus, Trash2, UserPlus, X } from "lucide-react"
 import { useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
-import type { CreateClientRequestResult, ManagerNewClientInput, ManagerRequestLineInput } from "@/app/admin/users/actions"
+import type { CreateClientRequestResult, ManagerNewClientInput, ManagerRequestLineInput, ManagerRequestUploadInput } from "@/app/admin/users/actions"
+import { createClient } from "@/lib/supabase/client"
+import { getSupabasePublicEnv } from "@/lib/supabase/env"
 
 type CustomerOption = { id: string; name: string; email: string | null }
 type RequestLine = ManagerRequestLineInput & { key: string }
 
 const UNITS = ["each", "pieces", "sheets", "boxes", "bags", "bundles", "rolls", "linear ft.", "sq. ft.", "gallons", "yards"]
+const MAX_ATTACHMENT_COUNT = 10
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024
+const ALLOWED_ATTACHMENT_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"])
 
 function emptyLine(): RequestLine {
   return { key: crypto.randomUUID(), name: "", quantity: 1, unit: "each" }
@@ -37,6 +42,7 @@ export function ManagerCreateClientRequest({
   const [freeText, setFreeText] = useState("")
   const [lines, setLines] = useState<RequestLine[]>([{ key: "initial", name: "", quantity: 1, unit: "each" }])
   const [notes, setNotes] = useState("")
+  const [attachments, setAttachments] = useState<File[]>([])
   const [showNotes, setShowNotes] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -52,11 +58,37 @@ export function ManagerCreateClientRequest({
     setError(null)
   }
 
+  function chooseAttachments(files: File[]) {
+    const next = [...attachments, ...files].slice(0, MAX_ATTACHMENT_COUNT)
+    const unsupported = next.find((file) => !ALLOWED_ATTACHMENT_TYPES.has(file.type))
+    const oversized = next.find((file) => file.size > MAX_ATTACHMENT_SIZE)
+    if (attachments.length + files.length > MAX_ATTACHMENT_COUNT) return setError(`Add up to ${MAX_ATTACHMENT_COUNT} photos or files.`)
+    if (unsupported) return setError(`${unsupported.name} is not supported. Add a PDF, JPG, PNG, or WebP file.`)
+    if (oversized) return setError(`${oversized.name} is too large. Keep each file under 25 MB.`)
+    setAttachments(next)
+    setError(null)
+  }
+
+  async function uploadAttachment(file: File): Promise<ManagerRequestUploadInput> {
+    const { url, anonKey } = getSupabasePublicEnv()
+    const response = await fetch(`${url}/functions/v1/public-quote-intake`, {
+      method: "POST",
+      headers: { apikey: anonKey, authorization: `Bearer ${anonKey}`, "content-type": "application/json" },
+      body: JSON.stringify({ action: "prepare_upload", filename: file.name, type: file.type, size: file.size }),
+    })
+    const prepared = await response.json().catch(() => null) as { path?: string; token?: string; error?: string } | null
+    if (!response.ok || !prepared?.path || !prepared.token) throw new Error(prepared?.error || `Could not prepare ${file.name}.`)
+    const { error: uploadError } = await createClient().storage.from("project-uploads").uploadToSignedUrl(prepared.path, prepared.token, file, { contentType: file.type, upsert: false })
+    if (uploadError) throw new Error(`Could not upload ${file.name}. Please try again.`)
+    return { storagePath: prepared.path, filename: file.name, type: file.type, size: file.size }
+  }
+
   function submit() {
     setError(null)
     startTransition(async () => {
       let result: CreateClientRequestResult
       try {
+        const uploadedAttachments = await Promise.all(attachments.map(uploadAttachment))
         const response = await fetch("/api/admin/client-requests", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -68,11 +100,12 @@ export function ManagerCreateClientRequest({
             notes,
             freeText: entryMode === "paste" ? freeText : "",
             lines: entryMode === "items" ? lines : [],
+            attachments: uploadedAttachments,
           }),
         })
         result = await response.json() as CreateClientRequestResult
-      } catch {
-        setError("The request could not reach the server. Please try again.")
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "The request could not reach the server. Please try again.")
         return
       }
       if (!result.ok) {
@@ -120,6 +153,11 @@ export function ManagerCreateClientRequest({
             </div>
 
             <div className="mt-4">{showNotes ? <label className="grid gap-1.5 text-sm font-semibold text-slate-800">Request notes <span className="font-normal text-slate-400">(optional)</span><textarea rows={3} maxLength={4000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Delivery, brand, timing, or other instructions" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" /></label> : <button type="button" onClick={() => setShowNotes(true)} className="text-sm font-semibold text-[#0066cc]">+ Add optional notes</button>}</div>
+            <div className="mt-4 rounded-xl border border-sky-100 bg-sky-50/60 p-3">
+              <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-sky-300 bg-white px-3 text-sm font-bold text-[#0066cc]"><Paperclip className="h-4 w-4" /><span>Add photos or files</span><input type="file" accept="image/jpeg,image/png,image/webp,.pdf" multiple className="sr-only" onChange={(event) => { chooseAttachments(Array.from(event.target.files ?? [])); event.currentTarget.value = "" }} /></label>
+              <p className="mt-1.5 text-xs text-slate-500">Photos, PDF, or plans · up to 10 files</p>
+              {attachments.length ? <div className="mt-2 grid gap-1.5">{attachments.map((file, index) => <div key={`${file.name}-${file.lastModified}-${index}`} className="flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3"><span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{file.name}</span><button type="button" onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${file.name}`} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>)}</div> : null}
+            </div>
             {error ? <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{error}</div> : null}
           </div>
 

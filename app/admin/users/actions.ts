@@ -1,10 +1,12 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { requireAdminProfile, requireStaffProfile } from "@/lib/auth";
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { buildProjectUploadStoragePath, PROJECT_UPLOAD_ALLOWED_MIME_TYPES, PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/projects";
 
 type AdminAction = "approve" | "reject" | "suspend" | "change_role";
 type RoleValue = "admin" | "staff" | "client";
@@ -13,6 +15,7 @@ type DeleteManagerRecordResult =
   | { ok: true; warning?: string }
   | { ok: false; error: string };
 export type ManagerRequestLineInput = { name: string; quantity: number; unit: string };
+export type ManagerRequestUploadInput = { storagePath: string; filename: string; type: string; size: number };
 export type ManagerNewClientInput = { fullName: string; email: string; phone?: string; companyName?: string; preferredLanguage?: "en" | "es" };
 export type CreateClientRequestResult =
   | { ok: true; requestId: string; customerId: string }
@@ -322,6 +325,7 @@ export async function createRequestForClientAction(input: {
   lines: ManagerRequestLineInput[];
   freeText?: string;
   notes?: string;
+  attachments?: ManagerRequestUploadInput[];
 }): Promise<CreateClientRequestResult> {
   const { supabase } = await requireStaffProfile("customers");
   let customerId = input.customerId?.trim() || "";
@@ -377,6 +381,13 @@ export async function createRequestForClientAction(input: {
   }
 
   const notes = input.notes?.trim().slice(0, 4000) || "";
+  const attachments = Array.isArray(input.attachments) ? input.attachments : [];
+  if (attachments.length > 10) return { ok: false, error: "Add up to 10 photos or files." };
+  const allowedTypes = new Set<string>(PROJECT_UPLOAD_ALLOWED_MIME_TYPES);
+  const invalidAttachment = attachments.find((attachment) =>
+    !attachment.storagePath.startsWith("public-intake/") || attachment.storagePath.includes("..") || !attachment.filename.trim() || !allowedTypes.has(attachment.type) || !Number.isFinite(attachment.size) || attachment.size <= 0 || attachment.size > PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES
+  );
+  if (invalidAttachment) return { ok: false, error: "One of the attached photos or files is invalid. Remove it and try again." };
   const requestDetails = [freeText, notes ? `Additional notes:\n${notes}` : ""].filter(Boolean).join("\n\n").slice(0, 4000);
   const storedLines = freeText ? [{ name: "Free-text material list", quantity: 1, unit: "request" }] : lines;
   const requestTitle = input.title?.trim().slice(0, 180) || (department ? `${department} request` : "Material request");
@@ -393,6 +404,30 @@ export async function createRequestForClientAction(input: {
     if (message.includes("client_not_available")) return { ok: false, error: "This customer account is not available." };
     if (message.includes("invalid_material")) return { ok: false, error: "Check every material name, quantity, and unit." };
     return { ok: false, error: "The request could not be saved. No order was submitted." };
+  }
+
+  if (attachments.length) {
+    const admin = createAdminClient();
+    const { data: createdRequest } = await supabase.from("quote_requests").select("id,project_id,owner_id").eq("id", String(requestId)).maybeSingle<{ id: string; project_id: string; owner_id: string }>();
+    const storedPaths: string[] = [];
+    try {
+      if (!createdRequest?.project_id || !createdRequest.owner_id) throw new Error("request_attachment_target_missing");
+      for (const attachment of attachments) {
+        const { data: fileInfo, error: infoError } = await admin.storage.from("project-uploads").info(attachment.storagePath);
+        if (infoError || !fileInfo || fileInfo.size !== attachment.size || fileInfo.contentType !== attachment.type) throw new Error("request_attachment_verification_failed");
+        const finalPath = buildProjectUploadStoragePath({ ownerId: createdRequest.owner_id, projectId: createdRequest.project_id, uploadId: randomUUID(), fileName: attachment.filename });
+        const { error: moveError } = await admin.storage.from("project-uploads").move(attachment.storagePath, finalPath);
+        if (moveError) throw new Error("request_attachment_move_failed");
+        storedPaths.push(finalPath);
+        const { error: recordError } = await admin.from("quote_request_attachments").insert({ request_id: createdRequest.id, project_id: createdRequest.project_id, owner_id: createdRequest.owner_id, file_name: attachment.filename.trim().slice(0, 180), file_path: finalPath, file_type: attachment.type, file_size: attachment.size });
+        if (recordError) throw new Error("request_attachment_record_failed");
+      }
+    } catch (cause) {
+      if (storedPaths.length) await admin.storage.from("project-uploads").remove(storedPaths);
+      await admin.from("quote_requests").delete().eq("id", String(requestId));
+      console.error("Manager request attachment storage failed", cause);
+      return { ok: false, error: "The photo could not be attached, so the request was not created. Please try again." };
+    }
   }
 
   if (freeText) {

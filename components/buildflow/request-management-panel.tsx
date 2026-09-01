@@ -265,7 +265,7 @@ export function RequestManagementPanel({
     const chosen = new Set([...recommendedSupplierIds, ...supplierIds])
     const result = await saveRequestSupplierPlanAction({ requestId, managerNotes, suppliers: [...chosen].map((supplierId) => ({ supplierId, isRecommended: recommendedSupplierIds.includes(supplierId), shouldContact: supplierIds.includes(supplierId) })) })
     setFeedbackError(!result.ok)
-    setFeedback(result.ok ? "Request notes and supplier choices saved." : result.error)
+    setFeedback(result.ok ? "Supplier pricing note and choices saved." : result.error)
     return result.ok
   }
 
@@ -441,13 +441,17 @@ export function RequestManagementPanel({
         <div className="border-t border-slate-200 p-4">
           {comparisons.length ? <p className="mb-3 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">Supplier prices are shown beside each request item in the table above.</p> : <p className="mb-3 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">Supplier answers and prices will appear beside each item after a quote is linked.</p>}
 
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3">
+            <label className="grid gap-1.5 text-sm font-bold text-slate-800">Supplier pricing note<textarea value={managerNotes} onChange={(event) => setManagerNotes(event.target.value)} rows={2} maxLength={5000} placeholder="What should Carlos or the supplier know before pricing?" className="resize-y rounded-lg border border-amber-300 bg-white px-3 py-2.5 font-normal text-slate-950 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100" /></label>
+            <div className="mt-2 flex justify-end"><button type="button" onClick={() => startTransition(async () => { await saveSupplierPlan() })} disabled={pending} className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#17304f] px-3 text-xs font-bold text-white disabled:opacity-50">Save pricing note</button></div>
+          </div>
+
           <RelatedEmailTimeline title="Supplier email" emails={supplierEmails} />
 
           <details id="supplier-routing" className="group/route scroll-mt-24 rounded-md border border-slate-200 bg-slate-50">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold"><span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-sky-700" />Find Supplier</span><ChevronDown className="h-4 w-4 text-slate-400 transition group-open/route:rotate-180" /></summary>
             <div className="border-t border-slate-200 p-3">
           <div className="mt-3 grid gap-3">
-            <label className="grid gap-1.5 text-sm font-semibold text-slate-700">Request notes<textarea value={managerNotes} onChange={(event) => setManagerNotes(event.target.value)} rows={3} maxLength={5000} placeholder="Add instructions for Carlos, supplier preferences, delivery details, or anything important." className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal text-slate-950 outline-none focus:border-sky-500" /></label>
             <fieldset>
               <legend className="text-sm font-semibold text-slate-700">Recommended suppliers</legend>
               <p className="mt-0.5 text-xs text-slate-500">Mark suppliers worth considering, then choose exactly who Carlos should contact.</p>
@@ -455,7 +459,7 @@ export function RequestManagementPanel({
                 {availableSuppliers.length ? availableSuppliers.map((entry) => <div key={entry.id} className="flex min-h-12 items-center gap-3 rounded-md px-2 text-sm hover:bg-slate-50"><label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"><input aria-label={`Recommend ${entry.name}`} type="checkbox" checked={recommendedSupplierIds.includes(entry.id)} onChange={() => toggleRecommendedSupplier(entry.id)} className="h-4 w-4 rounded border-slate-300 accent-amber-500" /><span className="min-w-0"><span className="block truncate font-semibold">{entry.name}</span><span className="block truncate text-xs text-slate-500">{entry.email || entry.phone || entry.whatsapp || "No contact method"} · {(entry.trustLevel || "not-reviewed").replaceAll("-", " ")}</span></span></label><label className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold"><input aria-label={`Contact ${entry.name}`} type="checkbox" checked={supplierIds.includes(entry.id)} onChange={() => toggleSupplier(entry.id)} className="h-4 w-4 rounded border-slate-300 accent-[#0071e3]" />Contact</label></div>) : <p className="px-2 py-4 text-center text-sm leading-5 text-slate-500">No suppliers are saved in Supplier Directory.</p>}
               </div>
             </fieldset>
-            <div className="flex flex-wrap justify-end gap-2"><button type="button" onClick={() => startTransition(async () => { await saveSupplierPlan() })} disabled={pending} className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 disabled:opacity-50">Save notes & choices</button><button type="button" onClick={createSupplierRequest} disabled={!supplierIds.length || pending} className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-[#0071e3] px-3 text-xs font-bold text-white disabled:opacity-50"><Route className="h-4 w-4" />Contact {supplierIds.length || ""} supplier{supplierIds.length === 1 ? "" : "s"}</button></div>
+            <div className="flex flex-wrap justify-end gap-2"><button type="button" onClick={() => startTransition(async () => { await saveSupplierPlan() })} disabled={pending} className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 disabled:opacity-50">Save supplier choices</button><button type="button" onClick={createSupplierRequest} disabled={!supplierIds.length || pending} className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-[#0071e3] px-3 text-xs font-bold text-white disabled:opacity-50"><Route className="h-4 w-4" />Contact {supplierIds.length || ""} supplier{supplierIds.length === 1 ? "" : "s"}</button></div>
           </div>
           {packages.length ? <div className="mt-4 border-t border-slate-200 pt-3"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Current routes</p><div className="mt-2 grid gap-2">{packages.map((pkg) => <div key={pkg.id} className="flex items-center justify-between gap-3 text-sm"><span className="font-semibold">{pkg.department}</span><span className="text-right text-slate-600">{suppliers.find((entry) => entry.id === pkg.supplier_id)?.name || "Not assigned"} · {pkg.status.replaceAll("_", " ")}</span></div>)}</div></div> : null}
             </div>

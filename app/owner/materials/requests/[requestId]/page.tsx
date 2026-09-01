@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status";
+import { RequestAttachmentUploader } from "@/components/buildflow/request-attachment-uploader";
 import { RequestClientContact } from "@/components/buildflow/request-client-contact";
 import { RequestMaterialWorktable, type RequestWorktableComparison } from "@/components/buildflow/request-material-worktable";
 import {
@@ -486,6 +487,7 @@ export default async function OwnerMaterialRequestPage({
           organizationCompletedLabel={organizationCompletedLabel}
           supplierComparisons={supplierComparisonTables}
         />
+        <RequestAttachmentUploader requestId={request.id} />
         {signedFiles.length || (responses ?? []).length ? (
           <details
             className="mt-2 rounded-lg border border-slate-200 bg-white"

@@ -1,16 +1,20 @@
 "use server"
 
+import { randomUUID } from "node:crypto"
 import { revalidatePath } from "next/cache"
 
 import { sendManagerClientReplyEmail } from "@/lib/cart-submission-email"
 import { requireStaffProfile } from "@/lib/auth"
+import { buildProjectUploadStoragePath, PROJECT_UPLOAD_ALLOWED_MIME_TYPES, PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/projects"
 import { generateRequestClientQuotePdf, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 type ReplyResult = { ok: true; providerId: string | null } | { ok: false; error: string }
 type QuoteResult = { ok: true; providerId: string | null; pdfBase64?: string; fileName?: string } | { ok: false; error: string }
 type DeliveryScheduleResult = { ok: true } | { ok: false; error: string }
 export type MaterialRequestStatus = "submitted" | "in_review" | "quoted" | "closed"
 export type MaterialRequestAssignee = "carlos" | "david"
+export type ExistingRequestUploadInput = { storagePath: string; filename: string; type: string; size: number }
 
 export type RequestSupplierPlanInput = {
   requestId: string
@@ -20,6 +24,43 @@ export type RequestSupplierPlanInput = {
 
 const MATERIAL_REQUEST_STATUSES = new Set<MaterialRequestStatus>(["submitted", "in_review", "quoted", "closed"])
 const MATERIAL_REQUEST_ASSIGNEES = new Set<MaterialRequestAssignee>(["carlos", "david"])
+
+export async function addRequestAttachmentsAction(input: { requestId: string; attachments: ExistingRequestUploadInput[] }) {
+  const requestId = String(input.requestId || "").trim()
+  const attachments = Array.isArray(input.attachments) ? input.attachments : []
+  if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false as const, error: "Request not found." }
+  if (!attachments.length || attachments.length > 10) return { ok: false as const, error: "Choose between 1 and 10 files." }
+  const allowedTypes = new Set<string>(PROJECT_UPLOAD_ALLOWED_MIME_TYPES)
+  const invalid = attachments.find((attachment) => !attachment.storagePath.startsWith("public-intake/") || attachment.storagePath.includes("..") || !attachment.filename.trim() || !allowedTypes.has(attachment.type) || !Number.isFinite(attachment.size) || attachment.size <= 0 || attachment.size > PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES)
+  if (invalid) return { ok: false as const, error: "One of the selected files is invalid. Remove it and try again." }
+
+  const { supabase } = await requireStaffProfile("customers")
+  const { data: request } = await supabase.from("quote_requests").select("id,project_id,owner_id").eq("id", requestId).maybeSingle<{ id: string; project_id: string; owner_id: string }>()
+  if (!request?.project_id || !request.owner_id) return { ok: false as const, error: "Request not found." }
+  const admin = createAdminClient()
+  const storedPaths: string[] = []
+  try {
+    for (const attachment of attachments) {
+      const { data: fileInfo, error: infoError } = await admin.storage.from("project-uploads").info(attachment.storagePath)
+      if (infoError || !fileInfo || fileInfo.size !== attachment.size || fileInfo.contentType !== attachment.type) throw new Error("attachment_verification_failed")
+      const finalPath = buildProjectUploadStoragePath({ ownerId: request.owner_id, projectId: request.project_id, uploadId: randomUUID(), fileName: attachment.filename })
+      const { error: moveError } = await admin.storage.from("project-uploads").move(attachment.storagePath, finalPath)
+      if (moveError) throw new Error("attachment_move_failed")
+      storedPaths.push(finalPath)
+      const { error: recordError } = await admin.from("quote_request_attachments").insert({ request_id: request.id, project_id: request.project_id, owner_id: request.owner_id, file_name: attachment.filename.trim().slice(0, 180), file_path: finalPath, file_type: attachment.type, file_size: attachment.size })
+      if (recordError) throw new Error("attachment_record_failed")
+    }
+  } catch (cause) {
+    if (storedPaths.length) {
+      await admin.from("quote_request_attachments").delete().eq("request_id", requestId).in("file_path", storedPaths)
+      await admin.storage.from("project-uploads").remove(storedPaths)
+    }
+    console.error("Existing request attachment storage failed", cause)
+    return { ok: false as const, error: "The files could not be attached. Please try again." }
+  }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const }
+}
 
 export async function saveRequestSupplierPlanAction(input: RequestSupplierPlanInput) {
   const requestId = String(input.requestId || "").trim()
