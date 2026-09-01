@@ -23,6 +23,7 @@ import {
 } from "@/components/buildflow/client-target-outreach";
 import { type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { ManagerGoalStatusSelect } from "@/components/buildflow/manager-goal-status-select";
+import { ManagerGoalPrioritySelect } from "@/components/buildflow/manager-goal-priority-select";
 import type {
   AffiliateActivity,
   AffiliateAttachment,
@@ -38,7 +39,7 @@ import {
   type CarlosFixedGoalKey,
   type ManagerGoalStatus,
 } from "@/lib/manager-goal-status";
-import { SUPPLIER_PARTNERS } from "@/lib/supplier-partners/catalog";
+import { loadSupplierPartnerProgress } from "@/lib/supplier-partners/store";
 
 type ClientTarget = {
   id: string;
@@ -73,6 +74,8 @@ function GoalDisclosure({
   title,
   description,
   status = "open",
+  priority = 3,
+  canManagePriority = false,
   fixedKey,
   children,
 }: {
@@ -82,6 +85,8 @@ function GoalDisclosure({
   title: string;
   description?: string;
   status?: ManagerGoalStatus;
+  priority?: number;
+  canManagePriority?: boolean;
   fixedKey: CarlosFixedGoalKey;
   children: ReactNode;
 }) {
@@ -109,8 +114,9 @@ function GoalDisclosure({
           className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180"
           aria-hidden="true"
         />
-        <span className="col-start-2 mt-1 flex items-center">
+        <span className="col-start-2 mt-1 flex flex-wrap items-center gap-1">
           <ManagerGoalStatusSelect fixedKey={fixedKey} status={status} />
+          <ManagerGoalPrioritySelect fixedKey={fixedKey} priority={priority} canManage={canManagePriority} />
         </span>
       </summary>
       <div className="border-t border-slate-200 p-3 sm:p-4">{children}</div>
@@ -118,7 +124,7 @@ function GoalDisclosure({
   );
 }
 
-async function OwnerAffiliateGoal({ status }: { status: ManagerGoalStatus }) {
+async function OwnerAffiliateGoal({ status, priority }: { status: ManagerGoalStatus; priority: number }) {
   const { supabase } = await requireAdminProfile();
   const [
     programResult,
@@ -187,6 +193,8 @@ async function OwnerAffiliateGoal({ status }: { status: ManagerGoalStatus }) {
       id="supplier-affiliate-program"
       fixedKey="supplier-affiliate-program"
       status={status}
+      priority={priority}
+      canManagePriority
       number={2}
       eyebrow="Programs"
       title="API, Affiliate & Partnership"
@@ -211,7 +219,7 @@ async function OwnerAffiliateGoal({ status }: { status: ManagerGoalStatus }) {
   );
 }
 
-function AbcSupplyDemoGoal({ status }: { status: ManagerGoalStatus }) {
+function AbcSupplyDemoGoal({ status, priority }: { status: ManagerGoalStatus; priority: number }) {
   const steps = [
     ["Customer connection", "/account/abc"],
     ["Ship-To", "/admin/abc#ship-to"],
@@ -227,6 +235,8 @@ function AbcSupplyDemoGoal({ status }: { status: ManagerGoalStatus }) {
       id="abc-supply-demo"
       fixedKey="abc-supply-demo"
       status={status}
+      priority={priority}
+      canManagePriority
       number={4}
       eyebrow="ABC"
       title="Prepare ABC Demo"
@@ -288,17 +298,23 @@ function ClientTargetGoal({
   leads,
   canManageClients,
   status,
+  priority,
+  canManagePriority,
 }: {
   clients: ClientTarget[];
   leads: OutreachLeadRecord[];
   canManageClients: boolean;
   status: ManagerGoalStatus;
+  priority: number;
+  canManagePriority: boolean;
 }) {
   return (
     <GoalDisclosure
       id="client-target"
       fixedKey="client-target"
       status={status}
+      priority={priority}
+      canManagePriority={canManagePriority}
       number={1}
       eyebrow="Clients"
       title="Contact New Clients"
@@ -375,9 +391,9 @@ function ClientTargetGoal({
   );
 }
 
-function SupplierPartnershipGoal({ status }: { status: ManagerGoalStatus }) {
+function SupplierPartnershipGoal({ status, priority, canManagePriority, importantSupplierCount }: { status: ManagerGoalStatus; priority: number; canManagePriority: boolean; importantSupplierCount: number }) {
   const lists = [
-    { label: "Suppliers from the Show", count: SUPPLIER_PARTNERS.length, href: "/owner/partnerships" },
+    { label: "Suppliers from the Show", count: importantSupplierCount, href: "/owner/partnerships" },
     { label: "Suppliers from Friends", count: 0, href: "/admin/vendors" },
     { label: "Suppliers from Google", count: 0, href: "/admin/vendors" },
   ];
@@ -386,6 +402,8 @@ function SupplierPartnershipGoal({ status }: { status: ManagerGoalStatus }) {
       id="supplier-partnerships"
       fixedKey="supplier-partnerships"
       status={status}
+      priority={priority}
+      canManagePriority={canManagePriority}
       number={3}
       eyebrow="Partnerships"
       title="Build Supplier Relationships"
@@ -411,7 +429,7 @@ export async function CarlosGoalsWorkspace({
     .eq("assignee", "carlos")
     .order("status")
     .order("created_at", { ascending: false });
-  const [clientResult, goalResult, leadResult, publishedResult] =
+  const [clientResult, goalResult, leadResult, publishedResult, supplierProgress] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -432,7 +450,7 @@ export async function CarlosGoalsWorkspace({
         .returns<OutreachLeadRecord[]>(),
       supabase
         .from("website_work_items")
-        .select("id,task_key,title,next_step,status,source_chat_title")
+        .select("id,task_key,title,next_step,status,source_chat_title,priority")
         .eq("published_to_carlos", true)
         .eq("item_kind", "task")
         .not("status", "in", "(completed,superseded,archived)")
@@ -446,12 +464,17 @@ export async function CarlosGoalsWorkspace({
             next_step: string;
             status: string;
             source_chat_title: string | null;
+            priority: number;
           }>
         >(),
+      loadSupplierPartnerProgress(supabase).catch(() => null),
     ]);
   const clients = clientResult.error ? [] : (clientResult.data ?? []);
   const goals = goalResult.error ? [] : (goalResult.data ?? []);
   const leads = leadResult.error ? [] : (leadResult.data ?? []);
+  const importantSupplierCount = supplierProgress
+    ? Object.values(supplierProgress).filter((item) => item.important).length
+    : 0;
   const carlosFixedTaskKeys = new Set(
     Object.keys(CARLOS_FIXED_GOALS).map((key) => `carlos-fixed-${key}`),
   );
@@ -461,6 +484,11 @@ export async function CarlosGoalsWorkspace({
   const publishedTaskKeys = new Set(
     allPublishedTasks.map((task) => task.task_key),
   );
+  const fixedPriorities = new Map(
+    allPublishedTasks.map((task) => [task.task_key, task.priority]),
+  );
+  const priorityFor = (key: CarlosFixedGoalKey) =>
+    fixedPriorities.get(`carlos-fixed-${key}`) ?? 3;
   const publishedTasks = allPublishedTasks.filter(
     (task) => !carlosFixedTaskKeys.has(task.task_key),
   );
@@ -480,18 +508,21 @@ export async function CarlosGoalsWorkspace({
           leads={leads}
           canManageClients={access.customers}
           status={statusFor("client-target")}
+          priority={priorityFor("client-target")}
+          canManagePriority={access.owner}
         />
       ),
     },
     {
       key: "supplier-affiliate-program",
       content: access.owner ? (
-        <OwnerAffiliateGoal status={statusFor("supplier-affiliate-program")} />
+        <OwnerAffiliateGoal status={statusFor("supplier-affiliate-program")} priority={priorityFor("supplier-affiliate-program")} />
       ) : (
         <GoalDisclosure
           id="supplier-affiliate-program"
           fixedKey="supplier-affiliate-program"
           status={statusFor("supplier-affiliate-program")}
+          priority={priorityFor("supplier-affiliate-program")}
           number={2}
           eyebrow="Programs"
           title="API, Affiliate & Partnership"
@@ -504,7 +535,7 @@ export async function CarlosGoalsWorkspace({
     {
       key: "supplier-partnerships",
       content: (
-        <SupplierPartnershipGoal status={statusFor("supplier-partnerships")} />
+        <SupplierPartnershipGoal status={statusFor("supplier-partnerships")} priority={priorityFor("supplier-partnerships")} canManagePriority={access.owner} importantSupplierCount={importantSupplierCount} />
       ),
     },
     ...(access.owner
@@ -512,7 +543,7 @@ export async function CarlosGoalsWorkspace({
           {
             key: "abc-supply-demo" as const,
             content: (
-              <AbcSupplyDemoGoal status={statusFor("abc-supply-demo")} />
+              <AbcSupplyDemoGoal status={statusFor("abc-supply-demo")} priority={priorityFor("abc-supply-demo")} />
             ),
           },
         ]

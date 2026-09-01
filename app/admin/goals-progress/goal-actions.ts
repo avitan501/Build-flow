@@ -118,6 +118,25 @@ export async function setFixedManagerGoalStatusAction(input: { key: CarlosFixedG
   return { ok: true };
 }
 
+export async function setFixedManagerGoalPriorityAction(input: { key: CarlosFixedGoalKey; priority: number }): Promise<GoalResult> {
+  const { supabase, access } = await requireManagerPortalProfile();
+  if (!access.owner) return { ok: false, error: "Only David can change Carlos task priority." };
+  if (!(input.key in CARLOS_FIXED_GOALS) || ![1, 3, 5].includes(input.priority)) {
+    return { ok: false, error: "Choose a valid task priority." };
+  }
+  const { data, error } = await supabase
+    .from("website_work_items")
+    .update({ priority: input.priority })
+    .eq("task_key", `carlos-fixed-${input.key}`)
+    .eq("item_kind", "task")
+    .select("id")
+    .maybeSingle<{ id: string }>();
+  if (error || !data) return { ok: false, error: "Task priority could not be updated." };
+
+  refreshGoals();
+  return { ok: true };
+}
+
 export async function deleteManagerGoalAction(id: string): Promise<GoalResult> {
   const { supabase, access } = await requireManagerPortalProfile();
   let deletion = supabase.from("manager_goals").delete().eq("id", id);

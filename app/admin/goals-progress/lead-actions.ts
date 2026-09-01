@@ -127,6 +127,22 @@ export async function updateOutreachLeadStatusAction(input: { id: string; status
   return { ok: true };
 }
 
+export async function updateOutreachLeadRelationshipAction(input: { id: string; relationshipLevel: number }): Promise<LeadResult> {
+  const { supabase } = await requireStaffProfile("customers");
+  const relationshipLevel = Number(input.relationshipLevel);
+  if (!Number.isInteger(relationshipLevel) || relationshipLevel < 1 || relationshipLevel > 5) {
+    return { ok: false, error: "Choose a valid lead group." };
+  }
+  const { error } = await supabase
+    .from("manager_outreach_leads")
+    .update({ relationship_level: relationshipLevel })
+    .eq("id", input.id);
+  if (error) return { ok: false, error: "The lead group could not be updated." };
+
+  refreshOutreach();
+  return { ok: true };
+}
+
 export async function deleteOutreachLeadAction(id: string): Promise<LeadResult> {
   const { supabase } = await requireStaffProfile("customers");
   const { error } = await supabase.from("manager_outreach_leads").delete().eq("id", id);

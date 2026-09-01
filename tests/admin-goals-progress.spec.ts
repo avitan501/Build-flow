@@ -32,17 +32,18 @@ test("Goals and Client Target stay in the dashboard instead of manager navigatio
 });
 
 test("Carlos Goals keeps every Carlos priority together and hides David goals", async () => {
-  const [page, actions, dashboard] = await Promise.all([
+  const [page, actions, dashboard, prioritySelect] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(
       path.join(root, "app/admin/goals-progress/goal-actions.ts"),
       "utf8",
     ),
     readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/manager-goal-priority-select.tsx"), "utf8"),
   ]);
 
   expect(page).toContain("await requireManagerPortalProfile()");
-  expect(page).toContain("async function OwnerAffiliateGoal({ status }");
+  expect(page).toContain("async function OwnerAffiliateGoal({ status, priority }");
   expect(page).toContain("const { supabase } = await requireAdminProfile()");
   expect(page).toContain("Carlos Dashboard");
   expect(page).toContain("Contact New Clients");
@@ -67,6 +68,13 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain('number={3}');
   expect(page).toContain('number={4}');
   expect(page).not.toContain('number={5}');
+  expect(page).toContain("<ManagerGoalPrioritySelect");
+  expect(page).toContain('priorityFor("client-target")');
+  expect(actions).toContain("setFixedManagerGoalPriorityAction");
+  expect(actions).toContain("Only David can change Carlos task priority.");
+  expect(prioritySelect).toContain('label: "Focus now"');
+  expect(prioritySelect).toContain('label: "Do later"');
+  expect(prioritySelect).toContain('label: "Low priority"');
   expect(page).toContain('id="supplier-affiliate-program"');
   expect(page).toContain('fixedKey="supplier-affiliate-program"');
   expect(page).toContain('.from("manager_goals")');
@@ -179,7 +187,7 @@ test("manager goals are persistent, status-aware, archivable, and protected for 
   expect(statusSelect).toContain('label: "Archived"');
   expect(actions).toContain("setManagerGoalStatusAction");
   expect(actions).toContain("setFixedManagerGoalStatusAction");
-  expect(actions.match(/requireManagerPortalProfile\(\)/g)?.length).toBe(6);
+  expect(actions.match(/requireManagerPortalProfile\(\)/g)?.length).toBe(7);
   expect(migration).toContain(
     "create table if not exists public.manager_goals",
   );
@@ -290,19 +298,22 @@ test("outreach leads remain separate from clients and store relationship level a
   expect(component).toContain(
     "A lead stays separate from active clients and orders.",
   );
-  expect(component).toContain("Relationship level");
-  expect(component).toContain("Level {lead.relationship_level}");
+  expect(component).toContain("Lead group");
+  expect(component).toContain('label: "Friend"');
+  expect(component).toContain('label: "Worked with"');
+  expect(component).toContain("updateOutreachLeadRelationshipAction");
   expect(component).toContain("Preferred language");
   expect(component).toContain("updateClientLanguageAction");
   expect(component).toContain("Edit outreach lead");
   expect(component).toContain("Save lead");
   expect(component).toContain("updateOutreachLeadAction");
   expect(addClient).toContain("Preferred language");
-  expect(actions.match(/requireStaffProfile\("customers"\)/g)?.length).toBe(5);
+  expect(actions.match(/requireStaffProfile\("customers"\)/g)?.length).toBe(6);
   expect(actions).not.toContain("createAdminClient");
   expect(
     actions.match(/supabase\.from\("manager_outreach_leads"\)/g)?.length,
   ).toBe(5);
+  expect(actions).toContain("export async function updateOutreachLeadRelationshipAction");
   expect(actions).toContain('error: "Enter a valid phone number."');
   expect(actions).toContain("relationship_level: relationshipLevel");
   expect(actions).toContain("preferred_language: preferredLanguage");

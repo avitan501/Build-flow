@@ -40,6 +40,9 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(store).not.toContain("createAdminClient");
   expect(store).not.toContain('.from("aura_tasks")');
   expect(goalsPage).toContain("Suppliers from the Show");
+  expect(goalsPage).toContain("importantSupplierCount");
+  expect(goalsPage).toContain("loadSupplierPartnerProgress");
+  expect(goalsPage).not.toContain('count: SUPPLIER_PARTNERS.length, href: "/owner/partnerships"');
   expect(goalsPage).toContain('href: "/owner/partnerships"');
   expect(deliveryPage).toContain('requireStaffProfile("suppliers")');
   expect(deliveryPage).toContain("loadDeliveryRequests(supabase)");
@@ -51,6 +54,11 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(scripts).toContain("Supplier call");
   expect(scripts).toContain("Contractor call");
   expect(scripts).toContain("export function ContractorCallScript()");
+  expect(scripts).toContain("HighlightedScript");
+  expect(scripts).toContain('bg-sky-100 text-sky-950');
+  expect(scripts).toContain('bg-amber-100 text-amber-950');
+  expect(scripts).toContain('bg-emerald-100 text-emerald-950');
+  expect(scripts).toContain('<details className="group overflow-hidden');
   const supplierScriptSection = scripts.split("export function SupplierRelationshipScripts()")[1]?.split("export function ContractorCallScript()")[0] ?? "";
   expect(supplierScriptSection).not.toContain('title="Contractor call"');
   expect(goalsPage).not.toContain("ApiAffiliateCallScript");
