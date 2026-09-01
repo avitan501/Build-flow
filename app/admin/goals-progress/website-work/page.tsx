@@ -1,4 +1,4 @@
-import { ArrowLeft, Bot, Check, LayoutDashboard, LockKeyhole, RotateCcw, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Check, LayoutDashboard, LockKeyhole, RotateCcw, Send, Target, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -139,6 +139,19 @@ export default async function DavidDashboardPage() {
           </form>
         </header>
         <div className="mt-5 grid gap-5">
+          <Link
+            href="/admin/goals-progress/website-work/quote-challenge"
+            className="group grid gap-3 rounded-xl border border-sky-200 bg-white p-4 shadow-sm transition hover:border-sky-300 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center"
+          >
+            <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#071523] text-white">
+              <Target className="h-5 w-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-slate-950">30-Day Quote Challenge</span>
+              <span className="mt-0.5 block text-xs leading-5 text-slate-500">Daily calls, real quotes, comparisons, purchases and referrals.</span>
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs font-bold text-[#0066cc]">Open tracker <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span>
+          </Link>
           <PhoneIntakeList intakes={intakeData ?? []} />
           <DavidDashboardBoard items={data ?? []} />
         </div>

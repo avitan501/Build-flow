@@ -201,3 +201,35 @@ test("pain resolution table persists the issue, resolution, and cost", async () 
   expect(actions).toContain('resolution_cost: input.kind === "pain" ? cost : null');
   expect(actions).toContain("{ title, summary: issue, next_step: resolution, resolution_cost: cost }");
 });
+
+test("David quote challenge is private, persistent, and action focused", async () => {
+  const [dashboard, page, tracker, actions, definitions, migration] = await Promise.all([
+    readFile(path.join(root, "app/admin/goals-progress/website-work/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/goals-progress/website-work/quote-challenge/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/david-quote-growth-tracker.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/goals-progress/website-work/quote-challenge/actions.ts"), "utf8"),
+    readFile(path.join(root, "lib/david-quote-growth.ts"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260901024749_add_david_quote_growth_tracker.sql"), "utf8"),
+  ]);
+
+  expect(dashboard).toContain("30-Day Quote Challenge");
+  expect(dashboard).toContain('href="/admin/goals-progress/website-work/quote-challenge"');
+  expect(page).toContain("requireManagerPortalProfile");
+  expect(page).toContain("verifyWebsiteWorkToken");
+  expect(page).toContain('if (!context.access.owner) redirect');
+  expect(tracker).toContain("Beat Your Material Quote");
+  expect(tracker).toContain("Collect 20 real quotes");
+  expect(tracker).toContain("Carlos script");
+  expect(tracker).toContain("One clean pipeline");
+  expect(tracker).toContain("updateQuoteGrowthMetricAction");
+  expect(definitions).toContain('key: "calls"');
+  expect(definitions).toContain('key: "quotes_received"');
+  expect(definitions).toContain('key: "purchases"');
+  expect(actions).toContain("quoteGrowthMetricDefinition");
+  expect(actions).toContain('period_kind: input.period');
+  expect(actions).toContain('onConflict: "metric_key,period_kind,period_start"');
+  expect(migration).toContain("enable row level security");
+  expect(migration).toContain("revoke all on table public.david_quote_growth_metrics from anon, authenticated");
+  expect(migration).toContain("private.is_admin()");
+  expect(migration).not.toContain("to anon");
+});
