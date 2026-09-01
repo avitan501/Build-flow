@@ -23,7 +23,7 @@ type MobileClientHeaderProps = {
   displayName?: string | null;
 };
 
-const HIDDEN_PATHS = new Set(["/login", "/signup", "/reset-password"]);
+const HIDDEN_PATHS = new Set(["/login", "/signup", "/reset-password", "/homepage-preview"]);
 
 function shouldShowHeader(pathname: string) {
   if (HIDDEN_PATHS.has(pathname)) {

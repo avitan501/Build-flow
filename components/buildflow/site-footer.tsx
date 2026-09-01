@@ -9,7 +9,7 @@ import { ShopTranslationBoundary } from "@/components/buildflow/shop-language-pr
 import { WhatsAppIcon } from "@/components/buildflow/whatsapp-icon"
 
 const BUSINESS_WHATSAPP_URL = "https://wa.me/15169088319?text=Hi%20Avantia%20Build%2C%20I%20need%20help%20with%20construction%20materials."
-const HIDDEN_PATHS = new Set(["/login", "/signup", "/reset-password"])
+const HIDDEN_PATHS = new Set(["/login", "/signup", "/reset-password", "/homepage-preview"])
 
 export function SiteFooter() {
   const pathname = usePathname()
