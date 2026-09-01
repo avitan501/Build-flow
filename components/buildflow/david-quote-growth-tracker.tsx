@@ -33,9 +33,9 @@ import {
 
 const CARLOS_SCRIPT = "Hi, this is Carlos from Avantia Build. We help contractors compare material quotes and delivery options. If you have a current supplier quote or material list, send it to us and we'll check whether another supplier can offer a better overall option. There's no obligation. What materials are you buying this week?";
 const UPLOAD_REPLY = "I'll text you the upload link. You can send a PDF, screenshot, or photo of the quote.";
-const SUPPLIER_SCRIPT = "Hi, this is Carlos from Avantia Build. We help local contractors source construction materials for jobs in Long Island, Queens, and Brooklyn. We're adding reliable suppliers by trade. Who handles contractor pricing and delivery at your company?";
-const SUPPLIER_RIGHT_PERSON = "We send itemized quote requests only when a customer needs your category. Could I confirm the best email, materials you supply, delivery areas, minimum order, and whether you offer contractor pricing?";
-const SUPPLIER_PERMISSION = "I'll send our contact details and a short sample request. We won't send mass or irrelevant quote requests. May I list your company as a supplier we can contact when a matching job comes in?";
+const SUPPLIER_SCRIPT = "Hi, this is Carlos with Avantia Build. We have local contractors buying construction materials, and we need a supplier we can send quote requests to. Who handles contractor quotes at your company?";
+const SUPPLIER_RIGHT_PERSON = "When we have a job that matches what you sell, can I email you the material list for pricing and delivery availability?";
+const SUPPLIER_PERMISSION = "Great. What is the best email, which materials should we contact you for, and where do you deliver?";
 
 function MetricRow({
   definition,
@@ -204,8 +204,8 @@ export function DavidQuoteGrowthTracker({
         <div className="grid gap-3 p-4 lg:grid-cols-3">
           {[
             { label: "Opening", text: SUPPLIER_SCRIPT },
-            { label: "Right person", text: SUPPLIER_RIGHT_PERSON },
-            { label: "Permission", text: SUPPLIER_PERMISSION },
+            { label: "Simple question", text: SUPPLIER_RIGHT_PERSON },
+            { label: "Get the details", text: SUPPLIER_PERMISSION },
           ].map((item) => <div key={item.label} className="flex flex-col rounded-xl bg-slate-50 p-4"><p className="text-[10px] font-bold uppercase tracking-[.15em] text-amber-700">{item.label}</p><p className="mt-2 flex-1 text-sm leading-6 text-slate-700">{item.text}</p><div className="mt-3"><CopyButton text={item.text} /></div></div>)}
         </div>
         <div className="border-t border-slate-100 px-4 py-3 text-xs text-slate-600"><strong>Record:</strong> contact name · email · trade · delivery area · minimum · contractor pricing</div>
