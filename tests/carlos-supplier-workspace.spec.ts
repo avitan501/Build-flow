@@ -21,6 +21,10 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
     affiliateCalls,
     networkActions,
     networkOptions,
+    supplierDirectoryActions,
+    supplierDirectoryManager,
+    supplierNetwork,
+    supplierBadges,
   ] = await Promise.all([
     readFile(path.join(root, "app/owner/partnerships/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/partnerships/actions.ts"), "utf8"),
@@ -45,6 +49,10 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
     readFile(path.join(root, "lib/affiliate-call-list.ts"), "utf8"),
     readFile(path.join(root, "app/admin/supplier-network/actions.ts"), "utf8"),
     readFile(path.join(root, "lib/supplier-network-options.ts"), "utf8"),
+    readFile(path.join(root, "app/admin/vendors/actions.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/supplier-routing-manager.tsx"), "utf8"),
+    readFile(path.join(root, "lib/supplier-network.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/supplier-program-badges.tsx"), "utf8"),
   ]);
 
   expect(page).toContain('requireStaffProfile("suppliers")');
@@ -68,6 +76,20 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(networkActions).toContain("note: z.string().trim().max(2000)");
   expect(networkActions).toContain("hidden: z.boolean()");
   expect(networkActions).toContain("priority: z.boolean()");
+  expect(networkActions).toContain('stage === "approved"');
+  expect(networkActions).toContain('trustLevel: parsed.data.stage === "approved" ? "verified"');
+  expect(networkActions).toContain('supabase.rpc("staff_upsert_supplier_directory_entry"');
+  expect(networkPage).toContain('supabase.rpc("staff_load_supplier_directory_snapshot")');
+  expect(networkPage).toContain("directorySuppliers:");
+  expect(supplierNetwork).toContain("directorySupplierId");
+  expect(supplierNetwork).toContain("supplier.programChannels ?? []");
+  expect(supplierDirectoryActions).toContain("deliveryChargeNote:");
+  expect(supplierDirectoryActions).toContain("programChannels:");
+  expect(supplierDirectoryManager).toContain("Delivery charge");
+  expect(supplierDirectoryManager).toContain("Delivery price note");
+  expect(supplierDirectoryManager).toContain("SupplierProgramBadges");
+  expect(supplierDirectoryManager).toContain('href="/admin/supplier-network"');
+  expect(supplierBadges).toContain('Affiliate: "AF"');
   expect(networkOptions).toContain('.from("manager_goals")');
   expect(networkOptions).toContain("supplier_network_options_v1:");
   expect(networkOptions).toContain("SupplierNetworkOverride");

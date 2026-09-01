@@ -8,10 +8,11 @@ import { SUPPLIER_PARTNERS } from "@/lib/supplier-partners/catalog";
 import { loadSupplierPartnerProgress } from "@/lib/supplier-partners/store";
 import { buildSupplierNetwork } from "@/lib/supplier-network";
 import { loadSupplierNetworkOptions } from "@/lib/supplier-network-options";
+import type { ShopQualificationSettings } from "@/lib/shop-qualification";
 
 export default async function SupplierNetworkPage() {
   const { supabase, access } = await requireManagerPortalProfile();
-  const [progress, programResult, overrides] = await Promise.all([
+  const [progress, programResult, overrides, directoryResult] = await Promise.all([
     loadSupplierPartnerProgress(supabase).catch(() => ({})),
     access.owner
       ? supabase
@@ -22,12 +23,15 @@ export default async function SupplierNetworkPage() {
           .returns<AffiliateProgram[]>()
       : Promise.resolve({ data: [] as AffiliateProgram[], error: null }),
     loadSupplierNetworkOptions(supabase).catch(() => ({})),
+    supabase.rpc("staff_load_supplier_directory_snapshot"),
   ]);
+  const directorySnapshot = directoryResult.data as { settings?: ShopQualificationSettings } | null;
   const rows = buildSupplierNetwork({
     programs: programResult.data ?? [],
     partners: SUPPLIER_PARTNERS,
     progress,
     overrides,
+    directorySuppliers: directorySnapshot?.settings?.suppliers ?? [],
   });
 
   return (
@@ -70,10 +74,10 @@ export default async function SupplierNetworkPage() {
 
         <div className="mt-3 flex justify-end">
           <Link
-            href="/owner/partnerships"
+            href="/admin/vendors"
             className="inline-flex h-9 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-[#0066cc] shadow-sm"
           >
-            Open full supplier records
+            Open Supplier Directory
           </Link>
         </div>
       </div>

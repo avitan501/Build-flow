@@ -13,6 +13,7 @@ import {
 import { useCallback, useMemo, useState, useTransition } from "react";
 
 import { updateSupplierNetworkRowAction } from "@/app/admin/supplier-network/actions";
+import { SupplierProgramBadges, SUPPLIER_PROGRAM_COLORS as CHANNEL_COLORS, SUPPLIER_PROGRAM_DESCRIPTIONS as CHANNEL_DESCRIPTIONS, SUPPLIER_PROGRAM_LABELS as CHANNEL_LABELS } from "@/components/buildflow/supplier-program-badges";
 
 import {
   SUPPLIER_NETWORK_CHANNELS,
@@ -23,35 +24,8 @@ import {
   type SupplierNetworkStage,
 } from "@/lib/supplier-network";
 
-const CHANNEL_LABELS: Record<SupplierNetworkChannel, string> = {
-  API: "API",
-  Affiliate: "AF",
-  Partner: "P",
-  Referral: "R",
-  Trade: "T",
-  Resale: "$",
-};
-
-const CHANNEL_COLORS: Record<SupplierNetworkChannel, string> = {
-  API: "border-sky-200 bg-sky-50 text-sky-800",
-  Affiliate: "border-violet-200 bg-violet-50 text-violet-800",
-  Partner: "border-amber-200 bg-amber-50 text-amber-900",
-  Referral: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  Trade: "border-blue-200 bg-blue-50 text-blue-800",
-  Resale: "border-rose-200 bg-rose-50 text-rose-800",
-};
-
-const CHANNEL_DESCRIPTIONS: Record<SupplierNetworkChannel, string> = {
-  API: "Direct catalog, stock, or pricing connection",
-  Affiliate: "Commission through a tracked link or program",
-  Partner: "Direct working partnership with the supplier",
-  Referral: "Referral fee for a lead or completed order",
-  Trade: "Contractor account with trade pricing or terms",
-  Resale: "Buy from the supplier and resell with a margin",
-};
-
 const STAGES: Array<{ key: SupplierNetworkStage; label: string }> = [
-  { key: "approved", label: "Approved" },
+  { key: "approved", label: "Approved → Verified Directory" },
   { key: "contact", label: "In contact" },
   { key: "more", label: "More suppliers" },
 ];
@@ -140,6 +114,11 @@ export function SupplierNetworkWorkspace({
       const result = await updateSupplierNetworkRowAction({
         key: row.key,
         supplierName: row.name,
+        directorySupplierId: row.directorySupplierId,
+        departments: row.departments,
+        phone: row.phone,
+        link: row.link,
+        ask: row.ask,
         ...next,
       });
       if (!result.ok) {
@@ -329,18 +308,7 @@ export function SupplierNetworkWorkspace({
                           aria-label={`Choose options for ${row.name}`}
                           aria-expanded={optionsOpen}
                         >
-                          {SUPPLIER_NETWORK_CHANNELS.map((channel) =>
-                            selectedChannels.includes(channel) ? (
-                              <span
-                                key={channel}
-                                title={channel}
-                                aria-label={channel}
-                                className={`inline-flex h-[19px] min-w-[19px] items-center justify-center rounded-[4px] border px-1 text-[8px] font-black ${CHANNEL_COLORS[channel]}`}
-                              >
-                                {CHANNEL_LABELS[channel]}
-                              </span>
-                            ) : null,
-                          )}
+                          <SupplierProgramBadges channels={selectedChannels} />
                           {!selectedChannels.length ? (
                             <span className="text-[9px] font-semibold text-slate-400">
                               Choose
@@ -355,7 +323,7 @@ export function SupplierNetworkWorkspace({
                         {row.ask}
                       </span>
                       <span className="truncate px-2 text-[9px] font-semibold text-slate-500">
-                        {edit.status}
+                        {row.directorySupplierId ? `${edit.status} · ${row.directoryTrustLevel === "verified" || row.directoryTrustLevel === "trusted" || row.directoryTrustLevel === "preferred" ? "Verified" : "Directory"}` : edit.status}
                       </span>
                       <button
                         type="button"
@@ -545,9 +513,14 @@ export function SupplierNetworkWorkspace({
                           </div>
                         )}
                         <div className="mt-2 flex items-start justify-between gap-3 border-t border-sky-100 pt-2">
-                          <p className="line-clamp-2 text-[10px] leading-4 text-slate-600">
-                            <strong>Ask:</strong> {row.ask}
-                          </p>
+                          <div className="min-w-0">
+                            <p className="line-clamp-2 text-[10px] leading-4 text-slate-600">
+                              <strong>Ask:</strong> {row.ask}
+                            </p>
+                            <p className="mt-1 text-[9px] font-semibold text-emerald-700">
+                              Moving to Approved adds or updates this company in the Verified Supplier Directory.
+                            </p>
+                          </div>
                           <span className="shrink-0 text-[9px] font-semibold text-slate-500">
                             {saving ? "Saving…" : "Saved automatically"}
                           </span>

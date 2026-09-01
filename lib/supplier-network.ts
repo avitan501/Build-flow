@@ -4,17 +4,14 @@ import type {
   SupplierPartner,
   SupplierPartnerProgress,
 } from "@/lib/supplier-partners/catalog";
+import type { SupplierRoutingOption } from "@/lib/shop-qualification";
+import {
+  SUPPLIER_PROGRAM_CHANNELS,
+  type SupplierProgramChannel,
+} from "@/lib/supplier-program-channels";
 
-export const SUPPLIER_NETWORK_CHANNELS = [
-  "API",
-  "Affiliate",
-  "Partner",
-  "Referral",
-  "Trade",
-  "Resale",
-] as const;
-
-export type SupplierNetworkChannel = (typeof SUPPLIER_NETWORK_CHANNELS)[number];
+export const SUPPLIER_NETWORK_CHANNELS = SUPPLIER_PROGRAM_CHANNELS;
+export type SupplierNetworkChannel = SupplierProgramChannel;
 export type SupplierNetworkStage = "approved" | "contact" | "more";
 export type SupplierNetworkSource = "Show" | "Friends" | "Google" | "Nearby";
 
@@ -42,6 +39,8 @@ export type SupplierNetworkRow = {
   note: string;
   hidden: boolean;
   priority: boolean;
+  directorySupplierId: string | null;
+  directoryTrustLevel: SupplierRoutingOption["trustLevel"] | null;
 };
 
 function canonicalName(value: string) {
@@ -189,6 +188,8 @@ function mergeRow(
     note: current.note || incoming.note,
     hidden: current.hidden || incoming.hidden,
     priority: current.priority || incoming.priority,
+    directorySupplierId: current.directorySupplierId || incoming.directorySupplierId,
+    directoryTrustLevel: current.directoryTrustLevel || incoming.directoryTrustLevel,
   });
 }
 
@@ -197,6 +198,7 @@ export function buildSupplierNetwork(input: {
   partners: SupplierPartner[];
   progress: Record<string, SupplierPartnerProgress>;
   overrides?: Record<string, SupplierNetworkOverride>;
+  directorySuppliers?: SupplierRoutingOption[];
 }) {
   const rows = new Map<string, SupplierNetworkRow>();
 
@@ -219,6 +221,8 @@ export function buildSupplierNetwork(input: {
       note: "",
       hidden: false,
       priority: false,
+      directorySupplierId: null,
+      directoryTrustLevel: null,
     });
   }
 
@@ -239,6 +243,8 @@ export function buildSupplierNetwork(input: {
       note: "",
       hidden: false,
       priority: false,
+      directorySupplierId: null,
+      directoryTrustLevel: null,
     });
   }
 
@@ -268,6 +274,31 @@ export function buildSupplierNetwork(input: {
       note: "",
       hidden: false,
       priority: false,
+      directorySupplierId: null,
+      directoryTrustLevel: null,
+    });
+  }
+
+  for (const supplier of input.directorySuppliers ?? []) {
+    const key = canonicalName(supplier.name);
+    const verified = ["verified", "trusted", "preferred"].includes(supplier.trustLevel ?? "not-reviewed");
+    mergeRow(rows, {
+      key,
+      name: supplier.name,
+      departments: supplier.catalogDepartments?.join(", ") || supplier.materials || "Departments not set",
+      channels: supplier.programChannels ?? [],
+      stage: verified ? "approved" : "contact",
+      sources: ["Nearby"],
+      ask: supplier.deliveryNotes || "Confirm products, pricing, availability, and delivery terms.",
+      phone: supplier.phone || supplier.whatsapp || "",
+      phoneHref: supplier.phone || supplier.whatsapp ? `tel:${(supplier.phone || supplier.whatsapp || "").replace(/[^0-9+]/g, "")}` : "",
+      link: supplier.portalUrl || "",
+      status: verified ? "Approved" : "In Progress",
+      note: supplier.notes || "",
+      hidden: false,
+      priority: false,
+      directorySupplierId: supplier.id,
+      directoryTrustLevel: supplier.trustLevel ?? "not-reviewed",
     });
   }
 

@@ -24,7 +24,10 @@ export type SupplierRoutingOption = {
   portalUrl?: string
   preferredDeliveryMethod?: SupplierDeliveryMethod
   deliveryNotes?: string
+  deliveryCharge?: number | null
+  deliveryChargeNote?: string
   notes?: string
+  programChannels?: import("@/lib/supplier-program-channels").SupplierProgramChannel[]
   trustLevel?: SupplierTrustLevel
   catalogDepartments?: string[]
   catalogEnabledDepartments?: string[]

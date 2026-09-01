@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { requireStaffProfile } from "@/lib/auth"
 import type { ShopQualificationSettings, SupplierRoutingOption } from "@/lib/shop-qualification"
+import { SUPPLIER_PROGRAM_CHANNELS, type SupplierProgramChannel } from "@/lib/supplier-program-channels"
 
 const JOB_ADDRESS = "280 Lawrence Ave, Lawrence, NY 11559"
 const MAX_MATERIAL_LIST_LENGTH = 20_000
@@ -58,6 +59,8 @@ function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | nu
   const email = input.email?.trim().toLowerCase().slice(0, 320) || ""
   if (!name || (email && !/^\S+@\S+\.\S+$/.test(email))) return null
 
+  const deliveryCharge = input.deliveryCharge == null ? null : Number(input.deliveryCharge)
+  const allowedChannels = new Set<string>(SUPPLIER_PROGRAM_CHANNELS)
   return {
     ...input,
     id: input.id.trim().slice(0, 160),
@@ -69,7 +72,10 @@ function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | nu
     whatsapp: input.whatsapp?.trim().slice(0, 80) || "",
     portalUrl: input.portalUrl?.trim().slice(0, 500) || "",
     deliveryNotes: input.deliveryNotes?.trim().slice(0, 4_000) || "",
+    deliveryCharge: Number.isFinite(deliveryCharge) && Number(deliveryCharge) >= 0 ? Math.round(Number(deliveryCharge) * 100) / 100 : null,
+    deliveryChargeNote: input.deliveryChargeNote?.trim().slice(0, 1_000) || "",
     notes: input.notes?.trim().slice(0, 4_000) || "",
+    programChannels: Array.isArray(input.programChannels) ? input.programChannels.filter((channel): channel is SupplierProgramChannel => typeof channel === "string" && allowedChannels.has(channel)) : [],
     trustLevel: input.trustLevel || "not-reviewed",
     catalogDepartments: Array.isArray(input.catalogDepartments) ? input.catalogDepartments.map((department) => department.trim().slice(0, 100)).filter(Boolean).slice(0, 20) : [],
     catalogEnabledDepartments: Array.isArray(input.catalogEnabledDepartments) ? input.catalogEnabledDepartments.map((department) => department.trim().slice(0, 100)).filter(Boolean).slice(0, 20) : [],
