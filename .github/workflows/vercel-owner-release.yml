@@ -1,34 +1,32 @@
-name: Release main to Vercel
+name: Deploy Avantia Build
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: vercel-owner-release-main
+  group: avantia-build-production-release
   cancel-in-progress: true
 
 jobs:
-  release:
-    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.author.email != 'sales@avdesignandbuilds.com'
+  deploy:
+    name: Deploy main to build.avantiap.com
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the production repository
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Create owner-authored release marker
+      - name: Trigger the scoped Vercel deploy hook
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         shell: bash
         run: |
-          git fetch origin main
-          git checkout -B main origin/main
-          git config user.name "Maor Avitan"
-          git config user.email "sales@avdesignandbuilds.com"
-          git commit --allow-empty -m "Release ${GITHUB_SHA} to Vercel"
-          git push origin HEAD:main
+          if [[ -z "${VERCEL_DEPLOY_HOOK_URL:-}" ]]; then
+            echo "::error::VERCEL_DEPLOY_HOOK_URL is not configured."
+            exit 1
+          fi
+
+          response=$(curl --fail --silent --show-error \
+            --request POST \
+            "$VERCEL_DEPLOY_HOOK_URL")
+          state=$(jq -r '.job.state // "UNKNOWN"' <<< "$response")
+          echo "Vercel accepted the manual production deployment. State: $state"
