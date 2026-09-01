@@ -1,11 +1,11 @@
 "use client"
 
-import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, FileImage, LoaderCircle, LogIn, LogOut, Save, Upload } from "lucide-react"
+import { AlertTriangle, BadgeCheck, CalendarDays, CheckCircle2, Clock3, FileImage, LoaderCircle, LogIn, LogOut, Pause, Play, Save, Upload } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 
-import { recordDailyAttendanceAction, saveDailyWorkSummaryAction, uploadDailyProblemPhotoAction } from "@/app/admin/daily-summary/actions"
-import { calculateWorkedMinutes, type DailyWorkSummary } from "@/lib/daily-work-summary"
+import { markDailySummaryPaidAction, recordDailyAttendanceAction, saveDailyWorkSummaryAction, uploadDailyProblemPhotoAction } from "@/app/admin/daily-summary/actions"
+import { calculateWorkedMinutes, totalPausedMilliseconds, type DailyWorkSummary } from "@/lib/daily-work-summary"
 
 function localToday() {
   const date = new Date()
@@ -23,15 +23,18 @@ function displayTime(value: string | null | undefined) {
   return new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date(value))
 }
 
-function workedTime(checkInAt: string | null | undefined, checkOutAt: string | null | undefined) {
-  const minutes = calculateWorkedMinutes(checkInAt, checkOutAt)
+function workedTime(summary: Pick<DailyWorkSummary, "checkInAt" | "checkOutAt" | "pauseStartedAt" | "pausedMilliseconds">, now: number) {
+  if (!summary.checkInAt) return null
+  const endAt = summary.checkOutAt ?? new Date(now).toISOString()
+  const paused = totalPausedMilliseconds(summary.pausedMilliseconds, summary.pauseStartedAt, endAt)
+  const minutes = calculateWorkedMinutes(summary.checkInAt, endAt, paused)
   if (minutes === null) return null
   const hours = Math.floor(minutes / 60)
   const remainingMinutes = minutes % 60
   return `${hours} hr ${remainingMinutes} min`
 }
 
-export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummary[] }) {
+export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: DailyWorkSummary[]; canMarkPaid: boolean }) {
   const router = useRouter()
   const today = localToday()
   const initialSummary = summaries.find((summary) => summary.date === today)
@@ -44,6 +47,13 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const [currentTime, setCurrentTime] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (!selectedSummary?.checkInAt || selectedSummary.checkOutAt || selectedSummary.pauseStartedAt) return
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [selectedSummary?.checkInAt, selectedSummary?.checkOutAt, selectedSummary?.pauseStartedAt])
 
   function selectDate(date: string) {
     const summary = summaries.find((entry) => entry.date === date)
@@ -93,7 +103,7 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
     })
   }
 
-  function recordAttendance(action: "check_in" | "check_out") {
+  function recordAttendance(action: "check_in" | "pause" | "resume" | "check_out") {
     setError(null)
     setMessage(null)
     startTransition(async () => {
@@ -102,12 +112,23 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
         setError(result.error)
         return
       }
-      setMessage(action === "check_in" ? "Carlos checked in." : "Carlos checked out. Hours worked are calculated below.")
+      setMessage(action === "check_in" ? "Carlos checked in." : action === "pause" ? "Timer paused. Break time will not count as work." : action === "resume" ? "Timer resumed." : "Carlos checked out. Hours worked are calculated below.")
       router.refresh()
     })
   }
 
-  const totalWorked = workedTime(selectedSummary?.checkInAt, selectedSummary?.checkOutAt)
+  function markPaid(date: string) {
+    setError(null)
+    setMessage(null)
+    startTransition(async () => {
+      const result = await markDailySummaryPaidAction({ date })
+      if (!result.ok) { setError(result.error); return }
+      setMessage(`${displayDate(date)} marked paid.`)
+      router.refresh()
+    })
+  }
+
+  const totalWorked = selectedSummary ? workedTime(selectedSummary, currentTime) : null
 
   return <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
     <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -124,8 +145,12 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
             <div><p className="text-[10px] font-bold uppercase text-slate-500">Check out</p><p className="mt-1 text-sm font-semibold">{displayTime(selectedSummary?.checkOutAt)}</p></div>
             <div><p className="text-[10px] font-bold uppercase text-slate-500">Hours</p><p className="mt-1 text-sm font-semibold text-[#0066cc]">{totalWorked ?? (selectedSummary?.checkInAt ? "In progress" : "—")}</p></div>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          {selectedSummary?.pauseStartedAt ? <p className="mt-3 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-center text-xs font-bold text-violet-700">Paused — break time is not being counted</p> : null}
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
             <button type="button" onClick={() => recordAttendance("check_in")} disabled={pending || Boolean(selectedSummary?.checkInAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-emerald-300 bg-white px-3 text-sm font-semibold text-emerald-700 disabled:opacity-40"><LogIn className="h-4 w-4" />Check in</button>
+            {selectedSummary?.pauseStartedAt
+              ? <button type="button" onClick={() => recordAttendance("resume")} disabled={pending || Boolean(selectedSummary?.checkOutAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet-300 bg-violet-50 px-3 text-sm font-semibold text-violet-700 disabled:opacity-40"><Play className="h-4 w-4" />Resume</button>
+              : <button type="button" onClick={() => recordAttendance("pause")} disabled={pending || !selectedSummary?.checkInAt || Boolean(selectedSummary?.checkOutAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet-300 bg-white px-3 text-sm font-semibold text-violet-700 disabled:opacity-40"><Pause className="h-4 w-4" />Pause</button>}
             <button type="button" onClick={() => recordAttendance("check_out")} disabled={pending || !selectedSummary?.checkInAt || Boolean(selectedSummary?.checkOutAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-amber-300 bg-white px-3 text-sm font-semibold text-amber-700 disabled:opacity-40"><LogOut className="h-4 w-4" />Check out</button>
           </div>
         </section>
@@ -146,8 +171,8 @@ export function DailyWorkSummaryForm({ summaries }: { summaries: DailyWorkSummar
       <header className="border-b border-slate-200 p-4"><h2 className="text-sm font-semibold">Recent summaries</h2><p className="mt-1 text-xs text-slate-500">Choose a date to review or update it.</p></header>
       <div className="max-h-[34rem] overflow-y-auto">
         {summaries.length ? summaries.map((summary) => {
-          const hours = workedTime(summary.checkInAt, summary.checkOutAt)
-          return <button key={summary.id} type="button" onClick={() => selectDate(summary.date)} className={`flex w-full items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50 ${selectedDate === summary.date ? "bg-sky-50" : ""}`}><span><span className="block text-sm font-semibold">{displayDate(summary.date)}</span><span className="mt-0.5 block text-xs text-slate-500">{hours ?? (summary.checkInAt ? "Clocked in" : summary.completed ? "Work recorded" : "Open items only")}</span></span><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${summary.open || (summary.checkInAt && !summary.checkOutAt) ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{summary.checkInAt && !summary.checkOutAt ? "Working" : summary.open ? "Open" : "Complete"}</span></button>
+          const hours = workedTime(summary, currentTime)
+          return <div key={summary.id} className={`flex items-center gap-2 border-b border-slate-100 px-2 py-2 ${selectedDate === summary.date ? "bg-sky-50" : ""}`}><button type="button" onClick={() => selectDate(summary.date)} className="min-w-0 flex-1 rounded-md px-2 py-1 text-left hover:bg-slate-50"><span className="block text-sm font-semibold">{displayDate(summary.date)}</span><span className="mt-0.5 block text-xs text-slate-500">{hours ?? (summary.completed ? "Work recorded" : "Open items only")}{summary.pauseStartedAt ? " · Paused" : ""}</span></button>{summary.paidAt ? <span className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-2 text-[10px] font-bold text-emerald-700"><BadgeCheck className="h-3.5 w-3.5" />Paid</span> : canMarkPaid ? <button type="button" onClick={() => markPaid(summary.date)} disabled={pending} className="min-h-9 shrink-0 rounded-md border border-emerald-300 bg-white px-2 text-[10px] font-bold text-emerald-700 disabled:opacity-40">Mark paid</button> : null}<span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${summary.pauseStartedAt ? "bg-violet-50 text-violet-700" : summary.open || (summary.checkInAt && !summary.checkOutAt) ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{summary.pauseStartedAt ? "Paused" : summary.checkInAt && !summary.checkOutAt ? "Working" : summary.open ? "Open" : "Complete"}</span></div>
         }) : <p className="p-4 text-sm leading-6 text-slate-500">No daily summaries yet. Carlos can save today&apos;s first update.</p>}
       </div>
     </aside>

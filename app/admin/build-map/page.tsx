@@ -311,6 +311,8 @@ export default async function AdminDashboardPage({
             compact
             checkInAt={todaySummary?.checkInAt ?? null}
             checkOutAt={todaySummary?.checkOutAt ?? null}
+            pauseStartedAt={todaySummary?.pauseStartedAt ?? null}
+            pausedMilliseconds={todaySummary?.pausedMilliseconds ?? 0}
           />
           <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled compact />
         </header>

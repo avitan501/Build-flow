@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
-import { DAILY_WORK_SUMMARY_PREFIX, DAILY_WORK_SUMMARY_TITLE_PREFIX, parseDailyWorkSummary, serializeDailyWorkSummary } from "@/lib/daily-work-summary"
+import { DAILY_WORK_SUMMARY_PREFIX, DAILY_WORK_SUMMARY_TITLE_PREFIX, parseDailyWorkSummary, serializeDailyWorkSummary, totalPausedMilliseconds } from "@/lib/daily-work-summary"
 import { SUPPLIER_QUOTE_BUCKET } from "@/lib/supplier-quotes"
 
 type SaveDailySummaryResult = { ok: true } | { ok: false; error: string }
@@ -70,6 +70,9 @@ export async function saveDailyWorkSummaryAction(input: {
     problemAttachments: current?.problemAttachments ?? [],
     checkInAt: current?.checkInAt,
     checkOutAt: current?.checkOutAt,
+    pauseStartedAt: current?.pauseStartedAt,
+    pausedMilliseconds: current?.pausedMilliseconds,
+    paidAt: current?.paidAt,
   })
 
   const result = existing.data
@@ -84,7 +87,7 @@ export async function saveDailyWorkSummaryAction(input: {
 
 export async function recordDailyAttendanceAction(input: {
   date: string
-  action: "check_in" | "check_out"
+  action: "check_in" | "pause" | "resume" | "check_out"
 }): Promise<SaveDailySummaryResult> {
   const { supabase, user } = await requireManagerPortalProfile()
   const date = input.date.trim()
@@ -100,13 +103,20 @@ export async function recordDailyAttendanceAction(input: {
   if (input.action === "check_in" && current?.checkInAt) return { ok: false, error: "Carlos is already checked in for today." }
   if (input.action === "check_out" && !current?.checkInAt) return { ok: false, error: "Carlos must check in before checking out." }
   if (input.action === "check_out" && current?.checkOutAt) return { ok: false, error: "Carlos is already checked out for today." }
+  if (input.action === "pause" && (!current?.checkInAt || current.checkOutAt)) return { ok: false, error: "Carlos must be working before taking a pause." }
+  if (input.action === "pause" && current?.pauseStartedAt) return { ok: false, error: "Carlos is already paused." }
+  if (input.action === "resume" && !current?.pauseStartedAt) return { ok: false, error: "Carlos is not paused." }
 
   const checkInAt = input.action === "check_in" ? now.toISOString() : current?.checkInAt ?? null
   const checkOutAt = input.action === "check_out" ? now.toISOString() : current?.checkOutAt ?? null
+  const pausedMilliseconds = input.action === "resume" || (input.action === "check_out" && current?.pauseStartedAt)
+    ? totalPausedMilliseconds(current?.pausedMilliseconds ?? 0, current?.pauseStartedAt, now.toISOString())
+    : current?.pausedMilliseconds ?? 0
+  const pauseStartedAt = input.action === "pause" ? now.toISOString() : input.action === "resume" || input.action === "check_out" ? null : current?.pauseStartedAt ?? null
   const completed = current?.completed ?? ""
   const open = current?.open ?? ""
   const problems = current?.problems ?? ""
-  const details = serializeDailyWorkSummary({ date, completed, open, problems, problemAttachments: current?.problemAttachments ?? [], checkInAt, checkOutAt })
+  const details = serializeDailyWorkSummary({ date, completed, open, problems, problemAttachments: current?.problemAttachments ?? [], checkInAt, checkOutAt, pauseStartedAt, pausedMilliseconds, paidAt: current?.paidAt })
   const status = open || (checkInAt && !checkOutAt) ? "open" : "completed"
   const title = `${DAILY_WORK_SUMMARY_TITLE_PREFIX}${date}`
   const result = existing.data
@@ -115,6 +125,34 @@ export async function recordDailyAttendanceAction(input: {
 
   if (result.error) return { ok: false, error: "Attendance could not be saved. Please try again." }
 
+  revalidateDailySummary()
+  return { ok: true }
+}
+
+export async function markDailySummaryPaidAction(input: { date: string }): Promise<SaveDailySummaryResult> {
+  const { supabase, access } = await requireManagerPortalProfile()
+  if (!access.owner) return { ok: false, error: "Only the owner can mark time as paid." }
+  const date = input.date.trim()
+  if (!validDate(date)) return { ok: false, error: "Choose a valid work date." }
+  const existing = await findDailySummary(supabase, date)
+  if (existing.error || !existing.data) return { ok: false, error: "The time summary could not be found." }
+  const current = parseDailyWorkSummary(existing.data)
+  if (!current) return { ok: false, error: "The time summary could not be read." }
+  if (current.paidAt) return { ok: true }
+  const details = serializeDailyWorkSummary({
+    date,
+    completed: current.completed,
+    open: current.open,
+    problems: current.problems,
+    problemAttachments: current.problemAttachments,
+    checkInAt: current.checkInAt,
+    checkOutAt: current.checkOutAt,
+    pauseStartedAt: current.pauseStartedAt,
+    pausedMilliseconds: current.pausedMilliseconds,
+    paidAt: new Date().toISOString(),
+  })
+  const result = await supabase.from("manager_goals").update({ details }).eq("id", existing.data.id)
+  if (result.error) return { ok: false, error: "Paid status could not be saved. Please try again." }
   revalidateDailySummary()
   return { ok: true }
 }
@@ -146,6 +184,9 @@ export async function uploadDailyProblemPhotoAction(formData: FormData): Promise
     problemAttachments,
     checkInAt: current?.checkInAt,
     checkOutAt: current?.checkOutAt,
+    pauseStartedAt: current?.pauseStartedAt,
+    pausedMilliseconds: current?.pausedMilliseconds,
+    paidAt: current?.paidAt,
   })
   const title = `${DAILY_WORK_SUMMARY_TITLE_PREFIX}${date}`
   const result = existing.data
