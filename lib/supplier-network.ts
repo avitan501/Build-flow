@@ -296,7 +296,7 @@ export function buildSupplierNetwork(input: {
       status: verified ? "Approved" : "In Progress",
       note: supplier.notes || "",
       hidden: false,
-      priority: false,
+      priority: supplier.trustLevel === "preferred",
       directorySupplierId: supplier.id,
       directoryTrustLevel: supplier.trustLevel ?? "not-reviewed",
     });
@@ -314,6 +314,12 @@ export function buildSupplierNetwork(input: {
       hidden: override.hidden ?? row.hidden,
       priority: override.priority ?? row.priority,
     });
+  }
+
+  // The relationship list is intentionally a short current-focus queue.
+  // Suppliers that are not marked as a current priority stay available in More suppliers.
+  for (const [key, row] of rows) {
+    if (row.stage === "contact" && !row.priority) rows.set(key, { ...row, stage: "more" });
   }
 
   return [...rows.values()].sort((a, b) => {

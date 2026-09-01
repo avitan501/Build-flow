@@ -2,17 +2,21 @@
 
 import {
   ExternalLink,
+  LoaderCircle,
+  MapPin,
   MoreHorizontal,
   Phone,
+  Plus,
   RotateCcw,
   Search,
+  Sparkles,
   Star,
   Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { Fragment, useCallback, useMemo, useState, useTransition } from "react";
 
-import { updateSupplierNetworkRowAction } from "@/app/admin/supplier-network/actions";
+import { addDiscoveredSupplierNetworkAction, updateSupplierNetworkRowAction } from "@/app/admin/supplier-network/actions";
 import { SupplierProgramBadges, SUPPLIER_PROGRAM_COLORS as CHANNEL_COLORS, SUPPLIER_PROGRAM_DESCRIPTIONS as CHANNEL_DESCRIPTIONS, SUPPLIER_PROGRAM_LABELS as CHANNEL_LABELS } from "@/components/buildflow/supplier-program-badges";
 
 import {
@@ -25,8 +29,8 @@ import {
 } from "@/lib/supplier-network";
 
 const STAGES: Array<{ key: SupplierNetworkStage; label: string }> = [
-  { key: "approved", label: "Approved → Verified Directory" },
-  { key: "contact", label: "In contact" },
+  { key: "approved", label: "Approved" },
+  { key: "contact", label: "Building Relationship" },
   { key: "more", label: "More suppliers" },
 ];
 
@@ -89,6 +93,12 @@ export function SupplierNetworkWorkspace({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
+  const [discoveryDepartment, setDiscoveryDepartment] = useState("");
+  const [discoveryZip, setDiscoveryZip] = useState("11516");
+  const [discoveryResults, setDiscoveryResults] = useState<Array<{ name: string; url: string; domain: string; summary: string }>>([]);
+  const [discoveryError, setDiscoveryError] = useState("");
+  const [discoveryPending, setDiscoveryPending] = useState(false);
+  const [addedDomains, setAddedDomains] = useState<string[]>([]);
 
   const currentEdit = useCallback(
     (row: SupplierNetworkRow) =>
@@ -137,6 +147,37 @@ export function SupplierNetworkWorkspace({
       ? current.channels.filter((item) => item !== channel)
       : [...current.channels, channel];
     saveRow(row, { ...current, channels }, current);
+  }
+
+  async function discoverSuppliers(more = false) {
+    if (!discoveryDepartment.trim() || !/^\d{5}(?:-\d{4})?$/.test(discoveryZip)) {
+      setDiscoveryError("Enter a department and a valid ZIP code.");
+      return;
+    }
+    setDiscoveryPending(true);
+    setDiscoveryError("");
+    try {
+      const excluded = more ? discoveryResults.map((supplier) => supplier.domain) : [];
+      const response = await fetch("/api/admin/suppliers/discover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ department: discoveryDepartment, zipCode: discoveryZip, excludeDomains: excluded }) });
+      const payload = await response.json() as { ok?: boolean; error?: string; suppliers?: Array<{ name: string; url: string; domain: string; summary: string }> };
+      if (!response.ok || !payload.ok) setDiscoveryError(payload.error || "Supplier discovery is temporarily unavailable.");
+      else setDiscoveryResults((current) => more ? [...current, ...(payload.suppliers ?? [])] : payload.suppliers ?? []);
+    } catch {
+      setDiscoveryError("Supplier discovery is temporarily unavailable.");
+    } finally {
+      setDiscoveryPending(false);
+    }
+  }
+
+  function addDiscoveredSupplier(supplier: { name: string; url: string; domain: string; summary: string }) {
+    startSaving(async () => {
+      const result = await addDiscoveredSupplierNetworkAction({ ...supplier, department: discoveryDepartment, zipCode: discoveryZip });
+      if (!result.ok) setDiscoveryError(result.error);
+      else {
+        setAddedDomains((current) => [...current, supplier.domain]);
+        window.setTimeout(() => window.location.reload(), 350);
+      }
+    });
   }
 
   const stageCounts = useMemo(
@@ -212,7 +253,7 @@ export function SupplierNetworkWorkspace({
           <Star
             className={`h-3.5 w-3.5 ${priorityOnly ? "fill-current" : ""}`}
           />
-          Priority{" "}
+          {stage === "approved" ? "Top vendors" : "Current focus"}{" "}
           <span className="tabular-nums opacity-70">{priorityCount}</span>
         </button>
         <label className="ml-auto flex h-8 min-w-36 flex-1 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 sm:max-w-56">
@@ -236,7 +277,8 @@ export function SupplierNetworkWorkspace({
       </div>
 
       {stage === "more" ? (
-        <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200 px-1.5 py-1">
+        <div className="border-b border-slate-200">
+        <div className="flex items-center gap-1 overflow-x-auto px-1.5 py-1">
           {(["All", ...SOURCES] as const).map((item) => (
             <button
               key={item}
@@ -247,6 +289,20 @@ export function SupplierNetworkWorkspace({
               {item}
             </button>
           ))}
+        </div>
+        <details className="group border-t border-slate-100 bg-sky-50/60">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-xs font-bold text-sky-950"><Sparkles className="h-4 w-4 text-[#0071e3]" />Find 10 suppliers with AI <span className="ml-auto text-[10px] font-semibold text-sky-700 group-open:hidden">Department + ZIP</span></summary>
+          <div className="border-t border-sky-100 p-3">
+            <div className="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_9rem_auto]">
+              <input value={discoveryDepartment} onChange={(event) => setDiscoveryDepartment(event.target.value)} placeholder="Department, e.g. Roofing" className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium" />
+              <label className="relative"><MapPin className="pointer-events-none absolute left-2.5 top-3 h-4 w-4 text-slate-400" /><input value={discoveryZip} onChange={(event) => setDiscoveryZip(event.target.value.replace(/[^0-9-]/g, "").slice(0, 10))} inputMode="numeric" aria-label="Supplier search ZIP code" className="h-10 w-full rounded-md border border-slate-300 bg-white pl-8 pr-2 text-sm font-medium" /></label>
+              <button type="button" onClick={() => void discoverSuppliers(false)} disabled={discoveryPending} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-xs font-bold text-white disabled:opacity-50">{discoveryPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}Generate 10</button>
+            </div>
+            {discoveryError ? <p className="mt-2 text-xs font-semibold text-rose-700" role="alert">{discoveryError}</p> : null}
+            {discoveryResults.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{discoveryResults.map((supplier) => { const added = addedDomains.includes(supplier.domain); return <article key={supplier.url} className="grid gap-2 rounded-md border border-sky-100 bg-white p-2.5"><div className="min-w-0"><p className="truncate text-xs font-bold text-slate-950">{supplier.name}</p><p className="truncate text-[10px] text-slate-500">{supplier.domain}</p><p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-600">{supplier.summary || `Potential ${discoveryDepartment} supplier near ${discoveryZip}.`}</p></div><div className="flex gap-2"><a href={supplier.url} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 px-2 text-[10px] font-bold text-[#0066cc]"><ExternalLink className="h-3 w-3" />Open</a><button type="button" onClick={() => addDiscoveredSupplier(supplier)} disabled={added || saving} className="inline-flex h-8 items-center gap-1 rounded-md bg-[#0071e3] px-2 text-[10px] font-bold text-white disabled:bg-emerald-600"><Plus className="h-3 w-3" />{added ? "Added" : "Add to list"}</button></div></article> })}</div> : null}
+            {discoveryResults.length ? <button type="button" onClick={() => void discoverSuppliers(true)} disabled={discoveryPending} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-sky-300 bg-white px-3 text-xs font-bold text-[#0066cc]">{discoveryPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}Generate 10 more</button> : null}
+          </div>
+        </details>
         </div>
       ) : null}
 
@@ -263,15 +319,17 @@ export function SupplierNetworkWorkspace({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filtered.map((row) => {
+            {filtered.map((row, index) => {
               const edit = currentEdit(row);
               const open = expanded?.key === row.key;
               const optionsOpen = open && expanded.mode === "options";
               const actionsOpen = open && expanded.mode === "actions";
               const selectedChannels = edit.channels;
+              const approvedGroup = stage === "approved" && (index === 0 || currentEdit(filtered[index - 1]).priority !== edit.priority)
               return (
+                <Fragment key={row.key}>
+                {approvedGroup ? <tr className="bg-slate-100"><td colSpan={6} className="px-3 py-2 text-[10px] font-black uppercase tracking-[.12em] text-slate-600">{edit.priority ? "Top vendors · actively working together" : "Approved suppliers · ready when needed"}</td></tr> : null}
                 <tr
-                  key={row.key}
                   className="group align-top hover:bg-sky-50/40"
                 >
                   <td className="p-0" colSpan={6}>
@@ -284,10 +342,11 @@ export function SupplierNetworkWorkspace({
                             saveRow(row, {
                               ...edit,
                               priority: event.target.checked,
+                              stage: edit.stage === "contact" && !event.target.checked ? "more" : edit.stage === "more" && event.target.checked ? "contact" : edit.stage,
                             })
                           }
                           className="h-3.5 w-3.5 shrink-0 accent-amber-500"
-                          aria-label={`Priority ${row.name}`}
+                          aria-label={`${stage === "approved" ? "Top vendor" : "Current priority"} ${row.name}`}
                         />
                         <span className="truncate">{row.name}</span>
                       </label>
@@ -397,13 +456,10 @@ export function SupplierNetworkWorkspace({
                               Move to
                               <select
                                 value={edit.stage}
-                                onChange={(event) =>
-                                  saveRow(row, {
-                                    ...edit,
-                                    stage: event.target
-                                      .value as SupplierNetworkStage,
-                                  })
-                                }
+                                onChange={(event) => {
+                                  const nextStage = event.target.value as SupplierNetworkStage;
+                                  saveRow(row, { ...edit, stage: nextStage, priority: nextStage === "contact" ? true : nextStage === "more" ? false : edit.priority });
+                                }}
                                 className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold normal-case text-slate-900 outline-none focus:border-[#0071e3]"
                               >
                                 {STAGES.map((item) => (
@@ -537,6 +593,7 @@ export function SupplierNetworkWorkspace({
                     ) : null}
                   </td>
                 </tr>
+                </Fragment>
               );
             })}
           </tbody>

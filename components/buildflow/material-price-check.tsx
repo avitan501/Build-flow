@@ -1,7 +1,8 @@
 "use client"
 
 import { ExternalLink, LoaderCircle, MapPin, Phone, Route, Search, ShoppingCart, Sparkles, Store, UsersRound, X } from "lucide-react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import { createPortal } from "react-dom"
 
 import type { ExaCatalogSearchResult, ProductCallResult, ProductSalesContact, ProductSearchLink } from "@/lib/exa-catalog-search"
 
@@ -40,6 +41,7 @@ export function MaterialPriceCheck({ requestId, query, department, defaultZipCod
   const [pending, setPending] = useState(false)
   const [morePending, setMorePending] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false)
   const startedSearch = useRef(false)
 
   const excludedDomains = useMemo(() => [...new Set([
@@ -94,6 +96,19 @@ export function MaterialPriceCheck({ requestId, query, department, defaultZipCod
     void search(false)
   }, [search])
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose()
+    }
+    window.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [onClose])
+
   const totalResults = buyNow.length + callForPrice.length + salesContacts.length
   const directDomains = new Set(buyNow.map((result) => result.domain))
   const majorRetailers = links.filter((link) => ["Home Depot", "Lowe's"].includes(link.label))
@@ -115,9 +130,12 @@ export function MaterialPriceCheck({ requestId, query, department, defaultZipCod
     routing.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
-  return <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+  if (!mounted) return null
+
+  return createPortal(<div className="fixed inset-0 z-[140] flex items-end justify-center bg-slate-950/55 p-2 backdrop-blur-[2px] sm:items-center sm:p-5" role="dialog" aria-modal="true" aria-labelledby="item-sourcing-title" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose() }}>
+  <section className="max-h-[94dvh] w-full max-w-6xl overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.38)]">
     <div className="border-b border-slate-200 bg-slate-50 px-3 py-3 sm:px-4">
-      <div className="flex items-start justify-between gap-3"><div><p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.12em] text-[#0066cc]"><Sparkles className="h-3.5 w-3.5" />Item sourcing</p><h3 className="mt-1 text-sm font-bold text-slate-950">Find this item</h3></div><button type="button" onClick={onClose} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white" aria-label="Close item search"><X className="h-4 w-4" /></button></div>
+      <div className="flex items-start justify-between gap-3"><div><p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.12em] text-[#0066cc]"><Sparkles className="h-3.5 w-3.5" />Item sourcing</p><h3 id="item-sourcing-title" className="mt-1 text-lg font-bold text-slate-950">Find this item</h3></div><button type="button" onClick={onClose} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white" aria-label="Close item search"><X className="h-4 w-4" /></button></div>
       <div className="mt-3 rounded-md border border-slate-200 bg-white p-3">
         <p className="text-[10px] font-bold uppercase tracking-[.08em] text-slate-500">Searching the catalog for</p>
         <p className="mt-1 text-sm font-bold leading-5 text-slate-950">{itemQuery}</p>
@@ -138,5 +156,6 @@ export function MaterialPriceCheck({ requestId, query, department, defaultZipCod
 
       <div className="mt-4 flex flex-wrap gap-2">{totalResults ? <button type="button" onClick={() => void search(true)} disabled={morePending} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-[#0071e3] bg-white px-3 text-xs font-bold text-[#0066cc] disabled:opacity-50">{morePending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}{morePending ? "Searching more..." : "Check more suppliers"}</button> : null}<button type="button" onClick={openSupplierRouting} className="inline-flex min-h-9 items-center gap-1.5 rounded-md bg-slate-950 px-3 text-xs font-bold text-white"><Route className="h-3.5 w-3.5" />Add suppliers</button></div>
     </div> : <div className="flex items-center gap-2 px-3 py-3 text-xs text-slate-500 sm:px-4"><LoaderCircle className="h-3.5 w-3.5 animate-spin" />Starting the catalog search near ZIP {zipCode}.</div>}
-  </div>
+  </section>
+  </div>, document.body)
 }

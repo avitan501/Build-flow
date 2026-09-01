@@ -33,6 +33,58 @@ const inputSchema = z.object({
   ask: z.string().trim().max(4000),
 });
 
+const discoveredSupplierSchema = z.object({
+  name: z.string().trim().min(2).max(160),
+  department: z.string().trim().min(2).max(100),
+  zipCode: z.string().regex(/^\d{5}(?:-\d{4})?$/),
+  url: z.string().url().max(1200),
+  summary: z.string().trim().max(1000),
+});
+
+function supplierKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 160);
+}
+
+export async function addDiscoveredSupplierNetworkAction(input: z.infer<typeof discoveredSupplierSchema>) {
+  const parsed = discoveredSupplierSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: "This supplier could not be added." };
+  const { supabase, user } = await requireStaffProfile("suppliers");
+  const key = supplierKey(parsed.data.name);
+  const supplierId = `discovered-${key.replace(/\s+/g, "-")}`.slice(0, 160);
+  const supplier = {
+    id: supplierId,
+    name: parsed.data.name,
+    contactLabel: "Supplier contact",
+    contactName: "",
+    email: "",
+    phone: "",
+    whatsapp: "",
+    portalUrl: parsed.data.url,
+    preferredDeliveryMethod: "manual",
+    contactMethods: ["manual"],
+    materials: parsed.data.department,
+    deliveryNotes: `AI-discovered near ${parsed.data.zipCode}. Confirm products, delivery area, and contractor pricing.`,
+    deliveryCharge: null,
+    deliveryChargeNote: "",
+    notes: parsed.data.summary,
+    address: "",
+    catalogDepartments: [parsed.data.department],
+    catalogEnabledDepartments: [],
+    programChannels: [],
+    trustLevel: "not-reviewed",
+    additionalContacts: [],
+    relationshipUpdates: [],
+  };
+  const { error } = await supabase.rpc("staff_upsert_supplier_directory_entry", { p_supplier: supplier, p_create: true });
+  if (error && !error.message.includes("already")) return { ok: false as const, error: "The supplier could not be added to the directory." };
+  await saveSupplierNetworkOptions(supabase, user.id, key, parsed.data.name, {
+    channels: [], stage: "more", status: "Research ready", note: parsed.data.summary, hidden: false, priority: false,
+  });
+  revalidatePath("/admin/supplier-network");
+  revalidatePath("/admin/vendors");
+  return { ok: true as const };
+}
+
 export async function updateSupplierNetworkRowAction(
   input: z.infer<typeof inputSchema>,
 ) {
@@ -84,7 +136,7 @@ export async function updateSupplierNetworkRowAction(
         catalogDepartments: Array.isArray(existing?.catalogDepartments) ? existing.catalogDepartments : [],
         catalogEnabledDepartments: Array.isArray(existing?.catalogEnabledDepartments) ? existing.catalogEnabledDepartments : [],
         programChannels: parsed.data.channels,
-        trustLevel: parsed.data.stage === "approved" ? "verified" : String(existing?.trustLevel || "first-time"),
+        trustLevel: parsed.data.stage === "approved" ? (parsed.data.priority ? "preferred" : "verified") : String(existing?.trustLevel || "first-time"),
       };
       const { error: directoryError } = await supabase.rpc("staff_upsert_supplier_directory_entry", { p_supplier: supplier, p_create: !existing });
       if (directoryError) throw directoryError;

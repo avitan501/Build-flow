@@ -3,7 +3,7 @@
 import { Check, Mail, Plus, RefreshCw, Search, StickyNote, Trash2, X } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useRef, useState, useTransition } from "react"
-import { deleteSupplierDirectoryEntryAction, loadSupplierDirectoryAction, saveSupplierDirectoryEntryAction, saveSupplierRoutingProductsAction } from "@/app/admin/vendors/actions"
+import { deleteSupplierDirectoryEntryAction, loadSupplierDirectoryAction, saveSupplierDirectoryEntryAction } from "@/app/admin/vendors/actions"
 import { saveWorkflowManagerSettingsAction } from "@/app/preview-admin/workflow-actions"
 import { DepartmentSymbolBadges, DEPARTMENT_SYMBOL_OPTIONS } from "@/components/buildflow/department-symbol-badges"
 import { QuoCallButton } from "@/components/buildflow/quo-call-button"
@@ -17,7 +17,6 @@ import {
   buildManagerProductAddOn,
   departmentDisplayLabel,
   departmentOverrideFor,
-  applyDepartmentAddOns,
   isDepartmentHidden,
   isManagerItemHidden,
   readManagerAddOns,
@@ -153,10 +152,6 @@ const departmentSlugByLabel = new Map<string, ShopToolSlug>(
   SHOP_TOOL_CATEGORIES.map((category) => [category.label, category.slug]),
 )
 
-function departmentRouteId(slug: string) {
-  return `department-route-${slug}`
-}
-
 function productsForDepartment(products: ShopCatalogProduct[], departmentLabel: string) {
   const slug = departmentSlugByLabel.get(departmentLabel)
   if (slug) return filterProductsForShopTool(products, slug)
@@ -216,6 +211,7 @@ export function SupplierRoutingManager({
   const [trialCatalogStatus, setTrialCatalogStatus] = useState("")
   const [supplierDraftNotesOpen, setSupplierDraftNotesOpen] = useState(false)
   const [supplierNotesOpen, setSupplierNotesOpen] = useState<Record<string, boolean>>({})
+  const [supplierUpdateDraft, setSupplierUpdateDraft] = useState("")
   const pendingSaveRef = useRef<{ qualificationSettings: ShopQualificationSettings; addOns: ManagerCatalogAddOns } | null>(null)
   const saveRunningRef = useRef(false)
   const [supplierDraft, setSupplierDraft] = useState({
@@ -305,17 +301,10 @@ export function SupplierRoutingManager({
       return [entry.name, entry.department, entry.materials, entry.address].some((value) => value.toLowerCase().includes(query))
     })
   }, [deletedSupplierIdSet, trialDepartment, trialSearch])
-  const shopDepartments = useMemo(() => applyDepartmentAddOns(SHOP_TOOL_CATEGORIES, addOns), [addOns])
   const catalogDepartmentOptions = useMemo(
     () => materialCatalogDepartmentOptions(catalogDepartments, addOns.categories.map((category) => category.label)),
     [addOns.categories, catalogDepartments],
   )
-  const selectedSupplierDepartments = useMemo(() => shopDepartments.filter((department) => {
-    const explicit = settings.products[departmentRouteId(department.slug)]
-    if (explicit) return explicit.supplierId === selectedSupplier?.id
-    const targets = assignmentTargets.filter((target) => target.departmentSlug === department.slug)
-    return targets.length > 0 && targets.every((target) => selectedSettingFor(settings, target.id, assignmentTargets).supplierId === selectedSupplier?.id)
-  }), [assignmentTargets, selectedSupplier?.id, settings, shopDepartments])
   const assignedSupplier = settings.suppliers.find((supplier) => supplier.id === selectedSetting.supplierId) ?? null
   const existingDepartmentProducts = useMemo(() => productsForDepartment(catalogProducts, selectedDepartment).filter((product) => !isManagerItemHidden(addOns, product.id)), [addOns, catalogProducts, selectedDepartment])
   const departmentProducts = useMemo(() => addOns.products.filter((product) => product.category === selectedDepartment), [addOns.products, selectedDepartment])
@@ -425,6 +414,27 @@ export function SupplierRoutingManager({
     }))
     setSupplierDirty(true)
     setSupplierFormError("")
+  }
+
+  function toggleSupplierContactMethod(supplier: SupplierRoutingOption, method: SupplierDeliveryMethod) {
+    const current = supplier.contactMethods?.length ? supplier.contactMethods : [supplier.preferredDeliveryMethod || "manual"]
+    const next = current.includes(method) ? current.filter((entry) => entry !== method) : [...current, method]
+    updateSupplier(supplier.id, { contactMethods: next, preferredDeliveryMethod: next[0] || "manual" })
+  }
+
+  function addSupplierContact(supplier: SupplierRoutingOption) {
+    updateSupplier(supplier.id, { additionalContacts: [...(supplier.additionalContacts ?? []), { id: crypto.randomUUID(), name: "", role: "Salesperson", email: "", phone: "" }] })
+  }
+
+  function updateAdditionalSupplierContact(supplier: SupplierRoutingOption, contactId: string, patch: Partial<NonNullable<SupplierRoutingOption["additionalContacts"]>[number]>) {
+    updateSupplier(supplier.id, { additionalContacts: (supplier.additionalContacts ?? []).map((contact) => contact.id === contactId ? { ...contact, ...patch } : contact) })
+  }
+
+  function addSupplierRelationshipUpdate(supplier: SupplierRoutingOption) {
+    const summary = supplierUpdateDraft.trim()
+    if (!summary) return
+    updateSupplier(supplier.id, { relationshipUpdates: [{ id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), summary }, ...(supplier.relationshipUpdates ?? [])] })
+    setSupplierUpdateDraft("")
   }
 
   function updateSupplierDirectorySearch(value: string) {
@@ -637,50 +647,6 @@ export function SupplierRoutingManager({
       const syncMessage = staleRemovals > 0 ? ` ${staleRemovals} earlier deletion${staleRemovals === 1 ? " was" : "s were"} also synchronized before this delete.` : ""
       const refreshMessage = latest.ok ? syncMessage : " The preliminary refresh was unavailable, so the atomic server response was used directly."
       setDirectoryNotice(`${latestSupplier?.name || supplier?.name || "That vendor"} alone was deleted. ${nextSettings.suppliers.length} active vendor${nextSettings.suppliers.length === 1 ? " remains" : "s remain"}.${refreshMessage}`)
-    })
-  }
-
-  function toggleSupplierDepartment(departmentSlug: string, checked: boolean) {
-    if (!selectedSupplier) return
-    const fallbackSupplier = settings.suppliers.find((supplier) => supplier.id !== selectedSupplier.id)
-    if (!checked && !fallbackSupplier) return
-    const supplierId = checked ? selectedSupplier.id : fallbackSupplier!.id
-    const routeId = departmentRouteId(departmentSlug)
-    const nextProducts = {
-      ...settings.products,
-      [routeId]: {
-        productId: routeId,
-        enabled: true,
-        supplierId,
-        questions: settings.products[routeId]?.questions ?? [],
-      },
-    }
-
-    for (const target of assignmentTargets.filter((entry) => entry.departmentSlug === departmentSlug)) {
-      const current = selectedSettingFor(settings, target.id, assignmentTargets)
-      nextProducts[target.id] = { ...current, productId: target.id, supplierId }
-    }
-    const nextSettings = { ...settings, products: nextProducts }
-    if (!supplierDirectoryOnly) {
-      persist(nextSettings)
-      return
-    }
-
-    setSettings(nextSettings)
-    writeShopQualificationSettings(nextSettings)
-    setDirectorySaveState("saving")
-    setDirectorySaveError("")
-    startSupplierSave(async () => {
-      const result = await saveSupplierRoutingProductsAction(nextProducts)
-      if (!result.ok) {
-        setDirectorySaveState("error")
-        setDirectorySaveError(result.error)
-        return
-      }
-      setSettings(result.settings)
-      setDeletedSupplierIds(result.deletedSupplierIds)
-      writeShopQualificationSettings(result.settings)
-      setDirectorySaveState("saved")
     })
   }
 
@@ -1345,6 +1311,11 @@ export function SupplierRoutingManager({
                       </p>
                     ) : null}
 
+                    <div className="mt-3 grid gap-2 rounded-xl border border-sky-200 bg-sky-50/70 p-3 sm:grid-cols-[12rem_1fr] sm:items-end">
+                      <label className="grid gap-1 text-xs font-bold text-slate-900">Delivery charge<span className="relative"><span className="pointer-events-none absolute left-3 top-2.5 text-sm text-slate-400">$</span><input type="number" min="0" step="0.01" value={selectedSupplier.deliveryCharge ?? ""} onChange={(event) => updateSupplier(selectedSupplier.id, { deliveryCharge: event.target.value === "" ? null : Number(event.target.value) })} placeholder="0.00" className="h-10 w-full rounded-lg border border-sky-200 bg-white pl-7 pr-3 text-sm font-bold" /></span></label>
+                      <p className="text-xs leading-5 text-sky-950">The delivery charge is kept with this supplier and appears when their quote is compared.</p>
+                    </div>
+
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <label className="grid gap-1 text-sm font-semibold text-slate-900">
                         Supplier name
@@ -1363,10 +1334,6 @@ export function SupplierRoutingManager({
                         <input value={selectedSupplier.phone || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { phone: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
                       <label className="grid gap-1 text-sm font-semibold text-slate-900">
-                        WhatsApp
-                        <input value={selectedSupplier.whatsapp || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { whatsapp: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
-                      </label>
-                      <label className="grid gap-1 text-sm font-semibold text-slate-900">
                         Supplier portal URL
                         <input value={selectedSupplier.portalUrl || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { portalUrl: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
@@ -1374,49 +1341,43 @@ export function SupplierRoutingManager({
                         Address
                         <input value={selectedSupplier.address || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { address: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
-                      <label className="grid gap-1 text-sm font-semibold text-slate-900 sm:col-span-2">
-                        Materials sold
-                        <textarea value={selectedSupplier.materials || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { materials: event.target.value })} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
-                      </label>
-                      <label className="grid gap-1 text-sm font-semibold text-slate-900">
-                        Preferred delivery method
-                        <select value={selectedSupplier.preferredDeliveryMethod || "manual"} onChange={(event) => updateSupplier(selectedSupplier.id, { preferredDeliveryMethod: event.target.value as SupplierDeliveryMethod })} className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium">
-                          {deliveryMethods.map((method) => <option key={method} value={method}>{methodLabel(method)}</option>)}
-                        </select>
-                      </label>
+                      <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-bold text-slate-950">Salespeople & emails</p><p className="text-[11px] text-slate-500">Keep every useful person at this supplier.</p></div><button type="button" onClick={() => addSupplierContact(selectedSupplier)} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-[#0066cc]"><Plus className="h-3.5 w-3.5" />Add salesperson or email</button></div>
+                        {(selectedSupplier.additionalContacts ?? []).length ? <div className="mt-3 grid gap-2">{(selectedSupplier.additionalContacts ?? []).map((contact) => <div key={contact.id} className="grid gap-2 rounded-md border border-slate-200 bg-white p-2 sm:grid-cols-[1fr_1fr_1fr_1fr_auto]"><input value={contact.name} onChange={(event) => updateAdditionalSupplierContact(selectedSupplier, contact.id, { name: event.target.value })} placeholder="Name" aria-label="Salesperson name" className="h-9 rounded-md border border-slate-200 px-2 text-xs" /><input value={contact.role || ""} onChange={(event) => updateAdditionalSupplierContact(selectedSupplier, contact.id, { role: event.target.value })} placeholder="Role" aria-label="Salesperson role" className="h-9 rounded-md border border-slate-200 px-2 text-xs" /><input type="email" value={contact.email || ""} onChange={(event) => updateAdditionalSupplierContact(selectedSupplier, contact.id, { email: event.target.value })} placeholder="Email" aria-label="Salesperson email" className="h-9 rounded-md border border-slate-200 px-2 text-xs" /><input value={contact.phone || ""} onChange={(event) => updateAdditionalSupplierContact(selectedSupplier, contact.id, { phone: event.target.value })} placeholder="Phone" aria-label="Salesperson phone" className="h-9 rounded-md border border-slate-200 px-2 text-xs" /><button type="button" onClick={() => updateSupplier(selectedSupplier.id, { additionalContacts: (selectedSupplier.additionalContacts ?? []).filter((entry) => entry.id !== contact.id) })} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-rose-200 text-rose-600" aria-label="Remove salesperson"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div> : null}
+                      </div>
+                      <fieldset className="sm:col-span-2"><legend className="text-sm font-semibold text-slate-900">Way to contact</legend><div className="mt-2 flex flex-wrap gap-2">{deliveryMethods.filter((method) => method !== "whatsapp").map((method) => { const checked = (selectedSupplier.contactMethods?.length ? selectedSupplier.contactMethods : [selectedSupplier.preferredDeliveryMethod || "manual"]).includes(method); return <label key={method} className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-xs font-bold ${checked ? "border-sky-300 bg-sky-50 text-sky-950" : "border-slate-200 bg-white text-slate-500"}`}><input type="checkbox" checked={checked} onChange={() => toggleSupplierContactMethod(selectedSupplier, method)} />{methodLabel(method)}</label> })}</div></fieldset>
                       <label className="grid gap-1 text-sm font-semibold text-slate-900">
                         Trust level
                         <select value={selectedSupplier.trustLevel || "not-reviewed"} onChange={(event) => updateSupplier(selectedSupplier.id, { trustLevel: event.target.value as SupplierTrustLevel })} className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium">
                           {trustLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
                         </select>
                       </label>
-                      <fieldset className="sm:col-span-2">
-                        <legend className="text-sm font-semibold text-slate-900">Categories supplied</legend>
-                        <p className="mt-1 text-xs text-slate-500">Requests and catalog pricing use these categories to find this supplier.</p>
+                      <details className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50">
+                        <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between px-3 text-sm font-semibold text-slate-900"><span>Categories supplied</span><span className="text-xs font-normal text-slate-500">{selectedSupplier.catalogDepartments?.length ?? 0} selected · Open</span></summary>
+                        <div className="border-t border-slate-200 p-3"><p className="text-xs text-slate-500">Requests and catalog pricing use these categories to find this supplier.</p>
                         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                           {catalogDepartmentOptions.map((department) => {
                             const checked = selectedSupplier.catalogDepartments?.includes(department) ?? false
                             return <label key={department} className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${checked ? "border-sky-300 bg-sky-50 text-slate-950" : "border-slate-200 bg-white text-slate-600"}`}><input type="checkbox" checked={checked} onChange={(event) => updateSupplier(selectedSupplier.id, { catalogDepartments: event.target.checked ? [...new Set([...(selectedSupplier.catalogDepartments ?? []), department])] : (selectedSupplier.catalogDepartments ?? []).filter((entry) => entry !== department) })} className="h-4 w-4 accent-[#0071e3]" />{department}</label>
                           })}
                         </div>
-                      </fieldset>
-                      <fieldset className="sm:col-span-2">
-                        <legend className="text-sm font-semibold text-slate-900">Supplier programs</legend>
-                        <p className="mt-1 text-xs text-slate-500">The same symbols appear in Carlos Supplier Relationships.</p>
+                        </div>
+                      </details>
+                      <details className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50">
+                        <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between px-3 text-sm font-semibold text-slate-900"><span>Supplier programs</span><span className="text-xs font-normal text-slate-500">{selectedSupplier.programChannels?.length ?? 0} selected · Open</span></summary>
+                        <div className="border-t border-slate-200 p-3"><p className="text-xs text-slate-500">The same symbols appear in Carlos Supplier Relationships.</p>
                         <div className="mt-2 flex flex-wrap gap-2">{SUPPLIER_PROGRAM_CHANNELS.map((channel) => { const checked = selectedSupplier.programChannels?.includes(channel) ?? false; return <label key={channel} className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-bold ${checked ? SUPPLIER_PROGRAM_COLORS[channel] : "border-slate-200 bg-white text-slate-500"}`}><input type="checkbox" checked={checked} onChange={(event) => updateSupplier(selectedSupplier.id, { programChannels: event.target.checked ? [...new Set([...(selectedSupplier.programChannels ?? []), channel])] : (selectedSupplier.programChannels ?? []).filter((entry) => entry !== channel) })} className="h-4 w-4 accent-[#0071e3]" />{channel}</label> })}</div>
-                      </fieldset>
-                      <label className="grid gap-1 text-sm font-semibold text-slate-900">
-                        Delivery charge
-                        <span className="relative"><span className="pointer-events-none absolute left-3 top-2.5 text-sm text-slate-400">$</span><input type="number" min="0" step="0.01" value={selectedSupplier.deliveryCharge ?? ""} onChange={(event) => updateSupplier(selectedSupplier.id, { deliveryCharge: event.target.value === "" ? null : Number(event.target.value) })} placeholder="0.00" className="min-h-10 w-full rounded-lg border border-slate-300 pl-7 pr-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" /></span>
-                      </label>
-                      <label className="grid gap-1 text-sm font-semibold text-slate-900">
-                        Delivery price note
-                        <input value={selectedSupplier.deliveryChargeNote || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { deliveryChargeNote: event.target.value })} placeholder="Free over $500, per truck, varies by ZIP…" className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
-                      </label>
+                        </div>
+                      </details>
                       <label className="grid gap-1 text-sm font-semibold text-slate-900 sm:col-span-2">
-                        Delivery instructions <span className="text-xs font-normal text-slate-500">Separate from the delivery price</span>
+                        Sales & supplier information <span className="text-xs font-normal text-slate-500">How to work with this supplier or salesperson</span>
                         <textarea value={selectedSupplier.deliveryNotes || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { deliveryNotes: event.target.value })} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
+                      <section className="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3" aria-label="Supplier relationship updates">
+                        <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-bold text-slate-950">Relationship updates</p><p className="text-[11px] text-slate-500">Record when you spoke and what happened.</p></div><span className="text-[10px] font-bold uppercase text-emerald-700">{selectedSupplier.relationshipUpdates?.length ?? 0} updates</span></div>
+                        <div className="mt-2 flex gap-2"><input value={supplierUpdateDraft} onChange={(event) => setSupplierUpdateDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addSupplierRelationshipUpdate(selectedSupplier) } }} placeholder="Spoke to John — send the next lumber list by email" className="h-10 min-w-0 flex-1 rounded-md border border-emerald-200 bg-white px-3 text-xs" /><button type="button" onClick={() => addSupplierRelationshipUpdate(selectedSupplier)} className="h-10 rounded-md bg-emerald-700 px-3 text-xs font-bold text-white">Add update</button></div>
+                        {(selectedSupplier.relationshipUpdates ?? []).length ? <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-emerald-100 bg-white">{(selectedSupplier.relationshipUpdates ?? []).map((update) => <div key={update.id} className="flex items-start gap-3 border-b border-slate-100 px-3 py-2 last:border-0"><time className="shrink-0 text-[10px] font-bold text-slate-500">{update.date}</time><p className="min-w-0 flex-1 text-xs leading-4 text-slate-700">{update.summary}</p><button type="button" onClick={() => updateSupplier(selectedSupplier.id, { relationshipUpdates: (selectedSupplier.relationshipUpdates ?? []).filter((entry) => entry.id !== update.id) })} aria-label="Remove relationship update" className="text-rose-500"><X className="h-3.5 w-3.5" /></button></div>)}</div> : null}
+                      </section>
                       <div className="sm:col-span-2">
                         {supplierNotesOpen[selectedSupplier.id] || selectedSupplier.notes ? (
                           <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
@@ -1449,30 +1410,6 @@ export function SupplierRoutingManager({
                     </div>
                     {supplierFormError ? <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{supplierFormError}</p> : null}
 
-                    <details className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                      <summary className="cursor-pointer text-sm font-bold text-slate-950">Automatic service routing · {selectedSupplierDepartments.length} assigned</summary>
-                      <div className="flex flex-wrap items-end justify-between gap-3">
-                      </div>
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        {shopDepartments.map((department) => {
-                          const explicit = settings.products[departmentRouteId(department.slug)]
-                          const targets = assignmentTargets.filter((target) => target.departmentSlug === department.slug)
-                          const checked = explicit ? explicit.supplierId === selectedSupplier.id : targets.length > 0 && targets.every((target) => selectedSettingFor(settings, target.id, assignmentTargets).supplierId === selectedSupplier.id)
-                          return (
-                            <label key={department.slug} className={`flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-sm ${checked ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white"}`}>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={(event) => toggleSupplierDepartment(department.slug, event.target.checked)}
-                              />
-                              <span>
-                                <span className="block font-semibold text-slate-950">{department.label}</span>
-                              </span>
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </details>
                   </>
                 ) : (
                   <div className="flex min-h-64 items-center justify-center rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-6 text-center">

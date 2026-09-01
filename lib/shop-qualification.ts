@@ -5,6 +5,20 @@ export type QualifyingQuestionType = "text" | "textarea" | "select"
 export type SupplierDeliveryMethod = "email" | "phone" | "whatsapp" | "sms" | "portal" | "manual"
 export type SupplierTrustLevel = "not-reviewed" | "first-time" | "verified" | "trusted" | "preferred" | "do-not-use"
 
+export type SupplierContact = {
+  id: string
+  name: string
+  role?: string
+  email?: string
+  phone?: string
+}
+
+export type SupplierRelationshipUpdate = {
+  id: string
+  date: string
+  summary: string
+}
+
 export type QualifyingQuestion = {
   id: string
   label: string
@@ -23,6 +37,9 @@ export type SupplierRoutingOption = {
   whatsapp?: string
   portalUrl?: string
   preferredDeliveryMethod?: SupplierDeliveryMethod
+  contactMethods?: SupplierDeliveryMethod[]
+  additionalContacts?: SupplierContact[]
+  relationshipUpdates?: SupplierRelationshipUpdate[]
   deliveryNotes?: string
   deliveryCharge?: number | null
   deliveryChargeNote?: string

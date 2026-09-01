@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { requireStaffProfile } from "@/lib/auth"
-import type { ShopQualificationSettings, SupplierRoutingOption } from "@/lib/shop-qualification"
+import type { ShopQualificationSettings, SupplierContact, SupplierRelationshipUpdate, SupplierRoutingOption } from "@/lib/shop-qualification"
 import { SUPPLIER_PROGRAM_CHANNELS, type SupplierProgramChannel } from "@/lib/supplier-program-channels"
 
 const JOB_ADDRESS = "280 Lawrence Ave, Lawrence, NY 11559"
@@ -61,6 +61,23 @@ function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | nu
 
   const deliveryCharge = input.deliveryCharge == null ? null : Number(input.deliveryCharge)
   const allowedChannels = new Set<string>(SUPPLIER_PROGRAM_CHANNELS)
+  const allowedContactMethods = new Set(["email", "phone", "whatsapp", "sms", "portal", "manual"])
+  const additionalContacts = (Array.isArray(input.additionalContacts) ? input.additionalContacts : []).flatMap((contact): SupplierContact[] => {
+    if (!contact || typeof contact !== "object") return []
+    const additionalEmail = String(contact.email || "").trim().toLowerCase().slice(0, 320)
+    if (additionalEmail && !/^\S+@\S+\.\S+$/.test(additionalEmail)) return []
+    const contactName = String(contact.name || "").trim().slice(0, 160)
+    const contactPhone = String(contact.phone || "").trim().slice(0, 80)
+    if (!contactName && !additionalEmail && !contactPhone) return []
+    return [{ id: String(contact.id || crypto.randomUUID()).slice(0, 160), name: contactName, role: String(contact.role || "").trim().slice(0, 120), email: additionalEmail, phone: contactPhone }]
+  }).slice(0, 20)
+  const relationshipUpdates = (Array.isArray(input.relationshipUpdates) ? input.relationshipUpdates : []).flatMap((update): SupplierRelationshipUpdate[] => {
+    if (!update || typeof update !== "object") return []
+    const summary = String(update.summary || "").trim().slice(0, 2000)
+    if (!summary) return []
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(update.date || "")) ? String(update.date) : new Date().toISOString().slice(0, 10)
+    return [{ id: String(update.id || crypto.randomUUID()).slice(0, 160), date, summary }]
+  }).slice(0, 100)
   return {
     ...input,
     id: input.id.trim().slice(0, 160),
@@ -71,6 +88,10 @@ function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | nu
     phone: input.phone?.trim().slice(0, 80) || "",
     whatsapp: input.whatsapp?.trim().slice(0, 80) || "",
     portalUrl: input.portalUrl?.trim().slice(0, 500) || "",
+    preferredDeliveryMethod: input.preferredDeliveryMethod || "manual",
+    contactMethods: Array.isArray(input.contactMethods) ? [...new Set(input.contactMethods.filter((method) => allowedContactMethods.has(method)))].slice(0, 6) as SupplierRoutingOption["contactMethods"] : [input.preferredDeliveryMethod || "manual"],
+    additionalContacts,
+    relationshipUpdates,
     deliveryNotes: input.deliveryNotes?.trim().slice(0, 4_000) || "",
     deliveryCharge: Number.isFinite(deliveryCharge) && Number(deliveryCharge) >= 0 ? Math.round(Number(deliveryCharge) * 100) / 100 : null,
     deliveryChargeNote: input.deliveryChargeNote?.trim().slice(0, 1_000) || "",

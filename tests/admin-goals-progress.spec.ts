@@ -466,12 +466,13 @@ test("affiliate tracker is persistent, owner-only, filterable, and setup-gated",
 });
 
 test("Carlos has one compact deduplicated supplier network while the research list stays preserved", async () => {
-  const [page, component, network, data] = await Promise.all([
+  const [page, component, badges, network, data] = await Promise.all([
     readFile(path.join(root, "app/admin/supplier-network/page.tsx"), "utf8"),
     readFile(
       path.join(root, "components/buildflow/supplier-network-workspace.tsx"),
       "utf8",
     ),
+    readFile(path.join(root, "components/buildflow/supplier-program-badges.tsx"), "utf8"),
     readFile(path.join(root, "lib/supplier-network.ts"), "utf8"),
     readFile(path.join(root, "lib/affiliate-call-list.ts"), "utf8"),
   ]);
@@ -486,7 +487,7 @@ test("Carlos has one compact deduplicated supplier network while the research li
     expect(component).toContain(`"${source}"`);
   }
   expect(component).toContain("CHANNEL_DESCRIPTIONS");
-  expect(component).toContain("Direct catalog, stock, or pricing connection");
+  expect(badges).toContain("Direct catalog, stock, or pricing connection");
   expect(component).toContain("Choose options for");
   expect(component).toContain("updateSupplierNetworkRowAction");
   expect(component).toContain("Saved automatically");
@@ -498,8 +499,12 @@ test("Carlos has one compact deduplicated supplier network while the research li
   expect(component).toContain("Restore");
   expect(component).toContain("deleteConfirm === row.key");
   expect(component).toContain("aria-pressed={priorityOnly}");
-  expect(component).toContain("Priority{");
-  expect(component).toContain("Priority ${row.name}");
+  expect(component).toContain("Current focus");
+  expect(component).toContain("Top vendors");
+  expect(component).toContain("Building Relationship");
+  expect(component).toContain("Generate 10 more");
+  expect(component).toContain("Top vendors · actively working together");
+  expect(component).toContain("Current priority");
   expect(component).toContain("priorityDifference");
   expect(component).toContain("priorityOnly");
   expect(component).toContain("SUPPLIER_NETWORK_CHANNELS.map");
