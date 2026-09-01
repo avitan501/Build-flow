@@ -1,6 +1,6 @@
 "use client"
 
-import { CalendarClock, ChevronDown, Download, FileText, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, Route, Send, Trash2, X } from "lucide-react"
+import { CalendarClock, ChevronDown, Download, FileText, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, Route, Search, Send, Trash2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
@@ -9,7 +9,9 @@ import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/
 import { openRequestPricingComparisonAction } from "@/app/admin/supplier-quotes/actions"
 import { previewRequestClientQuoteAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestWorkflowStepAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
+import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
 import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
+import { RequestSupplierRouteEditor } from "@/components/buildflow/request-supplier-route-editor"
 import { OPEN_REQUEST_CLIENT_CONTACT_EVENT } from "@/components/buildflow/request-client-contact"
 import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
@@ -21,6 +23,16 @@ type QuoteLine = { key: string; description: string; quantity: number; unit: str
 export type RequestComparisonSummary = { id: string; title: string; status: string; quoteNumber: string; updatedAt: string; bids: Array<{ id: string; supplierName: string; landedTotal: number; pricedItemCount: number; itemCount: number; recommended: boolean }> }
 
 const actionClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:border-sky-400 hover:bg-sky-50"
+
+function SupplierContactRow({ entry, recommendedSupplierIds, supplierIds, toggleRecommendedSupplier, toggleSupplier }: {
+  entry: SupplierRoutingOption
+  recommendedSupplierIds: string[]
+  supplierIds: string[]
+  toggleRecommendedSupplier: (supplierId: string) => void
+  toggleSupplier: (supplierId: string) => void
+}) {
+  return <div className="flex min-h-12 items-center gap-3 rounded-md px-2 text-sm hover:bg-slate-50"><label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"><input aria-label={`Recommend ${entry.name}`} type="checkbox" checked={recommendedSupplierIds.includes(entry.id)} onChange={() => toggleRecommendedSupplier(entry.id)} className="h-4 w-4 rounded border-slate-300 accent-amber-500" /><span className="min-w-0"><span className="block truncate font-semibold">{entry.name}</span><span className="block truncate text-xs text-slate-500">{entry.email || entry.phone || entry.whatsapp || "No contact method"} · {(entry.trustLevel || "not-reviewed").replaceAll("-", " ")}</span></span></label><label className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold"><input aria-label={`Contact ${entry.name}`} type="checkbox" checked={supplierIds.includes(entry.id)} onChange={() => toggleSupplier(entry.id)} className="h-4 w-4 rounded border-slate-300 accent-[#0071e3]" />Contact</label></div>
+}
 
 const REPLY_BLOCKS = [
   { id: "received", label: "Order received", text: "We received your order and are reviewing it now." },
@@ -66,7 +78,6 @@ export function RequestManagementPanel({
   step4CompletedOverride,
   initialManagerNotes,
   initialSupplierRecommendations,
-  supplierEmails,
   clientEmails,
 }: {
   requestId: string
@@ -76,7 +87,7 @@ export function RequestManagementPanel({
   suppliers: SupplierRoutingOption[]
   packages: PackageRoute[]
   requestItems: Array<{ id: string; name: string; quantity: number; unit: string | null; reviewReasons: string[] }>
-  pricingSummaryItems: Array<{ id: string; original: string; organized: string; route: string }>
+  pricingSummaryItems: Array<{ id: string; original: string; organized: string; route: string; metadata: Record<string, unknown> | null }>
   projectAddress: string
   currentStage: ManagerPipelineStage
   comparisons: RequestComparisonSummary[]
@@ -85,7 +96,6 @@ export function RequestManagementPanel({
   step4CompletedOverride: boolean | null
   initialManagerNotes: string
   initialSupplierRecommendations: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean }>
-  supplierEmails: RelatedEmailItem[]
   clientEmails: RelatedEmailItem[]
 }) {
   const router = useRouter()
@@ -120,6 +130,7 @@ export function RequestManagementPanel({
   const [includeAch, setIncludeAch] = useState(false)
   const [ach, setAch] = useState({ bankName: "", accountOwner: "", routingNumber: "", accountNumber: "" })
   const [quoteFeedback, setQuoteFeedback] = useState("")
+  const [onlineSupplierSearchOpen, setOnlineSupplierSearchOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const pendingRef = useRef(pending)
   const contactDialogRef = useRef<HTMLElement | null>(null)
@@ -127,6 +138,11 @@ export function RequestManagementPanel({
   const contactTriggerRef = useRef<HTMLElement | null>(null)
   const routeDepartment = departments.length === 1 ? departments[0] : departments.length > 1 ? "Multiple departments" : "Others"
   const availableSuppliers = useMemo(() => [...suppliers].sort((left, right) => left.name.localeCompare(right.name)), [suppliers])
+  const routeSupplierNames = useMemo(() => [...new Set(pricingSummaryItems.flatMap((item) => Array.isArray(item.metadata?.supplier_route_names) ? item.metadata.supplier_route_names.filter((name): name is string => typeof name === "string" && Boolean(name.trim())) : []))], [pricingSummaryItems])
+  const routeNameKeys = useMemo(() => new Set(routeSupplierNames.map((name) => name.trim().toLowerCase())), [routeSupplierNames])
+  const selectedRouteSuppliers = useMemo(() => availableSuppliers.filter((supplier) => routeNameKeys.has(supplier.name.trim().toLowerCase())), [availableSuppliers, routeNameKeys])
+  const remainingSuppliers = useMemo(() => availableSuppliers.filter((supplier) => !routeNameKeys.has(supplier.name.trim().toLowerCase())), [availableSuppliers, routeNameKeys])
+  const onlineSupplierQuery = useMemo(() => pricingSummaryItems.map((item) => item.organized).filter(Boolean).slice(0, 6).join("; "), [pricingSummaryItems])
 
   const firstName = client.name.trim().split(/\s+/)[0] || "there"
   const missingQuestions = useMemo(() => requestItems.flatMap((item) => item.reviewReasons.map((reason) => `${item.name}: ${reason}`)), [requestItems])
@@ -277,7 +293,7 @@ export function RequestManagementPanel({
     const chosen = new Set([...recommendedSupplierIds, ...supplierIds])
     const result = await saveRequestSupplierPlanAction({ requestId, managerNotes, suppliers: [...chosen].map((supplierId) => ({ supplierId, isRecommended: recommendedSupplierIds.includes(supplierId), shouldContact: supplierIds.includes(supplierId) })) })
     setFeedbackError(!result.ok)
-    setFeedback(result.ok ? "Supplier pricing note and choices saved." : result.error)
+    setFeedback(result.ok ? "Request notes and supplier choices saved." : result.error)
     return result.ok
   }
 
@@ -451,8 +467,9 @@ export function RequestManagementPanel({
       <details open={currentStage === "pricing"} className={workflowStepCardClass()}>
         <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier pricing & comparison" detail={supplierQuoteCount ? `${supplierQuoteCount} quote${supplierQuoteCount === 1 ? "" : "s"} ready to compare` : packages.length ? `${packages.length} supplier request${packages.length === 1 ? "" : "s"} sent` : "Choose a route, contact suppliers, and add returned pricing"} status={pricingStatus} icon="pricing" />
         <div className="border-t border-slate-200 p-3">
+          <details className="mb-3 rounded-md border border-slate-200 bg-white"><summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-bold"><span>Request notes</span><span className="max-w-[60%] truncate font-normal text-slate-400">{managerNotes || "Add a note"}</span></summary><div className="grid gap-2 border-t border-slate-100 p-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"><textarea value={managerNotes} onChange={(event) => setManagerNotes(event.target.value)} rows={2} maxLength={5000} placeholder="Notes for this pricing request" className="resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-950" /><button type="button" onClick={() => startTransition(async () => { await saveSupplierPlan() })} disabled={pending} className="min-h-9 rounded-md bg-[#17304f] px-3 text-xs font-bold text-white disabled:opacity-50">Save notes</button></div></details>
           <div className="mb-3 overflow-x-auto rounded-md border border-slate-200 bg-slate-100">
-            <table className="w-full min-w-[42rem] table-fixed text-left text-[11px]"><thead className="text-[9px] font-bold uppercase tracking-[.08em] text-slate-500"><tr><th className="w-16 px-2 py-1.5">Qty</th><th className="px-2 py-1.5">Original</th><th className="px-2 py-1.5">AI request</th><th className="px-2 py-1.5">Supplier route</th></tr></thead><tbody className="divide-y divide-slate-200 bg-slate-50">{pricingSummaryItems.slice(0, 8).map((item) => <tr key={item.id}><td className="px-2 py-1.5 font-bold">{requestItems.find((candidate) => candidate.id === item.id)?.quantity || "—"}</td><td title={item.original} className="truncate px-2 py-1.5 text-slate-500">{item.original}</td><td title={item.organized} className="truncate px-2 py-1.5 font-semibold">{item.organized}</td><td className="px-2 py-1.5"><a href="#supplier-routing" className="font-bold text-[#0066cc]">{item.route || "Choose supplier"}</a></td></tr>)}</tbody></table>
+            <table className="w-full min-w-[42rem] table-fixed text-left text-[11px]"><thead className="text-[9px] font-bold uppercase tracking-[.08em] text-slate-500"><tr><th className="w-16 px-2 py-1.5">Qty</th><th className="px-2 py-1.5">Original</th><th className="px-2 py-1.5">AI request</th><th className="px-2 py-1.5">Supplier route &amp; note</th></tr></thead><tbody className="divide-y divide-slate-200 bg-slate-50">{pricingSummaryItems.slice(0, 8).map((item) => <tr key={item.id}><td className="px-2 py-1.5 font-bold">{requestItems.find((candidate) => candidate.id === item.id)?.quantity || "—"}</td><td title={item.original} className="truncate px-2 py-1.5 text-slate-500">{item.original}</td><td title={item.organized} className="truncate px-2 py-1.5 font-semibold">{item.organized}</td><td className="px-2 py-1.5"><RequestSupplierRouteEditor requestId={requestId} itemId={item.id} metadata={item.metadata} suppliers={suppliers} /></td></tr>)}</tbody></table>
           </div>
           <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <a href="#supplier-routing" className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-xs font-bold"><Route className="h-3.5 w-3.5" />Choose route</a>
@@ -461,25 +478,20 @@ export function RequestManagementPanel({
             {comparisons[0] ? <a href={`/admin/quote-comparison/${comparisons[0].id}`} className="inline-flex min-h-10 items-center justify-center rounded-md border border-emerald-300 bg-emerald-50 px-2 text-xs font-bold text-emerald-900">Compare quotes</a> : <a href={`/admin/supplier-quotes?request=${requestId}`} className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-slate-600">Quotes will compare here</a>}
           </div>
 
-          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3">
-            <label className="grid gap-1.5 text-sm font-bold text-slate-800">Supplier pricing note<textarea value={managerNotes} onChange={(event) => setManagerNotes(event.target.value)} rows={2} maxLength={5000} placeholder="What should Carlos or the supplier know before pricing?" className="resize-y rounded-lg border border-amber-300 bg-white px-3 py-2.5 font-normal text-slate-950 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100" /></label>
-            <div className="mt-2 flex justify-end"><button type="button" onClick={() => startTransition(async () => { await saveSupplierPlan() })} disabled={pending} className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#17304f] px-3 text-xs font-bold text-white disabled:opacity-50">Save pricing note</button></div>
-          </div>
-
-          <RelatedEmailTimeline title="Supplier email" emails={supplierEmails} />
-
           <details id="supplier-routing" className="group/route scroll-mt-24 rounded-md border border-slate-200 bg-slate-50">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold"><span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-sky-700" />Find Supplier</span><ChevronDown className="h-4 w-4 text-slate-400 transition group-open/route:rotate-180" /></summary>
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold"><span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-sky-700" />Contact Suppliers</span><ChevronDown className="h-4 w-4 text-slate-400 transition group-open/route:rotate-180" /></summary>
             <div className="border-t border-slate-200 p-3">
           <div className="mt-3 grid gap-3">
             <fieldset>
-              <legend className="text-sm font-semibold text-slate-700">Recommended suppliers</legend>
-              <p className="mt-0.5 text-xs text-slate-500">Mark suppliers worth considering, then choose exactly who Carlos should contact.</p>
+              <legend className="text-sm font-semibold text-slate-700">Suppliers selected in Step 1</legend>
+              <p className="mt-0.5 text-xs text-slate-500">Your chosen routes appear first. Then use any supplier in the directory.</p>
               <div className="mt-1.5 max-h-56 overflow-y-auto rounded-lg border border-slate-300 bg-white p-2">
-                {availableSuppliers.length ? availableSuppliers.map((entry) => <div key={entry.id} className="flex min-h-12 items-center gap-3 rounded-md px-2 text-sm hover:bg-slate-50"><label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"><input aria-label={`Recommend ${entry.name}`} type="checkbox" checked={recommendedSupplierIds.includes(entry.id)} onChange={() => toggleRecommendedSupplier(entry.id)} className="h-4 w-4 rounded border-slate-300 accent-amber-500" /><span className="min-w-0"><span className="block truncate font-semibold">{entry.name}</span><span className="block truncate text-xs text-slate-500">{entry.email || entry.phone || entry.whatsapp || "No contact method"} · {(entry.trustLevel || "not-reviewed").replaceAll("-", " ")}</span></span></label><label className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold"><input aria-label={`Contact ${entry.name}`} type="checkbox" checked={supplierIds.includes(entry.id)} onChange={() => toggleSupplier(entry.id)} className="h-4 w-4 rounded border-slate-300 accent-[#0071e3]" />Contact</label></div>) : <p className="px-2 py-4 text-center text-sm leading-5 text-slate-500">No suppliers are saved in Supplier Directory.</p>}
+                {selectedRouteSuppliers.length ? selectedRouteSuppliers.map((entry) => <SupplierContactRow key={entry.id} entry={entry} recommendedSupplierIds={recommendedSupplierIds} supplierIds={supplierIds} toggleRecommendedSupplier={toggleRecommendedSupplier} toggleSupplier={toggleSupplier} />) : <p className="px-2 py-3 text-xs text-slate-500">Choose routes in Step 1. Manually typed route names still stay on the request.</p>}
+                {remainingSuppliers.length ? <details className="border-t border-slate-100"><summary className="min-h-10 cursor-pointer px-2 py-3 text-xs font-bold text-[#0066cc]">All Supplier Directory ({remainingSuppliers.length})</summary><div>{remainingSuppliers.map((entry) => <SupplierContactRow key={entry.id} entry={entry} recommendedSupplierIds={recommendedSupplierIds} supplierIds={supplierIds} toggleRecommendedSupplier={toggleRecommendedSupplier} toggleSupplier={toggleSupplier} />)}</div></details> : null}
               </div>
             </fieldset>
             <div className="flex flex-wrap justify-end gap-2"><button type="button" onClick={() => startTransition(async () => { await saveSupplierPlan() })} disabled={pending} className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 disabled:opacity-50">Save supplier choices</button><button type="button" onClick={createSupplierRequest} disabled={!supplierIds.length || pending} className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-[#0071e3] px-3 text-xs font-bold text-white disabled:opacity-50"><Route className="h-4 w-4" />Contact {supplierIds.length || ""} supplier{supplierIds.length === 1 ? "" : "s"}</button></div>
+            <div className="rounded-md border border-violet-200 bg-violet-50 p-2"><button type="button" onClick={() => setOnlineSupplierSearchOpen((value) => !value)} className="inline-flex min-h-10 w-full items-center justify-between gap-2 rounded-md bg-white px-3 text-left text-xs font-bold text-violet-900"><span className="inline-flex items-center gap-2"><Search className="h-4 w-4" />AI · Look for suppliers online</span><ChevronDown className={`h-4 w-4 transition ${onlineSupplierSearchOpen ? "rotate-180" : ""}`} /></button>{onlineSupplierSearchOpen ? <MaterialPriceCheck requestId={requestId} query={onlineSupplierQuery || requestTitle} department={routeDepartment} defaultZipCode={(projectAddress.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || "11516")} onClose={() => setOnlineSupplierSearchOpen(false)} /> : null}</div>
           </div>
           {packages.length ? <div className="mt-4 border-t border-slate-200 pt-3"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Current routes</p><div className="mt-2 grid gap-2">{packages.map((pkg) => <div key={pkg.id} className="flex items-center justify-between gap-3 text-sm"><span className="font-semibold">{pkg.department}</span><span className="text-right text-slate-600">{suppliers.find((entry) => entry.id === pkg.supplier_id)?.name || "Not assigned"} · {pkg.status.replaceAll("_", " ")}</span></div>)}</div></div> : null}
             </div>

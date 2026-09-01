@@ -119,7 +119,27 @@ test("supplier quotes move into compact step two instead of expanding the reques
   expect(management).toContain("Supplier pricing & comparison")
   expect(management).toContain("Upload returned quote")
   expect(management).toContain("Add pricing by hand")
+  expect(management).toContain("Contact Suppliers")
+  expect(management).toContain("Suppliers selected in Step 1")
+  expect(management).toContain("AI · Look for suppliers online")
+  expect(management).not.toContain('title="Supplier email"')
   expect(management, "supplier bids should not be isolated in repeated large comparison cards").not.toContain("comparisons.map((comparison) => <article")
+})
+
+test("supplier routes allow many suppliers, per-supplier notes, and one route for all items", async () => {
+  const [worktable, editor, actions] = await Promise.all([
+    source(worktablePath),
+    source(path.join(root, "components/buildflow/request-supplier-route-editor.tsx")),
+    source(path.join(root, "app/owner/materials/requests/actions.ts")),
+  ])
+
+  expect(editor).toContain("Set one route for all items")
+  expect(worktable).toContain("itemIds={items.map")
+  expect(editor).toContain("supplier_route_notes")
+  expect(editor).toContain("Note for this supplier")
+  expect(editor).toContain("Add as many suppliers as needed")
+  expect(actions).not.toContain("].slice(0, 12)")
+  expect(actions).toContain("supplier_route_notes: supplierNotes")
 })
 
 test("client contact is available at the request header and does not consume step four", async () => {

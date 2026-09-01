@@ -336,20 +336,20 @@ export async function saveRequestItemSupplierRouteAction(input: {
   requestId: string
   itemIds: string[]
   supplierNames: string[]
-  routeNote?: string
+  supplierNotes?: Record<string, string>
 }) {
   const requestId = String(input.requestId || "").trim()
   const itemIds = Array.isArray(input.itemIds) ? [...new Set(input.itemIds.map((id) => String(id).trim()))].slice(0, 100) : []
-  const supplierNames = Array.isArray(input.supplierNames) ? [...new Set(input.supplierNames.map((name) => String(name).trim().replace(/\s+/g, " ").slice(0, 160)).filter(Boolean))].slice(0, 12) : []
-  const routeNote = String(input.routeNote || "").trim().slice(0, 800)
+  const supplierNames = Array.isArray(input.supplierNames) ? [...new Set(input.supplierNames.map((name) => String(name).trim().replace(/\s+/g, " ").slice(0, 160)).filter(Boolean))] : []
+  if (JSON.stringify(supplierNames).length > 50_000) return { ok: false as const, error: "The supplier route is too large to save at once." }
+  const rawNotes = input.supplierNotes && typeof input.supplierNotes === "object" && !Array.isArray(input.supplierNotes) ? input.supplierNotes : {}
+  const supplierNotes = Object.fromEntries(supplierNames.map((name) => [name, String(rawNotes[name] || "").trim().slice(0, 800)]).filter(([, note]) => Boolean(note)))
   if (!/^[0-9a-f-]{36}$/i.test(requestId) || !itemIds.length || itemIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) return { ok: false as const, error: "Choose at least one valid request item." }
   const { supabase, user } = await requireStaffProfile("customers")
   const { data: items } = await supabase.from("quote_request_items").select("id,metadata").eq("request_id", requestId).in("id", itemIds).returns<Array<{ id: string; metadata: Record<string, unknown> | null }>>()
   if (!items || items.length !== itemIds.length) return { ok: false as const, error: "One of the selected items is no longer available." }
-  for (const item of items) {
-    const { error } = await supabase.from("quote_request_items").update({ metadata: { ...(item.metadata ?? {}), supplier_route_names: supplierNames, supplier_route_note: routeNote, supplier_route_updated_at: new Date().toISOString(), supplier_route_updated_by: user.id } }).eq("id", item.id).eq("request_id", requestId)
-    if (error) return { ok: false as const, error: "The supplier route could not be saved for every selected item." }
-  }
+  const updates = await Promise.all(items.map((item) => supabase.from("quote_request_items").update({ metadata: { ...(item.metadata ?? {}), supplier_route_names: supplierNames, supplier_route_notes: supplierNotes, supplier_route_note: null, supplier_route_updated_at: new Date().toISOString(), supplier_route_updated_by: user.id } }).eq("id", item.id).eq("request_id", requestId)))
+  if (updates.some((result) => result.error)) return { ok: false as const, error: "The supplier route could not be saved for every selected item." }
   revalidatePath(`/owner/materials/requests/${requestId}`)
   return { ok: true as const }
 }

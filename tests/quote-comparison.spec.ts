@@ -202,6 +202,16 @@ test("supplier quote workspace captures tax as a percentage", async () => {
   expect(actions).toContain("p_tax_percent: cleanTaxPercent(input.taxPercent)");
 });
 
+test("supplier comparison captures the client's ready-to-pay target beside supplier prices", async () => {
+  const workspace = await readFile(path.join(process.cwd(), "components/buildflow/quote-comparison-workspace.tsx"), "utf8");
+  const actions = await readFile(path.join(process.cwd(), "app/admin/quote-comparison/actions.ts"), "utf8");
+
+  expect(workspace).toContain("Client ready to pay");
+  expect(workspace).toContain("Target unit price");
+  expect(workspace).toContain("saveQuoteComparisonClientTargetsAction");
+  expect(actions).toContain("client_unit_price: value");
+});
+
 test("new comparison asks only for a comparison name", async () => {
   const form = await readFile(path.join(process.cwd(), "components/buildflow/quote-comparison-create-form.tsx"), "utf8");
 

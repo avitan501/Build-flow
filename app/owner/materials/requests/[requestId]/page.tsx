@@ -409,13 +409,6 @@ export default async function OwnerMaterialRequestPage({
       .filter((email): email is string => Boolean(email)),
   );
   const normalizedClientEmail = clientEmail.trim().toLowerCase();
-  const supplierEmails = (linkedEmails ?? []).filter((email) => {
-    const counterpart = email.counterparty_email?.trim().toLowerCase() || "";
-    return (
-      supplierEmailAddresses.has(counterpart) ||
-      (email.direction === "incoming" && counterpart !== normalizedClientEmail)
-    );
-  });
   const clientEmails = (linkedEmails ?? []).filter((email) => {
     const counterpart = email.counterparty_email?.trim().toLowerCase() || "";
     return (
@@ -584,6 +577,7 @@ export default async function OwnerMaterialRequestPage({
               route: Array.isArray(item.metadata?.supplier_route_names)
                 ? item.metadata.supplier_route_names.filter((name): name is string => typeof name === "string").join(", ")
                 : "",
+              metadata: item.metadata ?? null,
             }))}
             projectAddress={request.projects?.address || ""}
             currentStage={currentStage}
@@ -593,7 +587,6 @@ export default async function OwnerMaterialRequestPage({
             step4CompletedOverride={workflowOverrides.get(4) ?? null}
             initialManagerNotes={request.manager_notes || ""}
             initialSupplierRecommendations={(supplierRecommendations ?? []).map((entry) => ({ supplierId: entry.supplier_id, isRecommended: entry.is_recommended, shouldContact: entry.should_contact }))}
-            supplierEmails={supplierEmails}
             clientEmails={clientEmails}
           />
         </div>

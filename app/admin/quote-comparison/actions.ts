@@ -255,6 +255,26 @@ export async function removeQuoteComparisonSupplierAction(input: {
   return { ok: true };
 }
 
+export async function saveQuoteComparisonClientTargetsAction(input: {
+  comparisonId: string;
+  items: Array<{ itemId: string; clientUnitPrice: number | null }>;
+}): Promise<ActionResult> {
+  const { supabase } = await requireStaffProfile("suppliers");
+  const comparisonId = cleanText(input.comparisonId, 100);
+  if (!comparisonId || !Array.isArray(input.items) || input.items.length > 500) return { ok: false, error: "The client target prices are invalid." };
+  const itemIds = [...new Set(input.items.map((item) => cleanText(item.itemId, 100)).filter(Boolean))];
+  const { data: existing, error: loadError } = await supabase.from("quote_comparison_items").select("id").eq("comparison_id", comparisonId).in("id", itemIds).returns<Array<{ id: string }>>();
+  if (loadError || (existing ?? []).length !== itemIds.length) return { ok: false, error: "One of the material lines is no longer available." };
+  const updates = await Promise.all(input.items.map((item) => {
+    const raw = item.clientUnitPrice;
+    const value = raw === null || raw === undefined || !Number.isFinite(Number(raw)) ? null : cleanUnitPrice(Number(raw));
+    return supabase.from("quote_comparison_items").update({ client_unit_price: value }).eq("comparison_id", comparisonId).eq("id", item.itemId);
+  }));
+  if (updates.some((result) => result.error)) return { ok: false, error: "The client target prices could not be saved." };
+  revalidatePath(comparisonPath(comparisonId));
+  return { ok: true };
+}
+
 export async function saveQuoteComparisonBidAction(input: {
   comparisonId: string;
   bidId: string;
