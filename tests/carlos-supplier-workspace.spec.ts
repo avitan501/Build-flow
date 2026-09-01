@@ -47,8 +47,12 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(managerShell).not.toContain('href: "/owner/partnerships"');
   expect(goalsPage).toContain('title="Build Supplier Relationships"');
   expect(goalsPage).toContain("<SupplierRelationshipScripts />");
+  expect(goalsPage).toContain("<ContractorCallScript />");
   expect(scripts).toContain("Supplier call");
   expect(scripts).toContain("Contractor call");
+  expect(scripts).toContain("export function ContractorCallScript()");
+  const supplierScriptSection = scripts.split("export function SupplierRelationshipScripts()")[1]?.split("export function ContractorCallScript()")[0] ?? "";
+  expect(supplierScriptSection).not.toContain('title="Contractor call"');
   expect(goalsPage).not.toContain("ApiAffiliateCallScript");
   expect((affiliateCalls.match(/recommendedScript:/g) ?? []).length).toBe(10);
   expect((affiliateCalls.match(/termsFit:/g) ?? []).length).toBe(10);

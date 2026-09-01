@@ -46,6 +46,7 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain("const { supabase } = await requireAdminProfile()");
   expect(page).toContain("Carlos Dashboard");
   expect(page).toContain("Contact New Clients");
+  expect(page).toContain("<ContractorCallScript />");
   expect(page).toContain("<AddOutreachLead />");
   expect(page).toContain("<OutreachLeadList");
   expect(page).toContain("Clients in the system");

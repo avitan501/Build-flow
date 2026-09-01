@@ -12,6 +12,7 @@ import { AffiliateProgramTracker } from "@/components/buildflow/affiliate-progra
 import { AffiliateCallList } from "@/components/buildflow/affiliate-call-list";
 import { ClientTargetCallGuide } from "@/components/buildflow/client-target-call-guide";
 import {
+  ContractorCallScript,
   SupplierRelationshipScripts,
 } from "@/components/buildflow/carlos-outreach-scripts";
 import {
@@ -303,6 +304,7 @@ function ClientTargetGoal({
       title="Contact New Clients"
       description="Call new leads and record the next step."
     >
+      <ContractorCallScript />
       <div className="flex flex-wrap gap-2">
         {canManageClients ? (
           <>

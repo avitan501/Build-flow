@@ -83,6 +83,13 @@ export function SupplierRelationshipScripts() {
   return (
     <div className="mb-3 grid gap-3">
       <ScriptBlock title="Supplier call" steps={SUPPLIER_STEPS} tone="amber" record="contact name · email · trade · delivery area · minimum · contractor pricing" />
+    </div>
+  );
+}
+
+export function ContractorCallScript() {
+  return (
+    <div className="mb-3">
       <ScriptBlock title="Contractor call" steps={CONTRACTOR_STEPS} tone="sky" record="name · phone · material needed · quote/list received · next follow-up" />
     </div>
   );
