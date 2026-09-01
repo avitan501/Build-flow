@@ -13,14 +13,17 @@ test("item sourcing is portaled over the request without changing its table layo
 })
 
 test("supplier relationship workflow keeps only current focus in the middle stage", async () => {
-  const [network, workspace] = await Promise.all([
+  const [network, workspace, discovery] = await Promise.all([
     readFile(path.join(root, "lib/supplier-network.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/supplier-network-workspace.tsx"), "utf8"),
+    readFile(path.join(root, "app/api/admin/suppliers/discover/route.ts"), "utf8"),
   ])
   expect(network).toContain('row.stage === "contact" && !row.priority')
   expect(workspace).toContain('label: "Building Relationship"')
   expect(workspace).toContain("Approved suppliers · ready when needed")
   expect(workspace).toContain("Generate 10")
+  expect(discovery).toContain('action: "price_research"')
+  expect(discovery).toContain('requireStaffProfile("suppliers")')
 })
 
 test("supplier profile exposes compact relationship controls", async () => {
