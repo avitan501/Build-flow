@@ -88,6 +88,9 @@ export async function saveDailyWorkSummaryAction(input: {
 export async function recordDailyAttendanceAction(input: {
   date: string
   action: "check_in" | "pause" | "resume" | "check_out"
+  completed?: string
+  open?: string
+  problems?: string
 }): Promise<SaveDailySummaryResult> {
   const { supabase, user } = await requireManagerPortalProfile()
   const date = input.date.trim()
@@ -107,15 +110,18 @@ export async function recordDailyAttendanceAction(input: {
   if (input.action === "pause" && current?.pauseStartedAt) return { ok: false, error: "Carlos is already paused." }
   if (input.action === "resume" && !current?.pauseStartedAt) return { ok: false, error: "Carlos is not paused." }
 
+  const checkoutCompleted = input.action === "check_out" ? String(input.completed || "").trim().slice(0, 4000) : ""
+  if (input.action === "check_out" && !checkoutCompleted) return { ok: false, error: "Write what you completed today before checking out." }
+
   const checkInAt = input.action === "check_in" ? now.toISOString() : current?.checkInAt ?? null
   const checkOutAt = input.action === "check_out" ? now.toISOString() : current?.checkOutAt ?? null
   const pausedMilliseconds = input.action === "resume" || (input.action === "check_out" && current?.pauseStartedAt)
     ? totalPausedMilliseconds(current?.pausedMilliseconds ?? 0, current?.pauseStartedAt, now.toISOString())
     : current?.pausedMilliseconds ?? 0
   const pauseStartedAt = input.action === "pause" ? now.toISOString() : input.action === "resume" || input.action === "check_out" ? null : current?.pauseStartedAt ?? null
-  const completed = current?.completed ?? ""
-  const open = current?.open ?? ""
-  const problems = current?.problems ?? ""
+  const completed = input.action === "check_out" ? checkoutCompleted : current?.completed ?? ""
+  const open = input.action === "check_out" ? String(input.open || "").trim().slice(0, 4000) : current?.open ?? ""
+  const problems = input.action === "check_out" ? String(input.problems || "").trim().slice(0, 4000) : current?.problems ?? ""
   const details = serializeDailyWorkSummary({ date, completed, open, problems, problemAttachments: current?.problemAttachments ?? [], checkInAt, checkOutAt, pauseStartedAt, pausedMilliseconds, paidAt: current?.paidAt })
   const status = open || (checkInAt && !checkOutAt) ? "open" : "completed"
   const title = `${DAILY_WORK_SUMMARY_TITLE_PREFIX}${date}`

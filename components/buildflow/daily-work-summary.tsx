@@ -104,10 +104,18 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
   }
 
   function recordAttendance(action: "check_in" | "pause" | "resume" | "check_out") {
+    if (action === "check_out" && !completed.trim()) {
+      setError("Write what you completed today before checking out.")
+      return
+    }
     setError(null)
     setMessage(null)
     startTransition(async () => {
-      const result = await recordDailyAttendanceAction({ date: selectedDate, action })
+      const result = await recordDailyAttendanceAction({
+        date: selectedDate,
+        action,
+        ...(action === "check_out" ? { completed, open, problems } : {}),
+      })
       if (!result.ok) {
         setError(result.error)
         return
@@ -151,10 +159,10 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
             {selectedSummary?.pauseStartedAt
               ? <button type="button" onClick={() => recordAttendance("resume")} disabled={pending || Boolean(selectedSummary?.checkOutAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet-300 bg-violet-50 px-3 text-sm font-semibold text-violet-700 disabled:opacity-40"><Play className="h-4 w-4" />Resume</button>
               : <button type="button" onClick={() => recordAttendance("pause")} disabled={pending || !selectedSummary?.checkInAt || Boolean(selectedSummary?.checkOutAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet-300 bg-white px-3 text-sm font-semibold text-violet-700 disabled:opacity-40"><Pause className="h-4 w-4" />Pause</button>}
-            <button type="button" onClick={() => recordAttendance("check_out")} disabled={pending || !selectedSummary?.checkInAt || Boolean(selectedSummary?.checkOutAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-amber-300 bg-white px-3 text-sm font-semibold text-amber-700 disabled:opacity-40"><LogOut className="h-4 w-4" />Check out</button>
+            <button type="button" onClick={() => recordAttendance("check_out")} disabled={pending || !selectedSummary?.checkInAt || Boolean(selectedSummary?.checkOutAt) || !completed.trim()} title={!completed.trim() ? "Write what you completed today first" : undefined} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-amber-300 bg-white px-3 text-sm font-semibold text-amber-700 disabled:opacity-40"><LogOut className="h-4 w-4" />Check out</button>
           </div>
         </section>
-        <label className="grid gap-1.5 text-sm font-semibold"><span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600" />Completed today</span><textarea value={completed} onChange={(event) => setCompleted(event.target.value)} maxLength={4000} rows={5} placeholder="Calls made, leads contacted, supplier pricing received, orders handled..." className="min-h-28 rounded-md border border-slate-300 p-3 font-normal leading-6 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
+        <label className="grid gap-1.5 text-sm font-semibold"><span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600" />Completed today <span className="text-xs font-bold text-rose-600">Required to check out</span></span><textarea value={completed} onChange={(event) => setCompleted(event.target.value)} maxLength={4000} rows={5} required placeholder="Calls made, leads contacted, supplier pricing received, orders handled..." className="min-h-28 rounded-md border border-slate-300 p-3 font-normal leading-6 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
         <label className="grid gap-1.5 text-sm font-semibold"><span className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-amber-600" />Still open</span><textarea value={open} onChange={(event) => setOpen(event.target.value)} maxLength={4000} rows={4} placeholder="Follow-ups, unanswered calls, pricing still needed, and tomorrow's first steps..." className="min-h-24 rounded-md border border-slate-300 p-3 font-normal leading-6 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
         <section className="rounded-md border border-rose-200 bg-rose-50/60 p-3">
           <label className="grid gap-1.5 text-sm font-semibold"><span className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-rose-600" />Website problem</span><textarea value={problems} onChange={(event) => setProblems(event.target.value)} maxLength={4000} rows={3} placeholder="What happened, which page, and what were you trying to do?" className="min-h-20 rounded-md border border-rose-200 bg-white p-3 font-normal leading-6 outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-100" /></label>
