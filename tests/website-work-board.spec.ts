@@ -219,9 +219,13 @@ test("David quote challenge is private, persistent, and action focused", async (
   expect(page).toContain('if (!context.access.owner) redirect');
   expect(tracker).toContain("Beat Your Material Quote");
   expect(tracker).toContain("Collect 20 real quotes");
-  expect(tracker).toContain("Carlos script");
-  expect(tracker).toContain("One clean pipeline");
+  expect(tracker).toContain("Supplier call script");
+  expect(tracker).toContain("Contractor call script");
+  expect(tracker).toContain("Call 5 suppliers first");
+  expect(tracker).toContain("Then call 20 contractors");
   expect(tracker).toContain("updateQuoteGrowthMetricAction");
+  expect(definitions).toContain('key: "supplier_calls"');
+  expect(definitions).toContain('key: "active_suppliers"');
   expect(definitions).toContain('key: "calls"');
   expect(definitions).toContain('key: "quotes_received"');
   expect(definitions).toContain('key: "purchases"');
@@ -232,4 +236,20 @@ test("David quote challenge is private, persistent, and action focused", async (
   expect(migration).toContain("revoke all on table public.david_quote_growth_metrics from anon, authenticated");
   expect(migration).toContain("private.is_admin()");
   expect(migration).not.toContain("to anon");
+});
+
+test("homepage preview has five distinct designs and video stories", async () => {
+  const preview = await readFile(
+    path.join(root, "components/buildflow/homepage-concept-preview.tsx"),
+    "utf8",
+  );
+  for (const name of ["Quote Rescue", "Before / After", "Crew Moving", "Supplier Grid", "Delivery Mission"]) {
+    expect(preview).toContain(name);
+  }
+  expect(preview).toContain("01-contractor-request.mp4");
+  expect(preview).toContain("supplier-comparison.mp4");
+  expect(preview).toContain("02-contractor-crew-moving.mp4");
+  expect(preview).toContain("04-supplier-send-products.mp4");
+  expect(preview).toContain("delivery-coordination.mp4");
+  expect(preview).toContain("Different message. Different film. Different design.");
 });

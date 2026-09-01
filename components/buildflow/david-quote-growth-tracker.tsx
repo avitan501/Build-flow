@@ -10,6 +10,7 @@ import {
   Minus,
   Phone,
   Plus,
+  Store,
   Quote,
   RotateCcw,
   Target,
@@ -23,6 +24,8 @@ import {
   CAMPAIGN_QUOTE_GROWTH_METRICS,
   DAILY_QUOTE_GROWTH_METRICS,
   QUOTE_GROWTH_PIPELINE,
+  SUPPLIER_CAMPAIGN_METRICS,
+  SUPPLIER_GROWTH_PIPELINE,
   type QuoteGrowthMetricDefinition,
   type QuoteGrowthMetricRecord,
   type QuoteGrowthPeriod,
@@ -30,6 +33,9 @@ import {
 
 const CARLOS_SCRIPT = "Hi, this is Carlos from Avantia Build. We help contractors compare material quotes and delivery options. If you have a current supplier quote or material list, send it to us and we'll check whether another supplier can offer a better overall option. There's no obligation. What materials are you buying this week?";
 const UPLOAD_REPLY = "I'll text you the upload link. You can send a PDF, screenshot, or photo of the quote.";
+const SUPPLIER_SCRIPT = "Hi, this is Carlos from Avantia Build. We help local contractors source construction materials for jobs in Long Island, Queens, and Brooklyn. We're adding reliable suppliers by trade. Who handles contractor pricing and delivery at your company?";
+const SUPPLIER_RIGHT_PERSON = "We send itemized quote requests only when a customer needs your category. Could I confirm the best email, materials you supply, delivery areas, minimum order, and whether you offer contractor pricing?";
+const SUPPLIER_PERMISSION = "I'll send our contact details and a short sample request. We won't send mass or irrelevant quote requests. May I list your company as a supplier we can contact when a matching job comes in?";
 
 function MetricRow({
   definition,
@@ -159,26 +165,55 @@ export function DavidQuoteGrowthTracker({
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <TrackerPanel title="Today" subtitle={`${dailyDate} · resets with each workday`} definitions={DAILY_QUOTE_GROWTH_METRICS} records={dailyRecords} period="daily" periodStart={dailyDate} />
-        <TrackerPanel title="30-Day Goal" subtitle={`${campaignStart} → ${campaignEnd}`} definitions={CAMPAIGN_QUOTE_GROWTH_METRICS} records={campaignRecords} period="campaign" periodStart={campaignStart} />
-      </div>
-
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
-          <ArrowRight className="h-4 w-4 text-[#0878d1]" />
-          <h2 className="text-sm font-bold text-slate-950">One clean pipeline</h2>
-        </header>
-        <div className="overflow-x-auto">
-          <div className="flex min-w-max items-center gap-2 p-4">
-            {QUOTE_GROWTH_PIPELINE.map((stage, index) => <div key={stage} className="flex items-center gap-2"><span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700">{stage}</span>{index < QUOTE_GROWTH_PIPELINE.length - 1 ? <ArrowRight className="h-3.5 w-3.5 text-slate-300" /> : null}</div>)}
+      <section className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50">
+        <div className="grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+          <div className="flex items-center gap-3 px-4 py-4">
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-amber-400 text-sm font-black text-slate-950">1</span>
+            <div><p className="text-sm font-bold text-slate-950">Call 5 suppliers first</p><p className="text-xs text-slate-600">Find the right pricing contact.</p></div>
+          </div>
+          <ArrowRight className="hidden h-4 w-4 text-amber-500 sm:block" />
+          <div className="flex items-center gap-3 border-t border-amber-200 px-4 py-4 sm:border-l sm:border-t-0">
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-950 text-sm font-black text-white">2</span>
+            <div><p className="text-sm font-bold text-slate-950">Then call 20 contractors</p><p className="text-xs text-slate-600">Ask for one real quote or list.</p></div>
           </div>
         </div>
       </section>
 
+      <div className="grid gap-5 xl:grid-cols-2">
+        <TrackerPanel title="Today" subtitle={`${dailyDate} · resets with each workday`} definitions={DAILY_QUOTE_GROWTH_METRICS} records={dailyRecords} period="daily" periodStart={dailyDate} />
+        <div className="grid gap-5">
+          <TrackerPanel title="Supplier Network" subtitle="Build this first · 30-day goal" definitions={SUPPLIER_CAMPAIGN_METRICS} records={campaignRecords} period="campaign" periodStart={campaignStart} />
+          <TrackerPanel title="Customer Growth" subtitle={`${campaignStart} → ${campaignEnd}`} definitions={CAMPAIGN_QUOTE_GROWTH_METRICS} records={campaignRecords} period="campaign" periodStart={campaignStart} />
+        </div>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        {[
+          { title: "Supplier pipeline", icon: Store, stages: SUPPLIER_GROWTH_PIPELINE, tone: "text-amber-600" },
+          { title: "Customer pipeline", icon: ArrowRight, stages: QUOTE_GROWTH_PIPELINE, tone: "text-[#0878d1]" },
+        ].map(({ title, icon: Icon, stages, tone }) => (
+          <section key={title} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3"><Icon className={`h-4 w-4 ${tone}`} /><h2 className="text-sm font-bold text-slate-950">{title}</h2></header>
+            <div className="overflow-x-auto"><div className="flex min-w-max items-center gap-2 p-4">{stages.map((stage, index) => <div key={stage} className="flex items-center gap-2"><span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700">{stage}</span>{index < stages.length - 1 ? <ArrowRight className="h-3.5 w-3.5 text-slate-300" /> : null}</div>)}</div></div>
+          </section>
+        ))}
+      </div>
+
+      <section className="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-[0_12px_32px_rgba(15,23,42,.04)]">
+        <header className="flex items-center gap-3 border-b border-amber-100 bg-amber-50 px-4 py-3"><Store className="h-4 w-4 text-amber-600" /><div><h2 className="text-sm font-bold">Supplier call script</h2><p className="text-xs text-slate-500">Use before the contractor calls.</p></div></header>
+        <div className="grid gap-3 p-4 lg:grid-cols-3">
+          {[
+            { label: "Opening", text: SUPPLIER_SCRIPT },
+            { label: "Right person", text: SUPPLIER_RIGHT_PERSON },
+            { label: "Permission", text: SUPPLIER_PERMISSION },
+          ].map((item) => <div key={item.label} className="flex flex-col rounded-xl bg-slate-50 p-4"><p className="text-[10px] font-bold uppercase tracking-[.15em] text-amber-700">{item.label}</p><p className="mt-2 flex-1 text-sm leading-6 text-slate-700">{item.text}</p><div className="mt-3"><CopyButton text={item.text} /></div></div>)}
+        </div>
+        <div className="border-t border-slate-100 px-4 py-3 text-xs text-slate-600"><strong>Record:</strong> contact name · email · trade · delivery area · minimum · contractor pricing</div>
+      </section>
+
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(20rem,.9fr)]">
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3"><Phone className="h-4 w-4 text-[#0878d1]" /><h2 className="text-sm font-bold">Carlos script</h2></header>
+          <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3"><Phone className="h-4 w-4 text-[#0878d1]" /><h2 className="text-sm font-bold">Contractor call script</h2></header>
           <div className="grid gap-3 p-4">
             <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm leading-6 text-slate-700">{CARLOS_SCRIPT}</p><div className="mt-3"><CopyButton text={CARLOS_SCRIPT} /></div></div>
             <div className="rounded-xl border border-sky-100 bg-sky-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-sky-700">If interested</p><p className="mt-1 text-sm leading-6 text-slate-700">{UPLOAD_REPLY}</p><div className="mt-3"><CopyButton text={UPLOAD_REPLY} /></div></div>
@@ -186,7 +221,7 @@ export function DavidQuoteGrowthTracker({
         </section>
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3"><Users className="h-4 w-4 text-[#0878d1]" /><h2 className="text-sm font-bold">Start with</h2></header>
+          <header className="flex items-center gap-3 border-b border-slate-200 px-4 py-3"><Users className="h-4 w-4 text-[#0878d1]" /><h2 className="text-sm font-bold">Contractors: start with</h2></header>
           <ol className="divide-y divide-slate-100">
             {["Contractors who already know David", "Previous Avantia customers", "Friend, foreman and architect referrals", "Local contractors with a current quote", "Small local quote-check ad"].map((source, index) => <li key={source} className="flex gap-3 px-4 py-3 text-sm text-slate-700"><span className="font-bold tabular-nums text-slate-400">{index + 1}</span><span>{source}</span></li>)}
           </ol>
