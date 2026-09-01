@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Bot,
   Files,
   LayoutDashboard,
   Menu,
@@ -12,6 +11,7 @@ import {
   Store,
   UserRound,
   Users,
+  Wrench,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -73,7 +73,7 @@ function navigationLinks(access: ManagerAccess): ManagerNavigationLink[] {
       },
       { href: "/admin/documents", label: "Documents", shortLabel: "Documents", icon: Files },
     ] : []),
-    ...(access.aiTools ? [{ href: "/admin/ai-tools", label: "AI", shortLabel: "AI", icon: Bot }] : []),
+    ...(access.aiTools ? [{ href: "/admin/ai-tools", label: "Manager Tools", shortLabel: "Tools", icon: Wrench }] : []),
   ];
 }
 

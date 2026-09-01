@@ -14,10 +14,10 @@ test("small laptops start with the manager rail collapsed unless the user chose 
   expect(managerNavigationDefaultCollapsed({ savedPreference: "collapsed", smallLaptop: false })).toBe(true);
 });
 
-test("manager navigation exposes six short permission-scoped areas without changing their routes", async () => {
+test("manager navigation exposes permission-scoped areas and names the AI route Manager Tools", async () => {
   const shell = await readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8");
 
-  for (const label of ["Manager", "Customers", "Catalog", "Documents", "Communication", "AI"]) {
+  for (const label of ["Manager", "Customers", "Catalog", "Documents", "Communication", "Tools"]) {
     expect(shell).toContain(`shortLabel: "${label}"`);
   }
   for (const route of ["/admin/build-map", "/admin/users", "/admin/catalog", "/admin/documents", "/admin/communications", "/admin/ai-tools"]) {
@@ -27,6 +27,8 @@ test("manager navigation exposes six short permission-scoped areas without chang
   expect(shell).toContain("access.suppliers");
   expect(shell).toContain("access.communications");
   expect(shell).toContain("access.aiTools");
+  expect(shell).toContain('label: "Manager Tools"');
+  expect(shell).not.toContain('label: "AI", shortLabel: "AI"');
 });
 
 test("collapsed manager rail remembers preference and provides keyboard-readable tooltips", async () => {
