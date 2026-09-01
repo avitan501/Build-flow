@@ -287,6 +287,73 @@ export async function updateOrganizedMaterialItemAction(formData: FormData) {
   return { ok: true as const }
 }
 
+export async function saveOriginalMaterialItemAction(input: {
+  requestId: string
+  itemId?: string
+  name: string
+  quantity: number
+  unit: string
+  details?: string
+}) {
+  const requestId = String(input.requestId || "").trim()
+  const itemId = String(input.itemId || "").trim()
+  const name = String(input.name || "").trim().replace(/\s+/g, " ").slice(0, 300)
+  const quantity = Number(input.quantity)
+  const unit = String(input.unit || "").trim().replace(/\s+/g, " ").slice(0, 60)
+  const details = String(input.details || "").trim().replace(/\s+/g, " ").slice(0, 1200)
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || (itemId && !/^[0-9a-f-]{36}$/i.test(itemId))) return { ok: false as const, error: "This request item could not be identified." }
+  if (!name || !Number.isFinite(quantity) || quantity <= 0 || !unit) return { ok: false as const, error: "Enter the item, quantity, and unit." }
+
+  const { supabase, user } = await requireStaffProfile("customers")
+  const { data: request } = await supabase.from("quote_requests").select("id,project_id,owner_id").eq("id", requestId).maybeSingle<{ id: string; project_id: string; owner_id: string }>()
+  if (!request) return { ok: false as const, error: "Request not found." }
+
+  if (itemId) {
+    const { data: current } = await supabase.from("quote_request_items").select("id,metadata").eq("id", itemId).eq("request_id", requestId).maybeSingle<{ id: string; metadata: Record<string, unknown> | null }>()
+    if (!current || current.metadata?.ai_organized === true) return { ok: false as const, error: "Only the original request can be edited here." }
+    const { error } = await supabase.from("quote_request_items").update({ name, quantity, unit, metadata: { ...(current.metadata ?? {}), request_details: details, manually_edited_at: new Date().toISOString(), manually_edited_by: user.id } }).eq("id", itemId).eq("request_id", requestId)
+    if (error) return { ok: false as const, error: "The original item could not be saved." }
+  } else {
+    const { error } = await supabase.from("quote_request_items").insert({
+      request_id: request.id,
+      project_id: request.project_id,
+      owner_id: request.owner_id,
+      name,
+      department: "Others",
+      item_type: "custom_priced",
+      quantity,
+      unit,
+      qualification_status: "not_required",
+      metadata: { request_details: details, manually_added_at: new Date().toISOString(), manually_added_by: user.id },
+    })
+    if (error) return { ok: false as const, error: "The new item could not be added." }
+  }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const }
+}
+
+export async function saveRequestItemSupplierRouteAction(input: {
+  requestId: string
+  itemIds: string[]
+  supplierNames: string[]
+  routeNote?: string
+}) {
+  const requestId = String(input.requestId || "").trim()
+  const itemIds = Array.isArray(input.itemIds) ? [...new Set(input.itemIds.map((id) => String(id).trim()))].slice(0, 100) : []
+  const supplierNames = Array.isArray(input.supplierNames) ? [...new Set(input.supplierNames.map((name) => String(name).trim().replace(/\s+/g, " ").slice(0, 160)).filter(Boolean))].slice(0, 12) : []
+  const routeNote = String(input.routeNote || "").trim().slice(0, 800)
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !itemIds.length || itemIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) return { ok: false as const, error: "Choose at least one valid request item." }
+  const { supabase, user } = await requireStaffProfile("customers")
+  const { data: items } = await supabase.from("quote_request_items").select("id,metadata").eq("request_id", requestId).in("id", itemIds).returns<Array<{ id: string; metadata: Record<string, unknown> | null }>>()
+  if (!items || items.length !== itemIds.length) return { ok: false as const, error: "One of the selected items is no longer available." }
+  for (const item of items) {
+    const { error } = await supabase.from("quote_request_items").update({ metadata: { ...(item.metadata ?? {}), supplier_route_names: supplierNames, supplier_route_note: routeNote, supplier_route_updated_at: new Date().toISOString(), supplier_route_updated_by: user.id } }).eq("id", item.id).eq("request_id", requestId)
+    if (error) return { ok: false as const, error: "The supplier route could not be saved for every selected item." }
+  }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const }
+}
+
 export async function sendClientReplyAction(formData: FormData): Promise<ReplyResult> {
   const requestId = String(formData.get("requestId") || "").trim()
   const message = String(formData.get("message") || "").trim()

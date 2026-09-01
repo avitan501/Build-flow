@@ -23,7 +23,7 @@ async function source(filePath: string) {
   }
 }
 
-test("review and organization are one compact three-column material work table", async () => {
+test("review and organization are one compact four-column material work table", async () => {
   const [page, worktable] = await Promise.all([source(pagePath), source(worktablePath)])
 
   expect(page, "the request page should render the combined work table").toContain("RequestMaterialWorktable")
@@ -43,6 +43,7 @@ test("review and organization are one compact three-column material work table",
   expect(worktable).toMatch(/Quantity/)
   expect(worktable).toMatch(/Item details|AI organized/)
   expect(worktable).toMatch(/Missing info|AI notes/)
+  expect(worktable).toContain("Supplier route")
   expect(worktable).toContain("<tbody")
 
   expect(page, "steps 1 and 2 must not remain as separate expandable cards").not.toContain('title="Review client list"')
@@ -102,7 +103,7 @@ test("AI controls and notes appear only on rows that are actually missing inform
   expect(worktable, "ready rows must leave the third column clear instead of inventing a question").toMatch(/aria-label=["'{`][\s\S]*(?:No missing|Complete|Ready)/)
 })
 
-test("supplier quotes extend the same item grid as side-by-side comparison columns", async () => {
+test("supplier quotes move into compact step two instead of expanding the request grid", async () => {
   const [page, worktable, management] = await Promise.all([
     source(pagePath),
     source(worktablePath),
@@ -111,10 +112,13 @@ test("supplier quotes extend the same item grid as side-by-side comparison colum
 
   expect(page).toContain("comparisonSummaries")
   expect(page).toMatch(/comparisons=\{comparisonSummaries\}|supplierComparisons=\{supplierComparisonTables\}/)
-  expect(worktable).toMatch(/supplier|comparison/i)
-  expect(worktable).toContain("RequestSupplierComparison")
+  expect(worktable).toContain("Supplier route")
   expect(worktable).toMatch(/supplierComparisons\.map/)
-  expect(worktable).toMatch(/Unit price|Price/)
+  expect(worktable).not.toContain("supplierColumns.map")
+  expect(management).toContain('step={2}')
+  expect(management).toContain("Supplier pricing & comparison")
+  expect(management).toContain("Upload returned quote")
+  expect(management).toContain("Add pricing by hand")
   expect(management, "supplier bids should not be isolated in repeated large comparison cards").not.toContain("comparisons.map((comparison) => <article")
 })
 

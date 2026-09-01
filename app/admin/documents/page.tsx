@@ -4,6 +4,7 @@ import Link from "next/link"
 import { ManagerDocumentUpload } from "@/components/buildflow/manager-document-upload"
 import { requireStaffProfile } from "@/lib/auth"
 import { confidenceLabel, managerDocumentStatusLabel, managerDocumentTypeLabel, managerDocumentTypes, type ManagerDocumentRecord, type ManagerDocumentStatus } from "@/lib/manager-documents"
+import type { CatalogSupplier } from "@/lib/material-catalog"
 
 const PAGE_SIZE = 50
 const statusOptions: Array<{ value: "all" | ManagerDocumentStatus; label: string }> = [
@@ -44,14 +45,18 @@ export default async function ManagerDocumentsPage({ searchParams }: { searchPar
   if (type !== "all") documentsQuery = documentsQuery.eq("document_type", type)
   if (q) documentsQuery = documentsQuery.or(`title.ilike.%${q}%,party_name.ilike.%${q}%,document_number.ilike.%${q}%,file_name.ilike.%${q}%`)
 
-  const [documentsResult, totalResult, reviewResult, readyResult, routedResult, archivedResult] = await Promise.all([
+  const [documentsResult, totalResult, reviewResult, readyResult, routedResult, archivedResult, clientsResult, suppliersResult] = await Promise.all([
     documentsQuery.order("updated_at", { ascending: false }).range(offset, offset + PAGE_SIZE - 1).returns<ManagerDocumentRecord[]>(),
     supabase.from("manager_documents").select("id", { count: "exact", head: true }),
     supabase.from("manager_documents").select("id", { count: "exact", head: true }).in("status", ["needs_review", "error"]),
     supabase.from("manager_documents").select("id", { count: "exact", head: true }).eq("status", "ready"),
     supabase.from("manager_documents").select("id", { count: "exact", head: true }).eq("status", "routed"),
     supabase.from("manager_documents").select("id", { count: "exact", head: true }).eq("status", "archived"),
+    supabase.from("profiles").select("id,full_name,email").eq("role", "client").eq("is_active", true).order("full_name").limit(500),
+    supabase.rpc("staff_load_catalog_suppliers"),
   ])
+  const clients = (clientsResult.data ?? []).map((client) => ({ id: client.id, name: String(client.full_name || client.email || "Client") }))
+  const suppliers = (Array.isArray(suppliersResult.data) ? suppliersResult.data as CatalogSupplier[] : []).map((supplier) => ({ id: supplier.id, name: supplier.name }))
 
   const documents = documentsResult.data ?? []
   const filteredCount = documentsResult.count ?? 0
@@ -62,7 +67,7 @@ export default async function ManagerDocumentsPage({ searchParams }: { searchPar
   return <main className="min-h-screen bg-[#f2f4f7] px-3 pb-20 pt-4 text-slate-950 sm:px-8 sm:pt-7 lg:px-10"><div className="mx-auto max-w-7xl">
     <header className="relative overflow-hidden rounded-[1.75rem] bg-slate-950 px-5 py-6 text-white shadow-[0_24px_70px_rgba(15,23,42,.18)] sm:px-8 sm:py-8">
       <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full border-[42px] border-sky-400/10" />
-      <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[.2em] text-sky-300">Manager document center</p><h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-5xl">Every quote. One memory.</h1><p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 sm:text-base">One private inbox for every document Avantia has received, including archived history. Open a source, choose only the dependable product rows, then send them to the catalog, a client quote, or a supplier comparison.</p></div><ManagerDocumentUpload initialIntent={params.intent || ""} initiallyOpen={params.upload === "1" || Boolean(params.intent)} /></div>
+      <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[.2em] text-sky-300">Manager document center</p><h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-5xl">Every quote. One memory.</h1><p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 sm:text-base">One private inbox for every document Avantia has received, including archived history. Open a source, choose only the dependable product rows, then send them to the catalog, a client quote, or a supplier comparison.</p></div><ManagerDocumentUpload initialIntent={params.intent || ""} initiallyOpen={params.upload === "1" || Boolean(params.intent)} clients={clients} suppliers={suppliers} /></div>
     </header>
 
     {documentsResult.error ? <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">Documents is waiting for its database update.</div> : null}

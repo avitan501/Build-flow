@@ -13,7 +13,7 @@ async function sha256(file: File) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")
 }
 
-export function ManagerDocumentUpload({ initialIntent = "", initiallyOpen = false }: { initialIntent?: string; initiallyOpen?: boolean }) {
+export function ManagerDocumentUpload({ initialIntent = "", initiallyOpen = false, clients = [], suppliers = [] }: { initialIntent?: string; initiallyOpen?: boolean; clients?: Array<{ id: string; name: string }>; suppliers?: Array<{ id: string; name: string }> }) {
   const router = useRouter()
   const [open, setOpen] = useState(initiallyOpen)
   const [fileName, setFileName] = useState("")
@@ -67,6 +67,8 @@ export function ManagerDocumentUpload({ initialIntent = "", initiallyOpen = fals
           sourceSha256,
           browserOcrText,
           intent: String(formData.get("intent") ?? ""),
+          clientId: String(formData.get("clientId") ?? ""),
+          supplierId: String(formData.get("supplierId") ?? ""),
         })
         if (!result.ok) { setStatus(""); setError(result.error); return }
         router.push(`/admin/documents/${result.data.documentId}`)
@@ -88,6 +90,8 @@ export function ManagerDocumentUpload({ initialIntent = "", initiallyOpen = fals
       <input type="hidden" name="department" value="Test" />
       <div className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-950"><Sparkles className="h-4 w-4 shrink-0" />AI suggests the department. The document stays in Test until review.</div>
       <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-900"><ShieldCheck className="h-4 w-4 shrink-0" />Private original · no automatic posting</div>
+      <label className="grid gap-1 text-xs font-bold text-slate-600">Attach to client <span className="font-normal text-slate-400">(optional)</span><select name="clientId" className="h-10 rounded-lg border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-900"><option value="">No client</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>
+      <label className="grid gap-1 text-xs font-bold text-slate-600">Attach to supplier <span className="font-normal text-slate-400">(optional)</span><select name="supplierId" className="h-10 rounded-lg border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-900"><option value="">No supplier</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select></label>
       <label className="sm:col-span-2"><span className="flex min-h-28 cursor-pointer items-center justify-center gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm font-semibold text-slate-700 hover:border-[#0071e3] hover:bg-sky-50"><FileUp className="h-5 w-5 text-[#0071e3]" />{fileName || "Choose PDF, CSV, TXT, or image · 25 MB maximum"}</span><input name="documentFile" type="file" required accept=".pdf,.csv,.txt,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,text/plain,image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")} /></label>
       {error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 sm:col-span-2">{error}</p> : null}
       {status ? <p role="status" className="text-xs font-semibold text-[#0071e3] sm:col-span-2">{status}</p> : null}

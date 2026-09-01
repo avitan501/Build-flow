@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status";
-import { RequestAttachmentUploader } from "@/components/buildflow/request-attachment-uploader";
 import { RequestClientContact } from "@/components/buildflow/request-client-contact";
 import { RequestMaterialWorktable, type RequestWorktableComparison } from "@/components/buildflow/request-material-worktable";
 import {
@@ -276,7 +275,6 @@ export default async function OwnerMaterialRequestPage({
         ).data?.signedUrl ?? null,
     })),
   );
-  const generalFiles = signedFiles.filter((file) => !file.material_response_id);
   const suppliers =
     managerSettings?.state?.qualificationSettings?.suppliers ?? [];
   const organizedItems = (items ?? []).filter(
@@ -486,19 +484,17 @@ export default async function OwnerMaterialRequestPage({
           organizationStatus={organizationStatus}
           organizationCompletedLabel={organizationCompletedLabel}
           supplierComparisons={supplierComparisonTables}
+          suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
+          attachments={signedFiles.map((file) => ({ id: file.id, file_name: file.file_name, url: file.url }))}
         />
-        <RequestAttachmentUploader requestId={request.id} />
-        {signedFiles.length || (responses ?? []).length ? (
+        {(responses ?? []).length ? (
           <details
             className="mt-2 rounded-lg border border-slate-200 bg-white"
           >
-            <summary className="cursor-pointer px-4 py-3 text-sm font-bold">Files &amp; answers · {signedFiles.length} files · {answers.length} answers</summary>
+            <summary className="cursor-pointer px-4 py-3 text-sm font-bold">Original answers · {answers.length}</summary>
             <div className="border-t border-slate-200 p-4">
               <p className="text-sm text-slate-500">The original items and AI copy are already together in the table above.</p>
               {(responses ?? []).map((response) => {
-                const responseFiles = signedFiles.filter(
-                  (file) => file.material_response_id === response.id,
-                );
                 const responseAnswers = answers.filter(
                   (answer) =>
                     answer.response_id === response.id &&
@@ -548,55 +544,9 @@ export default async function OwnerMaterialRequestPage({
                         No material details were saved with this questionnaire.
                       </p>
                     )}
-                    {responseFiles.length ? (
-                      <div className="mt-4">
-                        <h4 className="text-sm font-bold">Files</h4>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {responseFiles.map((file) =>
-                            file.url ? (
-                              <a
-                                key={file.id}
-                                href={file.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-[#0066cc]"
-                              >
-                                {file.file_name}
-                              </a>
-                            ) : (
-                              <span key={file.id}>{file.file_name}</span>
-                            ),
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
                   </article>
                 );
               })}
-              {generalFiles.length ? (
-                <div className="mt-5 border-t border-slate-200 pt-5">
-                  <h3 className="text-sm font-bold">Attachments</h3>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {generalFiles.map((file) =>
-                      file.url ? (
-                        <a
-                          key={file.id}
-                          href={file.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-[#0066cc]"
-                        >
-                          {file.file_name}
-                        </a>
-                      ) : (
-                        <span key={file.id} className="text-sm">
-                          {file.file_name}
-                        </span>
-                      ),
-                    )}
-                  </div>
-                </div>
-              ) : null}
             </div>
           </details>
         ) : null}
@@ -623,6 +573,17 @@ export default async function OwnerMaterialRequestPage({
                       typeof reason === "string" && Boolean(reason.trim()),
                   )
                 : [],
+            }))}
+            pricingSummaryItems={departmentItems.map((item) => ({
+              id: item.id,
+              original: (() => {
+                const sourceId = typeof item.metadata?.source_item_id === "string" ? item.metadata.source_item_id : item.id;
+                return originalItems.find((source) => source.id === sourceId)?.name || item.name;
+              })(),
+              organized: item.name,
+              route: Array.isArray(item.metadata?.supplier_route_names)
+                ? item.metadata.supplier_route_names.filter((name): name is string => typeof name === "string").join(", ")
+                : "",
             }))}
             projectAddress={request.projects?.address || ""}
             currentStage={currentStage}

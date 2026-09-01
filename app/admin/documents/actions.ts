@@ -396,6 +396,8 @@ export async function completeManagerDocumentUploadAction(input: {
   sourceSha256: string;
   browserOcrText?: string;
   intent?: string;
+  clientId?: string;
+  supplierId?: string;
 }): Promise<Result<{ documentId: string }>> {
   const { supabase, user } = await requireStaffProfile("suppliers");
   const fileError = validateManagerDocumentFile(input);
@@ -435,6 +437,8 @@ export async function completeManagerDocumentUploadAction(input: {
     );
     formData.set("browserOcrText", input.browserOcrText ?? "");
     formData.set("intent", input.intent ?? "");
+    formData.set("clientId", input.clientId ?? "");
+    formData.set("supplierId", input.supplierId ?? "");
     formData.set("sourceChannel", "website_upload");
     formData.set("sourceLabel", "Website upload");
     return await uploadManagerDocumentAction(formData);
@@ -571,6 +575,13 @@ export async function uploadManagerDocumentAction(
     clean(formData.get("sourceLabel"), 200) || "Website upload";
   const sourceReference = clean(formData.get("sourceReference"), 500);
   const sourceGroupId = clean(formData.get("sourceGroupId"), 200);
+  const clientId = clean(formData.get("clientId"), 100);
+  const supplierId = clean(formData.get("supplierId"), 200);
+  if (clientId && !UUID_PATTERN.test(clientId)) return { ok: false, error: "Choose a valid client." };
+  if (clientId) {
+    const { data: client } = await supabase.from("profiles").select("id").eq("id", clientId).eq("role", "client").eq("is_active", true).maybeSingle<{ id: string }>();
+    if (!client) return { ok: false, error: "That client is no longer available." };
+  }
   const department = INTAKE_DEPARTMENT;
   const { error: insertError } = await supabase
     .from("manager_documents")
@@ -593,6 +604,8 @@ export async function uploadManagerDocumentAction(
       source_label: sourceLabel,
       source_reference: sourceReference,
       source_group_id: sourceGroupId,
+      client_id: clientId || null,
+      supplier_id: supplierId || null,
       created_by: user.id,
       updated_by: user.id,
     });

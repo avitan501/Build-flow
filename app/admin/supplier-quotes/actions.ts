@@ -209,6 +209,40 @@ async function ensureClientRequestComparison(input: {
   return { comparisonId: comparison.id, created: true };
 }
 
+export async function openRequestPricingComparisonAction(
+  requestId: string,
+): Promise<ActionResult<{ comparisonId: string }>> {
+  const { supabase, user } = await requireStaffProfile("suppliers");
+  if (!UUID_PATTERN.test(requestId)) return { ok: false, error: "The request is invalid." };
+  const { data: request } = await supabase
+    .from("quote_requests")
+    .select("owner_id")
+    .eq("id", requestId)
+    .maybeSingle<{ owner_id: string }>();
+  if (!request) return { ok: false, error: "The request could not be found." };
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name,email")
+    .eq("id", request.owner_id)
+    .maybeSingle<{ full_name: string | null; email: string | null }>();
+  try {
+    const comparison = await ensureClientRequestComparison({
+      supabase,
+      userId: user.id,
+      requestId,
+      clientId: request.owner_id,
+      clientName: clean(profile?.full_name || profile?.email || "Client", 200),
+      clientEmail: clean(profile?.email, 320),
+      fallbackDepartment: "Others",
+    });
+    revalidatePath(`/owner/materials/requests/${requestId}`);
+    return { ok: true, data: { comparisonId: comparison.comparisonId }, message: "Pricing comparison ready." };
+  } catch (error) {
+    console.error("Request pricing comparison creation failed", error);
+    return { ok: false, error: "The pricing comparison could not be opened." };
+  }
+}
+
 export async function uploadSupplierQuoteAction(
   formData: FormData,
 ): Promise<ActionResult<{ quoteId: string }>> {

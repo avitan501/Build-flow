@@ -12,7 +12,7 @@ const MAX_FILES = 10
 const MAX_FILE_SIZE = 25 * 1024 * 1024
 const ALLOWED_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"])
 
-export function RequestAttachmentUploader({ requestId }: { requestId: string }) {
+export function RequestAttachmentUploader({ requestId, compact = false }: { requestId: string; compact?: boolean }) {
   const router = useRouter()
   const [files, setFiles] = useState<File[]>([])
   const [message, setMessage] = useState("")
@@ -68,12 +68,11 @@ export function RequestAttachmentUploader({ requestId }: { requestId: string }) 
     })
   }
 
-  return <section className="mt-2 rounded-lg border border-sky-200 bg-sky-50/60 p-3" aria-label="Add files to request">
+  return <section className={compact ? "p-3" : "mt-2 rounded-lg border border-sky-200 bg-sky-50/60 p-3"} aria-label="Add files to request">
     <div className="flex flex-wrap items-center gap-2">
       <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-sky-300 bg-white px-4 text-sm font-bold text-[#0066cc]"><FileUp className="h-4 w-4" />Add documents or photos<input type="file" accept="image/jpeg,image/png,image/webp,.pdf" multiple className="sr-only" onChange={(event) => { chooseFiles(Array.from(event.target.files ?? [])); event.currentTarget.value = "" }} /></label>
       {files.length ? <button type="button" onClick={attachFiles} disabled={pending} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-50">{pending ? "Attaching..." : `Attach ${files.length} to request`}</button> : null}
     </div>
-    <p className="mt-1.5 text-xs text-slate-500">Add files at any time—even after the request was created.</p>
     {files.length ? <div className="mt-2 flex flex-wrap gap-1.5">{files.map((file, index) => <span key={`${file.name}-${file.lastModified}-${index}`} className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700"><span className="truncate">{file.name}</span><button type="button" onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${file.name}`} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded"><X className="h-3.5 w-3.5" /></button></span>)}</div> : null}
     {message ? <p role="status" className={`mt-2 text-xs font-bold ${isError ? "text-rose-700" : "text-emerald-700"}`}>{message}</p> : null}
   </section>

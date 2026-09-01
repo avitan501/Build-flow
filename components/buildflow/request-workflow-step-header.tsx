@@ -53,13 +53,13 @@ export function RequestWorkflowStepHeader({
 
   return (
     <>
-      <summary className={`flex min-h-[5.5rem] cursor-pointer list-none items-center gap-3 border-l-[3px] px-4 py-3.5 pr-16 sm:gap-4 sm:px-5 sm:pr-40 ${status === "active" ? "border-l-[#cda548]" : status === "complete" ? "border-l-[#17304f]" : "border-l-transparent"}`}>
-        <span className={`relative inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border text-2xl font-black tabular-nums ${styles.number}`} aria-label={`Step ${step}`}>
+      <summary className={`flex min-h-[4.5rem] cursor-pointer list-none items-center gap-3 border-l-[3px] px-3 py-2.5 pr-14 sm:px-4 sm:pr-36 ${status === "active" ? "border-l-[#cda548]" : status === "complete" ? "border-l-[#17304f]" : "border-l-transparent"}`}>
+        <span className={`relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border text-xl font-black tabular-nums ${styles.number}`} aria-label={`Step ${step}`}>
           {step}
           {status === "complete" ? <span className="absolute -right-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-700 text-white"><Check className="h-3.5 w-3.5" strokeWidth={3} /></span> : null}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="text-[10px] font-black uppercase tracking-[.18em] text-[#8b6a27]">Step {step} of 4</span>
+          <span className="text-[9px] font-black uppercase tracking-[.18em] text-[#8b6a27]">Step {step} of 2</span>
           <span className="mt-1 flex items-center gap-2 text-base font-black tracking-[-0.01em] text-[#12263f] sm:text-lg"><Icon className="h-4 w-4 shrink-0 text-[#8b6a27]" />{title}</span>
           <span className="mt-0.5 block truncate text-xs font-medium text-slate-500 sm:text-sm">{detail}</span>
         </span>

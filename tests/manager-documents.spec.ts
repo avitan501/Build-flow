@@ -305,7 +305,8 @@ test("a reviewed document can be linked directly to a request quote comparison",
   expect(review).toContain("Add to Request Compare");
   expect(worktable).toContain("Original request");
   expect(worktable).toContain("Missing info / AI notes");
-  expect(worktable).toContain("supplierColumns.map");
+  expect(worktable).toContain("Supplier route");
+  expect(worktable).not.toContain("supplierColumns.map");
 });
 
 test("document catalog routing is capability-scoped and one comparison stays active per request", async () => {

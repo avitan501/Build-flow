@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
+import { openRequestPricingComparisonAction } from "@/app/admin/supplier-quotes/actions"
 import { previewRequestClientQuoteAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestWorkflowStepAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
 import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
@@ -56,6 +57,7 @@ export function RequestManagementPanel({
   suppliers,
   packages,
   requestItems,
+  pricingSummaryItems,
   projectAddress,
   currentStage,
   comparisons,
@@ -74,6 +76,7 @@ export function RequestManagementPanel({
   suppliers: SupplierRoutingOption[]
   packages: PackageRoute[]
   requestItems: Array<{ id: string; name: string; quantity: number; unit: string | null; reviewReasons: string[] }>
+  pricingSummaryItems: Array<{ id: string; original: string; organized: string; route: string }>
   projectAddress: string
   currentStage: ManagerPipelineStage
   comparisons: RequestComparisonSummary[]
@@ -254,6 +257,15 @@ export function RequestManagementPanel({
   function toggleSupplier(supplierId: string) {
     setSupplierIds((current) => current.includes(supplierId) ? current.filter((id) => id !== supplierId) : [...current, supplierId])
     setRecommendedSupplierIds((current) => current.includes(supplierId) ? current : [...current, supplierId])
+  }
+
+  function openManualPricing() {
+    setFeedback("")
+    startTransition(async () => {
+      const result = await openRequestPricingComparisonAction(requestId)
+      if (!result.ok) { setFeedbackError(true); setFeedback(result.error); return }
+      router.push(`/admin/quote-comparison/${result.data.comparisonId}`)
+    })
   }
 
   function toggleRecommendedSupplier(supplierId: string) {
@@ -437,9 +449,17 @@ export function RequestManagementPanel({
   return (
     <div className="grid gap-2">
       <details open={currentStage === "pricing"} className={workflowStepCardClass()}>
-        <RequestWorkflowStepHeader requestId={requestId} step={3} title="Get supplier pricing" detail={supplierQuoteCount ? `${supplierQuoteCount} supplier quote${supplierQuoteCount === 1 ? "" : "s"} received` : packages.length ? `${packages.length} supplier request${packages.length === 1 ? "" : "s"} sent` : "No supplier prices received yet"} status={pricingStatus} icon="pricing" />
-        <div className="border-t border-slate-200 p-4">
-          {comparisons.length ? <p className="mb-3 rounded-md border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">Supplier prices are shown beside each request item in the table above.</p> : <p className="mb-3 rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-900">Supplier answers and prices will appear beside each item after a quote is linked.</p>}
+        <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier pricing & comparison" detail={supplierQuoteCount ? `${supplierQuoteCount} quote${supplierQuoteCount === 1 ? "" : "s"} ready to compare` : packages.length ? `${packages.length} supplier request${packages.length === 1 ? "" : "s"} sent` : "Choose a route, contact suppliers, and add returned pricing"} status={pricingStatus} icon="pricing" />
+        <div className="border-t border-slate-200 p-3">
+          <div className="mb-3 overflow-x-auto rounded-md border border-slate-200 bg-slate-100">
+            <table className="w-full min-w-[42rem] table-fixed text-left text-[11px]"><thead className="text-[9px] font-bold uppercase tracking-[.08em] text-slate-500"><tr><th className="w-16 px-2 py-1.5">Qty</th><th className="px-2 py-1.5">Original</th><th className="px-2 py-1.5">AI request</th><th className="px-2 py-1.5">Supplier route</th></tr></thead><tbody className="divide-y divide-slate-200 bg-slate-50">{pricingSummaryItems.slice(0, 8).map((item) => <tr key={item.id}><td className="px-2 py-1.5 font-bold">{requestItems.find((candidate) => candidate.id === item.id)?.quantity || "—"}</td><td title={item.original} className="truncate px-2 py-1.5 text-slate-500">{item.original}</td><td title={item.organized} className="truncate px-2 py-1.5 font-semibold">{item.organized}</td><td className="px-2 py-1.5"><a href="#supplier-routing" className="font-bold text-[#0066cc]">{item.route || "Choose supplier"}</a></td></tr>)}</tbody></table>
+          </div>
+          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <a href="#supplier-routing" className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-xs font-bold"><Route className="h-3.5 w-3.5" />Choose route</a>
+            <a href={`/admin/supplier-quotes?request=${requestId}#supplier-quote-upload`} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md bg-[#0071e3] px-2 text-center text-xs font-bold text-white"><Paperclip className="h-3.5 w-3.5" />Upload returned quote</a>
+            <button type="button" onClick={openManualPricing} disabled={pending} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-center text-xs font-bold disabled:opacity-40"><Plus className="h-3.5 w-3.5" />Add pricing by hand</button>
+            {comparisons[0] ? <a href={`/admin/quote-comparison/${comparisons[0].id}`} className="inline-flex min-h-10 items-center justify-center rounded-md border border-emerald-300 bg-emerald-50 px-2 text-xs font-bold text-emerald-900">Compare quotes</a> : <a href={`/admin/supplier-quotes?request=${requestId}`} className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-slate-600">Quotes will compare here</a>}
+          </div>
 
           <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3">
             <label className="grid gap-1.5 text-sm font-bold text-slate-800">Supplier pricing note<textarea value={managerNotes} onChange={(event) => setManagerNotes(event.target.value)} rows={2} maxLength={5000} placeholder="What should Carlos or the supplier know before pricing?" className="resize-y rounded-lg border border-amber-300 bg-white px-3 py-2.5 font-normal text-slate-950 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100" /></label>
