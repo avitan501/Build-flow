@@ -12,7 +12,6 @@ import { AffiliateProgramTracker } from "@/components/buildflow/affiliate-progra
 import { AffiliateCallList } from "@/components/buildflow/affiliate-call-list";
 import { ClientTargetCallGuide } from "@/components/buildflow/client-target-call-guide";
 import {
-  ApiAffiliateCallScript,
   SupplierRelationshipScripts,
 } from "@/components/buildflow/carlos-outreach-scripts";
 import {
@@ -187,13 +186,12 @@ async function OwnerAffiliateGoal({ status }: { status: ManagerGoalStatus }) {
       id="supplier-affiliate-program"
       fixedKey="supplier-affiliate-program"
       status={status}
-      number={3}
+      number={2}
       eyebrow="Programs"
       title="API, Affiliate & Partnership"
       description="Manage supplier APIs, affiliate programs, and partnerships."
     >
       <div className="grid gap-4">
-        <ApiAffiliateCallScript />
         <AffiliateCallList
           programs={programResult.data ?? []}
           activities={activityResult.data ?? []}
@@ -228,7 +226,7 @@ function AbcSupplyDemoGoal({ status }: { status: ManagerGoalStatus }) {
       id="abc-supply-demo"
       fixedKey="abc-supply-demo"
       status={status}
-      number={5}
+      number={4}
       eyebrow="ABC"
       title="Prepare ABC Demo"
       description="Finish branch, product, price, and demo checks."
@@ -386,7 +384,7 @@ function SupplierPartnershipGoal({ status }: { status: ManagerGoalStatus }) {
       id="supplier-partnerships"
       fixedKey="supplier-partnerships"
       status={status}
-      number={4}
+      number={3}
       eyebrow="Partnerships"
       title="Build Supplier Relationships"
       description="Contact suppliers and record the next follow-up."
@@ -492,12 +490,11 @@ export async function CarlosGoalsWorkspace({
           id="supplier-affiliate-program"
           fixedKey="supplier-affiliate-program"
           status={statusFor("supplier-affiliate-program")}
-          number={3}
+          number={2}
           eyebrow="Programs"
           title="API, Affiliate & Partnership"
           description="Manage supplier APIs, affiliate programs, and partnerships."
         >
-          <ApiAffiliateCallScript />
           <AffiliateCallList />
         </GoalDisclosure>
       ),

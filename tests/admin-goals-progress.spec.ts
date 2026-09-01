@@ -61,6 +61,11 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain("<AddTargetClient />");
   expect(page).toContain("<ClientTargetCallGuide />");
   expect(page).toContain('title="API, Affiliate & Partnership"');
+  expect(page).toContain('title="API, Affiliate & Partnership"\n      description="Manage supplier APIs, affiliate programs, and partnerships."');
+  expect(page).toContain('number={2}');
+  expect(page).toContain('number={3}');
+  expect(page).toContain('number={4}');
+  expect(page).not.toContain('number={5}');
   expect(page).toContain('id="supplier-affiliate-program"');
   expect(page).toContain('fixedKey="supplier-affiliate-program"');
   expect(page).toContain('.from("manager_goals")');
@@ -460,6 +465,9 @@ test("Carlos has a focused top-10 supplier call list while the full research lis
   expect(page).toContain("<AffiliateCallList />");
   expect(page).toContain("Manage supplier APIs, affiliate programs, and partnerships.");
   expect(component).toContain("Top 10 supplier programs");
+  expect(component).toContain("Call script");
+  expect(component).toContain("Copy script");
+  expect(component).toContain("Filters");
   expect(component).toContain("1 · Supplier");
   expect(component).toContain("2 · Status");
   expect(component).toContain("3 · Contact");
@@ -479,6 +487,8 @@ test("Carlos has a focused top-10 supplier call list while the full research lis
   expect((data.match(/trackerName:/g) ?? []).length).toBe(10);
   expect((data.match(/currentSituation:/g) ?? []).length).toBe(10);
   expect((data.match(/contactMethods:/g) ?? []).length).toBe(10);
+  expect((data.match(/recommendedScript:/g) ?? []).length).toBe(10);
+  expect((data.match(/termsFit:/g) ?? []).length).toBe(10);
   expect(data).toContain("allie.smith@cj.com");
   expect(data).toContain("publisher.growth@impact.com");
   expect(data).toContain("affiliatesmanager@acmetools.com");

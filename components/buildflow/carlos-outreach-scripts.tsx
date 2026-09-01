@@ -29,21 +29,6 @@ const CONTRACTOR_STEPS = [
   },
 ] as const;
 
-const PROGRAM_STEPS = [
-  {
-    label: "Opening",
-    text: "Hi, this is Carlos with Avantia Build. We help contractors request and compare construction materials. Who handles API access, affiliate partnerships, or contractor programs at your company?",
-  },
-  {
-    label: "What we need",
-    text: "We want to send customers to your products and request pricing when a job matches what you sell. Do you offer a product catalog API, affiliate program, or partner account?",
-  },
-  {
-    label: "Next step",
-    text: "What is the correct application link or email, and what information do you need from Avantia Build to apply?",
-  },
-] as const;
-
 function CopyScriptButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -99,14 +84,6 @@ export function SupplierRelationshipScripts() {
     <div className="mb-3 grid gap-3">
       <ScriptBlock title="Supplier call" steps={SUPPLIER_STEPS} tone="amber" record="contact name · email · trade · delivery area · minimum · contractor pricing" />
       <ScriptBlock title="Contractor call" steps={CONTRACTOR_STEPS} tone="sky" record="name · phone · material needed · quote/list received · next follow-up" />
-    </div>
-  );
-}
-
-export function ApiAffiliateCallScript() {
-  return (
-    <div className="mb-3">
-      <ScriptBlock title="API, affiliate & partnership call" steps={PROGRAM_STEPS} tone="sky" record="program type · contact · email · application link · requirements · status · follow-up date" />
     </div>
   );
 }

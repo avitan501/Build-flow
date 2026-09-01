@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import {
+  Check,
+  Copy,
   ExternalLink,
   Mail,
   MessageSquareText,
@@ -135,6 +137,7 @@ export function AffiliateCallList({
   activities?: AffiliateActivity[];
 }) {
   const [query, setQuery] = useState("");
+  const [copiedRank, setCopiedRank] = useState<number | null>(null);
   const [priority, setPriority] = useState<"All" | "A" | "B" | "C">("All");
   const [contactLevel, setContactLevel] = useState<
     | "All"
@@ -180,61 +183,20 @@ export function AffiliateCallList({
 
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-[#f8fafc] shadow-[0_12px_34px_rgba(15,23,42,0.06)]">
-      <div className="border-b border-slate-200 bg-white p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0066cc]">
-              Supplier affiliate worklist
-            </p>
-            <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">
-              Top 10 supplier programs
-            </h3>
-            <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">
-              Status, direct contacts, current situation, and the next move in
-              one place. Use a second route whenever email is waiting.
-            </p>
-          </div>
-          <span className="rounded-full bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white">
-            {filtered.length} suppliers
-          </span>
-        </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_12rem]">
-          <label className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search supplier, email, phone, or next step"
-              className="h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-[#0071e3] focus:ring-2 focus:ring-blue-100"
-            />
-          </label>
-          <select
-            aria-label="Filter by priority"
-            value={priority}
-            onChange={(event) =>
-              setPriority(event.target.value as typeof priority)
-            }
-            className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"
-          >
-            <option>All</option>
-            <option>A</option>
-            <option>B</option>
-            <option>C</option>
-          </select>
-          <select
-            aria-label="Filter by contact route"
-            value={contactLevel}
-            onChange={(event) =>
-              setContactLevel(event.target.value as typeof contactLevel)
-            }
-            className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"
-          >
-            <option>All</option>
-            <option>Dedicated team</option>
-            <option>Direct business</option>
-            <option>Pro or sales team</option>
-            <option>Network managed</option>
-          </select>
+      <div className="border-b border-slate-200 bg-white px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <h3 className="min-w-0 flex-1 truncate text-sm font-bold text-slate-950">Top 10 supplier programs</h3>
+          <span className="rounded-full bg-slate-950 px-2 py-1 text-[10px] font-bold text-white">{filtered.length}/10</span>
+          <details className="group relative">
+            <summary className="flex h-8 cursor-pointer list-none items-center rounded-md border border-slate-200 px-2.5 text-[11px] font-bold text-slate-700">Filters</summary>
+            <div className="absolute right-0 z-20 mt-1 grid w-[min(22rem,calc(100vw-2rem))] gap-2 rounded-md border border-slate-200 bg-white p-2 shadow-xl">
+              <label className="relative"><Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search" className="h-8 w-full rounded-md border border-slate-300 pl-8 pr-2 text-xs" /></label>
+              <div className="grid grid-cols-2 gap-2">
+                <select aria-label="Filter by priority" value={priority} onChange={(event) => setPriority(event.target.value as typeof priority)} className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs"><option>All</option><option>A</option><option>B</option><option>C</option></select>
+                <select aria-label="Filter by contact route" value={contactLevel} onChange={(event) => setContactLevel(event.target.value as typeof contactLevel)} className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs"><option>All</option><option>Dedicated team</option><option>Direct business</option><option>Pro or sales team</option><option>Network managed</option></select>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -316,6 +278,14 @@ export function AffiliateCallList({
                       <strong className="text-slate-700">Ask for:</strong>{" "}
                       {target.askFor}
                     </p>
+                    {target.recommendedScript ? (
+                      <details className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2">
+                        <summary className="cursor-pointer text-[11px] font-bold text-[#0066cc]">Call script</summary>
+                        <p className="mt-2 text-[11px] leading-4 text-slate-700">{target.recommendedScript}</p>
+                        {target.termsFit ? <p className="mt-2 text-[10px] leading-4 text-amber-800"><strong>Program fit:</strong> {target.termsFit}</p> : null}
+                        <button type="button" onClick={async () => { await navigator.clipboard.writeText(target.recommendedScript ?? ""); setCopiedRank(target.rank); window.setTimeout(() => setCopiedRank(null), 1500); }} className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700">{copiedRank === target.rank ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}{copiedRank === target.rank ? "Copied" : "Copy script"}</button>
+                      </details>
+                    ) : null}
                     <a
                       href={target.programUrl}
                       target="_blank"
@@ -408,6 +378,14 @@ export function AffiliateCallList({
                   <p className="mt-2 text-[11px] leading-4 text-slate-600">
                     <strong>Ask for:</strong> {target.askFor}
                   </p>
+                  {target.recommendedScript ? (
+                    <details className="mt-2 rounded-md border border-blue-100 bg-white p-2.5">
+                      <summary className="cursor-pointer text-xs font-bold text-[#0066cc]">Call script</summary>
+                      <p className="mt-2 text-xs leading-5 text-slate-700">{target.recommendedScript}</p>
+                      {target.termsFit ? <p className="mt-2 text-[10px] leading-4 text-amber-800"><strong>Program fit:</strong> {target.termsFit}</p> : null}
+                      <button type="button" onClick={async () => { await navigator.clipboard.writeText(target.recommendedScript ?? ""); setCopiedRank(target.rank); window.setTimeout(() => setCopiedRank(null), 1500); }} className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 px-2.5 text-[11px] font-bold text-slate-700">{copiedRank === target.rank ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}{copiedRank === target.rank ? "Copied" : "Copy script"}</button>
+                    </details>
+                  ) : null}
                   <a
                     href={target.programUrl}
                     target="_blank"

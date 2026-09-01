@@ -22,6 +22,8 @@ export type AffiliateCallTarget = {
   }>;
   currentSituation?: string;
   statusLabel?: string;
+  recommendedScript?: string;
+  termsFit?: string;
 };
 
 type TargetOptions = Pick<AffiliateCallTarget, "askFor" | "callRoute" | "contactLevel"> & {
@@ -129,6 +131,8 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     programUrl: "https://apidocs.abcsupply.com/api-overview/",
     programStatus: "Official program",
     currentSituation: "Sandbox and certification work are active. Production still depends on an authorized ABC customer account, New York branch access, and a complete account-to-price workflow.",
+    termsFit: "Use the Third-Party Aggregator route. Do not describe Avantia as a competitor price-comparison or resale platform.",
+    recommendedScript: "Hi, this is Carlos with Avantia Build. We are preparing a third-party aggregator integration for mutual ABC customers. We need to confirm the production path for OAuth account connection, authorized Ship-To access, New York branch selection, and customer-specific pricing. Who handles API certification?",
     contactMethods: [
       { label: "API support", detail: "Official support page", href: "https://apidocs.abcsupply.com/support/", type: "form" },
       { label: "Customer support", detail: "800-226-1280", href: "tel:+18002261280", type: "phone" },
@@ -151,6 +155,8 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     programUrl: "https://www.cj.com/publisher",
     programStatus: "Official program",
     currentSituation: "Creator Care replied on Aug 31: the social Creator program is not the right fit for a website-only publisher. They referred AvantiaBuild to Lowe's traditional affiliate team at CJ, and that team has been emailed.",
+    termsFit: "Use the traditional website-publisher route through CJ. Do not present Avantia as a social creator.",
+    recommendedScript: "Hi, this is Carlos with Avantia Build. We operate a live construction-material website for contractors. Lowe's Creator Care directed us to the traditional Lowe's affiliate team at CJ. I am following up to confirm the correct publisher application and whether you need any additional website or audience information.",
     contactMethods: [
       { label: "Lowe's CJ team", detail: "Allie Smith + 2 contacts", href: "mailto:allie.smith@cj.com?cc=kailie.stevens@cj.com,emily.hausen@cj.com", type: "email" },
       { label: "Pro desk", detail: "844-569-4776", href: "tel:+18445694776", type: "phone" },
@@ -175,6 +181,8 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     programStatus: "Official program",
     statusLabel: "Applied — Not Approved",
     currentSituation: "AvantiaBuild’s Impact publisher account 7653928 is approved, but Home Depot requires separate brand approval. Campaign 8154 / brand 1213441 was received Aug 27 and remains under review. Impact Support was emailed Aug 31. There is no separate Home Depot affiliate login.",
+    termsFit: "Home Depot requires a live website and separate brand approval inside Impact. Ask about the existing application, not a new login.",
+    recommendedScript: "Hi, this is Carlos with Avantia Build. We operate a live construction-material website and applied to The Home Depot inside Impact under account 7653928, campaign 8154. I am checking whether the brand review needs any additional website or compliance information.",
     contactMethods: [
       { label: "Impact Support", detail: "publisher.growth@impact.com", href: "mailto:publisher.growth@impact.com", type: "email" },
       { label: "Affiliate page", detail: "Home Depot application", href: "https://www.homedepot.com/c/SF_MS_The_Home_Depot_Affiliate_Program", type: "form" },
@@ -198,6 +206,8 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     programUrl: "https://affiliate-program.amazon.com/",
     programStatus: "Official program",
     currentSituation: "The account is active. The Aug 30 dashboard shows 9 clicks, 0 orders and $0 earnings. Amazon still requires the tax interview, payment setup and three qualifying purchases before final account review.",
+    termsFit: "Amazon reviews the site after three qualifying sales within 180 days and expects useful original content. Personal orders do not qualify.",
+    recommendedScript: "Our Amazon Associates account is active. We are completing tax and payment setup and working toward three qualifying customer purchases. I need help confirming that our listed website, original content, and affiliate disclosures are ready for the final review.",
     contactMethods: [
       { label: "Associates support", detail: "Account contact form", href: "https://affiliate-program.amazon.com/home/contact", type: "form" },
       { label: "Associates Central", detail: "Open account", href: "https://affiliate-program.amazon.com/home", type: "form" },
@@ -220,6 +230,8 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     programUrl: "https://affiliates.walmart.com/",
     programStatus: "Official program",
     currentSituation: "The website affiliate application was received Aug 17 and is still awaiting a decision. A status follow-up was sent to Walmart Affiliate Support on Aug 31; no decision email is verified yet.",
+    termsFit: "Describe Avantia as an independent website publisher using approved qualifying links. Never imply that Avantia is an official Walmart partner before approval.",
+    recommendedScript: "Hi, this is Carlos with Avantia Build. We submitted a Walmart website affiliate application on August 17. I am checking whether the review needs an email or phone verification, website information, or any other action from us.",
     contactMethods: [
       { label: "Affiliate support", detail: "affiliates-help-ext@wal-mart.com", href: "mailto:affiliates-help-ext@wal-mart.com", type: "email" },
       { label: "Affiliate portal", detail: "Open application account", href: "https://affiliates.walmart.com/", type: "form" },
@@ -242,6 +254,8 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     programUrl: "https://www.ferguson.com/content/pro-services/",
     programStatus: "Official program",
     currentSituation: "A direct affiliate inquiry was sent Aug 24 and followed up Aug 31 after Impact approved AvantiaBuild's publisher account. No Ferguson reply is verified yet; customer support and professional sales remain the backup routes.",
+    termsFit: "Separate the website-affiliate request from Ferguson Pro purchasing. Ask the affiliate team about tracked referrals; ask Pro Sales about real job quotes.",
+    recommendedScript: "Hi, this is Carlos with Avantia Build. We operate a construction-material website serving contractors, and our Impact publisher account is active. I am trying to confirm whether Ferguson Home accepts website publishers for tracked product referrals and what information your affiliate team needs from us.",
     contactMethods: [
       { label: "Affiliate team", detail: "bld-affiliateteam@ferguson.com", href: "mailto:bld-affiliateteam@ferguson.com", type: "email" },
       { label: "Customer support", detail: "customer.support@ferguson.com", href: "mailto:customer.support@ferguson.com", type: "email" },
@@ -265,6 +279,8 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     programUrl: "https://www.bldr.com/contact/contact-us",
     programStatus: "Confirm by phone",
     currentSituation: "Customer Service was emailed Aug 23, and several online cases produced automated replies, most recently case 00714195 on Aug 25. There is still no verified human partnership or trade-account contact, so the next route is the support line or a local branch.",
+    termsFit: "Builders FirstSource publicly routes quotes, pricing, accounts and myBLDR setup through local sales representatives. This is a trade relationship, not a verified affiliate program.",
+    recommendedScript: "Hi, this is Carlos with Avantia Build. We have contractors with real material lists for projects in Long Island. I need a local sales representative who can receive quote requests, confirm delivery options, and explain the correct account or myBLDR setup. I am following up on case 00714195.",
     contactMethods: [
       { label: "myBLDR support", detail: "844-487-8625", href: "tel:+18444878625", type: "phone" },
       { label: "Contact form", detail: "Reference case 00714195", href: "https://www.bldr.com/contact/contact-us", type: "form" },
@@ -288,6 +304,8 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     programUrl: "https://www.acehardware.com/affiliates",
     programStatus: "Official program",
     currentSituation: "AvantiaBuild's Impact publisher account is approved, but Ace requires its own separate brand application. The Ace affiliate team was followed up on Aug 31 for the direct campaign link; no reply is verified yet.",
+    termsFit: "Ace accepts website publishers through a separate Impact application and expects approved product links and compliant brand use.",
+    recommendedScript: "Hi, this is Carlos with Avantia Build. We operate a live construction-material website and already have an approved Impact publisher account. I am calling to confirm the separate Ace Hardware brand application and whether your team needs any additional site or promotional-method information.",
     contactMethods: [
       { label: "Affiliate help", detail: "866-290-5334", href: "tel:+18662905334", type: "phone" },
       { label: "Ace application", detail: "Apply to the Ace campaign", href: "https://www.acehardware.com/affiliates", type: "form" },
@@ -311,6 +329,8 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     programUrl: "https://www.acmetools.com/affiliates.html",
     programStatus: "Official program",
     currentSituation: "No verified Acme application has been submitted yet. Acme publishes a direct Impact application and a named affiliate-manager email.",
+    termsFit: "Acme invites publishers who educate or promote to a relevant audience through Impact tracked links; it also offers a product data feed after approval.",
+    recommendedScript: "Hi, this is Carlos with Avantia Build. We help contractors find relevant tools and materials through our website. We want to apply to Acme Tools in Impact and use approved tracked product links for our contractor audience. Is there anything your team wants to see on our site or application before we submit?",
     contactMethods: [
       { label: "Affiliate manager", detail: "affiliatesmanager@acmetools.com", href: "mailto:affiliatesmanager@acmetools.com", type: "email" },
       { label: "Impact application", detail: "Apply to Acme Tools", href: "http://app.impact.com/campaign-campaign-info-v2/Acme-Tools.brand", type: "form" },
@@ -334,6 +354,8 @@ export const TOP_AFFILIATE_CALL_TARGETS: AffiliateCallTarget[] = [
     programUrl: "https://www.thertastore.com/partner-with-us",
     programStatus: "Official program",
     currentSituation: "The official partner route is identified, but no submitted application or approval is verified.",
+    termsFit: "Use the cabinet partner route for qualified kitchen and bath projects. Do not promise affiliate tracking or API access unless the partner team confirms it.",
+    recommendedScript: "Hi, this is Carlos with Avantia Build. We work with contractors and customers who need kitchen cabinets for real projects. I am calling to understand The RTA Store's partner program, how qualified project referrals are handled, and what you need from us to apply.",
     contactMethods: [
       { label: "Partner team", detail: "877-992-2246", href: "tel:+18779922246", type: "phone" },
       { label: "Partner form", detail: "Open partner application", href: "https://www.thertastore.com/partner-with-us", type: "form" },
