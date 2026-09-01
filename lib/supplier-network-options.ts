@@ -42,6 +42,7 @@ export async function loadSupplierNetworkOptions(supabase: SupabaseClient) {
         status?: unknown;
         note?: unknown;
         hidden?: unknown;
+        priority?: unknown;
       };
       if (typeof parsed.key !== "string") continue;
       entries.push([
@@ -67,6 +68,9 @@ export async function loadSupplierNetworkOptions(supabase: SupabaseClient) {
             : {}),
           ...(typeof parsed.hidden === "boolean"
             ? { hidden: parsed.hidden }
+            : {}),
+          ...(typeof parsed.priority === "boolean"
+            ? { priority: parsed.priority }
             : {}),
         },
       ]);

@@ -24,6 +24,7 @@ export type SupplierNetworkOverride = {
   status?: string;
   note?: string;
   hidden?: boolean;
+  priority?: boolean;
 };
 
 export type SupplierNetworkRow = {
@@ -40,6 +41,7 @@ export type SupplierNetworkRow = {
   status: string;
   note: string;
   hidden: boolean;
+  priority: boolean;
 };
 
 function canonicalName(value: string) {
@@ -186,6 +188,7 @@ function mergeRow(
         : current.status,
     note: current.note || incoming.note,
     hidden: current.hidden || incoming.hidden,
+    priority: current.priority || incoming.priority,
   });
 }
 
@@ -215,6 +218,7 @@ export function buildSupplierNetwork(input: {
       status: "Research ready",
       note: "",
       hidden: false,
+      priority: false,
     });
   }
 
@@ -234,6 +238,7 @@ export function buildSupplierNetwork(input: {
       status: program.affiliate_status,
       note: "",
       hidden: false,
+      priority: false,
     });
   }
 
@@ -262,6 +267,7 @@ export function buildSupplierNetwork(input: {
       status: itemProgress.status,
       note: "",
       hidden: false,
+      priority: false,
     });
   }
 
@@ -275,6 +281,7 @@ export function buildSupplierNetwork(input: {
       status: override.status ?? row.status,
       note: override.note ?? row.note,
       hidden: override.hidden ?? row.hidden,
+      priority: override.priority ?? row.priority,
     });
   }
 

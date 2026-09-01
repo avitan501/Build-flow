@@ -497,6 +497,11 @@ test("Carlos has one compact deduplicated supplier network while the research li
   expect(component).toContain('label: "Hidden"');
   expect(component).toContain("Restore");
   expect(component).toContain("deleteConfirm === row.key");
+  expect(component).toContain("aria-pressed={priorityOnly}");
+  expect(component).toContain("Priority{");
+  expect(component).toContain("Priority ${row.name}");
+  expect(component).toContain("priorityDifference");
+  expect(component).toContain("priorityOnly");
   expect(component).toContain("SUPPLIER_NETWORK_CHANNELS.map");
   expect(component).toContain("min-h-11");
   expect(network).toContain("function canonicalName");

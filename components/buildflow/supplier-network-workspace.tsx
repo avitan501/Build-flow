@@ -6,6 +6,7 @@ import {
   Phone,
   RotateCcw,
   Search,
+  Star,
   Trash2,
   X,
 } from "lucide-react";
@@ -89,6 +90,7 @@ export function SupplierNetworkWorkspace({
   const [stage, setStage] = useState<SupplierNetworkView>("contact");
   const [source, setSource] = useState<SupplierNetworkSource | "All">("All");
   const [query, setQuery] = useState("");
+  const [priorityOnly, setPriorityOnly] = useState(false);
   const [expanded, setExpanded] = useState<{
     key: string;
     mode: "actions" | "options";
@@ -105,6 +107,7 @@ export function SupplierNetworkWorkspace({
           status: row.status,
           note: row.note,
           hidden: row.hidden,
+          priority: row.priority,
         },
       ]),
     ),
@@ -121,6 +124,7 @@ export function SupplierNetworkWorkspace({
         status: row.status,
         note: row.note,
         hidden: row.hidden,
+        priority: row.priority,
       },
     [rowEdits],
   );
@@ -173,20 +177,31 @@ export function SupplierNetworkWorkspace({
   );
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
-    return rows.filter((row) => {
-      const edit = currentEdit(row);
-      return (
-        (stage === "hidden"
-          ? edit.hidden
-          : !edit.hidden && edit.stage === stage) &&
-        (source === "All" || row.sources.includes(source)) &&
-        (!search ||
-          `${row.name} ${row.departments} ${row.ask} ${edit.note}`
-            .toLowerCase()
-            .includes(search))
-      );
-    });
-  }, [currentEdit, query, rows, source, stage]);
+    return rows
+      .filter((row) => {
+        const edit = currentEdit(row);
+        return (
+          (stage === "hidden"
+            ? edit.hidden
+            : !edit.hidden && edit.stage === stage) &&
+          (!priorityOnly || edit.priority) &&
+          (source === "All" || row.sources.includes(source)) &&
+          (!search ||
+            `${row.name} ${row.departments} ${row.ask} ${edit.note}`
+              .toLowerCase()
+              .includes(search))
+        );
+      })
+      .sort((a, b) => {
+        const priorityDifference =
+          Number(currentEdit(b).priority) - Number(currentEdit(a).priority);
+        return priorityDifference || a.name.localeCompare(b.name);
+      });
+  }, [currentEdit, priorityOnly, query, rows, source, stage]);
+
+  const priorityCount = rows.filter(
+    (row) => !currentEdit(row).hidden && currentEdit(row).priority,
+  ).length;
 
   return (
     <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
@@ -209,6 +224,18 @@ export function SupplierNetworkWorkspace({
             </span>
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setPriorityOnly((value) => !value)}
+          className={`inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-[11px] font-bold ${priorityOnly ? "bg-amber-400 text-slate-950" : "bg-white text-amber-700 hover:bg-amber-50"}`}
+          aria-pressed={priorityOnly}
+        >
+          <Star
+            className={`h-3.5 w-3.5 ${priorityOnly ? "fill-current" : ""}`}
+          />
+          Priority{" "}
+          <span className="tabular-nums opacity-70">{priorityCount}</span>
+        </button>
         <label className="ml-auto flex h-8 min-w-36 flex-1 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 sm:max-w-56">
           <Search className="h-3.5 w-3.5 text-slate-400" />
           <input
@@ -270,9 +297,21 @@ export function SupplierNetworkWorkspace({
                 >
                   <td className="p-0" colSpan={6}>
                     <div className="grid min-h-11 w-full grid-cols-[10rem_12rem_8rem_minmax(12rem,1fr)_5rem_4rem] items-center text-left">
-                      <span className="truncate px-2 text-xs font-bold text-slate-950">
-                        {row.name}
-                      </span>
+                      <label className="flex min-w-0 items-center gap-1.5 px-2 text-xs font-bold text-slate-950">
+                        <input
+                          type="checkbox"
+                          checked={edit.priority}
+                          onChange={(event) =>
+                            saveRow(row, {
+                              ...edit,
+                              priority: event.target.checked,
+                            })
+                          }
+                          className="h-3.5 w-3.5 shrink-0 accent-amber-500"
+                          aria-label={`Priority ${row.name}`}
+                        />
+                        <span className="truncate">{row.name}</span>
+                      </label>
                       <span className="line-clamp-2 px-2 text-[10px] leading-3.5 text-slate-600">
                         {row.departments}
                       </span>

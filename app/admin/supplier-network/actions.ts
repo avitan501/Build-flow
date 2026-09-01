@@ -25,6 +25,7 @@ const inputSchema = z.object({
   status: z.string().trim().min(1).max(80),
   note: z.string().trim().max(2000),
   hidden: z.boolean(),
+  priority: z.boolean(),
 });
 
 export async function updateSupplierNetworkRowAction(
@@ -49,6 +50,7 @@ export async function updateSupplierNetworkRowAction(
         status: parsed.data.status,
         note: parsed.data.note,
         hidden: parsed.data.hidden,
+        priority: parsed.data.priority,
       } satisfies SupplierNetworkOverride,
     );
   } catch {
