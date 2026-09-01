@@ -11,6 +11,7 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
     actions,
     store,
     goalsPage,
+    networkPage,
     deliveryPage,
     deliveryStore,
     managerShell,
@@ -23,6 +24,7 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
     readFile(path.join(root, "app/owner/partnerships/actions.ts"), "utf8"),
     readFile(path.join(root, "lib/supplier-partners/store.ts"), "utf8"),
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/supplier-network/page.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/delivery-requests/page.tsx"), "utf8"),
     readFile(path.join(root, "lib/delivery-requests.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/admin-shell.tsx"), "utf8"),
@@ -39,16 +41,18 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(store).toContain("created_by: userId");
   expect(store).not.toContain("createAdminClient");
   expect(store).not.toContain('.from("aura_tasks")');
-  expect(goalsPage).toContain("SupplierNetworkWorkspace");
-  expect(goalsPage).toContain("buildSupplierNetwork");
-  expect(goalsPage).toContain("loadSupplierPartnerProgress");
+  expect(goalsPage).toContain('href="/admin/supplier-network"');
+  expect(goalsPage).not.toContain("SupplierNetworkWorkspace");
+  expect(networkPage).toContain("SupplierNetworkWorkspace");
+  expect(networkPage).toContain("buildSupplierNetwork");
+  expect(networkPage).toContain("loadSupplierPartnerProgress");
   expect(goalsPage).not.toContain('count: SUPPLIER_PARTNERS.length, href: "/owner/partnerships"');
-  expect(goalsPage).toContain("SUPPLIER_PARTNERS");
+  expect(networkPage).toContain("SUPPLIER_PARTNERS");
   expect(deliveryPage).toContain('requireStaffProfile("suppliers")');
   expect(deliveryPage).toContain("loadDeliveryRequests(supabase)");
   expect(deliveryStore).not.toContain("createAdminClient");
   expect(managerShell).not.toContain('href: "/owner/partnerships"');
-  expect(goalsPage).toContain('title="Build Supplier Network"');
+  expect(goalsPage).toContain("Build Supplier Relationships");
   expect(goalsPage).not.toContain("<SupplierRelationshipScripts />");
   expect(goalsPage).toContain("<ContractorCallScript />");
   expect(scripts).toContain("Supplier call");

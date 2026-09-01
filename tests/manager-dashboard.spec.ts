@@ -36,7 +36,8 @@ test("manager dashboard is the employee daily command center", async () => {
   expect(page).toContain("<CarlosGoalsWorkspace embedded />");
   expect(page).not.toContain('href="/admin/goals-progress#abc-supply-demo"');
   expect(goalsPage).toContain('title="Prepare ABC Demo"');
-  expect(goalsPage).toContain('title="Build Supplier Network"');
+  expect(goalsPage).toContain("Build Supplier Relationships");
+  expect(goalsPage).toContain('href="/admin/supplier-network"');
   expect(page).not.toContain("One priority, clear tasks, and the next action.");
   expect(page).not.toContain('assignee="david"');
   expect(page).toContain("Manager tools");

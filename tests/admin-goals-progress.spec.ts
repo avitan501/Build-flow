@@ -43,8 +43,7 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   ]);
 
   expect(page).toContain("await requireManagerPortalProfile()");
-  expect(page).toContain("async function OwnerAffiliateGoal({ status, priority, supplierProgress }");
-  expect(page).toContain("const { supabase } = await requireAdminProfile()");
+  expect(page).toContain("function SupplierNetworkGoalLink({");
   expect(page).toContain("Carlos Dashboard");
   expect(page).toContain("Contact New Clients");
   expect(page).toContain("<ContractorCallScript />");
@@ -52,19 +51,16 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain("<OutreachLeadList");
   expect(page).toContain("Clients in the system");
   expect(page).not.toContain('title="Find Best Supplier Prices"');
-  expect(page).toContain('title="Build Supplier Network"');
+  expect(page).toContain("Build Supplier Relationships");
   expect(page).toContain("Prepare ABC Demo");
   expect(page).toContain('href="/admin/abc"');
   expect(page).not.toContain("<PersonHeader");
-  expect(page).toContain("<AffiliateProgramTracker");
-  expect(page).toContain("content: access.owner ? (");
-  expect(page).toContain("<OwnerAffiliateGoal status=");
-  expect(page).toContain('.from("affiliate_programs")');
+  expect(page).toContain('href="/admin/supplier-network"');
+  expect(page).not.toContain("<SupplierNetworkWorkspace");
   expect(page).toContain("<AddTargetClient />");
   expect(page).toContain("<ClientTargetCallGuide />");
   expect(page).not.toContain('title="API, Affiliate & Partnership"');
-  expect(page).toContain('description="Find more sources and open every useful buying channel."');
-  expect(page).toContain('number={2}');
+  expect(page).toContain("<GoalNumber>2</GoalNumber>");
   expect(page).toContain('number={3}');
   expect(page).not.toContain('number={4}');
   expect(page).not.toContain('number={5}');
@@ -466,7 +462,7 @@ test("affiliate tracker is persistent, owner-only, filterable, and setup-gated",
 
 test("Carlos has one compact deduplicated supplier network while the research list stays preserved", async () => {
   const [page, component, network, data] = await Promise.all([
-    readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/supplier-network/page.tsx"), "utf8"),
     readFile(
       path.join(root, "components/buildflow/supplier-network-workspace.tsx"),
       "utf8",
@@ -476,7 +472,9 @@ test("Carlos has one compact deduplicated supplier network while the research li
   ]);
 
   expect(page).toContain("<SupplierNetworkWorkspace");
-  expect(page).toContain("Full applications, terms & history");
+  expect(page).toContain("Build Supplier Relationships");
+  expect(page).toContain('href="/admin/goals-progress"');
+  expect(page).toContain("requireManagerPortalProfile");
   expect(component).toContain("Sells / departments");
   expect(component).toContain("What to ask");
   expect(component).toContain('"Show", "Friends", "Google", "Nearby"');
@@ -486,7 +484,7 @@ test("Carlos has one compact deduplicated supplier network while the research li
   expect(network).toContain("mergeRow(rows");
   expect(network).toContain("itemProgress?.important");
   expect(network).toContain("AFFILIATE_CALL_TARGETS");
-  expect(page).toContain("activities={activityResult.data ?? []}");
+  expect(page).toContain('.from("affiliate_programs")');
   expect(data).toContain("export const TOP_AFFILIATE_CALL_TARGETS");
   expect((data.match(/trackerName:/g) ?? []).length).toBe(10);
   expect((data.match(/currentSituation:/g) ?? []).length).toBe(10);

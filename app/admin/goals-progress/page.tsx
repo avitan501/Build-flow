@@ -8,8 +8,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { AddTargetClient } from "@/components/buildflow/add-target-client";
-import { AffiliateProgramTracker } from "@/components/buildflow/affiliate-program-tracker";
-import { SupplierNetworkWorkspace } from "@/components/buildflow/supplier-network-workspace";
 import { ClientTargetCallGuide } from "@/components/buildflow/client-target-call-guide";
 import { ContractorCallScript } from "@/components/buildflow/carlos-outreach-scripts";
 import {
@@ -21,24 +19,13 @@ import {
 import { type ManagerGoalRecord } from "@/components/buildflow/manager-goals";
 import { ManagerGoalStatusSelect } from "@/components/buildflow/manager-goal-status-select";
 import { ManagerGoalPrioritySelect } from "@/components/buildflow/manager-goal-priority-select";
-import type {
-  AffiliateActivity,
-  AffiliateAttachment,
-  AffiliateChecklistItem,
-  AffiliateIntegration,
-  AffiliateProgram,
-  AffiliateTrackerSettings,
-} from "@/lib/affiliate-tracker";
-import { requireAdminProfile, requireManagerPortalProfile } from "@/lib/auth";
+import { requireManagerPortalProfile } from "@/lib/auth";
 import {
   CARLOS_FIXED_GOALS,
   fixedGoalKey as parseFixedGoalKey,
   type CarlosFixedGoalKey,
   type ManagerGoalStatus,
 } from "@/lib/manager-goal-status";
-import { loadSupplierPartnerProgress } from "@/lib/supplier-partners/store";
-import { SUPPLIER_PARTNERS } from "@/lib/supplier-partners/catalog";
-import { buildSupplierNetwork } from "@/lib/supplier-network";
 
 type ClientTarget = {
   id: string;
@@ -123,100 +110,37 @@ function GoalDisclosure({
   );
 }
 
-async function OwnerAffiliateGoal({ status, priority, supplierProgress }: { status: ManagerGoalStatus; priority: number; supplierProgress: Awaited<ReturnType<typeof loadSupplierPartnerProgress>> }) {
-  const { supabase } = await requireAdminProfile();
-  const [
-    programResult,
-    checklistResult,
-    activityResult,
-    attachmentResult,
-    integrationResult,
-    settingsResult,
-  ] = await Promise.all([
-    supabase
-      .from("affiliate_programs")
-      .select("*")
-      .order("priority")
-      .order("supplier_name")
-      .returns<AffiliateProgram[]>(),
-    supabase
-      .from("affiliate_program_checklist")
-      .select("*")
-      .order("sort_order")
-      .returns<AffiliateChecklistItem[]>(),
-    supabase
-      .from("affiliate_program_activities")
-      .select("*")
-      .order("activity_date", { ascending: false })
-      .limit(500)
-      .returns<AffiliateActivity[]>(),
-    supabase
-      .from("affiliate_program_attachments")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .returns<AffiliateAttachment[]>(),
-    supabase
-      .from("affiliate_integrations")
-      .select("*")
-      .order("created_at")
-      .returns<AffiliateIntegration[]>(),
-    supabase
-      .from("affiliate_tracker_settings")
-      .select("*")
-      .eq("id", "global")
-      .maybeSingle<AffiliateTrackerSettings>(),
-  ]);
-  if (
-    programResult.error ||
-    checklistResult.error ||
-    activityResult.error ||
-    attachmentResult.error ||
-    integrationResult.error ||
-    settingsResult.error ||
-    !settingsResult.data
-  )
-    throw new Error("The affiliate tracker could not load.");
-  const signedAttachments = await Promise.all(
-    (attachmentResult.data ?? []).map(async (attachment) => ({
-      ...attachment,
-      signed_url:
-        (
-          await supabase.storage
-            .from("affiliate-confirmations")
-            .createSignedUrl(attachment.file_path, 1800)
-        ).data?.signedUrl ?? null,
-    })),
-  );
+function SupplierNetworkGoalLink({
+  status,
+  priority,
+  canManagePriority,
+}: {
+  status: ManagerGoalStatus;
+  priority: number;
+  canManagePriority: boolean;
+}) {
   return (
-    <GoalDisclosure
+    <section
       id="supplier-affiliate-program"
-      fixedKey="supplier-affiliate-program"
-      status={status}
-      priority={priority}
-      canManagePriority
-      number={2}
-      eyebrow="Supplier network"
-      title="Build Supplier Network"
-      description="Find more sources and open every useful buying channel."
+      className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
     >
-      <div className="grid gap-4">
-        <SupplierNetworkWorkspace rows={buildSupplierNetwork({ programs: programResult.data ?? [], partners: SUPPLIER_PARTNERS, progress: supplierProgress })} />
-        <details className="overflow-hidden rounded-md border border-slate-200 bg-white">
-          <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-[#0066cc]">Full applications, terms & history</summary>
-          <div className="border-t border-slate-200 p-3">
-            <AffiliateProgramTracker
-              programs={programResult.data ?? []}
-              checklist={checklistResult.data ?? []}
-              activities={activityResult.data ?? []}
-              attachments={signedAttachments}
-              integrations={integrationResult.data ?? []}
-              settings={settingsResult.data}
-              hideHeading
-            />
-          </div>
-        </details>
+      <Link
+        href="/admin/supplier-network"
+        className="grid min-h-16 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 transition hover:bg-sky-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0066cc]"
+      >
+        <GoalNumber>2</GoalNumber>
+        <div className="min-w-0">
+          <p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#0066cc]">Supplier network</p>
+          <h3 className="text-sm font-semibold leading-5">Build Supplier Relationships</h3>
+          <p className="mt-0.5 line-clamp-1 text-[10px] leading-4 text-slate-500">Open suppliers, channels, contacts and next steps.</p>
+        </div>
+        <ArrowRight className="h-4 w-4 text-[#0066cc]" aria-hidden="true" />
+      </Link>
+      <div className="flex flex-wrap items-center gap-1 border-t border-slate-100 px-3 py-1.5 pl-[3.5rem]">
+        <ManagerGoalStatusSelect fixedKey="supplier-affiliate-program" status={status} />
+        <ManagerGoalPrioritySelect fixedKey="supplier-affiliate-program" priority={priority} canManage={canManagePriority} />
       </div>
-    </GoalDisclosure>
+    </section>
   );
 }
 
@@ -404,7 +328,7 @@ export async function CarlosGoalsWorkspace({
     .eq("assignee", "carlos")
     .order("status")
     .order("created_at", { ascending: false });
-  const [clientResult, goalResult, leadResult, publishedResult, supplierProgress] =
+  const [clientResult, goalResult, leadResult, publishedResult] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -442,7 +366,6 @@ export async function CarlosGoalsWorkspace({
             priority: number;
           }>
         >(),
-      loadSupplierPartnerProgress(supabase).catch(() => null),
     ]);
   const clients = clientResult.error ? [] : (clientResult.data ?? []);
   const goals = goalResult.error ? [] : (goalResult.data ?? []);
@@ -487,21 +410,12 @@ export async function CarlosGoalsWorkspace({
     },
     {
       key: "supplier-affiliate-program",
-      content: access.owner ? (
-        <OwnerAffiliateGoal status={statusFor("supplier-affiliate-program")} priority={priorityFor("supplier-affiliate-program")} supplierProgress={supplierProgress ?? {}} />
-      ) : (
-        <GoalDisclosure
-          id="supplier-affiliate-program"
-          fixedKey="supplier-affiliate-program"
+      content: (
+        <SupplierNetworkGoalLink
           status={statusFor("supplier-affiliate-program")}
           priority={priorityFor("supplier-affiliate-program")}
-          number={2}
-          eyebrow="Supplier network"
-          title="Build Supplier Network"
-          description="Find more sources and open every useful buying channel."
-        >
-          <SupplierNetworkWorkspace rows={buildSupplierNetwork({ partners: SUPPLIER_PARTNERS, progress: supplierProgress ?? {} })} />
-        </GoalDisclosure>
+          canManagePriority={access.owner}
+        />
       ),
     },
     ...(access.owner
