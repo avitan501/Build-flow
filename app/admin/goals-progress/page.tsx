@@ -9,12 +9,9 @@ import type { ReactNode } from "react";
 
 import { AddTargetClient } from "@/components/buildflow/add-target-client";
 import { AffiliateProgramTracker } from "@/components/buildflow/affiliate-program-tracker";
-import { AffiliateCallList } from "@/components/buildflow/affiliate-call-list";
+import { SupplierNetworkWorkspace } from "@/components/buildflow/supplier-network-workspace";
 import { ClientTargetCallGuide } from "@/components/buildflow/client-target-call-guide";
-import {
-  ContractorCallScript,
-  SupplierRelationshipScripts,
-} from "@/components/buildflow/carlos-outreach-scripts";
+import { ContractorCallScript } from "@/components/buildflow/carlos-outreach-scripts";
 import {
   AddOutreachLead,
   ClientLanguageSelect,
@@ -40,6 +37,8 @@ import {
   type ManagerGoalStatus,
 } from "@/lib/manager-goal-status";
 import { loadSupplierPartnerProgress } from "@/lib/supplier-partners/store";
+import { SUPPLIER_PARTNERS } from "@/lib/supplier-partners/catalog";
+import { buildSupplierNetwork } from "@/lib/supplier-network";
 
 type ClientTarget = {
   id: string;
@@ -124,7 +123,7 @@ function GoalDisclosure({
   );
 }
 
-async function OwnerAffiliateGoal({ status, priority }: { status: ManagerGoalStatus; priority: number }) {
+async function OwnerAffiliateGoal({ status, priority, supplierProgress }: { status: ManagerGoalStatus; priority: number; supplierProgress: Awaited<ReturnType<typeof loadSupplierPartnerProgress>> }) {
   const { supabase } = await requireAdminProfile();
   const [
     programResult,
@@ -196,24 +195,26 @@ async function OwnerAffiliateGoal({ status, priority }: { status: ManagerGoalSta
       priority={priority}
       canManagePriority
       number={2}
-      eyebrow="Programs"
-      title="API, Affiliate & Partnership"
-      description="Manage supplier APIs, affiliate programs, and partnerships."
+      eyebrow="Supplier network"
+      title="Build Supplier Network"
+      description="Find more sources and open every useful buying channel."
     >
       <div className="grid gap-4">
-        <AffiliateCallList
-          programs={programResult.data ?? []}
-          activities={activityResult.data ?? []}
-        />
-        <AffiliateProgramTracker
-          programs={programResult.data ?? []}
-          checklist={checklistResult.data ?? []}
-          activities={activityResult.data ?? []}
-          attachments={signedAttachments}
-          integrations={integrationResult.data ?? []}
-          settings={settingsResult.data}
-          hideHeading
-        />
+        <SupplierNetworkWorkspace rows={buildSupplierNetwork({ programs: programResult.data ?? [], partners: SUPPLIER_PARTNERS, progress: supplierProgress })} />
+        <details className="overflow-hidden rounded-md border border-slate-200 bg-white">
+          <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-[#0066cc]">Full applications, terms & history</summary>
+          <div className="border-t border-slate-200 p-3">
+            <AffiliateProgramTracker
+              programs={programResult.data ?? []}
+              checklist={checklistResult.data ?? []}
+              activities={activityResult.data ?? []}
+              attachments={signedAttachments}
+              integrations={integrationResult.data ?? []}
+              settings={settingsResult.data}
+              hideHeading
+            />
+          </div>
+        </details>
       </div>
     </GoalDisclosure>
   );
@@ -237,7 +238,7 @@ function AbcSupplyDemoGoal({ status, priority }: { status: ManagerGoalStatus; pr
       status={status}
       priority={priority}
       canManagePriority
-      number={4}
+      number={3}
       eyebrow="ABC"
       title="Prepare ABC Demo"
       description="Finish branch, product, price, and demo checks."
@@ -391,32 +392,6 @@ function ClientTargetGoal({
   );
 }
 
-function SupplierPartnershipGoal({ status, priority, canManagePriority, importantSupplierCount }: { status: ManagerGoalStatus; priority: number; canManagePriority: boolean; importantSupplierCount: number }) {
-  const lists = [
-    { label: "Suppliers from the Show", count: importantSupplierCount, href: "/owner/partnerships" },
-    { label: "Suppliers from Friends", count: 0, href: "/admin/vendors" },
-    { label: "Suppliers from Google", count: 0, href: "/admin/vendors" },
-  ];
-  return (
-    <GoalDisclosure
-      id="supplier-partnerships"
-      fixedKey="supplier-partnerships"
-      status={status}
-      priority={priority}
-      canManagePriority={canManagePriority}
-      number={3}
-      eyebrow="Partnerships"
-      title="Build Supplier Relationships"
-      description="Contact suppliers and record the next follow-up."
-    >
-      <SupplierRelationshipScripts />
-      <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
-        {lists.map((list, index) => <Link key={list.label} href={list.href} className="flex min-h-11 items-center gap-3 border-b border-slate-100 px-3 text-sm last:border-b-0 hover:bg-slate-50"><span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-xs font-bold text-slate-600">{index + 1}</span><span className="min-w-0 flex-1 font-semibold">{list.label}</span><span className="text-xs tabular-nums text-slate-500">{list.count}</span><ArrowRight className="h-4 w-4 text-slate-400" /></Link>)}
-      </div>
-    </GoalDisclosure>
-  );
-}
-
 export async function CarlosGoalsWorkspace({
   embedded = false,
 }: {
@@ -472,9 +447,6 @@ export async function CarlosGoalsWorkspace({
   const clients = clientResult.error ? [] : (clientResult.data ?? []);
   const goals = goalResult.error ? [] : (goalResult.data ?? []);
   const leads = leadResult.error ? [] : (leadResult.data ?? []);
-  const importantSupplierCount = supplierProgress
-    ? Object.values(supplierProgress).filter((item) => item.important).length
-    : 0;
   const carlosFixedTaskKeys = new Set(
     Object.keys(CARLOS_FIXED_GOALS).map((key) => `carlos-fixed-${key}`),
   );
@@ -516,7 +488,7 @@ export async function CarlosGoalsWorkspace({
     {
       key: "supplier-affiliate-program",
       content: access.owner ? (
-        <OwnerAffiliateGoal status={statusFor("supplier-affiliate-program")} priority={priorityFor("supplier-affiliate-program")} />
+        <OwnerAffiliateGoal status={statusFor("supplier-affiliate-program")} priority={priorityFor("supplier-affiliate-program")} supplierProgress={supplierProgress ?? {}} />
       ) : (
         <GoalDisclosure
           id="supplier-affiliate-program"
@@ -524,18 +496,12 @@ export async function CarlosGoalsWorkspace({
           status={statusFor("supplier-affiliate-program")}
           priority={priorityFor("supplier-affiliate-program")}
           number={2}
-          eyebrow="Programs"
-          title="API, Affiliate & Partnership"
-          description="Manage supplier APIs, affiliate programs, and partnerships."
+          eyebrow="Supplier network"
+          title="Build Supplier Network"
+          description="Find more sources and open every useful buying channel."
         >
-          <AffiliateCallList />
+          <SupplierNetworkWorkspace rows={buildSupplierNetwork({ partners: SUPPLIER_PARTNERS, progress: supplierProgress ?? {} })} />
         </GoalDisclosure>
-      ),
-    },
-    {
-      key: "supplier-partnerships",
-      content: (
-        <SupplierPartnershipGoal status={statusFor("supplier-partnerships")} priority={priorityFor("supplier-partnerships")} canManagePriority={access.owner} importantSupplierCount={importantSupplierCount} />
       ),
     },
     ...(access.owner

@@ -43,7 +43,7 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   ]);
 
   expect(page).toContain("await requireManagerPortalProfile()");
-  expect(page).toContain("async function OwnerAffiliateGoal({ status, priority }");
+  expect(page).toContain("async function OwnerAffiliateGoal({ status, priority, supplierProgress }");
   expect(page).toContain("const { supabase } = await requireAdminProfile()");
   expect(page).toContain("Carlos Dashboard");
   expect(page).toContain("Contact New Clients");
@@ -52,7 +52,7 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain("<OutreachLeadList");
   expect(page).toContain("Clients in the system");
   expect(page).not.toContain('title="Find Best Supplier Prices"');
-  expect(page).toContain('title="Build Supplier Relationships"');
+  expect(page).toContain('title="Build Supplier Network"');
   expect(page).toContain("Prepare ABC Demo");
   expect(page).toContain('href="/admin/abc"');
   expect(page).not.toContain("<PersonHeader");
@@ -62,11 +62,11 @@ test("Carlos Goals keeps every Carlos priority together and hides David goals", 
   expect(page).toContain('.from("affiliate_programs")');
   expect(page).toContain("<AddTargetClient />");
   expect(page).toContain("<ClientTargetCallGuide />");
-  expect(page).toContain('title="API, Affiliate & Partnership"');
-  expect(page).toContain('title="API, Affiliate & Partnership"\n      description="Manage supplier APIs, affiliate programs, and partnerships."');
+  expect(page).not.toContain('title="API, Affiliate & Partnership"');
+  expect(page).toContain('description="Find more sources and open every useful buying channel."');
   expect(page).toContain('number={2}');
   expect(page).toContain('number={3}');
-  expect(page).toContain('number={4}');
+  expect(page).not.toContain('number={4}');
   expect(page).not.toContain('number={5}');
   expect(page).toContain("<ManagerGoalPrioritySelect");
   expect(page).toContain('priorityFor("client-target")');
@@ -464,36 +464,28 @@ test("affiliate tracker is persistent, owner-only, filterable, and setup-gated",
   expect(migration).toContain("'Developer/API Integration','In Progress'");
 });
 
-test("Carlos has a focused top-10 supplier call list while the full research list stays preserved", async () => {
-  const [page, component, data] = await Promise.all([
+test("Carlos has one compact deduplicated supplier network while the research list stays preserved", async () => {
+  const [page, component, network, data] = await Promise.all([
     readFile(path.join(root, "app/admin/goals-progress/page.tsx"), "utf8"),
     readFile(
-      path.join(root, "components/buildflow/affiliate-call-list.tsx"),
+      path.join(root, "components/buildflow/supplier-network-workspace.tsx"),
       "utf8",
     ),
+    readFile(path.join(root, "lib/supplier-network.ts"), "utf8"),
     readFile(path.join(root, "lib/affiliate-call-list.ts"), "utf8"),
   ]);
 
-  expect(page).toContain("<AffiliateCallList />");
-  expect(page).toContain("Manage supplier APIs, affiliate programs, and partnerships.");
-  expect(component).toContain("Top 10 supplier programs");
-  expect(component).toContain("Call script");
-  expect(component).toContain("Copy script");
-  expect(component).toContain("Filters");
-  expect(component).toContain("1 · Supplier");
-  expect(component).toContain("2 · Status");
-  expect(component).toContain("3 · Contact");
-  expect(component).toContain("4 · Current situation");
-  expect(component).toContain("5 · Next step");
-  expect(component).toContain("Direct business");
-  expect(component).toContain("Network managed");
-  expect(component).toContain("Contact routes are public business contacts");
-  expect(component).toContain("TOP_AFFILIATE_CALL_TARGETS");
-  expect(component).toContain("program?.api_status");
-  expect(component).toContain("program?.next_action");
-  expect(component).toContain("program.last_contact_date");
-  expect(component).toContain("program.next_follow_up_date");
-  expect(component).toContain("Full history");
+  expect(page).toContain("<SupplierNetworkWorkspace");
+  expect(page).toContain("Full applications, terms & history");
+  expect(component).toContain("Sells / departments");
+  expect(component).toContain("What to ask");
+  expect(component).toContain('"Show", "Friends", "Google", "Nearby"');
+  expect(component).toContain("SUPPLIER_NETWORK_CHANNELS.map");
+  expect(component).toContain("min-h-11");
+  expect(network).toContain("function canonicalName");
+  expect(network).toContain("mergeRow(rows");
+  expect(network).toContain("itemProgress?.important");
+  expect(network).toContain("AFFILIATE_CALL_TARGETS");
   expect(page).toContain("activities={activityResult.data ?? []}");
   expect(data).toContain("export const TOP_AFFILIATE_CALL_TARGETS");
   expect((data.match(/trackerName:/g) ?? []).length).toBe(10);
