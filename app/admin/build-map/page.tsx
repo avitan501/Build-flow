@@ -128,9 +128,9 @@ function formatUpdated(value: string) {
 export default async function AdminDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ stage?: string }>;
+  searchParams: Promise<{ stage?: string; section?: string }>;
 }) {
-  const { stage = "" } = await searchParams;
+  const { stage = "", section = "" } = await searchParams;
   const selectedStage = pipelineStages.some((item) => item.id === stage)
     ? (stage as ManagerPipelineStage)
     : null;
@@ -440,7 +440,11 @@ export default async function AdminDashboardPage({
           <CarlosGoalsWorkspace embedded />
         </section>
 
-        <details className="group mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <details
+          id="manager-tools"
+          open={section === "manager-tools"}
+          className="group mt-4 scroll-mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white"
+        >
           <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4">
             <Store className="h-4 w-4 text-[#0066cc]" />
             <span className="min-w-0 flex-1">

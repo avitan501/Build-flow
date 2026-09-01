@@ -20,7 +20,7 @@ test("manager navigation exposes permission-scoped areas and names the AI route 
   for (const label of ["Manager", "Customers", "Catalog", "Documents", "Communication", "Tools"]) {
     expect(shell).toContain(`shortLabel: "${label}"`);
   }
-  for (const route of ["/admin/build-map", "/admin/users", "/admin/catalog", "/admin/documents", "/admin/communications", "/admin/ai-tools"]) {
+  for (const route of ["/admin/build-map", "/admin/users", "/admin/catalog", "/admin/documents", "/admin/communications", "/admin/build-map?section=manager-tools#manager-tools"]) {
     expect(shell).toContain(`href: "${route}"`);
   }
   expect(shell).toContain("access.customers");
@@ -28,6 +28,7 @@ test("manager navigation exposes permission-scoped areas and names the AI route 
   expect(shell).toContain("access.communications");
   expect(shell).toContain("access.aiTools");
   expect(shell).toContain('label: "Manager Tools"');
+  expect(shell).not.toContain('href: "/admin/ai-tools", label: "Manager Tools"');
   expect(shell).not.toContain('label: "AI", shortLabel: "AI"');
 });
 
