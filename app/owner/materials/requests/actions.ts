@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 
 import { sendManagerClientReplyEmail } from "@/lib/cart-submission-email"
 import { requireStaffProfile } from "@/lib/auth"
+import { scheduleClientMaterialListOrganization } from "@/lib/material-request-organization"
 import { buildProjectUploadStoragePath, PROJECT_UPLOAD_ALLOWED_MIME_TYPES, PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/projects"
 import { generateRequestClientQuotePdf, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -58,8 +59,9 @@ export async function addRequestAttachmentsAction(input: { requestId: string; at
     console.error("Existing request attachment storage failed", cause)
     return { ok: false as const, error: "The files could not be attached. Please try again." }
   }
+  scheduleClientMaterialListOrganization({ requestId, force: true })
   revalidatePath(`/owner/materials/requests/${requestId}`)
-  return { ok: true as const }
+  return { ok: true as const, organizationStatus: "scheduled" as const }
 }
 
 export async function saveRequestSupplierPlanAction(input: RequestSupplierPlanInput) {

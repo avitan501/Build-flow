@@ -57,7 +57,7 @@ export function RequestAttachmentUploader({ requestId, compact = false }: { requ
         const result = await addRequestAttachmentsAction({ requestId, attachments: uploads })
         if (!result.ok) return showError(result.error)
         setIsError(false)
-        setMessage(`${uploads.length} file${uploads.length === 1 ? "" : "s"} attached to this request.`)
+        setMessage(`${uploads.length} file${uploads.length === 1 ? "" : "s"} attached. AI is reorganizing the request.`)
         router.refresh()
       } catch (cause) {
         showError(cause instanceof Error ? cause.message : "The files could not be attached. Please try again.")
