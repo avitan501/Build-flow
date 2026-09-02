@@ -1,26 +1,35 @@
 export type PhoneIntakeDashboardDestination = "david" | "carlos";
 
 function compact(value: string | null | undefined) {
-  return String(value || "").trim().replace(/\s+/g, " ");
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+export function trustedPhoneAddCommandText(value: string | null | undefined) {
+  const message = compact(value);
+  const commandIndex = message.search(/\badd\b/iu);
+  return commandIndex >= 0 ? message.slice(commandIndex) : null;
 }
 
 export function isExplicitTrustedPhoneAddCommand(
   value: string | null | undefined,
 ) {
-  return /^add\b/iu.test(compact(value));
+  return trustedPhoneAddCommandText(value) !== null;
 }
 
 export function trustedPhoneIntakeDestination(
   value: string | null | undefined,
 ): PhoneIntakeDashboardDestination {
   const message = compact(value);
-  if (!isExplicitTrustedPhoneAddCommand(message)) return "david";
+  const command = trustedPhoneAddCommandText(message);
+  if (!command) return "david";
   const explicitlyForCarlos =
-    /^add\b(?:\s+(?:task|to[\s-]?do))?\s+to\s+carlos\b/iu.test(message) ||
+    /^add\b(?:\s+(?:task|to[\s-]?do))?\s+to\s+carlos\b/iu.test(command) ||
     /\b(?:assign|give|route|send)\s+(?:this|it|the\s+task)?\s*to\s+carlos\b/iu.test(
-      message,
+      command,
     ) ||
-    /\bto\s+carlos\b[\s.!?,-]*(?:$|follow-up\s+message:)/iu.test(message);
+    /\bto\s+carlos\b[\s.!?,-]*(?:$|follow-up\s+message:)/iu.test(command);
   return explicitlyForCarlos ? "carlos" : "david";
 }
 
@@ -47,7 +56,8 @@ export function isTrustedPhoneIntakeContinuation(
 
 export function shouldJoinTrustedPhoneIntakeFollowUp(input: {
   body: string | null | undefined;
-  imageCount: number;
+  imageCount?: number;
+  attachmentCount?: number;
   priorMessageText: string | null | undefined;
   priorMissingCount: number;
   priorAutoRouted: boolean;
@@ -55,11 +65,11 @@ export function shouldJoinTrustedPhoneIntakeFollowUp(input: {
   if (!isExplicitTrustedPhoneAddCommand(input.priorMessageText)) return false;
   if (isExplicitTrustedPhoneAddCommand(input.body)) return false;
   if (isTrustedPhoneIntakeContinuation(input.body)) return true;
-  const hasImages = Number.isFinite(input.imageCount) && input.imageCount > 0;
-  if (!hasImages) return false;
+  const attachmentCount = input.attachmentCount ?? input.imageCount ?? 0;
+  const hasAttachments =
+    Number.isFinite(attachmentCount) && attachmentCount > 0;
+  if (!hasAttachments) return false;
   return (
-    input.priorAutoRouted ||
-    input.priorMissingCount > 0 ||
-    !compact(input.body)
+    input.priorAutoRouted || input.priorMissingCount > 0 || !compact(input.body)
   );
 }
