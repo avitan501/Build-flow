@@ -6,6 +6,8 @@ import {
   isExplicitTrustedPhoneAddCommand,
   shouldJoinTrustedPhoneIntakeFollowUp,
   stripCarlosRoutingPhrase,
+  trustedPhoneDashboardTaskKey,
+  trustedPhoneIntakeExternalMessageId,
   trustedPhoneIntakeDestination,
 } from "../supabase/functions/_shared/trusted-phone-intake-routing";
 
@@ -20,6 +22,23 @@ test("new trusted phone tasks accept ADD at the start or in natural wording", ()
   expect(isExplicitTrustedPhoneAddCommand("Send additional details")).toBe(false);
   expect(isExplicitTrustedPhoneAddCommand("Please call the roofer")).toBe(false);
   expect(isExplicitTrustedPhoneAddCommand(null)).toBe(false);
+});
+
+test("a replayed David ADD message resolves to one canonical David task identity", () => {
+  const message = "Add call the roofer about 123 Main Street";
+  const activityId = "AC-david-add-001";
+  const intakeId = "8e1a86a9-41bb-4d2b-8500-ec6fb5f08c22";
+
+  expect(isExplicitTrustedPhoneAddCommand(message)).toBe(true);
+  expect(trustedPhoneIntakeDestination(message)).toBe("david");
+  expect(new Set([
+    trustedPhoneIntakeExternalMessageId(activityId),
+    trustedPhoneIntakeExternalMessageId(activityId),
+  ])).toEqual(new Set(["quo:AC-david-add-001"]));
+  expect(new Set([
+    trustedPhoneDashboardTaskKey(intakeId),
+    trustedPhoneDashboardTaskKey(intakeId),
+  ])).toEqual(new Set([`phone-intake-${intakeId}`]));
 });
 
 test("explicit to Carlos wording chooses Carlos without polluting the title", () => {

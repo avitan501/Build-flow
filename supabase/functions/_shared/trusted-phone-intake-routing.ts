@@ -6,6 +6,14 @@ function compact(value: string | null | undefined) {
     .replace(/\s+/g, " ");
 }
 
+export function trustedPhoneIntakeExternalMessageId(activityId: string) {
+  return `quo:${activityId.trim()}`;
+}
+
+export function trustedPhoneDashboardTaskKey(intakeId: string) {
+  return `phone-intake-${intakeId.trim()}`;
+}
+
 export function trustedPhoneAddCommandText(value: string | null | undefined) {
   const message = compact(value);
   const commandIndex = message.search(/\badd\b/iu);

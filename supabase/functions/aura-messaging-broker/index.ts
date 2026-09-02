@@ -69,6 +69,8 @@ import {
   shouldJoinTrustedPhoneIntakeFollowUp,
   stripCarlosRoutingPhrase,
   trustedPhoneAddCommandText,
+  trustedPhoneDashboardTaskKey,
+  trustedPhoneIntakeExternalMessageId,
   trustedPhoneIntakeDestination,
 } from "../_shared/trusted-phone-intake-routing.ts";
 
@@ -7960,13 +7962,14 @@ async function autoRouteTrustedSmsToDashboard(
     itemKind === "task" ? trustedPhoneIntakeDestination(messageText) : "david";
   const assignedAgent = destination === "carlos" ? "Carlos" : "David";
   const publishedToCarlos = destination === "carlos";
+  const taskKey = trustedPhoneDashboardTaskKey(intakeId);
   await sql`
     insert into public.website_work_items (
       task_key, title, category, status, assigned_agent, progress_percent,
       summary, next_step, source_chat_title, priority, sort_order,
       item_kind, published_to_carlos
     ) values (
-      ${`phone-intake-${intakeId}`}, ${task.title}, 'phone_intake', 'open', ${assignedAgent}, 0,
+      ${taskKey}, ${task.title}, 'phone_intake', 'open', ${assignedAgent}, 0,
       ${itemKind === "idea" ? "David's private idea from Phone Intake." : `Added automatically from David's trusted phone for ${assignedAgent}.`},
       ${task.nextStep}, 'David Dashboard', 1, 0, ${itemKind}, ${publishedToCarlos}
     )
@@ -8001,7 +8004,7 @@ async function createTrustedSmsIntake(
   conversationId: string | null = null,
   senderPhone: string,
 ) {
-  const externalMessageId = `quo:${activityId}`;
+  const externalMessageId = trustedPhoneIntakeExternalMessageId(activityId);
   const existing = await sql<
     { id: string; status: string }[]
   >`select id, status from public.aura_intakes where external_message_id = ${externalMessageId} limit 1`;
