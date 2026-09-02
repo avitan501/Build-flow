@@ -9097,19 +9097,18 @@ Deno.serve(async (req: Request) => {
             { id: string }[]
           >`select id from public.aura_contacts where lower(email) = ${email} order by created_at limit 1`;
       const contactId = existing[0]?.id || crypto.randomUUID();
-      const notes = `Avantia link:${kind}:${sourceId}`;
       if (existing[0]?.id) {
         await sql`
           update public.aura_contacts
           set full_name = ${name || phone || email || "Linked contact"}, company = ${company || null},
               normalized_phone = coalesce(${phone}, normalized_phone), email = coalesce(${email}, email),
-              notes = ${notes}, updated_at = now()
+              updated_at = now()
           where id = ${contactId}::uuid
         `;
       } else {
         await sql`
           insert into public.aura_contacts (id, full_name, company, normalized_phone, email, notes)
-          values (${contactId}::uuid, ${name || phone || email || "Linked contact"}, ${company || null}, ${phone}, ${email}, ${notes})
+          values (${contactId}::uuid, ${name || phone || email || "Linked contact"}, ${company || null}, ${phone}, ${email}, null)
         `;
       }
       const communications = phone

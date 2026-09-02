@@ -941,7 +941,7 @@ export async function linkCommunicationContactAction(input: {
   conversationPhone?: string;
   conversationEmail?: string;
 }) {
-  const { supabase, access } = await requireManagerPortalProfile();
+  const { user, access } = await requireManagerPortalProfile();
   if (!access.customers)
     return {
       ok: false as const,
@@ -960,26 +960,88 @@ export async function linkCommunicationContactAction(input: {
       ok: false as const,
       error: "This conversation has no phone or email to link.",
     };
+  const safeConversationPhone = conversationPhone || "";
+  const safeConversationEmail = conversationEmail || "";
 
-  const { data, error } = await supabase.functions.invoke<{
-    ok?: boolean;
-    error?: string;
-  }>("aura-messaging-broker", {
-    body: {
-      action: "link_communication_contact",
-      kind: input.kind,
-      sourceId: input.sourceId,
-      name: input.name,
-      company: input.company || "",
-      conversationPhone,
-      conversationEmail,
-    },
-  });
-  if (error || !data?.ok)
-    return {
-      ok: false as const,
-      error: data?.error || "The contact link could not be saved.",
-    };
+  const admin = createAdminClient();
+  const existingResult = conversationPhone
+    ? await admin
+        .from("aura_contacts")
+        .select("id,full_name,company,normalized_phone,email,notes")
+        .eq("normalized_phone", safeConversationPhone)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle<{
+          id: string;
+          full_name: string | null;
+          company: string | null;
+          normalized_phone: string | null;
+          email: string | null;
+          notes: string | null;
+        }>()
+    : await admin
+        .from("aura_contacts")
+        .select("id,full_name,company,normalized_phone,email,notes")
+        .ilike("email", safeConversationEmail)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle<{
+          id: string;
+          full_name: string | null;
+          company: string | null;
+          normalized_phone: string | null;
+          email: string | null;
+          notes: string | null;
+        }>();
+  if (existingResult.error)
+    return { ok: false as const, error: "The contact could not be checked." };
+
+  const existing = existingResult.data;
+  const contactId = existing?.id || crypto.randomUUID();
+  const contactValues = {
+    full_name: input.name.trim().slice(0, 160) || existing?.full_name || safeConversationPhone || safeConversationEmail,
+    company: input.company?.trim().slice(0, 160) || existing?.company || null,
+    normalized_phone: conversationPhone || existing?.normalized_phone || null,
+    email: conversationEmail || existing?.email || null,
+  };
+  const contactResult = existing
+    ? await admin.from("aura_contacts").update(contactValues).eq("id", contactId)
+    : await admin.from("aura_contacts").insert({ id: contactId, ...contactValues, notes: null });
+  if (contactResult.error)
+    return { ok: false as const, error: "The contact link could not be saved." };
+
+  const communicationIds = new Set<string>();
+  const communicationUpdates = [
+    ...(conversationPhone
+      ? [admin.from("aura_communications").update({ contact_id: contactId }).eq("counterparty_phone", conversationPhone).select("id")]
+      : []),
+    ...(conversationEmail
+      ? [admin.from("aura_communications").update({ contact_id: contactId }).ilike("counterparty_email", conversationEmail).select("id")]
+      : []),
+  ];
+  const updated = await Promise.all(communicationUpdates);
+  if (updated.some((result) => result.error))
+    return { ok: false as const, error: "The conversation could not be linked." };
+  for (const result of updated)
+    for (const row of result.data ?? []) communicationIds.add(String(row.id));
+  if (!communicationIds.size)
+    return { ok: false as const, error: "No messages were found in this conversation." };
+
+  try {
+    await addAuraCommunicationLinks(
+      [...communicationIds],
+      [{
+        entity_type: input.kind === "customer" ? "client" : input.kind,
+        entity_id: input.sourceId,
+        entity_label: input.name.trim() || safeConversationPhone || safeConversationEmail,
+        link_source: "manual",
+        confidence: 1,
+      }],
+      user.id,
+    );
+  } catch {
+    return { ok: false as const, error: "The structured conversation link could not be saved." };
+  }
 
   revalidatePath("/admin/communications");
   return { ok: true as const };

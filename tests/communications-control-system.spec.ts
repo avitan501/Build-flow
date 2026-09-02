@@ -48,3 +48,33 @@ test("Carlos activity timeline records page changes and communications", () => {
   expect(migration).toContain("manager_staff_activity_events");
   expect(migration).toContain("enable row level security");
 });
+
+test("conversation assignment keeps contact notes and uses structured links", () => {
+  const actions = readFileSync(path.join(root, "app/admin/communications/actions.ts"), "utf8");
+  const broker = readFileSync(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8");
+  const inbox = readFileSync(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8");
+  const page = readFileSync(path.join(root, "app/admin/communications/page.tsx"), "utf8");
+
+  const action = actions.slice(
+    actions.indexOf("export async function linkCommunicationContactAction"),
+    actions.indexOf("export async function linkEmailConversationAction"),
+  );
+  const brokerAction = broker.slice(
+    broker.indexOf('if (input.action === "link_communication_contact")'),
+    broker.indexOf('if (input.action === "quality_check_sms_ai")'),
+  );
+  expect(action).toContain("addAuraCommunicationLinks");
+  expect(action).toContain("notes: null");
+  expect(action).not.toContain("Avantia link:");
+  expect(brokerAction).not.toContain("Avantia link:");
+  expect(brokerAction).not.toContain("notes =");
+  expect(page).toContain("loadAuraCommunicationLinks");
+  expect(inbox).toContain("communication.links?.find");
+});
+
+test("communications page does not load the hidden legacy log", () => {
+  const page = readFileSync(path.join(root, "app/admin/communications/page.tsx"), "utf8");
+  expect(page).not.toContain("CommunicationCenter");
+  expect(page).not.toContain("COMMUNICATION_LOG_PREFIX");
+  expect(page).not.toContain("listInboxThreads");
+});

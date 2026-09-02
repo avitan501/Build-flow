@@ -110,7 +110,8 @@ test("communication records are linked to customers and visible in the customer 
     readFile(path.join(root, "app/admin/users/page.tsx"), "utf8"),
   ])
 
-  expect(page).toContain("CommunicationCenter")
+  expect(page).toContain("UnifiedCommunicationInbox")
+  expect(page).toContain("loadAuraCommunicationLinks")
   expect(action).toContain("requireManagerPortalProfile")
   expect(action).toContain('eq("id", clientId)')
   expect(action).toContain("serializeCommunicationLog")

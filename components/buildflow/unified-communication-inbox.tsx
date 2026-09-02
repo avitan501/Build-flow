@@ -186,6 +186,8 @@ function attachmentLabel(attachment: { url?: string | null; name?: string | null
 function initialConversationKey(communication: AuraCommunicationRow | undefined, contacts: AuraContactRow[]) {
   if (!communication) return "__new__"
   const rawKey = identityKey(communication.counterparty_phone, communication.counterparty_email)
+  const structuredLink = communication.links?.find((link) => ["client", "lead", "supplier"].includes(link.entity_type))
+  if (structuredLink) return `${structuredLink.entity_type === "client" ? "customer" : structuredLink.entity_type}:${structuredLink.entity_id}`
   const contact = contacts.find((item) => identityKey(item.normalized_phone, item.email) === rawKey)
   const linked = contact?.notes?.match(/^Avantia link:(customer|lead|supplier):([A-Za-z0-9_-]+)$/)
   return linked ? `${linked[1]}:${linked[2]}` : rawKey || `unknown:${communication.contact_id || communication.id}`
@@ -340,8 +342,16 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         if (value) alias.set(value, target)
       }
     }
+    for (const communication of liveCommunications) {
+      const link = communication.links?.find((item) => ["client", "lead", "supplier"].includes(item.entity_type))
+      if (!link) continue
+      const kind = link.entity_type === "client" ? "customer" : link.entity_type
+      const target = entries.find((entry) => entry.kind === kind && entry.id === link.entity_id)
+      const rawKey = identityKey(communication.counterparty_phone, communication.counterparty_email)
+      if (target && rawKey) alias.set(rawKey, target)
+    }
     return { entries, alias }
-  }, [contacts, customers, leads, suppliers])
+  }, [contacts, customers, leads, suppliers, liveCommunications])
 
   const conversations = useMemo(() => {
     const grouped = new Map<string, AuraCommunicationRow[]>()
