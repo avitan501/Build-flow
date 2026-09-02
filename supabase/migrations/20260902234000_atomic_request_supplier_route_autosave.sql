@@ -1,3 +1,4 @@
+-- Save a canonical supplier route for one or more request items in one transaction.
 create or replace function public.staff_save_request_item_supplier_routes(
   p_request_id uuid,
   p_item_ids uuid[],
@@ -99,3 +100,8 @@ revoke all on function public.staff_save_request_item_supplier_routes(uuid, uuid
   from public, anon;
 grant execute on function public.staff_save_request_item_supplier_routes(uuid, uuid[], jsonb, jsonb, jsonb, uuid)
   to authenticated;
+
+-- This staff-only SECURITY DEFINER function drifted to an explicit anon grant in
+-- production. Its own checks reject anonymous calls, but the API surface should
+-- not expose it at all.
+revoke execute on function public.staff_load_catalog_suppliers() from anon;
