@@ -338,10 +338,8 @@ test("client material lists are organized securely in the background", async () 
     ),
   ]);
 
-  expect(requestAction).toContain("organizeMaterialListAfterResponse");
-  expect(requestAction).toMatch(
-    /functions\.invoke\(\s*["']client-material-list-ai["']/,
-  );
+  expect(requestAction).toContain("scheduleClientMaterialListOrganization");
+  expect(requestAction).toContain("await scheduleClientMaterialListOrganization");
   expect(publicIntake).toContain("EdgeRuntime.waitUntil");
   expect(aiFunction).toContain("openai_supplier_quote_api_key");
   expect(aiFunction).toContain('"gpt-5.6-sol"');

@@ -232,16 +232,35 @@ function hasBearerToken(request: Request) {
   return Boolean(request.headers.get("authorization")?.replace(/^Bearer\s+/i, ""))
 }
 
-async function organizeClientMaterialList(supabaseUrl: string, serviceRoleKey: string, requestId: string) {
+async function queueClientMaterialList(supabaseUrl: string, serviceRoleKey: string, requestId: string) {
   try {
-    const response = await fetch(`${supabaseUrl}/functions/v1/client-material-list-ai`, {
+    const queued = await fetch(`${supabaseUrl}/rest/v1/rpc/enqueue_client_material_list_job`, {
+      method: "POST",
+      headers: {
+        apikey: serviceRoleKey,
+        authorization: `Bearer ${serviceRoleKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ p_request_id: requestId, p_force: false }),
+    })
+    const functionName = queued.ok ? "client-material-list-worker" : "client-material-list-ai"
+    EdgeRuntime.waitUntil((async () => {
+      const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${serviceRoleKey}`, "content-type": "application/json" },
+        body: JSON.stringify(queued.ok ? { action: "drain" } : { requestId }),
+      })
+      if (!response.ok) console.error("client_material_list_background_failed", { requestId, status: response.status })
+    })())
+  } catch (cause) {
+    console.error("client_material_list_background_failed", { requestId, reason: cause instanceof Error ? cause.message : "unknown" })
+    EdgeRuntime.waitUntil(fetch(`${supabaseUrl}/functions/v1/client-material-list-ai`, {
       method: "POST",
       headers: { authorization: `Bearer ${serviceRoleKey}`, "content-type": "application/json" },
       body: JSON.stringify({ requestId }),
-    })
-    if (!response.ok) console.error("client_material_list_ai_failed", { requestId, status: response.status })
-  } catch (cause) {
-    console.error("client_material_list_ai_failed", { requestId, reason: cause instanceof Error ? cause.message : "unknown" })
+    }).then((response) => {
+      if (!response.ok) console.error("client_material_list_fallback_failed", { requestId, status: response.status })
+    }).catch(() => console.error("client_material_list_fallback_failed", { requestId, status: 0 })))
   }
 }
 
@@ -679,7 +698,7 @@ Deno.serve(async (request) => {
     }).eq("request_id", requestId)
 
     if (payload.requestKind !== "beat_quote") {
-      EdgeRuntime.waitUntil(organizeClientMaterialList(supabaseUrl, serviceRoleKey, requestId))
+      await queueClientMaterialList(supabaseUrl, serviceRoleKey, requestId)
     }
     const temporaryPaths = preparedAttachments.flatMap((attachment) => attachment.storagePath ? [attachment.storagePath] : [])
     if (temporaryPaths.length) {

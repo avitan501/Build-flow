@@ -23,6 +23,11 @@ export function OrganizeMaterialListButton({ requestId, refresh = false }: { req
         setError(result.error)
         return
       }
+      if (["queued", "processing", "retrying", "fallback"].includes(result.status)) {
+        setNotice(result.status === "retrying" ? "AI will retry automatically." : "Request queued. You can keep working while AI reads the files.")
+        router.refresh()
+        return
+      }
       if (!result.itemCount) {
         setNotice(result.status === "plan" ? "This file needs a plan takeoff before materials can be listed." : "No material rows were found. Review the original request or attachment.")
       } else {

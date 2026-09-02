@@ -59,7 +59,7 @@ export async function addRequestAttachmentsAction(input: { requestId: string; at
     console.error("Existing request attachment storage failed", cause)
     return { ok: false as const, error: "The files could not be attached. Please try again." }
   }
-  scheduleClientMaterialListOrganization({ requestId, force: true })
+  await scheduleClientMaterialListOrganization({ requestId, force: true })
   revalidatePath(`/owner/materials/requests/${requestId}`)
   return { ok: true as const, organizationStatus: "scheduled" as const }
 }
@@ -237,25 +237,11 @@ export async function organizeClientMaterialRequestAction(formData: FormData) {
   const { supabase } = await requireStaffProfile("customers")
   const { data: request } = await supabase.from("quote_requests").select("id").eq("id", requestId).maybeSingle<{ id: string }>()
   if (!request) return { ok: false as const, error: "This request was not found." }
-  const invocation = supabase.functions.invoke<{ ok?: boolean; status?: string; itemCount?: number; reviewCount?: number; error?: string }>("client-material-list-ai", { body: { requestId, force } })
-  let deadlineTimer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<never>((_, reject) => {
-    deadlineTimer = setTimeout(() => reject(new Error("material_organization_timeout")), 40_000)
-    deadlineTimer.unref?.()
-  })
-  let result: Awaited<typeof invocation>
-  try {
-    result = await Promise.race([invocation, deadline])
-  } catch {
-    return { ok: false as const, error: "The organizer is taking too long. Wait a minute, refresh, and check the request before trying again." }
-  } finally {
-    if (deadlineTimer) clearTimeout(deadlineTimer)
-  }
-  const { data, error } = result
-  if (error || !data?.ok) return { ok: false as const, error: "The list could not be organized. Please try again." }
+  const queued = await scheduleClientMaterialListOrganization({ requestId, force })
+  if (queued.status === "invalid") return { ok: false as const, error: "This request could not be identified." }
   revalidatePath(`/owner/materials/requests/${requestId}`)
   revalidatePath("/admin/supplier-quotes")
-  return { ok: true as const, status: data.status || "organized", itemCount: data.itemCount || 0, reviewCount: data.reviewCount || 0 }
+  return { ok: true as const, status: queued.status, itemCount: 0, reviewCount: 0 }
 }
 
 export async function updateOrganizedMaterialItemAction(formData: FormData) {

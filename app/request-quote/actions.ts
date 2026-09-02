@@ -10,6 +10,7 @@ import {
   phoneLoginEmailForPhone,
 } from "@/lib/auth-phone";
 import { notifyManagersSafely } from "@/lib/manager-push-notifications";
+import { scheduleClientMaterialListOrganization } from "@/lib/material-request-organization";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
@@ -140,29 +141,6 @@ async function findClientByContact(
     if (data) return data;
   }
   return null;
-}
-
-function organizeMaterialListAfterResponse(requestId: string) {
-  after(async () => {
-    try {
-      const { error: invokeError } = await createAdminClient().functions.invoke(
-        "client-material-list-ai",
-        {
-          body: { requestId },
-        },
-      );
-      if (invokeError)
-        console.error("client_material_list_ai_failed", {
-          requestId,
-          reason: invokeError.message,
-        });
-    } catch (cause) {
-      console.error("client_material_list_ai_failed", {
-        requestId,
-        reason: cause instanceof Error ? cause.message : "unknown",
-      });
-    }
-  });
 }
 
 export async function submitQuoteRequestFormAction(
@@ -587,7 +565,7 @@ export async function submitQuoteRequestFormAction(
       .eq("request_id", requestId);
 
     if (requestKind === "quote_request")
-      organizeMaterialListAfterResponse(requestId);
+      await scheduleClientMaterialListOrganization({ requestId });
     after(() =>
       notifyManagersSafely({
         eventType: "new_order",

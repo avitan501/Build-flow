@@ -1,11 +1,12 @@
 "use client"
 
-import { Check, Copy, FileText, Route, Search, Sparkles } from "lucide-react"
+import { Check, Copy, FileText, Route, Search } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
 import { saveRequestItemSupplierRouteAction } from "@/app/owner/materials/requests/actions"
 import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
+import { MaterialOrganizationStatus } from "@/components/buildflow/material-organization-status"
 import { MaterialReviewEditor } from "@/components/buildflow/material-review-editor"
 import { OrganizeMaterialListButton } from "@/components/buildflow/organize-material-list-button"
 import { OriginalRequestItemEditor } from "@/components/buildflow/original-request-item-editor"
@@ -72,6 +73,7 @@ export function RequestMaterialWorktable({
   const [batchFeedback, setBatchFeedback] = useState("")
   const [batchPending, startBatchTransition] = useTransition()
   const sourceItems = originalItems
+  const organizationInProgress = ["queued", "processing", "retrying"].includes(organizationStatus)
   const aiItems = organizedItems.map((item) => savedItems[item.id] ?? item)
   const representedSourceIds = new Set(aiItems.map((item) => typeof item.metadata?.source_item_id === "string" ? item.metadata.source_item_id : "").filter(Boolean))
   const aiCoversEverySource = sourceItems.every((item) => representedSourceIds.has(item.id))
@@ -125,7 +127,7 @@ export function RequestMaterialWorktable({
         </div>
         <div className="flex flex-wrap items-start gap-2">
           <OriginalRequestItemEditor requestId={requestId} mode="add" />
-          {organizationStatus !== "processing" ? <OrganizeMaterialListButton requestId={requestId} refresh={organizedItems.length > 0} /> : <span className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-sky-50 px-3 text-xs font-bold text-sky-800"><Sparkles className="h-4 w-4 animate-pulse" />Generating AI…</span>}
+          {organizationInProgress ? <MaterialOrganizationStatus status={organizationStatus} /> : <>{organizationStatus === "failed" ? <MaterialOrganizationStatus status="failed" /> : null}<OrganizeMaterialListButton requestId={requestId} refresh={organizedItems.length > 0} /></>}
         </div>
       </div>
 

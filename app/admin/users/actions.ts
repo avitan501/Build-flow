@@ -432,7 +432,7 @@ export async function createRequestForClientAction(input: {
     }
   }
 
-  if (freeText || attachments.length) scheduleClientMaterialListOrganization({ requestId: String(requestId) });
+  if (freeText || attachments.length) await scheduleClientMaterialListOrganization({ requestId: String(requestId) });
 
   revalidatePath("/admin/users");
   revalidatePath("/owner/materials/requests");

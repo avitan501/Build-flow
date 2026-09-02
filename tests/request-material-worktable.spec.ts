@@ -225,18 +225,20 @@ test("organizer asks exactly one unresolved blocker and excludes details already
   expect(organizer).toMatch(/sourceText|typedSource/)
 })
 
-test("organizer has bounded server and OpenAI deadlines", async () => {
-  const [organizer, actions] = await Promise.all([
+test("organizer has bounded OpenAI deadlines and the server action only enqueues", async () => {
+  const [organizer, actions, scheduler] = await Promise.all([
     source(path.join(root, "supabase/functions/client-material-list-ai/index.ts")),
     source(path.join(root, "app/owner/materials/requests/actions.ts")),
+    source(path.join(root, "lib/material-request-organization.ts")),
   ])
 
   expect(organizer).toContain("new AbortController()")
   expect(organizer).toContain("signal: controller.signal")
   expect(organizer).toContain("controller.abort(), 30_000")
   expect(organizer).toContain("clearTimeout(openAiTimeout)")
-  expect(actions).toContain("Promise.race([invocation, deadline])")
-  expect(actions).toContain("material_organization_timeout")
-  expect(actions).toContain("clearTimeout(deadlineTimer)")
-  expect(actions).toContain("The organizer is taking too long")
+  expect(actions).toContain("await scheduleClientMaterialListOrganization")
+  expect(actions).not.toContain("Promise.race([invocation, deadline])")
+  expect(actions).not.toContain("material_organization_timeout")
+  expect(scheduler).toContain('after(async () =>')
+  expect(scheduler).toContain('"enqueue_client_material_list_job"')
 })
