@@ -18,9 +18,6 @@ import {
 import { useMemo, useState, useTransition } from "react";
 
 import {
-  completeClientQuoteAttachmentUploadAction,
-  prepareClientQuoteAttachmentUploadAction,
-  removeClientQuoteAttachmentAction,
   saveClientQuoteAction,
   sendClientQuoteAction,
 } from "@/app/admin/quote-comparison/actions";
@@ -53,6 +50,10 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
   "text/csv",
   "application/csv",
 ]);
+
+type ActionResult<T = undefined> = T extends undefined
+  ? { ok: true } | { ok: false; error: string }
+  : { ok: true; data: T } | { ok: false; error: string };
 
 export type QuoteClientOption = {
   id: string;
@@ -268,26 +269,40 @@ export function ClientQuoteBuilder({
       return;
     }
     startAttachmentTransition(async () => {
-      for (const file of files) {
-        const fileType = attachmentType(file);
-        const prepared = await prepareClientQuoteAttachmentUploadAction({ comparisonId: comparison.id, fileName: file.name, fileType, fileSize: file.size });
-        if (!prepared.ok) {
-          setError(prepared.error);
-          return;
+      try {
+        for (const file of files) {
+          const fileType = attachmentType(file);
+          const preparedResponse = await fetch("/api/admin/quote-comparison/attachments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "prepare", comparisonId: comparison.id, fileName: file.name, fileType, fileSize: file.size }),
+          });
+          const prepared = await preparedResponse.json() as ActionResult<{ filePath: string; token: string }>;
+          if (!prepared.ok) {
+            setError(prepared.error);
+            return;
+          }
+          const { error: uploadError } = await createClient().storage.from("project-uploads").uploadToSignedUrl(prepared.data.filePath, prepared.data.token, file, { contentType: fileType, upsert: false });
+          if (uploadError) {
+            setError(`${file.name} could not be uploaded. Try again.`);
+            return;
+          }
+          const completedResponse = await fetch("/api/admin/quote-comparison/attachments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "complete", comparisonId: comparison.id, filePath: prepared.data.filePath, fileName: file.name, fileType, fileSize: file.size }),
+          });
+          const completed = await completedResponse.json() as ActionResult<ClientQuoteAttachmentRecord>;
+          if (!completed.ok) {
+            setError(completed.error);
+            return;
+          }
+          setAttachments((current) => [...current, completed.data]);
         }
-        const { error: uploadError } = await createClient().storage.from("project-uploads").uploadToSignedUrl(prepared.data.filePath, prepared.data.token, file, { contentType: fileType, upsert: false });
-        if (uploadError) {
-          setError(`${file.name} could not be uploaded. Try again.`);
-          return;
-        }
-        const completed = await completeClientQuoteAttachmentUploadAction({ comparisonId: comparison.id, filePath: prepared.data.filePath, fileName: file.name, fileType, fileSize: file.size });
-        if (!completed.ok) {
-          setError(completed.error);
-          return;
-        }
-        setAttachments((current) => [...current, completed.data]);
+        setMessage(`${files.length} attachment${files.length === 1 ? "" : "s"} will be sent with the quote PDF.`);
+      } catch {
+        setError("The attachment could not be added. Try again.");
       }
-      setMessage(`${files.length} attachment${files.length === 1 ? "" : "s"} will be sent with the quote PDF.`);
     });
   }
 
@@ -299,13 +314,22 @@ export function ClientQuoteBuilder({
     }
     setError("");
     startAttachmentTransition(async () => {
-      const result = await removeClientQuoteAttachmentAction({ comparisonId: comparison.id, attachmentId: attachment.id });
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      try {
+        const response = await fetch("/api/admin/quote-comparison/attachments", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ comparisonId: comparison.id, attachmentId: attachment.id }),
+        });
+        const result = await response.json() as ActionResult;
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        setAttachments((current) => current.filter((entry) => entry.id !== attachment.id));
+        setMessage(`${attachment.file_name} removed.`);
+      } catch {
+        setError("The attachment could not be removed. Try again.");
       }
-      setAttachments((current) => current.filter((entry) => entry.id !== attachment.id));
-      setMessage(`${attachment.file_name} removed.`);
     });
   }
 

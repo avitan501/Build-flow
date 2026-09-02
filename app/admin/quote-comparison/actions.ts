@@ -1,6 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -26,34 +25,10 @@ type ActionResult<T = undefined> = T extends undefined
 const comparisonPath = (comparisonId: string) => `/admin/quote-comparison/${comparisonId}`;
 const CLIENT_QUOTE_ATTACHMENT_BUCKET = "project-uploads";
 const CLIENT_QUOTE_MAX_FILES = 10;
-const CLIENT_QUOTE_MAX_FILE_SIZE = 25 * 1024 * 1024;
 const CLIENT_QUOTE_MAX_TOTAL_SIZE = 25 * 1024 * 1024;
-const CLIENT_QUOTE_ATTACHMENT_TYPES = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "text/csv",
-  "application/csv",
-]);
 
 function cleanText(value: string, maxLength: number) {
   return value.trim().slice(0, maxLength);
-}
-
-function cleanAttachmentFileName(value: string) {
-  return value
-    .normalize("NFKD")
-    .replace(/[^a-zA-Z0-9._ -]/g, "_")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(-180) || "attachment";
 }
 
 function cleanAttachmentDisplayName(value: string) {
@@ -62,109 +37,6 @@ function cleanAttachmentDisplayName(value: string) {
     .replace(/[\\/\u0000-\u001f\u007f]/g, "_")
     .trim()
     .slice(0, 180) || "attachment";
-}
-
-function validateClientQuoteAttachment(input: { fileName: string; fileType: string; fileSize: number }) {
-  if (!input.fileName.trim() || !Number.isFinite(input.fileSize) || input.fileSize <= 0) return "Choose a photo or file.";
-  if (input.fileSize > CLIENT_QUOTE_MAX_FILE_SIZE) return "Each attachment must be 25 MB or smaller.";
-  if (!CLIENT_QUOTE_ATTACHMENT_TYPES.has(input.fileType)) return "Use a photo, PDF, Word, Excel, or CSV file.";
-  return null;
-}
-
-export async function prepareClientQuoteAttachmentUploadAction(input: {
-  comparisonId: string;
-  fileName: string;
-  fileType: string;
-  fileSize: number;
-}): Promise<ActionResult<{ filePath: string; token: string }>> {
-  const { supabase, user } = await requireStaffProfile("suppliers");
-  const comparisonId = cleanText(input.comparisonId, 100);
-  const fileError = validateClientQuoteAttachment(input);
-  if (fileError) return { ok: false, error: fileError };
-  const { data: comparison } = await supabase.from("quote_comparisons").select("id").eq("id", comparisonId).maybeSingle<{ id: string }>();
-  if (!comparison) return { ok: false, error: "The quote could not be found." };
-
-  const filePath = `client-quotes/${comparisonId}/${user.id}/${randomUUID()}-${cleanAttachmentFileName(input.fileName)}`;
-  const { data, error } = await createAdminClient().storage.from(CLIENT_QUOTE_ATTACHMENT_BUCKET).createSignedUploadUrl(filePath);
-  if (error || !data?.token) {
-    console.error("Client quote attachment preparation failed", error);
-    return { ok: false, error: "The private upload could not be prepared. Try again." };
-  }
-  return { ok: true, data: { filePath, token: data.token } };
-}
-
-export async function completeClientQuoteAttachmentUploadAction(input: {
-  comparisonId: string;
-  filePath: string;
-  fileName: string;
-  fileType: string;
-  fileSize: number;
-}): Promise<ActionResult<ClientQuoteAttachmentRecord>> {
-  const { supabase, user } = await requireStaffProfile("suppliers");
-  const comparisonId = cleanText(input.comparisonId, 100);
-  const fileError = validateClientQuoteAttachment(input);
-  if (fileError) return { ok: false, error: fileError };
-  const expectedPrefix = `client-quotes/${comparisonId}/${user.id}/`;
-  if (!input.filePath.startsWith(expectedPrefix) || input.filePath.includes("..")) return { ok: false, error: "The uploaded file could not be verified." };
-  const admin = createAdminClient();
-  const discardUpload = () => admin.storage.from(CLIENT_QUOTE_ATTACHMENT_BUCKET).remove([input.filePath]);
-
-  const [{ data: comparison }, { data: existing, error: existingError }] = await Promise.all([
-    supabase.from("quote_comparisons").select("id").eq("id", comparisonId).maybeSingle<{ id: string }>(),
-    supabase.from("quote_comparison_client_attachments").select("file_size").eq("comparison_id", comparisonId).returns<Array<{ file_size: number }>>(),
-  ]);
-  if (!comparison || existingError) {
-    await discardUpload();
-    return { ok: false, error: "The quote attachments could not be loaded." };
-  }
-  if ((existing ?? []).length >= CLIENT_QUOTE_MAX_FILES) {
-    await discardUpload();
-    return { ok: false, error: `Add up to ${CLIENT_QUOTE_MAX_FILES} attachments.` };
-  }
-  const totalSize = (existing ?? []).reduce((sum, attachment) => sum + Number(attachment.file_size || 0), 0) + input.fileSize;
-  if (totalSize > CLIENT_QUOTE_MAX_TOTAL_SIZE) {
-    await discardUpload();
-    return { ok: false, error: "Keep all attachments together under 25 MB." };
-  }
-
-  const { data: fileInfo, error: infoError } = await admin.storage.from(CLIENT_QUOTE_ATTACHMENT_BUCKET).info(input.filePath);
-  if (infoError || !fileInfo || fileInfo.size !== input.fileSize || fileInfo.contentType !== input.fileType) {
-    await admin.storage.from(CLIENT_QUOTE_ATTACHMENT_BUCKET).remove([input.filePath]);
-    return { ok: false, error: "The uploaded file could not be verified. Try again." };
-  }
-  const { data, error } = await supabase.from("quote_comparison_client_attachments").insert({
-    comparison_id: comparisonId,
-    file_name: cleanAttachmentDisplayName(input.fileName),
-    file_path: input.filePath,
-    file_type: input.fileType,
-    file_size: input.fileSize,
-    created_by: user.id,
-  }).select("id,comparison_id,file_name,file_path,file_type,file_size,created_at").single<ClientQuoteAttachmentRecord>();
-  if (error || !data) {
-    await admin.storage.from(CLIENT_QUOTE_ATTACHMENT_BUCKET).remove([input.filePath]);
-    console.error("Client quote attachment record failed", error);
-    return { ok: false, error: "The file uploaded but could not be attached to the quote." };
-  }
-  revalidatePath(comparisonPath(comparisonId));
-  return { ok: true, data };
-}
-
-export async function removeClientQuoteAttachmentAction(input: { comparisonId: string; attachmentId: string }): Promise<ActionResult> {
-  const { supabase } = await requireStaffProfile("suppliers");
-  const comparisonId = cleanText(input.comparisonId, 100);
-  const attachmentId = cleanText(input.attachmentId, 100);
-  const { data } = await supabase.from("quote_comparison_client_attachments")
-    .select("id,file_path")
-    .eq("id", attachmentId)
-    .eq("comparison_id", comparisonId)
-    .maybeSingle<{ id: string; file_path: string }>();
-  if (!data) return { ok: false, error: "The attachment could not be found." };
-  const { error } = await supabase.from("quote_comparison_client_attachments").delete().eq("id", data.id).eq("comparison_id", comparisonId);
-  if (error) return { ok: false, error: "The attachment could not be removed." };
-  const { error: storageError } = await createAdminClient().storage.from(CLIENT_QUOTE_ATTACHMENT_BUCKET).remove([data.file_path]);
-  if (storageError) console.error("Client quote attachment storage cleanup failed", storageError);
-  revalidatePath(comparisonPath(comparisonId));
-  return { ok: true };
 }
 
 function cleanMoney(value: number | null | undefined) {
