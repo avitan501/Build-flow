@@ -38,27 +38,31 @@ test("analytics resets identity before a different authenticated actor", () => {
   expect(shouldResetAnalyticsActor(null, "actor-b")).toBe(false);
 });
 
-test("PostHog is explicit, privacy-safe, and never records session contents", async () => {
-  const [instrumentation, component, layout, quoteForm, activityReporter] = await Promise.all([
+test("PostHog is lazy, explicit, privacy-safe, and never records session contents", async () => {
+  const [instrumentation, posthogBrowser, posthogClient, component, layout, quoteForm, activityReporter] = await Promise.all([
     readFile("instrumentation-client.ts", "utf8"),
+    readFile("lib/analytics/posthog-browser.ts", "utf8"),
+    readFile("lib/analytics/posthog-client.ts", "utf8"),
     readFile("components/buildflow/posthog-analytics.tsx", "utf8"),
     readFile("app/layout.tsx", "utf8"),
     readFile("components/buildflow/quote-request-form.tsx", "utf8"),
     readFile("components/buildflow/employee-activity-reporter.tsx", "utf8"),
   ]);
-  expect(instrumentation).toContain("autocapture: false");
-  expect(instrumentation).toContain("capture_pageview: false");
-  expect(instrumentation).toContain("disable_session_recording: true");
-  expect(instrumentation).toContain("capture_exceptions: false");
-  expect(instrumentation).toContain("advanced_disable_flags: true");
-  expect(instrumentation).toContain("save_referrer: false");
-  expect(instrumentation).toContain("save_campaign_params: false");
-  expect(instrumentation).toContain("delete sanitized.$set_once");
-  expect(instrumentation).toContain("capture_performance: false");
-  expect(instrumentation).toContain("capture_heatmaps: false");
-  expect(instrumentation).toContain("captureConsoleLogs: false");
-  expect(instrumentation).toContain("$geoip_disable: true");
-  expect(instrumentation).not.toMatch(/phone|email|full_name|message_text|file\.name/);
+  expect(posthogBrowser).toContain("autocapture: false");
+  expect(posthogBrowser).toContain("capture_pageview: false");
+  expect(posthogBrowser).toContain("disable_session_recording: true");
+  expect(posthogBrowser).toContain("capture_exceptions: false");
+  expect(posthogBrowser).toContain("advanced_disable_flags: true");
+  expect(posthogBrowser).toContain("save_referrer: false");
+  expect(posthogBrowser).toContain("save_campaign_params: false");
+  expect(posthogBrowser).toContain("delete sanitized.$set_once");
+  expect(posthogBrowser).toContain("capture_performance: false");
+  expect(posthogBrowser).toContain("capture_heatmaps: false");
+  expect(posthogBrowser).toContain("captureConsoleLogs: false");
+  expect(posthogBrowser).toContain("$geoip_disable: true");
+  expect(instrumentation).not.toContain('from "posthog-js"');
+  expect(posthogClient).toContain('import("@/lib/analytics/posthog-browser")');
+  expect(`${instrumentation}\n${posthogBrowser}`).not.toMatch(/phone|email|full_name|message_text|file\.name/);
   expect(component).toContain('captureAvantiaEvent("avantia_page_view"');
   expect(component).toContain('captureAvantiaEvent("avantia_files_selected"');
   expect(component).not.toContain("file.name");

@@ -16,12 +16,19 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { EmployeeActivityReporter } from "@/components/buildflow/employee-activity-reporter";
-import { ManagerNotificationCenter } from "@/components/buildflow/manager-notification-center";
+
+const ManagerNotificationCenter = dynamic(
+  () => import("@/components/buildflow/manager-notification-center").then((module) => module.ManagerNotificationCenter),
+  {
+    loading: () => <span className="inline-flex h-10 w-10 animate-pulse rounded-lg bg-slate-100" aria-label="Loading notifications" />,
+  },
+);
 
 type ManagerAccess = {
   owner: boolean;
@@ -43,6 +50,7 @@ type ManagerNavigationLink = {
   icon: LucideIcon;
   relatedPaths?: string[];
   secondary?: Array<{ href: string; label: string; icon: LucideIcon }>;
+  prefetch?: boolean;
 };
 
 export const MANAGER_NAV_STORAGE_KEY = "avantia-manager-nav";
@@ -61,8 +69,9 @@ function navigationLinks(access: ManagerAccess): ManagerNavigationLink[] {
       label: "Manager Dashboard",
       shortLabel: "Manager",
       icon: LayoutDashboard,
+      prefetch: true,
     },
-    ...(access.customers ? [{ href: "/admin/users", label: "Customers", shortLabel: "Customers", icon: Users }] : []),
+    ...(access.customers ? [{ href: "/admin/users", label: "Customers", shortLabel: "Customers", icon: Users, prefetch: true }] : []),
     ...(access.suppliers ? [
       {
         href: "/admin/catalog",
@@ -74,7 +83,7 @@ function navigationLinks(access: ManagerAccess): ManagerNavigationLink[] {
       },
       { href: "/admin/documents", label: "Documents", shortLabel: "Documents", icon: Files },
     ] : []),
-    ...(access.aiTools ? [{ href: "/admin/build-map?section=manager-tools#manager-tools", label: "Manager Tools", shortLabel: "Tools", icon: Wrench }] : []),
+    ...(access.aiTools ? [{ href: "/admin/build-map?section=manager-tools#manager-tools", label: "Manager Tools", shortLabel: "Tools", icon: Wrench, prefetch: true }] : []),
   ];
 }
 
@@ -117,6 +126,7 @@ function NavigationLink({
     <div>
       <Link
         href={link.href}
+        prefetch={link.prefetch ?? false}
         onClick={onNavigate}
         aria-label={collapsed ? link.shortLabel : undefined}
         aria-describedby={collapsed ? tooltipId : undefined}

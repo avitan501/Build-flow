@@ -7,6 +7,7 @@ import { Fragment } from "react";
 import { AvantiaBuildClientShell } from "@/components/buildflow/buildflow-client-shell";
 import { MobileClientHeader } from "@/components/buildflow/mobile-client-header";
 import { PostHogAnalytics } from "@/components/buildflow/posthog-analytics";
+import { PrivateWebVitals } from "@/components/buildflow/private-web-vitals";
 import { PublicContactBar } from "@/components/buildflow/public-contact-bar";
 import { SiteFooter } from "@/components/buildflow/site-footer";
 import { ShopLanguageProvider } from "@/components/buildflow/shop-language-provider";
@@ -170,6 +171,7 @@ export default async function RootLayout({
           <AvantiaBuildClientShell>
             <Fragment>
               <PostHogAnalytics actorId={user?.id ?? null} actorType={analyticsActorType} actorCohort={analyticsActorCohort} />
+              <PrivateWebVitals />
               <TrafficTracker disabled={isAdmin} />
               <WorkflowSettingsHydrator state={publicStateRow?.state ?? null} />
               <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isOwner={managerAccess.owner} managerHref={managerHref} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />

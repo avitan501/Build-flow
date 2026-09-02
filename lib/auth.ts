@@ -45,18 +45,33 @@ export const getSessionWithProfile = cache(async function getSessionWithProfile(
   return { supabase, user, profile: profile ?? null };
 });
 
-export async function requireSignedInProfile() {
+const getSignedInProfileWithAccess = cache(async function getSignedInProfileWithAccess() {
   const session = await getSessionWithProfile();
 
   if (!session.user || !session.supabase) {
     redirect("/login");
   }
 
-  return session;
+  const access = managerCapabilities({
+    email: session.user.email || session.profile?.email || null,
+    role: session.profile?.role,
+    approvalStatus: session.profile?.approval_status,
+    isActive: session.profile?.is_active,
+  });
+  return { ...session, user: session.user, supabase: session.supabase, access };
+});
+
+async function getSignedInProfile() {
+  const { supabase, user, profile } = await getSignedInProfileWithAccess();
+  return { supabase, user, profile };
+}
+
+export async function requireSignedInProfile() {
+  return getSignedInProfile();
 }
 
 export async function requireAdminProfile() {
-  const session = await requireSignedInProfile();
+  const session = await getSignedInProfile();
   const email = session.user.email || session.profile?.email || null;
 
   if (!isApprovedManagerIdentity({
@@ -72,26 +87,14 @@ export async function requireAdminProfile() {
 }
 
 export async function requireStaffProfile(capability: StaffCapability) {
-  const session = await requireSignedInProfile();
-  const access = managerCapabilities({
-    email: session.user.email || session.profile?.email || null,
-    role: session.profile?.role,
-    approvalStatus: session.profile?.approval_status,
-    isActive: session.profile?.is_active,
-  });
+  const { access, ...session } = await getSignedInProfileWithAccess();
 
   if (!access[capability]) redirect("/");
   return session;
 }
 
 export async function requireManagerPortalProfile() {
-  const session = await requireSignedInProfile();
-  const access = managerCapabilities({
-    email: session.user.email || session.profile?.email || null,
-    role: session.profile?.role,
-    approvalStatus: session.profile?.approval_status,
-    isActive: session.profile?.is_active,
-  });
+  const { access, ...session } = await getSignedInProfileWithAccess();
 
   if (!access.owner && !access.operationsManager) redirect("/");
   return { ...session, access };
