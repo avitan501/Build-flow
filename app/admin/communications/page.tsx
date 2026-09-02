@@ -79,7 +79,7 @@ export default async function CommunicationsPage({
   const suppliers = (supplierSnapshot?.settings?.suppliers ?? []).filter((supplier): supplier is SupplierRoutingOption => Boolean(supplier?.id && supplier?.name))
   const normalizedCommunications = normalizeAuraCommunications(aura?.communications ?? [])
   const communicationLinks = access.customers
-    ? await loadAuraCommunicationLinks(normalizedCommunications.map((communication) => communication.id))
+    ? await loadAuraCommunicationLinks(normalizedCommunications.map((communication) => communication.id), supabase)
     : []
   const linksByCommunication = new Map<string, typeof communicationLinks>()
   for (const link of communicationLinks)

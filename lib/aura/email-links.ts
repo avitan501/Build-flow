@@ -78,9 +78,11 @@ export async function autoLinkAuraEmail(input: { communicationId: string; counte
   await addAuraCommunicationLinks(input.communicationId ? [input.communicationId] : [], [...new Map(links.map((link) => [`${link.entity_type}:${link.entity_id}`, link])).values()])
 }
 
-export async function loadAuraCommunicationLinks(communicationIds: string[]) {
+type AuraCommunicationLinkReader = Pick<ReturnType<typeof createAdminClient>, "from">
+
+export async function loadAuraCommunicationLinks(communicationIds: string[], reader?: AuraCommunicationLinkReader) {
   if (!communicationIds.length) return [] as AuraCommunicationLink[]
-  const { data, error } = await createAdminClient().from("aura_communication_links").select("communication_id,entity_type,entity_id,entity_label,link_source,confidence").in("communication_id", communicationIds).returns<AuraCommunicationLink[]>()
+  const { data, error } = await (reader ?? createAdminClient()).from("aura_communication_links").select("communication_id,entity_type,entity_id,entity_label,link_source,confidence").in("communication_id", communicationIds).returns<AuraCommunicationLink[]>()
   if (error) return []
   return data ?? []
 }

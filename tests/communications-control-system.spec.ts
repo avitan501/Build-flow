@@ -54,6 +54,7 @@ test("conversation assignment keeps contact notes and uses structured links", ()
   const broker = readFileSync(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8");
   const inbox = readFileSync(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8");
   const page = readFileSync(path.join(root, "app/admin/communications/page.tsx"), "utf8");
+  const emailLinks = readFileSync(path.join(root, "lib/aura/email-links.ts"), "utf8");
 
   const action = actions.slice(
     actions.indexOf("export async function linkCommunicationContactAction"),
@@ -68,7 +69,8 @@ test("conversation assignment keeps contact notes and uses structured links", ()
   expect(action).not.toContain("Avantia link:");
   expect(brokerAction).not.toContain("Avantia link:");
   expect(brokerAction).not.toContain("notes =");
-  expect(page).toContain("loadAuraCommunicationLinks");
+  expect(page).toContain("loadAuraCommunicationLinks(normalizedCommunications.map((communication) => communication.id), supabase)");
+  expect(emailLinks).toContain("reader ?? createAdminClient()");
   expect(inbox).toContain("communication.links?.find");
 });
 
