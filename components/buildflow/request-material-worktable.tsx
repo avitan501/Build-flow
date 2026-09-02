@@ -2,7 +2,7 @@
 
 import { Check, Copy, FileText, Route, Search } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState, useTransition } from "react"
+import { useMemo, useState, useTransition } from "react"
 
 import { saveRequestItemSupplierRouteAction } from "@/app/owner/materials/requests/actions"
 import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
@@ -31,6 +31,10 @@ function itemDetails(item: ReviewableMaterialItem) {
   const screwLength = typeof metadata.screw_length === "string" ? metadata.screw_length : ""
   const requestDetails = cleanMaterialRequestDetails(metadata.request_details)
   return [productType, dimensions, thickness, screwLength && `Length: ${screwLength}`, requestDetails].filter(Boolean).join(" · ")
+}
+
+function supplierRouteVersion(metadata: Record<string, unknown> | null | undefined) {
+  return JSON.stringify([metadata?.supplier_route_names ?? [], metadata?.supplier_route_notes ?? {}])
 }
 
 function copyText(items: ReviewableMaterialItem[]) {
@@ -89,6 +93,7 @@ export function RequestMaterialWorktable({
     seenSourceIds.add(sourceKey)
     return { item, sourceItem, showSource, hasAi }
   })
+  const orderedSuppliers = useMemo(() => [...suppliers].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base", numeric: true })), [suppliers])
 
   function applyBatchRoute() {
     const names = [...new Set([batchSupplier, ...batchManual.split(",")].map((name) => name.trim()).filter(Boolean))]
@@ -135,8 +140,8 @@ export function RequestMaterialWorktable({
       <details className="border-b border-slate-200 bg-slate-50/70"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-bold text-slate-700 sm:px-4"><span className="inline-flex items-center gap-2"><FileText className="h-4 w-4 text-[#0066cc]" />Documents &amp; photos</span><span className="text-[10px] text-slate-400">{attachments.length} attached · Open</span></summary><div className="border-t border-slate-200 bg-white"><RequestAttachmentUploader requestId={requestId} compact />{attachments.length ? <div className="flex flex-wrap gap-1.5 border-t border-slate-100 px-3 py-2">{attachments.map((file) => file.url ? <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="max-w-full truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-bold text-[#0066cc]">{file.file_name}</a> : <span key={file.id} className="max-w-full truncate rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">{file.file_name}</span>)}</div> : null}</div></details>
       <p className="sr-only" role="status" aria-live="polite">{copyNotice}</p>
       {items.length ? <p className="border-b border-slate-100 px-3 py-1.5 text-right text-[10px] font-bold text-[#0066cc] sm:hidden">Swipe to compare →</p> : null}
-      {items.length ? <div className="border-b border-sky-100 bg-sky-50/60 p-2"><div className="max-w-md"><RequestSupplierRouteEditor requestId={requestId} itemIds={items.map((item) => item.id)} suppliers={suppliers} applyToAll /></div></div> : null}
       {selectedRouteIds.length ? <div className="grid gap-2 border-b border-sky-200 bg-sky-50 p-2 sm:grid-cols-[auto_12rem_minmax(10rem,1fr)_auto] sm:items-center"><span className="text-[10px] font-bold text-sky-900">Route {selectedRouteIds.length} selected</span><select value={batchSupplier} onChange={(event) => setBatchSupplier(event.target.value)} className="h-9 rounded-md border border-sky-200 bg-white px-2 text-[11px] font-semibold"><option value="">Choose supplier…</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.name}>{supplier.name}</option>)}</select><input value={batchManual} onChange={(event) => setBatchManual(event.target.value)} placeholder="Or type supplier names" className="h-9 rounded-md border border-sky-200 px-2 text-[11px]" /><button type="button" onClick={applyBatchRoute} disabled={batchPending || (!batchSupplier && !batchManual.trim())} className="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-[#0071e3] px-3 text-[11px] font-bold text-white disabled:opacity-40"><Route className="h-3.5 w-3.5" />Apply</button>{batchFeedback ? <p className="text-[10px] font-bold text-rose-700 sm:col-span-4">{batchFeedback}</p> : null}</div> : null}
+      {selectedRouteIds.length ? <div className="grid gap-2 border-b border-sky-200 bg-sky-50 p-2 sm:grid-cols-[auto_12rem_minmax(10rem,1fr)_auto] sm:items-center"><span className="text-[10px] font-bold text-sky-900">Route {selectedRouteIds.length} selected</span><select value={batchSupplier} onChange={(event) => setBatchSupplier(event.target.value)} className="h-9 rounded-md border border-sky-200 bg-white px-2 text-[11px] font-semibold"><option value="">Choose supplier…</option>{orderedSuppliers.map((supplier) => <option key={supplier.id} value={supplier.name}>{supplier.name}</option>)}</select><input value={batchManual} onChange={(event) => setBatchManual(event.target.value)} placeholder="Or type supplier names" className="h-9 rounded-md border border-sky-200 px-2 text-[11px]" /><button type="button" onClick={applyBatchRoute} disabled={batchPending || (!batchSupplier && !batchManual.trim())} className="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-[#0071e3] px-3 text-[11px] font-bold text-white disabled:opacity-40"><Route className="h-3.5 w-3.5" />Apply</button>{batchFeedback ? <p className="text-[10px] font-bold text-rose-700 sm:col-span-4">{batchFeedback}</p> : null}</div> : null}
 
       {items.length ? (
         <div className="overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0071e3]" tabIndex={0} aria-label="Scrollable request, AI, and supplier comparison">
@@ -175,7 +180,7 @@ export function RequestMaterialWorktable({
                         </div>
                       ) : null}
                     </td>
-                    <td className="border-l border-slate-100 px-2 py-2"><RequestSupplierRouteEditor requestId={requestId} itemId={item.id} metadata={item.metadata} suppliers={suppliers} /></td>
+                    <td className="border-l border-slate-100 px-2 py-2"><RequestSupplierRouteEditor key={`${item.id}-${supplierRouteVersion(item.metadata)}`} requestId={requestId} itemId={item.id} itemIds={items.map((requestItem) => requestItem.id)} metadata={item.metadata} suppliers={orderedSuppliers} /></td>
                   </tr>
                 )
               })}

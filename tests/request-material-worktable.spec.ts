@@ -128,18 +128,23 @@ test("supplier quotes move into compact step two instead of expanding the reques
   expect(management, "supplier bids should not be isolated in repeated large comparison cards").not.toContain("comparisons.map((comparison) => <article")
 })
 
-test("supplier routes allow many suppliers, per-supplier notes, and one route for all items", async () => {
+test("supplier routes are alphabetical checklists with per-item or whole-request scope", async () => {
   const [worktable, editor, actions] = await Promise.all([
     source(worktablePath),
     source(path.join(root, "components/buildflow/request-supplier-route-editor.tsx")),
     source(path.join(root, "app/owner/materials/requests/actions.ts")),
   ])
 
-  expect(editor).toContain("Set one route for all items")
+  expect(editor).toContain("supplierNameCollator")
+  expect(editor).toContain('type="checkbox"')
+  expect(editor).toContain("Only this item")
+  expect(editor).toContain("All items in request")
+  expect(editor).toContain("This replaces the supplier route on every item in this request.")
   expect(worktable).toContain("itemIds={items.map")
+  expect(worktable).toContain("orderedSuppliers.map")
   expect(editor).toContain("supplier_route_notes")
   expect(editor).toContain("Note for this supplier")
-  expect(editor).toContain("Add as many suppliers as needed")
+  expect(editor).toContain("Choose any suppliers needed")
   expect(actions).not.toContain("].slice(0, 12)")
   expect(actions).toContain("supplier_route_notes: supplierNotes")
 })
