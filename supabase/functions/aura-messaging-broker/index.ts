@@ -25,6 +25,7 @@ import {
   smsHasFullDeliveryAddress,
   smsHasNeededByTiming,
   smsMaterialIntelligenceAssessment,
+  smsMessagesAfterInactivityBoundary,
   smsMessagesAfterConfirmedRequest,
   smsNeededByTimingValue,
   smsProductInquiryFallbackReply,
@@ -40,6 +41,7 @@ import {
   smsUnansweredFollowUpEligible,
   smsUnansweredFollowUpStageText,
   smsUnansweredFollowUpText,
+  smsBareOrderIntentReply,
 } from "../_shared/sms-reply-policy.ts";
 import { isExplicitCustomerRequestConfirmation } from "../_shared/customer-request-confirmation.ts";
 import {
@@ -1330,7 +1332,8 @@ async function loadPersistedSmsOrderState(
       left join public.quote_requests as request on request.id = state.created_request_id
       where state.normalized_phone = ${phone}
         and (
-          state.status in ('collecting', 'awaiting_confirmation')
+          (state.status in ('collecting', 'awaiting_confirmation')
+            and state.updated_at >= now() - interval '24 hours')
           or (state.status = 'confirmed' and request.status <> 'closed')
         )
       order by state.updated_at desc limit 1
@@ -2832,10 +2835,12 @@ async function smsConversationContext(phone: string) {
   // starts the next request with natural wording such as “I need 50 Sheetrock”
   // instead of explicitly saying “new request.” Never reuse its address,
   // timing, or product answers in the next order.
-  const ordered = smsMessagesAfterConfirmedRequest(
+  const afterConfirmation = smsMessagesAfterConfirmedRequest(
     [...rows].reverse(),
     latestConfirmationAt,
   );
+  const ordered = smsMessagesAfterInactivityBoundary(afterConfirmation);
+  const startedAfterInactivity = ordered.length < afterConfirmation.length;
   let newRequestBoundary = -1;
   for (let index = 0; index < ordered.length; index += 1) {
     const message = ordered[index];
@@ -2864,7 +2869,10 @@ async function smsConversationContext(phone: string) {
   };
   return {
     replyText: [
-      newRequestBoundary < 0 && !afterConfirmedRequest && linkedRequests[0]
+      newRequestBoundary < 0 &&
+      !afterConfirmedRequest &&
+      !startedAfterInactivity &&
+      linkedRequests[0]
         ? `Avantia record: Linked material request “${linkedRequests[0].title.slice(0, 180)}” has internal status “${linkedRequests[0].status.slice(0, 60)}”. Do not expose the internal status as a promise; use it only to avoid asking the customer for a request ID.`
         : "",
       ...activeOrdered.map(
@@ -2887,6 +2895,7 @@ async function smsConversationContext(phone: string) {
       .flatMap((message) => message.media as TrustedSmsMedia[])
       .filter((item) => trustedImageMedia([item]).length > 0)
       .slice(0, 2),
+    startedAfterInactivity,
   };
 }
 
@@ -3041,6 +3050,7 @@ async function runMaterialShadowAssessment(communicationId: string) {
     messages,
     confirmations[0]?.completed_at || null,
   );
+  active = smsMessagesAfterInactivityBoundary(active);
   let boundary = -1;
   for (let index = 0; index < active.length; index += 1)
     if (
@@ -4854,6 +4864,23 @@ async function processCustomerSmsAutomation(
   // explicit "new request" message is appended to that request while it is
   // open, so a customer cannot accidentally create duplicate requests.
   const activeSubmittedRequest = await loadActiveSubmittedSmsRequest(phone);
+  if (!activeSubmittedRequest) {
+    await Promise.all([
+      sql`
+        update public.aura_sms_request_states
+        set status = 'superseded', closed_at = now(), updated_at = now()
+        where normalized_phone = ${phone}
+          and status in ('collecting', 'awaiting_confirmation')
+          and updated_at < now() - interval '24 hours'
+      `,
+      sql`
+        update public.aura_sms_request_drafts
+        set status = 'dismissed', updated_at = now()
+        where sender_phone = ${phone} and status = 'new'
+          and updated_at < now() - interval '24 hours'
+      `,
+    ]);
+  }
   const startsNewRequest =
     explicitlyStartsNewRequest && !activeSubmittedRequest;
   const settings = await loadSmsAiSettings();
@@ -4920,6 +4947,7 @@ async function processCustomerSmsAutomation(
     select id, original_message, customer_name, customer_address, source_communication_ids, exact_list_only, delivery_address_known, items
     from public.aura_sms_request_drafts
     where sender_phone = ${phone} and status = 'new' and draft_kind = 'create'
+      and updated_at >= now() - interval '24 hours'
     order by created_at desc limit 1
   `;
   const draftCandidate = openDrafts[0];
@@ -5126,6 +5154,27 @@ async function processCustomerSmsAutomation(
     }
   }
   const { result, model, intent, metrics, promptVersion } = analyzed;
+  const bareOrderReply = smsBareOrderIntentReply(effectiveBody);
+  if (
+    bareOrderReply &&
+    !openDraft &&
+    !activeSubmittedRequest &&
+    !persistedOrderState
+  ) {
+    result.reply = bareOrderReply;
+    result.autoSafe = true;
+    result.isMaterialRequest = false;
+    result.request = null;
+    analyzed.safety = evaluateSmsReplyGate({
+      message: effectiveBody,
+      reply: result.reply,
+      intent: "greeting",
+      event: "message",
+      participantRole: result.participantRole || "lead",
+      modelAutoSafe: true,
+      exactListOnly,
+    });
+  }
   const confirmedDeliveryAddress =
     [
       result.customerAddress,
@@ -5588,7 +5637,7 @@ async function processCustomerSmsAutomation(
   }
   if (confirmationPrepared) return;
   if (!needsAiReply) return;
-  const shouldAuto =
+  let shouldAuto =
     contact?.sms_ai_mode === "auto_safe" &&
     safety.level === "green" &&
     safety.gateAutoSafe;
@@ -5603,6 +5652,26 @@ async function processCustomerSmsAutomation(
     latestRows[0].direction !== "incoming"
   )
     return;
+  const recentAutoReplies = shouldAuto
+    ? await sql<{ reply_text: string }[]>`
+        select reply_text from public.aura_sms_reply_drafts
+        where counterparty_phone = ${phone} and decision = 'auto_sent'
+          and created_at >= now() - interval '24 hours'
+        order by created_at desc limit 12
+      `
+    : [];
+  const repeatedAutoReply = recentAutoReplies.some(
+    (row) =>
+      normalizedSmsForDuplicate(row.reply_text) ===
+      normalizedSmsForDuplicate(result.reply),
+  );
+  if (repeatedAutoReply) {
+    shouldAuto = false;
+    result.safetyReason = `Repeated automatic reply suppressed. ${result.safetyReason}`.slice(
+      0,
+      300,
+    );
+  }
   const replyParts = shouldAuto
     ? smsReplyParts({
         reply: result.reply,

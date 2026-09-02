@@ -1352,6 +1352,46 @@ export function smsMessagesAfterConfirmedRequest<
   );
 }
 
+export const SMS_CONVERSATION_IDLE_LIMIT_MS = 24 * 60 * 60 * 1000;
+
+export function smsMessagesAfterInactivityBoundary<
+  T extends { occurred_at: string },
+>(messages: T[], idleLimitMs = SMS_CONVERSATION_IDLE_LIMIT_MS) {
+  if (messages.length < 2) return messages;
+  let boundary = 0;
+  for (let index = 1; index < messages.length; index += 1) {
+    const previous = Date.parse(messages[index - 1].occurred_at);
+    const current = Date.parse(messages[index].occurred_at);
+    if (
+      Number.isFinite(previous) &&
+      Number.isFinite(current) &&
+      current - previous > idleLimitMs
+    )
+      boundary = index;
+  }
+  return messages.slice(boundary);
+}
+
+export function smsBareOrderIntentReply(value: string) {
+  const trimmed = value.trim();
+  const withoutGreeting = trimmed.replace(
+    /^(?:hi|hello|hey|שלום|היי|hola)[!.?\s]*/iu,
+    "",
+  );
+  if (!(
+    /^(?:(?:can|could)\s+i|i\s+(?:want|need|would\s+like)\s+to)\s+(?:order|buy)[?.!\s]*$/iu.test(withoutGreeting) ||
+    /^(?:אפשר|אני רוצה|אני צריך)\s+(?:להזמין|לקנות)[?.!\s]*$/u.test(withoutGreeting) ||
+    /^(?:puedo|quiero|necesito)\s+(?:pedir|comprar)[?.!\s]*$/iu.test(withoutGreeting)
+  ))
+    return null;
+  const language = smsReplyLanguage(trimmed);
+  if (language === "he")
+    return "כן. שלח את רשימת החומרים והכמויות, מיקוד המשלוח ומתי אתה צריך אותם.";
+  if (language === "es")
+    return "Sí. Envíe la lista de materiales y cantidades, el código postal de entrega y para cuándo los necesita.";
+  return "Yes. Send the material list and quantities, delivery ZIP code, and when you need them.";
+}
+
 export function applyAvantiaMaterialDefaults<
   T extends { name: string; quantity: number; unit: string },
 >(items: T[], customerText: string): T[] {

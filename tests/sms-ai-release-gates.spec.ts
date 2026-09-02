@@ -24,6 +24,7 @@ import {
   smsHasNeededByTiming,
   smsMaterialClarificationQuestions,
   smsMaterialIntelligenceAssessment,
+  smsMessagesAfterInactivityBoundary,
   smsNeededByTimingValue,
   smsOutputSafetySignals,
   smsProductInquiryFallbackReply,
@@ -39,6 +40,7 @@ import {
   smsUnansweredFollowUpEligible,
   smsUnansweredFollowUpText,
   smsUnansweredFollowUpStageText,
+  smsBareOrderIntentReply,
 } from "../supabase/functions/_shared/sms-reply-policy"
 
 const root = process.cwd()
@@ -450,6 +452,24 @@ test("new-request boundaries require an affirmative instruction", () => {
   expect(smsStartsNewMaterialRequest("This is not a new order—add it to the same request")).toBe(false)
   expect(smsStartsNewMaterialRequest("Don't make a new order")).toBe(false)
   expect(smsStartsNewMaterialRequest("Is this a new order?")).toBe(false)
+})
+
+test("an idle SMS thread starts with fresh context and a safe order prompt", async () => {
+  const messages = [
+    { occurred_at: "2026-08-30T18:00:00Z", body: "45 sheets and 20 bricks" },
+    { occurred_at: "2026-08-30T18:05:00Z", body: "How much do you need?" },
+    { occurred_at: "2026-09-02T23:43:00Z", body: "Can I order" },
+  ]
+  expect(smsMessagesAfterInactivityBoundary(messages)).toEqual([messages[2]])
+  expect(smsBareOrderIntentReply("Can I order")).toBe(
+    "Yes. Send the material list and quantities, delivery ZIP code, and when you need them.",
+  )
+  expect(smsBareOrderIntentReply("Can I order 45 sheets of 5/8 Sheetrock")).toBeNull()
+
+  const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  expect(broker).toContain("smsMessagesAfterInactivityBoundary(afterConfirmation)")
+  expect(broker).toContain("updated_at < now() - interval '24 hours'")
+  expect(broker).toContain("Repeated automatic reply suppressed")
 })
 
 test("product inquiry fallback answers the product and asks only useful next questions", () => {
