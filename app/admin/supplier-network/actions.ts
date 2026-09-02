@@ -5,10 +5,16 @@ import { z } from "zod";
 
 import { requireStaffProfile } from "@/lib/auth";
 import {
+  canonicalSupplierId,
+  canonicalSupplierKey,
+  findCanonicalSupplier,
+} from "@/lib/supplier-canonical";
+import {
   SUPPLIER_NETWORK_CHANNELS,
   type SupplierNetworkOverride,
 } from "@/lib/supplier-network";
 import { saveSupplierNetworkOptions } from "@/lib/supplier-network-options";
+import type { SupplierRoutingOption } from "@/lib/shop-qualification";
 
 const inputSchema = z.object({
   key: z
@@ -41,16 +47,20 @@ const discoveredSupplierSchema = z.object({
   summary: z.string().trim().max(1000),
 });
 
-function supplierKey(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 160);
-}
-
 export async function addDiscoveredSupplierNetworkAction(input: z.infer<typeof discoveredSupplierSchema>) {
   const parsed = discoveredSupplierSchema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "This supplier could not be added." };
   const { supabase, user } = await requireStaffProfile("suppliers");
-  const key = supplierKey(parsed.data.name);
-  const supplierId = `discovered-${key.replace(/\s+/g, "-")}`.slice(0, 160);
+  const key = canonicalSupplierKey(parsed.data.name).slice(0, 160);
+  const { data: snapshotData, error: snapshotError } = await supabase.rpc("staff_load_supplier_directory_snapshot");
+  const snapshot = snapshotData as { settings?: { suppliers?: SupplierRoutingOption[] } } | null;
+  if (snapshotError || !Array.isArray(snapshot?.settings?.suppliers)) {
+    return { ok: false as const, error: "The Supplier Directory could not be checked." };
+  }
+  const existing = findCanonicalSupplier(snapshot.settings.suppliers, {
+    name: parsed.data.name,
+  });
+  const supplierId = existing?.id || canonicalSupplierId(parsed.data.name);
   const supplier = {
     id: supplierId,
     name: parsed.data.name,
@@ -75,8 +85,10 @@ export async function addDiscoveredSupplierNetworkAction(input: z.infer<typeof d
     additionalContacts: [],
     relationshipUpdates: [],
   };
-  const { error } = await supabase.rpc("staff_upsert_supplier_directory_entry", { p_supplier: supplier, p_create: true });
-  if (error && !error.message.includes("already")) return { ok: false as const, error: "The supplier could not be added to the directory." };
+  if (!existing) {
+    const { error } = await supabase.rpc("staff_upsert_supplier_directory_entry", { p_supplier: supplier, p_create: true });
+    if (error) return { ok: false as const, error: "The supplier could not be added to the directory." };
+  }
   await saveSupplierNetworkOptions(supabase, user.id, key, parsed.data.name, {
     channels: [], stage: "more", status: "Research ready", note: parsed.data.summary, hidden: false, priority: false,
   });
@@ -112,14 +124,17 @@ export async function updateSupplierNetworkRowAction(
     );
     if (parsed.data.directorySupplierId || parsed.data.stage === "approved") {
       const { data: snapshotData } = await supabase.rpc("staff_load_supplier_directory_snapshot");
-      const snapshot = snapshotData as { settings?: { suppliers?: Array<Record<string, unknown>> } } | null;
+      const snapshot = snapshotData as { settings?: { suppliers?: SupplierRoutingOption[] } } | null;
       const suppliers = snapshot?.settings?.suppliers ?? [];
-      const existing = suppliers.find((supplier) => supplier.id === parsed.data.directorySupplierId);
-      const supplierId = parsed.data.directorySupplierId || `network-${parsed.data.key.replace(/\s+/g, "-")}`.slice(0, 160);
+      const existing = findCanonicalSupplier(suppliers, {
+        supplierId: parsed.data.directorySupplierId,
+        name: parsed.data.supplierName,
+      });
+      const supplierId = existing?.id || canonicalSupplierId(parsed.data.supplierName);
       const supplier = {
         ...(existing ?? {}),
         id: supplierId,
-        name: parsed.data.supplierName,
+        name: existing?.name || parsed.data.supplierName,
         contactLabel: String(existing?.contactLabel || parsed.data.phone || "Supplier contact"),
         contactName: String(existing?.contactName || ""),
         email: String(existing?.email || ""),
@@ -149,5 +164,6 @@ export async function updateSupplierNetworkRowAction(
   }
   revalidatePath("/admin/supplier-network");
   revalidatePath("/admin/vendors");
+  revalidatePath("/owner/materials/requests/[requestId]", "page");
   return { ok: true as const };
 }

@@ -509,7 +509,8 @@ test("Carlos has one compact deduplicated supplier network while the research li
   expect(component).toContain("priorityOnly");
   expect(component).toContain("SUPPLIER_NETWORK_CHANNELS.map");
   expect(component).toContain("min-h-11");
-  expect(network).toContain("function canonicalName");
+  expect(network).toContain("canonicalSupplierKey");
+  expect(network).toContain("sourceRefs");
   expect(network).toContain("mergeRow(rows");
   expect(network).toContain("itemProgress?.important");
   expect(network).toContain("AFFILIATE_CALL_TARGETS");

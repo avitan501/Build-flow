@@ -44,6 +44,7 @@ import {
 } from "@/lib/shop-qualification"
 import type { ShopCatalogProduct } from "@/lib/shop-catalog"
 import { filterProductsForShopTool, SHOP_TOOL_CATEGORIES, type DepartmentSymbolKey, type ShopToolSlug } from "@/lib/shop-tools"
+import { canonicalSupplierKey } from "@/lib/supplier-canonical"
 import { supplierMatchesDirectorySearch } from "@/lib/supplier-directory-search"
 import {
   TRIAL_VENDOR_DEPARTMENTS,
@@ -105,10 +106,6 @@ function parseDepartmentItemList(value: string) {
 
 function makeId(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "item"
-}
-
-function normalizeVendorIdentity(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "")
 }
 
 function mergePersistedSupplier(settings: ShopQualificationSettings, supplier: SupplierRoutingOption): ShopQualificationSettings {
@@ -303,7 +300,10 @@ export function SupplierRoutingManager({
   const selectedSupplierMatchesSearch = !supplierDirectorySearch.trim()
     || filteredDirectorySuppliers.some((supplier) => supplier.id === selectedSupplier?.id)
   const existingVendorIdentities = useMemo(
-    () => new Set(settings.suppliers.flatMap((supplier) => [normalizeVendorIdentity(supplier.name), supplier.email ? normalizeVendorIdentity(supplier.email) : ""]).filter(Boolean)),
+    () => new Set(settings.suppliers.flatMap((supplier) => [
+      `name:${canonicalSupplierKey(supplier.name)}`,
+      supplier.email ? `email:${supplier.email.trim().toLowerCase()}` : "",
+    ]).filter(Boolean)),
     [settings.suppliers],
   )
   const deletedSupplierIdSet = useMemo(() => new Set(deletedSupplierIds), [deletedSupplierIds])
@@ -466,11 +466,11 @@ export function SupplierRoutingManager({
       return
     }
 
-    const normalizedName = normalizeVendorIdentity(name)
-    const normalizedEmail = normalizeVendorIdentity(supplierDraft.email)
+    const normalizedName = canonicalSupplierKey(name)
+    const normalizedEmail = supplierDraft.email.trim().toLowerCase()
     const existingSupplier = settings.suppliers.find((entry) => (
-      normalizeVendorIdentity(entry.name) === normalizedName
-      || Boolean(normalizedEmail && entry.email && normalizeVendorIdentity(entry.email) === normalizedEmail)
+      canonicalSupplierKey(entry.name) === normalizedName
+      || Boolean(normalizedEmail && entry.email?.trim().toLowerCase() === normalizedEmail)
     ))
     if (existingSupplier) {
       const group = directoryGroupForSupplier(existingSupplier)
@@ -1514,7 +1514,7 @@ export function SupplierRoutingManager({
 
                     <div className="min-h-0 flex-1 overflow-y-auto">
                       {filteredTrialEntries.map((entry) => {
-                        const added = existingVendorIdentities.has(normalizeVendorIdentity(entry.name)) || existingVendorIdentities.has(normalizeVendorIdentity(entry.email))
+                        const added = existingVendorIdentities.has(`name:${canonicalSupplierKey(entry.name)}`) || existingVendorIdentities.has(`email:${entry.email.trim().toLowerCase()}`)
                         return (
                           <div key={`${entry.department}:${entry.sourceId}`} className="grid gap-3 border-b border-slate-200 p-4 last:border-b-0 sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_auto] sm:items-center sm:px-6">
                             <div>

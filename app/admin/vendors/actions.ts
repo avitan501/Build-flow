@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { requireStaffProfile } from "@/lib/auth"
 import type { ShopQualificationSettings, SupplierContact, SupplierReferralSource, SupplierRelationshipUpdate, SupplierRoutingOption } from "@/lib/shop-qualification"
+import { canonicalSupplierId, findCanonicalSupplier } from "@/lib/supplier-canonical"
 import { SUPPLIER_PROGRAM_CHANNELS, type SupplierProgramChannel } from "@/lib/supplier-program-channels"
 
 const JOB_ADDRESS = "280 Lawrence Ave, Lawrence, NY 11559"
@@ -113,12 +114,33 @@ export async function saveSupplierDirectoryEntryAction(input: {
   create?: boolean
 }): Promise<SaveSupplierResult> {
   const { supabase } = await requireStaffProfile("suppliers")
-  const supplier = cleanSupplier(input.supplier)
+  let supplier = cleanSupplier(input.supplier)
   if (!supplier) return { ok: false, error: "Enter a supplier name and a valid email address." }
+
+  let create = input.create ?? false
+  if (create) {
+    const { data: snapshotData, error: snapshotError } = await supabase.rpc("staff_load_supplier_directory_snapshot")
+    const snapshot = cleanDirectorySnapshot(snapshotData)
+    if (snapshotError || !snapshot) {
+      return { ok: false, error: "Could not verify the Supplier Directory before saving." }
+    }
+    const email = supplier.email?.trim().toLowerCase() || ""
+    const existing = findCanonicalSupplier(snapshot.settings.suppliers, {
+      supplierId: supplier.id,
+      name: supplier.name,
+    }) ?? snapshot.settings.suppliers.find((entry) => (
+      Boolean(email) && entry.email?.trim().toLowerCase() === email
+    ))
+    if (existing) {
+      return { ok: true, supplier: existing }
+    }
+    supplier = { ...supplier, id: canonicalSupplierId(supplier.name) }
+    create = true
+  }
 
   const { data: persisted, error: saveError } = await supabase.rpc(
     "staff_upsert_supplier_directory_entry",
-    { p_supplier: supplier, p_create: input.create ?? false },
+    { p_supplier: supplier, p_create: create },
   )
   if (saveError || !persisted) {
     console.error("Supplier directory save failed", saveError)
@@ -129,7 +151,9 @@ export async function saveSupplierDirectoryEntryAction(input: {
   }
 
   revalidatePath("/admin/vendors")
+  revalidatePath("/admin/supplier-network")
   revalidatePath("/admin/catalog")
+  revalidatePath("/owner/materials/requests/[requestId]", "page")
   return { ok: true, supplier: persisted as SupplierRoutingOption }
 }
 
@@ -154,7 +178,9 @@ export async function saveSupplierRoutingProductsAction(
     return { ok: false, error: "Could not save department routing." }
   }
   revalidatePath("/admin/vendors")
+  revalidatePath("/admin/supplier-network")
   revalidatePath("/admin/supplier-approvals")
+  revalidatePath("/owner/materials/requests/[requestId]", "page")
   const { data: snapshotData } = await supabase.rpc("staff_load_supplier_directory_snapshot")
   const snapshot = cleanDirectorySnapshot(snapshotData)
   return {
@@ -180,7 +206,9 @@ export async function deleteSupplierDirectoryEntryAction(supplierId: string): Pr
   }
 
   revalidatePath("/admin/vendors")
+  revalidatePath("/admin/supplier-network")
   revalidatePath("/admin/supplier-approvals")
+  revalidatePath("/owner/materials/requests/[requestId]", "page")
   const { data: snapshotData } = await supabase.rpc("staff_load_supplier_directory_snapshot")
   const snapshot = cleanDirectorySnapshot(snapshotData)
   return {

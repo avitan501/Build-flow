@@ -8,6 +8,8 @@ import { requireStaffProfile } from "@/lib/auth"
 import { scheduleClientMaterialListOrganization } from "@/lib/material-request-organization"
 import { buildProjectUploadStoragePath, PROJECT_UPLOAD_ALLOWED_MIME_TYPES, PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/projects"
 import { generateRequestClientQuotePdf, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
+import type { SupplierRoutingOption } from "@/lib/shop-qualification"
+import { canonicalSupplierId, canonicalSupplierKey, findCanonicalSupplier, uniqueCanonicalSupplierNames } from "@/lib/supplier-canonical"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 type ReplyResult = { ok: true; providerId: string | null } | { ok: false; error: string }
@@ -342,10 +344,10 @@ export async function saveRequestItemSupplierRouteAction(input: {
 }) {
   const requestId = String(input.requestId || "").trim()
   const itemIds = Array.isArray(input.itemIds) ? [...new Set(input.itemIds.map((id) => String(id).trim()))].slice(0, 100) : []
-  const supplierNames = Array.isArray(input.supplierNames) ? [...new Set(input.supplierNames.map((name) => String(name).trim().replace(/\s+/g, " ").slice(0, 160)).filter(Boolean))] : []
-  if (JSON.stringify(supplierNames).length > 50_000) return { ok: false as const, error: "The supplier route is too large to save at once." }
+  const requestedSupplierNames = Array.isArray(input.supplierNames) ? uniqueCanonicalSupplierNames(input.supplierNames) : []
+  if (requestedSupplierNames.length > 20 || JSON.stringify(requestedSupplierNames).length > 50_000) return { ok: false as const, error: "Choose no more than 20 suppliers for one route." }
   const rawNotes = input.supplierNotes && typeof input.supplierNotes === "object" && !Array.isArray(input.supplierNotes) ? input.supplierNotes : {}
-  const supplierNotes = Object.fromEntries(supplierNames.map((name) => [name, String(rawNotes[name] || "").trim().slice(0, 800)]).filter(([, note]) => Boolean(note)))
+  const notesByCanonicalKey = new Map<string, string>(Object.entries(rawNotes).map(([name, note]) => [canonicalSupplierKey(name), String(note || "").trim().slice(0, 800)] as const).filter(([key, note]) => Boolean(key && note)))
   if (!/^[0-9a-f-]{36}$/i.test(requestId) || !itemIds.length || itemIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) return { ok: false as const, error: "Choose at least one valid request item." }
   const { supabase, user } = await requireStaffProfile("customers")
   const [{ data: items }, { data: supplierData }] = await Promise.all([
@@ -353,12 +355,55 @@ export async function saveRequestItemSupplierRouteAction(input: {
     supabase.rpc("staff_load_catalog_suppliers"),
   ])
   if (!items || items.length !== itemIds.length) return { ok: false as const, error: "One of the selected items is no longer available." }
-  const directory = Array.isArray(supplierData) ? supplierData as Array<{ id?: string; name?: string }> : []
-  const supplierByName = new Map(directory.filter((entry) => entry?.id && entry?.name).map((entry) => [String(entry.name).trim().toLocaleLowerCase(), String(entry.id)]))
-  const supplierRouteEntries = supplierNames.map((name) => ({ supplier_id: supplierByName.get(name.toLocaleLowerCase()) ?? null, name }))
+  const directory = Array.isArray(supplierData) ? supplierData as SupplierRoutingOption[] : []
+  const routeSuppliers: SupplierRoutingOption[] = []
+  for (const requestedName of requestedSupplierNames) {
+    let supplier = findCanonicalSupplier(directory, { name: requestedName })
+    if (!supplier) {
+      const draft: SupplierRoutingOption = {
+        id: canonicalSupplierId(requestedName),
+        name: requestedName,
+        contactLabel: "Supplier contact",
+        contactName: "",
+        email: "",
+        phone: "",
+        whatsapp: "",
+        portalUrl: "",
+        preferredDeliveryMethod: "manual",
+        contactMethods: ["manual"],
+        additionalContacts: [],
+        relationshipUpdates: [],
+        deliveryNotes: "Added from a material request supplier route. Confirm contact and delivery details before sending.",
+        deliveryCharge: null,
+        deliveryChargeNote: "",
+        notes: "",
+        programChannels: [],
+        trustLevel: "first-time",
+        catalogDepartments: [],
+        catalogEnabledDepartments: [],
+        address: "",
+        materials: "",
+      }
+      const { data: persisted, error: supplierError } = await supabase.rpc("staff_upsert_supplier_directory_entry", {
+        p_supplier: draft,
+        p_create: true,
+      })
+      if (supplierError || !persisted) {
+        return { ok: false as const, error: `Could not add ${requestedName} to the Supplier Directory. Open the directory and confirm this supplier first.` }
+      }
+      supplier = persisted as SupplierRoutingOption
+      directory.push(supplier)
+    }
+    routeSuppliers.push(supplier)
+  }
+  const supplierNames = routeSuppliers.map((supplier) => supplier.name)
+  const supplierNotes = Object.fromEntries(routeSuppliers.map((supplier) => [supplier.name, notesByCanonicalKey.get(canonicalSupplierKey(supplier.name)) || ""]).filter(([, note]) => Boolean(note)))
+  const supplierRouteEntries = routeSuppliers.map((supplier) => ({ supplier_id: supplier.id, name: supplier.name }))
   const updates = await Promise.all(items.map((item) => supabase.from("quote_request_items").update({ metadata: { ...(item.metadata ?? {}), supplier_route_names: supplierNames, supplier_route_entries: supplierRouteEntries, supplier_route_notes: supplierNotes, supplier_route_note: null, supplier_route_updated_at: new Date().toISOString(), supplier_route_updated_by: user.id } }).eq("id", item.id).eq("request_id", requestId)))
   if (updates.some((result) => result.error)) return { ok: false as const, error: "The supplier route could not be saved for every selected item." }
   revalidatePath(`/owner/materials/requests/${requestId}`)
+  revalidatePath("/admin/vendors")
+  revalidatePath("/admin/supplier-network")
   return { ok: true as const }
 }
 

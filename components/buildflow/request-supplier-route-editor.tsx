@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition } from "react"
 
 import { saveRequestItemSupplierRouteAction } from "@/app/owner/materials/requests/actions"
+import { canonicalSupplierKey, resolveRequestSupplierRouteSelections } from "@/lib/supplier-canonical"
 
 export type RequestRouteSupplier = { id: string; name: string }
 
@@ -12,16 +13,6 @@ const supplierNameCollator = new Intl.Collator(undefined, { sensitivity: "base",
 
 function orderedNames(names: string[]) {
   return [...names].sort((left, right) => supplierNameCollator.compare(left, right))
-}
-
-function savedNames(metadata: Record<string, unknown> | null | undefined) {
-  return Array.isArray(metadata?.supplier_route_names) ? metadata.supplier_route_names.filter((name): name is string => typeof name === "string" && Boolean(name.trim())) : []
-}
-
-function savedNotes(metadata: Record<string, unknown> | null | undefined) {
-  const raw = metadata?.supplier_route_notes
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {} as Record<string, string>
-  return Object.fromEntries(Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
 }
 
 export function RequestSupplierRouteEditor({ requestId, itemId, itemIds, metadata, suppliers }: {
@@ -32,8 +23,9 @@ export function RequestSupplierRouteEditor({ requestId, itemId, itemIds, metadat
   suppliers: RequestRouteSupplier[]
 }) {
   const router = useRouter()
-  const [names, setNames] = useState<string[]>(() => orderedNames(savedNames(metadata)))
-  const [notes, setNotes] = useState<Record<string, string>>(() => savedNotes(metadata))
+  const initialSelections = resolveRequestSupplierRouteSelections([{ metadata }], suppliers)
+  const [names, setNames] = useState<string[]>(() => orderedNames(initialSelections.map((selection) => selection.name)))
+  const [notes, setNotes] = useState<Record<string, string>>(() => Object.fromEntries(initialSelections.filter((selection) => selection.note).map((selection) => [selection.name, selection.note])))
   const [manualName, setManualName] = useState("")
   const [supplierQuery, setSupplierQuery] = useState("")
   const [scope, setScope] = useState<"item" | "all">("item")
@@ -51,7 +43,8 @@ export function RequestSupplierRouteEditor({ requestId, itemId, itemIds, metadat
   }, [orderedSuppliers, supplierQuery])
   function addSupplier(name: string) {
     const cleanName = name.trim().replace(/\s+/g, " ")
-    if (!cleanName || names.some((entry) => entry.toLowerCase() === cleanName.toLowerCase())) return
+    const key = canonicalSupplierKey(cleanName)
+    if (!cleanName || !key || names.some((entry) => canonicalSupplierKey(entry) === key)) return
     setNames((current) => orderedNames([...current, cleanName]))
     setManualName("")
   }

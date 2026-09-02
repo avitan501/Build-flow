@@ -17,6 +17,7 @@ import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/b
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
 import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms"
+import { findCanonicalSupplier } from "@/lib/supplier-canonical"
 
 type PackageRoute = { id: string; department: string; supplier_id: string | null; status: string }
 type QuoteLine = { key: string; description: string; quantity: number; unit: string; unitPrice: number }
@@ -27,10 +28,8 @@ const actionClass = "inline-flex min-h-11 items-center justify-center gap-2 roun
 const supplierNameCollator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true })
 
 function resolvedRouteSupplierIds(routeSelections: RequestSupplierRouteSelection[], suppliers: SupplierRoutingOption[]) {
-  const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]))
-  const supplierByName = new Map(suppliers.map((supplier) => [supplier.name.trim().toLocaleLowerCase(), supplier]))
   return [...new Set(routeSelections.flatMap((selection) => {
-    const supplier = selection.supplierId ? supplierById.get(selection.supplierId) : supplierByName.get(selection.name.trim().toLocaleLowerCase())
+    const supplier = findCanonicalSupplier(suppliers, selection)
     return supplier ? [supplier.id] : []
   }))]
 }
@@ -157,9 +156,7 @@ export function RequestManagementPanel({
   const routeDepartment = departments.length === 1 ? departments[0] : departments.length > 1 ? "Multiple departments" : "Others"
   const availableSuppliers = useMemo(() => [...suppliers].sort((left, right) => supplierNameCollator.compare(left.name, right.name)), [suppliers])
   const routeMatches = useMemo(() => {
-    const supplierById = new Map(availableSuppliers.map((supplier) => [supplier.id, supplier]))
-    const supplierByName = new Map(availableSuppliers.map((supplier) => [supplier.name.trim().toLocaleLowerCase(), supplier]))
-    return routeSelections.map((selection) => ({ selection, supplier: (selection.supplierId ? supplierById.get(selection.supplierId) : undefined) ?? supplierByName.get(selection.name.trim().toLocaleLowerCase()) ?? null }))
+    return routeSelections.map((selection) => ({ selection, supplier: findCanonicalSupplier(availableSuppliers, selection) ?? null }))
   }, [availableSuppliers, routeSelections])
   const routeSupplierNames = useMemo(() => [...new Set(routeMatches.map(({ selection, supplier }) => supplier?.name || selection.name))].sort(supplierNameCollator.compare), [routeMatches])
   const routeContactSupplierIds = useMemo(() => [...new Set(routeMatches.flatMap(({ supplier }) => supplier ? [supplier.id] : []))], [routeMatches])

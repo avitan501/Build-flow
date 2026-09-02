@@ -6,6 +6,11 @@ import type {
 } from "@/lib/supplier-partners/catalog";
 import type { SupplierRoutingOption } from "@/lib/shop-qualification";
 import {
+  canonicalSupplierKey,
+  mergeCanonicalSupplierSourceRefs,
+  type CanonicalSupplierSourceRef,
+} from "@/lib/supplier-canonical";
+import {
   SUPPLIER_PROGRAM_CHANNELS,
   type SupplierProgramChannel,
 } from "@/lib/supplier-program-channels";
@@ -40,25 +45,10 @@ export type SupplierNetworkRow = {
   hidden: boolean;
   priority: boolean;
   directorySupplierId: string | null;
+  directorySupplierIds: string[];
   directoryTrustLevel: SupplierRoutingOption["trustLevel"] | null;
+  sourceRefs: CanonicalSupplierSourceRef[];
 };
-
-function canonicalName(value: string) {
-  const normalized = value
-    .toLowerCase()
-    .replace(/the home depot pro|the home depot/g, "home depot")
-    .replace(/lowe['’]s creator|lowe['’]s pro/g, "lowes")
-    .replace(/build\.com \/ ferguson home|ferguson home/g, "ferguson")
-    .replace(/abc supply api \/ integration partnership/g, "abc supply")
-    .replace(
-      /builders firstsource \/ mybldr \(trade account\)/g,
-      "builders firstsource",
-    )
-    .replace(/u\.s\. electrical services \/ lade/g, "us electrical services")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-  return normalized;
-}
 
 function addChannel(
   channels: Set<SupplierNetworkChannel>,
@@ -189,7 +179,92 @@ function mergeRow(
     hidden: current.hidden || incoming.hidden,
     priority: current.priority || incoming.priority,
     directorySupplierId: current.directorySupplierId || incoming.directorySupplierId,
+    directorySupplierIds: Array.from(
+      new Set([...current.directorySupplierIds, ...incoming.directorySupplierIds]),
+    ),
     directoryTrustLevel: current.directoryTrustLevel || incoming.directoryTrustLevel,
+    sourceRefs: mergeCanonicalSupplierSourceRefs(
+      current.sourceRefs,
+      incoming.sourceRefs,
+    ),
+  });
+}
+
+function directoryDepartments(supplier: SupplierRoutingOption) {
+  return supplier.catalogDepartments?.join(", ") || supplier.materials || "";
+}
+
+function directoryTrustRank(
+  level: SupplierRoutingOption["trustLevel"] | null,
+) {
+  if (level === "preferred") return 5;
+  if (level === "trusted") return 4;
+  if (level === "verified") return 3;
+  if (level === "first-time") return 2;
+  if (level === "not-reviewed") return 1;
+  return 0;
+}
+
+function mergeDirectoryRow(
+  rows: Map<string, SupplierNetworkRow>,
+  supplier: SupplierRoutingOption,
+) {
+  const key = canonicalSupplierKey(supplier.name);
+  const verified = ["verified", "trusted", "preferred"].includes(
+    supplier.trustLevel ?? "not-reviewed",
+  );
+  const previous = rows.get(key);
+  const departments = directoryDepartments(supplier);
+  const phone = supplier.phone || supplier.whatsapp || "";
+  const incoming: SupplierNetworkRow = {
+    key,
+    name: supplier.name,
+    departments: departments || previous?.departments || "Departments not set",
+    channels: supplier.programChannels ?? [],
+    stage: verified ? "approved" : "contact",
+    sources: ["Nearby"],
+    ask:
+      supplier.deliveryNotes ||
+      previous?.ask ||
+      "Confirm products, pricing, availability, and delivery terms.",
+    phone,
+    phoneHref: phone ? `tel:${phone.replace(/[^0-9+]/g, "")}` : "",
+    link: supplier.portalUrl || "",
+    status: verified ? "Approved" : "In Progress",
+    note: supplier.notes || "",
+    hidden: false,
+    priority: supplier.trustLevel === "preferred",
+    directorySupplierId: supplier.id,
+    directorySupplierIds: [supplier.id],
+    directoryTrustLevel: supplier.trustLevel ?? "not-reviewed",
+    sourceRefs: [{ source: "directory", sourceId: supplier.id }],
+  };
+  mergeRow(rows, incoming);
+
+  // The saved directory is the operational authority for editable identity,
+  // contact, trust, and delivery fields. Research sources remain attached as
+  // provenance and fill only fields the directory has not captured yet.
+  const merged = rows.get(key);
+  if (!merged) return;
+  const shouldBecomePrimary =
+    !previous?.directorySupplierId ||
+    directoryTrustRank(supplier.trustLevel) >
+      directoryTrustRank(previous.directoryTrustLevel);
+  if (!shouldBecomePrimary) return;
+  rows.set(key, {
+    ...merged,
+    name: supplier.name,
+    departments: departments || merged.departments,
+    ask: supplier.deliveryNotes || merged.ask,
+    phone: phone || merged.phone,
+    phoneHref: phone ? `tel:${phone.replace(/[^0-9+]/g, "")}` : merged.phoneHref,
+    link: supplier.portalUrl || merged.link,
+    status: incoming.status,
+    note: supplier.notes || merged.note,
+    stage: incoming.stage,
+    priority: incoming.priority || merged.priority,
+    directorySupplierId: supplier.id,
+    directoryTrustLevel: supplier.trustLevel ?? "not-reviewed",
   });
 }
 
@@ -203,7 +278,7 @@ export function buildSupplierNetwork(input: {
   const rows = new Map<string, SupplierNetworkRow>();
 
   for (const target of AFFILIATE_CALL_TARGETS) {
-    const key = canonicalName(target.trackerName || target.company);
+    const key = canonicalSupplierKey(target.trackerName || target.company);
     mergeRow(rows, {
       key,
       name: target.company,
@@ -222,12 +297,16 @@ export function buildSupplierNetwork(input: {
       hidden: false,
       priority: false,
       directorySupplierId: null,
+      directorySupplierIds: [],
       directoryTrustLevel: null,
+      sourceRefs: [
+        { source: "researched_target", sourceId: String(target.rank) },
+      ],
     });
   }
 
   for (const program of input.programs ?? []) {
-    const key = canonicalName(program.supplier_name);
+    const key = canonicalSupplierKey(program.supplier_name);
     mergeRow(rows, {
       key,
       name: program.supplier_name,
@@ -244,7 +323,11 @@ export function buildSupplierNetwork(input: {
       hidden: false,
       priority: false,
       directorySupplierId: null,
+      directorySupplierIds: [],
       directoryTrustLevel: null,
+      sourceRefs: [
+        { source: "affiliate_program", sourceId: program.id },
+      ],
     });
   }
 
@@ -252,7 +335,7 @@ export function buildSupplierNetwork(input: {
     const itemProgress = input.progress[partner.slug];
     if (!itemProgress?.important) continue;
     const text = `${partner.programFinding} ${partner.bestAsk} ${partner.publishedBenefit}`;
-    const key = canonicalName(partner.company);
+    const key = canonicalSupplierKey(partner.company);
     mergeRow(rows, {
       key,
       name: partner.company,
@@ -275,31 +358,14 @@ export function buildSupplierNetwork(input: {
       hidden: false,
       priority: false,
       directorySupplierId: null,
+      directorySupplierIds: [],
       directoryTrustLevel: null,
+      sourceRefs: [{ source: "show_partner", sourceId: partner.slug }],
     });
   }
 
   for (const supplier of input.directorySuppliers ?? []) {
-    const key = canonicalName(supplier.name);
-    const verified = ["verified", "trusted", "preferred"].includes(supplier.trustLevel ?? "not-reviewed");
-    mergeRow(rows, {
-      key,
-      name: supplier.name,
-      departments: supplier.catalogDepartments?.join(", ") || supplier.materials || "Departments not set",
-      channels: supplier.programChannels ?? [],
-      stage: verified ? "approved" : "contact",
-      sources: ["Nearby"],
-      ask: supplier.deliveryNotes || "Confirm products, pricing, availability, and delivery terms.",
-      phone: supplier.phone || supplier.whatsapp || "",
-      phoneHref: supplier.phone || supplier.whatsapp ? `tel:${(supplier.phone || supplier.whatsapp || "").replace(/[^0-9+]/g, "")}` : "",
-      link: supplier.portalUrl || "",
-      status: verified ? "Approved" : "In Progress",
-      note: supplier.notes || "",
-      hidden: false,
-      priority: supplier.trustLevel === "preferred",
-      directorySupplierId: supplier.id,
-      directoryTrustLevel: supplier.trustLevel ?? "not-reviewed",
-    });
+    mergeDirectoryRow(rows, supplier);
   }
 
   for (const [key, override] of Object.entries(input.overrides ?? {})) {

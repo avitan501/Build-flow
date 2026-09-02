@@ -77,7 +77,7 @@ test("Carlos supplier workspace uses staff access and persistent manager goals",
   expect(networkActions).toContain("hidden: z.boolean()");
   expect(networkActions).toContain("priority: z.boolean()");
   expect(networkActions).toContain('stage === "approved"');
-  expect(networkActions).toContain('trustLevel: parsed.data.stage === "approved" ? "verified"');
+  expect(networkActions).toContain('parsed.data.priority ? "preferred" : "verified"');
   expect(networkActions).toContain('supabase.rpc("staff_upsert_supplier_directory_entry"');
   expect(networkPage).toContain('supabase.rpc("staff_load_supplier_directory_snapshot")');
   expect(networkPage).toContain("directorySuppliers:");
