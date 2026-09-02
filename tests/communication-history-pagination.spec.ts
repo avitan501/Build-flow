@@ -45,11 +45,22 @@ test("history endpoint is manager-only and pages every supported channel", async
   expect(route).toContain("getSessionWithProfile");
   expect(route).toContain("managerCapabilities");
   expect(route).toContain("if (!access.customers)");
+  expect(route).toContain("}, session.supabase)");
   expect(route).toContain('new Set(["all", "call", "sms", "whatsapp", "email"])');
   expect(route).toContain('"Cache-Control", "private, no-store"');
   expect(loader).toContain('reader.rpc("staff_load_aura_communication_history_page"');
+  expect(loader).not.toContain("createAdminClient");
   expect(loader).toContain("normalized.length > pageSize");
   expect(loader).toContain("communications[communications.length - 1]");
+});
+
+test("authenticated managers can read history without a Vercel service-role dependency", async () => {
+  const migration = await read("supabase/migrations/20260902193000_secure_communication_history_and_request_idempotency.sql");
+
+  expect(migration).toContain("private.has_staff_capability('customers')");
+  expect(migration).toContain("private.is_admin()");
+  expect(migration).toContain("to authenticated, service_role");
+  expect(migration).toContain("security definer");
 });
 
 test("communications page starts small and preserves an exact thread deep link", async () => {
@@ -86,6 +97,8 @@ test("incremental history leaves live delta polling in place", async () => {
   expect(inbox).toContain("Beginning of conversation");
   expect(updates).toContain("loadAuraCommunicationLinks");
   expect(updates).toContain("linksByCommunication");
+  expect(updates).toContain("session.supabase");
+  expect(updates).not.toContain("createAdminClient");
 });
 
 test("existing customer, supplier, SMS, WhatsApp, and call links carry an exact thread identity", async () => {

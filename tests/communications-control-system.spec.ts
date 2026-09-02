@@ -54,6 +54,8 @@ test("conversation assignment keeps contact notes and uses structured links", ()
   const broker = readFileSync(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8");
   const inbox = readFileSync(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8");
   const page = readFileSync(path.join(root, "app/admin/communications/page.tsx"), "utf8");
+  const history = readFileSync(path.join(root, "lib/aura/communication-history.ts"), "utf8");
+  const historyMigration = readFileSync(path.join(root, "supabase/migrations/20260902193000_secure_communication_history_and_request_idempotency.sql"), "utf8");
   const emailLinks = readFileSync(path.join(root, "lib/aura/email-links.ts"), "utf8");
 
   const action = actions.slice(
@@ -69,9 +71,10 @@ test("conversation assignment keeps contact notes and uses structured links", ()
   expect(action).not.toContain("Avantia link:");
   expect(brokerAction).not.toContain("Avantia link:");
   expect(brokerAction).not.toContain("notes =");
-  expect(page).toContain("loadAuraCommunicationLinks(normalizedCommunications.map((communication) => communication.id), supabase)");
-  expect(page).toContain("loadAuraDashboard(supabase, supabase)");
+  expect(page).toContain("loadCommunicationHistoryPage");
   expect(page).not.toContain("createAdminClient");
+  expect(history).toContain('reader.rpc("staff_load_aura_communication_history_page"');
+  expect(historyMigration).toContain("aura_communication_links as link");
   expect(emailLinks).toContain("reader ?? createAdminClient()");
   expect(inbox).toContain("communication.links?.find");
 });

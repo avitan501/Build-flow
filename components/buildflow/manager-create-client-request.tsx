@@ -46,6 +46,7 @@ export function ManagerCreateClientRequest({
   const [showNotes, setShowNotes] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [idempotencyKey, setIdempotencyKey] = useState("")
   const addingClient = clientSelection === "new"
   const hasMaterialInput = attachments.length > 0 || (entryMode === "paste" ? freeText.trim().length >= 3 : lines.some((line) => line.name.trim()))
 
@@ -94,6 +95,7 @@ export function ManagerCreateClientRequest({
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
+            idempotencyKey: idempotencyKey || crypto.randomUUID(),
             customerId: addingClient ? undefined : clientSelection,
             newClient: addingClient ? newClient : undefined,
             department,
@@ -120,7 +122,7 @@ export function ManagerCreateClientRequest({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} aria-label="Add new request" title="Add new request" className={iconOnly ? "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#0071e3] text-white hover:bg-[#0066cc]" : compact ? "inline-flex min-h-9 items-center gap-1.5 rounded-md bg-[#0071e3] px-3 text-xs font-semibold text-white" : "inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white shadow-sm"}>
+      <button type="button" onClick={() => { setIdempotencyKey(crypto.randomUUID()); setOpen(true) }} aria-label="Add new request" title="Add new request" className={iconOnly ? "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#0071e3] text-white hover:bg-[#0066cc]" : compact ? "inline-flex min-h-9 items-center gap-1.5 rounded-md bg-[#0071e3] px-3 text-xs font-semibold text-white" : "inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-semibold text-white shadow-sm"}>
         <Plus className="h-4 w-4" />{iconOnly ? null : compact ? "Add New" : "Create request for client"}
       </button>
 

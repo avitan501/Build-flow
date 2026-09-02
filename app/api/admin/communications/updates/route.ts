@@ -4,7 +4,6 @@ import { getSessionWithProfile } from "@/lib/auth";
 import { normalizeAuraCommunications } from "@/lib/aura/dashboard";
 import { loadAuraCommunicationLinks } from "@/lib/aura/email-links";
 import { managerCapabilities } from "@/lib/owner-identity";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,7 +18,7 @@ function safeCursor(value: string | null) {
 export async function GET(request: Request) {
   const startedAt = performance.now();
   const session = await getSessionWithProfile();
-  if (!session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session.user || !session.supabase) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const access = managerCapabilities({
     email: session.user.email || session.profile?.email,
     role: session.profile?.role,
@@ -31,8 +30,7 @@ export async function GET(request: Request) {
   const cursor = safeCursor(new URL(request.url).searchParams.get("after"));
   if (!cursor) return NextResponse.json({ error: "Invalid cursor" }, { status: 400 });
 
-  const admin = createAdminClient();
-  const { data, error } = await admin
+  const { data, error } = await session.supabase
     .from("aura_communications")
     .select("id, contact_id, provider, channel, direction, counterparty_phone, counterparty_email, subject, body, summary, transcript, next_steps, media, status, duration_seconds, occurred_at, last_event_at, mailbox_address, message_id, in_reply_to, read_at")
     .gt("last_event_at", cursor)
@@ -46,7 +44,7 @@ export async function GET(request: Request) {
     );
 
   const normalized = normalizeAuraCommunications(data);
-  const links = await loadAuraCommunicationLinks(normalized.map((communication) => communication.id), admin);
+  const links = await loadAuraCommunicationLinks(normalized.map((communication) => communication.id), session.supabase);
   const linksByCommunication = new Map<string, typeof links>();
   for (const link of links)
     linksByCommunication.set(link.communication_id, [...(linksByCommunication.get(link.communication_id) ?? []), link]);

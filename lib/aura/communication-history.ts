@@ -11,7 +11,6 @@ import {
   parseCommunicationHistoryCursor,
 } from "@/lib/aura/communication-history-cursor";
 import { normalizeAuraEmail, normalizeAuraPhone } from "@/lib/aura/identity";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 export const COMMUNICATION_HISTORY_PAGE_SIZE = 80;
 
@@ -29,7 +28,7 @@ export async function loadCommunicationHistoryPage(input: {
   phone?: string | null;
   email?: string | null;
   query?: string | null;
-}, reader: SupabaseClient = createAdminClient()): Promise<CommunicationHistoryPage> {
+}, reader: SupabaseClient): Promise<CommunicationHistoryPage> {
   const parsedCursor = input.cursor ? parseCommunicationHistoryCursor(input.cursor) : null;
   if (input.cursor && !parsedCursor) throw new Error("invalid_communication_history_cursor");
   const channel = input.channel && HISTORY_CHANNELS.has(input.channel) ? input.channel : null;

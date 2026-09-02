@@ -66,11 +66,11 @@ export default async function CommunicationsPage({
   const exactEmail = normalizeAuraEmail(exactThread)
   const historyPromise = access.customers
     ? Promise.all([
-        loadCommunicationHistoryPage({ pageSize: COMMUNICATION_HISTORY_PAGE_SIZE }),
+        loadCommunicationHistoryPage({ pageSize: COMMUNICATION_HISTORY_PAGE_SIZE }, supabase),
         exactPhone || exactEmail
-          ? loadCommunicationHistoryPage({ pageSize: 60, phone: exactPhone, email: exactEmail })
+          ? loadCommunicationHistoryPage({ pageSize: 60, phone: exactPhone, email: exactEmail }, supabase)
           : requestedSearch?.trim()
-            ? loadCommunicationHistoryPage({ pageSize: 60, query: requestedSearch })
+            ? loadCommunicationHistoryPage({ pageSize: 60, query: requestedSearch }, supabase)
             : Promise.resolve(null),
       ])
     : Promise.resolve(null)

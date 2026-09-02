@@ -320,6 +320,7 @@ export async function updateCustomerContact(
 }
 
 export async function createRequestForClientAction(input: {
+  idempotencyKey?: string;
   customerId?: string;
   newClient?: ManagerNewClientInput;
   department: string;
@@ -393,7 +394,9 @@ export async function createRequestForClientAction(input: {
   const requestDetails = [freeText, notes ? `Additional notes:\n${notes}` : ""].filter(Boolean).join("\n\n").slice(0, 4000);
   const storedLines = freeText || !lines.length ? [{ name: "Free-text material list", quantity: 1, unit: "request" }] : lines;
   const requestTitle = input.title?.trim().slice(0, 180) || (department ? `${department} request` : "Material request");
-  const { data: requestId, error: requestError } = await supabase.rpc("staff_create_client_request", {
+  const idempotencyKey = validUuid(input.idempotencyKey || "") ? input.idempotencyKey!.trim() : randomUUID();
+  const { data: requestId, error: requestError } = await supabase.rpc("staff_create_client_request_once", {
+    p_idempotency_key: idempotencyKey,
     p_customer_id: customerId,
     p_department: storedDepartment,
     p_title: requestTitle,

@@ -15,7 +15,7 @@ const VALID_CHANNELS = new Set(["all", "call", "sms", "whatsapp", "email"]);
 export async function GET(request: Request) {
   const startedAt = performance.now();
   const session = await getSessionWithProfile();
-  if (!session.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session.user || !session.supabase) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const access = managerCapabilities({
     email: session.user.email || session.profile?.email,
     role: session.profile?.role,
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
       phone: parameters.get("phone"),
       email: parameters.get("email"),
       query: parameters.get("q"),
-    });
+    }, session.supabase);
     const response = NextResponse.json(page);
     response.headers.set("Cache-Control", "private, no-store");
     response.headers.set("Server-Timing", `communications-history;dur=${Math.round(performance.now() - startedAt)}`);
