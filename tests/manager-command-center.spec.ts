@@ -104,14 +104,17 @@ test("approved staff use a compact manager workspace without owner-only controls
 })
 
 test("communication records are linked to customers and visible in the customer directory", async () => {
-  const [page, action, customerPage] = await Promise.all([
+  const [page, action, customerPage, history] = await Promise.all([
     readFile(path.join(root, "app/admin/communications/page.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/communications/actions.ts"), "utf8"),
     readFile(path.join(root, "app/admin/users/page.tsx"), "utf8"),
+    readFile(path.join(root, "lib/aura/communication-history.ts"), "utf8"),
   ])
 
   expect(page).toContain("UnifiedCommunicationInbox")
-  expect(page).toContain("loadAuraCommunicationLinks")
+  expect(page).toContain("loadCommunicationHistoryPage")
+  expect(history).toContain("staff_load_aura_communication_history_page")
+  expect(history).toContain("normalizeAuraCommunications")
   expect(action).toContain("requireManagerPortalProfile")
   expect(action).toContain('eq("id", clientId)')
   expect(action).toContain("serializeCommunicationLog")
