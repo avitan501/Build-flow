@@ -888,13 +888,14 @@ export async function saveCommunicationLogAction(input: {
     return { ok: false, error: "Choose a client and add a short summary." };
   const client = await supabase
     .from("profiles")
-    .select("id,full_name,email")
+    .select("id,full_name,email,phone")
     .eq("id", clientId)
     .eq("role", "client")
     .maybeSingle<{
       id: string;
       full_name: string | null;
       email: string | null;
+      phone: string | null;
     }>();
   if (!client.data)
     return { ok: false, error: "The selected client could not be found." };
@@ -927,6 +928,20 @@ export async function saveCommunicationLogAction(input: {
       ok: false,
       error: "The communication could not be added to the client log.",
     };
+  await supabase.from("manager_staff_activity_events").insert({
+    user_id: user.id,
+    event_type: "communication_sent",
+    page_path: "/admin/communications",
+    page_label: "Communications",
+    metadata: {
+      channel: input.channel,
+      direction: input.direction,
+      recipient: String(client.data.phone || client.data.email || "").slice(0, 320),
+      label: clientName,
+      outcome: input.direction === "inbound" ? "received" : "completed",
+      duration_seconds: 0,
+    },
+  });
   revalidatePath("/admin/communications");
   return { ok: true };
 }

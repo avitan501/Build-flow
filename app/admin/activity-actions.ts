@@ -26,16 +26,41 @@ export async function recordEmployeeActivityAction(pathInput: string, labelInput
   return { ok: true as const }
 }
 
-export async function recordCommunicationActivityAction(channelInput: string) {
+export type CommunicationActivityInput = {
+  channel: "call" | "sms" | "whatsapp" | "email" | "message"
+  recipient?: string
+  label?: string
+  requestId?: string
+  requestLabel?: string
+  outcome?: "sent" | "completed" | "failed" | "no_answer" | "opened_on_device" | "provider_unconfirmed"
+  durationSeconds?: number
+}
+
+export async function recordCommunicationActivityAction(input: string | CommunicationActivityInput) {
   const { supabase, user, access } = await requireManagerPortalProfile()
   if (!access.customers) return { ok: false as const }
-  const channel = ["call", "sms", "whatsapp", "email"].includes(channelInput) ? channelInput : "message"
+  const source: Omit<Partial<CommunicationActivityInput>, "channel"> & { channel: string } = typeof input === "string" ? { channel: input } : input
+  const channel = ["call", "sms", "whatsapp", "email"].includes(source.channel) ? source.channel : "message"
+  const recipient = String(source.recipient || "").trim().slice(0, 320)
+  const label = String(source.label || recipient || "Contact").trim().slice(0, 160)
+  const requestId = String(source.requestId || "").trim().slice(0, 80)
+  const request = String(source.requestLabel || "").trim().slice(0, 160)
+  const outcome = String(source.outcome || (channel === "call" ? "completed" : "sent")).trim().slice(0, 40)
+  const durationSeconds = Number(source.durationSeconds)
   const { error } = await supabase.from("manager_staff_activity_events").insert({
     user_id: user.id,
     event_type: "communication_sent",
     page_path: "/admin/communications",
     page_label: "Communications",
-    metadata: { channel },
+    metadata: {
+      channel,
+      ...(recipient ? { recipient } : {}),
+      ...(label ? { label } : {}),
+      ...(requestId ? { request_id: requestId } : {}),
+      ...(request ? { request } : {}),
+      outcome,
+      duration_seconds: Number.isFinite(durationSeconds) && durationSeconds >= 0 ? Math.round(durationSeconds) : 0,
+    },
   })
   return { ok: !error as boolean }
 }

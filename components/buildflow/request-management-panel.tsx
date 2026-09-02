@@ -335,7 +335,7 @@ export function RequestManagementPanel({
     startTransition(async () => {
       setFeedback("")
       if (!attachment) {
-        const result = await sendAuraMessageAction({ channel: "sms", recipient: client.phone, message: clientMessage })
+        const result = await sendAuraMessageAction({ channel: "sms", recipient: client.phone, recipientLabel: client.name, message: clientMessage, materialRequestId: requestId, materialRequestTitle: requestTitle })
         setFeedbackError(!result.ok)
         setFeedback(result.ok ? `Text sent directly to ${client.phone} from Q U O.` : result.error)
         if (result.ok) {
@@ -369,7 +369,7 @@ export function RequestManagementPanel({
   function sendClientWhatsApp() {
     startTransition(async () => {
       setFeedback("")
-      const result = await sendAuraMessageAction({ channel: "whatsapp", recipient: client.phone, message: clientMessage })
+      const result = await sendAuraMessageAction({ channel: "whatsapp", recipient: client.phone, recipientLabel: client.name, message: clientMessage, materialRequestId: requestId, materialRequestTitle: requestTitle })
       setFeedbackError(!result.ok)
       setFeedback(result.ok ? `WhatsApp message sent to ${client.phone}.` : result.error)
       if (result.ok) {

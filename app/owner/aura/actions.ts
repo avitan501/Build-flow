@@ -72,9 +72,46 @@ function whatsappSendError(error: unknown) {
   return "WhatsApp could not deliver this message. Confirm that the business number is connected and try again.";
 }
 
+async function recordAuraCommunicationActivity(
+  supabase: Awaited<ReturnType<typeof requireManagerPortalProfile>>["supabase"],
+  userId: string,
+  input: {
+    channel: AuraMessageChannel | "call";
+    recipient: string;
+    label?: string;
+    requestId?: string;
+    requestLabel?: string;
+    outcome: "sent" | "failed" | "provider_unconfirmed";
+    startedAt: number;
+    subject?: string;
+  },
+) {
+  try {
+    await supabase.from("manager_staff_activity_events").insert({
+      user_id: userId,
+      event_type: "communication_sent",
+      page_path: "/admin/communications",
+      page_label: "Communications",
+      metadata: {
+        channel: input.channel,
+        recipient: input.recipient.slice(0, 320),
+        label: String(input.label || input.recipient || "Contact").trim().slice(0, 160),
+        ...(input.requestId ? { request_id: input.requestId.slice(0, 80) } : {}),
+        ...(input.requestLabel ? { request: input.requestLabel.trim().slice(0, 160) } : {}),
+        ...(input.subject ? { subject: input.subject.trim().slice(0, 160) } : {}),
+        outcome: input.outcome,
+        duration_ms: Math.max(0, Date.now() - input.startedAt),
+      },
+    });
+  } catch {
+    // Communication delivery must not fail because its private activity receipt could not be stored.
+  }
+}
+
 export async function sendAuraMessageAction(input: {
   channel: AuraMessageChannel;
   recipient: string;
+  recipientLabel?: string;
   subject?: string;
   message: string;
   supplierId?: string;
@@ -106,6 +143,9 @@ export async function sendAuraMessageAction(input: {
       error: `Keep the ${channel === "email" ? "email" : "message"} under ${messageLimit.toLocaleString("en-US")} characters.`,
     };
 
+  const startedAt = Date.now();
+  const activityRecipient = email || phone || input.recipient.trim();
+  const activityLabel = input.recipientLabel || input.supplierName || activityRecipient;
   try {
     let externalId = "";
     if (channel === "sms") {
@@ -180,23 +220,44 @@ export async function sendAuraMessageAction(input: {
     } else {
       return { ok: false, error: "Choose SMS, WhatsApp, or email." };
     }
-    if (!externalId)
+    if (!externalId) {
+      await recordAuraCommunicationActivity(supabase, user.id, {
+        channel,
+        recipient: activityRecipient,
+        label: activityLabel,
+        requestId: input.materialRequestId,
+        requestLabel: input.materialRequestTitle,
+        outcome: "provider_unconfirmed",
+        startedAt,
+      });
       return {
         ok: false,
         error: "The provider did not confirm this message. Check the conversation before trying again.",
       };
-    await supabase.from("manager_staff_activity_events").insert({
-      user_id: user.id,
-      event_type: "communication_sent",
-      page_path: "/admin/communications",
-      page_label: "Communications",
-      metadata: { channel },
+    }
+    await recordAuraCommunicationActivity(supabase, user.id, {
+      channel,
+      recipient: activityRecipient,
+      label: activityLabel,
+      requestId: input.materialRequestId,
+      requestLabel: input.materialRequestTitle,
+      outcome: "sent",
+      startedAt,
     });
     revalidatePath("/owner/aura");
     revalidatePath("/admin/communications");
     revalidatePath("/admin/users");
     return { ok: true, externalId, occurredAt: new Date().toISOString() };
   } catch (error) {
+    await recordAuraCommunicationActivity(supabase, user.id, {
+      channel,
+      recipient: activityRecipient,
+      label: activityLabel,
+      requestId: input.materialRequestId,
+      requestLabel: input.materialRequestTitle,
+      outcome: "failed",
+      startedAt,
+    });
     const channelName =
       channel === "sms"
         ? "Q U O"
@@ -385,7 +446,7 @@ export async function sendAuraVideoAction(input: {
   recipientName?: string;
   videoId: string;
 }): Promise<SendAuraVideoResult> {
-  const { supabase, access } = await requireManagerPortalProfile();
+  const { supabase, user, access } = await requireManagerPortalProfile();
   if (!access.customers)
     return { ok: false, error: "Customer communication access is required." };
   const phone = normalizeAuraPhone(input.recipient);
@@ -396,6 +457,7 @@ export async function sendAuraVideoAction(input: {
 
   const mediaUrl = new URL(video.path, PRODUCTION_SITE_ORIGIN).toString();
   const caption = buildAuraShareVideoCaption(video, input.recipientName);
+  const startedAt = Date.now();
   try {
     await invokeMessagingBroker(supabase, {
       action: "send_whatsapp",
@@ -404,11 +466,28 @@ export async function sendAuraVideoAction(input: {
       mediaUrl,
     });
   } catch (error) {
+    await recordAuraCommunicationActivity(supabase, user.id, {
+      channel: "whatsapp",
+      recipient: phone,
+      label: input.recipientName || phone,
+      subject: video.title,
+      outcome: "failed",
+      startedAt,
+    });
     return {
       ok: false,
       error: whatsappSendError(error),
     };
   }
+
+  await recordAuraCommunicationActivity(supabase, user.id, {
+    channel: "whatsapp",
+    recipient: phone,
+    label: input.recipientName || phone,
+    subject: video.title,
+    outcome: "sent",
+    startedAt,
+  });
 
   revalidatePath("/owner/aura");
   revalidatePath("/admin/communications");

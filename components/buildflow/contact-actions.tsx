@@ -6,6 +6,7 @@ import { useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction, sendAuraVideoAction } from "@/app/owner/aura/actions"
+import { recordCommunicationActivityAction } from "@/app/admin/activity-actions"
 import { normalizeAuraPhone } from "@/lib/aura/identity"
 import { auraShareVideos, buildAuraShareVideoCaption, type AuraShareVideoId } from "@/lib/aura/share-videos"
 
@@ -118,7 +119,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
         return
       }
       const recipient = channel === "email" ? email || "" : normalizedPhone
-      const result = await sendAuraMessageAction({ channel, recipient, subject, message })
+      const result = await sendAuraMessageAction({ channel, recipient, recipientLabel: name, subject, message })
       if (!result.ok) { setFeedback(result.error); return }
       resetComposer()
       router.refresh()
@@ -143,7 +144,7 @@ export function ContactActions({ name, phone, email, senderName = "Avantia Build
     <div className="relative flex flex-wrap items-center gap-1" aria-label={`Contact ${name}`}>
       <button type="button" disabled={!normalizedPhone && !email} onClick={() => { setContactMenuOpen((open) => !open); setVideoMenuOpen(false) }} aria-expanded={contactMenuOpen} aria-haspopup="menu" aria-label={`Contact ${name}`} title="Contact" className={`${buttonClass} w-10 gap-0.5 text-[#0066cc]`}><ContactRound className="h-4 w-4" /><ChevronDown className="h-3 w-3" /></button>
       {contactMenuOpen ? <div role="menu" className="absolute right-0 top-11 z-40 w-52 overflow-hidden rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
-        <a href={normalizedPhone ? callHref(normalizedPhone) : undefined} aria-disabled={!normalizedPhone} onClick={() => setContactMenuOpen(false)} className={`flex min-h-10 items-center gap-3 rounded-md px-3 text-sm font-semibold hover:bg-slate-50 ${normalizedPhone ? "text-slate-800" : "pointer-events-none opacity-35"}`}><Phone className="h-4 w-4 text-[#0066cc]" />Call</a>
+        <a href={normalizedPhone ? callHref(normalizedPhone) : undefined} aria-disabled={!normalizedPhone} onClick={() => { setContactMenuOpen(false); if (normalizedPhone) void recordCommunicationActivityAction({ channel: "call", recipient: normalizedPhone, label: name, outcome: "opened_on_device", durationSeconds: 0 }) }} className={`flex min-h-10 items-center gap-3 rounded-md px-3 text-sm font-semibold hover:bg-slate-50 ${normalizedPhone ? "text-slate-800" : "pointer-events-none opacity-35"}`}><Phone className="h-4 w-4 text-[#0066cc]" />Call</a>
         <button type="button" disabled={!normalizedPhone && !email} onClick={() => openComposer()} className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-35"><Send className="h-4 w-4 text-[#0066cc]" />Send a Message</button>
         <button type="button" disabled={!normalizedPhone} onClick={() => openComposer("whatsapp")} className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-35"><MessageCircle className="h-4 w-4 text-emerald-600" />Send WhatsApp</button>
         <button type="button" disabled={!normalizedPhone || pending} onClick={() => { setContactMenuOpen(false); setVideoMenuOpen(true) }} className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-35"><Video className="h-4 w-4 text-[#0066cc]" />Send a Video</button>

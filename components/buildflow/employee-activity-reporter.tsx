@@ -7,22 +7,7 @@ import { useEffect } from "react"
 import { recordEmployeeActivityAction } from "@/app/admin/activity-actions"
 import { captureAvantiaEvent } from "@/lib/analytics/posthog-client"
 import { analyticsArea, analyticsRouteContext } from "@/lib/analytics/route-context"
-
-const labels: Record<string, string> = {
-  "/admin/build-map": "Dashboard",
-  "/admin/users": "Customers",
-  "/admin/vendors": "Suppliers",
-  "/admin/supplier-quotes": "Supplier quotes",
-  "/admin/catalog": "Material catalog",
-  "/admin/quote-comparison": "Quote comparison",
-  "/admin/communications": "Communications",
-  "/admin/daily-summary": "Daily summary",
-}
-
-function pageLabel(path: string) {
-  const entry = Object.entries(labels).find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))
-  return entry?.[1] ?? "Manager portal"
-}
+import { managerActivityPageLabel } from "@/lib/manager-staff-activity"
 
 export function EmployeeActivityReporter({ owner, compact = false }: { owner: boolean; compact?: boolean }) {
   const pathname = usePathname()
@@ -36,7 +21,7 @@ export function EmployeeActivityReporter({ owner, compact = false }: { owner: bo
         area: analyticsArea(context.route),
         actor_type: "staff",
       })
-      void recordEmployeeActivityAction(pathname, pageLabel(pathname))
+      void recordEmployeeActivityAction(pathname, managerActivityPageLabel(pathname))
     }
     report()
     const timer = window.setInterval(report, 60_000)

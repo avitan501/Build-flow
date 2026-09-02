@@ -241,7 +241,8 @@ export function AuraCommunicationWorkspace({
         if (attachmentInputRef.current) attachmentInputRef.current.value = "";
         return;
       }
-      const result = await sendAuraMessageAction({ channel: messageChannel, recipient, subject, message });
+      const recipientLabel = activeRecipients.find((item) => item.id === selectedRecipientId)?.label || recipient;
+      const result = await sendAuraMessageAction({ channel: messageChannel, recipient, recipientLabel, subject, message });
       if (!result.ok) {
         setFeedback({ tone: "error", text: result.error });
         return;

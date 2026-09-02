@@ -12,6 +12,8 @@ type CallStatus = "idle" | "connecting" | "ringing" | "active" | "ended" | "erro
 export function TwoChatSoftphone({ open, phone, name, onClose }: { open: boolean; phone: string; name: string; onClose: () => void }) {
   const deviceRef = useRef<Device | null>(null)
   const callRef = useRef<Call | null>(null)
+  const connectedAtRef = useRef<number | null>(null)
+  const activityRecordedRef = useRef(false)
   const [status, setStatus] = useState<CallStatus>("idle")
   const [muted, setMuted] = useState(false)
   const [error, setError] = useState("")
@@ -19,9 +21,19 @@ export function TwoChatSoftphone({ open, phone, name, onClose }: { open: boolean
 
   useEffect(() => () => { callRef.current?.disconnect().catch(() => undefined); deviceRef.current?.destroy() }, [])
 
+  function recordCallActivity(outcome: "completed" | "failed" | "no_answer") {
+    if (activityRecordedRef.current) return
+    activityRecordedRef.current = true
+    const connectedAt = connectedAtRef.current
+    const durationSeconds = connectedAt ? Math.max(0, Math.round((Date.now() - connectedAt) / 1000)) : 0
+    void recordCommunicationActivityAction({ channel: "call", recipient: phone, label: name, outcome, durationSeconds })
+  }
+
   function startCall() {
     setError("")
     setStatus("connecting")
+    connectedAtRef.current = null
+    activityRecordedRef.current = false
     startTransition(async () => {
       const result = await getTwoChatVoiceTokenAction()
       if (!result.ok) { setStatus("error"); setError(result.error); return }
@@ -30,15 +42,16 @@ export function TwoChatSoftphone({ open, phone, name, onClose }: { open: boolean
         const { Device: VoiceDevice } = await import("@2chat/voice-sdk")
         const device = new VoiceDevice({ token: result.token, logLevel: "error" })
         deviceRef.current = device
-        device.on("error", (event) => { setStatus("error"); setError(event.message) })
+        device.on("error", (event) => { setStatus("error"); setError(event.message); recordCallActivity("failed") })
         await device.register()
         const call = await device.connect({ to: phone, from: result.from })
         callRef.current = call
         call.on("ringing", () => setStatus("ringing"))
-        call.on("accepted", () => { setStatus("active"); void recordCommunicationActivityAction("call") })
-        call.on("disconnect", () => { setStatus("ended"); callRef.current = null })
-        call.on("error", (event) => { setStatus("error"); setError(event.message) })
+        call.on("accepted", () => { connectedAtRef.current = Date.now(); setStatus("active") })
+        call.on("disconnect", () => { recordCallActivity(connectedAtRef.current ? "completed" : "no_answer"); setStatus("ended"); callRef.current = null })
+        call.on("error", (event) => { recordCallActivity("failed"); setStatus("error"); setError(event.message) })
       } catch (callError) {
+        recordCallActivity("failed")
         setStatus("error")
         setError(callError instanceof Error ? callError.message : "The browser call could not start.")
       }
@@ -47,6 +60,7 @@ export function TwoChatSoftphone({ open, phone, name, onClose }: { open: boolean
 
   async function endCall() {
     await callRef.current?.disconnect().catch(() => undefined)
+    recordCallActivity(connectedAtRef.current ? "completed" : "no_answer")
     callRef.current = null
     deviceRef.current?.destroy()
     deviceRef.current = null
