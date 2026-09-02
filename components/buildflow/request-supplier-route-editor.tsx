@@ -1,11 +1,13 @@
 "use client"
 
-import { Check, Plus, Route, X } from "lucide-react"
+import { Plus, Route, X } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useMemo, useState, useTransition } from "react"
+import { useMemo, useState } from "react"
 
 import { saveRequestItemSupplierRouteAction } from "@/app/owner/materials/requests/actions"
+import { AutosaveStatus } from "@/components/buildflow/autosave-status"
 import { canonicalSupplierKey, resolveRequestSupplierRouteSelections } from "@/lib/supplier-canonical"
+import { useSequencedAutosave } from "@/lib/use-sequenced-autosave"
 
 export type RequestRouteSupplier = { id: string; name: string }
 
@@ -30,8 +32,6 @@ export function RequestSupplierRouteEditor({ requestId, itemId, itemIds, metadat
   const [supplierQuery, setSupplierQuery] = useState("")
   const [scope, setScope] = useState<"item" | "all">("item")
   const [open, setOpen] = useState(false)
-  const [feedback, setFeedback] = useState("")
-  const [pending, startTransition] = useTransition()
   const allTargetIds = useMemo(() => [...new Set((itemIds?.length ? itemIds : itemId ? [itemId] : []).filter(Boolean))], [itemId, itemIds])
   const itemTargetIds = useMemo(() => itemId ? [itemId] : allTargetIds, [allTargetIds, itemId])
   const canApplyToAll = allTargetIds.length > 1
@@ -41,28 +41,27 @@ export function RequestSupplierRouteEditor({ requestId, itemId, itemIds, metadat
     const query = supplierQuery.trim().toLocaleLowerCase()
     return query ? orderedSuppliers.filter((supplier) => supplier.name.toLocaleLowerCase().includes(query)) : orderedSuppliers
   }, [orderedSuppliers, supplierQuery])
+  const autosave = useSequencedAutosave<{ itemIds: string[]; supplierNames: string[]; supplierNotes: Record<string, string> }>({
+    save: (draft, version) => saveRequestItemSupplierRouteAction({ requestId, ...draft, version }),
+    onSaved: () => router.refresh(),
+  })
+
+  function queueRoute(nextNames: string[], nextNotes: Record<string, string>) {
+    setNames(nextNames)
+    setNotes(nextNotes)
+    autosave.queue({ itemIds: targetIds, supplierNames: nextNames, supplierNotes: nextNotes })
+  }
+
   function addSupplier(name: string) {
     const cleanName = name.trim().replace(/\s+/g, " ")
     const key = canonicalSupplierKey(cleanName)
     if (!cleanName || !key || names.some((entry) => canonicalSupplierKey(entry) === key)) return
-    setNames((current) => orderedNames([...current, cleanName]))
+    queueRoute(orderedNames([...names, cleanName]), notes)
     setManualName("")
   }
 
   function removeSupplier(name: string) {
-    setNames((current) => current.filter((entry) => entry !== name))
-    setNotes((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key !== name)))
-  }
-
-  function save() {
-    setFeedback("")
-    startTransition(async () => {
-      const result = await saveRequestItemSupplierRouteAction({ requestId, itemIds: targetIds, supplierNames: names, supplierNotes: notes })
-      if (!result.ok) { setFeedback(result.error); return }
-      setFeedback(scope === "all" && canApplyToAll ? "Saved for every item" : "Saved for this item")
-      setOpen(false)
-      router.refresh()
-    })
+    queueRoute(names.filter((entry) => entry !== name), Object.fromEntries(Object.entries(notes).filter(([key]) => key !== name)))
   }
 
   const label = names.length ? orderedNames(names).join(" · ") : "Choose supplier route"
@@ -74,10 +73,9 @@ export function RequestSupplierRouteEditor({ requestId, itemId, itemIds, metadat
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5"><input value={supplierQuery} onChange={(event) => setSupplierQuery(event.target.value)} placeholder="Find supplier A–Z" aria-label="Find supplier" className="h-9 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-[11px] font-semibold" /><span className="inline-flex h-9 items-center rounded-md bg-white px-2 text-[10px] font-bold text-slate-500">{names.length} selected</span></div>
       <fieldset className="max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-white" aria-label="Choose suppliers"><legend className="sr-only">Choose suppliers in alphabetical order</legend>{visibleSuppliers.length ? visibleSuppliers.map((supplier) => { const supplierKey = canonicalSupplierKey(supplier.name); const checked = names.some((name) => canonicalSupplierKey(name) === supplierKey); return <label key={supplier.id} className={`flex min-h-9 cursor-pointer items-center gap-2 border-b border-slate-100 px-2 text-[10px] font-semibold last:border-b-0 ${checked ? "bg-sky-50 text-sky-900" : "text-slate-700 hover:bg-slate-50"}`}><input type="checkbox" checked={checked} onChange={(event) => event.target.checked ? addSupplier(supplier.name) : removeSupplier(names.find((name) => canonicalSupplierKey(name) === supplierKey) ?? supplier.name)} className="h-4 w-4 rounded border-slate-300 accent-[#0071e3]" /><span className="truncate">{supplier.name}</span></label> }) : <p className="px-2 py-3 text-[10px] text-slate-500">No supplier found.</p>}</fieldset>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5"><input value={manualName} onChange={(event) => setManualName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addSupplier(manualName) } }} placeholder="Type another supplier" className="h-9 min-w-0 rounded-md border border-slate-300 px-2 text-[11px]" /><button type="button" onClick={() => addSupplier(manualName)} disabled={!manualName.trim()} className="inline-flex h-9 items-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-[10px] font-bold disabled:opacity-40"><Plus className="h-3 w-3" />Add</button></div>
-      {names.length ? <div className="grid max-h-64 gap-1.5 overflow-y-auto">{orderedNames(names).map((name) => <div key={name} className="grid grid-cols-[minmax(7rem,.7fr)_minmax(9rem,1fr)_2rem] items-center gap-1 rounded-md border border-slate-200 bg-white p-1"><span title={name} className="truncate px-1 text-[10px] font-bold text-slate-800">{name}</span><input value={notes[name] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [name]: event.target.value }))} maxLength={800} placeholder="Note for this supplier" className="h-8 min-w-0 rounded border border-slate-200 px-2 text-[10px]" /><button type="button" onClick={() => removeSupplier(name)} aria-label={`Remove ${name}`} className="inline-flex h-8 w-8 items-center justify-center rounded text-slate-400 hover:bg-rose-50 hover:text-rose-600"><X className="h-3.5 w-3.5" /></button></div>)}</div> : <p className="text-[10px] text-slate-500">Choose any suppliers needed.</p>}
+      {names.length ? <div className="grid max-h-64 gap-1.5 overflow-y-auto">{orderedNames(names).map((name) => <div key={name} className="grid grid-cols-[minmax(7rem,.7fr)_minmax(9rem,1fr)_2rem] items-center gap-1 rounded-md border border-slate-200 bg-white p-1"><span title={name} className="truncate px-1 text-[10px] font-bold text-slate-800">{name}</span><input value={notes[name] ?? ""} onChange={(event) => { const nextNotes = { ...notes, [name]: event.target.value }; queueRoute(names, nextNotes) }} maxLength={800} placeholder="Note for this supplier" className="h-8 min-w-0 rounded border border-slate-200 px-2 text-[10px]" /><button type="button" onClick={() => removeSupplier(name)} aria-label={`Remove ${name}`} className="inline-flex h-8 w-8 items-center justify-center rounded text-slate-400 hover:bg-rose-50 hover:text-rose-600"><X className="h-3.5 w-3.5" /></button></div>)}</div> : <p className="text-[10px] text-slate-500">Choose any suppliers needed.</p>}
       {scope === "all" && canApplyToAll ? <p className="rounded bg-amber-50 px-2 py-1.5 text-[9px] font-semibold text-amber-800">This replaces the supplier route on every item in this request.</p> : null}
-      <button type="button" onClick={save} disabled={pending || !targetIds.length} className="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-[#0071e3] px-3 text-[11px] font-bold text-white disabled:opacity-50"><Check className="h-3.5 w-3.5" />{pending ? "Saving…" : scope === "all" && canApplyToAll ? "Save for all items" : "Save for this item"}</button>
-      {feedback ? <p className={`text-[10px] font-bold ${feedback.startsWith("Saved") ? "text-emerald-700" : "text-rose-700"}`}>{feedback}</p> : null}
+      <AutosaveStatus status={autosave.status} error={autosave.error} retry={autosave.retry} />
     </div> : null}
     {!open && names.some((name) => notes[name]?.trim()) ? <div className="mt-1 grid gap-0.5">{names.filter((name) => notes[name]?.trim()).map((name) => <p key={name} title={notes[name]} className="line-clamp-1 cursor-help text-[9px] leading-4 text-slate-500"><strong>{name}:</strong> {notes[name]}</p>)}</div> : null}
   </div>

@@ -21,7 +21,6 @@ export type ExistingRequestUploadInput = { storagePath: string; filename: string
 
 export type RequestSupplierPlanInput = {
   requestId: string
-  managerNotes: string
   suppliers: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean }>
 }
 
@@ -68,7 +67,6 @@ export async function addRequestAttachmentsAction(input: { requestId: string; at
 
 export async function saveRequestSupplierPlanAction(input: RequestSupplierPlanInput) {
   const requestId = String(input.requestId || "").trim()
-  const managerNotes = String(input.managerNotes || "").trim().slice(0, 5000)
   if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false as const, error: "Request not found." }
   if (!Array.isArray(input.suppliers) || input.suppliers.length > 250) return { ok: false as const, error: "Choose fewer suppliers." }
 
@@ -84,8 +82,6 @@ export async function saveRequestSupplierPlanAction(input: RequestSupplierPlanIn
     .map((entry) => ({ supplierId: String(entry.supplierId || "").trim(), isRecommended: Boolean(entry.isRecommended), shouldContact: Boolean(entry.shouldContact) }))
     .filter((entry, index, all) => supplierById.has(entry.supplierId) && all.findIndex((candidate) => candidate.supplierId === entry.supplierId) === index)
 
-  const notesResult = await supabase.from("quote_requests").update({ manager_notes: managerNotes }).eq("id", requestId)
-  if (notesResult.error) return { ok: false as const, error: "The request notes could not be saved." }
   const selectedIds = rows.map((row) => row.supplierId)
   let removeQuery = supabase.from("quote_request_supplier_recommendations").delete().eq("request_id", requestId)
   if (selectedIds.length) removeQuery = removeQuery.not("supplier_id", "in", `(${selectedIds.map((id) => `"${id.replaceAll('"', '')}"`).join(",")})`)
@@ -106,6 +102,18 @@ export async function saveRequestSupplierPlanAction(input: RequestSupplierPlanIn
   }
   revalidatePath(`/owner/materials/requests/${requestId}`)
   return { ok: true as const }
+}
+
+export async function saveRequestManagerNotesAction(input: { requestId: string; managerNotes: string; version?: number }) {
+  const requestId = String(input.requestId || "").trim()
+  const managerNotes = String(input.managerNotes || "").trim().slice(0, 5000)
+  const version = Number.isSafeInteger(input.version) && Number(input.version) >= 0 ? Number(input.version) : 0
+  if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false as const, error: "Request not found.", version }
+  const { supabase } = await requireStaffProfile("customers")
+  const { data, error } = await supabase.from("quote_requests").update({ manager_notes: managerNotes, updated_at: new Date().toISOString() }).eq("id", requestId).select("id").maybeSingle<{ id: string }>()
+  if (error || !data) return { ok: false as const, error: "The request notes could not be saved.", version }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const, version }
 }
 
 export async function updateSmsRequestDraftAction(formData: FormData) {
@@ -298,6 +306,7 @@ export async function saveOriginalMaterialItemAction(input: {
   quantity: number
   unit: string
   details?: string
+  version?: number
 }) {
   const requestId = String(input.requestId || "").trim()
   const itemId = String(input.itemId || "").trim()
@@ -305,18 +314,19 @@ export async function saveOriginalMaterialItemAction(input: {
   const quantity = Number(input.quantity)
   const unit = String(input.unit || "").trim().replace(/\s+/g, " ").slice(0, 60)
   const details = String(input.details || "").trim().replace(/\s+/g, " ").slice(0, 1200)
-  if (!/^[0-9a-f-]{36}$/i.test(requestId) || (itemId && !/^[0-9a-f-]{36}$/i.test(itemId))) return { ok: false as const, error: "This request item could not be identified." }
-  if (!name || !Number.isFinite(quantity) || quantity <= 0 || !unit) return { ok: false as const, error: "Enter the item, quantity, and unit." }
+  const version = Number.isSafeInteger(input.version) && Number(input.version) >= 0 ? Number(input.version) : 0
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || (itemId && !/^[0-9a-f-]{36}$/i.test(itemId))) return { ok: false as const, error: "This request item could not be identified.", version }
+  if (!name || !Number.isFinite(quantity) || quantity <= 0 || !unit) return { ok: false as const, error: "Enter the item, quantity, and unit.", version }
 
   const { supabase, user } = await requireStaffProfile("customers")
   const { data: request } = await supabase.from("quote_requests").select("id,project_id,owner_id").eq("id", requestId).maybeSingle<{ id: string; project_id: string; owner_id: string }>()
-  if (!request) return { ok: false as const, error: "Request not found." }
+  if (!request) return { ok: false as const, error: "Request not found.", version }
 
   if (itemId) {
     const { data: current } = await supabase.from("quote_request_items").select("id,metadata").eq("id", itemId).eq("request_id", requestId).maybeSingle<{ id: string; metadata: Record<string, unknown> | null }>()
-    if (!current || current.metadata?.ai_organized === true) return { ok: false as const, error: "Only the original request can be edited here." }
+    if (!current || current.metadata?.ai_organized === true) return { ok: false as const, error: "Only the original request can be edited here.", version }
     const { error } = await supabase.from("quote_request_items").update({ name, quantity, unit, metadata: { ...(current.metadata ?? {}), request_details: details, manually_edited_at: new Date().toISOString(), manually_edited_by: user.id } }).eq("id", itemId).eq("request_id", requestId)
-    if (error) return { ok: false as const, error: "The original item could not be saved." }
+    if (error) return { ok: false as const, error: "The original item could not be saved.", version }
   } else {
     const { error } = await supabase.from("quote_request_items").insert({
       request_id: request.id,
@@ -330,10 +340,10 @@ export async function saveOriginalMaterialItemAction(input: {
       qualification_status: "not_required",
       metadata: { request_details: details, manually_added_at: new Date().toISOString(), manually_added_by: user.id },
     })
-    if (error) return { ok: false as const, error: "The new item could not be added." }
+    if (error) return { ok: false as const, error: "The new item could not be added.", version }
   }
   revalidatePath(`/owner/materials/requests/${requestId}`)
-  return { ok: true as const }
+  return { ok: true as const, version }
 }
 
 export async function saveRequestItemSupplierRouteAction(input: {
@@ -341,20 +351,22 @@ export async function saveRequestItemSupplierRouteAction(input: {
   itemIds: string[]
   supplierNames: string[]
   supplierNotes?: Record<string, string>
+  version?: number
 }) {
   const requestId = String(input.requestId || "").trim()
   const itemIds = Array.isArray(input.itemIds) ? [...new Set(input.itemIds.map((id) => String(id).trim()))].slice(0, 100) : []
   const requestedSupplierNames = Array.isArray(input.supplierNames) ? uniqueCanonicalSupplierNames(input.supplierNames) : []
-  if (JSON.stringify(requestedSupplierNames).length > 50_000) return { ok: false as const, error: "The supplier route is too large to save at once." }
+  const version = Number.isSafeInteger(input.version) && Number(input.version) >= 0 ? Number(input.version) : 0
+  if (JSON.stringify(requestedSupplierNames).length > 50_000) return { ok: false as const, error: "The supplier route is too large to save at once.", version }
   const rawNotes = input.supplierNotes && typeof input.supplierNotes === "object" && !Array.isArray(input.supplierNotes) ? input.supplierNotes : {}
   const notesByCanonicalKey = new Map<string, string>(Object.entries(rawNotes).map(([name, note]) => [canonicalSupplierKey(name), String(note || "").trim().slice(0, 800)] as const).filter(([key, note]) => Boolean(key && note)))
-  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !itemIds.length || itemIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) return { ok: false as const, error: "Choose at least one valid request item." }
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !itemIds.length || itemIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) return { ok: false as const, error: "Choose at least one valid request item.", version }
   const { supabase, user } = await requireStaffProfile("customers")
   const [{ data: items }, { data: supplierData }] = await Promise.all([
     supabase.from("quote_request_items").select("id,metadata").eq("request_id", requestId).in("id", itemIds).returns<Array<{ id: string; metadata: Record<string, unknown> | null }>>(),
     supabase.rpc("staff_load_catalog_suppliers"),
   ])
-  if (!items || items.length !== itemIds.length) return { ok: false as const, error: "One of the selected items is no longer available." }
+  if (!items || items.length !== itemIds.length) return { ok: false as const, error: "One of the selected items is no longer available.", version }
   const directory = Array.isArray(supplierData) ? supplierData as SupplierRoutingOption[] : []
   const routeSuppliers: SupplierRoutingOption[] = []
   for (const requestedName of requestedSupplierNames) {
@@ -389,7 +401,7 @@ export async function saveRequestItemSupplierRouteAction(input: {
         p_create: true,
       })
       if (supplierError || !persisted) {
-        return { ok: false as const, error: `Could not add ${requestedName} to the Supplier Directory. Open the directory and confirm this supplier first.` }
+        return { ok: false as const, error: `Could not add ${requestedName} to the Supplier Directory. Open the directory and confirm this supplier first.`, version }
       }
       supplier = persisted as SupplierRoutingOption
       directory.push(supplier)
@@ -399,12 +411,19 @@ export async function saveRequestItemSupplierRouteAction(input: {
   const supplierNames = routeSuppliers.map((supplier) => supplier.name)
   const supplierNotes = Object.fromEntries(routeSuppliers.map((supplier) => [supplier.name, notesByCanonicalKey.get(canonicalSupplierKey(supplier.name)) || ""]).filter(([, note]) => Boolean(note)))
   const supplierRouteEntries = routeSuppliers.map((supplier) => ({ supplier_id: supplier.id, name: supplier.name }))
-  const updates = await Promise.all(items.map((item) => supabase.from("quote_request_items").update({ metadata: { ...(item.metadata ?? {}), supplier_route_names: supplierNames, supplier_route_entries: supplierRouteEntries, supplier_route_notes: supplierNotes, supplier_route_note: null, supplier_route_updated_at: new Date().toISOString(), supplier_route_updated_by: user.id } }).eq("id", item.id).eq("request_id", requestId)))
-  if (updates.some((result) => result.error)) return { ok: false as const, error: "The supplier route could not be saved for every selected item." }
+  const { error } = await supabase.rpc("staff_save_request_item_supplier_routes", {
+    p_request_id: requestId,
+    p_item_ids: itemIds,
+    p_supplier_names: supplierNames,
+    p_supplier_route_entries: supplierRouteEntries,
+    p_supplier_notes: supplierNotes,
+    p_updated_by: user.id,
+  })
+  if (error) return { ok: false as const, error: "The supplier route could not be saved for every selected item.", version }
   revalidatePath(`/owner/materials/requests/${requestId}`)
   revalidatePath("/admin/vendors")
   revalidatePath("/admin/supplier-network")
-  return { ok: true as const }
+  return { ok: true as const, version }
 }
 
 export async function sendClientReplyAction(formData: FormData): Promise<ReplyResult> {

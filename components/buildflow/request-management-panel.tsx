@@ -7,7 +7,8 @@ import { createPortal } from "react-dom"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
 import { openRequestPricingComparisonAction } from "@/app/admin/supplier-quotes/actions"
-import { previewRequestClientQuoteAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestWorkflowStepAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
+import { previewRequestClientQuoteAction, saveRequestManagerNotesAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestWorkflowStepAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
+import { AutosaveStatus } from "@/components/buildflow/autosave-status"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
 import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
 import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
@@ -18,6 +19,7 @@ import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
 import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms"
 import { findCanonicalSupplier } from "@/lib/supplier-canonical"
+import { useSequencedAutosave } from "@/lib/use-sequenced-autosave"
 
 type PackageRoute = { id: string; department: string; supplier_id: string | null; status: string }
 type QuoteLine = { key: string; description: string; quantity: number; unit: string; unitPrice: number }
@@ -119,6 +121,9 @@ export function RequestManagementPanel({
   const [supplierIds, setSupplierIds] = useState<string[]>(() => [...new Set([...initialSupplierRecommendations.filter((entry) => entry.shouldContact).map((entry) => entry.supplierId), ...initialRouteSupplierIds])])
   const [recommendedSupplierIds, setRecommendedSupplierIds] = useState<string[]>(() => [...new Set([...initialSupplierRecommendations.filter((entry) => entry.isRecommended).map((entry) => entry.supplierId), ...initialRouteSupplierIds])])
   const [managerNotes, setManagerNotes] = useState(initialManagerNotes)
+  const notesAutosave = useSequencedAutosave<string>({
+    save: (value, version) => saveRequestManagerNotesAction({ requestId, managerNotes: value, version }),
+  })
   const [greeting, setGreeting] = useState<"hi" | "hello" | "morning" | "afternoon">("hi")
   const [replyBlock, setReplyBlock] = useState<string>(() => requestItems.some((item) => item.reviewReasons.length) ? "missing" : "received")
   const [replyNote, setReplyNote] = useState("")
@@ -313,15 +318,20 @@ export function RequestManagementPanel({
 
   async function saveSupplierPlan() {
     const chosen = new Set([...recommendedSupplierIds, ...supplierIds])
-    const result = await saveRequestSupplierPlanAction({ requestId, managerNotes, suppliers: [...chosen].map((supplierId) => ({ supplierId, isRecommended: recommendedSupplierIds.includes(supplierId), shouldContact: supplierIds.includes(supplierId) })) })
+    const result = await saveRequestSupplierPlanAction({ requestId, suppliers: [...chosen].map((supplierId) => ({ supplierId, isRecommended: recommendedSupplierIds.includes(supplierId), shouldContact: supplierIds.includes(supplierId) })) })
     setFeedbackError(!result.ok)
-    setFeedback(result.ok ? "Request notes and supplier choices saved." : result.error)
+    setFeedback(result.ok ? "Supplier choices saved." : result.error)
     return result.ok
   }
 
   function createSupplierRequest() {
     if (!supplierIds.length) return
     startTransition(async () => {
+      if (!await notesAutosave.flush()) {
+        setFeedbackError(true)
+        setFeedback("Save the request note before contacting suppliers.")
+        return
+      }
       if (!await saveSupplierPlan()) return
       const query = new URLSearchParams({ department: routeDepartment })
       supplierIds.forEach((supplierId) => query.append("supplier", supplierId))
@@ -489,7 +499,7 @@ export function RequestManagementPanel({
       <details open={currentStage === "pricing"} className={workflowStepCardClass()}>
         <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier pricing & comparison" detail={supplierQuoteCount ? `${supplierQuoteCount} quote${supplierQuoteCount === 1 ? "" : "s"} ready to compare` : packages.length ? `${packages.length} supplier request${packages.length === 1 ? "" : "s"} sent` : "Choose a route, contact suppliers, and add returned pricing"} status={pricingStatus} icon="pricing" />
         <div className="border-t border-slate-200 p-3">
-          <details className="mb-3 rounded-md border border-slate-200 bg-white"><summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-bold"><span>Request notes</span><span className="max-w-[60%] truncate font-normal text-slate-400">{managerNotes || "Add a note"}</span></summary><div className="grid gap-2 border-t border-slate-100 p-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"><textarea value={managerNotes} onChange={(event) => setManagerNotes(event.target.value)} rows={2} maxLength={5000} placeholder="Notes for this pricing request" className="resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-950" /><button type="button" onClick={() => startTransition(async () => { await saveSupplierPlan() })} disabled={pending} className="min-h-9 rounded-md bg-[#17304f] px-3 text-xs font-bold text-white disabled:opacity-50">Save notes</button></div></details>
+          <details className="mb-3 rounded-md border border-slate-200 bg-white"><summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-bold"><span>Request notes</span><span className="max-w-[60%] truncate font-normal text-slate-400">{managerNotes || "Add a note"}</span></summary><div className="grid gap-2 border-t border-slate-100 p-2"><textarea value={managerNotes} onChange={(event) => { const value = event.target.value; setManagerNotes(value); notesAutosave.queue(value) }} rows={2} maxLength={5000} placeholder="Notes for this pricing request" className="resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-950" /><AutosaveStatus status={notesAutosave.status} error={notesAutosave.error} retry={notesAutosave.retry} /></div></details>
           {routeSupplierNames.length ? <div className="mb-2 flex flex-wrap items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2 py-1.5"><span className="mr-1 text-[10px] font-black uppercase tracking-[.08em] text-sky-900">Suppliers from Step 1</span>{routeSupplierNames.map((name) => <span key={name} className="rounded bg-white px-2 py-1 text-[10px] font-bold text-slate-700 ring-1 ring-sky-100">{name}</span>)}</div> : null}
           <div className="mb-3 overflow-x-auto rounded-md border border-slate-200 bg-slate-100">
             <table className="w-full min-w-[42rem] table-fixed text-left text-[11px]"><thead className="text-[9px] font-bold uppercase tracking-[.08em] text-slate-500"><tr><th className="w-16 px-2 py-1.5">Qty</th><th className="px-2 py-1.5">Original</th><th className="px-2 py-1.5">AI request</th><th className="px-2 py-1.5">Supplier route &amp; note</th></tr></thead><tbody className="divide-y divide-slate-200 bg-slate-50">{pricingSummaryItems.slice(0, 8).map((item) => <tr key={item.id}><td className="px-2 py-1.5 font-bold">{requestItems.find((candidate) => candidate.id === item.id)?.quantity || "—"}</td><td title={item.original} className="truncate px-2 py-1.5 text-slate-500">{item.original}</td><td title={item.organized} className="truncate px-2 py-1.5 font-semibold">{item.organized}</td><td className="px-2 py-1.5"><RequestSupplierRouteEditor key={`${item.id}-${supplierRouteVersion(item.metadata)}`} requestId={requestId} itemId={item.id} metadata={item.metadata} suppliers={availableSuppliers} /></td></tr>)}</tbody></table>

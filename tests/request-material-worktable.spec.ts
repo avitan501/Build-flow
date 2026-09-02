@@ -4,6 +4,7 @@ import path from "node:path"
 import { expect, test } from "@playwright/test"
 
 import { comparisonItemForRequestSources } from "@/lib/request-worktable-matching"
+import { createAutosaveVersionGuard } from "@/lib/autosave-version"
 
 const root = process.cwd()
 const pagePath = path.join(root, "app/owner/materials/requests/[requestId]/page.tsx")
@@ -13,6 +14,10 @@ const documentActionsPath = path.join(root, "app/admin/documents/actions.ts")
 const migrationPath = path.join(root, "supabase/migrations/20260831154500_link_comparison_items_to_request_sources.sql")
 const managementPath = path.join(root, "components/buildflow/request-management-panel.tsx")
 const clientContactPath = path.join(root, "components/buildflow/request-client-contact.tsx")
+const routeEditorPath = path.join(root, "components/buildflow/request-supplier-route-editor.tsx")
+const originalEditorPath = path.join(root, "components/buildflow/original-request-item-editor.tsx")
+const autosaveHookPath = path.join(root, "lib/use-sequenced-autosave.ts")
+const routeAutosaveMigrationPath = path.join(root, "supabase/migrations/20260902223500_atomic_request_supplier_route_autosave.sql")
 
 async function source(filePath: string) {
   try {
@@ -132,7 +137,7 @@ test("supplier routes are alphabetical checklists with per-item or whole-request
   const [page, worktable, editor, management, actions] = await Promise.all([
     source(pagePath),
     source(worktablePath),
-    source(path.join(root, "components/buildflow/request-supplier-route-editor.tsx")),
+    source(routeEditorPath),
     source(managementPath),
     source(path.join(root, "app/owner/materials/requests/actions.ts")),
   ])
@@ -144,7 +149,7 @@ test("supplier routes are alphabetical checklists with per-item or whole-request
   expect(editor).toContain("This replaces the supplier route on every item in this request.")
   expect(worktable).toContain("itemIds={items.map")
   expect(worktable).toContain("orderedSuppliers.map")
-  expect(actions).toContain("supplier_route_notes")
+  expect(actions).toContain("p_supplier_notes: supplierNotes")
   expect(editor).toContain("canonicalSupplierKey(name) === supplierKey")
   expect(editor).toContain("Note for this supplier")
   expect(editor).toContain("Choose any suppliers needed")
@@ -156,8 +161,59 @@ test("supplier routes are alphabetical checklists with per-item or whole-request
   expect(management).toContain("supplierRouteVersion(item.metadata)")
   expect(worktable.match(/Route \{selectedRouteIds\.length\} selected/g)).toHaveLength(1)
   expect(actions).not.toContain("].slice(0, 12)")
-  expect(actions).toContain("supplier_route_notes: supplierNotes")
-  expect(actions).toContain("supplier_route_entries: supplierRouteEntries")
+  expect(actions).toContain("p_supplier_route_entries: supplierRouteEntries")
+  expect(actions).toContain('supabase.rpc("staff_save_request_item_supplier_routes"')
+})
+
+test("safe request text, notes, and routes autosave with stale-response protection and retry", async () => {
+  const [management, routeEditor, originalEditor, autosave] = await Promise.all([
+    source(managementPath),
+    source(routeEditorPath),
+    source(originalEditorPath),
+    source(autosaveHookPath),
+  ])
+
+  expect(management).toContain("saveRequestManagerNotesAction")
+  expect(management).toContain("notesAutosave.queue(value)")
+  expect(management).not.toContain(">Save notes</button>")
+  expect(routeEditor).toContain("autosave.queue")
+  expect(routeEditor).not.toContain("Save route")
+  expect(routeEditor).not.toContain("Apply to all items")
+  expect(originalEditor).toContain('mode === "edit" && valid(next)')
+  expect(originalEditor).toContain("autosave.queue(next)")
+  expect(originalEditor).toContain('mode === "add" ? <button')
+  expect(autosave).toContain("createAutosaveVersionGuard")
+  expect(autosave).toContain("isCurrent(version)")
+  expect(autosave).toContain("saveQueueRef.current.then")
+  expect(autosave).toContain("clearTimeout(timerRef.current)")
+  expect(autosave).toContain("retry")
+  expect(management).toContain("notesAutosave.flush()")
+})
+
+test("a completed autosave response can update the UI only while its version is latest", () => {
+  const versions = createAutosaveVersionGuard()
+  const first = versions.next()
+  const second = versions.next()
+
+  expect(versions.isCurrent(first)).toBe(false)
+  expect(versions.isCurrent(second)).toBe(true)
+  versions.invalidate()
+  expect(versions.isCurrent(second)).toBe(false)
+})
+
+test("bulk supplier route autosave is one authenticated database transaction", async () => {
+  const migration = await source(routeAutosaveMigrationPath)
+
+  expect(migration).toContain("staff_save_request_item_supplier_routes")
+  expect(migration).toContain("security invoker")
+  expect(migration).toContain("private.has_staff_capability('customers')")
+  expect(migration).toContain("id = any(p_item_ids)")
+  expect(migration).toContain("get diagnostics updated_count = row_count")
+  expect(migration).toContain("updated_count <> expected_count")
+  expect(migration).toContain("'supplier_route_entries', p_supplier_route_entries")
+  expect(migration).toContain("'supplier_route_notes', p_supplier_notes")
+  expect(migration).toContain("revoke all on function")
+  expect(migration).not.toContain("to anon")
 })
 
 test("client contact is available at the request header and does not consume step four", async () => {
