@@ -28,6 +28,7 @@ import {
   isObsoleteSelectionSubtotalWarning,
   managerDocumentReviewLineIncomplete,
 } from "@/lib/manager-document-validation";
+import { captureOperationalError } from "@/lib/monitoring/capture-operational-error";
 import {
   detectSupplierMatch,
   inferSupplierName,
@@ -139,6 +140,12 @@ async function runDocumentExtraction(
             requestId: null,
           };
     console.error("Protected document AI service unavailable", diagnostic);
+    await captureOperationalError(error, {
+      feature: "manager-documents",
+      operation: "extract-document",
+      provider: "supabase-edge-function",
+      safeCode: diagnostic.code,
+    });
     return { extraction: null, diagnostic };
   }
   return {
@@ -375,6 +382,12 @@ export async function prepareManagerDocumentUploadAction(input: {
     .createSignedUploadUrl(filePath);
   if (error || !data?.token) {
     console.error("Manager document signed upload preparation failed", error);
+    await captureOperationalError(error, {
+      feature: "manager-documents",
+      operation: "prepare-upload",
+      provider: "supabase-storage",
+      safeCode: "document-upload-prepare-failed",
+    });
     return {
       ok: false,
       error: "The private upload could not be prepared. Try again.",
@@ -418,6 +431,12 @@ export async function completeManagerDocumentUploadAction(input: {
     .download(input.filePath);
   if (error || !data) {
     console.error("Manager staged document download failed", error);
+    await captureOperationalError(error, {
+      feature: "manager-documents",
+      operation: "complete-upload",
+      provider: "supabase-storage",
+      safeCode: "staged-document-download-failed",
+    });
     return {
       ok: false,
       error: "The document did not finish uploading. Try again.",
@@ -551,6 +570,12 @@ export async function uploadManagerDocumentAction(
     .upload(filePath, bytes, { contentType: file.type, upsert: false });
   if (storageError) {
     console.error("Manager document upload failed", storageError);
+    await captureOperationalError(storageError, {
+      feature: "manager-documents",
+      operation: "store-original",
+      provider: "supabase-storage",
+      safeCode: "document-storage-failed",
+    });
     return {
       ok: false,
       error: "The original document could not be stored. Try again.",
@@ -636,6 +661,12 @@ export async function uploadManagerDocumentAction(
         };
     }
     console.error("Manager document record creation failed", insertError);
+    await captureOperationalError(insertError, {
+      feature: "manager-documents",
+      operation: "create-record",
+      provider: "supabase",
+      safeCode: "document-record-create-failed",
+    });
     return {
       ok: false,
       error: "The file uploaded, but its document record could not be created.",
@@ -741,6 +772,12 @@ export async function uploadManagerDocumentAction(
   );
   if (applyError) {
     console.error("Atomic manager document extraction failed", applyError);
+    await captureOperationalError(applyError, {
+      feature: "manager-documents",
+      operation: "save-extraction",
+      provider: "supabase",
+      safeCode: "document-extraction-save-failed",
+    });
     const note =
       "The original document is safe. AI read it, but the review could not be saved; use Re-read with AI.";
     await supabase
@@ -1182,7 +1219,15 @@ export async function retryManagerDocumentExtractionAction(
     .from(savedDocument.storage_bucket)
     .download(savedDocument.file_path);
   if (downloadError || !blob)
-    return retryFailure("The saved original could not be opened.");
+    {
+      await captureOperationalError(downloadError, {
+        feature: "manager-documents",
+        operation: "retry-download",
+        provider: "supabase-storage",
+        safeCode: "document-retry-download-failed",
+      });
+      return retryFailure("The saved original could not be opened.");
+    }
   const file = new File([blob], savedDocument.file_name, {
     type: savedDocument.mime_type,
   });
@@ -1250,6 +1295,12 @@ export async function retryManagerDocumentExtractionAction(
   );
   if (applyError) {
     console.error("Atomic document AI replacement failed", applyError);
+    await captureOperationalError(applyError, {
+      feature: "manager-documents",
+      operation: "replace-extraction",
+      provider: "supabase",
+      safeCode: "document-extraction-replace-failed",
+    });
     return retryFailure(
       "The new AI reading could not be saved. The previous review was preserved.",
     );

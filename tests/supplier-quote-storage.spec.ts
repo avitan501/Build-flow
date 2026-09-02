@@ -339,7 +339,9 @@ test("client material lists are organized securely in the background", async () 
   ]);
 
   expect(requestAction).toContain("organizeMaterialListAfterResponse");
-  expect(requestAction).toContain('functions.invoke("client-material-list-ai"');
+  expect(requestAction).toMatch(
+    /functions\.invoke\(\s*["']client-material-list-ai["']/,
+  );
   expect(publicIntake).toContain("EdgeRuntime.waitUntil");
   expect(aiFunction).toContain("openai_supplier_quote_api_key");
   expect(aiFunction).toContain('"gpt-5.6-sol"');
@@ -483,15 +485,18 @@ test("request workspace keeps pricing steps and makes client contact globally av
   expect(status).toContain("Supplier pricing");
   expect(status).toContain("Client approval");
   expect(status).toContain("Payment & delivery");
-  expect(management).toContain("step={3}");
-  expect(management).toContain("Find Supplier");
-  expect(management).toContain("Recommended suppliers");
+  expect(management).toContain("step={2}");
+  expect(management).toContain("Contact Suppliers");
+  expect(management).toContain("Suppliers selected in Step 1");
+  expect(management).toContain("All Supplier Directory");
   expect(management).toContain("Contact {supplierIds.length");
   expect(management).toContain('id="supplier-routing"');
   expect(management).toContain(
-    "Supplier answers and prices will appear beside each item",
+    "Choose a route, contact suppliers, and add returned pricing",
   );
+  expect(management).toContain("Supplier route &amp; note");
   expect(management).not.toContain("step={4}");
+  expect(management).not.toContain("step={3}");
   expect(management).not.toContain('id="contact-client"');
   expect(management).toContain('id="request-client-contact-dialog"');
   expect(management).toContain("OPEN_REQUEST_CLIENT_CONTACT_EVENT");

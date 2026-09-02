@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getSessionWithProfile } from "@/lib/auth";
 import { DELIVERY_NOTES_PREFIX, DELIVERY_TASK_PREFIX, parseDeliveryRequest } from "@/lib/delivery-requests";
+import { captureOperationalError } from "@/lib/monitoring/capture-operational-error";
 import { managerCapabilities } from "@/lib/owner-identity";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createUberDirectDelivery, UberDirectError } from "@/lib/uber-direct";
@@ -97,10 +98,24 @@ export async function POST(request: Request) {
       notes: `${DELIVERY_NOTES_PREFIX}${JSON.stringify({ ...deliveryRequest, providerDelivery, status: "dispatched" })}`,
       status: "open",
     }).eq("id", task.id);
-    if (updateError) return NextResponse.json({ ok: false, error: "Uber accepted the delivery, but Avantia could not save its tracking record. Contact the owner immediately." }, { status: 500 });
+    if (updateError) {
+      await captureOperationalError(updateError, {
+        feature: "delivery",
+        operation: "save-tracking",
+        provider: "supabase",
+        safeCode: "uber-tracking-save-failed",
+      });
+      return NextResponse.json({ ok: false, error: "Uber accepted the delivery, but Avantia could not save its tracking record. Contact the owner immediately." }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true, delivery: providerDelivery }, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error) {
+    await captureOperationalError(error, {
+      feature: "delivery",
+      operation: "schedule-delivery",
+      provider: "uber-direct",
+      safeCode: error instanceof UberDirectError ? error.code : "uber-schedule-failed",
+    });
     if (error instanceof UberDirectError) {
       return NextResponse.json({ ok: false, code: error.code, error: error.message }, { status: 502 });
     }

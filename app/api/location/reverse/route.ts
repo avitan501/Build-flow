@@ -1,3 +1,8 @@
+import {
+  captureOperationalError,
+  shouldCaptureOperationalStatus,
+} from "@/lib/monitoring/capture-operational-error"
+
 type NominatimAddress = {
   house_number?: string
   road?: string
@@ -61,6 +66,14 @@ export async function GET(request: Request) {
     })
 
     if (!response.ok) {
+      if (shouldCaptureOperationalStatus(response.status)) {
+        await captureOperationalError(new Error("Address provider returned a server failure."), {
+          feature: "location",
+          operation: "reverse-geocode",
+          provider: "openstreetmap",
+          safeCode: `address-provider-${response.status}`,
+        })
+      }
       return Response.json({ error: "The address service is temporarily unavailable." }, { status: 502 })
     }
 
@@ -72,7 +85,13 @@ export async function GET(request: Request) {
     }
 
     return Response.json({ address })
-  } catch {
+  } catch (error) {
+    await captureOperationalError(error, {
+      feature: "location",
+      operation: "reverse-geocode",
+      provider: "openstreetmap",
+      safeCode: "address-provider-unreachable",
+    })
     return Response.json({ error: "The address service could not be reached." }, { status: 502 })
   }
 }

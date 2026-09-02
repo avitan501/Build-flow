@@ -1,4 +1,5 @@
 import { createRequestForClientAction, type CreateClientRequestResult } from "@/app/admin/users/actions"
+import { captureOperationalError } from "@/lib/monitoring/capture-operational-error"
 
 function sameOrigin(request: Request) {
   const origin = request.headers.get("origin")
@@ -27,6 +28,12 @@ export async function POST(request: Request) {
     const result = await createRequestForClientAction(input)
     return Response.json(result, { status: result.ok ? 201 : 400 })
   } catch (error) {
+    await captureOperationalError(error, {
+      feature: "client-requests",
+      operation: "create-request",
+      provider: "supabase",
+      safeCode: "client-request-create-failed",
+    })
     console.error("Manager client request creation failed", error)
     const result: CreateClientRequestResult = { ok: false, error: "The request could not be created. No order was submitted. Please try again." }
     return Response.json(result, { status: 500 })

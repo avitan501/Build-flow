@@ -7,6 +7,7 @@ import {
   normalizeMaterialCatalogDepartment,
   type CatalogSupplier,
 } from "@/lib/material-catalog";
+import { captureOperationalError } from "@/lib/monitoring/capture-operational-error";
 import { extractSupplierQuoteFile } from "@/lib/supplier-quote-extraction";
 import {
   detectSupplierMatch,
@@ -327,6 +328,12 @@ export async function uploadSupplierQuoteAction(
     });
   if (storageError) {
     console.error("Supplier quote upload failed", storageError);
+    await captureOperationalError(storageError, {
+      feature: "supplier-quotes",
+      operation: "store-original",
+      provider: "supabase-storage",
+      safeCode: "supplier-quote-storage-failed",
+    });
     return { ok: false, error: "The document could not be stored. Try again." };
   }
 
@@ -348,6 +355,12 @@ export async function uploadSupplierQuoteAction(
     } catch (error) {
       await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).remove([filePath]);
       console.error("Client request comparison creation failed", error);
+      await captureOperationalError(error, {
+        feature: "supplier-quotes",
+        operation: "create-comparison",
+        provider: "supabase",
+        safeCode: "supplier-comparison-create-failed",
+      });
       return {
         ok: false,
         error:
@@ -389,6 +402,12 @@ export async function uploadSupplierQuoteAction(
     if (createdComparison && comparisonId)
       await supabase.from("quote_comparisons").delete().eq("id", comparisonId);
     console.error("Supplier quote record creation failed", quoteError);
+    await captureOperationalError(quoteError, {
+      feature: "supplier-quotes",
+      operation: "create-record",
+      provider: "supabase",
+      safeCode: "supplier-quote-record-create-failed",
+    });
     return {
       ok: false,
       error:
@@ -409,6 +428,12 @@ export async function uploadSupplierQuoteAction(
     );
   } catch (error) {
     console.error("Supplier quote extraction failed", error);
+    await captureOperationalError(error, {
+      feature: "supplier-quotes",
+      operation: "extract-quote",
+      provider: "supabase-edge-function",
+      safeCode: "supplier-quote-extraction-failed",
+    });
     extraction = {
       text: "",
       items: [],
@@ -435,6 +460,12 @@ export async function uploadSupplierQuoteAction(
     );
     if (supplierError) {
       console.error("Supplier Directory lookup failed", supplierError);
+      await captureOperationalError(supplierError, {
+        feature: "supplier-quotes",
+        operation: "match-supplier",
+        provider: "supabase",
+        safeCode: "supplier-directory-lookup-failed",
+      });
       supplierDirectoryNote =
         "The supplier directory could not be checked automatically. Confirm the supplier during review.";
     } else {
@@ -482,8 +513,15 @@ export async function uploadSupplierQuoteAction(
       updated_by: user.id,
     })
     .eq("id", quoteId);
-  if (quoteUpdateError)
+  if (quoteUpdateError) {
     console.error("Supplier quote extraction update failed", quoteUpdateError);
+    await captureOperationalError(quoteUpdateError, {
+      feature: "supplier-quotes",
+      operation: "save-extraction",
+      provider: "supabase",
+      safeCode: "supplier-quote-update-failed",
+    });
+  }
 
   if (extraction.items.length) {
     const { error: itemError } = await supabase
@@ -503,8 +541,15 @@ export async function uploadSupplierQuoteAction(
           review_status: "needs_review",
         })),
       );
-    if (itemError)
+    if (itemError) {
       console.error("Supplier quote item creation failed", itemError);
+      await captureOperationalError(itemError, {
+        feature: "supplier-quotes",
+        operation: "save-items",
+        provider: "supabase",
+        safeCode: "supplier-quote-items-save-failed",
+      });
+    }
   }
 
   revalidatePath("/admin/supplier-quotes");

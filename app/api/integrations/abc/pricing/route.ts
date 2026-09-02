@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminProfile, requireSignedInProfile } from "@/lib/auth";
 import { callAbcBridge } from "@/lib/abc-supply/bridge";
+import { captureOperationalError } from "@/lib/monitoring/capture-operational-error";
 
 export const runtime = "nodejs";
 export const preferredRegion = "iad1";
@@ -17,10 +18,22 @@ export async function POST(request: Request) {
     }
     const payload = await callAbcBridge({ action: "pricing", pricing: { ...pricing, serviceFeePercent: 0 }, connectionMode: connectedUser ? "connected-user" : "automatic" });
     if (!payload?.pricing || typeof payload.pricing !== "object") {
+      await captureOperationalError(new Error("ABC returned no pricing."), {
+        feature: "supplier-pricing",
+        operation: "price-items",
+        provider: "abc-supply",
+        safeCode: "abc-pricing-empty",
+      });
       return NextResponse.json({ error: "ABC Sandbox did not return a pricing result." }, { status: 502, headers: { "Cache-Control": "no-store, max-age=0" } });
     }
     return NextResponse.json(payload, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error) {
+    await captureOperationalError(error, {
+      feature: "supplier-pricing",
+      operation: "price-items",
+      provider: "abc-supply",
+      safeCode: "abc-pricing-failed",
+    });
     return NextResponse.json({ error: error instanceof Error ? error.message : "ABC pricing request failed." }, { status: 502, headers: { "Cache-Control": "no-store, max-age=0" } });
   }
 }

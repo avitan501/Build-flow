@@ -14,6 +14,7 @@
     "@2chat/voice-sdk": "0.2.1",
     "@ai-sdk/openai": "4.0.42",
     "@napi-rs/canvas": "^1.0.0",
+    "@sentry/nextjs": "^10.73.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.1",
     "ai": "7.0.66",

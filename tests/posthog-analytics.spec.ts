@@ -67,7 +67,7 @@ test("PostHog is explicit, privacy-safe, and never records session contents", as
   expect(quoteForm).toContain("avantia_quote_request_completed");
   expect(activityReporter).toContain("avantia_staff_active");
   expect(`${instrumentation}\n${component}\n${quoteForm}\n${activityReporter}`).not.toMatch(
-    /captureAvantiaEvent\([^)]*(?:phone|email|full_name|message_text|file\.name)/s,
+    /captureAvantiaEvent\([^)]*(?:phone|email|full_name|message_text|file\.name)/,
   );
 });
 

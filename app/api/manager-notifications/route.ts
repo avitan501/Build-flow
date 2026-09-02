@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getSessionWithProfile } from "@/lib/auth";
+import {
+  captureOperationalError,
+  shouldCaptureOperationalStatus,
+} from "@/lib/monitoring/capture-operational-error";
 import { managerCapabilities } from "@/lib/owner-identity";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
@@ -57,7 +61,17 @@ export async function GET() {
   try {
     const { response, result } = await invokeNotificationService(session, { action: "status" });
     if (!response) return NextResponse.json(result, { status: 401 });
-    if (!response.ok) return NextResponse.json(result, { status: response.status });
+    if (!response.ok) {
+      if (shouldCaptureOperationalStatus(response.status)) {
+        await captureOperationalError(new Error("Notification service failed."), {
+          feature: "manager-notifications",
+          operation: "read-status",
+          provider: "supabase-edge-function",
+          safeCode: `notification-status-${response.status}`,
+        });
+      }
+      return NextResponse.json(result, { status: response.status });
+    }
     const { data: activity } = await session.supabase
       .from("aura_audit_log")
       .select("id,intake_id,action,created_at")
@@ -65,6 +79,12 @@ export async function GET() {
       .limit(50);
     return NextResponse.json({ ...result, activity: activity ?? [] }, { status: response.status });
   } catch (cause) {
+    await captureOperationalError(cause, {
+      feature: "manager-notifications",
+      operation: "read-status",
+      provider: "supabase-edge-function",
+      safeCode: "notification-status-failed",
+    });
     console.error("manager_push_status_failed", cause);
     return NextResponse.json({ error: "Notifications are not ready yet." }, { status: 503 });
   }
@@ -87,8 +107,22 @@ export async function POST(request: Request) {
       : parsed.data;
     const { response, result } = await invokeNotificationService(session, payload);
     if (!response) return NextResponse.json(result, { status: 401 });
+    if (shouldCaptureOperationalStatus(response.status)) {
+      await captureOperationalError(new Error("Notification service failed."), {
+        feature: "manager-notifications",
+        operation: parsed.data.action,
+        provider: "supabase-edge-function",
+        safeCode: `notification-action-${response.status}`,
+      });
+    }
     return NextResponse.json(result, { status: response.status });
   } catch (cause) {
+    await captureOperationalError(cause, {
+      feature: "manager-notifications",
+      operation: parsed.data.action,
+      provider: "supabase-edge-function",
+      safeCode: "notification-action-failed",
+    });
     console.error("manager_push_action_failed", { action: parsed.data.action, cause });
     return NextResponse.json({ error: "The notification setting could not be saved." }, { status: 500 });
   }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getSessionWithProfile } from "@/lib/auth";
+import { captureOperationalError } from "@/lib/monitoring/capture-operational-error";
 import { managerCapabilities } from "@/lib/owner-identity";
 
 export const runtime = "nodejs";
@@ -64,7 +65,13 @@ export async function POST(request: Request) {
       data,
       { headers: { "Cache-Control": "no-store, max-age=0" } },
     );
-  } catch {
+  } catch (error) {
+    await captureOperationalError(error, {
+      feature: "delivery",
+      operation: "request-quote",
+      provider: "uber-direct",
+      safeCode: "uber-quote-failed",
+    });
     return NextResponse.json({ ok: false, code: "quote_failed", error: "Uber could not return a live quote right now." }, { status: 502, headers: { "Cache-Control": "no-store, max-age=0" } });
   }
 }

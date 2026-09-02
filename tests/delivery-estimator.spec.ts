@@ -18,7 +18,7 @@ test("delivery planning math remains deterministic and itemized", () => {
   expect(estimate.mileageCharge).toBeGreaterThanOrEqual(0)
 })
 
-test("jobsite delivery is Manager-only and wired into AI Tools", async () => {
+test("jobsite delivery remains a protected Manager-only internal route", async () => {
   const [header, shopNavigation, aiTools, managerDashboard, page, actions, estimator, autocomplete, locationApi, quoteApi, scheduleApi, uberDirect, quoteFunction] = await Promise.all([
     readFile(path.join(root, "components/buildflow/mobile-client-header.tsx"), "utf8"),
     readFile(path.join(root, "lib/shop-navigation.ts"), "utf8"),
@@ -36,8 +36,8 @@ test("jobsite delivery is Manager-only and wired into AI Tools", async () => {
   ])
   expect(header).not.toContain('href: "/delivery"')
   expect(shopNavigation).not.toContain('label: "Jobsite Delivery"')
-  expect(aiTools).toContain('href: "/admin/ai-tools/jobsite-delivery"')
-  expect(managerDashboard).toContain('label: "Jobsite Delivery"')
+  expect(aiTools).not.toContain('href: "/admin/ai-tools/jobsite-delivery"')
+  expect(managerDashboard).not.toContain('label: "Jobsite Delivery"')
   expect(page).toContain("requireManagerPortalProfile")
   expect(page).toContain("loadDeliveryRequests(supabase)")
   expect(page).not.toContain("createAdminClient")
