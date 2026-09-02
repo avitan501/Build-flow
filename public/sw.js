@@ -33,6 +33,21 @@ self.addEventListener("notificationclick", (event) => {
     for (const client of windows) {
       if (client.url === destination.href && "focus" in client) return client.focus();
     }
+
+    // Mobile browsers often reuse an already-open PWA window for openWindow().
+    // Navigate that window explicitly so tapping a notification opens the exact
+    // request, quote, supplier, or communication referenced by the alert.
+    for (const client of windows) {
+      try {
+        const clientUrl = new URL(client.url);
+        if (clientUrl.origin !== destination.origin || !("navigate" in client)) continue;
+        const navigated = await client.navigate(destination.href);
+        if (navigated && "focus" in navigated) return navigated.focus();
+        if ("focus" in client) return client.focus();
+      } catch {
+        // If an existing window cannot navigate, open the exact link below.
+      }
+    }
     return clients.openWindow(destination.href);
   })());
 });

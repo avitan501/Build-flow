@@ -4,7 +4,6 @@ import { getSessionWithProfile } from "@/lib/auth";
 import { captureOperationalError } from "@/lib/monitoring/capture-operational-error";
 import { managerCapabilities } from "@/lib/owner-identity";
 import type { ClientQuoteAttachmentRecord } from "@/lib/quote-comparison";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -89,11 +88,11 @@ export async function POST(request: Request) {
 
     const { data: comparison } = await session.supabase.from("quote_comparisons").select("id").eq("id", comparisonId).maybeSingle<{ id: string }>();
     if (!comparison) return NextResponse.json({ ok: false, error: "The quote could not be found." }, { status: 404 });
-    const admin = createAdminClient();
+    const storage = session.supabase.storage.from(BUCKET);
 
     if (body.action === "prepare") {
       const filePath = `client-quotes/${comparisonId}/${session.user.id}/${crypto.randomUUID()}-${storageName(file.fileName)}`;
-      const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(filePath);
+      const { data, error } = await storage.createSignedUploadUrl(filePath);
       if (error || !data?.token) return NextResponse.json({ ok: false, error: "The private upload could not be prepared. Try again." }, { status: 503 });
       return NextResponse.json({ ok: true, data: { filePath, token: data.token } });
     }
@@ -102,7 +101,7 @@ export async function POST(request: Request) {
     const filePath = text(body.filePath, 1200);
     const expectedPrefix = `client-quotes/${comparisonId}/${session.user.id}/`;
     if (!filePath.startsWith(expectedPrefix) || filePath.includes("..")) return NextResponse.json({ ok: false, error: "The uploaded file could not be verified." }, { status: 400 });
-    const discard = () => admin.storage.from(BUCKET).remove([filePath]);
+    const discard = () => storage.remove([filePath]);
     const { data: existing, error: existingError } = await session.supabase
       .from("quote_comparison_client_attachments")
       .select("file_size")
@@ -122,7 +121,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Keep all attachments together under 25 MB." }, { status: 400 });
     }
 
-    const { data: info, error: infoError } = await admin.storage.from(BUCKET).info(filePath);
+    const { data: info, error: infoError } = await storage.info(filePath);
     if (infoError || !info || Number(info.size) !== file.fileSize || String(info.contentType || "").toLowerCase() !== file.fileType) {
       await discard();
       return NextResponse.json({ ok: false, error: "The uploaded file could not be verified. Try again." }, { status: 400 });
@@ -166,7 +165,7 @@ export async function DELETE(request: Request) {
     if (!data) return NextResponse.json({ ok: false, error: "The attachment could not be found." }, { status: 404 });
     const { error } = await session.supabase.from("quote_comparison_client_attachments").delete().eq("id", data.id).eq("comparison_id", comparisonId);
     if (error) return NextResponse.json({ ok: false, error: "The attachment could not be removed." }, { status: 503 });
-    const { error: storageError } = await createAdminClient().storage.from(BUCKET).remove([data.file_path]);
+    const { error: storageError } = await session.supabase.storage.from(BUCKET).remove([data.file_path]);
     if (storageError) console.error("Client quote attachment storage cleanup failed", storageError);
     return NextResponse.json({ ok: true, data: null });
   } catch (error) {

@@ -175,8 +175,9 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
 
 test("client quote attachments are private, bounded, and delivered with the branded PDF", async () => {
   const root = process.cwd();
-  const [migration, actions, uploadRoute, email, fallback, builder] = await Promise.all([
+  const [migration, storagePolicyMigration, actions, uploadRoute, email, fallback, builder] = await Promise.all([
     readFile(path.join(root, "supabase/migrations/20260902185436_add_client_quote_attachments.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260902192906_allow_staff_client_quote_attachments.sql"), "utf8"),
     readFile(path.join(root, "app/admin/quote-comparison/actions.ts"), "utf8"),
     readFile(path.join(root, "app/api/admin/quote-comparison/attachments/route.ts"), "utf8"),
     readFile(path.join(root, "lib/cart-submission-email.ts"), "utf8"),
@@ -188,6 +189,10 @@ test("client quote attachments are private, bounded, and delivered with the bran
   expect(migration).toContain("enable row level security");
   expect(migration).toContain("private.has_staff_capability('suppliers')");
   expect(migration).not.toMatch(/grant\s+.+\s+to\s+anon/i);
+  expect(storagePolicyMigration).toContain("client_quote_files_staff_insert");
+  expect(storagePolicyMigration).toContain("client_quote_files_staff_read");
+  expect(storagePolicyMigration).toContain("client_quote_files_staff_delete");
+  expect(storagePolicyMigration).toContain("private.has_staff_capability('suppliers')");
   expect(uploadRoute).toContain("createSignedUploadUrl(filePath)");
   expect(uploadRoute).toContain("MAX_FILES = 10");
   expect(uploadRoute).toContain('runtime = "nodejs"');

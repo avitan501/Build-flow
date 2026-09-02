@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { requireStaffProfile } from "@/lib/auth"
-import type { ShopQualificationSettings, SupplierContact, SupplierRelationshipUpdate, SupplierRoutingOption } from "@/lib/shop-qualification"
+import type { ShopQualificationSettings, SupplierContact, SupplierReferralSource, SupplierRelationshipUpdate, SupplierRoutingOption } from "@/lib/shop-qualification"
 import { SUPPLIER_PROGRAM_CHANNELS, type SupplierProgramChannel } from "@/lib/supplier-program-channels"
 
 const JOB_ADDRESS = "280 Lawrence Ave, Lawrence, NY 11559"
@@ -62,6 +62,7 @@ function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | nu
   const deliveryCharge = input.deliveryCharge == null ? null : Number(input.deliveryCharge)
   const allowedChannels = new Set<string>(SUPPLIER_PROGRAM_CHANNELS)
   const allowedContactMethods = new Set(["email", "phone", "whatsapp", "sms", "portal", "manual"])
+  const allowedReferralSources = new Set<SupplierReferralSource>(["friend", "client", "contractor", "supplier", "other"])
   const additionalContacts = (Array.isArray(input.additionalContacts) ? input.additionalContacts : []).flatMap((contact): SupplierContact[] => {
     if (!contact || typeof contact !== "object") return []
     const additionalEmail = String(contact.email || "").trim().toLowerCase().slice(0, 320)
@@ -98,6 +99,8 @@ function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | nu
     notes: input.notes?.trim().slice(0, 4_000) || "",
     programChannels: Array.isArray(input.programChannels) ? input.programChannels.filter((channel): channel is SupplierProgramChannel => typeof channel === "string" && allowedChannels.has(channel)) : [],
     trustLevel: input.trustLevel || "not-reviewed",
+    referredBySource: input.referredBySource && allowedReferralSources.has(input.referredBySource) ? input.referredBySource : "",
+    referredByName: input.referredByName?.trim().slice(0, 160) || "",
     catalogDepartments: Array.isArray(input.catalogDepartments) ? input.catalogDepartments.map((department) => department.trim().slice(0, 100)).filter(Boolean).slice(0, 20) : [],
     catalogEnabledDepartments: Array.isArray(input.catalogEnabledDepartments) ? input.catalogEnabledDepartments.map((department) => department.trim().slice(0, 100)).filter(Boolean).slice(0, 20) : [],
     address: input.address?.trim().slice(0, 500) || "",

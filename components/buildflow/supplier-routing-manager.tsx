@@ -38,6 +38,7 @@ import {
   type ServiceAssignmentTarget,
   type ShopQualificationSettings,
   type SupplierDeliveryMethod,
+  type SupplierReferralSource,
   type SupplierRoutingOption,
   type SupplierTrustLevel,
 } from "@/lib/shop-qualification"
@@ -74,6 +75,14 @@ const trustLevels: Array<{ value: SupplierTrustLevel; label: string }> = [
   { value: "trusted", label: "Trusted" },
   { value: "preferred", label: "Preferred" },
   { value: "do-not-use", label: "Do not use" },
+]
+const referralSources: Array<{ value: SupplierReferralSource | ""; label: string }> = [
+  { value: "", label: "Not set" },
+  { value: "friend", label: "Friend" },
+  { value: "client", label: "Client" },
+  { value: "contractor", label: "Contractor" },
+  { value: "supplier", label: "Supplier" },
+  { value: "other", label: "Other" },
 ]
 
 function loadSettings(initial?: ShopQualificationSettings | null): ShopQualificationSettings {
@@ -141,6 +150,10 @@ function supplierReachLine(supplier: SupplierRoutingOption) {
 
 function trustLevelLabel(level: SupplierTrustLevel | undefined) {
   return trustLevels.find((item) => item.value === level)?.label || "Not reviewed"
+}
+
+function directoryGroupForSupplier(supplier: Pick<SupplierRoutingOption, "trustLevel">): SupplierDirectoryGroup {
+  return ["verified", "trusted", "preferred"].includes(supplier.trustLevel ?? "not-reviewed") ? "verified" : "trial"
 }
 
 function selectedSettingFor(settings: ShopQualificationSettings, targetId: string, targets = SERVICE_ASSIGNMENT_TARGETS) {
@@ -228,6 +241,8 @@ export function SupplierRoutingManager({
     notes: "",
     programChannels: [] as SupplierProgramChannel[],
     trustLevel: "not-reviewed" as SupplierTrustLevel,
+    referredBySource: "" as SupplierReferralSource | "",
+    referredByName: "",
     catalogDepartments: [] as string[],
   })
   const [questionLabel, setQuestionLabel] = useState("")
@@ -451,6 +466,24 @@ export function SupplierRoutingManager({
       return
     }
 
+    const normalizedName = normalizeVendorIdentity(name)
+    const normalizedEmail = normalizeVendorIdentity(supplierDraft.email)
+    const existingSupplier = settings.suppliers.find((entry) => (
+      normalizeVendorIdentity(entry.name) === normalizedName
+      || Boolean(normalizedEmail && entry.email && normalizeVendorIdentity(entry.email) === normalizedEmail)
+    ))
+    if (existingSupplier) {
+      const group = directoryGroupForSupplier(existingSupplier)
+      setSelectedSupplierId(existingSupplier.id)
+      setSupplierDirectoryGroup(group)
+      setSupplierDirectorySearch("")
+      setSupplierAddOpen(false)
+      setSupplierProfileOpen(true)
+      setDirectoryNotice(`${existingSupplier.name} is already saved. Its supplier profile is open.`)
+      setSupplierFormError("")
+      return
+    }
+
     const supplier: SupplierRoutingOption = {
       id: makeId(name),
       name,
@@ -467,6 +500,8 @@ export function SupplierRoutingManager({
       notes: supplierDraft.notes.trim(),
       programChannels: supplierDraft.programChannels,
       trustLevel: supplierDraft.trustLevel,
+      referredBySource: supplierDraft.referredBySource,
+      referredByName: supplierDraft.referredByName.trim(),
       catalogDepartments: supplierDraft.catalogDepartments,
     }
 
@@ -484,10 +519,14 @@ export function SupplierRoutingManager({
           return next
         })
         setSelectedSupplierId(result.supplier.id)
+        const group = directoryGroupForSupplier(result.supplier)
+        setSupplierDirectoryGroup(group)
+        setSupplierDirectorySearch("")
         setActivePanel("suppliers")
         setSupplierDirty(false)
         setDirectorySaveState("saved")
-        setSupplierDraft({ name: "", contactName: "", email: "", phone: "", whatsapp: "", portalUrl: "", preferredDeliveryMethod: "manual", deliveryNotes: "", deliveryCharge: "", deliveryChargeNote: "", notes: "", programChannels: [], trustLevel: "not-reviewed", catalogDepartments: [] })
+        setDirectoryNotice(`${result.supplier.name} was saved in ${group === "verified" ? "Verified Suppliers" : "Trial Suppliers"}.`)
+        setSupplierDraft({ name: "", contactName: "", email: "", phone: "", whatsapp: "", portalUrl: "", preferredDeliveryMethod: "manual", deliveryNotes: "", deliveryCharge: "", deliveryChargeNote: "", notes: "", programChannels: [], trustLevel: "not-reviewed", referredBySource: "", referredByName: "", catalogDepartments: [] })
         setSupplierDraftNotesOpen(false)
         setSupplierAddOpen(false)
       } catch {
@@ -517,6 +556,10 @@ export function SupplierRoutingManager({
         })
         setSupplierDirty(false)
         setDirectorySaveState("saved")
+        const group = directoryGroupForSupplier(result.supplier)
+        setSupplierDirectoryGroup(group)
+        setSupplierDirectorySearch("")
+        setDirectoryNotice(`${result.supplier.name} was saved in ${group === "verified" ? "Verified Suppliers" : "Trial Suppliers"}.`)
       } catch {
         setSupplierFormError("The server could not save these changes. Please try again.")
       }
@@ -1352,6 +1395,18 @@ export function SupplierRoutingManager({
                           {trustLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
                         </select>
                       </label>
+                      <div className="grid gap-2 sm:grid-cols-[11rem_minmax(0,1fr)] sm:col-span-2">
+                        <label className="grid gap-1 text-sm font-semibold text-slate-900">
+                          Referred by
+                          <select value={selectedSupplier.referredBySource || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { referredBySource: event.target.value as SupplierReferralSource | "" })} className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium">
+                            {referralSources.map((source) => <option key={source.value || "none"} value={source.value}>{source.label}</option>)}
+                          </select>
+                        </label>
+                        <label className="grid gap-1 text-sm font-semibold text-slate-900">
+                          Referral name
+                          <input value={selectedSupplier.referredByName || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { referredByName: event.target.value })} placeholder={selectedSupplier.referredBySource === "friend" ? "Friend's name" : "Person or company name"} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
+                        </label>
+                      </div>
                       <details className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50">
                         <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between px-3 text-sm font-semibold text-slate-900"><span>Categories supplied</span><span className="text-xs font-normal text-slate-500">{selectedSupplier.catalogDepartments?.length ?? 0} selected · Open</span></summary>
                         <div className="border-t border-slate-200 p-3"><p className="text-xs text-slate-500">Requests and catalog pricing use these categories to find this supplier.</p>
@@ -1503,6 +1558,8 @@ export function SupplierRoutingManager({
                       <label className="grid gap-2 text-sm font-semibold text-slate-900">WhatsApp <input inputMode="tel" value={supplierDraft.whatsapp} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, whatsapp: event.target.value }))} placeholder="WhatsApp number" className="min-h-12 rounded-xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
                       <label className="grid gap-2 text-sm font-semibold text-slate-900">Best way to contact <select value={supplierDraft.preferredDeliveryMethod} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, preferredDeliveryMethod: event.target.value as SupplierDeliveryMethod }))} className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium">{deliveryMethods.map((method) => <option key={method} value={method}>{methodLabel(method)}</option>)}</select></label>
                       <label className="grid gap-2 text-sm font-semibold text-slate-900">Trust level <select value={supplierDraft.trustLevel} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, trustLevel: event.target.value as SupplierTrustLevel }))} className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium">{trustLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}</select></label>
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900">Referred by <select value={supplierDraft.referredBySource} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, referredBySource: event.target.value as SupplierReferralSource | "" }))} className="min-h-12 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium">{referralSources.map((source) => <option key={source.value || "none"} value={source.value}>{source.label}</option>)}</select></label>
+                      <label className="grid gap-2 text-sm font-semibold text-slate-900 sm:col-span-2">Referral name <span className="text-xs font-normal text-slate-500">Optional</span><input value={supplierDraft.referredByName} onChange={(event) => setSupplierDraft((draft) => ({ ...draft, referredByName: event.target.value }))} placeholder={supplierDraft.referredBySource === "friend" ? "Friend's name" : "Person or company name"} className="min-h-12 rounded-xl border border-slate-300 px-4 text-sm font-medium outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
                       <fieldset className="sm:col-span-2">
                         <legend className="text-sm font-semibold text-slate-900">Categories supplied</legend>
                         <p className="mt-1 text-xs font-normal text-slate-500">Choose every material department this supplier can quote.</p>

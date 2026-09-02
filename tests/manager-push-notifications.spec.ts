@@ -53,7 +53,8 @@ test("manager push notifications stay private and cover business events", async 
   expect(serviceWorker).toContain("self.skipWaiting()");
   expect(serviceWorker).toContain("self.clients.claim()");
   expect(serviceWorker).toContain("clients.openWindow(destination.href)");
-  expect(serviceWorker).not.toContain("client.navigate(");
+  expect(serviceWorker).toContain("client.navigate(destination.href)");
+  expect(serviceWorker).toContain("clientUrl.origin !== destination.origin");
   expect(migration).toContain("enable row level security");
   expect(migration).toContain("grant execute on function public.initialize_manager_web_push(text, text) to service_role");
   expect(migration).toContain("revoke all on function public.initialize_manager_web_push(text, text) from public, anon, authenticated");
@@ -83,9 +84,15 @@ test("manager notification feed is per user, queue-backed, and links to the exac
   expect(store).toContain('.from("manager_push_queue")');
   expect(store).toContain('.from("manager_notification_reads")');
   expect(communicationsPage).not.toContain("createAdminClient");
-  expect(communicationsPage).toContain("loadAuraDashboard(supabase, supabase)");
+  expect(communicationsPage).toContain("loadCommunicationHistoryPage");
+  expect(communicationsPage).toContain("loadManagerAura(supabase)");
   expect(communicationsPage).toContain("initialCommunicationId=");
+  expect(communicationsPage).toContain('.from("aura_communications")');
+  expect(communicationsPage).toContain('.eq("id", exactCommunicationId)');
   expect(inbox).toContain("communication.id === communicationId");
+  expect(inbox).toContain("Boolean(initialDraft || ((initialCommunicationId || initialThread) && initialCommunication))");
+  expect(inbox).toContain("exactCommunicationRef.current?.scrollIntoView");
+  expect(inbox).toContain('ring-2 ring-[#0071e3]');
 });
 
 test("publishes the installable web app and protected notification endpoint", async ({ request }) => {

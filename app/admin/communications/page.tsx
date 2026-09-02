@@ -3,7 +3,7 @@ import { after } from "next/server"
 import type { SmsReplyDraft } from "@/app/admin/communications/actions"
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { contactEmailForDisplay } from "@/lib/auth-phone"
-import { loadAuraConnectionStatus, type AuraContactRow } from "@/lib/aura/dashboard"
+import { loadAuraConnectionStatus, normalizeAuraCommunications, type AuraContactRow } from "@/lib/aura/dashboard"
 import {
   COMMUNICATION_HISTORY_PAGE_SIZE,
   loadCommunicationHistoryPage,
@@ -62,6 +62,7 @@ export default async function CommunicationsPage({
   const { supabase, access } = await requireManagerPortalProfile()
   if (access.customers) after(() => syncRecentTwilioWhatsAppMessages().catch(() => null))
   const exactThread = String(requestedThread || "").trim().slice(0, 160)
+  const exactCommunicationId = String(requestedCommunication || "").trim().slice(0, 64)
   const exactPhone = normalizeAuraPhone(exactThread)
   const exactEmail = normalizeAuraEmail(exactThread)
   const historyPromise = access.customers
@@ -74,7 +75,7 @@ export default async function CommunicationsPage({
             : Promise.resolve(null),
       ])
     : Promise.resolve(null)
-  const [clientsResult, leadsResult, suppliersResult, requestsResult, smsDraftsResult, aura, historyResult] = await Promise.all([
+  const [clientsResult, leadsResult, suppliersResult, requestsResult, smsDraftsResult, aura, historyResult, exactCommunicationResult] = await Promise.all([
     access.customers ? supabase.from("profiles").select("id,full_name,email,phone,company_name").eq("role", "client").eq("is_active", true).order("full_name").limit(500) : Promise.resolve({ data: [] }),
     access.customers ? supabase.from("manager_outreach_leads").select("id,full_name,company_name,email,phone").neq("status", "archived").order("full_name").limit(500).returns<AuraLeadRecipient[]>() : Promise.resolve({ data: [] }),
     access.suppliers ? supabase.rpc("staff_load_supplier_directory_snapshot") : Promise.resolve({ data: null }),
@@ -84,6 +85,13 @@ export default async function CommunicationsPage({
       ? loadManagerAura(supabase)
       : Promise.resolve(null),
     historyPromise,
+    access.customers && exactCommunicationId
+      ? supabase
+          .from("aura_communications")
+          .select("id,contact_id,provider,channel,direction,counterparty_phone,counterparty_email,subject,body,summary,transcript,next_steps,media,status,duration_seconds,occurred_at,last_event_at,mailbox_address,message_id,in_reply_to,read_at")
+          .eq("id", exactCommunicationId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ])
   const customers = (clientsResult.data ?? []).map((client) => ({
     ...client,
@@ -97,6 +105,7 @@ export default async function CommunicationsPage({
   const communications = mergeCommunicationHistory(
     initialHistory?.communications ?? [],
     contextualHistory?.communications ?? [],
+    normalizeAuraCommunications(exactCommunicationResult.data ? [exactCommunicationResult.data] : []),
   )
   const liveAura = initialHistory && aura?.contacts && aura.connections
     ? {
@@ -109,5 +118,5 @@ export default async function CommunicationsPage({
       }
     : null
 
-  return <main className="h-[calc(100dvh-4rem)] min-h-0 min-w-0 overflow-hidden bg-[#f5f5f7] p-2 text-slate-950 sm:p-4 lg:h-screen lg:px-6"><div className="mx-auto h-full min-h-0 min-w-0 max-w-[96rem]">{liveAura ? <UnifiedCommunicationInbox communications={liveAura.communications} contacts={liveAura.contacts} customers={liveAura.customers} leads={liveAura.leads} suppliers={liveAura.suppliers} materialRequests={(requestsResult.data ?? []).map((request) => ({ id: request.id, title: request.title, status: request.status }))} smsReplyDrafts={(smsDraftsResult.data ?? []) as SmsReplyDraft[]} connections={liveAura.connections} initialChannelFilter={initialChannelFilter} initialCommunicationId={(requestedCommunication || "").slice(0, 64)} initialQuery={(requestedSearch || "").slice(0, 160)} initialDraft={(requestedDraft || "").slice(0, 1600)} initialThread={exactThread} initialHistoryCursor={initialHistory?.cursor ?? null} initialHistoryHasMore={Boolean(initialHistory?.hasMore)} /> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Live phone connections are temporarily unavailable.</p>}</div></main>
+  return <main className="h-[calc(100dvh-4rem)] min-h-0 min-w-0 overflow-hidden bg-[#f5f5f7] p-2 text-slate-950 sm:p-4 lg:h-screen lg:px-6"><div className="mx-auto h-full min-h-0 min-w-0 max-w-[96rem]">{liveAura ? <UnifiedCommunicationInbox communications={liveAura.communications} contacts={liveAura.contacts} customers={liveAura.customers} leads={liveAura.leads} suppliers={liveAura.suppliers} materialRequests={(requestsResult.data ?? []).map((request) => ({ id: request.id, title: request.title, status: request.status }))} smsReplyDrafts={(smsDraftsResult.data ?? []) as SmsReplyDraft[]} connections={liveAura.connections} initialChannelFilter={initialChannelFilter} initialCommunicationId={exactCommunicationId} initialQuery={(requestedSearch || "").slice(0, 160)} initialDraft={(requestedDraft || "").slice(0, 1600)} initialThread={exactThread} initialHistoryCursor={initialHistory?.cursor ?? null} initialHistoryHasMore={Boolean(initialHistory?.hasMore)} /> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Live phone connections are temporarily unavailable.</p>}</div></main>
 }

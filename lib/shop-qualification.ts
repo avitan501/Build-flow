@@ -4,6 +4,7 @@ import type { ShopToolSlug } from "@/lib/shop-tools"
 export type QualifyingQuestionType = "text" | "textarea" | "select"
 export type SupplierDeliveryMethod = "email" | "phone" | "whatsapp" | "sms" | "portal" | "manual"
 export type SupplierTrustLevel = "not-reviewed" | "first-time" | "verified" | "trusted" | "preferred" | "do-not-use"
+export type SupplierReferralSource = "friend" | "client" | "contractor" | "supplier" | "other"
 
 export type SupplierContact = {
   id: string
@@ -46,6 +47,8 @@ export type SupplierRoutingOption = {
   notes?: string
   programChannels?: import("@/lib/supplier-program-channels").SupplierProgramChannel[]
   trustLevel?: SupplierTrustLevel
+  referredBySource?: SupplierReferralSource | ""
+  referredByName?: string
   catalogDepartments?: string[]
   catalogEnabledDepartments?: string[]
   address?: string

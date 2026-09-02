@@ -16,7 +16,6 @@ import {
   type QuoteComparisonRecord,
 } from "@/lib/quote-comparison";
 import type { SupplierRoutingOption } from "@/lib/shop-qualification";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 type ActionResult<T = undefined> = T extends undefined
   ? { ok: true } | { ok: false; error: string }
@@ -464,10 +463,9 @@ export async function sendClientQuoteAction(comparisonId: string): Promise<Actio
   if (attachmentRecords.length > CLIENT_QUOTE_MAX_FILES || attachmentBinaryTotal > CLIENT_QUOTE_MAX_TOTAL_SIZE + pdf.byteLength) {
     return { ok: false, error: "The quote attachments are too large to email. Remove a file and try again." };
   }
-  const admin = createAdminClient();
   const clientAttachments: Array<{ filename: string; content: string }> = [];
   for (const attachment of attachmentRecords) {
-    const { data, error } = await admin.storage.from(CLIENT_QUOTE_ATTACHMENT_BUCKET).download(attachment.file_path);
+    const { data, error } = await supabase.storage.from(CLIENT_QUOTE_ATTACHMENT_BUCKET).download(attachment.file_path);
     if (error || !data) {
       console.error("Client quote attachment download failed", { attachmentId: attachment.id, error });
       return { ok: false, error: `${attachment.file_name} could not be attached. Remove it or upload it again.` };
