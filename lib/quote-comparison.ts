@@ -22,6 +22,7 @@ export type QuoteComparisonRecord = {
   expires_on: string | null;
   client_message: string;
   client_delivery_charge: number;
+  client_tax_percent: number;
   quote_sent_at: string | null;
   created_at: string;
   updated_at: string;
@@ -134,6 +135,8 @@ export type ClientQuoteSummary = {
   supplierLandedCost: number;
   clientMaterialSubtotal: number;
   clientDeliveryCharge: number;
+  clientTaxPercent: number;
+  clientTaxAmount: number;
   clientTotal: number;
   profit: number;
   marginPercent: number;
@@ -371,6 +374,7 @@ export function buildClientQuoteSummary(
   items: QuoteComparisonItemRecord[],
   selectedBid: QuoteComparisonBidRecord | null | undefined,
   clientDeliveryCharge: number,
+  clientTaxPercent = 8.875,
 ): ClientQuoteSummary {
   const prices = new Map((selectedBid?.quote_comparison_prices ?? []).map((price) => [price.item_id, price]));
   const lines = items.map<ClientQuoteLine>((item) => {
@@ -406,8 +410,11 @@ export function buildClientQuoteSummary(
   const supplierLandedCost = supplierMaterialCost + supplierDeliveryAndTax;
   const clientMaterialSubtotal = lines.reduce((total, line) => total + line.clientLineTotal, 0);
   const safeClientDeliveryCharge = positiveNumber(clientDeliveryCharge);
-  const clientTotal = clientMaterialSubtotal + safeClientDeliveryCharge;
-  const profit = clientTotal - supplierLandedCost;
+  const safeClientTaxPercent = Math.min(100, positiveNumber(clientTaxPercent));
+  const clientTaxAmount = calculateQuoteTax(clientMaterialSubtotal + safeClientDeliveryCharge, safeClientTaxPercent);
+  const clientTotal = clientMaterialSubtotal + safeClientDeliveryCharge + clientTaxAmount;
+  const taxableClientSubtotal = clientMaterialSubtotal + safeClientDeliveryCharge;
+  const profit = taxableClientSubtotal - supplierLandedCost;
 
   return {
     lines,
@@ -416,9 +423,11 @@ export function buildClientQuoteSummary(
     supplierLandedCost,
     clientMaterialSubtotal,
     clientDeliveryCharge: safeClientDeliveryCharge,
+    clientTaxPercent: safeClientTaxPercent,
+    clientTaxAmount,
     clientTotal,
     profit,
-    marginPercent: clientTotal > 0 ? (profit / clientTotal) * 100 : 0,
+    marginPercent: taxableClientSubtotal > 0 ? (profit / taxableClientSubtotal) * 100 : 0,
     complete: Boolean(selectedBid) && lines.length > 0 && lines.every((line) => line.supplierUnitCost !== null && line.clientUnitPrice !== null),
   };
 }

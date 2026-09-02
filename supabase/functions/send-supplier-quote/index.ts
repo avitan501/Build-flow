@@ -17,6 +17,15 @@ function escapeHtml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
 }
 
+function money(value: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
+}
+
+function nonNegativeNumber(value: unknown) {
+  const parsed = Number(value ?? 0)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders })
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405)
@@ -50,6 +59,95 @@ Deno.serve(async (request) => {
   const action = String(payload.action || "send_supplier_quote")
   const requestId = String(payload.requestId || "")
   if (!requestId) return json({ error: "invalid_request" }, 400)
+
+  if (action === "send_client_quote") {
+    if (!isOwner && !isSupplierStaff) return json({ error: "forbidden" }, 403)
+    const attachment = payload.attachment && typeof payload.attachment === "object"
+      ? payload.attachment as { filename?: unknown; content?: unknown }
+      : null
+    const deliveryId = String(payload.deliveryId || "")
+    if (!attachment || typeof attachment.filename !== "string" || typeof attachment.content !== "string" || attachment.content.length > 14_500_000) {
+      return json({ error: "invalid_attachment" }, 400)
+    }
+    if (!/^[0-9a-f-]{36}$/i.test(deliveryId)) return json({ error: "invalid_delivery_id" }, 400)
+
+    const { data: comparison } = await admin
+      .from("quote_comparisons")
+      .select("id,quote_number,client_name_snapshot,client_email_snapshot,job_address,client_message,client_delivery_charge,client_tax_percent,awarded_bid_id")
+      .eq("id", requestId)
+      .maybeSingle<{
+        id: string
+        quote_number: string
+        client_name_snapshot: string
+        client_email_snapshot: string
+        job_address: string
+        client_message: string
+        client_delivery_charge: number
+        client_tax_percent: number
+        awarded_bid_id: string | null
+      }>()
+    if (!comparison?.awarded_bid_id) return json({ error: "quote_not_ready" }, 400)
+    const recipientEmail = comparison.client_email_snapshot.trim().toLowerCase()
+    if (!/^\S+@\S+\.\S+$/.test(recipientEmail)) return json({ error: "client_email_required" }, 400)
+
+    const { data: rows } = await admin
+      .from("quote_comparison_items")
+      .select("description,specification,quantity,unit,client_unit_price,sort_order")
+      .eq("comparison_id", comparison.id)
+      .order("sort_order")
+    const items = (rows ?? []).map((row) => {
+      const quantity = nonNegativeNumber(row.quantity)
+      const unitPrice = row.client_unit_price === null ? null : nonNegativeNumber(row.client_unit_price)
+      return {
+        description: String(row.description || "Material").slice(0, 300),
+        specification: String(row.specification || "").slice(0, 1000),
+        quantity,
+        unit: String(row.unit || "each").slice(0, 40),
+        unitPrice,
+        lineTotal: quantity * (unitPrice ?? 0),
+      }
+    })
+    if (!items.length || items.some((item) => item.unitPrice === null)) return json({ error: "client_prices_incomplete" }, 400)
+
+    const materials = items.reduce((total, item) => total + item.lineTotal, 0)
+    const delivery = nonNegativeNumber(comparison.client_delivery_charge)
+    const taxPercent = Math.min(100, nonNegativeNumber(comparison.client_tax_percent ?? 8.875))
+    const tax = Math.round((materials + delivery) * taxPercent) / 100
+    const total = materials + delivery + tax
+    const subject = `Avantia Build material quote ${comparison.quote_number}`
+    const itemText = items.map((item) => `${item.quantity} ${item.unit} - ${item.description}${item.specification ? ` (${item.specification})` : ""}: ${money(item.lineTotal)}`)
+    const text = [
+      `Hi ${comparison.client_name_snapshot || "Client"},`, "",
+      `Your Avantia Build material quote ${comparison.quote_number} is ready.`,
+      `Job location: ${comparison.job_address || "Not provided"}`, "", "Materials:", ...itemText,
+      ...(delivery > 0 ? [`Delivery: ${money(delivery)}`] : []),
+      `Sales tax (${taxPercent.toFixed(3)}%): ${money(tax)}`,
+      `Total: ${money(total)}`, "",
+      "Terms & conditions: A 3% processing fee applies to credit card payments.",
+      ...(comparison.client_message.trim() ? ["", comparison.client_message.trim()] : []), "",
+      "The full branded quote is attached as a PDF.", "", "Avantia Build", companyEmail, "(516) 908-8319", "https://build.avantiap.com",
+    ].join("\n")
+    const htmlRows = items.map((item) => `<tr><td style="border-bottom:1px solid #e5eaf1"><strong>${escapeHtml(item.description)}</strong>${item.specification ? `<br><span style="color:#64748b">${escapeHtml(item.specification)}</span>` : ""}</td><td style="border-bottom:1px solid #e5eaf1">${item.quantity} ${escapeHtml(item.unit)}</td><td style="border-bottom:1px solid #e5eaf1;text-align:right">${money(item.lineTotal)}</td></tr>`).join("")
+    const html = `<div style="margin:0;background:#eef2f6;padding:24px 10px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.55"><div style="max-width:680px;margin:0 auto;border:1px solid #dbe3ee;border-radius:14px;background:#fff;overflow:hidden"><div style="padding:18px 22px;border-bottom:1px solid #e5eaf1"><strong style="font-size:20px">Avantia Build</strong></div><div style="padding:24px 22px"><p style="color:#06c;font-size:12px;font-weight:700;text-transform:uppercase">Material quote</p><h1>Your quote is ready</h1><p>Hi ${escapeHtml(comparison.client_name_snapshot || "Client")}, we prepared quote <strong>${escapeHtml(comparison.quote_number)}</strong>.</p><p><strong>Job location:</strong> ${escapeHtml(comparison.job_address || "Not provided")}</p><table cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#071126;color:#fff;text-align:left"><th>Material</th><th>Qty</th><th style="text-align:right">Price</th></tr></thead><tbody>${htmlRows}</tbody></table><div style="margin-top:18px;text-align:right;color:#475569">${delivery > 0 ? `<div>Delivery: ${money(delivery)}</div>` : ""}<div>Sales tax (${taxPercent.toFixed(3)}%): ${money(tax)}</div><div style="margin-top:5px;font-size:19px;font-weight:700;color:#071126">Total: ${money(total)}</div></div>${comparison.client_message.trim() ? `<p style="margin-top:22px;white-space:pre-wrap">${escapeHtml(comparison.client_message.trim())}</p>` : ""}<p style="margin-top:22px;border-top:1px solid #e5eaf1;padding-top:16px"><strong>Terms &amp; conditions</strong><br>A 3% processing fee applies to credit card payments.</p><p>The complete quote is attached as a PDF. Reply with any questions.</p></div><div style="padding:18px 22px;border-top:1px solid #e5eaf1;background:#f8fafc"><strong>Avantia Build</strong><br>${companyEmail} · (516) 908-8319</div></div></div>`
+
+    try {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { authorization: `Bearer ${resendKey}`, "content-type": "application/json", "idempotency-key": `avantia-client-quote-${comparison.id}-${deliveryId}` },
+        body: JSON.stringify({
+          from: Deno.env.get("QUOTE_SUBMISSION_FROM") || `Avantia Build <${companyEmail}>`,
+          to: [recipientEmail], subject, html, text, reply_to: companyEmail,
+          attachments: [{ filename: attachment.filename.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 180) || "quote.pdf", content: attachment.content }],
+        }),
+      })
+      const result = await response.json().catch(() => null) as { id?: string; message?: string; error?: string } | null
+      if (!response.ok) return json({ error: result?.message || result?.error || `Email provider returned ${response.status}` }, 502)
+      console.log("client_quote_email", { comparisonId: comparison.id, status: "sent" })
+      return json({ ok: true, providerId: result?.id || null })
+    } catch (cause) {
+      return json({ error: cause instanceof Error ? cause.message : "Email provider could not be reached" }, 502)
+    }
+  }
 
   if (action === "send_client_reply") {
     if (!isOwner && !isCustomerStaff) return json({ error: "forbidden" }, 403)

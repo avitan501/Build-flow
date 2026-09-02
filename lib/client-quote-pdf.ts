@@ -136,6 +136,9 @@ export async function generateClientQuotePdf(input: ClientQuotePdfInput) {
     rightText(page, regular, money(input.summary.clientDeliveryCharge), 560, y, 9, navy);
     y -= 18;
   }
+  page.drawText(`Sales tax (${input.summary.clientTaxPercent.toFixed(3)}%)`, { x: totalsX, y, size: 9, font: regular, color: slate });
+  rightText(page, regular, money(input.summary.clientTaxAmount), 560, y, 9, navy);
+  y -= 18;
   page.drawLine({ start: { x: totalsX, y: y + 8 }, end: { x: 570, y: y + 8 }, thickness: 1, color: border });
   page.drawText("Quote total", { x: totalsX, y: y - 10, size: 12, font: bold, color: navy });
   rightText(page, bold, money(input.summary.clientTotal), 560, y - 10, 12, navy);

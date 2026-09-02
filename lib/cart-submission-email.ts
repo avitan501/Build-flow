@@ -82,6 +82,8 @@ export type ClientQuoteEmailInput = {
     lineTotal: number
   }>
   deliveryCharge: number
+  taxPercent: number
+  taxAmount: number
   total: number
   pdfBase64: string
   idempotencyKey: string
@@ -520,6 +522,7 @@ export async function sendClientQuoteEmail(input: ClientQuoteEmailInput): Promis
     "Materials:",
     ...itemText,
     ...(input.deliveryCharge > 0 ? [`Delivery: ${money(input.deliveryCharge)}`] : []),
+    `Sales tax (${input.taxPercent.toFixed(3)}%): ${money(input.taxAmount)}`,
     `Total: ${money(input.total)}`,
     "",
     `Terms & conditions: ${CREDIT_CARD_PROCESSING_TERM}`,
@@ -549,6 +552,7 @@ export async function sendClientQuoteEmail(input: ClientQuoteEmailInput): Promis
           </table>
           <div style="margin:18px 0 0;text-align:right;color:#475569">
             ${input.deliveryCharge > 0 ? `<div>Delivery: ${money(input.deliveryCharge)}</div>` : ""}
+            <div>Sales tax (${input.taxPercent.toFixed(3)}%): ${money(input.taxAmount)}</div>
             <div style="margin-top:5px;font-size:19px;font-weight:700;color:#071126">Total: ${money(input.total)}</div>
           </div>
           ${input.message.trim() ? `<p style="margin:22px 0 0;white-space:pre-wrap;color:#475569">${escapeHtml(input.message.trim())}</p>` : ""}

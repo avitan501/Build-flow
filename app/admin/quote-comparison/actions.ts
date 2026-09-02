@@ -378,6 +378,7 @@ export async function saveClientQuoteAction(input: {
   expiresOn: string | null;
   clientMessage: string;
   clientDeliveryCharge: number;
+  clientTaxPercent: number;
   items: Array<{ itemId: string; markupPercent: number; clientUnitPrice: number }>;
 }): Promise<ActionResult> {
   const { supabase } = await requireStaffProfile("suppliers");
@@ -396,6 +397,7 @@ export async function saveClientQuoteAction(input: {
     p_expires_on: expiresOn,
     p_client_message: cleanText(input.clientMessage, 4000),
     p_client_delivery_charge: cleanMoney(input.clientDeliveryCharge),
+    p_client_tax_percent: cleanTaxPercent(input.clientTaxPercent),
     p_items: input.items.map((item) => ({
       item_id: item.itemId,
       markup_percent: cleanMarkup(item.markupPercent),
@@ -433,7 +435,7 @@ export async function sendClientQuoteAction(comparisonId: string): Promise<Actio
   if (!comparison.client_id || !comparison.client_email_snapshot) return { ok: false, error: "Choose a client and save the quote first." };
   if (!comparison.awarded_bid_id) return { ok: false, error: "Select the winning supplier first." };
   const selectedBid = bids.find((bid) => bid.id === comparison.awarded_bid_id);
-  const summary = buildClientQuoteSummary(items, selectedBid, comparison.client_delivery_charge);
+  const summary = buildClientQuoteSummary(items, selectedBid, comparison.client_delivery_charge, comparison.client_tax_percent);
   if (!summary.complete) return { ok: false, error: "Every material needs a supplier cost and client price before sending." };
   if (summary.clientTotal <= 0) return { ok: false, error: "The client quote total must be greater than zero." };
 
@@ -444,7 +446,7 @@ export async function sendClientQuoteAction(comparisonId: string): Promise<Actio
     summary,
   });
   const deliveryId = crypto.randomUUID();
-  const delivery = await sendClientQuoteEmail({
+  const directDelivery = await sendClientQuoteEmail({
     comparisonId: comparison.id,
     quoteNumber: comparison.quote_number,
     recipientName: comparison.client_name_snapshot || "Client",
@@ -461,11 +463,29 @@ export async function sendClientQuoteAction(comparisonId: string): Promise<Actio
       lineTotal: line.clientLineTotal,
     })),
     deliveryCharge: summary.clientDeliveryCharge,
+    taxPercent: summary.clientTaxPercent,
+    taxAmount: summary.clientTaxAmount,
     total: summary.clientTotal,
     pdfBase64: pdf.toString("base64"),
     idempotencyKey: `avantia-client-quote-${comparison.id}-${deliveryId}`,
   });
+  let delivery = directDelivery;
+  if (directDelivery.status === "not_configured") {
+    const { data: fallback, error: fallbackError } = await supabase.functions.invoke<{ ok?: boolean; providerId?: string | null; error?: string }>("send-supplier-quote", {
+      body: {
+        action: "send_client_quote",
+        requestId: comparison.id,
+        deliveryId,
+        attachment: { filename: `${comparison.quote_number}.pdf`, content: pdf.toString("base64") },
+      },
+    });
+    delivery = !fallbackError && fallback?.ok
+      ? { status: "sent", providerId: fallback.providerId ?? "" }
+      : { status: "failed", error: fallback?.error || fallbackError?.message || "The client quote was not sent." };
+  }
   const sent = delivery.status === "sent";
+  const providerId = delivery.status === "sent" ? delivery.providerId : null;
+  const deliveryError = delivery.status === "failed" ? delivery.error : delivery.status === "not_configured" ? "Email is not configured." : "";
   const { error: auditError } = await supabase.from("quote_comparison_client_deliveries").insert({
     comparison_id: comparison.id,
     recipient_name: comparison.client_name_snapshot || comparison.client_email_snapshot,
@@ -473,6 +493,8 @@ export async function sendClientQuoteAction(comparisonId: string): Promise<Actio
     quote_number_snapshot: comparison.quote_number,
     subject: `Avantia Build material quote ${comparison.quote_number}`,
     client_total_snapshot: cleanMoney(summary.clientTotal),
+    client_tax_percent_snapshot: cleanTaxPercent(summary.clientTaxPercent),
+    client_tax_amount_snapshot: cleanMoney(summary.clientTaxAmount),
     profit_snapshot: cleanSignedMoney(summary.profit),
     items_snapshot: summary.lines.map((line) => ({
       description: line.description,
@@ -482,9 +504,9 @@ export async function sendClientQuoteAction(comparisonId: string): Promise<Actio
       unit_price: line.clientUnitPrice,
       line_total: line.clientLineTotal,
     })),
-    provider_id: sent ? delivery.providerId : null,
+    provider_id: providerId,
     delivery_status: sent ? "sent" : "failed",
-    error_message: delivery.status === "failed" ? delivery.error : delivery.status === "not_configured" ? "Email is not configured." : "",
+    error_message: deliveryError,
     created_by: user.id,
   });
   if (auditError) console.error("Client quote delivery audit failed", auditError);
@@ -503,7 +525,7 @@ export async function sendClientQuoteAction(comparisonId: string): Promise<Actio
 
   revalidatePath(comparisonPath(comparison.id));
   revalidatePath("/admin/quote-comparison");
-  return { ok: true, data: { recipient: comparison.client_email_snapshot, providerId: delivery.providerId } };
+  return { ok: true, data: { recipient: comparison.client_email_snapshot, providerId } };
 }
 
 export async function reopenQuoteComparisonAction(comparisonId: string): Promise<ActionResult> {

@@ -96,12 +96,13 @@ test("client quote totals preserve private landed cost, profit, and margin", () 
     delivery: 100,
     taxPercent: 5,
   });
-  const summary = buildClientQuoteSummary(items, selected, 200);
+  const summary = buildClientQuoteSummary(items, selected, 200, 8.875);
 
   expect(summary.supplierMaterialCost).toBe(1100);
   expect(summary.supplierLandedCost).toBe(1260);
   expect(summary.clientMaterialSubtotal).toBe(1320);
-  expect(summary.clientTotal).toBe(1520);
+  expect(summary.clientTaxAmount).toBe(134.9);
+  expect(summary.clientTotal).toBe(1654.9);
   expect(summary.profit).toBe(260);
   expect(summary.marginPercent).toBeCloseTo(17.105, 2);
   expect(summary.complete).toBe(true);

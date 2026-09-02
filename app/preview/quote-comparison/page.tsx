@@ -20,6 +20,7 @@ const comparison: QuoteComparisonRecord = {
   expires_on: "2026-09-12",
   client_message: "Pricing includes the listed materials and delivery to the jobsite.",
   client_delivery_charge: 275,
+  client_tax_percent: 8.875,
   quote_sent_at: null,
   created_at: "2026-08-13T12:00:00.000Z",
   updated_at: "2026-08-13T12:00:00.000Z",
