@@ -33,6 +33,8 @@ const pages: SitemapPage[] = [
   { path: "/shop/tile-work/thinset-calculator", changeFrequency: "monthly", priority: 0.7 },
   { path: "/shop/wood-floor/flooring-calculator", changeFrequency: "monthly", priority: 0.7 },
   { path: "/how-it-works", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/how-we-select-materials", changeFrequency: "yearly", priority: 0.4 },
+  { path: "/affiliate-disclosure", changeFrequency: "yearly", priority: 0.3 },
   { path: "/delivery-policy", changeFrequency: "yearly", priority: 0.3 },
   { path: "/returns", changeFrequency: "yearly", priority: 0.3 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.2 },

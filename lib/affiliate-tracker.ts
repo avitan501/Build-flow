@@ -113,5 +113,4 @@ export const STATUS_STYLES: Record<AffiliateStatus, string> = {
   Closed: "border-slate-700 bg-slate-700 text-white",
 };
 
-export const AFFILIATE_DISCLOSURE = "AvantiaBuild may earn a commission if you purchase through certain retailer links. This does not increase the price you pay.";
-export const RETAILER_PRICE_DISCLAIMER = "Final price, availability, delivery options, taxes, and product details are confirmed by the retailer.";
+export { AFFILIATE_DISCLOSURE, RETAILER_PRICE_DISCLAIMER } from "@/lib/affiliate-policy";

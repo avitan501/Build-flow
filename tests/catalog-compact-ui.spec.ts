@@ -89,7 +89,7 @@ test("catalog exposes Home Depot and Lowe's without inventing a price", async ()
     "catalogRetailerSearchLinks(selectedItem).map",
   );
   expect(workspace).toContain('data-testid="catalog-retailer-discovery"');
-  expect(workspace).toContain("Home Depot &amp; Lowe&apos;s");
+  expect(workspace).toContain("The Home Depot &amp; Lowe&apos;s");
   expect(compactWorkspace).toContain(
     "Exact price is shown only after verification.",
   );
@@ -102,7 +102,7 @@ test("catalog exposes Home Depot and Lowe's without inventing a price", async ()
   expect(workspace).not.toContain("Lowe&apos;s price");
   expect(priceCheck).toContain("const majorRetailers = links.filter");
   expect(priceCheck).toContain("Exact price not shown until verified");
-  expect(retailerLinks).toContain('name: "Home Depot"');
+  expect(retailerLinks).toContain('name: "The Home Depot"');
   expect(retailerLinks).toContain('name: "Lowe\'s"');
 });
 

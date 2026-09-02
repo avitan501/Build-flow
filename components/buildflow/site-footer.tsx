@@ -49,6 +49,8 @@ export function SiteFooter() {
           <Link href="/terms" className="hover:text-[#0066cc]">Terms</Link>
           <Link href="/returns" className="hover:text-[#0066cc]">Returns</Link>
           <Link href="/delivery-policy" className="hover:text-[#0066cc]">Delivery Policy</Link>
+          <Link href="/affiliate-disclosure" className="hover:text-[#0066cc]">Affiliate Disclosure</Link>
+          <Link href="/how-we-select-materials" className="hover:text-[#0066cc]">How We Select Materials</Link>
           <Link href="/accessibility" className="hover:text-[#0066cc]">Accessibility</Link>
           <Link href="/shop#shop-faq" className="ml-auto hover:text-[#0066cc]">Ordering FAQ</Link>
         </nav>

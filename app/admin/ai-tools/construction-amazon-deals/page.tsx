@@ -3,6 +3,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { ArrowUpRight, BadgeDollarSign, CheckCircle2, ChevronLeft, CircleAlert, Hammer, Link2, Search, ShieldCheck } from "lucide-react"
 
+import { AffiliateDisclosure } from "@/components/buildflow/affiliate-disclosure"
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { recordAmazonAffiliateLinkAction } from "@/app/admin/goals-progress/affiliate-actions"
 
@@ -121,7 +122,8 @@ export default async function AmazonConstructionDealsPage({ searchParams }: { se
               <div className="rounded-xl bg-slate-50 p-3"><dt className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Cookie window</dt><dd className="mt-1 font-bold text-slate-950">{program.cookie_window}</dd></div>
             </dl>
             <p className="mt-4 text-xs leading-5 text-slate-500">Last verified: {program.last_verified_date ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${program.last_verified_date}T00:00:00Z`)) : "Not recorded"}. Coverage: {program.new_york_access}.</p>
-            <div className="mt-5 flex flex-wrap gap-2">{program.affiliate_test_url ? <Link href={program.affiliate_test_url} target="_blank" rel="noopener noreferrer sponsored" prefetch={false} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-500 px-4 text-sm font-black text-slate-950 hover:bg-orange-400"><Link2 className="h-4 w-4" />Open verified Amazon link<ArrowUpRight className="h-4 w-4" /></Link> : null}{program.application_url ? <Link href={program.application_url} target="_blank" rel="noopener noreferrer" prefetch={false} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 px-4 text-sm font-bold text-slate-800 hover:border-slate-500">Associates dashboard<ArrowUpRight className="h-4 w-4" /></Link> : null}</div>
+            {program.affiliate_test_url ? <AffiliateDisclosure className="mt-5" /> : null}
+            <div className="mt-2 flex flex-wrap gap-2">{program.affiliate_test_url ? <Link href={program.affiliate_test_url} target="_blank" rel="noopener noreferrer sponsored" prefetch={false} aria-label="Open Amazon affiliate link in a new tab" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-500 px-4 text-sm font-black text-slate-950 hover:bg-orange-400"><Link2 className="h-4 w-4" />Open Amazon affiliate link<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></Link> : null}{program.application_url ? <Link href={program.application_url} target="_blank" rel="noopener noreferrer" prefetch={false} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 px-4 text-sm font-bold text-slate-800 hover:border-slate-500">Associates dashboard<ArrowUpRight className="h-4 w-4" /></Link> : null}</div>
           </article>
 
           <aside className="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6">

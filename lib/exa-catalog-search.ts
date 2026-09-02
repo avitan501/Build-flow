@@ -91,7 +91,7 @@ export function productSearchLinks(queryValue: string, zipCodeValue = ""): Produ
   const encoded = encodeURIComponent([query, zipCode && `near ${zipCode}`].filter(Boolean).join(" "))
   return [
     { label: "Google Shopping", url: `https://www.google.com/search?tbm=shop&q=${encoded}` },
-    { label: "Home Depot", url: `https://www.homedepot.com/s/${encoded}` },
+    { label: "The Home Depot", url: `https://www.homedepot.com/s/${encoded}` },
     { label: "Lowe's", url: `https://www.lowes.com/search?searchTerm=${encoded}` },
   ]
 }

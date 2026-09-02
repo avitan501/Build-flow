@@ -32,6 +32,7 @@ import {
   saveMaterialCatalogItemAction,
   saveMaterialCatalogPricesAction,
 } from "@/app/admin/catalog/actions";
+import { AffiliateDisclosure } from "@/components/buildflow/affiliate-disclosure";
 import { ExaCatalogResearch } from "@/components/buildflow/exa-catalog-research";
 import { MaterialPriceCheck } from "@/components/buildflow/material-price-check";
 import {
@@ -932,14 +933,14 @@ export function MaterialCatalogWorkspace({
         <div
           data-testid="catalog-retailer-discovery"
           className="mt-2 flex min-h-10 items-center gap-2 rounded-md border border-sky-200 bg-sky-50/50 px-3 text-sm"
-          aria-label="Home Depot and Lowe's official product searches"
+          aria-label="The Home Depot and Lowe's direct retailer searches"
         >
           <Store className="h-4 w-4 shrink-0 text-sky-700" aria-hidden="true" />
           <p className="min-w-0 text-slate-700">
-            <strong>Home Depot &amp; Lowe&apos;s</strong>
+            <strong>The Home Depot &amp; Lowe&apos;s</strong>
             <span className="text-slate-500">
               {" "}
-              · Select a product for official search links. Exact price is shown
+              · Select a product for direct retailer search links. Exact price is shown
               only after verification.
             </span>
           </p>
@@ -1260,8 +1261,9 @@ export function MaterialCatalogWorkspace({
                 </div>
                 <div className="mt-4">
                   <p className="text-xs font-bold uppercase tracking-[0.1em] text-slate-500">
-                    Major retailers
+                    Direct retailer searches
                   </p>
+                  <AffiliateDisclosure className="mt-2" />
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     {catalogRetailerSearchLinks(selectedItem).map(
                       (retailer) => (
@@ -1270,9 +1272,10 @@ export function MaterialCatalogWorkspace({
                           href={retailer.url}
                           target="_blank"
                           rel="noopener noreferrer"
+                          aria-label={`Search ${retailer.name} for ${selectedItem.name} (opens in a new tab)`}
                           className="flex min-h-12 items-center justify-between gap-2 rounded-md border border-sky-200 bg-white px-3 text-sm font-bold text-sky-800 hover:border-sky-400"
                         >
-                          <span>{retailer.name}</span>
+                          <span>Search {retailer.name}</span>
                           <span className="inline-flex items-center gap-1 text-xs font-semibold">
                             Check online{" "}
                             <ExternalLink className="h-3.5 w-3.5" />
