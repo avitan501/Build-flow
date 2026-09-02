@@ -1,5 +1,6 @@
 import { ArrowLeft, Clock3, Eye, FilePenLine, Mail, MessageCircle, MessageSquareText, Phone } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { requireManagerPortalProfile } from "@/lib/auth";
 import {
@@ -50,10 +51,9 @@ function recordActionLabel(event: ManagerStaffActivityEvent) {
 }
 
 export default async function CarlosActivityPage() {
-  const { supabase, user, access } = await requireManagerPortalProfile();
-  const staff = access.owner
-    ? await supabase.from("profiles").select("id,full_name,email").eq("role", "staff").eq("email", "buildavantiap@gmail.com").eq("is_active", true)
-    : { data: [{ id: user.id, full_name: "My activity", email: user.email || "" }] };
+  const { supabase, access } = await requireManagerPortalProfile();
+  if (!access.owner) redirect("/admin/build-map");
+  const staff = await supabase.from("profiles").select("id,full_name,email").eq("role", "staff").eq("email", "buildavantiap@gmail.com").eq("is_active", true);
   const staffIds = (staff.data ?? []).map((profile) => profile.id);
   let query = supabase
     .from("manager_staff_activity_events")
@@ -61,7 +61,7 @@ export default async function CarlosActivityPage() {
     .order("occurred_at", { ascending: false })
     .limit(300);
   if (staffIds.length) query = query.in("user_id", staffIds);
-  else query = query.eq("user_id", user.id);
+  else query = query.eq("user_id", "00000000-0000-0000-0000-000000000000");
   const result = await query.returns<ManagerStaffActivityEvent[]>();
   const events = result.error ? [] : result.data ?? [];
   const summary = summarizeManagerStaffActivity(events);

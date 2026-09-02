@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -39,6 +40,12 @@ test("the 24-hour window is anchored to current time instead of the newest store
   ];
   expect(activityEventsInLast24Hours(staleEvents, now)).toEqual([]);
   expect(summarizeManagerStaffActivity(staleEvents, now).pageViews).toBe(0);
+});
+
+test("Carlos activity is visible only to the owner", () => {
+  const page = readFileSync(path.join(root, "app/admin/carlos-activity/page.tsx"), "utf8");
+  expect(page).toContain('if (!access.owner) redirect("/admin/build-map")');
+  expect(page).not.toContain('full_name: "My activity"');
 });
 
 test("the one-glance activity summary is stable and separates completed from failed communications", () => {
