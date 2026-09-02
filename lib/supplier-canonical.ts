@@ -20,7 +20,7 @@ export type CanonicalSupplierRouteSelection = {
 
 const SUPPLIER_NAME_ALIASES: Array<[pattern: RegExp, replacement: string]> = [
   [/the home depot pro|home depot pro|the home depot/g, "home depot"],
-  [/lowe['’]s creator|lowe['’]s pro/g, "lowes"],
+  [/lowe['’]s creator|lowe['’]s pro|lowe['’]s/g, "lowes"],
   [/build\.com \/ ferguson home|ferguson home/g, "ferguson"],
   [/abc supply api \/ integration partnership/g, "abc supply"],
   [/builders firstsource \/ mybldr \(trade account\)/g, "builders firstsource"],
@@ -36,7 +36,13 @@ export function canonicalSupplierKey(value: string) {
   for (const [pattern, replacement] of SUPPLIER_NAME_ALIASES) {
     normalized = normalized.replace(pattern, replacement);
   }
-  return normalized.replace(/[^a-z0-9]+/g, " ").trim();
+  return normalized
+    .replace(
+      /\b(incorporated|inc|limited|ltd|llc|company|co|corporation|corp)\b/g,
+      " ",
+    )
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 /**

@@ -73,6 +73,8 @@ test("supplier aliases resolve to one stable cross-source identity", () => {
   expect(canonicalSupplierKey("The Home Depot Pro")).toBe("home depot");
   expect(canonicalSupplierKey("Home Depot")).toBe("home depot");
   expect(canonicalSupplierKey("Lowe’s Creator")).toBe("lowes");
+  expect(canonicalSupplierKey("Lowe's")).toBe("lowes");
+  expect(canonicalSupplierKey("ABC Supply Co.")).toBe("abc supply");
   expect(canonicalSupplierKey("ABC Supply API / Integration Partnership")).toBe(
     "abc supply",
   );

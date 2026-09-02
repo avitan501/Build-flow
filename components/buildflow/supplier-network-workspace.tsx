@@ -9,6 +9,7 @@ import {
   Plus,
   RotateCcw,
   Search,
+  ShieldCheck,
   Sparkles,
   Star,
   Trash2,
@@ -18,6 +19,8 @@ import { Fragment, useCallback, useMemo, useState, useTransition } from "react";
 
 import { addDiscoveredSupplierNetworkAction, updateSupplierNetworkRowAction } from "@/app/admin/supplier-network/actions";
 import { SupplierProgramBadges, SUPPLIER_PROGRAM_COLORS as CHANNEL_COLORS, SUPPLIER_PROGRAM_DESCRIPTIONS as CHANNEL_DESCRIPTIONS, SUPPLIER_PROGRAM_LABELS as CHANNEL_LABELS } from "@/components/buildflow/supplier-program-badges";
+import type { SupplierDiscoveryCandidate } from "@/lib/supplier-discovery";
+import { supplierIdentityKeys } from "@/lib/supplier-identity";
 
 import {
   SUPPLIER_NETWORK_CHANNELS,
@@ -60,6 +63,12 @@ const SOURCES: SupplierNetworkSource[] = [
   "Nearby",
 ];
 
+const EMPTY_CANDIDATE_REVIEW = {
+  officialSource: false,
+  departmentFit: false,
+  serviceArea: false,
+};
+
 export function SupplierNetworkWorkspace({
   rows,
 }: {
@@ -95,10 +104,15 @@ export function SupplierNetworkWorkspace({
   const [saving, startSaving] = useTransition();
   const [discoveryDepartment, setDiscoveryDepartment] = useState("");
   const [discoveryZip, setDiscoveryZip] = useState("11516");
-  const [discoveryResults, setDiscoveryResults] = useState<Array<{ name: string; url: string; domain: string; summary: string }>>([]);
+  const [discoveryResults, setDiscoveryResults] = useState<SupplierDiscoveryCandidate[]>([]);
   const [discoveryError, setDiscoveryError] = useState("");
+  const [discoveryNotice, setDiscoveryNotice] = useState("");
   const [discoveryPending, setDiscoveryPending] = useState(false);
-  const [addedDomains, setAddedDomains] = useState<string[]>([]);
+  const [discoveryContext, setDiscoveryContext] = useState({ department: "", zipCode: "" });
+  const [reviewingCandidate, setReviewingCandidate] = useState<SupplierDiscoveryCandidate | null>(null);
+  const [reviewedSupplierName, setReviewedSupplierName] = useState("");
+  const [candidateReview, setCandidateReview] = useState(EMPTY_CANDIDATE_REVIEW);
+  const [addedIdentities, setAddedIdentities] = useState<string[]>([]);
 
   const currentEdit = useCallback(
     (row: SupplierNetworkRow) =>
@@ -117,6 +131,7 @@ export function SupplierNetworkWorkspace({
     row: SupplierNetworkRow,
     next: Required<SupplierNetworkOverride>,
     previous = currentEdit(row),
+    reviewConfirmed = false,
   ) {
     setRowEdits((value) => ({ ...value, [row.key]: next }));
     setSaveError(null);
@@ -129,6 +144,7 @@ export function SupplierNetworkWorkspace({
         phone: row.phone,
         link: row.link,
         ask: row.ask,
+        reviewConfirmed,
         ...next,
       });
       if (!result.ok) {
@@ -156,12 +172,47 @@ export function SupplierNetworkWorkspace({
     }
     setDiscoveryPending(true);
     setDiscoveryError("");
+    setDiscoveryNotice("");
     try {
-      const excluded = more ? discoveryResults.map((supplier) => supplier.domain) : [];
-      const response = await fetch("/api/admin/suppliers/discover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ department: discoveryDepartment, zipCode: discoveryZip, excludeDomains: excluded }) });
-      const payload = await response.json() as { ok?: boolean; error?: string; suppliers?: Array<{ name: string; url: string; domain: string; summary: string }> };
+      const department = discoveryDepartment.trim();
+      const sameSearch = discoveryContext.department === department && discoveryContext.zipCode === discoveryZip;
+      const append = more && sameSearch;
+      const networkIdentities = rows.flatMap((row) =>
+        supplierIdentityKeys({ name: row.name, url: row.link }),
+      );
+      const previousIdentities = append
+        ? discoveryResults.flatMap((supplier) =>
+            supplierIdentityKeys(supplier),
+          )
+        : [];
+      const excludeIdentities = [...new Set([...networkIdentities, ...previousIdentities])];
+      const response = await fetch("/api/admin/suppliers/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ department, zipCode: discoveryZip, excludeIdentities }),
+      });
+      const payload = await response.json() as {
+        ok?: boolean;
+        error?: string;
+        suppliers?: SupplierDiscoveryCandidate[];
+        partial?: boolean;
+      };
       if (!response.ok || !payload.ok) setDiscoveryError(payload.error || "Supplier discovery is temporarily unavailable.");
-      else setDiscoveryResults((current) => more ? [...current, ...(payload.suppliers ?? [])] : payload.suppliers ?? []);
+      else {
+        const suppliers = payload.suppliers ?? [];
+        setDiscoveryContext({ department, zipCode: discoveryZip });
+        setDiscoveryResults((current) => append ? [...current, ...suppliers] : suppliers);
+        setReviewingCandidate(null);
+        setReviewedSupplierName("");
+        setCandidateReview(EMPTY_CANDIDATE_REVIEW);
+        if (payload.partial) {
+          setDiscoveryNotice(
+            suppliers.length
+              ? `Found ${suppliers.length} new source-backed candidate${suppliers.length === 1 ? "" : "s"} after safety and duplicate checks.`
+              : "No new source-backed candidates passed the safety and duplicate checks. Try another department or ZIP code.",
+          );
+        }
+      }
     } catch {
       setDiscoveryError("Supplier discovery is temporarily unavailable.");
     } finally {
@@ -169,15 +220,74 @@ export function SupplierNetworkWorkspace({
     }
   }
 
-  function addDiscoveredSupplier(supplier: { name: string; url: string; domain: string; summary: string }) {
+  function beginCandidateReview(supplier: SupplierDiscoveryCandidate) {
+    setReviewingCandidate(supplier);
+    setReviewedSupplierName(supplier.name);
+    setCandidateReview(EMPTY_CANDIDATE_REVIEW);
+    setDiscoveryError("");
+  }
+
+  function addDiscoveredSupplier(supplier: SupplierDiscoveryCandidate) {
+    if (
+      reviewedSupplierName.trim().length < 2 ||
+      !Object.values(candidateReview).every(Boolean)
+    ) {
+      setDiscoveryError("Complete the three review checks before adding this candidate.");
+      return;
+    }
     startSaving(async () => {
-      const result = await addDiscoveredSupplierNetworkAction({ ...supplier, department: discoveryDepartment, zipCode: discoveryZip });
+      const result = await addDiscoveredSupplierNetworkAction({
+        name: reviewedSupplierName.trim(),
+        url: supplier.url,
+        summary: supplier.summary,
+        department: discoveryContext.department,
+        zipCode: discoveryContext.zipCode,
+        reviewConfirmed: true,
+      });
       if (!result.ok) setDiscoveryError(result.error);
       else {
-        setAddedDomains((current) => [...current, supplier.domain]);
-        window.setTimeout(() => window.location.reload(), 350);
+        setAddedIdentities((current) => [...current, supplier.identity]);
+        setReviewingCandidate(null);
+        setReviewedSupplierName("");
+        setCandidateReview(EMPTY_CANDIDATE_REVIEW);
+        setDiscoveryNotice(
+          result.status === "already-exists"
+            ? `${result.supplierName} is already in the canonical Supplier Directory.`
+            : `${result.supplierName} was added to More suppliers for continued human review. No outreach was sent.`,
+        );
+        if (result.status === "added") window.setTimeout(() => window.location.reload(), 700);
       }
     });
+  }
+
+  function moveRow(row: SupplierNetworkRow, nextStage: SupplierNetworkStage) {
+    const edit = currentEdit(row);
+    const requiresReview =
+      nextStage === "approved" ||
+      (nextStage === "contact" && row.directoryTrustLevel === "not-reviewed");
+    if (
+      requiresReview &&
+      !window.confirm(
+        `Confirm you reviewed ${row.name}'s official source, department fit, and service area. This promotion does not send outreach.`,
+      )
+    ) {
+      return;
+    }
+    saveRow(
+      row,
+      {
+        ...edit,
+        stage: nextStage,
+        priority:
+          nextStage === "contact"
+            ? true
+            : nextStage === "more"
+              ? false
+              : edit.priority,
+      },
+      edit,
+      requiresReview,
+    );
   }
 
   const stageCounts = useMemo(
@@ -291,16 +401,204 @@ export function SupplierNetworkWorkspace({
           ))}
         </div>
         <details className="group border-t border-slate-100 bg-sky-50/60">
-          <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-xs font-bold text-sky-950"><Sparkles className="h-4 w-4 text-[#0071e3]" />Find 10 suppliers with AI <span className="ml-auto text-[10px] font-semibold text-sky-700 group-open:hidden">Department + ZIP</span></summary>
+          <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 px-3 text-xs font-bold text-sky-950">
+            <Sparkles className="h-4 w-4 text-[#0071e3]" />
+            Find 10 suppliers with AI
+            <span className="ml-auto text-[10px] font-semibold text-sky-700 group-open:hidden">
+              Department + ZIP
+            </span>
+          </summary>
           <div className="border-t border-sky-100 p-3">
-            <div className="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_9rem_auto]">
-              <input value={discoveryDepartment} onChange={(event) => setDiscoveryDepartment(event.target.value)} placeholder="Department, e.g. Roofing" className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium" />
-              <label className="relative"><MapPin className="pointer-events-none absolute left-2.5 top-3 h-4 w-4 text-slate-400" /><input value={discoveryZip} onChange={(event) => setDiscoveryZip(event.target.value.replace(/[^0-9-]/g, "").slice(0, 10))} inputMode="numeric" aria-label="Supplier search ZIP code" className="h-10 w-full rounded-md border border-slate-300 bg-white pl-8 pr-2 text-sm font-medium" /></label>
-              <button type="button" onClick={() => void discoverSuppliers(false)} disabled={discoveryPending} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-xs font-bold text-white disabled:opacity-50">{discoveryPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}Generate 10</button>
+            <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] leading-4 text-amber-950">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+              <p>
+                AI returns source-backed candidates only. Review the official page,
+                department fit, and service area before adding. Contact details are
+                never populated from search results, and no outreach is sent.
+              </p>
             </div>
-            {discoveryError ? <p className="mt-2 text-xs font-semibold text-rose-700" role="alert">{discoveryError}</p> : null}
-            {discoveryResults.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{discoveryResults.map((supplier) => { const added = addedDomains.includes(supplier.domain); return <article key={supplier.url} className="grid gap-2 rounded-md border border-sky-100 bg-white p-2.5"><div className="min-w-0"><p className="truncate text-xs font-bold text-slate-950">{supplier.name}</p><p className="truncate text-[10px] text-slate-500">{supplier.domain}</p><p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-600">{supplier.summary || `Potential ${discoveryDepartment} supplier near ${discoveryZip}.`}</p></div><div className="flex gap-2"><a href={supplier.url} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 px-2 text-[10px] font-bold text-[#0066cc]"><ExternalLink className="h-3 w-3" />Open</a><button type="button" onClick={() => addDiscoveredSupplier(supplier)} disabled={added || saving} className="inline-flex h-8 items-center gap-1 rounded-md bg-[#0071e3] px-2 text-[10px] font-bold text-white disabled:bg-emerald-600"><Plus className="h-3 w-3" />{added ? "Added" : "Add to list"}</button></div></article> })}</div> : null}
-            {discoveryResults.length ? <button type="button" onClick={() => void discoverSuppliers(true)} disabled={discoveryPending} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-sky-300 bg-white px-3 text-xs font-bold text-[#0066cc]">{discoveryPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}Generate 10 more</button> : null}
+            <div className="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_9rem_auto]">
+              <input
+                value={discoveryDepartment}
+                onChange={(event) => setDiscoveryDepartment(event.target.value)}
+                placeholder="Department, e.g. Roofing"
+                aria-label="Supplier search department"
+                className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium"
+              />
+              <label className="relative">
+                <MapPin className="pointer-events-none absolute left-2.5 top-3 h-4 w-4 text-slate-400" />
+                <input
+                  value={discoveryZip}
+                  onChange={(event) =>
+                    setDiscoveryZip(
+                      event.target.value.replace(/[^0-9-]/g, "").slice(0, 10),
+                    )
+                  }
+                  inputMode="numeric"
+                  aria-label="Supplier search ZIP code"
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white pl-8 pr-2 text-sm font-medium"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void discoverSuppliers(false)}
+                disabled={discoveryPending}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-xs font-bold text-white disabled:opacity-50"
+              >
+                {discoveryPending ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+                Generate 10
+              </button>
+            </div>
+            {discoveryError ? (
+              <p className="mt-2 text-xs font-semibold text-rose-700" role="alert">
+                {discoveryError}
+              </p>
+            ) : null}
+            {discoveryNotice ? (
+              <p className="mt-2 text-xs font-semibold text-sky-800" role="status">
+                {discoveryNotice}
+              </p>
+            ) : null}
+            {discoveryResults.length ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {discoveryResults.map((supplier) => {
+                  const added = addedIdentities.includes(supplier.identity);
+                  const reviewing = reviewingCandidate?.identity === supplier.identity;
+                  return (
+                    <article
+                      key={supplier.identity}
+                      className={`grid gap-2 rounded-md border bg-white p-3 ${reviewing ? "border-amber-300 ring-2 ring-amber-100" : "border-sky-100"}`}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-xs font-bold text-slate-950">
+                            {supplier.name}
+                          </p>
+                          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-800">
+                            Needs review
+                          </span>
+                        </div>
+                        <p className="truncate text-[10px] text-slate-500">
+                          {supplier.domain}
+                        </p>
+                        <p className="mt-1 line-clamp-3 text-[10px] leading-4 text-slate-600">
+                          {supplier.summary ||
+                            "Open the source page to verify products and service area."}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <a
+                          href={supplier.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 px-2 text-[10px] font-bold text-[#0066cc]"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Open source
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => beginCandidateReview(supplier)}
+                          disabled={added || saving}
+                          className="inline-flex h-8 items-center gap-1 rounded-md bg-[#0071e3] px-2 text-[10px] font-bold text-white disabled:bg-emerald-600"
+                        >
+                          <ShieldCheck className="h-3 w-3" />
+                          {added ? "Added" : reviewing ? "Reviewing" : "Review candidate"}
+                        </button>
+                      </div>
+                      {reviewing ? (
+                        <div className="grid gap-2 border-t border-amber-100 pt-2">
+                          <label className="grid gap-1 text-[10px] font-bold text-slate-700">
+                            Verified supplier name
+                            <input
+                              value={reviewedSupplierName}
+                              onChange={(event) =>
+                                setReviewedSupplierName(event.target.value.slice(0, 160))
+                              }
+                              minLength={2}
+                              maxLength={160}
+                              className="h-9 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-950"
+                            />
+                          </label>
+                          {[
+                            ["officialSource", "The source appears to be this company’s official page."],
+                            ["departmentFit", `The source supports the ${discoveryContext.department} department fit.`],
+                            ["serviceArea", `The company appears able to serve ${discoveryContext.zipCode}.`],
+                          ].map(([key, label]) => (
+                            <label
+                              key={key}
+                              className="flex cursor-pointer items-start gap-2 text-[10px] leading-4 text-slate-700"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={candidateReview[key as keyof typeof candidateReview]}
+                                onChange={(event) =>
+                                  setCandidateReview((current) => ({
+                                    ...current,
+                                    [key]: event.target.checked,
+                                  }))
+                                }
+                                className="mt-0.5 h-3.5 w-3.5 accent-[#0071e3]"
+                              />
+                              {label}
+                            </label>
+                          ))}
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReviewingCandidate(null);
+                                setReviewedSupplierName("");
+                                setCandidateReview(EMPTY_CANDIDATE_REVIEW);
+                              }}
+                              className="h-8 rounded-md border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-600"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => addDiscoveredSupplier(supplier)}
+                              disabled={
+                                saving ||
+                                reviewedSupplierName.trim().length < 2 ||
+                                !Object.values(candidateReview).every(Boolean)
+                              }
+                              className="inline-flex h-8 items-center gap-1 rounded-md bg-slate-950 px-3 text-[10px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              {saving ? (
+                                <LoaderCircle className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Plus className="h-3 w-3" />
+                              )}
+                              Add to More suppliers
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+            ) : null}
+            {discoveryResults.length ? (
+              <button
+                type="button"
+                onClick={() => void discoverSuppliers(true)}
+                disabled={discoveryPending}
+                className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-sky-300 bg-white px-3 text-xs font-bold text-[#0066cc] disabled:opacity-50"
+              >
+                {discoveryPending ? (
+                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                Generate 10 more
+              </button>
+            ) : null}
           </div>
         </details>
         </div>
@@ -338,13 +636,26 @@ export function SupplierNetworkWorkspace({
                         <input
                           type="checkbox"
                           checked={edit.priority}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            if (
+                              edit.stage === "more" &&
+                              event.target.checked &&
+                              row.directoryTrustLevel === "not-reviewed"
+                            ) {
+                              moveRow(row, "contact");
+                              return;
+                            }
                             saveRow(row, {
                               ...edit,
                               priority: event.target.checked,
-                              stage: edit.stage === "contact" && !event.target.checked ? "more" : edit.stage === "more" && event.target.checked ? "contact" : edit.stage,
-                            })
-                          }
+                              stage:
+                                edit.stage === "contact" && !event.target.checked
+                                  ? "more"
+                                  : edit.stage === "more" && event.target.checked
+                                    ? "contact"
+                                    : edit.stage,
+                            });
+                          }}
                           className="h-3.5 w-3.5 shrink-0 accent-amber-500"
                           aria-label={`${stage === "approved" ? "Top vendor" : "Current priority"} ${row.name}`}
                         />
@@ -458,7 +769,7 @@ export function SupplierNetworkWorkspace({
                                 value={edit.stage}
                                 onChange={(event) => {
                                   const nextStage = event.target.value as SupplierNetworkStage;
-                                  saveRow(row, { ...edit, stage: nextStage, priority: nextStage === "contact" ? true : nextStage === "more" ? false : edit.priority });
+                                  moveRow(row, nextStage);
                                 }}
                                 className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold normal-case text-slate-900 outline-none focus:border-[#0071e3]"
                               >
@@ -575,6 +886,9 @@ export function SupplierNetworkWorkspace({
                             </p>
                             <p className="mt-1 text-[9px] font-semibold text-emerald-700">
                               Moving to Approved adds or updates this company in the Verified Supplier Directory.
+                            </p>
+                            <p className="mt-1 text-[9px] font-semibold text-slate-500">
+                              Candidate promotions require human confirmation and never send outreach.
                             </p>
                           </div>
                           <span className="shrink-0 text-[9px] font-semibold text-slate-500">
