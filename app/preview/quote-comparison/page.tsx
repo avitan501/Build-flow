@@ -78,6 +78,7 @@ export default function PublicQuoteComparisonPreviewPage() {
         { id: "client-jacob", name: "Jacob Darry", email: "jacob@example.com", companyName: "Darry Construction", phone: "(516) 555-0182" },
         { id: "client-five-towns", name: "David Avitan", email: "info@fivetownsbuilders.com", companyName: "Five Towns Builders", phone: "(516) 555-0134" },
       ]}
+      clientQuoteAttachments={[]}
       previewMode
     />
   );

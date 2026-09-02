@@ -6,15 +6,21 @@ import {
   CircleDollarSign,
   Eye,
   FileText,
+  LoaderCircle,
   LockKeyhole,
   Mail,
+  Paperclip,
   Save,
+  Trash2,
   UserRound,
   X,
 } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
 import {
+  completeClientQuoteAttachmentUploadAction,
+  prepareClientQuoteAttachmentUploadAction,
+  removeClientQuoteAttachmentAction,
   saveClientQuoteAction,
   sendClientQuoteAction,
 } from "@/app/admin/quote-comparison/actions";
@@ -22,11 +28,31 @@ import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup"
 import {
   buildClientQuoteSummary,
   formatComparisonMoney,
+  type ClientQuoteAttachmentRecord,
   type QuoteComparisonBidRecord,
   type QuoteComparisonItemRecord,
   type QuoteComparisonRecord,
 } from "@/lib/quote-comparison";
 import { CREDIT_CARD_PROCESSING_TERM } from "@/lib/proposal-terms";
+import { createClient } from "@/lib/supabase/client";
+
+const MAX_ATTACHMENT_FILES = 10;
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024;
+const MAX_ATTACHMENT_TOTAL_SIZE = 25 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+  "application/csv",
+]);
 
 export type QuoteClientOption = {
   id: string;
@@ -59,20 +85,47 @@ function profitTone(value: number) {
   return value < 0 ? "text-rose-700" : "text-emerald-700";
 }
 
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function attachmentType(file: File) {
+  if (file.type) return file.type;
+  const extension = file.name.toLowerCase().split(".").pop();
+  return ({
+    pdf: "application/pdf",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    heic: "image/heic",
+    heif: "image/heif",
+    doc: "application/msword",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xls: "application/vnd.ms-excel",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    csv: "text/csv",
+  } as Record<string, string>)[extension || ""] || "";
+}
+
 export function ClientQuoteBuilder({
   comparison,
   items,
   selectedBid,
   clients,
+  initialAttachments,
   previewMode,
 }: {
   comparison: QuoteComparisonRecord;
   items: QuoteComparisonItemRecord[];
   selectedBid: QuoteComparisonBidRecord | null;
   clients: QuoteClientOption[];
+  initialAttachments: ClientQuoteAttachmentRecord[];
   previewMode: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const [attachmentPending, startAttachmentTransition] = useTransition();
   const [selectedClientId, setSelectedClientId] = useState(comparison.client_id || "");
   const [quoteNumber, setQuoteNumber] = useState(comparison.quote_number);
   const [clientMessage, setClientMessage] = useState(comparison.client_message);
@@ -83,6 +136,7 @@ export function ClientQuoteBuilder({
   const [error, setError] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [clientQuoteStatus, setClientQuoteStatus] = useState(comparison.client_quote_status);
+  const [attachments, setAttachments] = useState(initialAttachments);
 
   const supplierPrices = useMemo(
     () => new Map((selectedBid?.quote_comparison_prices ?? []).map((price) => [price.item_id, price])),
@@ -182,6 +236,77 @@ export function ClientQuoteBuilder({
         clientUnitPrice: item.client_unit_price ?? 0,
       })),
     };
+  }
+
+  function validateAttachmentSelection(files: File[]) {
+    if (attachments.length + files.length > MAX_ATTACHMENT_FILES) return `Add up to ${MAX_ATTACHMENT_FILES} attachments.`;
+    const unsupported = files.find((file) => !ALLOWED_ATTACHMENT_TYPES.has(attachmentType(file)));
+    if (unsupported) return `${unsupported.name} is not supported. Use a photo, PDF, Word, Excel, or CSV file.`;
+    const oversized = files.find((file) => file.size > MAX_ATTACHMENT_SIZE);
+    if (oversized) return `${oversized.name} is too large. Keep each file under 25 MB.`;
+    const totalSize = attachments.reduce((sum, attachment) => sum + attachment.file_size, 0) + files.reduce((sum, file) => sum + file.size, 0);
+    if (totalSize > MAX_ATTACHMENT_TOTAL_SIZE) return "Keep all attachments together under 25 MB.";
+    return "";
+  }
+
+  function attachFiles(files: File[]) {
+    if (!files.length || attachmentPending) return;
+    const validationError = validateAttachmentSelection(files);
+    if (validationError) {
+      setError(validationError);
+      setMessage("");
+      return;
+    }
+    setError("");
+    setMessage("");
+    if (previewMode) {
+      setAttachments((current) => [
+        ...current,
+        ...files.map((file, index) => ({ id: `preview-${Date.now()}-${index}`, comparison_id: comparison.id, file_name: file.name, file_path: "", file_type: attachmentType(file), file_size: file.size, created_at: new Date().toISOString() })),
+      ]);
+      setMessage(`${files.length} attachment${files.length === 1 ? "" : "s"} added to the sample quote.`);
+      return;
+    }
+    startAttachmentTransition(async () => {
+      for (const file of files) {
+        const fileType = attachmentType(file);
+        const prepared = await prepareClientQuoteAttachmentUploadAction({ comparisonId: comparison.id, fileName: file.name, fileType, fileSize: file.size });
+        if (!prepared.ok) {
+          setError(prepared.error);
+          return;
+        }
+        const { error: uploadError } = await createClient().storage.from("project-uploads").uploadToSignedUrl(prepared.data.filePath, prepared.data.token, file, { contentType: fileType, upsert: false });
+        if (uploadError) {
+          setError(`${file.name} could not be uploaded. Try again.`);
+          return;
+        }
+        const completed = await completeClientQuoteAttachmentUploadAction({ comparisonId: comparison.id, filePath: prepared.data.filePath, fileName: file.name, fileType, fileSize: file.size });
+        if (!completed.ok) {
+          setError(completed.error);
+          return;
+        }
+        setAttachments((current) => [...current, completed.data]);
+      }
+      setMessage(`${files.length} attachment${files.length === 1 ? "" : "s"} will be sent with the quote PDF.`);
+    });
+  }
+
+  function removeAttachment(attachment: ClientQuoteAttachmentRecord) {
+    if (attachmentPending) return;
+    if (previewMode) {
+      setAttachments((current) => current.filter((entry) => entry.id !== attachment.id));
+      return;
+    }
+    setError("");
+    startAttachmentTransition(async () => {
+      const result = await removeClientQuoteAttachmentAction({ comparisonId: comparison.id, attachmentId: attachment.id });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setAttachments((current) => current.filter((entry) => entry.id !== attachment.id));
+      setMessage(`${attachment.file_name} removed.`);
+    });
   }
 
   function saveQuote() {
@@ -309,12 +434,19 @@ export function ClientQuoteBuilder({
             <div><p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">Margin</p><p className={`mt-1 text-lg font-bold tabular-nums ${profitTone(summary.marginPercent)}`}>{summary.marginPercent.toFixed(1)}%</p></div>
           </div>
 
-          <div className="grid gap-4 p-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div className="grid gap-4 p-5 sm:px-6">
             <label className="grid gap-1.5 text-xs font-bold text-slate-600">Message on client quote <span className="font-medium text-slate-400">Optional</span><textarea value={clientMessage} onChange={(event) => setClientMessage(event.target.value)} rows={2} placeholder="Delivery terms, exclusions, or a short note to the client" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium" /></label>
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3" aria-label="Client quote attachments">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="flex items-center gap-2 text-sm font-bold"><Paperclip className="h-4 w-4 text-[#0071e3]" /> Attachments for client</p><p className="mt-0.5 text-xs text-slate-500">Photos and files are sent with the branded quote PDF.</p></div>
+                <label className={`inline-flex min-h-10 items-center gap-2 rounded-lg border border-sky-300 bg-white px-3 text-sm font-bold text-[#0066cc] ${attachmentPending ? "cursor-wait opacity-60" : "cursor-pointer"}`}>{attachmentPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}{attachmentPending ? "Attaching…" : "Add photo or file"}<input type="file" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,.doc,.docx,.xls,.xlsx,.csv" disabled={attachmentPending} className="sr-only" onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; attachFiles(files); }} /></label>
+              </div>
+              {attachments.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{attachments.map((attachment) => <div key={attachment.id} className="flex min-w-0 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2"><FileText className="h-4 w-4 shrink-0 text-slate-400" /><span className="min-w-0 flex-1 truncate text-xs font-semibold" title={attachment.file_name}>{attachment.file_name}</span><span className="shrink-0 text-[10px] text-slate-400">{formatFileSize(attachment.file_size)}</span><button type="button" onClick={() => removeAttachment(attachment)} disabled={attachmentPending} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40" aria-label={`Remove ${attachment.file_name}`}><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div> : <p className="mt-3 text-xs font-semibold text-slate-400">No extra attachments yet.</p>}
+            </div>
+            <div className="flex flex-col justify-end gap-2 sm:flex-row">
               <button type="button" onClick={() => setShowPreview(true)} disabled={!canPrepare} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Eye className="h-4 w-4" /> Preview client copy</button>
-              <button type="button" onClick={saveQuote} disabled={pending || !canPrepare} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-40"><Save className="h-4 w-4" /> Save quote</button>
-              <button type="button" onClick={sendQuote} disabled={pending || !canPrepare} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-5 text-sm font-bold text-white disabled:opacity-40"><Mail className="h-4 w-4" /> Send to client</button>
+              <button type="button" onClick={saveQuote} disabled={pending || attachmentPending || !canPrepare} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-40"><Save className="h-4 w-4" /> Save quote</button>
+              <button type="button" onClick={sendQuote} disabled={pending || attachmentPending || !canPrepare} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-5 text-sm font-bold text-white disabled:opacity-40"><Mail className="h-4 w-4" /> Send to client</button>
             </div>
           </div>
         </>
@@ -336,7 +468,7 @@ export function ClientQuoteBuilder({
               <div className="mt-6 border-t border-slate-200 pt-5"><p className="text-xs font-bold uppercase tracking-[0.1em] text-slate-500">Terms &amp; conditions</p><p className="mt-2 text-xs leading-5 text-slate-600">{CREDIT_CARD_PROCESSING_TERM}</p></div>
               <div className="mt-7 flex flex-col gap-3 border-t border-slate-200 pt-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between"><span>Avantia Build · (516) 908-8319 · office@build.avantiap.com</span><span className="inline-flex items-center gap-1 font-bold text-[#0066cc]">build.avantiap.com <ArrowRight className="h-3.5 w-3.5" /></span></div>
             </div>
-            <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-7"><span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500"><FileText className="h-4 w-4" /> PDF attached when sent</span><button type="button" onClick={() => setShowPreview(false)} className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white">Done</button></div>
+            <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-7"><span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500"><FileText className="h-4 w-4" /> PDF{attachments.length ? ` + ${attachments.length} attachment${attachments.length === 1 ? "" : "s"}` : ""} sent together</span><button type="button" onClick={() => setShowPreview(false)} className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white">Done</button></div>
           </div>
         </div>
       ) : null}

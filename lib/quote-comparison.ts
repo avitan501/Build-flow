@@ -69,6 +69,16 @@ export type QuoteComparisonBidRecord = {
   quote_comparison_prices?: QuoteComparisonPriceRecord[];
 };
 
+export type ClientQuoteAttachmentRecord = {
+  id: string;
+  comparison_id: string;
+  file_name: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
+  created_at: string;
+};
+
 export type QuoteComparisonAnalysis = {
   bidId: string;
   supplierName: string;

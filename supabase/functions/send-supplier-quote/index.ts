@@ -26,6 +26,19 @@ function nonNegativeNumber(value: unknown) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
 }
 
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = ""
+  const chunkSize = 32_768
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length)))
+  }
+  return btoa(binary)
+}
+
+function safeAttachmentName(value: string) {
+  return value.normalize("NFC").replace(/[\\/\u0000-\u001f\u007f]/g, "_").trim().slice(0, 180) || "attachment"
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders })
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405)
@@ -90,6 +103,22 @@ Deno.serve(async (request) => {
     const recipientEmail = comparison.client_email_snapshot.trim().toLowerCase()
     if (!/^\S+@\S+\.\S+$/.test(recipientEmail)) return json({ error: "client_email_required" }, 400)
 
+    const { data: attachmentRows, error: attachmentRowsError } = await admin
+      .from("quote_comparison_client_attachments")
+      .select("id,file_name,file_path,file_type,file_size")
+      .eq("comparison_id", comparison.id)
+      .order("created_at")
+    if (attachmentRowsError) return json({ error: "quote_attachments_unavailable" }, 500)
+    if ((attachmentRows ?? []).length > 10) return json({ error: "too_many_quote_attachments" }, 400)
+    const storedAttachmentBytes = (attachmentRows ?? []).reduce((sum, row) => sum + nonNegativeNumber(row.file_size), 0)
+    if (storedAttachmentBytes > 25 * 1024 * 1024) return json({ error: "quote_attachments_too_large" }, 400)
+    const emailAttachments = [{ filename: safeAttachmentName(attachment.filename), content: attachment.content }]
+    for (const row of attachmentRows ?? []) {
+      const { data: file, error: downloadError } = await admin.storage.from("project-uploads").download(String(row.file_path || ""))
+      if (downloadError || !file || file.size !== Number(row.file_size)) return json({ error: "quote_attachment_download_failed" }, 500)
+      emailAttachments.push({ filename: safeAttachmentName(String(row.file_name || "attachment")), content: bytesToBase64(new Uint8Array(await file.arrayBuffer())) })
+    }
+
     const { data: rows } = await admin
       .from("quote_comparison_items")
       .select("description,specification,quantity,unit,client_unit_price,sort_order")
@@ -137,7 +166,7 @@ Deno.serve(async (request) => {
         body: JSON.stringify({
           from: Deno.env.get("QUOTE_SUBMISSION_FROM") || `Avantia Build <${companyEmail}>`,
           to: [recipientEmail], subject, html, text, reply_to: companyEmail,
-          attachments: [{ filename: attachment.filename.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 180) || "quote.pdf", content: attachment.content }],
+          attachments: emailAttachments,
         }),
       })
       const result = await response.json().catch(() => null) as { id?: string; message?: string; error?: string } | null

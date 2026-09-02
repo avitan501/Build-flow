@@ -45,6 +45,7 @@ import {
   lowestSupplierPriceByItem,
   quoteLineMatchStatus,
   quoteComparisonStatusLabel,
+  type ClientQuoteAttachmentRecord,
   type QuoteComparisonBidRecord,
   type QuoteComparisonItemRecord,
   type QuoteComparisonPriceRecord,
@@ -87,6 +88,7 @@ export function QuoteComparisonWorkspace({
   projects,
   departments,
   clients,
+  clientQuoteAttachments,
   previewMode = false,
 }: {
   comparison: QuoteComparisonRecord;
@@ -96,6 +98,7 @@ export function QuoteComparisonWorkspace({
   projects: ProjectOption[];
   departments: string[];
   clients: QuoteClientOption[];
+  clientQuoteAttachments: ClientQuoteAttachmentRecord[];
   previewMode?: boolean;
 }) {
   const router = useRouter();
@@ -404,6 +407,7 @@ export function QuoteComparisonWorkspace({
           items={items}
           selectedBid={selectedBid}
           clients={clients}
+          initialAttachments={clientQuoteAttachments}
           previewMode={previewMode}
         />
 

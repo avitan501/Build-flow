@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { QuoteComparisonWorkspace } from "@/components/buildflow/quote-comparison-workspace";
 import { requireStaffProfile } from "@/lib/auth";
-import type { QuoteComparisonBidRecord, QuoteComparisonItemRecord, QuoteComparisonRecord } from "@/lib/quote-comparison";
+import type { ClientQuoteAttachmentRecord, QuoteComparisonBidRecord, QuoteComparisonItemRecord, QuoteComparisonRecord } from "@/lib/quote-comparison";
 import type { SupplierRoutingOption } from "@/lib/shop-qualification";
 import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools";
 
@@ -22,7 +22,7 @@ export default async function QuoteComparisonDetailPage({
 }) {
   const { comparisonId } = await params;
   const { supabase } = await requireStaffProfile("suppliers");
-  const [comparisonResult, itemsResult, bidsResult, projectsResult, directoryResult, clientsResult] = await Promise.all([
+  const [comparisonResult, itemsResult, bidsResult, projectsResult, directoryResult, clientsResult, attachmentsResult] = await Promise.all([
     supabase.from("quote_comparisons").select("*").eq("id", comparisonId).maybeSingle<QuoteComparisonRecord>(),
     supabase.from("quote_comparison_items").select("*").eq("comparison_id", comparisonId).order("sort_order").order("created_at").returns<QuoteComparisonItemRecord[]>(),
     supabase.from("quote_comparison_bids").select("*,quote_comparison_prices(*)").eq("comparison_id", comparisonId).order("created_at").returns<QuoteComparisonBidRecord[]>(),
@@ -36,10 +36,16 @@ export default async function QuoteComparisonDetailPage({
       .not("email", "is", null)
       .order("full_name")
       .limit(500),
+    supabase
+      .from("quote_comparison_client_attachments")
+      .select("id,comparison_id,file_name,file_path,file_type,file_size,created_at")
+      .eq("comparison_id", comparisonId)
+      .order("created_at")
+      .returns<ClientQuoteAttachmentRecord[]>(),
   ]);
 
   if (comparisonResult.error || !comparisonResult.data) notFound();
-  if (itemsResult.error || bidsResult.error) throw new Error("Could not load the quote comparison workspace.");
+  if (itemsResult.error || bidsResult.error || attachmentsResult.error) throw new Error("Could not load the quote comparison workspace.");
 
   const snapshot = directoryResult.data as { settings?: { suppliers?: SupplierRoutingOption[] } } | null;
   const suppliers = snapshot?.settings?.suppliers ?? [];
@@ -63,6 +69,7 @@ export default async function QuoteComparisonDetailPage({
       projects={projectsResult.data ?? []}
       departments={departments}
       clients={clients}
+      clientQuoteAttachments={attachmentsResult.data ?? []}
     />
   );
 }

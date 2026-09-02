@@ -173,6 +173,31 @@ test("manager navigation and migration enforce supplier-scoped access", async ()
   expect(taxMigration).not.toMatch(/grant\s+.+\s+to\s+anon/i);
 });
 
+test("client quote attachments are private, bounded, and delivered with the branded PDF", async () => {
+  const root = process.cwd();
+  const [migration, actions, email, fallback, builder] = await Promise.all([
+    readFile(path.join(root, "supabase/migrations/20260902185436_add_client_quote_attachments.sql"), "utf8"),
+    readFile(path.join(root, "app/admin/quote-comparison/actions.ts"), "utf8"),
+    readFile(path.join(root, "lib/cart-submission-email.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/send-supplier-quote/index.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/client-quote-builder.tsx"), "utf8"),
+  ]);
+
+  expect(migration).toContain("quote_comparison_client_attachments");
+  expect(migration).toContain("enable row level security");
+  expect(migration).toContain("private.has_staff_capability('suppliers')");
+  expect(migration).not.toMatch(/grant\s+.+\s+to\s+anon/i);
+  expect(actions).toContain("createSignedUploadUrl(filePath)");
+  expect(actions).toContain("CLIENT_QUOTE_MAX_FILES = 10");
+  expect(actions).toContain("CLIENT_QUOTE_MAX_TOTAL_SIZE = 25 * 1024 * 1024");
+  expect(actions).toContain("attachments_snapshot: attachmentRecords.map");
+  expect(email).toContain("...(input.attachments ?? [])");
+  expect(fallback).toContain('from("quote_comparison_client_attachments")');
+  expect(fallback).toContain("attachments: emailAttachments");
+  expect(builder).toContain('type="file" multiple');
+  expect(builder).toContain("Add photo or file");
+});
+
 test("selecting a supplier saves the current price draft before awarding it", async () => {
   const [workspace, actions] = await Promise.all([
     readFile(path.join(process.cwd(), "components/buildflow/quote-comparison-workspace.tsx"), "utf8"),

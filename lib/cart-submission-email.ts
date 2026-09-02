@@ -86,6 +86,7 @@ export type ClientQuoteEmailInput = {
   taxAmount: number
   total: number
   pdfBase64: string
+  attachments?: Array<{ filename: string; content: string }>
   idempotencyKey: string
 }
 
@@ -528,7 +529,9 @@ export async function sendClientQuoteEmail(input: ClientQuoteEmailInput): Promis
     `Terms & conditions: ${CREDIT_CARD_PROCESSING_TERM}`,
     ...(input.message.trim() ? ["", input.message.trim()] : []),
     "",
-    "The full branded quote is attached as a PDF.",
+    input.attachments?.length
+      ? `The branded quote PDF and ${input.attachments.length} additional attachment${input.attachments.length === 1 ? "" : "s"} are included.`
+      : "The full branded quote is attached as a PDF.",
     "",
     "Avantia Build",
     COMPANY_EMAIL,
@@ -557,7 +560,7 @@ export async function sendClientQuoteEmail(input: ClientQuoteEmailInput): Promis
           </div>
           ${input.message.trim() ? `<p style="margin:22px 0 0;white-space:pre-wrap;color:#475569">${escapeHtml(input.message.trim())}</p>` : ""}
           <div style="margin:22px 0 0;padding-top:16px;border-top:1px solid #e5eaf1;color:#475569;font-size:13px"><strong style="color:#071126">Terms &amp; conditions</strong><br />${escapeHtml(CREDIT_CARD_PROCESSING_TERM)}</div>
-          <p style="margin:22px 0 0;color:#475569">The complete Avantia Build quote is attached as a PDF. Reply to this email with any questions or requested changes.</p>
+          <p style="margin:22px 0 0;color:#475569">The complete Avantia Build quote is attached as a PDF${input.attachments?.length ? `, together with ${input.attachments.length} additional attachment${input.attachments.length === 1 ? "" : "s"}` : ""}. Reply to this email with any questions or requested changes.</p>
         </div>
         <div style="padding:18px 22px;border-top:1px solid #e5eaf1;background:#f8fafc;color:#475569;font-size:13px;line-height:1.65">
           <strong style="color:#071126">Avantia Build</strong><br />
@@ -578,7 +581,10 @@ export async function sendClientQuoteEmail(input: ClientQuoteEmailInput): Promis
     text,
     replyTo: COMPANY_EMAIL,
     idempotencyKey: input.idempotencyKey,
-    attachments: [{ filename: `${input.quoteNumber}.pdf`, content: input.pdfBase64 }],
+    attachments: [
+      { filename: `${input.quoteNumber}.pdf`, content: input.pdfBase64 },
+      ...(input.attachments ?? []),
+    ],
     allowTestFallback: false,
   })
 }
