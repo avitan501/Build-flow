@@ -24,14 +24,15 @@ test("manager push notifications stay private and cover business events", async 
   expect(api).toContain("sameOrigin");
   expect(api).toContain('action: z.literal("subscribe")');
   expect(api).toContain("functions/v1/manager-web-push");
-  expect(api).toContain('.from("aura_audit_log")');
-  expect(api).toContain("createAdminClient");
+  expect(api).not.toContain('.from("aura_audit_log")');
+  expect(api).not.toContain("createAdminClient");
+  expect(api).toContain("loadManagerNotificationFeed(session.supabase, session.user.id)");
+  expect(api).toContain('action: z.literal("mark_all_read")');
   expect(edgeFunction).toContain("get_manager_web_push_private_key");
   expect(edgeFunction).toContain("managerUser(request)");
   expect(edgeFunction).toContain("dispatchAuthorized(request)");
-  expect(edgeFunction).toContain('from("manager_push_notification_log")');
-  expect(edgeFunction).toContain("notifications:");
-  expect(edgeFunction).toContain(".limit(100)");
+  expect(edgeFunction).toContain("deliverQueue");
+  expect(edgeFunction).not.toContain('manager_push_notification_log").select');
   expect(edgeFunction).toContain("retryableFailed");
   expect(dashboard).toContain("<ManagerNotificationControl settings />");
   expect(dashboard).not.toContain("ManagerNotificationCenter");
@@ -42,11 +43,11 @@ test("manager push notifications stay private and cover business events", async 
   expect(control).toContain("Add to Home Screen");
   expect(control).toContain("Open Avantia in Safari");
   expect(control).toContain("Send test notification");
-  expect(center).toContain('fetch("/api/manager-notifications"');
+  expect(center).toContain('fetch("/api/manager-notifications?history=1"');
   expect(center).toContain("Notifications & activity");
-  expect(center).toContain("Phone AI activity");
-  expect(center).toContain('href="/owner/ai-inbox"');
-  expect(center).toContain('event.href.startsWith("/")');
+  expect(center).toContain('action: "mark_all_read"');
+  expect(center).toContain("summarizeManagerNotifications(events)");
+  expect(center).not.toContain("localStorage");
   expect(serviceWorker).toContain('self.addEventListener("push"');
   expect(serviceWorker).toContain('self.addEventListener("notificationclick"');
   expect(serviceWorker).toContain("self.skipWaiting()");
@@ -63,9 +64,28 @@ test("manager push notifications stay private and cover business events", async 
   expect(queueMigration).toContain("dispatch-manager-web-push");
   expect(queueMigration).toContain("manager_push_dispatch_secret");
   expect(notificationFixMigration).toContain("new.direction <> 'incoming'");
-  expect(notificationFixMigration).not.toContain("new.direction <> 'inbound'");
   expect(notificationFixMigration).toContain("grant execute on function public.queue_manager_push_event");
   expect(lockdownMigration).toContain("revoke all on function public.queue_new_request_push() from public, anon, authenticated");
+});
+
+test("manager notification feed is per user, queue-backed, and links to the exact communication", async () => {
+  const [migration, store, communicationsPage, inbox] = await Promise.all([
+    readFile(path.join(root, "supabase/migrations/20260902180000_unify_manager_notification_center.sql"), "utf8"),
+    readFile(path.join(root, "lib/manager-notification-store.ts"), "utf8"),
+    readFile(path.join(root, "app/admin/communications/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8"),
+  ]);
+  expect(migration).toContain("manager_notification_reads");
+  expect(migration).toContain("primary key (user_id, notification_id)");
+  expect(migration).toContain("user_id = (select auth.uid())");
+  expect(migration).toContain("('incoming', 'inbound')");
+  expect(migration).toContain("?communication=' || new.id::text");
+  expect(store).toContain('.from("manager_push_queue")');
+  expect(store).toContain('.from("manager_notification_reads")');
+  expect(communicationsPage).not.toContain("createAdminClient");
+  expect(communicationsPage).toContain("loadAuraDashboard(supabase, supabase)");
+  expect(communicationsPage).toContain("initialCommunicationId=");
+  expect(inbox).toContain("communication.id === communicationId");
 });
 
 test("publishes the installable web app and protected notification endpoint", async ({ request }) => {

@@ -70,6 +70,8 @@ test("conversation assignment keeps contact notes and uses structured links", ()
   expect(brokerAction).not.toContain("Avantia link:");
   expect(brokerAction).not.toContain("notes =");
   expect(page).toContain("loadAuraCommunicationLinks(normalizedCommunications.map((communication) => communication.id), supabase)");
+  expect(page).toContain("loadAuraDashboard(supabase, supabase)");
+  expect(page).not.toContain("createAdminClient");
   expect(emailLinks).toContain("reader ?? createAdminClient()");
   expect(inbox).toContain("communication.links?.find");
 });

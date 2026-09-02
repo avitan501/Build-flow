@@ -6,8 +6,11 @@ import {
   captureOperationalError,
   shouldCaptureOperationalStatus,
 } from "@/lib/monitoring/capture-operational-error";
+import {
+  loadManagerNotificationFeed,
+  markManagerNotificationRead,
+} from "@/lib/manager-notification-store";
 import { managerCapabilities } from "@/lib/owner-identity";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +20,9 @@ const subscriptionSchema = z.object({ action: z.literal("subscribe"), subscripti
 const unsubscribeSchema = z.object({ action: z.literal("unsubscribe"), endpoint: z.string().url().max(4000) });
 const preferencesSchema = z.object({ action: z.literal("preferences"), preferences: z.object({ new_orders: z.boolean(), calls_and_messages: z.boolean(), supplier_updates: z.boolean(), quote_approvals: z.boolean(), delivery_updates: z.boolean() }) });
 const testSchema = z.object({ action: z.literal("test") });
-const requestSchema = z.discriminatedUnion("action", [subscriptionSchema, unsubscribeSchema, preferencesSchema, testSchema]);
+const markReadSchema = z.object({ action: z.literal("mark_read"), notificationId: z.number().int().positive() });
+const markAllReadSchema = z.object({ action: z.literal("mark_all_read") });
+const requestSchema = z.discriminatedUnion("action", [subscriptionSchema, unsubscribeSchema, preferencesSchema, testSchema, markReadSchema, markAllReadSchema]);
 
 async function managerSession() {
   const session = await getSessionWithProfile();
@@ -61,19 +66,23 @@ export async function GET(request: Request) {
   const session = await managerSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    if (new URL(request.url).searchParams.get("summary") === "1") {
-      const admin = createAdminClient();
-      const [latestResult, unreadResult] = await Promise.all([
-        admin.from("manager_push_notification_log").select("created_at").order("created_at", { ascending: false }).limit(1).maybeSingle<{ created_at: string }>(),
-        admin.from("aura_communications").select("id", { count: "exact", head: true }).eq("direction", "incoming").is("read_at", null),
-      ]);
-      if (latestResult.error || unreadResult.error) throw latestResult.error || unreadResult.error;
+    const searchParams = new URL(request.url).searchParams;
+    if (searchParams.get("summary") === "1") {
+      const notifications = await loadManagerNotificationFeed(session.supabase, session.user.id);
       const response = NextResponse.json({
-        latestAt: latestResult.data?.created_at || null,
-        unreadCommunications: unreadResult.count ?? 0,
+        latestAt: notifications[0]?.created_at ?? null,
+        unreadNotifications: notifications.filter((event) => !event.read_at).length,
+        unreadCommunications: notifications.filter((event) => event.event_type === "call_message" && !event.read_at).length,
       });
       response.headers.set("Cache-Control", "private, no-store");
       response.headers.set("Server-Timing", `notification-summary;dur=${Math.round(performance.now() - startedAt)}`);
+      return response;
+    }
+    if (searchParams.get("history") === "1") {
+      const notifications = await loadManagerNotificationFeed(session.supabase, session.user.id);
+      const response = NextResponse.json({ notifications });
+      response.headers.set("Cache-Control", "private, no-store");
+      response.headers.set("Server-Timing", `notification-history;dur=${Math.round(performance.now() - startedAt)}`);
       return response;
     }
     const { response, result } = await invokeNotificationService(session, { action: "status" });
@@ -89,12 +98,7 @@ export async function GET(request: Request) {
       }
       return NextResponse.json(result, { status: response.status });
     }
-    const { data: activity } = await session.supabase
-      .from("aura_audit_log")
-      .select("id,intake_id,action,created_at")
-      .order("created_at", { ascending: false })
-      .limit(50);
-    const nextResponse = NextResponse.json({ ...result, activity: activity ?? [] }, { status: response.status });
+    const nextResponse = NextResponse.json(result, { status: response.status });
     nextResponse.headers.set("Server-Timing", `notification-center;dur=${Math.round(performance.now() - startedAt)}`);
     return nextResponse;
   } catch (cause) {
@@ -120,6 +124,15 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid notification request" }, { status: 400 });
 
   try {
+    if (parsed.data.action === "mark_read") {
+      await markManagerNotificationRead(session.supabase, session.user.id, [parsed.data.notificationId]);
+      return NextResponse.json({ ok: true });
+    }
+    if (parsed.data.action === "mark_all_read") {
+      const feed = await loadManagerNotificationFeed(session.supabase, session.user.id);
+      await markManagerNotificationRead(session.supabase, session.user.id, feed.map((event) => event.id));
+      return NextResponse.json({ ok: true, marked: feed.length });
+    }
     const userAgent = request.headers.get("user-agent") || "";
     const payload = parsed.data.action === "subscribe"
       ? { ...parsed.data, deviceName: deviceName(userAgent), userAgent: userAgent.slice(0, 1000) }

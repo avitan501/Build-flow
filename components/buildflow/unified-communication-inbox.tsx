@@ -154,8 +154,10 @@ function ExpandableMessage({ text }: { text: string }) {
   return <div><p className={`whitespace-pre-wrap break-words text-sm leading-5 ${long && !expanded ? "max-h-32 overflow-hidden" : ""}`}>{text}</p>{long ? <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-[#0066cc]">{expanded ? "Show less" : "Show more"}<ChevronDown className={`h-3 w-3 transition ${expanded ? "rotate-180" : ""}`} /></button> : null}</div>
 }
 
-function initialCommunicationForQuery(communications: AuraCommunicationRow[], query: string, channelFilter: string) {
+function initialCommunicationForQuery(communications: AuraCommunicationRow[], query: string, channelFilter: string, communicationId = "") {
   const available = channelFilter === "all" ? communications : communications.filter((communication) => communication.channel === channelFilter)
+  const exact = communicationId && communications.find((communication) => communication.id === communicationId)
+  if (exact) return exact
   const needle = query.trim().toLowerCase()
   if (!needle) return available[0]
   return available.find((communication) => [
@@ -194,7 +196,7 @@ function initialConversationKey(communication: AuraCommunicationRow | undefined,
   return linked ? `${linked[1]}:${linked[2]}` : rawKey || `unknown:${communication.contact_id || communication.id}`
 }
 
-export function UnifiedCommunicationInbox({ communications, contacts, customers, leads = [], suppliers = [], materialRequests = [], smsReplyDrafts = [], connections, initialChannelFilter = "all", initialQuery = "", initialDraft = "" }: {
+export function UnifiedCommunicationInbox({ communications, contacts, customers, leads = [], suppliers = [], materialRequests = [], smsReplyDrafts = [], connections, initialChannelFilter = "all", initialCommunicationId = "", initialQuery = "", initialDraft = "" }: {
   communications: AuraCommunicationRow[]
   contacts: AuraContactRow[]
   customers: AuraCustomerIdentity[]
@@ -204,11 +206,12 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   smsReplyDrafts?: SmsReplyDraft[]
   connections: Connections
   initialChannelFilter?: string
+  initialCommunicationId?: string
   initialQuery?: string
   initialDraft?: string
 }) {
   const router = useRouter()
-  const initialCommunication = initialCommunicationForQuery(communications, initialQuery, initialChannelFilter)
+  const initialCommunication = initialCommunicationForQuery(communications, initialQuery, initialChannelFilter, initialCommunicationId)
   const initialStoredDraft = smsReplyDrafts.find((draft) => draft.communication_id === initialCommunication?.id)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const initialCursor = communications.reduce((latest, item) => {
