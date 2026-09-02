@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdminProfile, requireStaffProfile } from "@/lib/auth";
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
 import { captureOperationalError } from "@/lib/monitoring/capture-operational-error";
+import { scheduleClientMaterialListOrganization } from "@/lib/material-request-organization";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildProjectUploadStoragePath, PROJECT_UPLOAD_ALLOWED_MIME_TYPES, PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/projects";
 
@@ -368,14 +369,13 @@ export async function createRequestForClientAction(input: {
   const storedDepartment = department || "Unassigned";
 
   const freeText = input.freeText?.trim().slice(0, 4000) || "";
-  const lines = input.lines
+  const lines = (Array.isArray(input.lines) ? input.lines : [])
     .map((line) => ({
       name: line.name.trim().slice(0, 300),
       quantity: Number(line.quantity),
       unit: line.unit.trim().slice(0, 40) || "each",
     }))
     .filter((line) => line.name);
-  if (!lines.length && !freeText) return { ok: false, error: "Paste the client's list or add at least one material item." };
   if (lines.length > 50) return { ok: false, error: "Keep each request to 50 material lines or fewer." };
   if (lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0 || line.quantity > 1_000_000)) {
     return { ok: false, error: "Every item needs a valid quantity greater than zero." };
@@ -389,8 +389,9 @@ export async function createRequestForClientAction(input: {
     !attachment.storagePath.startsWith("public-intake/") || attachment.storagePath.includes("..") || !attachment.filename.trim() || !allowedTypes.has(attachment.type) || !Number.isFinite(attachment.size) || attachment.size <= 0 || attachment.size > PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES
   );
   if (invalidAttachment) return { ok: false, error: "One of the attached photos or files is invalid. Remove it and try again." };
+  if (!lines.length && !freeText && !attachments.length) return { ok: false, error: "Paste the client's list, add a material item, or attach a photo or PDF." };
   const requestDetails = [freeText, notes ? `Additional notes:\n${notes}` : ""].filter(Boolean).join("\n\n").slice(0, 4000);
-  const storedLines = freeText ? [{ name: "Free-text material list", quantity: 1, unit: "request" }] : lines;
+  const storedLines = freeText || !lines.length ? [{ name: "Free-text material list", quantity: 1, unit: "request" }] : lines;
   const requestTitle = input.title?.trim().slice(0, 180) || (department ? `${department} request` : "Material request");
   const { data: requestId, error: requestError } = await supabase.rpc("staff_create_client_request", {
     p_customer_id: customerId,
@@ -431,9 +432,7 @@ export async function createRequestForClientAction(input: {
     }
   }
 
-  if (freeText) {
-    await supabase.functions.invoke("client-material-list-ai", { body: { requestId: String(requestId) } });
-  }
+  if (freeText || attachments.length) scheduleClientMaterialListOrganization({ requestId: String(requestId) });
 
   revalidatePath("/admin/users");
   revalidatePath("/owner/materials/requests");

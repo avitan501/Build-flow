@@ -31,7 +31,7 @@ test("direct checkout removes project selection and preserves manager request de
 })
 
 test("manager can create, assign, and archive a structured request on behalf of a client", async () => {
-  const [component, actions, apiRoute, requestMigration, customerPage, inboxPage, clientFunction, requestActions, statusControl, assigneeControl, assigneeMigration, catalogAdmin] = await Promise.all([
+  const [component, actions, apiRoute, requestMigration, customerPage, inboxPage, clientFunction, requestActions, statusControl, assigneeControl, assigneeMigration, catalogAdmin, organizationScheduler] = await Promise.all([
     readFile(path.join(root, "components/buildflow/manager-create-client-request.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/users/actions.ts"), "utf8"),
     readFile(path.join(root, "app/api/admin/client-requests/route.ts"), "utf8"),
@@ -44,6 +44,7 @@ test("manager can create, assign, and archive a structured request on behalf of 
     readFile(path.join(root, "components/buildflow/material-request-assignee-control.tsx"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260826220722_add_material_request_assignee.sql"), "utf8"),
     readFile(path.join(root, "components/buildflow/owner-materials-admin-shell.tsx"), "utf8"),
+    readFile(path.join(root, "lib/material-request-organization.ts"), "utf8"),
   ])
 
   expect(component).toContain("Create request for a client")
@@ -73,7 +74,8 @@ test("manager can create, assign, and archive a structured request on behalf of 
   expect(actions).toContain('supabase.rpc("staff_create_client_request"')
   expect(actions).toContain('from("quote_request_attachments").insert')
   expect(actions).toContain("buildProjectUploadStoragePath")
-  expect(actions).toContain('supabase.functions.invoke("client-material-list-ai"')
+  expect(actions).toContain("scheduleClientMaterialListOrganization")
+  expect(organizationScheduler).toContain('>("client-material-list-ai"')
   expect(actions).toContain('name: "Free-text material list"')
   expect(actions).toContain('const storedDepartment = department || "Unassigned"')
   expect(actions).toContain('supabase.functions.invoke<{')

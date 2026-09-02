@@ -26,3 +26,32 @@ test("adding files to an existing request schedules one safe forced reorganizati
   expect(organizer).toContain('metadata?.ai_organized === true')
   expect(organizer).toContain('metadata?.ai_organized !== true')
 })
+
+test("David can create an attachment-only request and AI receives its files", async () => {
+  const [actions, component] = await Promise.all([
+    source("app/admin/users/actions.ts"),
+    source("components/buildflow/manager-create-client-request.tsx"),
+  ])
+
+  expect(actions).toContain("!lines.length && !freeText && !attachments.length")
+  expect(actions).toContain('freeText || !lines.length ? [{ name: "Free-text material list"')
+  expect(actions).toContain("if (freeText || attachments.length) scheduleClientMaterialListOrganization")
+  expect(component).toContain("const hasMaterialInput = attachments.length > 0")
+  expect(component).toContain("!hasMaterialInput")
+  expect(component).toContain("attach the client&apos;s photo/PDF below")
+})
+
+test("file limits remain enforced before request mutation", async () => {
+  const [actions, component, attachmentInput] = await Promise.all([
+    source("app/admin/users/actions.ts"),
+    source("components/buildflow/manager-create-client-request.tsx"),
+    source("supabase/functions/client-material-list-ai/attachment-input.ts"),
+  ])
+
+  expect(actions).toContain("attachments.length > 10")
+  expect(actions).toContain("PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES")
+  expect(component).toContain("const MAX_ATTACHMENT_COUNT = 10")
+  expect(component).toContain("const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024")
+  expect(attachmentInput).toContain("MAX_ATTACHMENT_COUNT = 8")
+  expect(attachmentInput).toContain("MAX_TOTAL_ATTACHMENT_BYTES = 32 * 1024 * 1024")
+})
