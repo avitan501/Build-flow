@@ -172,7 +172,7 @@ export function OutreachLeadDirectory({ leads, conversations, senderName }: { le
         </div>
         {lead.notes ? <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">{lead.notes}</p> : null}
       </div>
-      <ContactConversation entries={conversations[lead.id] ?? []} historyHref={`/admin/communications?channel=whatsapp&q=${encodeURIComponent(lead.phone || lead.email || lead.full_name)}`} />
+      <ContactConversation entries={conversations[lead.id] ?? []} historyHref={`/admin/communications?channel=whatsapp&q=${encodeURIComponent(lead.phone || lead.email || lead.full_name)}${lead.phone || lead.email ? `&thread=${encodeURIComponent(lead.phone || lead.email || "")}` : ""}`} />
     </article>)}
     {error ? <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p> : null}
   </section>;

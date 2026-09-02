@@ -101,6 +101,36 @@ export function normalizeAuraCommunications(rows: unknown[] | null | undefined):
   });
 }
 
+export async function loadAuraConnectionStatus(brokerClient: SupabaseClient) {
+  const brokerResult = await brokerClient.functions.invoke<{ ok?: boolean; whatsapp?: boolean; whatsappProvider?: string | null; sms?: boolean; smsReceive?: boolean; voice?: boolean; voiceRecording?: boolean; voicePhone?: string | null; email?: boolean }>("aura-messaging-broker", {
+    body: { action: "status" },
+  }).catch(() => ({ data: null }));
+  const brokerStatus = brokerResult.data?.ok ? brokerResult.data : null;
+  return {
+    voice: {
+      receive: Boolean(brokerStatus?.voice),
+      send: Boolean(brokerStatus?.voice),
+      recording: Boolean(brokerStatus?.voiceRecording),
+      phone: brokerStatus?.voicePhone || null,
+    },
+    quo: {
+      receive: Boolean(brokerStatus?.smsReceive) || Boolean(process.env.AURA_QUO_WEBHOOK_SIGNING_SECRET && process.env.AURA_QUO_PHONE_NUMBER_IDS),
+      send: Boolean(brokerStatus?.sms) || canSendAuraQuoText(),
+    },
+    whatsapp: {
+      receive:
+        Boolean(brokerStatus?.whatsapp) ||
+        Boolean(process.env.AURA_WHATSAPP_APP_SECRET && process.env.AURA_WHATSAPP_VERIFY_TOKEN) ||
+        canUseTwilioWhatsApp(),
+      send: Boolean(brokerStatus?.whatsapp) || canSendAuraWhatsApp(),
+    },
+    email: {
+      receive: Boolean(process.env.RESEND_API_KEY && process.env.AURA_RESEND_WEBHOOK_SECRET && process.env.AURA_RESEND_INBOUND_ADDRESS),
+      send: Boolean(brokerStatus?.email) || canSendAuraEmail(),
+    },
+  };
+}
+
 export async function loadAuraDashboard(supabase: SupabaseClient, brokerClient: SupabaseClient = supabase) {
   const [intakesResult, contactsResult, leadsResult, tasksResult, communicationsResult, customersResult, brokerResult] = await Promise.all([
     supabase

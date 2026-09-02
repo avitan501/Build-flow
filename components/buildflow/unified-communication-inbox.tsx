@@ -10,6 +10,7 @@ import { recordCommunicationActivityAction } from "@/app/admin/activity-actions"
 import { completeSmsReplyDraftAction, createSmsMaterialRequestAction, generateSmsReplyAction, linkCommunicationContactAction, linkEmailConversationAction, markCommunicationConversationReadAction, quickTagPhoneContactAction, reviewSmsRequestAction, saveSmsAutomationAction, type SmsReplyDraft, type SmsRequestProposal } from "@/app/admin/communications/actions"
 import { TwoChatSoftphone } from "@/components/buildflow/two-chat-softphone"
 import { captureAvantiaEvent } from "@/lib/analytics/posthog-client"
+import { communicationHistoryCursor } from "@/lib/aura/communication-history-cursor"
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard"
 import { normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identity"
 import { looksLikeMaterialRequestMessage } from "@/lib/aura/material-request-detection"
@@ -64,6 +65,13 @@ type Conversation = {
 type CommunicationUpdatesResponse = {
   communications?: AuraCommunicationRow[]
   cursor?: string
+}
+
+type CommunicationHistoryResponse = {
+  communications?: AuraCommunicationRow[]
+  cursor?: string | null
+  hasMore?: boolean
+  error?: string
 }
 
 const QUICK_REPLIES = ["Received, thank you.", "I need a few more details.", "I am checking current pricing.", "A manager will confirm the next step."]
@@ -168,6 +176,21 @@ function initialCommunicationForQuery(communications: AuraCommunicationRow[], qu
   ].some((value) => value.toLowerCase().includes(needle))) || available[0]
 }
 
+function initialCommunicationForThread(communications: AuraCommunicationRow[], thread: string, channelFilter: string) {
+  const threadKey = identityKey(normalizeAuraPhone(thread), thread.includes("@") ? thread : null)
+  if (!threadKey) return undefined
+  return communications.find((communication) =>
+    (channelFilter === "all" || communication.channel === channelFilter)
+    && identityKey(communication.counterparty_phone, communication.counterparty_email) === threadKey,
+  )
+}
+
+function mergeCommunicationRows(current: AuraCommunicationRow[], incoming: AuraCommunicationRow[]) {
+  const merged = new Map(current.map((item) => [item.id, item]))
+  for (const item of incoming) merged.set(item.id, item)
+  return [...merged.values()]
+}
+
 function replySubject(subject?: string | null) {
   const clean = String(subject || "").trim()
   if (!clean) return "Avantia Build"
@@ -196,7 +219,7 @@ function initialConversationKey(communication: AuraCommunicationRow | undefined,
   return linked ? `${linked[1]}:${linked[2]}` : rawKey || `unknown:${communication.contact_id || communication.id}`
 }
 
-export function UnifiedCommunicationInbox({ communications, contacts, customers, leads = [], suppliers = [], materialRequests = [], smsReplyDrafts = [], connections, initialChannelFilter = "all", initialCommunicationId = "", initialQuery = "", initialDraft = "" }: {
+export function UnifiedCommunicationInbox({ communications, contacts, customers, leads = [], suppliers = [], materialRequests = [], smsReplyDrafts = [], connections, initialChannelFilter = "all", initialCommunicationId = "", initialQuery = "", initialDraft = "", initialThread = "", initialHistoryCursor = null, initialHistoryHasMore = false }: {
   communications: AuraCommunicationRow[]
   contacts: AuraContactRow[]
   customers: AuraCustomerIdentity[]
@@ -209,9 +232,13 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   initialCommunicationId?: string
   initialQuery?: string
   initialDraft?: string
+  initialThread?: string
+  initialHistoryCursor?: string | null
+  initialHistoryHasMore?: boolean
 }) {
   const router = useRouter()
   const initialCommunication = initialCommunicationForQuery(communications, initialQuery, initialChannelFilter, initialCommunicationId)
+    || initialCommunicationForThread(communications, initialThread, initialChannelFilter)
   const initialStoredDraft = smsReplyDrafts.find((draft) => draft.communication_id === initialCommunication?.id)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const initialCursor = communications.reduce((latest, item) => {
@@ -250,6 +277,11 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const [teachAi, setTeachAi] = useState(false)
   const [correctionReasons, setCorrectionReasons] = useState<SmsCorrectionReason[]>([])
   const [confirmationCommunicationId, setConfirmationCommunicationId] = useState("")
+  const [historyCursor, setHistoryCursor] = useState(initialHistoryCursor)
+  const [historyHasMore, setHistoryHasMore] = useState(initialHistoryHasMore)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState("")
+  const [threadHistory, setThreadHistory] = useState<Record<string, { cursor: string | null; hasMore: boolean }>>({})
 
   useEffect(() => {
     let stopped = false
@@ -324,6 +356,33 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     }
   }, [])
 
+  useEffect(() => {
+    const needle = query.trim()
+    if (needle.length < 2) return
+    const controller = new AbortController()
+    const timer = window.setTimeout(async () => {
+      const parameters = new URLSearchParams({ q: needle, limit: "60" })
+      if (channelFilter !== "all") parameters.set("channel", channelFilter)
+      try {
+        const response = await fetch(`/api/admin/communications/history?${parameters}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        })
+        if (!response.ok) return
+        const result = await response.json() as CommunicationHistoryResponse
+        if (result.communications?.length)
+          setLiveCommunications((current) => mergeCommunicationRows(current, result.communications || []))
+      } catch (cause) {
+        if (!(cause instanceof DOMException && cause.name === "AbortError"))
+          captureAvantiaEvent("avantia_communications_history_search", { success: false })
+      }
+    }, 350)
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+    }
+  }, [channelFilter, query])
+
   const directory = useMemo(() => {
     const entries: DirectoryEntry[] = [
       ...customers.map((item) => ({ key: `customer:${item.id}`, id: item.id, name: item.full_name || item.company_name || item.email || item.phone || "Unnamed customer", company: item.company_name || "", phone: item.phone || "", whatsapp: item.phone || "", email: item.email || "", kind: "customer" as const })),
@@ -397,6 +456,66 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const activeConversation = conversations.find((conversation) => conversation.key === activeKey) || (activeKey !== "__new__" ? conversations[0] : undefined)
   const recipientOptions = directory.entries.filter((entry) => entry.kind === recipientType)
   const selectedChannelReady = channel === "call" || (channel === "sms" ? connections.quo.send : channel === "whatsapp" ? connections.whatsapp.send : connections.email.send)
+  const activeThreadHistory = activeConversation ? threadHistory[activeConversation.key] : undefined
+  const activeThreadHasMore = Boolean(activeConversation && (activeThreadHistory?.hasMore ?? true))
+
+  function updateConversationDeepLink(conversation: Conversation, nextChannel = channelFilter) {
+    const thread = conversation.phone || conversation.email
+    if (!thread) return
+    const url = new URL(window.location.href)
+    url.searchParams.set("thread", thread)
+    if (nextChannel === "all") url.searchParams.delete("channel")
+    else url.searchParams.set("channel", nextChannel)
+    url.searchParams.delete("draft")
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
+  }
+
+  async function loadOlderHistory(scope: "all" | "thread") {
+    if (historyLoading) return
+    const conversation = scope === "thread" ? activeConversation : undefined
+    const oldest = conversation?.messages[0]
+    const cursor = scope === "all"
+      ? historyCursor
+      : activeThreadHistory?.cursor ?? (oldest ? communicationHistoryCursor(oldest) : null)
+    if (!cursor) return
+    const parameters = new URLSearchParams({ cursor, limit: scope === "all" ? "80" : "60" })
+    if (conversation?.phone) parameters.set("phone", conversation.phone)
+    if (conversation?.email) parameters.set("email", conversation.email)
+    setHistoryLoading(true)
+    setHistoryError("")
+    const startedAt = performance.now()
+    try {
+      const response = await fetch(`/api/admin/communications/history?${parameters}`, { cache: "no-store" })
+      const result = await response.json() as CommunicationHistoryResponse
+      if (!response.ok) throw new Error(result.error || `communication-history-${response.status}`)
+      setLiveCommunications((current) => mergeCommunicationRows(current, result.communications || []))
+      if (scope === "all") {
+        setHistoryCursor(result.cursor || null)
+        setHistoryHasMore(Boolean(result.hasMore))
+      } else if (conversation) {
+        setThreadHistory((current) => ({
+          ...current,
+          [conversation.key]: { cursor: result.cursor || null, hasMore: Boolean(result.hasMore) },
+        }))
+      }
+      captureAvantiaEvent("avantia_communications_history_page", {
+        duration_ms: Math.round(performance.now() - startedAt),
+        scope,
+        rows: result.communications?.length || 0,
+        success: true,
+      })
+    } catch {
+      setHistoryError("Older communication history could not be loaded. Try again.")
+      captureAvantiaEvent("avantia_communications_history_page", {
+        duration_ms: Math.round(performance.now() - startedAt),
+        scope,
+        rows: 0,
+        success: false,
+      })
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
 
   function openConversation(conversation: Conversation) {
     setActiveKey(conversation.key)
@@ -415,6 +534,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     setCorrectionReasons([])
     if (storedDraft) setChannel("sms")
     setFeedback(null)
+    updateConversationDeepLink(conversation)
     const auraContact = contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(conversation.phone, conversation.email))
     setSmsAiMode(auraContact?.sms_ai_mode || "auto_safe")
     setSmsAiStyle(auraContact?.sms_ai_style || "professional")
@@ -451,6 +571,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     setTeachAi(false)
     setCorrectionReasons([])
     setFeedback(null)
+    if (activeConversation) updateConversationDeepLink(activeConversation, nextFilter)
   }
 
   function saveSmsAiSettings() {
@@ -524,6 +645,11 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     setTeachAi(false)
     setCorrectionReasons([])
     setFeedback(null)
+    const url = new URL(window.location.href)
+    url.searchParams.delete("thread")
+    url.searchParams.delete("q")
+    url.searchParams.delete("draft")
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
   }
 
   function selectNewRecipient(id: string) {
@@ -721,6 +847,8 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         <div className="min-h-0 flex-1 overflow-y-auto">
           {filteredConversations.map((conversation) => <button key={conversation.key} type="button" onClick={() => openConversation(conversation)} className={`flex w-full items-start gap-3 border-b border-slate-100 px-3 py-3 text-left ${activeKey === conversation.key ? "bg-sky-50" : "hover:bg-slate-50"}`}><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">{initials(conversation.name)}</span><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><strong className={`truncate text-sm ${conversation.unread ? "font-black text-slate-950" : ""}`}>{conversation.name}</strong><span className="flex shrink-0 items-center gap-1.5">{conversation.unread ? <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#0071e3] px-1.5 py-0.5 text-[9px] font-black text-white" aria-label={`${conversation.unread} unread`}>{conversation.unread}</span> : null}<time className="text-[10px] text-slate-400">{formatTime(conversation.latest.occurred_at)}</time></span></span><span className="mt-0.5 flex items-center gap-1.5"><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${contactKindTone(conversation.kind)}`}>{contactKindLabel(conversation.kind)}</span>{conversation.channels.slice(0, 3).map((item) => <span key={item}>{channelIcon(item, "h-3 w-3")}</span>)}</span><span className={`mt-1 block truncate text-xs ${conversation.unread ? "font-semibold text-slate-800" : "text-slate-500"}`}>{messageText(conversation.latest)}</span></span></button>)}
           {!filteredConversations.length ? <p className="p-6 text-center text-sm text-slate-500">No conversations found.</p> : null}
+          {historyHasMore ? <div className="border-t border-slate-100 p-3"><button type="button" onClick={() => void loadOlderHistory("all")} disabled={historyLoading} className="h-9 w-full rounded-md border border-slate-300 bg-white text-[11px] font-bold text-slate-700 disabled:opacity-50">{historyLoading ? "Loading…" : "Load older conversations"}</button></div> : null}
+          {historyError ? <p className="px-3 pb-3 text-center text-[10px] font-semibold text-rose-700">{historyError}</p> : null}
         </div>
       </aside>
 
@@ -731,7 +859,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
 
         {activeConversation?.phone ? <span className="sr-only">Add or change contact type</span> : null}
         <div className="min-h-0 min-w-0 flex-1 overscroll-contain overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-5">
-          {activeConversation ? <div className="mx-auto grid min-w-0 max-w-3xl gap-2">{activeConversation.messages.map((item) => { const outgoing = item.direction === "outgoing"; const text = messageText(item); const media = Array.isArray(item.media) ? item.media : []; return <article key={item.id} className={`flex min-w-0 ${outgoing ? "justify-end" : "justify-start"}`}><div className={`min-w-0 max-w-[88%] overflow-hidden rounded-lg border px-3 py-2 shadow-sm sm:max-w-[75%] ${outgoing ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}><ExpandableMessage text={text} />{item.channel === "call" && item.summary && item.summary !== text ? <p className="mt-2 border-t border-slate-200 pt-2 text-xs leading-5 text-slate-600"><strong>Summary:</strong> {item.summary}</p> : null}{item.next_steps?.length ? <p className="mt-1 text-xs font-semibold text-[#0066cc]">Next: {item.next_steps.join(" · ")}</p> : null}{media.length ? <div className="mt-2 flex flex-wrap gap-2">{media.map((attachment, index) => attachment.url ? attachment.type?.startsWith("audio/") ? <audio key={`${attachment.url}-${index}`} controls preload="none" className="h-9 max-w-full" src={attachment.url} /> : <a key={`${attachment.url}-${index}`} href={attachment.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-[10px] font-bold"><Paperclip className="h-3 w-3 shrink-0" /><span className="truncate">{attachmentLabel(attachment, index)}</span></a> : null)}</div> : null}{item.id === requestCandidateId ? <button type="button" onClick={() => reviewMessageForRequest(item.id)} disabled={pending} className="mt-2 inline-flex h-7 items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-bold text-sky-800 disabled:opacity-40"><ClipboardList className="h-3 w-3" />Review material request</button> : null}<div className="mt-1.5 flex items-center justify-end gap-1.5 text-[9px] text-slate-400"><span>{channelIcon(item.channel, "h-3 w-3")}</span><time>{formatMessageTime(item.occurred_at)}</time>{item.duration_seconds ? <span>{Math.floor(item.duration_seconds / 60)}:{String(item.duration_seconds % 60).padStart(2, "0")}</span> : null}{outgoing ? statusIcon(item.status) : null}</div></div></article>})}</div> : <div className="flex h-full min-h-48 items-center justify-center text-center"><div><MessageCircle className="mx-auto h-10 w-10 text-slate-300" /><p className="mt-3 text-sm font-semibold text-slate-600">Start a conversation</p></div></div>}
+          {activeConversation ? <div className="mx-auto grid min-w-0 max-w-3xl gap-2">{historyError ? <p className="mb-1 text-center text-[10px] font-semibold text-rose-700">{historyError}</p> : null}{activeThreadHasMore ? <div className="mb-2 flex justify-center"><button type="button" onClick={() => void loadOlderHistory("thread")} disabled={historyLoading} className="h-8 rounded-full border border-slate-300 bg-white px-4 text-[10px] font-bold text-slate-600 shadow-sm disabled:opacity-50">{historyLoading ? "Loading…" : "Load earlier messages"}</button></div> : <p className="mb-2 text-center text-[10px] font-semibold text-slate-400">Beginning of conversation</p>}{activeConversation.messages.map((item) => { const outgoing = item.direction === "outgoing"; const text = messageText(item); const media = Array.isArray(item.media) ? item.media : []; return <article key={item.id} className={`flex min-w-0 ${outgoing ? "justify-end" : "justify-start"}`}><div className={`min-w-0 max-w-[88%] overflow-hidden rounded-lg border px-3 py-2 shadow-sm sm:max-w-[75%] ${outgoing ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}><ExpandableMessage text={text} />{item.channel === "call" && item.summary && item.summary !== text ? <p className="mt-2 border-t border-slate-200 pt-2 text-xs leading-5 text-slate-600"><strong>Summary:</strong> {item.summary}</p> : null}{item.next_steps?.length ? <p className="mt-1 text-xs font-semibold text-[#0066cc]">Next: {item.next_steps.join(" · ")}</p> : null}{media.length ? <div className="mt-2 flex flex-wrap gap-2">{media.map((attachment, index) => attachment.url ? attachment.type?.startsWith("audio/") ? <audio key={`${attachment.url}-${index}`} controls preload="none" className="h-9 max-w-full" src={attachment.url} /> : <a key={`${attachment.url}-${index}`} href={attachment.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 max-w-full items-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-[10px] font-bold"><Paperclip className="h-3 w-3 shrink-0" /><span className="truncate">{attachmentLabel(attachment, index)}</span></a> : null)}</div> : null}{item.id === requestCandidateId ? <button type="button" onClick={() => reviewMessageForRequest(item.id)} disabled={pending} className="mt-2 inline-flex h-7 items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 text-[10px] font-bold text-sky-800 disabled:opacity-40"><ClipboardList className="h-3 w-3" />Review material request</button> : null}<div className="mt-1.5 flex items-center justify-end gap-1.5 text-[9px] text-slate-400"><span>{channelIcon(item.channel, "h-3 w-3")}</span><time>{formatMessageTime(item.occurred_at)}</time>{item.duration_seconds ? <span>{Math.floor(item.duration_seconds / 60)}:{String(item.duration_seconds % 60).padStart(2, "0")}</span> : null}{outgoing ? statusIcon(item.status) : null}</div></div></article>})}</div> : <div className="flex h-full min-h-48 items-center justify-center text-center"><div><MessageCircle className="mx-auto h-10 w-10 text-slate-300" /><p className="mt-3 text-sm font-semibold text-slate-600">Start a conversation</p></div></div>}
         </div>
 
         <footer className="shrink-0 border-t border-slate-200 bg-white p-2.5 sm:p-3">

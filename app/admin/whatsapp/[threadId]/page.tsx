@@ -14,7 +14,7 @@ export default async function AdminWhatsAppThreadPage({
   const search = detail?.thread.phone || detail?.thread.contactName || "";
   redirect(
     search
-      ? `/admin/communications?channel=whatsapp&q=${encodeURIComponent(search)}`
+      ? `/admin/communications?channel=whatsapp&q=${encodeURIComponent(search)}&thread=${encodeURIComponent(search)}`
       : "/admin/communications?channel=whatsapp",
   );
 }

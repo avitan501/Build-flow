@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       eventType: "call_message",
       title: incoming && !completed ? "Incoming business call" : payload.recording_url ? "Call recording ready" : "Business call updated",
       body: `${counterparty || "Unknown number"}${payload.duration ? ` · ${payload.duration}s` : ""}`,
-      href: `/admin/communications?channel=call&q=${encodeURIComponent(counterparty || "")}`,
+      href: `/admin/communications?channel=call&q=${encodeURIComponent(counterparty || "")}&thread=${encodeURIComponent(counterparty || "")}`,
       tag: `avantia-2chat-call-${payload.uuid}-${payload.status || "update"}`,
     });
   }

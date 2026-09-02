@@ -1292,7 +1292,7 @@ export function SupplierRoutingManager({
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <QuoCallButton phone={selectedSupplier.phone || selectedSupplier.whatsapp || null} supplierName={selectedSupplier.name} />
-                        {selectedSupplier.email ? <Link href={`/admin/communications?channel=email&q=${encodeURIComponent(selectedSupplier.email)}`} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 text-sm font-semibold text-sky-800"><Mail className="h-4 w-4" />Emails</Link> : null}
+                        {selectedSupplier.email ? <Link href={`/admin/communications?channel=email&q=${encodeURIComponent(selectedSupplier.email)}&thread=${encodeURIComponent(selectedSupplier.email)}`} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 text-sm font-semibold text-sky-800"><Mail className="h-4 w-4" />Emails</Link> : null}
                         <SupplierQuoteRequestDialog
                           supplierId={selectedSupplier.id}
                           supplierName={selectedSupplier.name}
