@@ -17,7 +17,7 @@ const clientContactPath = path.join(root, "components/buildflow/request-client-c
 const routeEditorPath = path.join(root, "components/buildflow/request-supplier-route-editor.tsx")
 const originalEditorPath = path.join(root, "components/buildflow/original-request-item-editor.tsx")
 const autosaveHookPath = path.join(root, "lib/use-sequenced-autosave.ts")
-const routeAutosaveMigrationPath = path.join(root, "supabase/migrations/20260902234000_atomic_request_supplier_route_autosave.sql")
+const routeAutosaveMigrationPath = path.join(root, "supabase/migrations/20260902233933_atomic_request_supplier_route_autosave.sql")
 
 async function source(filePath: string) {
   try {

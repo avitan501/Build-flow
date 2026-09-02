@@ -1,4 +1,4 @@
--- Save a canonical supplier route for one or more request items in one transaction.
+-- Save canonical supplier routes for one or more request items in one transaction.
 create or replace function public.staff_save_request_item_supplier_routes(
   p_request_id uuid,
   p_item_ids uuid[],
