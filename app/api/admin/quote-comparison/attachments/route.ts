@@ -168,7 +168,7 @@ export async function DELETE(request: Request) {
     if (error) return NextResponse.json({ ok: false, error: "The attachment could not be removed." }, { status: 503 });
     const { error: storageError } = await createAdminClient().storage.from(BUCKET).remove([data.file_path]);
     if (storageError) console.error("Client quote attachment storage cleanup failed", storageError);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, data: null });
   } catch (error) {
     console.error("Client quote attachment delete API failed", error);
     await captureOperationalError(error, {

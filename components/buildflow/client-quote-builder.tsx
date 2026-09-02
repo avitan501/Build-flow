@@ -51,9 +51,13 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
   "application/csv",
 ]);
 
-type ActionResult<T = undefined> = T extends undefined
-  ? { ok: true } | { ok: false; error: string }
-  : { ok: true; data: T } | { ok: false; error: string };
+type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
+
+async function attachmentResponse<T>(response: Response): Promise<ActionResult<T>> {
+  const payload = await response.json().catch(() => null) as ActionResult<T> | null;
+  if (!payload || typeof payload.ok !== "boolean") return { ok: false, error: "The attachment service did not respond. Try again." };
+  return payload;
+}
 
 export type QuoteClientOption = {
   id: string;
@@ -277,7 +281,7 @@ export function ClientQuoteBuilder({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action: "prepare", comparisonId: comparison.id, fileName: file.name, fileType, fileSize: file.size }),
           });
-          const prepared = await preparedResponse.json() as ActionResult<{ filePath: string; token: string }>;
+          const prepared = await attachmentResponse<{ filePath: string; token: string }>(preparedResponse);
           if (!prepared.ok) {
             setError(prepared.error);
             return;
@@ -292,7 +296,7 @@ export function ClientQuoteBuilder({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action: "complete", comparisonId: comparison.id, filePath: prepared.data.filePath, fileName: file.name, fileType, fileSize: file.size }),
           });
-          const completed = await completedResponse.json() as ActionResult<ClientQuoteAttachmentRecord>;
+          const completed = await attachmentResponse<ClientQuoteAttachmentRecord>(completedResponse);
           if (!completed.ok) {
             setError(completed.error);
             return;
@@ -320,7 +324,7 @@ export function ClientQuoteBuilder({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ comparisonId: comparison.id, attachmentId: attachment.id }),
         });
-        const result = await response.json() as ActionResult;
+        const result = await attachmentResponse<null>(response);
         if (!result.ok) {
           setError(result.error);
           return;
