@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 
-import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
+import { prepareQuoAttachmentMessageAction, sendAuraMessageAction, sendAuraMessageWithAttachmentAction } from "@/app/owner/aura/actions"
 import { recordCommunicationActivityAction } from "@/app/admin/activity-actions"
 import { completeSmsReplyDraftAction, createSmsMaterialRequestAction, generateSmsReplyAction, linkCommunicationContactAction, linkEmailConversationAction, markCommunicationConversationReadAction, quickTagPhoneContactAction, reviewSmsRequestAction, saveSmsAutomationAction, type SmsReplyDraft, type SmsRequestProposal } from "@/app/admin/communications/actions"
 import { TwoChatSoftphone } from "@/components/buildflow/two-chat-softphone"
@@ -568,6 +568,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       .find((link) => link.entity_type === "material_request")
     const sentDraftId = messageChannel === "sms" ? activeDraftId : null
     const teachSentReply = Boolean(sentDraftId && teachAi)
+    const idempotencyKey = crypto.randomUUID()
     const sourceCommunicationId = activeConversation
       ? [...activeConversation.messages].reverse().find((item) => item.direction === "incoming" && (item.channel === "sms" || item.channel === "whatsapp"))?.id
       : undefined
@@ -592,7 +593,19 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         return
       }
       const startedAt = performance.now()
-      const result = await sendAuraMessageAction({ channel: messageChannel, recipient: sentRecipient, recipientLabel, subject: sentSubject, message: sentText, sourceCommunicationId, materialRequestId: requestLink?.entity_id, materialRequestTitle: requestLink?.entity_label })
+      const result = attachment
+        ? await (() => {
+            const formData = new FormData()
+            formData.set("channel", messageChannel)
+            formData.set("recipient", sentRecipient)
+            formData.set("subject", sentSubject)
+            formData.set("message", sentText)
+            formData.set("sourceCommunicationId", sourceCommunicationId || "")
+            formData.set("idempotencyKey", idempotencyKey)
+            formData.set("attachment", attachment)
+            return sendAuraMessageWithAttachmentAction(formData)
+          })()
+        : await sendAuraMessageAction({ channel: messageChannel, recipient: sentRecipient, recipientLabel, subject: sentSubject, message: sentText, sourceCommunicationId, materialRequestId: requestLink?.entity_id, materialRequestTitle: requestLink?.entity_label, idempotencyKey })
       if (!result.ok) {
         captureAvantiaEvent("avantia_communication_sent", {
           channel: messageChannel,
@@ -615,14 +628,16 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         summary: null,
         transcript: null,
         next_steps: [],
-        media: [],
-        status: "sent",
+        media: attachment ? [{ type: attachment.type }] : [],
+        status: "queued",
         duration_seconds: null,
         occurred_at: result.occurredAt || new Date().toISOString(),
         last_event_at: result.occurredAt || new Date().toISOString(),
         read_at: result.occurredAt || new Date().toISOString(),
       }
       setLiveCommunications((current) => [optimistic, ...current])
+      setAttachment(null)
+      if (attachmentInputRef.current) attachmentInputRef.current.value = ""
       const sentIdentity = identityKey(optimistic.counterparty_phone, optimistic.counterparty_email)
       setActiveKey(directory.alias.get(sentIdentity)?.key || sentIdentity || `unknown:${optimistic.id}`)
       setMobileThreadOpen(true)
@@ -726,11 +741,11 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
             <div className="flex items-end gap-2 rounded-lg border border-slate-300 bg-white p-1.5 focus-within:border-[#0071e3]">
               <select value={channel} onChange={(event) => changeChannel(event.target.value as Channel)} className="h-9 w-[5.25rem] shrink-0 rounded-md border-0 bg-slate-100 px-1.5 text-[10px] font-bold sm:w-[6.6rem] sm:px-2"><option value="whatsapp">WhatsApp</option><option value="sms">Text</option><option value="email">Email</option></select>
               <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={1} maxLength={1600} placeholder="Write a message" className="max-h-28 min-h-9 min-w-0 flex-1 resize-y border-0 bg-transparent px-1 py-2 text-sm leading-5 outline-none" />
-              {channel === "sms" ? <label className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-500" aria-label="Add attachment"><Paperclip className="h-4 w-4" /><input ref={attachmentInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.mp4,.mov" className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] || null)} /></label> : null}
+              {channel !== "call" ? <label className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-500" aria-label="Add attachment"><Paperclip className="h-4 w-4" /><input ref={attachmentInputRef} type="file" accept={channel === "sms" ? ".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.mp4,.mov" : ".pdf,.jpg,.jpeg,.png,.webp"} className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] || null)} /></label> : null}
               <button type="button" onClick={sendMessage} disabled={pending || !selectedChannelReady || !recipient.trim() || !message.trim()} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0071e3] text-white disabled:bg-slate-300" aria-label="Send message"><Send className="h-4 w-4" /></button>
             </div>
             {channel === "email" ? <input value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Email subject" className="mt-2 h-9 w-full rounded-md border border-slate-300 px-3 text-xs" /> : null}
-            {attachment ? <div className="mt-2 flex items-center justify-between rounded-md bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold"><span className="truncate">{attachment.name} · Q U O supports up to 5 MB</span><button type="button" onClick={() => { setAttachment(null); if (attachmentInputRef.current) attachmentInputRef.current.value = "" }} aria-label="Remove attachment"><X className="h-3.5 w-3.5" /></button></div> : null}
+            {attachment ? <div className="mt-2 flex items-center justify-between rounded-md bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold"><span className="truncate">{attachment.name} · {channel === "sms" ? "opens securely in Q U O" : "delivers with the message"}</span><button type="button" onClick={() => { setAttachment(null); if (attachmentInputRef.current) attachmentInputRef.current.value = "" }} aria-label="Remove attachment"><X className="h-3.5 w-3.5" /></button></div> : null}
             {!selectedChannelReady ? <p className="mt-2 text-xs font-semibold text-amber-700">This channel still needs a connection.</p> : null}
             {feedback ? <p className={`mt-2 text-xs font-semibold ${feedback.tone === "success" ? "text-emerald-700" : "text-rose-700"}`} role="status">{feedback.text}</p> : null}
           </div>

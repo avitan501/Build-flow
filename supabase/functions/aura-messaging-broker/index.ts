@@ -434,8 +434,26 @@ async function handleResendWebhook(req: Request) {
   } catch {
     return json({ error: "Invalid JSON" }, 400);
   }
-  if (event.type !== "email.received" || !event.data?.email_id)
-    return json({ ok: true, ignored: true });
+  if (!event.data?.email_id) return json({ ok: true, ignored: true });
+  const outboundStatuses: Record<string, string> = {
+    "email.sent": "sent",
+    "email.delivered": "delivered",
+    "email.bounced": "bounced",
+    "email.complained": "complained",
+  };
+  const outboundStatus = event.type ? outboundStatuses[event.type] : null;
+  if (outboundStatus) {
+    await sql`
+      update public.aura_communications as communication
+      set status = ${outboundStatus}, last_event_at = now(), updated_at = now()
+      from public.aura_message_outbox as outbox
+      where outbox.provider = 'resend'
+        and outbox.provider_message_id = ${event.data.email_id}
+        and outbox.communication_id = communication.id
+    `;
+    return json({ ok: true });
+  }
+  if (event.type !== "email.received") return json({ ok: true, ignored: true });
   const apiKey = Deno.env.get("RESEND_API_KEY") || "";
   if (!apiKey) return json({ error: "Email receiving is not configured" }, 503);
   const response = await fetch(
@@ -7050,6 +7068,139 @@ async function sendEmail(
   return result.id;
 }
 
+type ManagerOutboxAttachment = {
+  storageBucket: "project-uploads";
+  storagePath: string;
+  filename: string;
+  contentType: string;
+  byteSize: number;
+  contentSha256?: string | null;
+};
+
+function managerOutboxAttachments(value: unknown) {
+  if (!Array.isArray(value) || value.length > 10) return [];
+  return value.flatMap((candidate): ManagerOutboxAttachment[] => {
+    if (!candidate || typeof candidate !== "object") return [];
+    const item = candidate as Record<string, unknown>;
+    const storagePath =
+      typeof item.storagePath === "string" ? item.storagePath.trim() : "";
+    const filename =
+      typeof item.filename === "string" ? item.filename.trim().slice(0, 180) : "";
+    const contentType =
+      typeof item.contentType === "string"
+        ? item.contentType.trim().slice(0, 120)
+        : "";
+    const byteSize = Number(item.byteSize);
+    const contentSha256 =
+      typeof item.contentSha256 === "string" &&
+      /^[a-f0-9]{64}$/.test(item.contentSha256)
+        ? item.contentSha256
+        : null;
+    if (
+      item.storageBucket !== "project-uploads" ||
+      !/^[0-9a-f-]{36}\/communications\/[a-z0-9-]+\.[a-z0-9]+$/i.test(storagePath) ||
+      !filename ||
+      !contentType ||
+      !Number.isInteger(byteSize) ||
+      byteSize < 1 ||
+      byteSize > 25 * 1024 * 1024
+    ) return [];
+    return [{
+      storageBucket: "project-uploads",
+      storagePath,
+      filename,
+      contentType,
+      byteSize,
+      contentSha256,
+    }];
+  });
+}
+
+async function dispatchCommunicationOutboxWorker() {
+  const dispatchSecret = await secret(secretNames.smsAutomationDispatchSecret);
+  if (!dispatchSecret) throw new Error("Communication outbox is not configured.");
+  const result = await fetch(
+    `${supabaseUrl}/functions/v1/aura-communication-outbox-worker?mode=communication-outbox-dispatch`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Communication-Outbox-Dispatch": dispatchSecret,
+      },
+      body: JSON.stringify({ action: "drain" }),
+    },
+  );
+  if (!result.ok)
+    throw new Error(`Communication outbox dispatch failed: ${result.status}`);
+}
+
+async function enqueueManagerMessage(
+  managerId: string,
+  channel: "sms" | "whatsapp" | "email",
+  destinationValue: unknown,
+  subjectValue: unknown,
+  bodyValue: unknown,
+  idempotencyValue: unknown,
+  sourceCommunicationIdValue: unknown,
+  attachmentValue: unknown,
+) {
+  const destination = channel === "email"
+    ? validEmail(destinationValue)
+    : normalizePhone(destinationValue);
+  const subject = channel === "email" && typeof subjectValue === "string"
+    ? subjectValue.trim().slice(0, 200) || "Message from Avantia Build"
+    : null;
+  const bodyLimit = channel === "email" ? 10_000 : channel === "whatsapp" ? 4_096 : 1_600;
+  const body = typeof bodyValue === "string"
+    ? bodyValue.trim().slice(0, bodyLimit)
+    : "";
+  if (!destination || !body)
+    throw new Error("Enter a valid recipient and message.");
+  const sourceCommunicationId =
+    typeof sourceCommunicationIdValue === "string" &&
+    /^[0-9a-f-]{36}$/i.test(sourceCommunicationIdValue)
+      ? sourceCommunicationIdValue
+      : null;
+  const attachments = managerOutboxAttachments(attachmentValue);
+  if (Array.isArray(attachmentValue) && attachmentValue.length !== attachments.length)
+    throw new Error("One or more attachment references are invalid.");
+  const requestKey =
+    typeof idempotencyValue === "string" && /^[a-z0-9:/_.-]{10,160}$/i.test(idempotencyValue)
+      ? idempotencyValue
+      : crypto.randomUUID();
+  const dedupeKey = `manager/${managerId}/${requestKey}`;
+  const payloadHash = await sha256Hex(JSON.stringify({
+    channel,
+    destination,
+    subject,
+    body,
+    sourceCommunicationId,
+    attachments,
+  }));
+  const rows = await sql<{ result: {
+    outboxId: string;
+    communicationId: string;
+    status: string;
+    duplicate: boolean;
+  } }[]>`
+    select public.enqueue_aura_message_outbox(
+      ${dedupeKey}, ${payloadHash}, ${channel}, ${destination}, ${subject}, ${body},
+      ${sourceCommunicationId}::uuid, ${managerId}::uuid, ${sql.json(attachments)}
+    ) as result
+  `;
+  const queued = rows[0]?.result;
+  if (!queued?.outboxId) throw new Error("The message could not be queued.");
+  EdgeRuntime.waitUntil(
+    dispatchCommunicationOutboxWorker().catch((error) =>
+      console.error(
+        "communication_outbox_dispatch_failed",
+        error instanceof Error ? error.message : "unknown error",
+      )
+    ),
+  );
+  return queued;
+}
+
 function openAiOutputText(payload: Record<string, unknown>) {
   if (typeof payload.output_text === "string")
     return payload.output_text.trim();
@@ -9688,6 +9839,19 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, smsReceive: true });
     }
     if (input.action === "send_whatsapp") {
+      if (!input.mediaUrl) {
+        const queued = await enqueueManagerMessage(
+          manager.user.id,
+          "whatsapp",
+          input.to,
+          null,
+          input.message,
+          input.idempotencyKey,
+          input.sourceCommunicationId,
+          input.attachments,
+        );
+        return json({ ok: true, id: queued.outboxId, queued: true });
+      }
       const id = await sendTwoChatWhatsApp(
         input.to,
         input.message,
@@ -9697,12 +9861,30 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, id });
     }
     if (input.action === "send_sms") {
-      const id = await sendQuoSms(input.to, input.message);
-      return json({ ok: true, id });
+      const queued = await enqueueManagerMessage(
+        manager.user.id,
+        "sms",
+        input.to,
+        null,
+        input.message,
+        input.idempotencyKey,
+        input.sourceCommunicationId,
+        input.attachments,
+      );
+      return json({ ok: true, id: queued.outboxId, queued: true });
     }
     if (input.action === "send_email") {
-      const id = await sendEmail(input.to, input.subject, input.message);
-      return json({ ok: true, id });
+      const queued = await enqueueManagerMessage(
+        manager.user.id,
+        "email",
+        input.to,
+        input.subject,
+        input.message,
+        input.idempotencyKey,
+        input.sourceCommunicationId,
+        input.attachments,
+      );
+      return json({ ok: true, id: queued.outboxId, queued: true });
     }
     if (input.action === "dashboard_ai") {
       const answer = await dashboardAi(

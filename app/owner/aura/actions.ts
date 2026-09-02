@@ -119,6 +119,7 @@ export async function sendAuraMessageAction(input: {
   materialRequestId?: string;
   materialRequestTitle?: string;
   sourceCommunicationId?: string;
+  idempotencyKey?: string;
 }): Promise<SendAuraMessageResult> {
   const { supabase, user, access } = await requireManagerPortalProfile();
   if (!access.customers)
@@ -153,6 +154,8 @@ export async function sendAuraMessageAction(input: {
         action: "send_sms",
         to: phone,
         message,
+        idempotencyKey: input.idempotencyKey,
+        sourceCommunicationId: input.sourceCommunicationId,
       })).id || "";
     } else if (channel === "whatsapp") {
       externalId = (await invokeMessagingBroker(supabase, {
@@ -160,6 +163,7 @@ export async function sendAuraMessageAction(input: {
         to: phone,
         message,
         sourceCommunicationId: input.sourceCommunicationId,
+        idempotencyKey: input.idempotencyKey,
       })).id || "";
     } else if (channel === "email") {
       const requestReference =
@@ -175,6 +179,8 @@ export async function sendAuraMessageAction(input: {
             to: email,
             subject: emailSubject,
             message,
+            idempotencyKey: input.idempotencyKey,
+            sourceCommunicationId: input.sourceCommunicationId,
           })
         ).id || null;
       externalId = providerId || "";
@@ -271,6 +277,87 @@ export async function sendAuraMessageAction(input: {
           ? whatsappSendError(error)
           : `${channelName} could not send this message.`,
     };
+  }
+}
+
+export async function sendAuraMessageWithAttachmentAction(
+  formData: FormData,
+): Promise<SendAuraMessageResult> {
+  const { supabase, user, access } = await requireManagerPortalProfile();
+  if (!access.customers)
+    return { ok: false, error: "Customer communication access is required." };
+  const channel = String(formData.get("channel") || "");
+  if (channel !== "whatsapp" && channel !== "email")
+    return { ok: false, error: "Choose WhatsApp or email for automatic file delivery." };
+  const recipient = String(formData.get("recipient") || "").trim();
+  const message = String(formData.get("message") || "").trim();
+  const subject = String(formData.get("subject") || "").trim();
+  const sourceCommunicationId = String(formData.get("sourceCommunicationId") || "").trim();
+  const idempotencyKey = String(formData.get("idempotencyKey") || "").trim();
+  const attachment = formData.get("attachment");
+  const phone = channel === "whatsapp" ? normalizeAuraPhone(recipient) : null;
+  const email = channel === "email" ? normalizeAuraEmail(recipient) : null;
+  if (channel === "email" ? !email : !phone)
+    return { ok: false, error: "Enter a valid recipient." };
+  if (!message) return { ok: false, error: "Enter a message." };
+  if (!(attachment instanceof File) || attachment.size < 1)
+    return { ok: false, error: "Choose a file." };
+  const maxBytes = channel === "whatsapp" ? 16 * 1024 * 1024 : 25 * 1024 * 1024;
+  const allowedTypes = new Set([
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+  ]);
+  if (attachment.size > maxBytes || !allowedTypes.has(attachment.type))
+    return {
+      ok: false,
+      error: `Attach a PDF, JPG, PNG, or WebP file under ${channel === "whatsapp" ? "16" : "25"} MB.`,
+    };
+  const extension = attachment.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
+  const storagePath = `${user.id}/communications/${crypto.randomUUID()}.${extension}`;
+  const uploaded = await supabase.storage.from("project-uploads").upload(
+    storagePath,
+    attachment,
+    { contentType: attachment.type, upsert: false },
+  );
+  if (uploaded.error)
+    return { ok: false, error: "The attachment could not be saved for delivery." };
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", await attachment.arrayBuffer());
+    const contentSha256 = Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+    const action = channel === "email" ? "send_email" : "send_whatsapp";
+    const result = await invokeMessagingBroker(supabase, {
+      action,
+      to: email || phone,
+      subject,
+      message,
+      idempotencyKey,
+      sourceCommunicationId: /^[0-9a-f-]{36}$/i.test(sourceCommunicationId)
+        ? sourceCommunicationId
+        : undefined,
+      attachments: [{
+        storageBucket: "project-uploads",
+        storagePath,
+        filename: attachment.name.slice(0, 180),
+        contentType: attachment.type,
+        byteSize: attachment.size,
+        contentSha256,
+      }],
+    });
+    revalidatePath("/owner/aura");
+    revalidatePath("/admin/communications");
+    return {
+      ok: true,
+      externalId: result.id,
+      occurredAt: new Date().toISOString(),
+    };
+  } catch {
+    // The enqueue request can time out after the database committed. Keep the
+    // private object so a possibly queued delivery never loses its attachment.
+    return { ok: false, error: "The message could not be queued for delivery." };
   }
 }
 

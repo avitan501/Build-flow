@@ -139,6 +139,11 @@ begin
 end;
 $$;
 
+revoke all on function private.protect_aura_message_outbox_payload() from public;
+revoke all on function private.prevent_aura_message_outbox_attachment_change() from public;
+revoke all on function private.prevent_aura_message_outbox_event_change() from public;
+revoke all on function private.record_aura_message_outbox_event() from public;
+
 drop trigger if exists protect_aura_message_outbox_payload on public.aura_message_outbox;
 create trigger protect_aura_message_outbox_payload
 before update on public.aura_message_outbox
