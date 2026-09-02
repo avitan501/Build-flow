@@ -230,18 +230,26 @@ Deno.serve(async (request: Request) => {
       }
     }
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: AI_MODEL,
-        store: false,
-        reasoning: { effort: "medium" },
-        max_output_tokens: 8_000,
-        input: [{ role: "user", content }],
-        text: { verbosity: "low", format: { type: "json_schema", name: "client_material_list", strict: true, schema } },
-      }),
-    })
+    const controller = new AbortController()
+    const openAiTimeout = setTimeout(() => controller.abort(), 30_000)
+    let response: Response
+    try {
+      response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        signal: controller.signal,
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: AI_MODEL,
+          store: false,
+          reasoning: { effort: "medium" },
+          max_output_tokens: 8_000,
+          input: [{ role: "user", content }],
+          text: { verbosity: "low", format: { type: "json_schema", name: "client_material_list", strict: true, schema } },
+        }),
+      })
+    } finally {
+      clearTimeout(openAiTimeout)
+    }
     if (!response.ok) throw new Error(`openai_${response.status}`)
     const text = responseText(await response.json())
     const result = JSON.parse(text) as AiResult

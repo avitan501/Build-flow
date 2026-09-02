@@ -298,13 +298,13 @@ export function getBuildflowWireframeData() {
       nextStep: adminUsers.nextStep,
       missing: ["Deeper audit filters", "Safer bulk actions", "Search/segment tools"],
       actions: [
-        { label: "WhatsApp Inbox", href: "/admin/whatsapp", status: whatsapp.status },
+        { label: "WhatsApp Inbox", href: "/admin/communications?channel=whatsapp", status: whatsapp.status },
         { label: "Build Map", href: "/admin/build-map", status: foundation.status },
       ],
     },
     {
       key: "admin-whatsapp",
-      href: "/admin/whatsapp",
+      href: "/admin/communications?channel=whatsapp",
       title: "WhatsApp Inbox",
       purpose: "Protected admin-only read-only inbox preview for WhatsApp operations.",
       flow: "whatsapp",
@@ -338,7 +338,7 @@ export function getBuildflowWireframeData() {
       nextStep: "Keep preview mode safe until DB-backed storage is approved.",
       missing: ["Persistent production storage", "Change history", "Shared admin state"],
       actions: [
-        { label: "Back to Inbox", href: "/admin/whatsapp", status: whatsapp.status },
+        { label: "Back to Inbox", href: "/admin/communications?channel=whatsapp", status: whatsapp.status },
         { label: "Build Map", href: "/admin/build-map", status: foundation.status },
       ],
     },

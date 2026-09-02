@@ -172,16 +172,24 @@ test("critical handled failures are flushed to Sentry before returning", async (
     "utf8",
   );
   expect(helper).toContain("await Sentry.flush(2_000)");
+  expect(helper).toContain("safeDatabaseDiagnostics");
+  expect(helper).toContain("database_code");
+  expect(helper).toContain("database_constraint");
+  expect(helper).not.toContain("record.details");
+  expect(helper).not.toContain("record.hint");
 });
 
 test("browser transport removes URL queries, error text, emails and phone numbers", async ({
   page,
 }) => {
   const envelopes: string[] = [];
-  await page.route("https://*.ingest.sentry.io/**", async (route) => {
+  await page.route(
+    /https:\/\/[^/]+\.ingest(?:\.[^./]+)?\.sentry\.io\/.*/,
+    async (route) => {
     envelopes.push(route.request().postData() ?? "");
     await route.fulfill({ status: 200, body: "{}" });
-  });
+    },
+  );
 
   await page.goto(
     "/request-quote?email=private-marker@example.com&phone=3475675077",

@@ -136,22 +136,33 @@ export async function routePhoneIntakeTaskAction(formData: FormData) {
     ? intake.proposal.recordType
     : "task";
   const itemKind = destination === "david" && recordType === "idea" ? "idea" : "task";
-  const { error: insertError } = await context.supabase.from("website_work_items").insert({
-    task_key: `phone-intake-${intakeId}`,
-    title: task.title,
-    category: "phone_intake",
-    status: "open",
-    assigned_agent: destination === "carlos" ? "Carlos" : "David",
-    progress_percent: 0,
-    summary: itemKind === "idea" ? "David's private idea." : "Approved phone intake task.",
-    next_step: task.nextStep,
-    source_chat_title: "David Dashboard",
-    priority: 1,
-    sort_order: 0,
-    item_kind: itemKind,
-    published_to_carlos: destination === "carlos",
-  });
-  if (insertError && insertError.code !== "23505") {
+  const taskKey = `phone-intake-${intakeId}`;
+  const { data: workItem, error: upsertError } = await context.supabase
+    .from("website_work_items")
+    .upsert(
+      {
+        task_key: taskKey,
+        title: task.title,
+        category: "phone_intake",
+        status: "open",
+        assigned_agent: destination === "carlos" ? "Carlos" : "David",
+        progress_percent: 0,
+        summary:
+          itemKind === "idea"
+            ? "David's private idea."
+            : "Approved phone intake task.",
+        next_step: task.nextStep,
+        source_chat_title: "David Dashboard",
+        priority: 1,
+        sort_order: 0,
+        item_kind: itemKind,
+        published_to_carlos: destination === "carlos",
+      },
+      { onConflict: "task_key" },
+    )
+    .select("id")
+    .maybeSingle<{ id: string }>();
+  if (upsertError || !workItem) {
     throw new Error("The phone task could not be added.");
   }
   await admin.from("aura_intakes").update({ status: "confirmed" }).eq("id", intakeId);

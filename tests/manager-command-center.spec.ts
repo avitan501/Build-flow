@@ -36,7 +36,7 @@ test("dashboard AI uses authorized server data and keeps the API key private", a
   expect(broker).toContain("reasoning: { effort: selectedModel.effort }")
   expect(action).not.toContain("NEXT_PUBLIC_OPENAI")
   expect(component).toContain("Recent searches")
-  expect(component).toContain("Ask AI")
+  expect(component).toContain("Orders &amp; Requests AI")
   expect(component).toContain("Add photo")
   expect(component).toContain('aria-label="AI model"')
   expect(component).toContain("Terra · Recommended")

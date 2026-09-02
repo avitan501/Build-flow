@@ -44,8 +44,13 @@ test("customer manager hides project UI while retaining protected project deleti
   expect(actions).toContain('supabase.rpc("staff_delete_customer_quote_request"')
   expect(actions).toContain('supabase.rpc("staff_delete_customer_project"')
   expect(actions).toContain('supabase.rpc("staff_delete_customer_account"')
-  expect(actions).toContain("let cleanupFailed = false")
-  expect(actions).toContain('if (cleanupFailed)')
+  expect(actions).not.toContain("let cleanupFailed = false")
+  expect(actions).toContain("the customer account was not deleted")
+  expect(actions).not.toContain("Nothing was lost")
+  expect(actions).toContain("customer-file-cleanup-failed")
+  expect(actions.indexOf("await cleanupQueuedFiles(\"customer\", normalizedId)")).toBeLessThan(
+    actions.indexOf('supabase.rpc("staff_delete_customer_account"'),
+  )
   expect(actions).toContain('message.includes("customer_files_must_be_removed_first")')
   expect(actions).toContain("stillReferenced")
   expect(actions).toContain('.maybeSingle<{ id: string }>()')

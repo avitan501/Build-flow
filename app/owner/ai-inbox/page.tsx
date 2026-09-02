@@ -134,7 +134,7 @@ function formatDate(value: string) {
 function StructuredPreview({ proposal }: { proposal: IntakeProposal }) {
   if (proposal.recordType === "material_request" && proposal.request) {
     return (
-      <div className="mt-4 rounded-md border border-slate-200 bg-white">
+      <div className="mt-4 min-w-0 break-words rounded-md border border-slate-200 bg-white [overflow-wrap:anywhere]">
         <div className="border-b border-slate-200 px-4 py-3">
           <p className="text-sm font-semibold">
             {proposal.request.title || "Material request"}
@@ -167,7 +167,7 @@ function StructuredPreview({ proposal }: { proposal: IntakeProposal }) {
     proposal.contact
   ) {
     return (
-      <div className="mt-4 grid gap-2 rounded-md border border-slate-200 bg-white p-4 text-sm">
+      <div className="mt-4 grid min-w-0 gap-2 break-words rounded-md border border-slate-200 bg-white p-4 text-sm [overflow-wrap:anywhere]">
         <strong>
           {proposal.contact.fullName ||
             proposal.contact.company ||
@@ -187,7 +187,7 @@ function StructuredPreview({ proposal }: { proposal: IntakeProposal }) {
   }
   if (proposal.recordType === "lead" && proposal.lead) {
     return (
-      <div className="mt-4 rounded-md border border-slate-200 bg-white p-4 text-sm">
+      <div className="mt-4 min-w-0 break-words rounded-md border border-slate-200 bg-white p-4 text-sm [overflow-wrap:anywhere]">
         <strong>{proposal.lead.title || "New lead"}</strong>
         <p className="mt-1 text-slate-600">
           {[proposal.lead.location, proposal.lead.description]
@@ -207,7 +207,7 @@ function StructuredPreview({ proposal }: { proposal: IntakeProposal }) {
       .filter(Boolean)
       .join(" · ");
     return (
-      <div className="mt-4 grid gap-2 rounded-md border border-slate-200 bg-white p-4 text-sm">
+      <div className="mt-4 grid min-w-0 gap-2 break-words rounded-md border border-slate-200 bg-white p-4 text-sm [overflow-wrap:anywhere]">
         <strong>{proposal.supplier.name || "New supplier"}</strong>
         {supplierDetails ? (
           <span className="text-slate-600">{supplierDetails}</span>
@@ -216,11 +216,11 @@ function StructuredPreview({ proposal }: { proposal: IntakeProposal }) {
     );
   }
   return (
-    <div className="mt-4 divide-y divide-slate-100 rounded-md border border-slate-200 bg-white">
+    <div className="mt-4 min-w-0 divide-y divide-slate-100 rounded-md border border-slate-200 bg-white [overflow-wrap:anywhere]">
       {proposal.tasks?.map((task, index) => (
         <div key={`${task.title}-${index}`} className="px-4 py-3">
           <div className="flex items-start justify-between gap-3">
-            <strong className="text-sm">{task.title || "New task"}</strong>
+            <strong className="min-w-0 break-words text-sm">{task.title || "New task"}</strong>
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
               {task.priority || "normal"}
             </span>
@@ -292,7 +292,7 @@ export default async function AiInboxPage({
 
   return (
     <main className="min-h-screen bg-[#f2f4f5] px-3 py-4 text-slate-950 sm:px-6 sm:py-8">
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto min-w-0 max-w-6xl">
         <header className="overflow-hidden rounded-lg border border-[#17324d] bg-[#102a43] text-white shadow-sm">
           <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[1fr_auto]">
             <div>
@@ -345,14 +345,14 @@ export default async function AiInboxPage({
         </header>
 
         <nav
-          className="mt-4 flex gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm"
+          className="mt-4 grid grid-cols-3 gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm sm:flex"
           aria-label="AI Inbox views"
         >
           {[
-            ["waiting", "Waiting for approval", waiting.length],
-            ["done", "Added", done.length],
-            ["cancelled", "Skipped", cancelled.length],
-          ].map(([id, label, count]) => (
+            ["waiting", "Waiting", "Waiting for approval", waiting.length],
+            ["done", "Added", "Added", done.length],
+            ["cancelled", "Skipped", "Skipped", cancelled.length],
+          ].map(([id, mobileLabel, label, count]) => (
             <Link
               key={id}
               href={
@@ -360,18 +360,20 @@ export default async function AiInboxPage({
                   ? "/owner/ai-inbox"
                   : `/owner/ai-inbox?view=${id}`
               }
-              className={`flex min-h-10 flex-1 items-center justify-center gap-2 rounded-md px-3 text-xs font-semibold sm:text-sm ${view === id ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+              aria-label={`${label} (${count})`}
+              className={`flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden rounded-md px-1.5 text-xs font-semibold sm:gap-2 sm:px-3 sm:text-sm ${view === id ? "bg-slate-950 text-white" : "text-slate-600 hover:bg-slate-50"}`}
             >
               {id === "waiting" ? (
-                <Clock3 className="h-4 w-4" />
+                <Clock3 className="h-4 w-4 shrink-0" />
               ) : id === "done" ? (
-                <CheckCircle2 className="h-4 w-4" />
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
               ) : (
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4 shrink-0" />
               )}
-              {label}
+              <span className="min-w-0 truncate sm:hidden">{mobileLabel}</span>
+              <span className="hidden sm:inline">{label}</span>
               <span
-                className={`rounded-full px-2 py-0.5 text-[10px] ${view === id ? "bg-white/15" : "bg-slate-100"}`}
+                className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] sm:px-2 ${view === id ? "bg-white/15" : "bg-slate-100"}`}
               >
                 {count}
               </span>
@@ -473,7 +475,7 @@ export default async function AiInboxPage({
                       <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
                         Original phone message
                       </p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                      <p className="mt-2 min-w-0 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]">
                         {intake.message_text || "No message text"}
                       </p>
                       {intake.raw_payload?.media?.length ? (
@@ -500,13 +502,13 @@ export default async function AiInboxPage({
                           : intake.ai_model || "not run"}
                       </p>
                     </aside>
-                    <div className="p-4 sm:p-5">
+                    <div className="min-w-0 p-4 sm:p-5">
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#0875b7]">
                             AI understood
                           </p>
-                          <h2 className="mt-1 text-lg font-semibold">
+                          <h2 className="mt-1 break-words text-lg font-semibold [overflow-wrap:anywhere]">
                             {proposal.summary || "Phone instruction"}
                           </h2>
                         </div>
@@ -527,7 +529,7 @@ export default async function AiInboxPage({
                       </div>
                       <StructuredPreview proposal={proposal} />
                       {proposal.missingInformation?.length ? (
-                        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                        <div className="mt-3 min-w-0 break-words rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 [overflow-wrap:anywhere]">
                           <strong>Check before approval:</strong>{" "}
                           {proposal.missingInformation.join(" · ")}
                         </div>

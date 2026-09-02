@@ -64,6 +64,12 @@ import {
   requestCommunicationDeliveryTransition,
   type RequestCommunicationDeliveryStatus,
 } from "../_shared/request-communication-state.ts";
+import {
+  isExplicitTrustedPhoneAddCommand,
+  shouldJoinTrustedPhoneIntakeFollowUp,
+  stripCarlosRoutingPhrase,
+  trustedPhoneIntakeDestination,
+} from "../_shared/trusted-phone-intake-routing.ts";
 
 const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, {
   max: 1,
@@ -7709,7 +7715,7 @@ function trustedSmsDashboardTask(
   messageText: string,
 ) {
   const firstTask = proposal.tasks[0];
-  const title = (
+  const proposedTitle = (
     firstTask?.title?.trim() ||
     proposal.summary.trim() ||
     messageText.trim() ||
@@ -7717,12 +7723,14 @@ function trustedSmsDashboardTask(
   )
     .replace(/\s+/g, " ")
     .slice(0, 160);
+  const title =
+    stripCarlosRoutingPhrase(proposedTitle) || "Review phone instruction";
   const nextStep = (firstTask?.notes?.trim() || messageText.trim())
     .slice(0, 500);
   return { title, nextStep };
 }
 
-async function autoRouteTrustedSmsToDavid(
+async function autoRouteTrustedSmsToDashboard(
   intakeId: string,
   proposal: TrustedSmsProposal,
   messageText: string,
@@ -7731,17 +7739,32 @@ async function autoRouteTrustedSmsToDavid(
     return false;
   const task = trustedSmsDashboardTask(proposal, messageText);
   const itemKind = proposal.recordType === "idea" ? "idea" : "task";
+  const destination =
+    itemKind === "task"
+      ? trustedPhoneIntakeDestination(messageText)
+      : "david";
+  const assignedAgent = destination === "carlos" ? "Carlos" : "David";
+  const publishedToCarlos = destination === "carlos";
   await sql`
     insert into public.website_work_items (
       task_key, title, category, status, assigned_agent, progress_percent,
       summary, next_step, source_chat_title, priority, sort_order,
       item_kind, published_to_carlos
     ) values (
-      ${`phone-intake-${intakeId}`}, ${task.title}, 'phone_intake', 'open', 'David', 0,
-      ${itemKind === "idea" ? "David's private idea from Phone Intake." : "Added automatically from David's trusted phone."},
-      ${task.nextStep}, 'David Dashboard', 1, 0, ${itemKind}, false
+      ${`phone-intake-${intakeId}`}, ${task.title}, 'phone_intake', 'open', ${assignedAgent}, 0,
+      ${itemKind === "idea" ? "David's private idea from Phone Intake." : `Added automatically from David's trusted phone for ${assignedAgent}.`},
+      ${task.nextStep}, 'David Dashboard', 1, 0, ${itemKind}, ${publishedToCarlos}
     )
-    on conflict (task_key) do nothing
+    on conflict (task_key) do update set
+      title = excluded.title,
+      category = excluded.category,
+      assigned_agent = excluded.assigned_agent,
+      summary = excluded.summary,
+      next_step = excluded.next_step,
+      source_chat_title = excluded.source_chat_title,
+      priority = excluded.priority,
+      item_kind = excluded.item_kind,
+      published_to_carlos = excluded.published_to_carlos
   `;
   await sql`
     update public.aura_intakes
@@ -7750,7 +7773,7 @@ async function autoRouteTrustedSmsToDavid(
   `;
   await sql`
     insert into public.aura_audit_log (intake_id, actor_user_id, action, details)
-    values (${intakeId}::uuid, null, 'intake_auto_routed_to_david', ${sql.json({ itemKind, source: "trusted_owner_sms" })})
+    values (${intakeId}::uuid, null, 'intake_auto_routed_to_dashboard', ${sql.json({ itemKind, destination, source: "trusted_owner_sms" })})
   `;
   return true;
 }
@@ -7776,28 +7799,50 @@ async function createTrustedSmsIntake(
       message_text: string;
       raw_payload: Record<string, unknown> | null;
       missing_count: number;
+      status: string;
+      auto_routed: boolean;
     }>
   >`
-    select id, message_text, raw_payload,
-      jsonb_array_length(coalesce(proposal -> 'missingInformation', '[]'::jsonb))::int as missing_count
-    from public.aura_intakes
-    where source = 'sms' and sender_phone = ${senderPhone}
-      and status in ('pending', 'needs_follow_up')
-      and external_message_id <> ${externalMessageId}
-      and created_at >= now() - interval '5 minutes'
-      and (${conversationId}::text is null or raw_payload ->> 'conversationId' is null or raw_payload ->> 'conversationId' = ${conversationId})
-    order by created_at desc
-    limit 1
+    select intake.id, intake.message_text, intake.raw_payload, intake.status,
+      jsonb_array_length(coalesce(intake.proposal -> 'missingInformation', '[]'::jsonb))::int as missing_count,
+      exists (
+        select 1 from public.website_work_items work
+        where work.task_key = 'phone-intake-' || intake.id::text
+      ) as auto_routed
+    from public.aura_intakes intake
+    where intake.source = 'sms' and intake.sender_phone = ${senderPhone}
+      and intake.status in ('pending', 'needs_follow_up', 'failed', 'confirmed')
+      and intake.external_message_id <> ${externalMessageId}
+      and intake.created_at >= now() - interval '5 minutes'
+      and (${conversationId}::text is null or intake.raw_payload ->> 'conversationId' is null or intake.raw_payload ->> 'conversationId' = ${conversationId})
+    order by intake.created_at desc
+    limit 5
   `;
-  const prior = priorRows[0];
-  const continuation =
-    /^(?:and|also|plus|his|her|their|the\s+(?:number|phone|email|address)|use\s+this|this\s+is|add\s+him|add\s+her|same\s+(?:person|request))/i.test(
-      messageText,
-    );
+  const alreadyJoined = priorRows.some((candidate) =>
+    Array.isArray(candidate.raw_payload?.messageParts) &&
+    candidate.raw_payload.messageParts.some(
+      (part) =>
+        part &&
+        typeof part === "object" &&
+        (part as { activityId?: unknown }).activityId === activityId,
+    )
+  );
+  if (alreadyJoined) return;
+  const prior = priorRows.find(
+    (candidate) =>
+      isExplicitTrustedPhoneAddCommand(candidate.message_text) &&
+      (candidate.status !== "confirmed" || candidate.auto_routed),
+  );
   const joinPrior =
     Boolean(prior) &&
-    ((images.length > 0 && (prior.missing_count > 0 || !body?.trim())) ||
-      continuation);
+    shouldJoinTrustedPhoneIntakeFollowUp({
+      body,
+      imageCount: images.length,
+      priorMessageText: prior?.message_text,
+      priorMissingCount: prior?.missing_count ?? 0,
+      priorAutoRouted: prior?.auto_routed === true,
+    });
+  if (!joinPrior && !isExplicitTrustedPhoneAddCommand(body)) return;
   const previousMedia =
     joinPrior && Array.isArray(prior.raw_payload?.media)
       ? (prior.raw_payload.media as TrustedSmsMedia[])
@@ -7833,7 +7878,7 @@ async function createTrustedSmsIntake(
       insert into public.aura_audit_log (intake_id, actor_user_id, action, details)
       values (${prior.id}::uuid, null, 'sms_message_joined', ${sql.json({ eventId, activityId, imageCount: images.length, reviewRequired: true })})
     `;
-    await autoRouteTrustedSmsToDavid(prior.id, proposal, combinedText);
+    await autoRouteTrustedSmsToDashboard(prior.id, proposal, combinedText);
     return;
   }
   const code = crypto
@@ -7855,7 +7900,7 @@ async function createTrustedSmsIntake(
     insert into public.aura_audit_log (intake_id, actor_user_id, action, details)
     values (${rows[0].id}, null, 'sms_command_received', ${sql.json({ eventId, activityId, imageCount: images.length, reviewRequired: true })})
   `;
-  await autoRouteTrustedSmsToDavid(rows[0].id, proposal, messageText);
+  await autoRouteTrustedSmsToDashboard(rows[0].id, proposal, messageText);
 }
 
 const dashboardAiModels = {

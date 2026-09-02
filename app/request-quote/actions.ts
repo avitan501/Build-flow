@@ -48,6 +48,14 @@ function safeFileName(value: string) {
   );
 }
 
+type QuoteIntakeAttachmentPayload = {
+  filename: string;
+  content?: string;
+  storagePath?: string;
+  type: string;
+  size?: number;
+};
+
 type QuoteIntakePayload = {
   requestKind: "quote_request" | "beat_quote";
   referenceId: string;
@@ -67,13 +75,9 @@ type QuoteIntakePayload = {
   departments: string[];
   contactMethods: string[];
   details: string;
-  attachment?: {
-    filename: string;
-    content?: string;
-    storagePath?: string;
-    type: string;
-    size?: number;
-  };
+  attachments?: QuoteIntakeAttachmentPayload[];
+  /** Accepted by the Edge Function for older callers during rollout. */
+  attachment?: QuoteIntakeAttachmentPayload;
 };
 
 type IntakeAttachment = {
@@ -105,7 +109,11 @@ async function saveWithSupabaseFunction(payload: QuoteIntakePayload) {
     cache: "no-store",
   });
   if (!response.ok) return null;
-  return response.json() as Promise<{ ok: true; requestId: string }>;
+  return response.json() as Promise<{
+    ok: true;
+    requestId: string;
+    attachmentCount: number;
+  }>;
 }
 
 async function findClientByContact(
@@ -319,15 +327,13 @@ export async function submitQuoteRequestFormAction(
     departments,
     contactMethods: contactMethods.length ? contactMethods : ["WhatsApp"],
     details,
-    attachment: attachments[0]
-      ? {
-          filename: attachments[0].filename,
-          content: attachments[0].content,
-          storagePath: attachments[0].storagePath,
-          type: attachments[0].type,
-          size: attachments[0].size,
-        }
-      : undefined,
+    attachments: attachments.map((attachment) => ({
+      filename: attachment.filename,
+      content: attachment.content,
+      storagePath: attachment.storagePath,
+      type: attachment.type,
+      size: attachment.size,
+    })),
   };
   let projectId = "";
   let requestId = "";
@@ -512,10 +518,10 @@ export async function submitQuoteRequestFormAction(
           await emailFile.arrayBuffer(),
         ).toString("base64");
         const storedFilePath = `${clientId}/${projectId}/${randomUUID()}-${attachment.filename}`;
-        const { error: moveError } = await supabase.storage
+        const { error: copyError } = await supabase.storage
           .from("project-uploads")
-          .move(attachment.storagePath, storedFilePath);
-        if (moveError) throw new Error("attachment_move_failed");
+          .copy(attachment.storagePath, storedFilePath);
+        if (copyError) throw new Error("attachment_copy_failed");
         storedFilePaths.push(storedFilePath);
         const { error: attachmentError } = await supabase
           .from("quote_request_attachments")
@@ -553,7 +559,6 @@ export async function submitQuoteRequestFormAction(
         if (attachmentError) throw new Error("attachment_record_failed");
       }
     }
-
     const emailDelivery = await sendQuoteIntakeEmail({
       ...intakePayload,
       requestId,
@@ -598,6 +603,19 @@ export async function submitQuoteRequestFormAction(
 
     revalidatePath("/admin/users");
     revalidatePath("/owner/materials/requests");
+    const temporaryFilePaths = attachments.flatMap((attachment) =>
+      attachment.storagePath ? [attachment.storagePath] : [],
+    );
+    if (temporaryFilePaths.length) {
+      const { error: temporaryCleanupError } = await supabase.storage
+        .from("project-uploads")
+        .remove(temporaryFilePaths);
+      if (temporaryCleanupError)
+        console.error("Public quote temporary upload cleanup failed", {
+          requestId,
+          count: temporaryFilePaths.length,
+        });
+    }
     return {
       status: "success",
       message:
@@ -619,7 +637,7 @@ export async function submitQuoteRequestFormAction(
     }
     try {
       const saved = await saveWithSupabaseFunction(intakePayload);
-      if (saved?.ok) {
+      if (saved?.ok && saved.attachmentCount === attachments.length) {
         after(() =>
           notifyManagersSafely({
             eventType: "new_order",

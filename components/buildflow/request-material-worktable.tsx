@@ -165,13 +165,13 @@ export function RequestMaterialWorktable({
                     <td className="border-l border-slate-100 px-3 py-3">
                       {hasAi ? <><p className="text-sm font-extrabold tabular-nums text-slate-950">{materialQuantity(item)} <span className="text-xs font-semibold text-slate-500">{materialSalesUnit(item)}</span></p><p className="text-sm font-bold text-slate-950">{item.name}</p>{itemDetails(item) ? <p className="mt-0.5 text-xs leading-5 text-slate-500">{itemDetails(item)}</p> : null}<button type="button" onClick={() => setPriceItemId(priceOpen ? null : item.id)} className="mt-1 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-[#0066cc]"><Search className="h-3.5 w-3.5" />Online prices</button>{priceOpen ? <MaterialPriceCheck requestId={requestId} query={materialSearchQuery(item)} department={item.department} defaultZipCode={defaultZipCode} onClose={() => setPriceItemId(null)} /> : null}</> : <p className="text-xs font-semibold text-slate-400">Not organized yet</p>}
                     </td>
-                    <td className={`border-l border-slate-100 px-3 py-3 ${missing ? "bg-amber-50/70" : ""}`}>
+                    <td aria-label={!missing ? "No missing information — Ready" : undefined} className={`border-l border-slate-100 px-3 py-3 ${missing ? "bg-amber-50/70" : ""}`}>
                       {missing ? (
                         <div>
                           <div className="flex flex-wrap gap-1">{reasons.map((reason) => <span key={reason} className="rounded bg-white px-2 py-1 text-xs font-bold text-rose-700 ring-1 ring-rose-100">{reason}</span>)}</div>
                           <div className="mt-2"><span className="sr-only">Ask AI</span><MaterialReviewEditor requestId={requestId} item={item} onSaved={(savedItem) => setSavedItems((current) => ({ ...current, [savedItem.id]: savedItem }))} /></div>
                         </div>
-                      ) : <span aria-label="No missing information — Ready" className="sr-only">Ready</span>}
+                      ) : null}
                     </td>
                     <td className="border-l border-slate-100 px-2 py-2"><RequestSupplierRouteEditor requestId={requestId} itemId={item.id} metadata={item.metadata} suppliers={suppliers} /></td>
                   </tr>

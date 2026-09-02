@@ -218,7 +218,11 @@ export function QuoteRequestForm({
           return;
         }
         const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-        if (files.length === 0 || totalSize <= directAttachmentSize) return;
+        if (
+          files.length === 0 ||
+          (files.length === 1 && totalSize <= directAttachmentSize)
+        )
+          return;
 
         event.preventDefault();
         submission.delete("attachment");

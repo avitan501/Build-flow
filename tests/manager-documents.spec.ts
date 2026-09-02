@@ -429,7 +429,7 @@ test("document intelligence keeps charges and tax out of product rows", () => {
 });
 
 test("document AI failure recovery is bounded, diagnosable, and atomic", async () => {
-  const [edge, actions, intelligence, migration] = await Promise.all([
+  const [edge, actions, intelligence, migration, valueHardeningMigration] = await Promise.all([
     readFile(
       path.join(root, "supabase/functions/manager-document-ocr/index.ts"),
       "utf8",
@@ -440,6 +440,13 @@ test("document AI failure recovery is bounded, diagnosable, and atomic", async (
       path.join(
         root,
         "supabase/migrations/20260831171000_atomic_manager_document_extraction.sql",
+      ),
+      "utf8",
+    ),
+    readFile(
+      path.join(
+        root,
+        "supabase/migrations/20260902034804_harden_manager_document_extraction_values.sql",
       ),
       "utf8",
     ),
@@ -468,6 +475,10 @@ test("document AI failure recovery is bounded, diagnosable, and atomic", async (
   expect(actions).not.toContain("Document AI server fallback unavailable");
   expect(intelligence).toContain('apiKey?.startsWith("sk-")');
   expect(intelligence).toContain("apiKey.length < 30");
+  expect(intelligence).toContain("MAX_DOCUMENT_LINE_VALUE");
+  expect(intelligence).toContain("positive: true");
+  expect(intelligence).toContain("/^[A-Z]{3,8}$/");
+  expect(intelligence).toContain('parsed.toISOString().slice(0, 10) === candidate');
 
   expect(migration).toContain("for update");
   expect(migration).toContain("extraction_lease_token uuid");
@@ -485,6 +496,12 @@ test("document AI failure recovery is bounded, diagnosable, and atomic", async (
   expect(migration).toContain("status = 'needs_review'");
   expect(migration).toContain("security definer");
   expect(migration).toContain("private.has_staff_capability('suppliers')");
+  expect(valueHardeningMigration).toContain("jsonb_array_length");
+  expect(valueHardeningMigration).toContain("Document extraction is limited to 500 lines");
+  expect(valueHardeningMigration).toContain("entry.value->>'quantity'");
+  expect(valueHardeningMigration).toContain("between 1 and 2147483647");
+  expect(valueHardeningMigration).toContain("upper(coalesce(p_document->>'currency', '')) ~ '^[A-Z]{3,8}$'");
+  expect(valueHardeningMigration).toContain("exception when others then v_document_date := null");
 });
 
 test("choosing one catalog product does not keep the obsolete partial-subtotal warning", () => {

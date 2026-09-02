@@ -14,8 +14,8 @@ test("trusted phone intake reads screenshots and safely joins follow-up messages
   expect(broker).toContain("visionImageInputs(media)");
   expect(broker).toContain("interval '5 minutes'");
   expect(broker).toContain("sms_message_joined");
-  expect(broker).toContain("prior.missing_count > 0");
-  expect(broker).toContain("continuation");
+  expect(broker).toContain("priorMissingCount");
+  expect(broker).toContain("shouldJoinTrustedPhoneIntakeFollowUp");
   expect(broker).toContain("trustedImageMedia(media).length > 0");
   expect(broker).toContain('"+15169398484"');
   expect(broker).toContain("isTrustedSmsCommandPhone(counterpartyPhone)");
@@ -24,8 +24,8 @@ test("trusted phone intake reads screenshots and safely joins follow-up messages
   expect(broker).toContain('commandType === "idea"');
   expect(broker).toContain("quoPolledMedia(message)");
   expect(broker).toContain("createTrustedSmsIntake(");
-  expect(broker).toContain("autoRouteTrustedSmsToDavid");
-  expect(broker).toContain("intake_auto_routed_to_david");
+  expect(broker).toContain("autoRouteTrustedSmsToDashboard");
+  expect(broker).toContain("intake_auto_routed_to_dashboard");
   expect(broker).toContain("'David Dashboard'");
 });
 
@@ -106,6 +106,20 @@ test("Phone intake is flat inside David Dashboard and absent from Carlos", () =>
   expect(dashboard).not.toContain('label: "AI Phone Inbox"');
   expect(inbox).toContain('href="/admin/goals-progress"');
   expect(inbox).not.toContain("Supplier details were not included");
+});
+
+test("AI Inbox tabs and long phone details stay contained on narrow screens", () => {
+  const inbox = readFileSync(
+    path.join(root, "app/owner/ai-inbox/page.tsx"),
+    "utf8",
+  );
+
+  expect(inbox).toContain("grid grid-cols-3");
+  expect(inbox).toContain("sm:flex");
+  expect(inbox).toContain("min-h-10 min-w-0 flex-1");
+  expect(inbox).toContain('sm:hidden">{mobileLabel}');
+  expect(inbox).toContain('hidden sm:inline">{label}');
+  expect(inbox).toContain("[overflow-wrap:anywhere]");
 });
 
 test("ADD IDEA routes to David's Ideas list while Carlos receives a task", async () => {

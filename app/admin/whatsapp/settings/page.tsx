@@ -41,8 +41,8 @@ export default async function AdminWhatsAppSettingsPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link href="/admin/whatsapp" className={statusButtonClass(spec.status)}>
-                Back to Draft Inbox
+              <Link href="/admin/communications?channel=whatsapp" className={statusButtonClass(spec.status)}>
+                Back to Communications
               </Link>
               <div className={`rounded-2xl px-4 py-3 text-sm ${readOnly ? "border border-orange-200 bg-orange-50 text-orange-700" : "border border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
                 {readOnly ? "Preview only on live runtime" : "Temporary JSON writes enabled locally"}

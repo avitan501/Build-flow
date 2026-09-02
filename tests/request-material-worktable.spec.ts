@@ -101,6 +101,8 @@ test("AI controls and notes appear only on rows that are actually missing inform
   expect(worktable).toMatch(/Ask AI|Generate AI/)
   expect(worktable).toMatch(/status\s*!==\s*["']ready["']|status\s*===\s*["']missing["']/)
   expect(worktable, "ready rows must leave the third column clear instead of inventing a question").toMatch(/aria-label=["'{`][\s\S]*(?:No missing|Complete|Ready)/)
+  expect(worktable).toContain('aria-label={!missing ? "No missing information — Ready" : undefined}')
+  expect(worktable).not.toContain('className="sr-only">Ready</span>')
 })
 
 test("supplier quotes move into compact step two instead of expanding the request grid", async () => {
@@ -221,4 +223,20 @@ test("organizer asks exactly one unresolved blocker and excludes details already
   expect(organizer).toMatch(/never repeat|do not ask.*already|already answered/i)
   expect(organizer).toMatch(/extract every|already supplied|already provided/i)
   expect(organizer).toMatch(/sourceText|typedSource/)
+})
+
+test("organizer has bounded server and OpenAI deadlines", async () => {
+  const [organizer, actions] = await Promise.all([
+    source(path.join(root, "supabase/functions/client-material-list-ai/index.ts")),
+    source(path.join(root, "app/owner/materials/requests/actions.ts")),
+  ])
+
+  expect(organizer).toContain("new AbortController()")
+  expect(organizer).toContain("signal: controller.signal")
+  expect(organizer).toContain("controller.abort(), 30_000")
+  expect(organizer).toContain("clearTimeout(openAiTimeout)")
+  expect(actions).toContain("Promise.race([invocation, deadline])")
+  expect(actions).toContain("material_organization_timeout")
+  expect(actions).toContain("clearTimeout(deadlineTimer)")
+  expect(actions).toContain("The organizer is taking too long")
 })

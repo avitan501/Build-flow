@@ -166,6 +166,16 @@ function clean(value: unknown, max: number) {
     .slice(0, max);
 }
 
+function validDocumentDate(value: unknown) {
+  const candidate = clean(value, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(candidate) || candidate.startsWith("0000-"))
+    return null;
+  const parsed = new Date(`${candidate}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === candidate
+    ? candidate
+    : null;
+}
+
 async function ensureDocumentRequestComparison(
   supabase: StaffSupabase,
   userId: string,
@@ -912,10 +922,17 @@ export async function saveManagerDocumentReviewAction(input: {
     return { ok: false, error: "Invalid document." };
   if (!Array.isArray(input.items) || input.items.length > 500)
     return { ok: false, error: "Review no more than 500 lines at once." };
-  const nonNegative = (value: number | null | undefined, decimals: number) =>
+  const nonNegative = (
+    value: number | null | undefined,
+    decimals: number,
+    max = 999_999_999_999.99,
+    positive = false,
+  ) =>
     value === null || value === undefined
       ? null
-      : Number.isFinite(Number(value)) && Number(value) >= 0
+      : Number.isFinite(Number(value)) &&
+          (positive ? Number(value) > 0 : Number(value) >= 0) &&
+          Number(value) <= max
         ? Math.round(Number(value) * 10 ** decimals) / 10 ** decimals
         : null;
   const money = (value: number | null | undefined) => nonNegative(value, 2);
@@ -934,9 +951,9 @@ export async function saveManagerDocumentReviewAction(input: {
     "purchase_order",
   ].includes(input.documentType);
   const reviewedItems = input.items.map((item) => {
-    const quantity = nonNegative(item.quantity, 3);
-    const unitPrice = nonNegative(item.unitPrice, 4);
-    const lineTotal = money(item.lineTotal);
+    const quantity = nonNegative(item.quantity, 3, 100_000_000, true);
+    const unitPrice = nonNegative(item.unitPrice, 4, 100_000_000);
+    const lineTotal = nonNegative(item.lineTotal, 2, 100_000_000);
     const expected =
       quantity !== null && unitPrice !== null
         ? Math.round(quantity * unitPrice * 100) / 100
@@ -1042,15 +1059,9 @@ export async function saveManagerDocumentReviewAction(input: {
       title: clean(input.title, 240),
       party_name: clean(input.partyName, 200),
       document_number: clean(input.documentNumber, 100),
-      document_date: /^\d{4}-\d{2}-\d{2}$/.test(input.documentDate)
-        ? input.documentDate
-        : null,
-      due_date: /^\d{4}-\d{2}-\d{2}$/.test(input.dueDate)
-        ? input.dueDate
-        : null,
-      expires_on: /^\d{4}-\d{2}-\d{2}$/.test(input.expiresOn)
-        ? input.expiresOn
-        : null,
+      document_date: validDocumentDate(input.documentDate),
+      due_date: validDocumentDate(input.dueDate),
+      expires_on: validDocumentDate(input.expiresOn),
       department: normalizeMaterialCatalogDepartment(input.department),
       subtotal,
       discount,

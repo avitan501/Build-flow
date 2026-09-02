@@ -1,6 +1,23 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 
+type QuoteAttachmentPayload = {
+  filename: string
+  content?: string
+  storagePath?: string
+  type: string
+  size?: number
+}
+
+type PreparedQuoteAttachment = {
+  filename: string
+  type: string
+  size: number
+  content?: string
+  bytes?: Uint8Array
+  storagePath?: string
+}
+
 type QuotePayload = {
   requestKind?: "quote_request" | "beat_quote"
   referenceId: string
@@ -20,7 +37,9 @@ type QuotePayload = {
   departments: string[]
   contactMethods?: string[]
   details: string
-  attachment?: { filename: string; content?: string; storagePath?: string; type: string; size?: number }
+  attachments?: QuoteAttachmentPayload[]
+  /** Backward compatibility for callers deployed before multi-file intake. */
+  attachment?: QuoteAttachmentPayload
 }
 
 type EmailDeliveryResult =
@@ -54,6 +73,7 @@ type CustomerEmailItem = {
 const allowedTypes = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"])
 const maxInlineFileSize = 4 * 1024 * 1024
 const maxStoredFileSize = 25 * 1024 * 1024
+const maxAttachmentCount = 10
 const temporaryUploadPrefix = "public-intake/"
 const siteUrl = "https://build.avantiap.com"
 const companyEmail = "office@build.avantiap.com"
@@ -83,6 +103,26 @@ function encodeBase64(bytes: Uint8Array) {
     binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize))
   }
   return btoa(binary)
+}
+
+function safeFilename(value: unknown) {
+  return String(value || "").replace(/[^a-zA-Z0-9._ -]+/g, "-").slice(0, 100) || "project-file"
+}
+
+function expectedFileType(filename: string) {
+  const extension = filename.split(".").pop()?.toLowerCase()
+  if (extension === "pdf") return "application/pdf"
+  if (extension === "jpg" || extension === "jpeg") return "image/jpeg"
+  if (extension === "png") return "image/png"
+  if (extension === "webp") return "image/webp"
+  return ""
+}
+
+function payloadAttachments(payload: QuotePayload) {
+  if (payload.attachments !== undefined) {
+    return Array.isArray(payload.attachments) ? payload.attachments : null
+  }
+  return payload.attachment ? [payload.attachment] : []
 }
 
 function escapeHtml(value: string) {
@@ -148,12 +188,15 @@ function valid(payload: QuotePayload) {
   const email = (payload.email || "").trim()
   const phone = (payload.phone || "").trim()
   const name = `${payload.firstName || ""} ${payload.lastName || ""}`.trim()
-  return payload.referenceId?.startsWith("AB-")
+  const attachments = payloadAttachments(payload)
+  return attachments !== null
+    && attachments.length <= maxAttachmentCount
+    && payload.referenceId?.startsWith("AB-")
     && (name ? Boolean(email || phone) : Boolean(email && phone))
     && (!email || /^\S+@\S+\.\S+$/.test(email))
     && (!phone || phone.replace(/\D/g, "").length >= 7)
     && Array.isArray(payload.departments)
-    && ((payload.details || "").trim().length >= 3 || Boolean(payload.attachment))
+    && ((payload.details || "").trim().length >= 3 || attachments.length > 0)
 }
 
 function normalizePhone(value: string) {
@@ -388,6 +431,51 @@ Deno.serve(async (request) => {
 
   const payload = rawPayload as QuotePayload
   if (!valid(payload)) return json({ error: "invalid_request" }, 400)
+  const incomingAttachments = payloadAttachments(payload) ?? []
+  const preparedAttachments: PreparedQuoteAttachment[] = []
+  let inlineBytesTotal = 0
+  try {
+    for (const [index, attachment] of incomingAttachments.entries()) {
+      const filename = safeFilename(attachment?.filename)
+      const type = String(attachment?.type || "")
+      if (!allowedTypes.has(type) || expectedFileType(filename) !== type) throw new Error("invalid_attachment")
+
+      const storagePath = String(attachment?.storagePath || "")
+      if (storagePath) {
+        const statedSize = Number(attachment?.size)
+        if (
+          !storagePath.startsWith(temporaryUploadPrefix)
+          || storagePath.includes("..")
+          || !Number.isFinite(statedSize)
+          || statedSize <= 0
+          || statedSize > maxStoredFileSize
+        ) throw new Error("invalid_attachment")
+        const { data: fileInfo, error: infoError } = await supabase.storage.from("project-uploads").info(storagePath)
+        if (infoError || !fileInfo || fileInfo.size !== statedSize || fileInfo.contentType !== type) throw new Error("invalid_attachment")
+
+        let content: string | undefined
+        if (index === 0) {
+          const { data: emailFile, error: downloadError } = await supabase.storage.from("project-uploads").download(storagePath)
+          if (downloadError || !emailFile) throw new Error("attachment_download_failed")
+          content = encodeBase64(new Uint8Array(await emailFile.arrayBuffer()))
+        }
+        preparedAttachments.push({ filename, type, size: statedSize, storagePath, content })
+        continue
+      }
+
+      if (typeof attachment?.content !== "string" || !attachment.content) throw new Error("invalid_attachment")
+      const bytes = decodeBase64(attachment.content)
+      inlineBytesTotal += bytes.byteLength
+      if (
+        bytes.byteLength <= 0
+        || inlineBytesTotal > maxInlineFileSize
+        || (attachment.size !== undefined && Number(attachment.size) !== bytes.byteLength)
+      ) throw new Error("attachment_too_large")
+      preparedAttachments.push({ filename, type, size: bytes.byteLength, bytes, content: attachment.content })
+    }
+  } catch {
+    return json({ error: "invalid_attachment" }, 400)
+  }
   const email = payload.email.trim().toLowerCase()
   const phone = normalizePhone(payload.phone || "")
   const submittedName = `${payload.firstName.trim()} ${payload.lastName.trim()}`.trim()
@@ -398,7 +486,7 @@ Deno.serve(async (request) => {
   let clientId = ""
   let projectId = ""
   let requestId = ""
-  let storedFilePath = ""
+  const storedFilePaths: string[] = []
   let createdClient = false
 
   try {
@@ -490,49 +578,57 @@ Deno.serve(async (request) => {
     })
     if (itemError) throw new Error("request_item_create_failed")
 
-    if (payload.attachment?.storagePath) {
-      const temporaryPath = payload.attachment.storagePath
-      const statedSize = Number(payload.attachment.size)
-      if (!temporaryPath.startsWith(temporaryUploadPrefix) || temporaryPath.includes("..") || !allowedTypes.has(payload.attachment.type)) throw new Error("invalid_attachment")
-      const { data: fileInfo, error: infoError } = await supabase.storage.from("project-uploads").info(temporaryPath)
-      if (infoError || !fileInfo || !Number.isFinite(statedSize) || statedSize <= 0 || fileInfo.size !== statedSize || fileInfo.size > maxStoredFileSize || fileInfo.contentType !== payload.attachment.type) throw new Error("invalid_attachment")
-      const { data: emailFile, error: downloadError } = await supabase.storage.from("project-uploads").download(temporaryPath)
-      if (downloadError || !emailFile) throw new Error("attachment_download_failed")
-      payload.attachment.content = encodeBase64(new Uint8Array(await emailFile.arrayBuffer()))
-      const filename = payload.attachment.filename.replace(/[^a-zA-Z0-9._ -]+/g, "-").slice(0, 100) || "project-file"
-      storedFilePath = `${clientId}/${projectId}/${crypto.randomUUID()}-${filename}`
-      const { error: moveError } = await supabase.storage.from("project-uploads").move(temporaryPath, storedFilePath)
-      if (moveError) throw new Error("attachment_move_failed")
-      const { error: attachmentError } = await supabase.from("quote_request_attachments").insert({
+    const attachmentRows: Array<{
+      request_id: string
+      project_id: string
+      owner_id: string
+      file_name: string
+      file_path: string
+      file_type: string
+      file_size: number
+    }> = []
+    for (const attachment of preparedAttachments) {
+      const storedFilePath = `${clientId}/${projectId}/${crypto.randomUUID()}-${attachment.filename}`
+      if (attachment.storagePath) {
+        const { error: copyError } = await supabase.storage.from("project-uploads").copy(attachment.storagePath, storedFilePath)
+        if (copyError) throw new Error("attachment_copy_failed")
+      } else if (attachment.bytes) {
+        const { error: uploadError } = await supabase.storage.from("project-uploads").upload(storedFilePath, attachment.bytes, { contentType: attachment.type, upsert: false })
+        if (uploadError) throw new Error("attachment_upload_failed")
+      } else {
+        throw new Error("invalid_attachment")
+      }
+      storedFilePaths.push(storedFilePath)
+      attachmentRows.push({
         request_id: requestId,
         project_id: projectId,
         owner_id: clientId,
-        file_name: filename,
+        file_name: attachment.filename,
         file_path: storedFilePath,
-        file_type: payload.attachment.type,
-        file_size: statedSize,
+        file_type: attachment.type,
+        file_size: attachment.size,
       })
-      if (attachmentError) throw new Error("attachment_record_failed")
-    } else if (payload.attachment?.content) {
-      if (!allowedTypes.has(payload.attachment.type)) throw new Error("invalid_attachment")
-      const bytes = decodeBase64(payload.attachment.content)
-      if (bytes.byteLength > maxInlineFileSize) throw new Error("attachment_too_large")
-      const filename = payload.attachment.filename.replace(/[^a-zA-Z0-9._ -]+/g, "-").slice(0, 100) || "project-file"
-      storedFilePath = `${clientId}/${projectId}/${crypto.randomUUID()}-${filename}`
-      const { error: uploadError } = await supabase.storage.from("project-uploads").upload(storedFilePath, bytes, { contentType: payload.attachment.type, upsert: false })
-      if (uploadError) throw new Error("attachment_upload_failed")
-      const { error: attachmentError } = await supabase.from("quote_request_attachments").insert({
-        request_id: requestId,
-        project_id: projectId,
-        owner_id: clientId,
-        file_name: filename,
-        file_path: storedFilePath,
-        file_type: payload.attachment.type,
-        file_size: bytes.byteLength,
-      })
-      if (attachmentError) throw new Error("attachment_record_failed")
     }
-
+    if (attachmentRows.length) {
+      const { data: insertedAttachments, error: attachmentError } = await supabase
+        .from("quote_request_attachments")
+        .insert(attachmentRows)
+        .select("id")
+      if (attachmentError || insertedAttachments?.length !== attachmentRows.length) throw new Error("attachment_record_failed")
+    }
+    const primaryAttachment = preparedAttachments[0]
+      ? {
+          filename: preparedAttachments[0].filename,
+          content: preparedAttachments[0].content,
+          type: preparedAttachments[0].type,
+          size: preparedAttachments[0].size,
+        }
+      : undefined
+    const attachmentNames = preparedAttachments.map((attachment) => attachment.filename)
+    const attachmentSummaryText = attachmentNames.length ? `\nAttachments: ${attachmentNames.join(", ")}` : ""
+    const attachmentSummaryHtml = attachmentNames.length
+      ? `<p style="margin:20px 0 0;color:#475569;font-size:13px"><strong>Attachments:</strong> ${escapeHtml(attachmentNames.join(", "))}</p>`
+      : ""
     const departmentText = payload.departments.join(", ") || "Not selected"
     const requestUrl = `${siteUrl}/owner/materials/requests/${encodeURIComponent(requestId)}`
     const customerItems: CustomerEmailItem[] = [{ name: departmentText, details: [payload.details || "See the attached file."] }]
@@ -556,16 +652,16 @@ Deno.serve(async (request) => {
       subject: `NEW MATERIAL REQUEST - ${fullName} - ${payload.referenceId}`,
       replyTo: email || undefined,
       text: ownerText,
-      html: `<div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5"><div style="max-width:680px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff"><div style="padding:20px 22px;border-bottom:1px solid #e5eaf1"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:12px"><img src="${siteUrl}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px"></td><td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br><span style="font-size:13px;color:#64748b">Material request desk</span></td></tr></table></div><div style="padding:24px 22px"><p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">New material request</p><h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">${escapeHtml(fullName)} sent a request</h1><p style="margin:10px 0 0;color:#475569">${escapeHtml(departmentText)}${payload.timeframe ? ` &bull; Needed ${escapeHtml(payload.timeframe)}` : ""}</p><p style="margin:22px 0"><a href="${requestUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Request</a></p><div style="padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}<br><strong>Customer:</strong> ${escapeHtml(fullName)}<br><strong>Phone:</strong> ${escapeHtml(payload.phone || "Not provided")}<br><strong>Email:</strong> ${escapeHtml(email || "Not provided")}${payload.company ? `<br><strong>Company:</strong> ${escapeHtml(payload.company)}` : ""}<br><strong>Reply by:</strong> ${escapeHtml((contactMethods.length ? contactMethods : ["WhatsApp"]).join(", "))}</div><h2 style="margin:24px 0 8px;font-size:17px">Job details</h2><p style="margin:0"><strong>Location:</strong> ${escapeHtml(address || "Not provided")}<br><strong>Departments:</strong> ${escapeHtml(departmentText)}</p><h2 style="margin:24px 0 8px;font-size:17px">What they need</h2><p style="margin:0;white-space:pre-wrap">${escapeHtml(payload.details || "See attached file")}</p>${payload.attachment?.filename ? `<p style="margin:20px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(payload.attachment.filename)}</p>` : ""}</div></div></div>`,
-      attachment: payload.attachment,
+      html: `<div style="margin:0;background:#f2f5f9;padding:24px 12px;font-family:Arial,sans-serif;color:#0f172a;line-height:1.5"><div style="max-width:680px;margin:0 auto;overflow:hidden;border:1px solid #dbe3ee;border-radius:16px;background:#ffffff"><div style="padding:20px 22px;border-bottom:1px solid #e5eaf1"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="padding-right:12px"><img src="${siteUrl}/images/avantia/avantia-app-icon-512.png" width="46" height="46" alt="" style="display:block;border-radius:12px"></td><td><strong style="font-size:18px;color:#071126">Avantia Build</strong><br><span style="font-size:13px;color:#64748b">Material request desk</span></td></tr></table></div><div style="padding:24px 22px"><p style="margin:0 0 8px;color:#0071e3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">New material request</p><h1 style="margin:0;font-size:26px;line-height:1.2;color:#071126">${escapeHtml(fullName)} sent a request</h1><p style="margin:10px 0 0;color:#475569">${escapeHtml(departmentText)}${payload.timeframe ? ` &bull; Needed ${escapeHtml(payload.timeframe)}` : ""}</p><p style="margin:22px 0"><a href="${requestUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Request</a></p><div style="padding:16px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}<br><strong>Customer:</strong> ${escapeHtml(fullName)}<br><strong>Phone:</strong> ${escapeHtml(payload.phone || "Not provided")}<br><strong>Email:</strong> ${escapeHtml(email || "Not provided")}${payload.company ? `<br><strong>Company:</strong> ${escapeHtml(payload.company)}` : ""}<br><strong>Reply by:</strong> ${escapeHtml((contactMethods.length ? contactMethods : ["WhatsApp"]).join(", "))}</div><h2 style="margin:24px 0 8px;font-size:17px">Job details</h2><p style="margin:0"><strong>Location:</strong> ${escapeHtml(address || "Not provided")}<br><strong>Departments:</strong> ${escapeHtml(departmentText)}</p><h2 style="margin:24px 0 8px;font-size:17px">What they need</h2><p style="margin:0;white-space:pre-wrap">${escapeHtml(payload.details || "See attached file")}</p>${attachmentSummaryHtml}</div></div></div>`,
+      attachment: primaryAttachment,
     })
-    const clientText = `Hi ${greetingName},\n\nWe received your Avantia Build quote request. Someone from our team will contact you within the next 24 hours.\n\nReference: ${payload.referenceId}\nProject: ${payload.projectName || "Not named"}\n\nMaterials requested:\n${requestedItemsText(customerItems)}${payload.attachment?.filename ? `\nAttachment: ${payload.attachment.filename}` : ""}\n\n${companyContactText()}`
+    const clientText = `Hi ${greetingName},\n\nWe received your Avantia Build quote request. Someone from our team will contact you within the next 24 hours.\n\nReference: ${payload.referenceId}\nProject: ${payload.projectName || "Not named"}\n\nMaterials requested:\n${requestedItemsText(customerItems)}${attachmentSummaryText}\n\n${companyContactText()}`
     const clientEmail = email ? await sendEmail({
       to: email,
       subject: `Material request received - ${payload.referenceId}`,
       replyTo: companyEmail,
       text: clientText,
-      html: customerEmailShell(`<p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p><h1 style="margin:0;font-size:25px;line-height:1.25;color:#071126">Your request is in.</h1><p style="margin:12px 0;color:#475569">Hi ${escapeHtml(greetingName)}, we will review your details and contact you within 24 hours.</p><div style="margin:20px 0;padding:15px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}${payload.projectName ? `<br><strong>Project:</strong> ${escapeHtml(payload.projectName)}` : ""}</div><h2 style="margin:22px 0 0;font-size:17px;color:#071126">Materials requested</h2>${requestedItemsHtml(customerItems)}${payload.attachment?.filename ? `<p style="margin:14px 0 0;color:#475569;font-size:13px"><strong>Attached:</strong> ${escapeHtml(payload.attachment.filename)}</p>` : ""}<p style="margin:22px 0 0"><a href="${siteUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Avantia Build</a></p>`),
+      html: customerEmailShell(`<p style="margin:0 0 8px;color:#0066cc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em">Request received</p><h1 style="margin:0;font-size:25px;line-height:1.25;color:#071126">Your request is in.</h1><p style="margin:12px 0;color:#475569">Hi ${escapeHtml(greetingName)}, we will review your details and contact you within 24 hours.</p><div style="margin:20px 0;padding:15px;border:1px solid #dbe3ee;border-radius:10px;background:#f8fafc"><strong>Reference:</strong> ${escapeHtml(payload.referenceId)}${payload.projectName ? `<br><strong>Project:</strong> ${escapeHtml(payload.projectName)}` : ""}</div><h2 style="margin:22px 0 0;font-size:17px;color:#071126">Materials requested</h2>${requestedItemsHtml(customerItems)}${attachmentSummaryHtml}<p style="margin:22px 0 0"><a href="${siteUrl}" style="display:inline-block;border-radius:8px;background:#0071e3;padding:13px 20px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none">Open Avantia Build</a></p>`),
     }) : { status: "skipped" as const }
 
     await supabase.from("quote_request_items").update({
@@ -585,10 +681,25 @@ Deno.serve(async (request) => {
     if (payload.requestKind !== "beat_quote") {
       EdgeRuntime.waitUntil(organizeClientMaterialList(supabaseUrl, serviceRoleKey, requestId))
     }
+    const temporaryPaths = preparedAttachments.flatMap((attachment) => attachment.storagePath ? [attachment.storagePath] : [])
+    if (temporaryPaths.length) {
+      const { error: temporaryCleanupError } = await supabase.storage.from("project-uploads").remove(temporaryPaths)
+      if (temporaryCleanupError) console.error("public_quote_temporary_cleanup_failed", { requestId, count: temporaryPaths.length })
+    }
 
-    return json({ ok: true, clientId, projectId, requestId, referenceId: payload.referenceId, email: { owner: ownerEmail, client: clientEmail } })
+    return json({
+      ok: true,
+      clientId,
+      projectId,
+      requestId,
+      referenceId: payload.referenceId,
+      attachmentCount: preparedAttachments.length,
+      email: { owner: ownerEmail, client: clientEmail },
+    })
   } catch (cause) {
-    if (storedFilePath) await supabase.storage.from("project-uploads").remove([storedFilePath])
+    const temporaryPaths = preparedAttachments.flatMap((attachment) => attachment.storagePath ? [attachment.storagePath] : [])
+    const rollbackPaths = [...new Set([...storedFilePaths, ...temporaryPaths])]
+    if (rollbackPaths.length) await supabase.storage.from("project-uploads").remove(rollbackPaths)
     if (projectId) await supabase.from("projects").delete().eq("id", projectId)
     if (createdClient && clientId) await supabase.auth.admin.deleteUser(clientId)
     console.error("public_quote_intake_failed", cause instanceof Error ? cause.message : "unknown")

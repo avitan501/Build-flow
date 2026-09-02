@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdminProfile, requireStaffProfile } from "@/lib/auth";
 import { normalizePhoneNumber, phoneLoginEmailForPhone } from "@/lib/auth-phone";
+import { captureOperationalError } from "@/lib/monitoring/capture-operational-error";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildProjectUploadStoragePath, PROJECT_UPLOAD_ALLOWED_MIME_TYPES, PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/projects";
 
@@ -490,34 +491,27 @@ export async function deleteCustomerAction(customerId: string): Promise<DeleteMa
   if (prepareError) return { ok: false, error: deletionError(prepareError.message, "customer") };
 
   const queuedFileCount = Number((preparation as { queued_file_count?: number } | null)?.queued_file_count ?? 0);
-  let cleanupFailed = false;
   if (queuedFileCount > 0) {
     try {
       await cleanupQueuedFiles("customer", normalizedId);
     } catch (error) {
-      cleanupFailed = true;
       console.error("Customer file cleanup failed before account deletion.", error);
+      await captureOperationalError(error, {
+        feature: "customer-deletion",
+        operation: "remove-uploaded-files",
+        provider: "supabase-storage",
+        safeCode: "customer-file-cleanup-failed",
+      });
+      return {
+        ok: false,
+        error:
+          "File cleanup did not finish, so the customer account was not deleted. Refresh and try again; any completed cleanup will not be repeated.",
+      };
     }
   }
 
   const { error: deleteError } = await supabase.rpc("staff_delete_customer_account", { p_customer_id: normalizedId });
   if (deleteError) return { ok: false, error: deletionError(deleteError.message, "customer") };
-
-  let warning: string | undefined;
-  if (cleanupFailed) {
-    try {
-      const admin = createAdminClient();
-      const { error: staleQueueError } = await admin
-        .from("manager_file_deletion_queue")
-        .delete()
-        .eq("target_type", "customer")
-        .eq("target_id", normalizedId);
-      if (staleQueueError) throw staleQueueError;
-    } catch (error) {
-      console.error("Customer was deleted, but stale file cleanup records remain.", error);
-      warning = "The customer was deleted, but stale file-cleanup records remain for an administrator to review.";
-    }
-  }
 
   const { data: remaining, error: verifyError } = await supabase
     .from("profiles")
@@ -529,5 +523,5 @@ export async function deleteCustomerAction(customerId: string): Promise<DeleteMa
   revalidatePath("/admin/users");
   revalidatePath("/admin/projects");
   revalidatePath("/projects");
-  return warning ? { ok: true, warning } : { ok: true };
+  return { ok: true };
 }

@@ -67,6 +67,8 @@ type OpenAIResponse = {
   output?: Array<{ content?: Array<{ text?: string }> }>;
 };
 const DOCUMENT_TYPES = new Set<string>(managerDocumentTypes);
+const MAX_DOCUMENT_MONEY = 999_999_999_999.99;
+const MAX_DOCUMENT_LINE_VALUE = 100_000_000;
 
 function clean(value: unknown, max = 500) {
   return typeof value === "string"
@@ -74,10 +76,14 @@ function clean(value: unknown, max = 500) {
     : "";
 }
 
-function numberOrNull(value: unknown) {
+function numberOrNull(
+  value: unknown,
+  options: { max?: number; positive?: boolean } = {},
+) {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0
+  const minimumAccepted = options.positive ? parsed > 0 : parsed >= 0;
+  return Number.isFinite(parsed) && minimumAccepted && parsed <= (options.max ?? MAX_DOCUMENT_MONEY)
     ? Math.round(parsed * 10_000) / 10_000
     : null;
 }
@@ -89,7 +95,17 @@ function confidence(value: unknown) {
 
 function date(value: unknown) {
   const candidate = clean(value, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(candidate) ? candidate : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(candidate) || candidate.startsWith("0000-"))
+    return "";
+  const parsed = new Date(`${candidate}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === candidate
+    ? candidate
+    : "";
+}
+
+function currency(value: unknown) {
+  const candidate = clean(value, 8).toUpperCase();
+  return /^[A-Z]{3,8}$/.test(candidate) ? candidate : "USD";
 }
 
 function responseText(response: OpenAIResponse) {
@@ -210,12 +226,21 @@ export function normalizeManagerDocumentExtraction(
         itemCode: clean(item.itemCode, 120),
         description: clean(item.description, 500),
         specification: clean(item.specification, 1000),
-        quantity: numberOrNull(item.quantity),
+        quantity: numberOrNull(item.quantity, {
+          max: MAX_DOCUMENT_LINE_VALUE,
+          positive: true,
+        }),
         unit: clean(item.unit, 40),
-        unitPrice: numberOrNull(item.unitPrice),
-        lineTotal: numberOrNull(item.lineTotal),
+        unitPrice: numberOrNull(item.unitPrice, {
+          max: MAX_DOCUMENT_LINE_VALUE,
+        }),
+        lineTotal: numberOrNull(item.lineTotal, {
+          max: MAX_DOCUMENT_LINE_VALUE,
+        }),
         page:
-          Number.isInteger(Number(item.page)) && Number(item.page) > 0
+          Number.isInteger(Number(item.page)) &&
+          Number(item.page) > 0 &&
+          Number(item.page) <= 2_147_483_647
             ? Number(item.page)
             : null,
         sourceText: clean(item.sourceText, 1000),
@@ -236,7 +261,7 @@ export function normalizeManagerDocumentExtraction(
   const discount = numberOrNull(metadata.discount) ?? 0;
   const deliveryCharge = numberOrNull(metadata.deliveryCharge) ?? 0;
   const taxAmount = numberOrNull(metadata.taxAmount);
-  const taxPercent = numberOrNull(metadata.taxPercent);
+  const taxPercent = numberOrNull(metadata.taxPercent, { max: 100 });
   const total = numberOrNull(metadata.total);
   const warnings = (Array.isArray(input.warnings) ? input.warnings : [])
     .map((warning) => clean(warning, 500))
@@ -266,7 +291,7 @@ export function normalizeManagerDocumentExtraction(
     dueDate: date(metadata.dueDate),
     expiresOn: date(metadata.expiresOn),
     department: clean(metadata.department, 120) || "Others",
-    currency: clean(metadata.currency, 8).toUpperCase() || "USD",
+    currency: currency(metadata.currency),
     subtotal,
     discount,
     deliveryCharge,

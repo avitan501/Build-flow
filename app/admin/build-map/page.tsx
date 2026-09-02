@@ -34,7 +34,7 @@ import {
 
 const QUO_INBOX_URL =
   "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
-const WHATSAPP_URL = "https://web.whatsapp.com/";
+const WHATSAPP_URL = "/admin/communications?channel=whatsapp";
 const CARLOS_MEETING_URL =
   "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Avantia%20Build%20meeting%20with%20Carlos&details=Avantia%20Build%20manager%20meeting&add=buildavantiap%40gmail.com";
 

@@ -116,6 +116,7 @@ function NavigationLink({
     <div>
       <Link
         href={link.href}
+        prefetch={false}
         onClick={onNavigate}
         aria-label={collapsed ? link.shortLabel : undefined}
         aria-describedby={collapsed ? tooltipId : undefined}
@@ -135,6 +136,7 @@ function NavigationLink({
               <Link
                 key={secondary.href}
                 href={secondary.href}
+                prefetch={false}
                 onClick={onNavigate}
                 aria-current={secondaryActive ? "page" : undefined}
                 className={`flex min-h-8 items-center gap-2 rounded-md px-2 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#0071e3] ${secondaryActive ? "bg-sky-50 text-[#0066cc]" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"}`}
@@ -168,7 +170,7 @@ function ManagerNavigation({
   return (
     <div className="flex h-full flex-col overflow-visible bg-white">
       <div className={`relative flex h-16 shrink-0 items-center border-b border-slate-100 ${collapsed ? "justify-center px-2" : "justify-between gap-2 px-3"}`}>
-        <Link href="/" onClick={onNavigate} aria-label="Open the Avantia Build customer website" className="min-w-0 overflow-hidden">
+        <Link href="/" prefetch={false} onClick={onNavigate} aria-label="Open the Avantia Build customer website" className="min-w-0 overflow-hidden">
           {collapsed ? (
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-[13px] font-black tracking-[-0.04em] text-white">AV</span>
           ) : (
@@ -216,6 +218,7 @@ function ManagerNavigation({
         ) : null}
         <Link
           href="/account"
+          prefetch={false}
           onClick={onNavigate}
           aria-label={collapsed ? "Account" : undefined}
           aria-describedby={collapsed ? "manager-nav-account" : undefined}

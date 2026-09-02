@@ -101,7 +101,7 @@ test("quote request is a compact contact and material workflow", async ({
   await expect(page.getByText(/I am a/)).toHaveCount(0);
   await expect(
     page.getByRole("navigation", { name: "Mobile homepage" }),
-  ).toHaveCount((page.viewportSize()?.width ?? 0) < 1024 ? 1 : 0);
+  ).toHaveCount(0);
   await expect(page.getByLabel("What do you need?")).toHaveAttribute(
     "placeholder",
     "Paste your list or request any item. We’ll look for it.",
@@ -252,7 +252,7 @@ test("beat a quote is a dedicated upload request", async ({ page }) => {
   await expect(page.getByRole("checkbox", { name: "Framing" })).toHaveCount(0);
   await expect(
     page.getByRole("navigation", { name: "Mobile homepage" }),
-  ).toHaveCount((page.viewportSize()?.width ?? 0) < 1024 ? 1 : 0);
+  ).toHaveCount(0);
 
   await page.getByRole("button", { name: "Open navigation menu" }).click();
   await expect(

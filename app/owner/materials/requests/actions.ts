@@ -235,7 +235,21 @@ export async function organizeClientMaterialRequestAction(formData: FormData) {
   const { supabase } = await requireStaffProfile("customers")
   const { data: request } = await supabase.from("quote_requests").select("id").eq("id", requestId).maybeSingle<{ id: string }>()
   if (!request) return { ok: false as const, error: "This request was not found." }
-  const { data, error } = await supabase.functions.invoke<{ ok?: boolean; status?: string; itemCount?: number; reviewCount?: number; error?: string }>("client-material-list-ai", { body: { requestId, force } })
+  const invocation = supabase.functions.invoke<{ ok?: boolean; status?: string; itemCount?: number; reviewCount?: number; error?: string }>("client-material-list-ai", { body: { requestId, force } })
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<never>((_, reject) => {
+    deadlineTimer = setTimeout(() => reject(new Error("material_organization_timeout")), 40_000)
+    deadlineTimer.unref?.()
+  })
+  let result: Awaited<typeof invocation>
+  try {
+    result = await Promise.race([invocation, deadline])
+  } catch {
+    return { ok: false as const, error: "The organizer is taking too long. Wait a minute, refresh, and check the request before trying again." }
+  } finally {
+    if (deadlineTimer) clearTimeout(deadlineTimer)
+  }
+  const { data, error } = result
   if (error || !data?.ok) return { ok: false as const, error: "The list could not be organized. Please try again." }
   revalidatePath(`/owner/materials/requests/${requestId}`)
   revalidatePath("/admin/supplier-quotes")

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",
-    "test:e2e:prod": "PLAYWRIGHT_BASE_URL=https://build-flow-wfl3.vercel.app playwright test"
+    "test:e2e:live": "PLAYWRIGHT_BASE_URL=https://build.avantiap.com PLAYWRIGHT_LIVE_GUARD=1 playwright test tests/production-critical-paths.spec.ts",
+    "test:e2e:prod": "npm run test:e2e:live"
   },
   "dependencies": {
     "@2chat/voice-sdk": "0.2.1",

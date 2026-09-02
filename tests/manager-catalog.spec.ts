@@ -30,7 +30,7 @@ test("manager navigation is compact and keeps one communication center at the bo
   expect(shell).not.toContain('label: "Manager Settings"')
   expect(shell).not.toContain("Customer Website")
   expect(shell).not.toContain("Quick Access")
-  expect(shell).toContain('href="/" onClick={onNavigate} aria-label="Open the Avantia Build customer website"')
+  expect(shell).toContain('href="/" prefetch={false} onClick={onNavigate} aria-label="Open the Avantia Build customer website"')
   expect(shell).not.toContain('<span className="min-w-0 flex-1 text-left">More</span>')
   expect(shell).not.toContain('shortLabel: "Messages"')
   expect(shell).not.toContain('shortLabel: "Meet"')
@@ -40,6 +40,19 @@ test("manager navigation is compact and keeps one communication center at the bo
   expect(aiTools).toContain('title: "Google Meet"')
   expect(aiTools).toContain('add=buildavantiap%40gmail.com')
 })
+
+test("legacy WhatsApp threads preserve their contact when routed into the unified inbox", async () => {
+  const [legacyThread, center] = await Promise.all([
+    readFile(path.join(root, "app/admin/whatsapp/[threadId]/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/communication-center.tsx"), "utf8"),
+  ])
+
+  expect(legacyThread).toContain("getInboxThread(threadId)")
+  expect(legacyThread).toContain("/admin/communications?channel=whatsapp&q=")
+  expect(center).toContain("/admin/communications?channel=whatsapp&q=")
+  expect(center).not.toContain("/admin/whatsapp/${thread.id}")
+})
+
 test("installation catalog shows real product identity and keeps internal notes editable", async () => {
   const [page, workspace, actions, catalog, migration] = await Promise.all([
     readFile(path.join(root, "app/admin/catalog/page.tsx"), "utf8"),
