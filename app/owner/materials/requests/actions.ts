@@ -345,7 +345,7 @@ export async function saveRequestItemSupplierRouteAction(input: {
   const requestId = String(input.requestId || "").trim()
   const itemIds = Array.isArray(input.itemIds) ? [...new Set(input.itemIds.map((id) => String(id).trim()))].slice(0, 100) : []
   const requestedSupplierNames = Array.isArray(input.supplierNames) ? uniqueCanonicalSupplierNames(input.supplierNames) : []
-  if (requestedSupplierNames.length > 20 || JSON.stringify(requestedSupplierNames).length > 50_000) return { ok: false as const, error: "Choose no more than 20 suppliers for one route." }
+  if (JSON.stringify(requestedSupplierNames).length > 50_000) return { ok: false as const, error: "The supplier route is too large to save at once." }
   const rawNotes = input.supplierNotes && typeof input.supplierNotes === "object" && !Array.isArray(input.supplierNotes) ? input.supplierNotes : {}
   const notesByCanonicalKey = new Map<string, string>(Object.entries(rawNotes).map(([name, note]) => [canonicalSupplierKey(name), String(note || "").trim().slice(0, 800)] as const).filter(([key, note]) => Boolean(key && note)))
   if (!/^[0-9a-f-]{36}$/i.test(requestId) || !itemIds.length || itemIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) return { ok: false as const, error: "Choose at least one valid request item." }
