@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState, useTransition } from "react"
 
 import { markDailySummaryPaidAction, recordDailyAttendanceAction, saveDailyWorkSummaryAction, uploadDailyProblemPhotoAction } from "@/app/admin/daily-summary/actions"
+import { captureAvantiaEvent } from "@/lib/analytics/posthog-client"
 import { calculateWorkedMinutes, totalPausedMilliseconds, type DailyWorkSummary } from "@/lib/daily-work-summary"
 
 function localToday() {
@@ -75,6 +76,7 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
         setError(result.error)
         return
       }
+      captureAvantiaEvent("avantia_daily_summary_saved", { actor_type: "staff" })
       setMessage("Daily summary saved.")
       router.refresh()
     })
@@ -120,6 +122,10 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
         setError(result.error)
         return
       }
+      captureAvantiaEvent("avantia_staff_attendance_recorded", {
+        action,
+        actor_type: "staff",
+      })
       setMessage(action === "check_in" ? "Carlos checked in." : action === "pause" ? "Timer paused. Break time will not count as work." : action === "resume" ? "Timer resumed." : "Carlos checked out. Hours worked are calculated below.")
       router.refresh()
     })

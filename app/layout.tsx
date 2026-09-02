@@ -6,13 +6,14 @@ import { Fragment } from "react";
 
 import { AvantiaBuildClientShell } from "@/components/buildflow/buildflow-client-shell";
 import { MobileClientHeader } from "@/components/buildflow/mobile-client-header";
+import { PostHogAnalytics } from "@/components/buildflow/posthog-analytics";
 import { PublicContactBar } from "@/components/buildflow/public-contact-bar";
 import { SiteFooter } from "@/components/buildflow/site-footer";
 import { ShopLanguageProvider } from "@/components/buildflow/shop-language-provider";
 import { TrafficTracker } from "@/components/buildflow/traffic-tracker";
 import { WorkflowSettingsHydrator } from "@/components/buildflow/workflow-settings-hydrator";
 import { getSessionWithProfile } from "@/lib/auth";
-import { managerCapabilities } from "@/lib/owner-identity";
+import { managerCapabilities, STAFF_EMAILS } from "@/lib/owner-identity";
 import { parseShopLanguage, SHOP_LANGUAGE_COOKIE } from "@/lib/shop-i18n";
 import { getSupabasePublicEnv, hasSupabasePublicEnv } from "@/lib/supabase/env";
 import type { PublicWorkflowState } from "@/lib/workflow-public";
@@ -128,6 +129,23 @@ export default async function RootLayout({
   const managerHref = managerAccess.owner ? "/admin/build-map" : managerAccess.customers ? "/admin/users" : "/admin/vendors";
   const isPreviewAdminEnabled = process.env.VERCEL_ENV !== "production";
   const displayName = profile?.full_name?.trim() || user?.email?.split("@")[0] || null;
+  const analyticsActorType = managerAccess.owner
+    ? "owner"
+    : managerAccess.operationsManager
+      ? "staff"
+      : user
+        ? "client"
+        : "anonymous";
+  const normalizedAnalyticsEmail = (user?.email || profile?.email || "").trim().toLowerCase();
+  const analyticsActorCohort = managerAccess.owner
+    ? "owner"
+    : managerAccess.operationsManager
+      ? normalizedAnalyticsEmail === STAFF_EMAILS[0]
+        ? "operations_primary"
+        : "operations_secondary"
+      : user
+        ? "client"
+        : "anonymous";
   const supabaseBrowserConfig = hasSupabasePublicEnv() ? getSupabasePublicEnv() : null;
   const serializedSupabaseConfig = supabaseBrowserConfig
     ? JSON.stringify(supabaseBrowserConfig).replace(/</g, "\\u003c")
@@ -151,6 +169,7 @@ export default async function RootLayout({
         <ShopLanguageProvider initialLanguage={shopLanguage}>
           <AvantiaBuildClientShell>
             <Fragment>
+              <PostHogAnalytics actorId={user?.id ?? null} actorType={analyticsActorType} actorCohort={analyticsActorCohort} />
               <TrafficTracker disabled={isAdmin} />
               <WorkflowSettingsHydrator state={publicStateRow?.state ?? null} />
               <MobileClientHeader isSignedIn={isSignedIn} isAdmin={isAdmin} isOwner={managerAccess.owner} managerHref={managerHref} isPreviewAdminEnabled={isPreviewAdminEnabled} displayName={displayName} />

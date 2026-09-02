@@ -1,12 +1,13 @@
 "use client";
 
 import { CheckCircle2, FileUp, LoaderCircle, Send, X } from "lucide-react";
-import { useActionState, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 
 import {
   submitQuoteRequestFormAction,
   type QuoteRequestFormState,
 } from "@/app/request-quote/actions";
+import { captureAvantiaEvent } from "@/lib/analytics/posthog-client";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
@@ -60,6 +61,16 @@ export function QuoteRequestForm({
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const attachmentRef = useRef<HTMLInputElement>(null);
+  const successTrackedRef = useRef(false);
+
+  useEffect(() => {
+    if (state.status !== "success" || successTrackedRef.current) return;
+    successTrackedRef.current = true;
+    captureAvantiaEvent("avantia_quote_request_completed", {
+      request_kind: beatQuote ? "beat_quote" : "material_quote",
+      attachment_count: Math.min(selectedFiles.length, maxAttachmentCount),
+    });
+  }, [beatQuote, selectedFiles.length, state.status]);
 
   function validateAttachments(files: File[]) {
     if (files.length > maxAttachmentCount) {
@@ -236,6 +247,7 @@ export function QuoteRequestForm({
           });
       }}
       className="border-y border-slate-200 bg-white px-4 py-5 sm:rounded-lg sm:border sm:p-6 sm:shadow-sm"
+      data-analytics-form={beatQuote ? "beat_quote_request" : "material_quote_request"}
       data-testid="quote-request-form"
     >
       <input

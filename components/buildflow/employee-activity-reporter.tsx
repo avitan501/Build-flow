@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation"
 import { useEffect } from "react"
 
 import { recordEmployeeActivityAction } from "@/app/admin/activity-actions"
+import { captureAvantiaEvent } from "@/lib/analytics/posthog-client"
+import { analyticsArea, analyticsRouteContext } from "@/lib/analytics/route-context"
 
 const labels: Record<string, string> = {
   "/admin/build-map": "Dashboard",
@@ -27,7 +29,14 @@ export function EmployeeActivityReporter({ owner, compact = false }: { owner: bo
   useEffect(() => {
     if (owner) return
     const report = () => {
-      if (document.visibilityState === "visible") void recordEmployeeActivityAction(pathname, pageLabel(pathname))
+      if (document.visibilityState !== "visible") return
+      const context = analyticsRouteContext(pathname)
+      captureAvantiaEvent("avantia_staff_active", {
+        ...context,
+        area: analyticsArea(context.route),
+        actor_type: "staff",
+      })
+      void recordEmployeeActivityAction(pathname, pageLabel(pathname))
     }
     report()
     const timer = window.setInterval(report, 60_000)
