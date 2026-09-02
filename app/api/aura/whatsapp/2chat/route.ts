@@ -1,5 +1,4 @@
 import { processAuraOwnerCommand } from "@/lib/aura/owner-command";
-import { notifyManagersSafely } from "@/lib/manager-push-notifications";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
@@ -64,13 +63,6 @@ export async function POST(request: Request) {
     const body = payload.message?.text?.trim() || "";
     const externalMessageId = payload.uuid || payload.id || "";
     if (incoming && from && externalMessageId) {
-      await notifyManagersSafely({
-        eventType: "call_message",
-        title: "New WhatsApp message",
-        body: `${from} · ${(body || "Attachment received").slice(0, 160)}`,
-        href: "/admin/communications?channel=whatsapp",
-        tag: `avantia-whatsapp-${externalMessageId}`,
-      });
       if (body) {
         await processAuraOwnerCommand({
           from,

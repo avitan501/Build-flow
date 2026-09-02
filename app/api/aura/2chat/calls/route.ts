@@ -53,7 +53,10 @@ export async function POST(request: Request) {
   const incoming = payload.direction === "I";
   const completed = ["completed", "missed", "failed"].includes(payload.status?.toLowerCase() || "");
   const counterparty = incoming ? payload.from : payload.to_number;
-  if (incoming || completed) {
+  // The initial incoming-call insert alerts through the database trigger.
+  // A completed call is a separate useful event because its recording/summary
+  // may now be ready.
+  if (completed) {
     await notifyManagersSafely({
       eventType: "call_message",
       title: incoming && !completed ? "Incoming business call" : payload.recording_url ? "Call recording ready" : "Business call updated",

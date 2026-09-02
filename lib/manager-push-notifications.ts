@@ -121,9 +121,25 @@ export async function sendManagerPushNotification(input: {
 
 export async function notifyManagersSafely(input: Parameters<typeof sendManagerPushNotification>[0]) {
   try {
-    return await sendManagerPushNotification(input);
+    if (input.eventType === "test") return await sendManagerPushNotification(input);
+    const requestMatch = input.eventType === "new_order"
+      ? input.tag?.match(/^avantia-request-([0-9a-f-]{36})$/i)
+      : null;
+    const dedupeKey = requestMatch
+      ? `new_order:${requestMatch[1]}`
+      : `${input.eventType}:${input.tag || `${input.href}:${input.title}`}`;
+    const { error } = await createAdminClient().rpc("queue_manager_push_event", {
+      p_event_type: input.eventType,
+      p_title: input.title,
+      p_body: input.body,
+      p_href: input.href,
+      p_dedupe_key: dedupeKey,
+      p_tag: input.tag || null,
+    });
+    if (error) throw new Error(`Unable to queue manager notification: ${error.message}`);
+    return { delivered: 0, failed: 0, subscribedDevices: 0, queued: true };
   } catch (cause) {
     console.error("manager_push_notification_failed", { eventType: input.eventType, cause });
-    return { delivered: 0, failed: 0, subscribedDevices: 0 };
+    return { delivered: 0, failed: 0, subscribedDevices: 0, queued: false };
   }
 }

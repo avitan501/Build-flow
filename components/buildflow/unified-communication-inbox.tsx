@@ -6,8 +6,9 @@ import Link from "next/link"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
-import { completeSmsReplyDraftAction, createSmsMaterialRequestAction, generateSmsReplyAction, linkCommunicationContactAction, linkEmailConversationAction, markEmailConversationReadAction, quickTagPhoneContactAction, reviewSmsRequestAction, saveSmsAutomationAction, type SmsReplyDraft, type SmsRequestProposal } from "@/app/admin/communications/actions"
+import { completeSmsReplyDraftAction, createSmsMaterialRequestAction, generateSmsReplyAction, linkCommunicationContactAction, linkEmailConversationAction, markCommunicationConversationReadAction, quickTagPhoneContactAction, reviewSmsRequestAction, saveSmsAutomationAction, type SmsReplyDraft, type SmsRequestProposal } from "@/app/admin/communications/actions"
 import { TwoChatSoftphone } from "@/components/buildflow/two-chat-softphone"
+import { captureAvantiaEvent } from "@/lib/analytics/posthog-client"
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard"
 import { normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identity"
 import { looksLikeMaterialRequestMessage } from "@/lib/aura/material-request-detection"
@@ -56,6 +57,12 @@ type Conversation = {
   messages: AuraCommunicationRow[]
   latest: AuraCommunicationRow
   channels: AuraCommunicationRow["channel"][]
+  unread: number
+}
+
+type CommunicationUpdatesResponse = {
+  communications?: AuraCommunicationRow[]
+  cursor?: string
 }
 
 const QUICK_REPLIES = ["Received, thank you.", "I need a few more details.", "I am checking current pricing.", "A manager will confirm the next step."]
@@ -201,6 +208,13 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const initialCommunication = initialCommunicationForQuery(communications, initialQuery, initialChannelFilter)
   const initialStoredDraft = smsReplyDrafts.find((draft) => draft.communication_id === initialCommunication?.id)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
+  const initialCursor = communications.reduce((latest, item) => {
+    const value = item.last_event_at || item.occurred_at
+    return value > latest ? value : latest
+  }, "1970-01-01T00:00:00.000Z")
+  const updatesCursorRef = useRef(initialCursor)
+  const syncCountRef = useRef(0)
+  const [liveCommunications, setLiveCommunications] = useState(communications)
   const [query, setQuery] = useState(initialQuery)
   const [contactFilter, setContactFilter] = useState<ContactFilter>("all")
   const [channelFilter, setChannelFilter] = useState(initialChannelFilter)
@@ -232,12 +246,77 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   const [confirmationCommunicationId, setConfirmationCommunicationId] = useState("")
 
   useEffect(() => {
-    const refresh = () => { if (document.visibilityState === "visible") router.refresh() }
-    const timer = window.setInterval(refresh, 10_000)
-    window.addEventListener("focus", refresh)
-    document.addEventListener("visibilitychange", refresh)
-    return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh) }
-  }, [router])
+    let stopped = false
+    let timer: number | undefined
+    let failures = 0
+    const controller = new AbortController()
+
+    const schedule = () => {
+      if (stopped) return
+      const delay = failures ? Math.min(30_000, 5_000 * 2 ** Math.min(failures, 3)) : 5_000
+      timer = window.setTimeout(sync, delay)
+    }
+    const sync = async () => {
+      if (stopped) return
+      if (document.visibilityState !== "visible") { schedule(); return }
+      const startedAt = performance.now()
+      try {
+        const response = await fetch(`/api/admin/communications/updates?after=${encodeURIComponent(updatesCursorRef.current)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        })
+        if (!response.ok) throw new Error(`communication-sync-${response.status}`)
+        const result = await response.json() as CommunicationUpdatesResponse
+        const updates = result.communications ?? []
+        if (result.cursor) updatesCursorRef.current = result.cursor
+        if (updates.length) {
+          setLiveCommunications((current) => {
+            const merged = new Map(current.map((item) => [item.id, item]))
+            for (const item of updates) merged.set(item.id, item)
+            for (const optimistic of current.filter((item) => item.id.startsWith("optimistic:"))) {
+              const matched = updates.some((item) =>
+                item.direction === "outgoing" &&
+                item.channel === optimistic.channel &&
+                item.body === optimistic.body &&
+                identityKey(item.counterparty_phone, item.counterparty_email) === identityKey(optimistic.counterparty_phone, optimistic.counterparty_email),
+              )
+              if (matched) merged.delete(optimistic.id)
+            }
+            return [...merged.values()]
+          })
+        }
+        failures = 0
+        syncCountRef.current += 1
+        if (updates.length || syncCountRef.current === 1)
+          captureAvantiaEvent("avantia_communications_sync", {
+            duration_ms: Math.round(performance.now() - startedAt),
+            updates: updates.length,
+            success: true,
+          })
+      } catch (cause) {
+        if (!stopped && !(cause instanceof DOMException && cause.name === "AbortError")) {
+          failures += 1
+          if (failures === 1)
+            captureAvantiaEvent("avantia_communications_sync", {
+              duration_ms: Math.round(performance.now() - startedAt),
+              updates: 0,
+              success: false,
+            })
+        }
+      } finally {
+        schedule()
+      }
+    }
+    const onFocus = () => { if (timer) window.clearTimeout(timer); void sync() }
+    timer = window.setTimeout(sync, 1_500)
+    window.addEventListener("focus", onFocus)
+    return () => {
+      stopped = true
+      controller.abort()
+      if (timer) window.clearTimeout(timer)
+      window.removeEventListener("focus", onFocus)
+    }
+  }, [])
 
   const directory = useMemo(() => {
     const entries: DirectoryEntry[] = [
@@ -266,7 +345,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
 
   const conversations = useMemo(() => {
     const grouped = new Map<string, AuraCommunicationRow[]>()
-    for (const communication of communications) {
+    for (const communication of liveCommunications) {
       if (channelFilter !== "all" && communication.channel !== channelFilter) continue
       const rawKey = identityKey(communication.counterparty_phone, communication.counterparty_email) || `unknown:${communication.contact_id || communication.id}`
       const canonical = directory.alias.get(rawKey)?.key || rawKey
@@ -287,9 +366,10 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         messages: ordered,
         latest,
         channels: [...new Set(ordered.map((item) => item.channel))],
+        unread: ordered.filter((item) => item.direction === "incoming" && !item.read_at).length,
       } satisfies Conversation
     }).sort((left, right) => Date.parse(right.latest.occurred_at) - Date.parse(left.latest.occurred_at))
-  }, [channelFilter, communications, directory])
+  }, [channelFilter, liveCommunications, directory])
 
   const filteredConversations = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -324,10 +404,16 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     const auraContact = contacts.find((item) => identityKey(item.normalized_phone, item.email) === identityKey(conversation.phone, conversation.email))
     setSmsAiMode(auraContact?.sms_ai_mode || "auto_safe")
     setSmsAiStyle(auraContact?.sms_ai_style || "professional")
-    if (conversation.email && conversation.messages.some((item) => item.channel === "email" && item.direction === "incoming" && !item.read_at)) {
+    const unreadIds = new Set(conversation.messages.filter((item) => item.direction === "incoming" && !item.read_at).map((item) => item.id))
+    if (unreadIds.size) {
+      const readAt = new Date().toISOString()
+      setLiveCommunications((current) => current.map((item) => unreadIds.has(item.id) ? { ...item, read_at: readAt } : item))
       startTransition(async () => {
-        await markEmailConversationReadAction({ conversationEmail: conversation.email })
-        router.refresh()
+        const result = await markCommunicationConversationReadAction({ conversationPhone: conversation.phone, conversationEmail: conversation.email })
+        if (!result.ok) {
+          setLiveCommunications((current) => current.map((item) => unreadIds.has(item.id) ? { ...item, read_at: null } : item))
+          setFeedback({ tone: "error", text: result.error })
+        }
       })
     }
   }
@@ -335,7 +421,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   function changeChannelFilter(nextFilter: string) {
     setChannelFilter(nextFilter)
     const currentMatch = activeConversation?.messages.find((item) => nextFilter === "all" || item.channel === nextFilter)
-    const nextCommunication = currentMatch || initialCommunicationForQuery(communications, query, nextFilter)
+    const nextCommunication = currentMatch || initialCommunicationForQuery(liveCommunications, query, nextFilter)
     if (!nextCommunication) return
     setActiveKey(initialConversationKey(nextCommunication, contacts))
     const nextChannel = nextCommunication.channel === "email" || nextCommunication.channel === "sms" || nextCommunication.channel === "whatsapp"
@@ -443,6 +529,9 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   function sendMessage() {
     if (channel === "call") return
     const messageChannel = channel
+    const sentText = message.trim()
+    const sentRecipient = recipient.trim()
+    const sentSubject = subject.trim()
     const sentDraftId = messageChannel === "sms" ? activeDraftId : null
     const teachSentReply = Boolean(sentDraftId && teachAi)
     const sourceCommunicationId = activeConversation
@@ -468,8 +557,46 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         if (attachmentInputRef.current) attachmentInputRef.current.value = ""
         return
       }
-      const result = await sendAuraMessageAction({ channel: messageChannel, recipient, subject, message, sourceCommunicationId })
-      if (!result.ok) { setFeedback({ tone: "error", text: result.error }); return }
+      const startedAt = performance.now()
+      const result = await sendAuraMessageAction({ channel: messageChannel, recipient: sentRecipient, subject: sentSubject, message: sentText, sourceCommunicationId })
+      if (!result.ok) {
+        captureAvantiaEvent("avantia_communication_sent", {
+          channel: messageChannel,
+          duration_ms: Math.round(performance.now() - startedAt),
+          success: false,
+        })
+        setFeedback({ tone: "error", text: result.error })
+        return
+      }
+      const optimistic: AuraCommunicationRow = {
+        id: `optimistic:${result.externalId || crypto.randomUUID()}`,
+        contact_id: null,
+        provider: messageChannel === "sms" ? "quo" : messageChannel === "whatsapp" ? "whatsapp" : "manual",
+        channel: messageChannel,
+        direction: "outgoing",
+        counterparty_phone: messageChannel === "email" ? null : normalizeAuraPhone(sentRecipient),
+        counterparty_email: messageChannel === "email" ? sentRecipient.toLowerCase() : null,
+        subject: messageChannel === "email" ? sentSubject || "Avantia Build" : null,
+        body: sentText,
+        summary: null,
+        transcript: null,
+        next_steps: [],
+        media: [],
+        status: "sent",
+        duration_seconds: null,
+        occurred_at: result.occurredAt || new Date().toISOString(),
+        last_event_at: result.occurredAt || new Date().toISOString(),
+        read_at: result.occurredAt || new Date().toISOString(),
+      }
+      setLiveCommunications((current) => [optimistic, ...current])
+      const sentIdentity = identityKey(optimistic.counterparty_phone, optimistic.counterparty_email)
+      setActiveKey(directory.alias.get(sentIdentity)?.key || sentIdentity || `unknown:${optimistic.id}`)
+      setMobileThreadOpen(true)
+      captureAvantiaEvent("avantia_communication_sent", {
+        channel: messageChannel,
+        duration_ms: Math.round(performance.now() - startedAt),
+        success: true,
+      })
       if (sentDraftId) {
         const completed = await completeSmsReplyDraftAction({ draftId: sentDraftId, reply: message, teachAi: teachSentReply, correctionReasons })
         setActiveDraftId(null)
@@ -484,7 +611,6 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       }
       setMessage("")
       setFeedback({ tone: "success", text: `${messageChannel === "sms" ? "Text" : messageChannel === "whatsapp" ? "WhatsApp" : "Email"} sent and saved.${teachSentReply ? " This manager-approved correction was added to AI training examples." : ""}` })
-      router.refresh()
     })
   }
 
@@ -544,7 +670,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
           <label className="mt-2 block"><span className="sr-only">Filter channel</span><select value={channelFilter} onChange={(event) => changeChannelFilter(event.target.value)} className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold"><option value="all">All channels</option><option value="whatsapp">WhatsApp</option><option value="sms">Text</option><option value="email">Email</option><option value="call">Calls</option></select></label>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {filteredConversations.map((conversation) => <button key={conversation.key} type="button" onClick={() => openConversation(conversation)} className={`flex w-full items-start gap-3 border-b border-slate-100 px-3 py-3 text-left ${activeKey === conversation.key ? "bg-sky-50" : "hover:bg-slate-50"}`}><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">{initials(conversation.name)}</span><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><strong className="truncate text-sm">{conversation.name}</strong><time className="shrink-0 text-[10px] text-slate-400">{formatTime(conversation.latest.occurred_at)}</time></span><span className="mt-0.5 flex items-center gap-1.5"><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${contactKindTone(conversation.kind)}`}>{contactKindLabel(conversation.kind)}</span>{conversation.channels.slice(0, 3).map((item) => <span key={item}>{channelIcon(item, "h-3 w-3")}</span>)}</span><span className="mt-1 block truncate text-xs text-slate-500">{messageText(conversation.latest)}</span></span></button>)}
+          {filteredConversations.map((conversation) => <button key={conversation.key} type="button" onClick={() => openConversation(conversation)} className={`flex w-full items-start gap-3 border-b border-slate-100 px-3 py-3 text-left ${activeKey === conversation.key ? "bg-sky-50" : "hover:bg-slate-50"}`}><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">{initials(conversation.name)}</span><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><strong className={`truncate text-sm ${conversation.unread ? "font-black text-slate-950" : ""}`}>{conversation.name}</strong><span className="flex shrink-0 items-center gap-1.5">{conversation.unread ? <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#0071e3] px-1.5 py-0.5 text-[9px] font-black text-white" aria-label={`${conversation.unread} unread`}>{conversation.unread}</span> : null}<time className="text-[10px] text-slate-400">{formatTime(conversation.latest.occurred_at)}</time></span></span><span className="mt-0.5 flex items-center gap-1.5"><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${contactKindTone(conversation.kind)}`}>{contactKindLabel(conversation.kind)}</span>{conversation.channels.slice(0, 3).map((item) => <span key={item}>{channelIcon(item, "h-3 w-3")}</span>)}</span><span className={`mt-1 block truncate text-xs ${conversation.unread ? "font-semibold text-slate-800" : "text-slate-500"}`}>{messageText(conversation.latest)}</span></span></button>)}
           {!filteredConversations.length ? <p className="p-6 text-center text-sm text-slate-500">No conversations found.</p> : null}
         </div>
       </aside>

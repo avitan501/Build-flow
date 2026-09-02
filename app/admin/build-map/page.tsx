@@ -307,13 +307,19 @@ export default async function AdminDashboardPage({
       <div className="mx-auto max-w-7xl">
         <header className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-slate-200 pb-3">
           <h1 className="text-2xl font-semibold sm:text-3xl">Dashboard</h1>
-          <EmployeeClockStatus
-            compact
-            checkInAt={todaySummary?.checkInAt ?? null}
-            checkOutAt={todaySummary?.checkOutAt ?? null}
-            pauseStartedAt={todaySummary?.pauseStartedAt ?? null}
-            pausedMilliseconds={todaySummary?.pausedMilliseconds ?? 0}
-          />
+          {access.owner ? <Link href="/admin/carlos-activity" title="Open Carlos activity history"><EmployeeClockStatus
+              compact
+              checkInAt={todaySummary?.checkInAt ?? null}
+              checkOutAt={todaySummary?.checkOutAt ?? null}
+              pauseStartedAt={todaySummary?.pauseStartedAt ?? null}
+              pausedMilliseconds={todaySummary?.pausedMilliseconds ?? 0}
+            /></Link> : <EmployeeClockStatus
+              compact
+              checkInAt={todaySummary?.checkInAt ?? null}
+              checkOutAt={todaySummary?.checkOutAt ?? null}
+              pauseStartedAt={todaySummary?.pauseStartedAt ?? null}
+              pausedMilliseconds={todaySummary?.pausedMilliseconds ?? 0}
+            />}
           <ManagerDashboardAiSearch initialHistory={dashboardHistory} enabled compact />
         </header>
 

@@ -5,6 +5,7 @@ import { Mic, MicOff, Phone, PhoneOff, X } from "lucide-react"
 import { useEffect, useRef, useState, useTransition } from "react"
 
 import { getTwoChatVoiceTokenAction } from "@/app/owner/aura/actions"
+import { recordCommunicationActivityAction } from "@/app/admin/activity-actions"
 
 type CallStatus = "idle" | "connecting" | "ringing" | "active" | "ended" | "error"
 
@@ -34,7 +35,7 @@ export function TwoChatSoftphone({ open, phone, name, onClose }: { open: boolean
         const call = await device.connect({ to: phone, from: result.from })
         callRef.current = call
         call.on("ringing", () => setStatus("ringing"))
-        call.on("accepted", () => setStatus("active"))
+        call.on("accepted", () => { setStatus("active"); void recordCommunicationActivityAction("call") })
         call.on("disconnect", () => { setStatus("ended"); callRef.current = null })
         call.on("error", (event) => { setStatus("error"); setError(event.message) })
       } catch (callError) {

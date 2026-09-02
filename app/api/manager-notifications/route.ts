@@ -7,6 +7,7 @@ import {
   shouldCaptureOperationalStatus,
 } from "@/lib/monitoring/capture-operational-error";
 import { managerCapabilities } from "@/lib/owner-identity";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
@@ -55,10 +56,26 @@ async function invokeNotificationService(session: NonNullable<Awaited<ReturnType
   return { response, result };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const startedAt = performance.now();
   const session = await managerSession();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
+    if (new URL(request.url).searchParams.get("summary") === "1") {
+      const admin = createAdminClient();
+      const [latestResult, unreadResult] = await Promise.all([
+        admin.from("manager_push_notification_log").select("created_at").order("created_at", { ascending: false }).limit(1).maybeSingle<{ created_at: string }>(),
+        admin.from("aura_communications").select("id", { count: "exact", head: true }).eq("direction", "incoming").is("read_at", null),
+      ]);
+      if (latestResult.error || unreadResult.error) throw latestResult.error || unreadResult.error;
+      const response = NextResponse.json({
+        latestAt: latestResult.data?.created_at || null,
+        unreadCommunications: unreadResult.count ?? 0,
+      });
+      response.headers.set("Cache-Control", "private, no-store");
+      response.headers.set("Server-Timing", `notification-summary;dur=${Math.round(performance.now() - startedAt)}`);
+      return response;
+    }
     const { response, result } = await invokeNotificationService(session, { action: "status" });
     if (!response) return NextResponse.json(result, { status: 401 });
     if (!response.ok) {
@@ -77,7 +94,9 @@ export async function GET() {
       .select("id,intake_id,action,created_at")
       .order("created_at", { ascending: false })
       .limit(50);
-    return NextResponse.json({ ...result, activity: activity ?? [] }, { status: response.status });
+    const nextResponse = NextResponse.json({ ...result, activity: activity ?? [] }, { status: response.status });
+    nextResponse.headers.set("Server-Timing", `notification-center;dur=${Math.round(performance.now() - startedAt)}`);
+    return nextResponse;
   } catch (cause) {
     await captureOperationalError(cause, {
       feature: "manager-notifications",

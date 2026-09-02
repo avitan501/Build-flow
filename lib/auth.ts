@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabasePublicEnv } from "@/lib/supabase/env";
@@ -17,7 +18,7 @@ export type ProfileRecord = {
   created_at?: string;
 };
 
-export async function getSessionWithProfile() {
+export const getSessionWithProfile = cache(async function getSessionWithProfile() {
   if (!hasSupabasePublicEnv()) {
     await cookies();
     return { supabase: null, user: null, profile: null };
@@ -42,7 +43,7 @@ export async function getSessionWithProfile() {
   }
 
   return { supabase, user, profile: profile ?? null };
-}
+});
 
 export async function requireSignedInProfile() {
   const session = await getSessionWithProfile();

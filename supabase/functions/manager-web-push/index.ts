@@ -110,6 +110,7 @@ async function deliver(event: { eventType: EventType; title: string; body: strin
   webPush.setVapidDetails("mailto:office@build.avantiap.com", vapidPublicKey, privateKey)
   let delivered = 0
   let failed = 0
+  let retryableFailed = 0
   const expiredIds: string[] = []
   await Promise.all(selected.map(async (row) => {
     try {
@@ -119,7 +120,10 @@ async function deliver(event: { eventType: EventType; title: string; body: strin
       failed += 1
       const statusCode = typeof cause === "object" && cause && "statusCode" in cause ? Number(cause.statusCode) : 0
       if (statusCode === 404 || statusCode === 410) expiredIds.push(row.id)
-      else console.error("manager_push_delivery_failed", { eventType: event.eventType, statusCode })
+      else {
+        retryableFailed += 1
+        console.error("manager_push_delivery_failed", { eventType: event.eventType, statusCode })
+      }
     }
   }))
 
@@ -132,7 +136,7 @@ async function deliver(event: { eventType: EventType; title: string; body: strin
     delivered_count: delivered,
     failed_count: failed,
   })
-  return { delivered, failed, subscribedDevices: selected.length }
+  return { delivered, failed, retryableFailed, subscribedDevices: selected.length }
 }
 
 async function dispatchAuthorized(request: Request) {
@@ -148,7 +152,9 @@ async function deliverQueue() {
   let processed = 0
   for (const event of events) {
     try {
-      await deliver({ eventType: event.event_type, title: event.title, body: event.body, href: event.href, tag: event.tag || undefined })
+      const result = await deliver({ eventType: event.event_type, title: event.title, body: event.body, href: event.href, tag: event.tag || undefined })
+      if (result.delivered === 0 && result.retryableFailed > 0)
+        throw new Error(`All ${result.retryableFailed} active device deliveries failed`)
       await admin.from("manager_push_queue").update({ processed_at: new Date().toISOString(), last_error: null }).eq("id", event.id)
       processed += 1
     } catch (cause) {

@@ -5,17 +5,12 @@ import { revalidatePath } from "next/cache";
 import {
   normalizeAuraPhone,
   normalizeAuraEmail,
-  sendAuraEmail,
-  sendAuraQuoText,
-  storeAuraCommunication,
   type AuraMessageChannel,
 } from "@/lib/aura/communications";
-import { sendAuraWhatsAppText } from "@/lib/aura/whatsapp";
 import {
   buildAuraShareVideoCaption,
   findAuraShareVideo,
 } from "@/lib/aura/share-videos";
-import { sendTwilioWhatsAppMessage } from "@/lib/aura/twilio-whatsapp";
 import { requireOwnerAccess } from "@/lib/owner-access";
 import { requireManagerPortalProfile } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -36,7 +31,9 @@ function requireUuid(value: FormDataEntryValue | null) {
   return id;
 }
 
-export type SendAuraMessageResult = { ok: true } | { ok: false; error: string };
+export type SendAuraMessageResult =
+  | { ok: true; externalId?: string; occurredAt?: string }
+  | { ok: false; error: string };
 export type PrepareQuoAttachmentResult =
   | { ok: true; deepLink: string; attachmentUrl: string; quoWebUrl: string }
   | { ok: false; error: string };
@@ -86,7 +83,7 @@ export async function sendAuraMessageAction(input: {
   materialRequestTitle?: string;
   sourceCommunicationId?: string;
 }): Promise<SendAuraMessageResult> {
-  const { supabase, access } = await requireManagerPortalProfile();
+  const { supabase, user, access } = await requireManagerPortalProfile();
   if (!access.customers)
     return { ok: false, error: "Customer communication access is required." };
   const channel = input.channel;
@@ -110,41 +107,20 @@ export async function sendAuraMessageAction(input: {
     };
 
   try {
+    let externalId = "";
     if (channel === "sms") {
-      try {
-        await invokeMessagingBroker(supabase, {
-          action: "send_sms",
-          to: phone,
-          message,
-        });
-      } catch {
-        await sendAuraQuoText(phone!, message);
-      }
+      externalId = (await invokeMessagingBroker(supabase, {
+        action: "send_sms",
+        to: phone,
+        message,
+      })).id || "";
     } else if (channel === "whatsapp") {
-      let brokerError: unknown = null;
-      try {
-        await invokeMessagingBroker(supabase, {
-          action: "send_whatsapp",
-          to: phone,
-          message,
-          sourceCommunicationId: input.sourceCommunicationId,
-        });
-      } catch (error) {
-        brokerError = error;
-        const sent = await sendAuraWhatsAppText(phone!, message);
-        if (!sent.sent)
-          return { ok: false, error: whatsappSendError(brokerError) };
-        await storeAuraCommunication({
-          provider: "whatsapp",
-          channel: "whatsapp",
-          externalActivityId:
-            sent.messageId || `whatsapp-out-${crypto.randomUUID()}`,
-          direction: "outgoing",
-          counterpartyPhone: phone,
-          body: message,
-          status: "sent",
-        });
-      }
+      externalId = (await invokeMessagingBroker(supabase, {
+        action: "send_whatsapp",
+        to: phone,
+        message,
+        sourceCommunicationId: input.sourceCommunicationId,
+      })).id || "";
     } else if (channel === "email") {
       const requestReference =
         input.materialRequestId &&
@@ -152,20 +128,16 @@ export async function sendAuraMessageAction(input: {
           ? `[AVB-${input.materialRequestId.slice(0, 8).toUpperCase()}] `
           : "";
       const emailSubject = `${requestReference}${input.subject || ""}`.trim();
-      let providerId: string | null = null;
-      try {
-        providerId =
-          (
-            await invokeMessagingBroker(supabase, {
-              action: "send_email",
-              to: email,
-              subject: emailSubject,
-              message,
-            })
-          ).id || null;
-      } catch {
-        providerId = (await sendAuraEmail(email!, emailSubject, message)).id;
-      }
+      const providerId =
+        (
+          await invokeMessagingBroker(supabase, {
+            action: "send_email",
+            to: email,
+            subject: emailSubject,
+            message,
+          })
+        ).id || null;
+      externalId = providerId || "";
       if (providerId) {
         const admin = createAdminClient();
         const { data: communication } = await admin
@@ -208,6 +180,22 @@ export async function sendAuraMessageAction(input: {
     } else {
       return { ok: false, error: "Choose SMS, WhatsApp, or email." };
     }
+    if (!externalId)
+      return {
+        ok: false,
+        error: "The provider did not confirm this message. Check the conversation before trying again.",
+      };
+    await supabase.from("manager_staff_activity_events").insert({
+      user_id: user.id,
+      event_type: "communication_sent",
+      page_path: "/admin/communications",
+      page_label: "Communications",
+      metadata: { channel },
+    });
+    revalidatePath("/owner/aura");
+    revalidatePath("/admin/communications");
+    revalidatePath("/admin/users");
+    return { ok: true, externalId, occurredAt: new Date().toISOString() };
   } catch (error) {
     const channelName =
       channel === "sms"
@@ -223,11 +211,6 @@ export async function sendAuraMessageAction(input: {
           : `${channelName} could not send this message.`,
     };
   }
-
-  revalidatePath("/owner/aura");
-  revalidatePath("/admin/communications");
-  revalidatePath("/admin/users");
-  return { ok: true };
 }
 
 export async function getTwoChatVoiceTokenAction(): Promise<TwoChatVoiceTokenResult> {
@@ -414,34 +397,16 @@ export async function sendAuraVideoAction(input: {
   const mediaUrl = new URL(video.path, PRODUCTION_SITE_ORIGIN).toString();
   const caption = buildAuraShareVideoCaption(video, input.recipientName);
   try {
-    try {
-      await invokeMessagingBroker(supabase, {
-        action: "send_whatsapp",
-        to: phone,
-        message: caption,
-        mediaUrl,
-      });
-    } catch {
-      const sent = await sendTwilioWhatsAppMessage(phone, caption, mediaUrl);
-      if (!sent.sent)
-        return { ok: false, error: "WhatsApp sending is not configured." };
-      await storeAuraCommunication({
-        provider: "whatsapp",
-        channel: "whatsapp",
-        externalActivityId:
-          sent.messageId || `whatsapp-video-${crypto.randomUUID()}`,
-        direction: "outgoing",
-        counterpartyPhone: phone,
-        body: caption,
-        status: "queued",
-        media: [{ url: mediaUrl, type: "video/mp4", duration: 20 }],
-      });
-    }
-  } catch {
+    await invokeMessagingBroker(supabase, {
+      action: "send_whatsapp",
+      to: phone,
+      message: caption,
+      mediaUrl,
+    });
+  } catch (error) {
     return {
       ok: false,
-      error:
-        "The WhatsApp video could not be sent. Confirm that this contact can receive WhatsApp messages.",
+      error: whatsappSendError(error),
     };
   }
 

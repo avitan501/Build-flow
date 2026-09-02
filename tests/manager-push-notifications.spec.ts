@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 const root = process.cwd();
 
 test("manager push notifications stay private and cover business events", async () => {
-  const [api, edgeFunction, dashboard, shell, control, center, serviceWorker, migration, queueMigration, lockdownMigration] = await Promise.all([
+  const [api, edgeFunction, dashboard, shell, control, center, serviceWorker, migration, queueMigration, notificationFixMigration, lockdownMigration] = await Promise.all([
     readFile(path.join(root, "app/api/manager-notifications/route.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/manager-web-push/index.ts"), "utf8"),
     readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
@@ -16,6 +16,7 @@ test("manager push notifications stay private and cover business events", async 
     readFile(path.join(root, "public/sw.js"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260824011214_add_manager_web_push_notifications.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260824022900_harden_manager_web_push_delivery.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260902173000_fix_manager_communication_notifications.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260824023200_lock_down_manager_push_trigger_functions.sql"), "utf8"),
   ]);
 
@@ -24,18 +25,20 @@ test("manager push notifications stay private and cover business events", async 
   expect(api).toContain('action: z.literal("subscribe")');
   expect(api).toContain("functions/v1/manager-web-push");
   expect(api).toContain('.from("aura_audit_log")');
-  expect(api).not.toContain("createAdminClient");
+  expect(api).toContain("createAdminClient");
   expect(edgeFunction).toContain("get_manager_web_push_private_key");
   expect(edgeFunction).toContain("managerUser(request)");
   expect(edgeFunction).toContain("dispatchAuthorized(request)");
   expect(edgeFunction).toContain('from("manager_push_notification_log")');
   expect(edgeFunction).toContain("notifications:");
   expect(edgeFunction).toContain(".limit(100)");
+  expect(edgeFunction).toContain("retryableFailed");
   expect(dashboard).toContain("<ManagerNotificationControl settings />");
   expect(dashboard).not.toContain("ManagerNotificationCenter");
   expect(dashboard).not.toContain('id="phone-notifications"');
   expect(dashboard.indexOf("<ManagerNotificationControl settings />")).toBeGreaterThan(dashboard.indexOf("Manager tools"));
   expect(shell).not.toContain("ManagerNotificationControl");
+  expect(shell).toContain("ManagerNotificationCenter");
   expect(control).toContain("Add to Home Screen");
   expect(control).toContain("Open Avantia in Safari");
   expect(control).toContain("Send test notification");
@@ -59,6 +62,9 @@ test("manager push notifications stay private and cover business events", async 
   expect(queueMigration).toContain("quote_comparisons_manager_push");
   expect(queueMigration).toContain("dispatch-manager-web-push");
   expect(queueMigration).toContain("manager_push_dispatch_secret");
+  expect(notificationFixMigration).toContain("new.direction <> 'incoming'");
+  expect(notificationFixMigration).not.toContain("new.direction <> 'inbound'");
+  expect(notificationFixMigration).toContain("grant execute on function public.queue_manager_push_event");
   expect(lockdownMigration).toContain("revoke all on function public.queue_new_request_push() from public, anon, authenticated");
 });
 

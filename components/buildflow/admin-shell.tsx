@@ -21,6 +21,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
 import { EmployeeActivityReporter } from "@/components/buildflow/employee-activity-reporter";
+import { ManagerNotificationCenter } from "@/components/buildflow/manager-notification-center";
 
 type ManagerAccess = {
   owner: boolean;
@@ -116,7 +117,6 @@ function NavigationLink({
     <div>
       <Link
         href={link.href}
-        prefetch={false}
         onClick={onNavigate}
         aria-label={collapsed ? link.shortLabel : undefined}
         aria-describedby={collapsed ? tooltipId : undefined}
@@ -136,7 +136,6 @@ function NavigationLink({
               <Link
                 key={secondary.href}
                 href={secondary.href}
-                prefetch={false}
                 onClick={onNavigate}
                 aria-current={secondaryActive ? "page" : undefined}
                 className={`flex min-h-8 items-center gap-2 rounded-md px-2 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#0071e3] ${secondaryActive ? "bg-sky-50 text-[#0066cc]" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"}`}
@@ -158,12 +157,14 @@ function ManagerNavigation({
   collapsed = false,
   onCollapsedChange,
   onNavigate,
+  showNotifications = false,
 }: {
   pathname: string;
   access: ManagerAccess;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
   onNavigate?: () => void;
+  showNotifications?: boolean;
 }) {
   const links = navigationLinks(access);
 
@@ -208,6 +209,7 @@ function ManagerNavigation({
       </nav>
 
       <div className={`shrink-0 border-t border-slate-100 py-2.5 ${collapsed ? "px-2" : "px-3"}`}>
+        {showNotifications ? <ManagerNotificationCenter compact={collapsed} /> : null}
         {access.communications ? (
           <NavigationLink
             pathname={pathname}
@@ -257,7 +259,7 @@ export function AdminShell({ children, access }: { children: ReactNode; access: 
   return (
     <div className={`min-h-screen bg-[#f5f5f7] lg:grid ${desktopCollapsed ? "lg:grid-cols-[4.5rem_minmax(0,1fr)]" : "lg:grid-cols-[13rem_minmax(0,1fr)]"}`}>
       <aside className="sticky top-0 z-[60] hidden h-screen overflow-visible border-r border-slate-200 lg:block" data-collapsed={desktopCollapsed}>
-        <ManagerNavigation pathname={pathname} access={access} collapsed={desktopCollapsed} onCollapsedChange={updateDesktopCollapsed} />
+        <ManagerNavigation pathname={pathname} access={access} collapsed={desktopCollapsed} onCollapsedChange={updateDesktopCollapsed} showNotifications />
       </aside>
 
       <div className="min-w-0">
@@ -271,7 +273,7 @@ export function AdminShell({ children, access }: { children: ReactNode; access: 
             <Menu className="h-5 w-5" />
           </button>
           <Link href="/" aria-label="Open the Avantia Build customer website" className="min-w-0"><AvantiaBuildLockup compact /></Link>
-          <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{access.owner ? "Owner" : "Manager"}</span>
+          <ManagerNotificationCenter compact />
         </header>
         {children}
       </div>

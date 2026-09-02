@@ -1,5 +1,6 @@
 import { CommunicationCenter } from "@/components/buildflow/communication-center"
 import { UnifiedCommunicationInbox, type AuraLeadRecipient } from "@/components/buildflow/unified-communication-inbox"
+import { after } from "next/server"
 import type { SmsReplyDraft } from "@/app/admin/communications/actions"
 import { requireManagerPortalProfile } from "@/lib/auth"
 import { contactEmailForDisplay } from "@/lib/auth-phone"
@@ -60,7 +61,7 @@ export default async function CommunicationsPage({
     ? "email"
     : ["all", "call", "sms", "whatsapp", "email"].includes(requestedChannel || "") ? requestedChannel! : "all"
   const { supabase, access } = await requireManagerPortalProfile()
-  if (access.customers) await syncRecentTwilioWhatsAppMessages().catch(() => null)
+  if (access.customers) after(() => syncRecentTwilioWhatsAppMessages().catch(() => null))
   const [clientsResult, leadsResult, suppliersResult, requestsResult, smsDraftsResult, logsResult, threads, aura] = await Promise.all([
     access.customers ? supabase.from("profiles").select("id,full_name,email,phone,company_name").eq("role", "client").eq("is_active", true).order("full_name").limit(500) : Promise.resolve({ data: [] }),
     access.customers ? supabase.from("manager_outreach_leads").select("id,full_name,company_name,email,phone").neq("status", "archived").order("full_name").limit(500).returns<AuraLeadRecipient[]>() : Promise.resolve({ data: [] }),

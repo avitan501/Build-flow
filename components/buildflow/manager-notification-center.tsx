@@ -2,7 +2,9 @@
 
 import { Bell, BellRing, ChevronRight, LoaderCircle, MessageSquareText, PackageCheck, RefreshCw, Store, Truck, X } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { captureAvantiaEvent } from "@/lib/analytics/posthog-client";
 
 type NotificationEvent = {
   id: string;
@@ -17,6 +19,9 @@ type NotificationEvent = {
 
 type ActivityEvent = { id: string; intake_id: string | null; action: string; created_at: string };
 type HistoryResponse = { notifications?: NotificationEvent[]; activity?: ActivityEvent[]; error?: string };
+type SummaryResponse = { latestAt?: string | null; unreadCommunications?: number };
+
+const LAST_SEEN_KEY = "avantia-manager-notifications-seen-at";
 
 const eventStyle = {
   new_order: { icon: PackageCheck, tone: "border-amber-200 bg-amber-50 text-amber-700" },
@@ -44,14 +49,42 @@ function activityTitle(action: string) {
   return known[action] || action.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase());
 }
 
-export function ManagerNotificationCenter() {
+export function ManagerNotificationCenter({ compact = false }: { compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<NotificationEvent[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [error, setError] = useState("");
+  const [hasNewActivity, setHasNewActivity] = useState(false);
+  const [unreadCommunications, setUnreadCommunications] = useState(0);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    let stopped = false;
+    async function loadSummary() {
+      if (document.visibilityState !== "visible") return;
+      const bounds = buttonRef.current?.getBoundingClientRect();
+      if (!bounds || bounds.width === 0 || bounds.height === 0 || bounds.right < 0 || bounds.left > window.innerWidth) return;
+      try {
+        const response = await fetch("/api/manager-notifications?summary=1", { cache: "no-store" });
+        if (!response.ok) return;
+        const result = await response.json() as SummaryResponse;
+        if (stopped) return;
+        const seenAt = window.localStorage.getItem(LAST_SEEN_KEY) || "";
+        setHasNewActivity(Boolean(result.latestAt && result.latestAt > seenAt));
+        setUnreadCommunications(Math.max(0, result.unreadCommunications || 0));
+      } catch {
+        // A badge is optional; notification history remains available on demand.
+      }
+    }
+    void loadSummary();
+    const timer = window.setInterval(loadSummary, 60_000);
+    window.addEventListener("focus", loadSummary);
+    return () => { stopped = true; window.clearInterval(timer); window.removeEventListener("focus", loadSummary); };
+  }, []);
 
   async function load() {
+    const startedAt = performance.now();
     setLoading(true);
     setError("");
     try {
@@ -60,18 +93,30 @@ export function ManagerNotificationCenter() {
       if (!response.ok) throw new Error(result.error || "Notification history could not load.");
       setEvents(result.notifications ?? []);
       setActivity(result.activity ?? []);
+      captureAvantiaEvent("avantia_notification_center_loaded", {
+        duration_ms: Math.round(performance.now() - startedAt),
+        event_count: (result.notifications ?? []).length + (result.activity ?? []).length,
+        success: true,
+      });
     } catch (cause) {
+      captureAvantiaEvent("avantia_notification_center_loaded", {
+        duration_ms: Math.round(performance.now() - startedAt),
+        event_count: 0,
+        success: false,
+      });
       setError(cause instanceof Error ? cause.message : "Notification history could not load.");
     } finally { setLoading(false); }
   }
 
   function openCenter() {
     setOpen(true);
+    window.localStorage.setItem(LAST_SEEN_KEY, new Date().toISOString());
+    setHasNewActivity(false);
     void load();
   }
 
   return <>
-    <button type="button" onClick={openCenter} className="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 shadow-sm hover:border-sky-300" aria-label="Open notifications and activity"><Bell className="h-4 w-4 text-[#0071e3]" />Notifications & activity</button>
+    <button ref={buttonRef} type="button" onClick={openCenter} className={`group relative inline-flex min-h-10 items-center rounded-lg text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-[#0071e3] ${compact ? "mx-auto w-10 justify-center" : "w-full gap-2.5 px-2.5"}`} aria-label="Open notifications and activity"><Bell className="h-[18px] w-[18px] shrink-0 text-[#0071e3]" />{compact ? null : <span className="min-w-0 flex-1 text-left">Notifications</span>}{unreadCommunications ? <span className={`${compact ? "absolute -right-0.5 -top-0.5" : ""} inline-flex min-w-5 items-center justify-center rounded-full bg-[#0071e3] px-1.5 py-0.5 text-[9px] font-black text-white`}>{unreadCommunications > 99 ? "99+" : unreadCommunications}</span> : hasNewActivity ? <span className={`${compact ? "absolute right-1 top-1" : ""} h-2 w-2 rounded-full bg-rose-500`} aria-label="New activity" /> : null}</button>
     {open ? <div className="fixed inset-0 z-[170] grid place-items-end bg-slate-950/40 sm:place-items-center" role="dialog" aria-modal="true" aria-labelledby="notification-center-title" onMouseDown={(event) => { if (event.currentTarget === event.target) setOpen(false); }}>
       <section className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-xl bg-white shadow-2xl sm:max-w-xl sm:rounded-lg">
         <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#0071e3]">Manager center</p><h2 id="notification-center-title" className="mt-0.5 text-xl font-semibold">Notifications & activity</h2><p className="mt-0.5 text-xs text-slate-500">A dated log of orders, messages, suppliers, approvals, and deliveries.</p></div><div className="flex gap-1"><button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200" aria-label="Refresh notifications">{loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}</button><button type="button" onClick={() => setOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200" aria-label="Close notification center"><X className="h-4 w-4" /></button></div></header>

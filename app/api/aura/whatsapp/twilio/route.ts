@@ -4,7 +4,6 @@ import {
   processTwilioWhatsAppWebhook,
   verifyTwilioWhatsAppRequest,
 } from "@/lib/aura/twilio-whatsapp";
-import { notifyManagersSafely } from "@/lib/manager-push-notifications";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
@@ -77,15 +76,6 @@ export async function POST(request: Request) {
     const from = (params.get("From") || "").replace(/^whatsapp:/i, "");
     const body = (params.get("Body") || "").trim();
     const externalMessageId = params.get("MessageSid") || params.get("SmsSid") || "";
-    if (from && body && externalMessageId) {
-      await notifyManagersSafely({
-        eventType: "call_message",
-        title: "New WhatsApp message",
-        body: `${from} · ${body.slice(0, 160)}`,
-        href: "/admin/communications?channel=whatsapp",
-        tag: `avantia-whatsapp-${externalMessageId}`,
-      });
-    }
     const reply = await processAuraOwnerCommand({
       from,
       body,

@@ -1,5 +1,4 @@
 import { parseQuoEvent } from "@/lib/aura/quo";
-import { notifyManagersSafely } from "@/lib/manager-push-notifications";
 import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
@@ -55,18 +54,8 @@ export async function POST(request: Request) {
   if (!parsed.success) return response("Unsupported event", 400);
 
   try {
-    const activity = parsed.data.data.object;
-    const isIncomingCall = parsed.data.type === "call.ringing" && activity.direction !== "outgoing";
-    if (!broker.duplicate && (isIncomingCall || parsed.data.type === "message.received")) {
-      const from = activity.from || "Unknown number";
-      await notifyManagersSafely({
-        eventType: "call_message",
-        title: parsed.data.type === "call.ringing" ? "Incoming call" : "New text message",
-        body: parsed.data.type === "call.ringing" ? `Call from ${from}` : `${from} · ${(activity.body || activity.text || "New message").slice(0, 160)}`,
-        href: parsed.data.type === "call.ringing" ? "/admin/communications?channel=call" : "/admin/communications?channel=sms",
-        tag: `avantia-quo-${parsed.data.id}`,
-      });
-    }
+    // The database insert is the single notification source. Its unique
+    // communication ID prevents provider webhook replays from alerting twice.
     return response("EVENT_RECEIVED", 200);
   } catch {
     return response("Processing failed", 500);
