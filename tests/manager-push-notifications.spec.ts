@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 const root = process.cwd();
 
 test("manager push notifications stay private and cover business events", async () => {
-  const [api, edgeFunction, dashboard, shell, control, center, serviceWorker, migration, queueMigration, notificationFixMigration, lockdownMigration] = await Promise.all([
+  const [api, edgeFunction, dashboard, shell, control, center, serviceWorker, migration, queueMigration, notificationFixMigration, richCopyMigration, lockdownMigration] = await Promise.all([
     readFile(path.join(root, "app/api/manager-notifications/route.ts"), "utf8"),
     readFile(path.join(root, "supabase/functions/manager-web-push/index.ts"), "utf8"),
     readFile(path.join(root, "app/admin/build-map/page.tsx"), "utf8"),
@@ -17,6 +17,7 @@ test("manager push notifications stay private and cover business events", async 
     readFile(path.join(root, "supabase/migrations/20260824011214_add_manager_web_push_notifications.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260824022900_harden_manager_web_push_delivery.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260902173000_fix_manager_communication_notifications.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260902222024_enrich_manager_communication_notifications.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260824023200_lock_down_manager_push_trigger_functions.sql"), "utf8"),
   ]);
 
@@ -47,6 +48,8 @@ test("manager push notifications stay private and cover business events", async 
   expect(center).toContain("Notifications & activity");
   expect(center).toContain('action: "mark_all_read"');
   expect(center).toContain("summarizeManagerNotifications(events)");
+  expect(center).toContain("managerNotificationCategory(event)");
+  expect(center).toContain("managerNotificationCategoryLabel(category)");
   expect(center).not.toContain("localStorage");
   expect(serviceWorker).toContain('self.addEventListener("push"');
   expect(serviceWorker).toContain('self.addEventListener("notificationclick"');
@@ -66,6 +69,13 @@ test("manager push notifications stay private and cover business events", async 
   expect(queueMigration).toContain("manager_push_dispatch_secret");
   expect(notificationFixMigration).toContain("new.direction <> 'incoming'");
   expect(notificationFixMigration).toContain("grant execute on function public.queue_manager_push_event");
+  expect(richCopyMigration).toContain("Missed call from");
+  expect(richCopyMigration).toContain("Incoming call from");
+  expect(richCopyMigration).toContain("Text message from");
+  expect(richCopyMigration).toContain("Email from");
+  expect(richCopyMigration).toContain("Phone ending");
+  expect(richCopyMigration).toContain("after insert or update of status");
+  expect(richCopyMigration).toContain("?communication=' || new.id::text");
   expect(lockdownMigration).toContain("revoke all on function public.queue_new_request_push() from public, anon, authenticated");
 });
 

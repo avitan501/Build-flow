@@ -17,6 +17,18 @@ export type ManagerNotificationEvent = {
   read_at: string | null;
 };
 
+export type ManagerNotificationCategory =
+  | "message"
+  | "incoming_call"
+  | "missed_call"
+  | "email"
+  | "task"
+  | "system"
+  | "request"
+  | "supplier"
+  | "quote"
+  | "delivery";
+
 export function safeManagerNotificationHref(value: string) {
   const href = value.trim();
   if (!href.startsWith("/") || href.startsWith("//") || href.includes("\\"))
@@ -37,6 +49,55 @@ export function managerNotificationDestination(href: string) {
   if (path.startsWith("/admin/documents")) return "Documents";
   if (path.startsWith("/admin/build-map")) return "Manager Dashboard";
   return "Avantia";
+}
+
+function notificationChannel(href: string) {
+  const query = safeManagerNotificationHref(href).split("?", 2)[1] || "";
+  return new URLSearchParams(query).get("channel")?.toLowerCase() || "";
+}
+
+export function managerNotificationCategory(
+  event: Pick<ManagerNotificationEvent, "event_type" | "title" | "body" | "href">,
+): ManagerNotificationCategory {
+  const href = safeManagerNotificationHref(event.href);
+  const path = href.split("?", 1)[0];
+  const channel = notificationChannel(href);
+  const copy = `${event.title} ${event.body}`.toLowerCase();
+
+  if (path.startsWith("/admin/goals-progress")) return "task";
+  if (event.event_type === "test") return "system";
+  if (event.event_type === "call_message") {
+    if (channel === "call" || /\bcall\b/.test(copy)) {
+      return /\bmissed\b|\bno answer\b/.test(copy)
+        ? "missed_call"
+        : "incoming_call";
+    }
+    if (channel === "email" || /\bemail\b/.test(copy)) return "email";
+    return "message";
+  }
+  if (event.event_type === "new_order") return "request";
+  if (event.event_type === "supplier_update") return "supplier";
+  if (event.event_type === "quote_approval") return "quote";
+  if (event.event_type === "delivery_update") return "delivery";
+  return "system";
+}
+
+export function managerNotificationCategoryLabel(
+  category: ManagerNotificationCategory,
+) {
+  const labels: Record<ManagerNotificationCategory, string> = {
+    message: "Incoming message",
+    incoming_call: "Incoming call",
+    missed_call: "Missed call",
+    email: "Email",
+    task: "Task",
+    system: "System",
+    request: "Material request",
+    supplier: "Supplier",
+    quote: "Quote",
+    delivery: "Delivery",
+  };
+  return labels[category];
 }
 
 export function summarizeManagerNotifications(

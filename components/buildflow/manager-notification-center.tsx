@@ -1,11 +1,13 @@
 "use client";
 
-import { Bell, BellRing, ChevronRight, LoaderCircle, MessageSquareText, PackageCheck, RefreshCw, Store, Truck, X } from "lucide-react";
+import { Bell, BellRing, ChevronRight, ListTodo, LoaderCircle, Mail, MessageSquareText, PackageCheck, PhoneIncoming, PhoneMissed, RefreshCw, Settings2, Store, Truck, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { captureAvantiaEvent } from "@/lib/analytics/posthog-client";
 import {
+  managerNotificationCategory,
+  managerNotificationCategoryLabel,
   managerNotificationDestination,
   safeManagerNotificationHref,
   summarizeManagerNotifications,
@@ -16,12 +18,16 @@ type HistoryResponse = { notifications?: ManagerNotificationEvent[]; error?: str
 type SummaryResponse = { latestAt?: string | null; unreadNotifications?: number };
 
 const eventStyle = {
-  new_order: { icon: PackageCheck, tone: "border-amber-200 bg-amber-50 text-amber-700" },
-  call_message: { icon: MessageSquareText, tone: "border-violet-200 bg-violet-50 text-violet-700" },
-  supplier_update: { icon: Store, tone: "border-sky-200 bg-sky-50 text-sky-700" },
-  quote_approval: { icon: BellRing, tone: "border-emerald-200 bg-emerald-50 text-emerald-700" },
-  delivery_update: { icon: Truck, tone: "border-teal-200 bg-teal-50 text-teal-700" },
-  test: { icon: Bell, tone: "border-slate-200 bg-slate-50 text-slate-600" },
+  message: { icon: MessageSquareText, tone: "border-violet-200 bg-violet-50 text-violet-700", labelTone: "text-violet-700" },
+  incoming_call: { icon: PhoneIncoming, tone: "border-sky-200 bg-sky-50 text-sky-700", labelTone: "text-sky-700" },
+  missed_call: { icon: PhoneMissed, tone: "border-rose-200 bg-rose-50 text-rose-700", labelTone: "text-rose-700" },
+  email: { icon: Mail, tone: "border-indigo-200 bg-indigo-50 text-indigo-700", labelTone: "text-indigo-700" },
+  task: { icon: ListTodo, tone: "border-amber-200 bg-amber-50 text-amber-700", labelTone: "text-amber-700" },
+  system: { icon: Settings2, tone: "border-slate-200 bg-slate-50 text-slate-600", labelTone: "text-slate-500" },
+  request: { icon: PackageCheck, tone: "border-amber-200 bg-amber-50 text-amber-700", labelTone: "text-amber-700" },
+  supplier: { icon: Store, tone: "border-cyan-200 bg-cyan-50 text-cyan-700", labelTone: "text-cyan-700" },
+  quote: { icon: BellRing, tone: "border-emerald-200 bg-emerald-50 text-emerald-700", labelTone: "text-emerald-700" },
+  delivery: { icon: Truck, tone: "border-teal-200 bg-teal-50 text-teal-700", labelTone: "text-teal-700" },
 } as const;
 
 function eventDate(value: string) {
@@ -110,9 +116,9 @@ export function ManagerNotificationCenter({ compact = false }: { compact?: boole
         <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#0071e3]">Manager center</p><h2 id="notification-center-title" className="mt-0.5 text-xl font-semibold">Notifications & activity</h2><p className="mt-0.5 text-xs text-slate-500">One timeline for requests, incoming messages, quotes, and deliveries.</p></div><div className="flex gap-1"><button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200" aria-label="Refresh notifications">{loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}</button><button type="button" onClick={() => setOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200" aria-label="Close notification center"><X className="h-4 w-4" /></button></div></header>
         <div className="overflow-y-auto">
           {error ? <p role="alert" className="m-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">{error}</p> : null}
-          {events.length ? <div className="grid grid-cols-3 border-b border-slate-200 bg-slate-50"><div className="px-3 py-2 text-center"><strong className="block text-sm">{summary.unread}</strong><span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Unread</span></div><div className="border-x border-slate-200 px-3 py-2 text-center"><strong className="block text-sm">{summary.last24Hours}</strong><span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Last 24h</span></div><div className="px-3 py-2 text-center"><strong className="block text-sm">{summary.incoming}</strong><span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Messages</span></div></div> : null}
+          {events.length ? <div className="grid grid-cols-3 border-b border-slate-200 bg-slate-50"><div className="px-3 py-2 text-center"><strong className="block text-sm">{summary.unread}</strong><span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Unread</span></div><div className="border-x border-slate-200 px-3 py-2 text-center"><strong className="block text-sm">{summary.last24Hours}</strong><span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Last 24h</span></div><div className="px-3 py-2 text-center"><strong className="block text-sm">{summary.incoming}</strong><span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">Comms</span></div></div> : null}
           {!loading && !error && !events.length ? <div className="px-5 py-12 text-center"><Bell className="mx-auto h-6 w-6 text-slate-300" /><p className="mt-2 text-sm font-semibold">No activity yet</p></div> : null}
-          {events.map((event) => { const style = eventStyle[event.event_type]; const Icon = style.icon; const href = safeManagerNotificationHref(event.href); return <Link key={event.id} href={href} onClick={() => setOpen(false)} className={`group flex min-h-20 items-start gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50 ${event.read_at ? "" : "bg-sky-50/40"}`}><span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${style.tone}`}><Icon className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center justify-between gap-x-3"><strong className="text-sm">{event.title}</strong><time className="text-[11px] text-slate-400">{eventDate(event.created_at)}</time></span><span className="mt-0.5 block line-clamp-2 text-xs leading-5 text-slate-600">{event.body}</span><span className="mt-1 block text-[10px] font-semibold text-[#0066cc]">{managerNotificationDestination(href)}{event.processed_at ? "" : " · Sending"}</span></span><ChevronRight className="mt-2 h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5" /></Link>; })}
+          {events.map((event) => { const category = managerNotificationCategory(event); const style = eventStyle[category]; const Icon = style.icon; const href = safeManagerNotificationHref(event.href); return <Link key={event.id} href={href} onClick={() => setOpen(false)} className={`group flex min-h-20 items-start gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50 ${event.read_at ? "" : "bg-sky-50/40"}`}><span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${style.tone}`}><Icon className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-3"><span className={`text-[9px] font-black uppercase tracking-[.1em] ${style.labelTone}`}>{managerNotificationCategoryLabel(category)}</span><time className="shrink-0 text-[11px] text-slate-400">{eventDate(event.created_at)}</time></span><strong className="mt-0.5 block text-sm leading-5">{event.title}</strong><span className="mt-0.5 block line-clamp-2 text-xs leading-5 text-slate-600">{event.body}</span><span className="mt-1 block text-[10px] font-semibold text-[#0066cc]">{managerNotificationDestination(href)}{event.processed_at ? "" : " · Sending"}</span></span><ChevronRight className="mt-2 h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5" /></Link>; })}
         </div>
       </section>
     </div> : null}

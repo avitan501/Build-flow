@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  managerNotificationCategory,
+  managerNotificationCategoryLabel,
   managerNotificationDestination,
   safeManagerNotificationHref,
   summarizeManagerNotifications,
@@ -43,4 +45,30 @@ test("notification links stay internal and important destinations have clear lab
   expect(managerNotificationDestination("/admin/supplier-quotes/abc")).toBe("Supplier Quotes");
   expect(managerNotificationDestination("/admin/carlos-activity")).toBe("Carlos Activity");
   expect(managerNotificationDestination("/admin/goals-progress")).toBe("Goals & Tasks");
+});
+
+test("communication notifications have distinct operational categories", () => {
+  expect(managerNotificationCategory(event({
+    event_type: "call_message",
+    title: "Text message from David",
+    href: "/admin/communications?communication=one&channel=sms",
+  }))).toBe("message");
+  expect(managerNotificationCategory(event({
+    event_type: "call_message",
+    title: "Incoming call from Phone ending 5077",
+    href: "/admin/communications?communication=two&channel=call",
+  }))).toBe("incoming_call");
+  expect(managerNotificationCategory(event({
+    event_type: "call_message",
+    title: "Missed call from Phone ending 5077",
+    href: "/admin/communications?communication=three&channel=call",
+  }))).toBe("missed_call");
+  expect(managerNotificationCategory(event({
+    event_type: "call_message",
+    title: "Email from David",
+    href: "/admin/communications?communication=four&channel=email",
+  }))).toBe("email");
+  expect(managerNotificationCategory(event({ href: "/admin/goals-progress/website-work" }))).toBe("task");
+  expect(managerNotificationCategory(event({ event_type: "test", href: "/admin/build-map" }))).toBe("system");
+  expect(managerNotificationCategoryLabel("missed_call")).toBe("Missed call");
 });
