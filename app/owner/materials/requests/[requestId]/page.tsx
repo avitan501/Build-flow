@@ -60,6 +60,11 @@ type RequestItem = {
   answers: unknown;
   metadata: Record<string, unknown> | null;
 };
+type RequestSupplierRouteSelection = {
+  supplierId: string | null;
+  name: string;
+  note: string;
+};
 type SupplierPackage = {
   id: string;
   department: string;
@@ -89,6 +94,43 @@ type ComparisonRecord = Pick<
 
 function zipCodeFromAddress(address: string | null | undefined) {
   return address?.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || "11516";
+}
+
+function requestSupplierRouteSelections(items: RequestItem[]) {
+  const selections = new Map<string, RequestSupplierRouteSelection>();
+  for (const item of items) {
+    const metadata = item.metadata ?? {};
+    const notes = metadata.supplier_route_notes && typeof metadata.supplier_route_notes === "object" && !Array.isArray(metadata.supplier_route_notes)
+      ? metadata.supplier_route_notes as Record<string, unknown>
+      : {};
+    const structured = Array.isArray(metadata.supplier_route_entries) ? metadata.supplier_route_entries : [];
+    const structuredNames = new Set<string>();
+    for (const rawEntry of structured) {
+      if (!rawEntry || typeof rawEntry !== "object" || Array.isArray(rawEntry)) continue;
+      const entry = rawEntry as Record<string, unknown>;
+      const name = typeof entry.name === "string" ? entry.name.trim() : "";
+      if (!name) continue;
+      const supplierId = typeof entry.supplier_id === "string" && /^[0-9a-f-]{36}$/i.test(entry.supplier_id) ? entry.supplier_id : null;
+      const nameKey = name.toLocaleLowerCase();
+      structuredNames.add(nameKey);
+      const key = `name:${nameKey}`;
+      const note = typeof notes[name] === "string" ? notes[name].trim() : "";
+      const existing = selections.get(key);
+      if (!existing || (!existing.supplierId && supplierId) || (!existing.note && note)) selections.set(key, { supplierId: supplierId || existing?.supplierId || null, name, note: note || existing?.note || "" });
+    }
+    const legacyNames = Array.isArray(metadata.supplier_route_names)
+      ? metadata.supplier_route_names.filter((name): name is string => typeof name === "string" && Boolean(name.trim()))
+      : [];
+    for (const rawName of legacyNames) {
+      const name = rawName.trim();
+      const nameKey = name.toLocaleLowerCase();
+      if (structuredNames.has(nameKey)) continue;
+      const key = `name:${nameKey}`;
+      const note = typeof notes[name] === "string" ? notes[name].trim() : "";
+      if (!selections.has(key) || (!selections.get(key)?.note && note)) selections.set(key, { supplierId: null, name, note });
+    }
+  }
+  return [...selections.values()];
 }
 
 export default async function OwnerMaterialRequestPage({
@@ -305,6 +347,7 @@ export default async function OwnerMaterialRequestPage({
   const departmentItems = organizedItems.length
     ? organizedItems
     : (items ?? []);
+  const routeSelections = requestSupplierRouteSelections(items ?? []);
   const departments = Array.from(
     new Set(
       departmentItems.map((item) =>
@@ -545,6 +588,7 @@ export default async function OwnerMaterialRequestPage({
         ) : null}
         <div className="mt-2">
           <RequestManagementPanel
+            key={routeSelections.map((selection) => `${selection.supplierId || "manual"}:${selection.name}:${selection.note}`).sort().join("|")}
             requestId={request.id}
             requestTitle={request.title}
             client={{
@@ -579,6 +623,7 @@ export default async function OwnerMaterialRequestPage({
                 : "",
               metadata: item.metadata ?? null,
             }))}
+            routeSelections={routeSelections}
             projectAddress={request.projects?.address || ""}
             currentStage={currentStage}
             comparisons={comparisonSummaries}

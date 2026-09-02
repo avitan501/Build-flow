@@ -21,8 +21,23 @@ import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms"
 type PackageRoute = { id: string; department: string; supplier_id: string | null; status: string }
 type QuoteLine = { key: string; description: string; quantity: number; unit: string; unitPrice: number }
 export type RequestComparisonSummary = { id: string; title: string; status: string; quoteNumber: string; updatedAt: string; bids: Array<{ id: string; supplierName: string; landedTotal: number; pricedItemCount: number; itemCount: number; recommended: boolean }> }
+export type RequestSupplierRouteSelection = { supplierId: string | null; name: string; note: string }
 
 const actionClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:border-sky-400 hover:bg-sky-50"
+const supplierNameCollator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true })
+
+function resolvedRouteSupplierIds(routeSelections: RequestSupplierRouteSelection[], suppliers: SupplierRoutingOption[]) {
+  const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]))
+  const supplierByName = new Map(suppliers.map((supplier) => [supplier.name.trim().toLocaleLowerCase(), supplier]))
+  return [...new Set(routeSelections.flatMap((selection) => {
+    const supplier = selection.supplierId ? supplierById.get(selection.supplierId) : supplierByName.get(selection.name.trim().toLocaleLowerCase())
+    return supplier ? [supplier.id] : []
+  }))]
+}
+
+function supplierRouteVersion(metadata: Record<string, unknown> | null | undefined) {
+  return JSON.stringify([metadata?.supplier_route_names ?? [], metadata?.supplier_route_entries ?? [], metadata?.supplier_route_notes ?? {}])
+}
 
 function SupplierContactRow({ entry, recommendedSupplierIds, supplierIds, toggleRecommendedSupplier, toggleSupplier }: {
   entry: SupplierRoutingOption
@@ -70,6 +85,7 @@ export function RequestManagementPanel({
   packages,
   requestItems,
   pricingSummaryItems,
+  routeSelections,
   projectAddress,
   currentStage,
   comparisons,
@@ -88,6 +104,7 @@ export function RequestManagementPanel({
   packages: PackageRoute[]
   requestItems: Array<{ id: string; name: string; quantity: number; unit: string | null; reviewReasons: string[] }>
   pricingSummaryItems: Array<{ id: string; original: string; organized: string; route: string; metadata: Record<string, unknown> | null }>
+  routeSelections: RequestSupplierRouteSelection[]
   projectAddress: string
   currentStage: ManagerPipelineStage
   comparisons: RequestComparisonSummary[]
@@ -99,8 +116,9 @@ export function RequestManagementPanel({
   clientEmails: RelatedEmailItem[]
 }) {
   const router = useRouter()
-  const [supplierIds, setSupplierIds] = useState<string[]>(() => initialSupplierRecommendations.filter((entry) => entry.shouldContact).map((entry) => entry.supplierId))
-  const [recommendedSupplierIds, setRecommendedSupplierIds] = useState<string[]>(() => initialSupplierRecommendations.filter((entry) => entry.isRecommended).map((entry) => entry.supplierId))
+  const initialRouteSupplierIds = resolvedRouteSupplierIds(routeSelections, suppliers)
+  const [supplierIds, setSupplierIds] = useState<string[]>(() => [...new Set([...initialSupplierRecommendations.filter((entry) => entry.shouldContact).map((entry) => entry.supplierId), ...initialRouteSupplierIds])])
+  const [recommendedSupplierIds, setRecommendedSupplierIds] = useState<string[]>(() => [...new Set([...initialSupplierRecommendations.filter((entry) => entry.isRecommended).map((entry) => entry.supplierId), ...initialRouteSupplierIds])])
   const [managerNotes, setManagerNotes] = useState(initialManagerNotes)
   const [greeting, setGreeting] = useState<"hi" | "hello" | "morning" | "afternoon">("hi")
   const [replyBlock, setReplyBlock] = useState<string>(() => requestItems.some((item) => item.reviewReasons.length) ? "missing" : "received")
@@ -137,11 +155,18 @@ export function RequestManagementPanel({
   const quoteDialogRef = useRef<HTMLElement | null>(null)
   const contactTriggerRef = useRef<HTMLElement | null>(null)
   const routeDepartment = departments.length === 1 ? departments[0] : departments.length > 1 ? "Multiple departments" : "Others"
-  const availableSuppliers = useMemo(() => [...suppliers].sort((left, right) => left.name.localeCompare(right.name)), [suppliers])
-  const routeSupplierNames = useMemo(() => [...new Set(pricingSummaryItems.flatMap((item) => Array.isArray(item.metadata?.supplier_route_names) ? item.metadata.supplier_route_names.filter((name): name is string => typeof name === "string" && Boolean(name.trim())) : []))], [pricingSummaryItems])
-  const routeNameKeys = useMemo(() => new Set(routeSupplierNames.map((name) => name.trim().toLowerCase())), [routeSupplierNames])
-  const selectedRouteSuppliers = useMemo(() => availableSuppliers.filter((supplier) => routeNameKeys.has(supplier.name.trim().toLowerCase())), [availableSuppliers, routeNameKeys])
-  const remainingSuppliers = useMemo(() => availableSuppliers.filter((supplier) => !routeNameKeys.has(supplier.name.trim().toLowerCase())), [availableSuppliers, routeNameKeys])
+  const availableSuppliers = useMemo(() => [...suppliers].sort((left, right) => supplierNameCollator.compare(left.name, right.name)), [suppliers])
+  const routeMatches = useMemo(() => {
+    const supplierById = new Map(availableSuppliers.map((supplier) => [supplier.id, supplier]))
+    const supplierByName = new Map(availableSuppliers.map((supplier) => [supplier.name.trim().toLocaleLowerCase(), supplier]))
+    return routeSelections.map((selection) => ({ selection, supplier: (selection.supplierId ? supplierById.get(selection.supplierId) : undefined) ?? supplierByName.get(selection.name.trim().toLocaleLowerCase()) ?? null }))
+  }, [availableSuppliers, routeSelections])
+  const routeSupplierNames = useMemo(() => [...new Set(routeMatches.map(({ selection, supplier }) => supplier?.name || selection.name))].sort(supplierNameCollator.compare), [routeMatches])
+  const routeContactSupplierIds = useMemo(() => [...new Set(routeMatches.flatMap(({ supplier }) => supplier ? [supplier.id] : []))], [routeMatches])
+  const routeContactSupplierIdSet = useMemo(() => new Set(routeContactSupplierIds), [routeContactSupplierIds])
+  const selectedRouteSuppliers = useMemo(() => availableSuppliers.filter((supplier) => routeContactSupplierIdSet.has(supplier.id)), [availableSuppliers, routeContactSupplierIdSet])
+  const unlinkedRouteNames = useMemo(() => [...new Set(routeMatches.filter(({ supplier }) => !supplier).map(({ selection }) => selection.name))].sort(supplierNameCollator.compare), [routeMatches])
+  const remainingSuppliers = useMemo(() => availableSuppliers.filter((supplier) => !routeContactSupplierIdSet.has(supplier.id)), [availableSuppliers, routeContactSupplierIdSet])
   const onlineSupplierQuery = useMemo(() => pricingSummaryItems.map((item) => item.organized).filter(Boolean).slice(0, 6).join("; "), [pricingSummaryItems])
 
   const firstName = client.name.trim().split(/\s+/)[0] || "there"
@@ -468,8 +493,9 @@ export function RequestManagementPanel({
         <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier pricing & comparison" detail={supplierQuoteCount ? `${supplierQuoteCount} quote${supplierQuoteCount === 1 ? "" : "s"} ready to compare` : packages.length ? `${packages.length} supplier request${packages.length === 1 ? "" : "s"} sent` : "Choose a route, contact suppliers, and add returned pricing"} status={pricingStatus} icon="pricing" />
         <div className="border-t border-slate-200 p-3">
           <details className="mb-3 rounded-md border border-slate-200 bg-white"><summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-bold"><span>Request notes</span><span className="max-w-[60%] truncate font-normal text-slate-400">{managerNotes || "Add a note"}</span></summary><div className="grid gap-2 border-t border-slate-100 p-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"><textarea value={managerNotes} onChange={(event) => setManagerNotes(event.target.value)} rows={2} maxLength={5000} placeholder="Notes for this pricing request" className="resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-950" /><button type="button" onClick={() => startTransition(async () => { await saveSupplierPlan() })} disabled={pending} className="min-h-9 rounded-md bg-[#17304f] px-3 text-xs font-bold text-white disabled:opacity-50">Save notes</button></div></details>
+          {routeSupplierNames.length ? <div className="mb-2 flex flex-wrap items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2 py-1.5"><span className="mr-1 text-[10px] font-black uppercase tracking-[.08em] text-sky-900">Suppliers from Step 1</span>{routeSupplierNames.map((name) => <span key={name} className="rounded bg-white px-2 py-1 text-[10px] font-bold text-slate-700 ring-1 ring-sky-100">{name}</span>)}</div> : null}
           <div className="mb-3 overflow-x-auto rounded-md border border-slate-200 bg-slate-100">
-            <table className="w-full min-w-[42rem] table-fixed text-left text-[11px]"><thead className="text-[9px] font-bold uppercase tracking-[.08em] text-slate-500"><tr><th className="w-16 px-2 py-1.5">Qty</th><th className="px-2 py-1.5">Original</th><th className="px-2 py-1.5">AI request</th><th className="px-2 py-1.5">Supplier route &amp; note</th></tr></thead><tbody className="divide-y divide-slate-200 bg-slate-50">{pricingSummaryItems.slice(0, 8).map((item) => <tr key={item.id}><td className="px-2 py-1.5 font-bold">{requestItems.find((candidate) => candidate.id === item.id)?.quantity || "—"}</td><td title={item.original} className="truncate px-2 py-1.5 text-slate-500">{item.original}</td><td title={item.organized} className="truncate px-2 py-1.5 font-semibold">{item.organized}</td><td className="px-2 py-1.5"><RequestSupplierRouteEditor requestId={requestId} itemId={item.id} metadata={item.metadata} suppliers={suppliers} /></td></tr>)}</tbody></table>
+            <table className="w-full min-w-[42rem] table-fixed text-left text-[11px]"><thead className="text-[9px] font-bold uppercase tracking-[.08em] text-slate-500"><tr><th className="w-16 px-2 py-1.5">Qty</th><th className="px-2 py-1.5">Original</th><th className="px-2 py-1.5">AI request</th><th className="px-2 py-1.5">Supplier route &amp; note</th></tr></thead><tbody className="divide-y divide-slate-200 bg-slate-50">{pricingSummaryItems.slice(0, 8).map((item) => <tr key={item.id}><td className="px-2 py-1.5 font-bold">{requestItems.find((candidate) => candidate.id === item.id)?.quantity || "—"}</td><td title={item.original} className="truncate px-2 py-1.5 text-slate-500">{item.original}</td><td title={item.organized} className="truncate px-2 py-1.5 font-semibold">{item.organized}</td><td className="px-2 py-1.5"><RequestSupplierRouteEditor key={`${item.id}-${supplierRouteVersion(item.metadata)}`} requestId={requestId} itemId={item.id} metadata={item.metadata} suppliers={availableSuppliers} /></td></tr>)}</tbody></table>
           </div>
           <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <a href="#supplier-routing" className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-xs font-bold"><Route className="h-3.5 w-3.5" />Choose route</a>
@@ -486,7 +512,9 @@ export function RequestManagementPanel({
               <legend className="text-sm font-semibold text-slate-700">Suppliers selected in Step 1</legend>
               <p className="mt-0.5 text-xs text-slate-500">Your chosen routes appear first. Then use any supplier in the directory.</p>
               <div className="mt-1.5 max-h-56 overflow-y-auto rounded-lg border border-slate-300 bg-white p-2">
-                {selectedRouteSuppliers.length ? selectedRouteSuppliers.map((entry) => <SupplierContactRow key={entry.id} entry={entry} recommendedSupplierIds={recommendedSupplierIds} supplierIds={supplierIds} toggleRecommendedSupplier={toggleRecommendedSupplier} toggleSupplier={toggleSupplier} />) : <p className="px-2 py-3 text-xs text-slate-500">Choose routes in Step 1. Manually typed route names still stay on the request.</p>}
+                {selectedRouteSuppliers.map((entry) => <SupplierContactRow key={entry.id} entry={entry} recommendedSupplierIds={recommendedSupplierIds} supplierIds={supplierIds} toggleRecommendedSupplier={toggleRecommendedSupplier} toggleSupplier={toggleSupplier} />)}
+                {unlinkedRouteNames.map((name) => <div key={name} className="flex min-h-11 items-center justify-between gap-3 rounded-md px-2 text-sm"><span className="truncate font-semibold text-slate-800">{name}</span><span className="shrink-0 rounded bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800">Not linked to directory</span></div>)}
+                {!selectedRouteSuppliers.length && !unlinkedRouteNames.length ? <p className="px-2 py-3 text-xs text-slate-500">Choose routes in Step 1.</p> : null}
                 {remainingSuppliers.length ? <details className="border-t border-slate-100"><summary className="min-h-10 cursor-pointer px-2 py-3 text-xs font-bold text-[#0066cc]">All Supplier Directory ({remainingSuppliers.length})</summary><div>{remainingSuppliers.map((entry) => <SupplierContactRow key={entry.id} entry={entry} recommendedSupplierIds={recommendedSupplierIds} supplierIds={supplierIds} toggleRecommendedSupplier={toggleRecommendedSupplier} toggleSupplier={toggleSupplier} />)}</div></details> : null}
               </div>
             </fieldset>

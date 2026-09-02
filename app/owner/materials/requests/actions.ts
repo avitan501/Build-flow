@@ -348,9 +348,15 @@ export async function saveRequestItemSupplierRouteAction(input: {
   const supplierNotes = Object.fromEntries(supplierNames.map((name) => [name, String(rawNotes[name] || "").trim().slice(0, 800)]).filter(([, note]) => Boolean(note)))
   if (!/^[0-9a-f-]{36}$/i.test(requestId) || !itemIds.length || itemIds.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) return { ok: false as const, error: "Choose at least one valid request item." }
   const { supabase, user } = await requireStaffProfile("customers")
-  const { data: items } = await supabase.from("quote_request_items").select("id,metadata").eq("request_id", requestId).in("id", itemIds).returns<Array<{ id: string; metadata: Record<string, unknown> | null }>>()
+  const [{ data: items }, { data: supplierData }] = await Promise.all([
+    supabase.from("quote_request_items").select("id,metadata").eq("request_id", requestId).in("id", itemIds).returns<Array<{ id: string; metadata: Record<string, unknown> | null }>>(),
+    supabase.rpc("staff_load_catalog_suppliers"),
+  ])
   if (!items || items.length !== itemIds.length) return { ok: false as const, error: "One of the selected items is no longer available." }
-  const updates = await Promise.all(items.map((item) => supabase.from("quote_request_items").update({ metadata: { ...(item.metadata ?? {}), supplier_route_names: supplierNames, supplier_route_notes: supplierNotes, supplier_route_note: null, supplier_route_updated_at: new Date().toISOString(), supplier_route_updated_by: user.id } }).eq("id", item.id).eq("request_id", requestId)))
+  const directory = Array.isArray(supplierData) ? supplierData as Array<{ id?: string; name?: string }> : []
+  const supplierByName = new Map(directory.filter((entry) => entry?.id && entry?.name).map((entry) => [String(entry.name).trim().toLocaleLowerCase(), String(entry.id)]))
+  const supplierRouteEntries = supplierNames.map((name) => ({ supplier_id: supplierByName.get(name.toLocaleLowerCase()) ?? null, name }))
+  const updates = await Promise.all(items.map((item) => supabase.from("quote_request_items").update({ metadata: { ...(item.metadata ?? {}), supplier_route_names: supplierNames, supplier_route_entries: supplierRouteEntries, supplier_route_notes: supplierNotes, supplier_route_note: null, supplier_route_updated_at: new Date().toISOString(), supplier_route_updated_by: user.id } }).eq("id", item.id).eq("request_id", requestId)))
   if (updates.some((result) => result.error)) return { ok: false as const, error: "The supplier route could not be saved for every selected item." }
   revalidatePath(`/owner/materials/requests/${requestId}`)
   return { ok: true as const }

@@ -129,9 +129,11 @@ test("supplier quotes move into compact step two instead of expanding the reques
 })
 
 test("supplier routes are alphabetical checklists with per-item or whole-request scope", async () => {
-  const [worktable, editor, actions] = await Promise.all([
+  const [page, worktable, editor, management, actions] = await Promise.all([
+    source(pagePath),
     source(worktablePath),
     source(path.join(root, "components/buildflow/request-supplier-route-editor.tsx")),
+    source(managementPath),
     source(path.join(root, "app/owner/materials/requests/actions.ts")),
   ])
 
@@ -145,8 +147,16 @@ test("supplier routes are alphabetical checklists with per-item or whole-request
   expect(editor).toContain("supplier_route_notes")
   expect(editor).toContain("Note for this supplier")
   expect(editor).toContain("Choose any suppliers needed")
+  expect(page).toContain("requestSupplierRouteSelections(items ?? [])")
+  expect(page).toContain("routeSelections={routeSelections}")
+  expect(management).toContain("Suppliers from Step 1")
+  expect(management).toContain("routeContactSupplierIds")
+  expect(management).toContain("Not linked to directory")
+  expect(management).toContain("supplierRouteVersion(item.metadata)")
+  expect(worktable.match(/Route \{selectedRouteIds\.length\} selected/g)).toHaveLength(1)
   expect(actions).not.toContain("].slice(0, 12)")
   expect(actions).toContain("supplier_route_notes: supplierNotes")
+  expect(actions).toContain("supplier_route_entries: supplierRouteEntries")
 })
 
 test("client contact is available at the request header and does not consume step four", async () => {
