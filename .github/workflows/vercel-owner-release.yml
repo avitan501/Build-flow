@@ -5,28 +5,73 @@ on:
 
 permissions:
   contents: read
+  statuses: read
 
 concurrency:
   group: avantia-build-production-release
-  cancel-in-progress: true
+  cancel-in-progress: false
+
+env:
+  PRODUCTION_DOMAIN: https://build.avantiap.com
+  PRODUCTION_SUPABASE_REF: nprfhspwdflpqlopydmp
+  VERCEL_TEAM_SLUG: av-design-and-builds-projects
+  VERCEL_PROJECT_SLUG: avantia-build
+  VERCEL_APPROVED_AUTHOR_EMAILS: sales@avdesignandbuilds.com
 
 jobs:
   deploy:
     name: Deploy main to build.avantiap.com
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
+      - name: Check out the exact release commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Guard repository, commit, author and production targets
+        run: node scripts/production-release-guard.mjs preflight
+
+      - name: Install the locked dependency tree
+        run: npm ci
+
+      - name: Verify the release guard
+        run: npm run verify:release
+
+      - name: Install the release-test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the bounded application regression suite
+        run: npm run test:release
+
+      - name: Lint, type-check and build
+        run: |
+          npm run lint
+          npx tsc --noEmit --incremental false
+          npm run build
+
+      - name: Recheck immutable main immediately before deployment
+        run: node scripts/production-release-guard.mjs preflight
+
       - name: Trigger the scoped Vercel deploy hook
+        id: trigger
         env:
           VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
-        shell: bash
         run: |
-          if [[ -z "${VERCEL_DEPLOY_HOOK_URL:-}" ]]; then
-            echo "::error::VERCEL_DEPLOY_HOOK_URL is not configured."
-            exit 1
-          fi
+          echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          node scripts/production-release-guard.mjs trigger
 
-          response=$(curl --fail --silent --show-error \
-            --request POST \
-            "$VERCEL_DEPLOY_HOOK_URL")
-          state=$(jq -r '.job.state // "UNKNOWN"' <<< "$response")
-          echo "Vercel accepted the manual production deployment. State: $state"
+      - name: Verify the exact Vercel team and project deployment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_STARTED_AT: ${{ steps.trigger.outputs.started_at }}
+        run: node scripts/production-release-guard.mjs wait-vercel
+
+      - name: Verify the live commit and Supabase binding
+        run: node scripts/production-release-guard.mjs verify-live

@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "verify:release": "node --test tests/deployment-guard.test.mjs",
+    "test:release": "playwright test tests/ai-sms-stage2.spec.ts tests/manager-command-center.spec.ts tests/request-quote.spec.ts --project=chromium-desktop",
     "test:e2e": "playwright test",
     "test:e2e:live": "PLAYWRIGHT_BASE_URL=https://build.avantiap.com PLAYWRIGHT_LIVE_GUARD=1 playwright test tests/production-critical-paths.spec.ts",
     "test:e2e:prod": "npm run test:e2e:live"

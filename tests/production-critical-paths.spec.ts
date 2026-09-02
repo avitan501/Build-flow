@@ -59,6 +59,30 @@ test.describe("production critical paths", () => {
     "Set PLAYWRIGHT_LIVE_GUARD=1 to run checks against production.",
   );
 
+  test("release guard reports the live production commit and Supabase binding", async ({
+    request,
+  }) => {
+    const response = await request.get("/api/release", {
+      headers: { "Cache-Control": "no-cache" },
+    });
+    expect(response.ok()).toBe(true);
+    const payload = (await response.json()) as {
+      status?: string;
+      environment?: string;
+      release?: string;
+      supabaseRef?: string;
+    };
+    expect(payload).toMatchObject({
+      status: "ok",
+      environment: "production",
+      supabaseRef: "nprfhspwdflpqlopydmp",
+    });
+    expect(payload.release).toMatch(/^[a-f0-9]{40}$/i);
+    if (process.env.PLAYWRIGHT_EXPECTED_RELEASE_SHA) {
+      expect(payload.release).toBe(process.env.PLAYWRIGHT_EXPECTED_RELEASE_SHA);
+    }
+  });
+
   test("public request accepts several documents without submitting", async ({
     page,
   }) => {
