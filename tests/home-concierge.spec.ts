@@ -7,15 +7,16 @@ test("new homepage presents the approved request flow", async ({ page }) => {
     "Avantia Build | Construction Materials, Handled.",
   );
   await expect(
-    page.getByRole("heading", { level: 1, name: /Stop Calling Every Supplier/ }),
+    page.getByRole("heading", { level: 1, name: /One Quote. Better Options./ }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "Send My List", exact: true })).toHaveAttribute(
+  await expect(page.getByText("Before / after", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Check My Quote", exact: true })).toHaveAttribute(
+    "href",
+    "/beat-a-quote",
+  );
+  await expect(page.getByRole("link", { name: "Send a Photo", exact: true })).toHaveAttribute(
     "href",
     "/request-quote",
-  );
-  await expect(page.getByRole("link", { name: "Text My List", exact: true })).toHaveAttribute(
-    "href",
-    /sms:\+15169088319/,
   );
   await expect(page.locator("#brands").getByText("Serving all 50 states", { exact: true })).toBeVisible();
   await expect(
@@ -30,6 +31,13 @@ test("new homepage presents the approved request flow", async ({ page }) => {
   for (const title of ["Beat Your Quote", "Send Any Material List", "Find a Specific Item"]) {
     await expect(page.getByRole("heading", { name: title })).toBeAttached();
   }
+  for (const asset of [
+    "service-beat-quote-v4.webp",
+    "service-send-list-v4.webp",
+    "service-find-item-v4.webp",
+  ]) {
+    await expect(page.locator(`img[src*="${asset}"]`)).toBeAttached();
+  }
   await expect(page.getByRole("contentinfo")).toBeAttached();
   expect(
     await page.evaluate(
@@ -42,9 +50,9 @@ test("new homepage keeps the approved mobile composition compact", async ({ page
   test.skip((page.viewportSize()?.width ?? 1024) >= 640, "Mobile-only layout check");
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { level: 1, name: /Stop Calling Every Supplier/ })).toBeVisible();
-  const primary = page.getByRole("link", { name: "Send My List", exact: true });
-  const secondary = page.getByRole("link", { name: "Text My List", exact: true });
+  await expect(page.getByRole("heading", { level: 1, name: /One Quote. Better Options./ })).toBeVisible();
+  const primary = page.getByRole("link", { name: "Check My Quote", exact: true });
+  const secondary = page.getByRole("link", { name: "Send a Photo", exact: true });
   const primaryBox = await primary.boundingBox();
   const secondaryBox = await secondary.boundingBox();
   expect(primaryBox?.width ?? 0).toBeGreaterThan(300);

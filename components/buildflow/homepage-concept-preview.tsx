@@ -9,16 +9,16 @@ import { ShopBrandShowcase } from "@/components/buildflow/shop-brand-showcase"
 
 const concepts = [
   { id: 1, name: "Quote Rescue", eyebrow: "Avantia materials desk", headline: <>Send Your Quote.<br />We’ll Check the Rest.</>, summary: "Price · Availability · Delivery", primary: "Upload Your Quote", secondary: "Text It", videos: [["/videos/avantia-story/01-contractor-request.mp4", "/videos/avantia-story/01-contractor-request-poster.jpg"], ["/videos/avantia-story/08-material-actual-cost.mp4", "/videos/avantia-story/08-material-actual-cost-poster.jpg"]] },
-  { id: 2, name: "Light Supplier Reach", eyebrow: "More reach.", headline: <>Stop Calling<br />Every Supplier.</>, summary: "Avantia organizes the request and checks matching sources.", primary: "Send My List", secondary: "Text My List", videos: [["/videos/marketing/crew-downtime.mp4", "/videos/marketing/crew-downtime-poster.jpg"], ["/videos/marketing/delivery-coordination.mp4", "/videos/marketing/delivery-coordination-poster.jpg"]] },
+  { id: 2, name: "Light Quote Check", eyebrow: "Compare before you buy", headline: <>One Quote.<br />Better Options.</>, summary: "We compare the supplier, total price, and delivery.", primary: "Check My Quote", secondary: "Send a Photo", videos: [["/videos/marketing/crew-downtime.mp4", "/videos/marketing/crew-downtime-poster.jpg"], ["/videos/marketing/delivery-coordination.mp4", "/videos/marketing/delivery-coordination-poster.jpg"]] },
   { id: 3, name: "Crew Moving", eyebrow: "Materials this week?", headline: <>Keep the Crew<br />Moving.</>, summary: "Send the list. We chase the material—not your crew.", primary: "Send My List", secondary: "How It Works", videos: [["/videos/avantia-story/02-contractor-crew-moving.mp4", "/videos/avantia-story/02-contractor-crew-moving-poster.jpg"], ["/videos/avantia-story/09-job-gets-busy.mp4", "/videos/avantia-story/09-job-gets-busy-poster.jpg"]] },
   { id: 4, name: "Supplier Grid", eyebrow: "One request. More reach.", headline: <>Stop Calling<br />Every Supplier.</>, summary: "Avantia organizes the request and checks matching sources.", primary: "Start a Request", secondary: "Text My List", videos: [["/videos/avantia-story/04-supplier-send-products.mp4", "/videos/avantia-story/04-supplier-send-products-poster.jpg"], ["/videos/avantia-story/07-many-calls-one-job.mp4", "/videos/avantia-story/07-many-calls-one-job-poster.jpg"]] },
   { id: 5, name: "Delivery Mission", eyebrow: "From list to jobsite", headline: <>Materials.<br />Handled.</>, summary: "Quote review, supplier follow-up, and delivery coordination.", primary: "Send It to Avantia", secondary: "Upload Quote", videos: [["/videos/marketing/delivery-coordination.mp4", "/videos/marketing/delivery-coordination-poster.jpg"], ["/videos/avantia-story/05-designer-order-coordination.mp4", "/videos/avantia-story/05-designer-order-coordination-poster.jpg"], ["/videos/avantia-story/06-designer-materials-desk.mp4", "/videos/avantia-story/06-designer-materials-desk-poster.jpg"]] },
 ] as const
 
 const reviewHeroPhotos = [
-  { src: "/images/buildflow-retail/framing-materials-yard.webp", position: "object-[62%_center]", label: "Framing lumber and structural materials" },
-  { src: "/images/buildflow-retail/framing-jobsite-v3.webp", position: "object-[56%_center]", label: "A Long Island-style house under construction" },
-  { src: "/images/buildflow-retail/exterior.jpg", position: "object-[58%_center]", label: "Exterior building materials ready for delivery" },
+  { src: "/images/buildflow-homepage/hero-material-yard-v4.webp", position: "object-[66%_center]", label: "Framing lumber and structural materials" },
+  { src: "/images/buildflow-homepage/hero-long-island-home-v4.webp", position: "object-[62%_center]", label: "A Long Island house under construction" },
+  { src: "/images/buildflow-homepage/hero-exterior-materials-v4.webp", position: "object-[68%_center]", label: "Exterior building materials staged at a Long Island home" },
 ] as const
 
 const reviewServices = [
@@ -26,21 +26,21 @@ const reviewServices = [
     title: "Beat Your Quote",
     description: "Send an existing quote. We’ll check the material, total, and delivery.",
     href: "/beat-a-quote",
-    image: "/images/buildflow-retail/orders.jpg",
+    image: "/images/buildflow-homepage/service-beat-quote-v4.webp",
     action: "Check my quote",
   },
   {
     title: "Send Any Material List",
     description: "A typed list, photo, plan, or file is enough to start.",
     href: "/request-quote",
-    image: "/images/buildflow-retail/uploads.jpg",
+    image: "/images/buildflow-homepage/service-send-list-v4.webp",
     action: "Send my list",
   },
   {
     title: "Find a Specific Item",
     description: "Search the material catalog or send the exact item you need.",
     href: "/shop",
-    image: "/images/buildflow-retail/find-specific-item-designer-v3.webp",
+    image: "/images/buildflow-homepage/service-find-item-v4.webp",
     action: "Find an item",
   },
 ] as const
@@ -98,7 +98,7 @@ function HomepageReviewSections() {
           className={`relative mx-auto w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/70 bg-slate-950 p-2 shadow-[0_35px_90px_rgba(15,23,42,.2)] transition-[transform,opacity] duration-700 ease-out motion-reduce:transform-none ${videoInView ? "scale-100 opacity-100" : "scale-[0.965] opacity-90"}`}
         >
           <div className="relative aspect-[4/5] overflow-hidden rounded-[1.55rem] bg-slate-900 sm:aspect-[16/10]">
-            <video autoPlay muted loop playsInline preload="metadata" poster="/images/buildflow-retail/uploads.jpg" className="h-full w-full object-cover object-center" aria-label="A material request moving from a contractor's list through supplier comparison to jobsite delivery">
+            <video autoPlay muted loop playsInline preload="metadata" poster="/images/buildflow-homepage/service-send-list-v4.webp" className="h-full w-full object-cover object-center" aria-label="A material request moving from a contractor's list through supplier comparison to jobsite delivery">
               <source src="/videos/homepage-material-process.mp4" type="video/mp4" />
             </video>
             <div className="absolute inset-x-3 bottom-3 flex items-center gap-2 rounded-2xl border border-white/20 bg-black/45 px-4 py-3 text-sm font-bold text-white shadow-lg backdrop-blur-md sm:inset-x-auto sm:bottom-5 sm:left-5">
@@ -192,7 +192,7 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
       </div> : <video key={videoSource} ref={videoRef} src={videoSource} poster={posterSource} autoPlay muted playsInline preload="auto" onEnded={() => setVideoIndex((current) => (current + 1) % concept.videos.length)} className={`absolute object-cover ${conceptId === 2 ? "inset-y-0 right-0 h-full w-full sm:w-[62%]" : conceptId === 4 ? "inset-y-0 right-0 h-full w-full lg:w-[68%]" : conceptId === 5 ? "inset-x-4 bottom-5 top-24 h-[calc(100%-7.25rem)] w-[calc(100%-2rem)] rounded-[2rem] sm:inset-x-[38%] sm:w-[60%]" : "inset-0 h-full w-full scale-[1.015]"}`} aria-hidden="true" />}
 
       {conceptId === 1 ? <><div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.08)_40%,rgba(0,0,0,.84))]" /><div className="relative z-10 mx-auto flex min-h-[100svh] max-w-7xl flex-col justify-end px-5 pb-24 pt-24 sm:px-8 lg:px-12"><div className="max-w-3xl drop-shadow-[0_5px_28px_rgba(0,0,0,.65)]">{text}<Actions primary={concept.primary} secondary={concept.secondary} /><p className="mt-3 text-xs font-semibold text-white/65">No account. No obligation.</p></div></div></> : null}
-      {conceptId === 2 ? <><div className="absolute inset-0 bg-[linear-gradient(90deg,#f4efe6_0%,#f4efe6_42%,rgba(244,239,230,.95)_58%,rgba(244,239,230,.36)_100%)]" /><div className="relative z-10 flex min-h-[100svh] items-center px-5 pt-16 text-slate-950 sm:w-[54%] sm:px-10 lg:px-16"><div className="max-w-2xl"><p className="mb-3 inline-flex border-b-2 border-slate-950 pb-2 text-xs font-black uppercase tracking-[.2em]">One request</p>{text}<Actions primary={concept.primary} secondary={concept.secondary} dark /><p className="mt-4 text-xs font-semibold text-slate-500">One business day review.</p></div></div></> : null}
+      {conceptId === 2 ? <><div className="absolute inset-0 bg-[linear-gradient(90deg,#f4efe6_0%,#f4efe6_42%,rgba(244,239,230,.95)_58%,rgba(244,239,230,.36)_100%)]" /><div className="relative z-10 flex min-h-[100svh] items-center px-5 pt-16 text-slate-950 sm:w-[54%] sm:px-10 lg:px-16"><div className="max-w-2xl"><p className="mb-3 inline-flex border-b-2 border-slate-950 pb-2 text-xs font-black uppercase tracking-[.2em]">Before / after</p>{text}<Actions primary={concept.primary} secondary={concept.secondary} dark /><p className="mt-4 text-xs font-semibold text-slate-500">One business day review.</p></div></div></> : null}
       {conceptId === 3 ? <><div className="absolute inset-0 bg-black/45" /><div className="absolute inset-x-0 top-[18%] h-3 bg-amber-400" /><div className="relative z-10 flex min-h-[100svh] flex-col items-center justify-center px-5 pt-20 text-center"><div className="max-w-5xl">{text}<div className="flex justify-center"><Actions primary={concept.primary} secondary={concept.secondary} /></div><p className="mt-4 font-mono text-xs uppercase tracking-[.15em] text-amber-300">Fast request intake · Human review</p></div></div></> : null}
       {conceptId === 4 ? <><div className="absolute inset-0 bg-[linear-gradient(90deg,#061d3b_0%,#061d3b_42%,rgba(6,29,59,.78)_66%,rgba(6,29,59,.18))]" /><div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(78,170,255,.3)_1px,transparent_1px),linear-gradient(90deg,rgba(78,170,255,.3)_1px,transparent_1px)] [background-size:32px_32px]" /><div className="relative z-10 flex min-h-[100svh] items-center px-5 pt-16 sm:px-10 lg:w-1/2 lg:px-16"><div className="max-w-2xl border-l-4 border-sky-400 pl-5 sm:pl-8">{text}<Actions primary={concept.primary} secondary={concept.secondary} /><div className="mt-5 grid max-w-md grid-cols-3 gap-2 text-center text-[10px] font-bold uppercase tracking-wide text-sky-200"><span className="border border-sky-300/25 p-2">Request</span><span className="border border-sky-300/25 p-2">Compare</span><span className="border border-sky-300/25 p-2">Deliver</span></div></div></div></> : null}
       {conceptId === 5 ? <><div className="absolute inset-0 bg-gradient-to-r from-[#edf2f7] via-[#edf2f7] to-transparent sm:w-[58%]" /><div className="relative z-10 flex min-h-[100svh] items-end px-5 pb-20 pt-24 sm:w-[50%] sm:items-center sm:px-10 lg:px-16"><div className="max-w-xl rounded-3xl bg-white/92 p-6 shadow-[0_25px_80px_rgba(15,23,42,.18)] backdrop-blur-xl sm:p-9">{text}<Actions primary={concept.primary} secondary={concept.secondary} dark /><p className="mt-4 text-xs font-bold text-slate-500">Local jobs · Real supplier follow-up</p></div></div></> : null}
