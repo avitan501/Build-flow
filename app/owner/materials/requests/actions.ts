@@ -462,12 +462,20 @@ export async function saveOriginalMaterialItemAction(input: {
     const { error } = await supabase.from("quote_request_items").update({ name, quantity, unit, metadata: { ...(current.metadata ?? {}), request_details: details, manually_edited_at: new Date().toISOString(), manually_edited_by: user.id } }).eq("id", itemId).eq("request_id", requestId)
     if (error) return { ok: false as const, error: "The original item could not be saved.", version }
   } else {
+    const { data: departmentSource } = await supabase
+      .from("quote_request_items")
+      .select("department")
+      .eq("request_id", requestId)
+      .order("created_at")
+      .limit(1)
+      .maybeSingle<{ department: string | null }>()
+    const department = String(departmentSource?.department || "Others").trim().slice(0, 100) || "Others"
     const { error } = await supabase.from("quote_request_items").insert({
       request_id: request.id,
       project_id: request.project_id,
       owner_id: request.owner_id,
       name,
-      department: "Others",
+      department,
       item_type: "custom_priced",
       quantity,
       unit,

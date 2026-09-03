@@ -19,6 +19,7 @@ const originalEditorPath = path.join(root, "components/buildflow/original-reques
 const autosaveHookPath = path.join(root, "lib/use-sequenced-autosave.ts")
 const liveSyncPath = path.join(root, "components/buildflow/request-live-sync.tsx")
 const routeAutosaveMigrationPath = path.join(root, "supabase/migrations/20260902233933_atomic_request_supplier_route_autosave.sql")
+const staffWorkflowMigrationPath = path.join(root, "supabase/migrations/20260903225000_fix_staff_request_workflow.sql")
 
 async function source(filePath: string) {
   try {
@@ -72,6 +73,20 @@ test("request changes synchronize between staff screens", async () => {
   expect(page).toContain("(supplierRecommendations ?? []).map")
   expect(page).toContain("entry.contact_status")
   expect(page).toContain("entry.notes")
+})
+
+test("staff can add a request item after the client submitted the request", async () => {
+  const [migration, actions] = await Promise.all([
+    source(staffWorkflowMigrationPath),
+    source(path.join(root, "app/owner/materials/requests/actions.ts")),
+  ])
+
+  expect(migration).toContain("drop policy if exists quote_request_items_owner_insert")
+  expect(migration).toContain("or private.is_admin_or_staff()")
+  expect(migration).toContain("for insert")
+  expect(actions).toContain('select("department")')
+  expect(actions).toContain("departmentSource?.department")
+  expect(actions).not.toContain('department: "Others"')
 })
 
 test("comparison rows preserve exact request and supplier quote provenance", async () => {
@@ -368,5 +383,5 @@ test("organizer has bounded OpenAI deadlines and the server action only enqueues
   expect(actions).not.toContain("Promise.race([invocation, deadline])")
   expect(actions).not.toContain("material_organization_timeout")
   expect(scheduler).toContain('after(async () =>')
-  expect(scheduler).toContain('"enqueue_client_material_list_job"')
+  expect(scheduler).toContain('"enqueue_client_material_list_job_for_requester"')
 })

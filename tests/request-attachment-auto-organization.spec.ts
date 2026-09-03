@@ -22,7 +22,7 @@ test("adding files to an existing request schedules one safe forced reorganizati
   expect(actions).toContain('organizationStatus = "not_scheduled"')
   expect(actions).toContain("Existing request attachment organization scheduling failed")
   expect(scheduler).toContain('after(async () =>')
-  expect(scheduler).toContain('"enqueue_client_material_list_job"')
+  expect(scheduler).toContain('"enqueue_client_material_list_job_for_requester"')
   expect(scheduler).toContain('"client-material-list-worker"')
   expect(scheduler).toContain("const force = input.force === true")
   expect(organizer).toContain('ai_organization_status === "processing"')

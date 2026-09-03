@@ -81,15 +81,26 @@ test("Next actions persist the job before returning and only nudge the worker af
     source("app/admin/users/actions.ts"),
   ])
 
-  const enqueueAt = scheduler.indexOf('admin.rpc("enqueue_client_material_list_job"')
+  const enqueueAt = scheduler.indexOf('requester.rpc("enqueue_client_material_list_job_for_requester"')
   const afterAt = scheduler.indexOf("after(async () =>")
   expect(enqueueAt).toBeGreaterThan(0)
   expect(afterAt).toBeGreaterThan(enqueueAt)
   expect(scheduler).toContain('>("client-material-list-worker"')
   expect(scheduler).toContain("invokeDirectFallback")
+  expect(scheduler).toContain("client_material_list_worker_nudge_not_scheduled")
   expect(requestActions).toContain("await scheduleClientMaterialListOrganization({ requestId, force: true })")
   expect(managerActions).toContain("await scheduleClientMaterialListOrganization({ requestId: String(requestId) })")
   expect(requestActions).not.toContain("material_organization_timeout")
+})
+
+test("authenticated owners and staff can queue durable organization without a service-role browser path", async () => {
+  const migration = await source("supabase/migrations/20260903225000_fix_staff_request_workflow.sql")
+
+  expect(migration).toContain("enqueue_client_material_list_job_for_requester")
+  expect(migration).toContain("request.owner_id = (select auth.uid())")
+  expect(migration).toContain("private.is_admin_or_staff()")
+  expect(migration).toContain("to authenticated")
+  expect(migration).not.toContain("to anon")
 })
 
 test("public intake durably enqueues before its non-blocking worker nudge", async () => {
