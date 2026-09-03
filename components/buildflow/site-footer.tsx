@@ -16,6 +16,50 @@ export function SiteFooter() {
 
   if (pathname && (HIDDEN_PATHS.has(pathname) || pathname.startsWith("/admin"))) return null
 
+  if (pathname === "/homepage-review") {
+    return (
+      <ShopTranslationBoundary>
+        <footer className="border-t border-white/10 bg-[#030507] px-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-7 text-white sm:px-8 sm:pb-7 sm:pt-9">
+          <div className="mx-auto max-w-[88rem]">
+            <div className="flex flex-col justify-between gap-5 border-b border-white/15 pb-6 sm:flex-row sm:items-end">
+              <div>
+                <Link href="/" aria-label="Avantia home" className="inline-flex [&_img]:brightness-0 [&_img]:invert">
+                  <AvantiaBuildLockup header />
+                </Link>
+                <p className="mt-3 max-w-md text-xl font-semibold leading-[1.02] tracking-[-0.04em] sm:text-3xl">You build. We handle the materials.</p>
+                <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.18em] text-white/45">Plans · Pricing · Ordering · Delivery</p>
+              </div>
+              <nav aria-label="Avantia contact" className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] gap-1.5 sm:w-auto sm:min-w-[34rem]">
+                <a href="mailto:office@build.avantiap.com" className="flex min-h-10 min-w-0 items-center justify-between border border-white/25 px-3 text-[11px] font-bold transition-colors hover:border-white hover:bg-white hover:text-black">
+                  <span className="inline-flex min-w-0 items-center gap-2"><Mail className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="truncate">office@build.avantiap.com</span></span><span aria-hidden="true">↗</span>
+                </a>
+                  <a href="tel:+15169088319" aria-label="Call or text (516) 908-8319" className="inline-flex min-h-10 items-center gap-2 border border-white/25 px-3 text-[11px] font-bold transition-colors hover:border-white hover:bg-white hover:text-black">
+                    <Phone className="h-4 w-4" aria-hidden="true" /><span>(516) 908-8319</span>
+                  </a>
+                  <a href={BUSINESS_WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="WhatsApp us" className="inline-flex h-10 w-10 items-center justify-center border border-white/25 text-white transition-colors hover:border-white hover:bg-white hover:text-black">
+                    <WhatsAppIcon className="h-5 w-5" />
+                  </a>
+              </nav>
+            </div>
+            <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <nav aria-label="Policies" className="flex max-w-full flex-nowrap gap-5 overflow-x-auto whitespace-nowrap pb-1 text-[9px] font-bold uppercase tracking-[0.1em] text-white/48 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <Link href="/privacy" className="transition hover:text-white">Privacy</Link>
+                <Link href="/terms" className="transition hover:text-white">Terms</Link>
+                <Link href="/returns" className="transition hover:text-white">Returns</Link>
+                <Link href="/delivery-policy" className="transition hover:text-white">Delivery</Link>
+                <Link href="/affiliate-disclosure" className="transition hover:text-white">Affiliate Disclosure</Link>
+                <Link href="/how-we-select-materials" className="transition hover:text-white">Material Selection</Link>
+                <Link href="/accessibility" className="transition hover:text-white">Accessibility</Link>
+                <Link href="/shop#shop-faq" className="transition hover:text-white">Ordering FAQ</Link>
+              </nav>
+              <p className="shrink-0 text-[9px] font-bold uppercase tracking-[0.14em] text-white/35">Serving all 50 states</p>
+            </div>
+          </div>
+        </footer>
+      </ShopTranslationBoundary>
+    )
+  }
+
   return (
     <ShopTranslationBoundary><footer className="border-t border-slate-200 bg-[#eef3f8] px-4 pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-6 sm:pt-6">
       <div className="mx-auto max-w-[88rem] rounded-[18px] border border-slate-200 bg-white px-5 py-4 shadow-[0_10px_30px_rgba(7,17,38,0.05)] sm:px-6">
