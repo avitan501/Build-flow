@@ -2,8 +2,9 @@ import "server-only";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import { storeAuraCommunication } from "@/lib/aura/communications";
+import { storeAuraCommunication, updateAuraCommunicationMedia } from "@/lib/aura/communications";
 import { autoLinkAuraEmail } from "@/lib/aura/email-links";
+import { persistAuraResendAttachments } from "@/lib/aura/resend-attachments";
 
 type ResendReceivedEvent = {
   type?: string;
@@ -90,11 +91,19 @@ export async function storeAuraResendEvent(payload: unknown) {
     body: [body, attachmentNames.length ? `Attachments: ${attachmentNames.join(", ")}` : ""].filter(Boolean).join("\n\n"),
     status: "received",
     occurredAt: event.data.created_at || event.created_at,
-    media: (event.data.attachments || []).map((attachment) => ({ type: attachment.content_type })),
+    media: [],
     mailboxAddress: event.data.to?.[0] || email.to?.[0] || null,
     messageId,
     inReplyTo,
   });
   await autoLinkAuraEmail({ communicationId, counterpartyEmail, subject: event.data.subject, inReplyTo });
+  if (event.data.attachments?.length) {
+    const media = await persistAuraResendAttachments({
+      apiKey,
+      emailId: event.data.email_id,
+      communicationId,
+    });
+    await updateAuraCommunicationMedia(communicationId, media);
+  }
   return true;
 }

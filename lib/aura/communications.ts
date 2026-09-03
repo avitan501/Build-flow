@@ -18,7 +18,7 @@ type CommunicationInput = {
   subject?: string | null;
   body?: string | null;
   status?: string | null;
-  media?: Array<{ url?: string; type?: string; duration?: number }>;
+  media?: Array<{ url?: string; type?: string; name?: string; size?: number; storagePath?: string; providerAttachmentId?: string; duration?: number }>;
   occurredAt?: string;
   mailboxAddress?: string | null;
   messageId?: string | null;
@@ -79,6 +79,17 @@ export async function updateAuraCommunicationStatus(
     .eq("provider", provider)
     .eq("external_activity_id", externalActivityId);
   if (error) throw new Error(`Unable to update Aura communication: ${error.message}`);
+}
+
+export async function updateAuraCommunicationMedia(
+  communicationId: string,
+  media: NonNullable<CommunicationInput["media"]>,
+) {
+  const { error } = await createAdminClient()
+    .from("aura_communications")
+    .update({ media })
+    .eq("id", communicationId);
+  if (error) throw new Error(`Unable to save Aura communication attachments: ${error.message}`);
 }
 
 function quoConfig() {

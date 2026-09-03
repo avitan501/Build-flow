@@ -66,7 +66,7 @@ export type AuraCommunicationRow = {
   summary: string | null;
   transcript: string | null;
   next_steps: string[];
-  media: Array<{ url?: string; type?: string; duration?: number }>;
+  media: Array<{ url?: string; type?: string; name?: string; size?: number; storagePath?: string; providerAttachmentId?: string; duration?: number }>;
   status: string | null;
   duration_seconds: number | null;
   occurred_at: string;
@@ -95,7 +95,7 @@ export function normalizeAuraCommunications(rows: unknown[] | null | undefined):
     return {
       ...row,
       next_steps: jsonArray<string>(row.next_steps),
-      media: jsonArray<{ url?: string; type?: string; duration?: number }>(row.media),
+      media: jsonArray<{ url?: string; type?: string; name?: string; size?: number; storagePath?: string; providerAttachmentId?: string; duration?: number }>(row.media),
       links: jsonArray<AuraCommunicationLink>(row.links),
     };
   });

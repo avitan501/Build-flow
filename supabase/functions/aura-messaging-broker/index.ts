@@ -413,6 +413,105 @@ function stripEmailHtml(value: string) {
     .trim();
 }
 
+const RESEND_ATTACHMENT_BUCKET = "supplier-quotes";
+const RESEND_ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
+const RESEND_ATTACHMENT_MAX_COUNT = 10;
+const RESEND_ATTACHMENT_TYPES = new Set([
+  "application/pdf",
+  "text/csv",
+  "text/plain",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+function safeResendAttachmentName(value: unknown) {
+  return (typeof value === "string" ? value.trim() : "")
+    .normalize("NFC")
+    .replace(/[\\/\u0000-\u001f\u007f]/g, "_")
+    .slice(0, 220) || "attachment";
+}
+
+function resendAttachmentStorageName(value: string) {
+  return value.normalize("NFKD").replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_").slice(-180) || "attachment";
+}
+
+function trustedResendAttachmentUrl(value: unknown) {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === "inbound-cdn.resend.com";
+  } catch {
+    return false;
+  }
+}
+
+async function persistResendAttachments(params: {
+  apiKey: string;
+  emailId: string;
+  communicationId: string;
+}) {
+  const response = await fetch(
+    `https://api.resend.com/emails/receiving/${encodeURIComponent(params.emailId)}/attachments`,
+    {
+      headers: { Authorization: `Bearer ${params.apiKey}` },
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+  if (!response.ok) throw new Error("Unable to retrieve received email attachments");
+  const payload = await response.json() as { data?: unknown };
+  const candidates = Array.isArray(payload.data)
+    ? payload.data.slice(0, RESEND_ATTACHMENT_MAX_COUNT)
+    : [];
+  const attachments = candidates.map((value) => {
+    const item = (value || {}) as Record<string, unknown>;
+    const id = typeof item.id === "string" ? item.id.trim().slice(0, 160) : "";
+    const type = typeof item.content_type === "string"
+      ? item.content_type.trim().toLowerCase().slice(0, 160)
+      : "";
+    const size = Number(item.size);
+    const downloadUrl = typeof item.download_url === "string"
+      ? item.download_url.trim().slice(0, 4_000)
+      : "";
+    if (!id || !/^[a-zA-Z0-9_-]+$/.test(id) || !RESEND_ATTACHMENT_TYPES.has(type)) return null;
+    if (!Number.isSafeInteger(size) || size <= 0 || size > RESEND_ATTACHMENT_MAX_BYTES) return null;
+    if (!trustedResendAttachmentUrl(downloadUrl)) return null;
+    return { id, type, size, downloadUrl, name: safeResendAttachmentName(item.filename) };
+  }).filter((item): item is NonNullable<typeof item> => Boolean(item));
+  if (attachments.reduce((sum, item) => sum + item.size, 0) > RESEND_ATTACHMENT_MAX_BYTES)
+    throw new Error("Received email attachments exceed the safe total size");
+
+  const media: Array<{ url: string; type: string; name: string; size: number; storagePath: string; providerAttachmentId: string }> = [];
+  for (const attachment of attachments) {
+    const download = await fetch(attachment.downloadUrl, {
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!download.ok) throw new Error("Unable to download received email attachment");
+    const contentLength = Number(download.headers.get("content-length"));
+    if (Number.isFinite(contentLength) && contentLength > attachment.size)
+      throw new Error("Received email attachment size did not match its verified metadata");
+    const bytes = await download.arrayBuffer();
+    if (bytes.byteLength !== attachment.size || bytes.byteLength > RESEND_ATTACHMENT_MAX_BYTES)
+      throw new Error("Received email attachment size did not match its verified metadata");
+    const storagePath = `inbound-email/${params.communicationId}/${attachment.id}-${resendAttachmentStorageName(attachment.name)}`;
+    const { error } = await admin.storage.from(RESEND_ATTACHMENT_BUCKET).upload(storagePath, bytes, {
+      contentType: attachment.type,
+      upsert: true,
+    });
+    if (error) throw new Error("Unable to preserve received email attachment");
+    media.push({
+      url: `/api/aura/attachments/${params.communicationId}/${attachment.id}`,
+      type: attachment.type,
+      name: attachment.name,
+      size: attachment.size,
+      storagePath,
+      providerAttachmentId: attachment.id,
+    });
+  }
+  return media;
+}
+
 async function handleResendWebhook(req: Request) {
   const rawBody = await req.text();
   const webhookSecret = Deno.env.get("AURA_RESEND_WEBHOOK_SECRET") || "";
@@ -506,7 +605,7 @@ async function handleResendWebhook(req: Request) {
       .filter(Boolean)
       .join("\n\n"),
     status: "received",
-    media: attachments.map((item) => ({ type: item.content_type })),
+    media: [],
     occurredAt: event.data.created_at || event.created_at,
     mailboxAddress: event.data.to?.[0] || email.to?.[0] || null,
     messageId,
@@ -543,6 +642,18 @@ async function handleResendWebhook(req: Request) {
     where left(lower(request.id::text), 8) = ${requestPrefix}
     on conflict (communication_id, entity_type, entity_id) do nothing
   `;
+  if (attachments.length) {
+    const media = await persistResendAttachments({
+      apiKey,
+      emailId: event.data.email_id,
+      communicationId,
+    });
+    await sql`
+      update public.aura_communications
+      set media = ${sql.json(media)}, updated_at = now()
+      where id = ${communicationId}::uuid
+    `;
+  }
   return json({ ok: true });
 }
 
@@ -682,7 +793,7 @@ async function storeCommunication(input: {
   subject?: string | null;
   body: string | null;
   status: string;
-  media?: Array<{ url?: string; type?: string; duration?: number }>;
+  media?: Array<{ url?: string; type?: string; name?: string; size?: number; storagePath?: string; providerAttachmentId?: string; duration?: number }>;
   summary?: string | null;
   transcript?: string | null;
   nextSteps?: string[];
