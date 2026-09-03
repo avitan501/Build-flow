@@ -93,6 +93,8 @@ test("approved staff use a compact manager workspace without owner-only controls
   expect(shell).toContain('link={{ href: "/admin/communications", label: "Communications", shortLabel: "Communication"')
   expect(settings).toContain("Connection credentials and owner delivery tests remain restricted to David.")
   expect(settings).toContain("checkCommunicationConnectionsAction")
+  expect(settings).toContain("Website direct email")
+  expect(settings).toContain("Supabase email fallback")
   expect(traffic).toContain('requireStaffProfile("traffic")')
   expect(traffic).toContain('action: "website_traffic"')
   expect(broker).toContain('input.action === "website_traffic"')

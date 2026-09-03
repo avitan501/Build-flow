@@ -22,7 +22,7 @@ function deliveryClass(status?: string) {
 
 type ConnectionStatus = "connected" | "not-connected";
 
-export default async function AdminSettingsPage({ searchParams }: { searchParams: Promise<{ owner?: DeliveryStatus; client?: DeliveryStatus; clientReason?: "domain" | "provider"; check?: "complete" | "failed"; quo?: ConnectionStatus; whatsapp?: ConnectionStatus; email?: ConnectionStatus }> }) {
+export default async function AdminSettingsPage({ searchParams }: { searchParams: Promise<{ owner?: DeliveryStatus; client?: DeliveryStatus; clientReason?: "domain" | "provider"; check?: "complete" | "failed"; quo?: ConnectionStatus; whatsapp?: ConnectionStatus; websiteEmail?: ConnectionStatus; supabaseEmail?: ConnectionStatus }> }) {
   const { access } = await requireManagerPortalProfile();
   const params = await searchParams;
   const ownerResult = deliveryLabel(params.owner);
@@ -37,13 +37,14 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
           <p className="mt-2 text-sm leading-6 text-slate-600">Check communication availability without exposing passwords or integration keys.</p>
         </div>
         <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5"><div><h2 className="font-bold">Communication connections</h2><p className="mt-1 text-xs text-slate-500">Live send or receive status from the secure broker.</p></div><form action={checkCommunicationConnectionsAction}><button type="submit" className="min-h-10 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white">Test connections</button></form></div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5"><div><h2 className="font-bold">Communication connections</h2><p className="mt-1 text-xs text-slate-500">Website and secure broker availability, without exposing credentials.</p></div><form action={checkCommunicationConnectionsAction}><button type="submit" className="min-h-10 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white">Test connections</button></form></div>
           {params.check ? <p role="status" className={`border-b px-4 py-3 text-sm font-semibold ${params.check === "complete" ? "border-emerald-100 bg-emerald-50 text-emerald-800" : "border-rose-100 bg-rose-50 text-rose-800"}`}>{params.check === "complete" ? "Connection check completed." : "The connection check could not complete."}</p> : null}
-          <div className="grid sm:grid-cols-3">{[
+          <div className="grid md:grid-cols-4">{[
             { key: "quo" as const, label: "Q U O", icon: PhoneCall },
             { key: "whatsapp" as const, label: "WhatsApp", icon: MessageCircle },
-            { key: "email" as const, label: "Email", icon: Mail },
-          ].map((item) => { const Icon = item.icon; const status = params[item.key]; return <div key={item.key} className="flex items-center gap-3 border-b border-slate-100 px-4 py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"><Icon className="h-5 w-5 text-[#0066cc]" /><div><p className="text-sm font-semibold">{item.label}</p><p className={`text-xs font-semibold ${status === "connected" ? "text-emerald-700" : status === "not-connected" ? "text-amber-700" : "text-slate-500"}`}>{status === "connected" ? "Connected" : status === "not-connected" ? "Not connected" : "Press Test connections"}</p></div></div>; })}</div>
+            { key: "websiteEmail" as const, label: "Website direct email", icon: Mail },
+            { key: "supabaseEmail" as const, label: "Supabase email fallback", icon: Mail },
+          ].map((item) => { const Icon = item.icon; const status = params[item.key]; return <div key={item.key} className="flex items-center gap-3 border-b border-slate-100 px-4 py-4 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0"><Icon className="h-5 w-5 text-[#0066cc]" /><div><p className="text-sm font-semibold">{item.label}</p><p className={`text-xs font-semibold ${status === "connected" ? "text-emerald-700" : status === "not-connected" ? "text-amber-700" : "text-slate-500"}`}>{status === "connected" ? "Connected" : status === "not-connected" ? "Not connected" : "Press Test connections"}</p></div></div>; })}</div>
         </section>
         {ownerResult || clientResult ? (
           <div className="mt-6 grid gap-2 sm:grid-cols-2" role="status" aria-live="polite">

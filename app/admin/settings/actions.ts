@@ -51,10 +51,12 @@ export async function checkCommunicationConnectionsAction() {
     connections?: Record<"quo" | "whatsapp" | "email", { receive: boolean; send: boolean }>;
   }>("aura-messaging-broker", { body: { action: "dashboard" } });
   const params = new URLSearchParams();
-  for (const channel of ["quo", "whatsapp", "email"] as const) {
+  for (const channel of ["quo", "whatsapp"] as const) {
     const connection = result.data?.connections?.[channel];
     params.set(channel, connection?.send || connection?.receive ? "connected" : "not-connected");
   }
+  params.set("websiteEmail", process.env.RESEND_API_KEY ? "connected" : "not-connected");
+  params.set("supabaseEmail", result.data?.connections?.email?.send ? "connected" : "not-connected");
   if (result.error || !result.data?.ok) params.set("check", "failed");
   else params.set("check", "complete");
   redirect(`/admin/settings?${params.toString()}`);

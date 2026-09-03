@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto"
 import { revalidatePath } from "next/cache"
 
 import { sendManagerClientReplyEmail } from "@/lib/cart-submission-email"
+import { deliverEmailWithSupabaseFallback } from "@/lib/email-delivery-fallback"
 import { requireStaffProfile } from "@/lib/auth"
 import { scheduleClientMaterialListOrganization } from "@/lib/material-request-organization"
 import { buildProjectUploadStoragePath, PROJECT_UPLOAD_ALLOWED_MIME_TYPES, PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/projects"
@@ -516,21 +517,14 @@ export async function sendClientReplyAction(formData: FormData): Promise<ReplyRe
     items: emailItems,
     attachment: attachmentPayload,
   }
-  const directResult = await sendManagerClientReplyEmail(emailInput)
-  let sent = directResult.status === "sent"
-  let providerId = directResult.status === "sent" ? directResult.providerId : null
-  let deliveryError = directResult.status === "failed" ? directResult.error : "Website email is not configured."
-
-  if (!sent && directResult.status !== "skipped") {
-    const { data: fallback, error: fallbackError } = await supabase.functions.invoke<{ ok?: boolean; providerId?: string | null; error?: string }>("send-supplier-quote", {
+  const delivery = await deliverEmailWithSupabaseFallback(
+    () => sendManagerClientReplyEmail(emailInput),
+    () => supabase.functions.invoke<{ ok?: boolean; providerId?: string | null; error?: string }>("send-supplier-quote", {
       body: { action: "send_client_reply", requestId: request.id, message, items: emailItems, attachment: attachmentPayload },
-    })
-    sent = !fallbackError && Boolean(fallback?.ok)
-    providerId = fallback?.providerId || null
-    deliveryError = fallback?.error || fallbackError?.message || deliveryError
-  }
+    }),
+  )
 
-  if (sent) {
+  if (delivery.status === "sent") {
     await supabase.from("project_events").insert({
       project_id: request.project_id,
       owner_id: request.owner_id,
@@ -538,12 +532,12 @@ export async function sendClientReplyAction(formData: FormData): Promise<ReplyRe
       source: "admin",
       title: "Reply emailed to client",
       description: message.slice(0, 2000),
-      metadata: { quote_request_id: request.id, client_action: "email_reply", attachment_name: attachment?.name || null },
+      metadata: { quote_request_id: request.id, client_action: "email_reply", attachment_name: attachment?.name || null, email_route: delivery.route },
     })
-    return { ok: true, providerId }
+    return { ok: true, providerId: delivery.providerId }
   }
-  if (directResult.status === "skipped") return { ok: false, error: "Email was not sent." }
-  return { ok: false, error: deliveryError }
+  if (delivery.status === "skipped") return { ok: false, error: "Email was not sent." }
+  return { ok: false, error: delivery.status === "failed" ? delivery.error : "Email delivery is not configured." }
 }
 
 export async function scheduleRequestDeliveryAction(input: { requestId: string; date: string; startTime: string; durationHours: number; address: string }): Promise<DeliveryScheduleResult> {
@@ -742,17 +736,11 @@ export async function sendRequestClientQuoteAction(input: RequestClientQuoteInpu
     message,
     items: prepared.lines.map((line) => ({ name: line.description, quantity: line.quantity, unit: line.unit, details: [`Unit price: $${line.unitPrice.toFixed(2)}`] })),
   }
-  const direct = await sendManagerClientReplyEmail(emailInput)
-  let sent = direct.status === "sent"
-  let providerId = direct.status === "sent" ? direct.providerId : null
-  let deliveryError = direct.status === "failed" ? direct.error : "Website email is not configured."
-  if (!sent && direct.status !== "skipped") {
-    const { data: fallback, error } = await prepared.supabase.functions.invoke<{ ok?: boolean; providerId?: string | null; error?: string }>("send-supplier-quote", { body: { action: "send_client_reply", requestId: prepared.request.id, message, items: emailInput.items } })
-    sent = !error && Boolean(fallback?.ok)
-    providerId = fallback?.providerId || null
-    deliveryError = fallback?.error || error?.message || deliveryError
-  }
-  if (!sent) return { ok: false, error: direct.status === "skipped" ? "Email was not sent." : deliveryError }
+  const delivery = await deliverEmailWithSupabaseFallback(
+    () => sendManagerClientReplyEmail(emailInput),
+    () => prepared.supabase.functions.invoke<{ ok?: boolean; providerId?: string | null; error?: string }>("send-supplier-quote", { body: { action: "send_client_reply", requestId: prepared.request.id, message, items: emailInput.items } }),
+  )
+  if (delivery.status !== "sent") return { ok: false, error: delivery.status === "failed" ? delivery.error : "Email was not sent." }
 
   const { data: sentDocument, error: sentDocumentError } = await prepared.supabase
     .from("request_client_documents")
@@ -770,10 +758,10 @@ export async function sendRequestClientQuoteAction(input: RequestClientQuoteInpu
     source: "admin",
     title: `${label} ${prepared.quoteNumber} emailed to client`,
     description: message,
-    metadata: { quote_request_id: prepared.request.id, client_action: `${documentType}_sent`, document_type: documentType, document_number: sentDocument.document_number, document_public_token: sentDocument.public_token, document_version: sentDocument.version, share_url: saved.shareUrl, delivery_channel: "email" },
+    metadata: { quote_request_id: prepared.request.id, client_action: `${documentType}_sent`, document_type: documentType, document_number: sentDocument.document_number, document_public_token: sentDocument.public_token, document_version: sentDocument.version, share_url: saved.shareUrl, delivery_channel: "email", email_route: delivery.route },
   })
   if (eventError) return { ok: false, error: `${label} was emailed, but its activity history could not be saved.` }
-  return { ok: true, providerId, fileName, shareUrl: saved.shareUrl }
+  return { ok: true, providerId: delivery.providerId, fileName, shareUrl: saved.shareUrl }
 }
 
 export async function recordRequestClientDocumentSentAction(input: { requestId: string; documentType: RequestClientDocumentType; documentNumber: string; channel: "sms" | "whatsapp" }) {

@@ -2,6 +2,7 @@ import type { ProfileRecord } from "@/lib/auth"
 import type { ProjectRecord } from "@/lib/projects"
 import type { ShopCartItemDetails, ShopCustomCartItem } from "@/lib/shop-cart"
 import { CREDIT_CARD_PROCESSING_TERM } from "@/lib/proposal-terms"
+import type { EmailDeliveryAttempt } from "@/lib/email-delivery-fallback"
 
 type QuoteItemForEmail = {
   name: string
@@ -26,11 +27,7 @@ export type CartSubmissionEmailInput = {
   total: number
 }
 
-export type EmailDeliveryResult =
-  | { status: "sent"; providerId: string | null }
-  | { status: "not_configured" }
-  | { status: "skipped" }
-  | { status: "failed"; error: string }
+export type EmailDeliveryResult = EmailDeliveryAttempt
 
 export type CartSubmissionEmailResult = {
   status: "sent" | "not_configured" | "failed"
@@ -611,52 +608,42 @@ export async function sendManagerClientReplyEmail(input: ManagerClientReplyEmail
     ${renderRequestedItemsHtml(input.items)}
   `)
 
-  if (apiKey) {
-    const directResult = await sendEmail({
-      apiKey,
-      from,
-      to: input.recipientEmail,
-      subject,
-      html,
-      text,
-      replyTo: COMPANY_EMAIL,
-      idempotencyKey: `avantia-manager-reply-${input.requestId}-${crypto.randomUUID()}`,
-      attachments: input.attachment ? [input.attachment] : undefined,
-    })
-    if (directResult.status === "sent") {
-      try {
-        const [{ storeAuraCommunication }, { addAuraCommunicationLinks }] = await Promise.all([
-          import("@/lib/aura/communications"),
-          import("@/lib/aura/email-links"),
-        ])
-        const communicationId = await storeAuraCommunication({
-          provider: "manual",
-          channel: "email",
-          externalActivityId: directResult.providerId || `email-out-${crypto.randomUUID()}`,
-          direction: "outgoing",
-          counterpartyEmail: input.recipientEmail,
-          subject,
-          body: input.message,
-          status: "sent",
-          mailboxAddress: COMPANY_EMAIL,
-        })
-        await addAuraCommunicationLinks([communicationId], [{ entity_type: "material_request", entity_id: input.requestId, entity_label: input.requestTitle, link_source: "manual", confidence: 1 }])
-      } catch {
-        // Email delivery succeeded; inbox indexing can be recovered from the provider webhook.
-      }
-      return directResult
-    }
-    if (input.attachment) return directResult
-  }
+  if (!apiKey) return { status: "not_configured" }
 
-  if (input.attachment) return { status: "not_configured" }
-
-  const fallback = await sendWithSupabaseEmailFallback("send_manager_reply", {
-    requestId: input.requestId,
-    message: input.message,
-    items: input.items,
+  const directResult = await sendEmail({
+    apiKey,
+    from,
+    to: input.recipientEmail,
+    subject,
+    html,
+    text,
+    replyTo: COMPANY_EMAIL,
+    idempotencyKey: `avantia-manager-reply-${input.requestId}-${crypto.randomUUID()}`,
+    attachments: input.attachment ? [input.attachment] : undefined,
   })
-  return fallback.result ?? { status: "failed", error: "Website email could not be sent." }
+  if (directResult.status !== "sent") return directResult
+
+  try {
+    const [{ storeAuraCommunication }, { addAuraCommunicationLinks }] = await Promise.all([
+      import("@/lib/aura/communications"),
+      import("@/lib/aura/email-links"),
+    ])
+    const communicationId = await storeAuraCommunication({
+      provider: "manual",
+      channel: "email",
+      externalActivityId: directResult.providerId || `email-out-${crypto.randomUUID()}`,
+      direction: "outgoing",
+      counterpartyEmail: input.recipientEmail,
+      subject,
+      body: input.message,
+      status: "sent",
+      mailboxAddress: COMPANY_EMAIL,
+    })
+    await addAuraCommunicationLinks([communicationId], [{ entity_type: "material_request", entity_id: input.requestId, entity_label: input.requestTitle, link_source: "manual", confidence: 1 }])
+  } catch {
+    // Email delivery succeeded; inbox indexing can be recovered from the provider webhook.
+  }
+  return directResult
 }
 
 export async function sendClientRequestActionEmail(input: ClientRequestActionEmailInput): Promise<EmailDeliveryResult> {
