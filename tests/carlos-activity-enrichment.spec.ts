@@ -84,10 +84,10 @@ test("durations render consistently for message latency and completed calls", ()
 });
 
 test("send and call activity receipts include recipient, label, request, outcome, and duration", async () => {
-  const [auraActions, activityActions, softphone, timeline] = await Promise.all([
+  const [auraActions, activityActions, launcher, timeline] = await Promise.all([
     readFile(path.join(root, "app/owner/aura/actions.ts"), "utf8"),
     readFile(path.join(root, "app/admin/activity-actions.ts"), "utf8"),
-    readFile(path.join(root, "components/buildflow/two-chat-softphone.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/communication-call-launcher.tsx"), "utf8"),
     readFile(path.join(root, "app/admin/carlos-activity/page.tsx"), "utf8"),
   ]);
   for (const field of ["recipient", "label", "request_id", "request", "outcome", "duration_ms"]) {
@@ -96,8 +96,9 @@ test("send and call activity receipts include recipient, label, request, outcome
   for (const field of ["recipient", "label", "request_id", "request", "outcome", "duration_seconds"]) {
     expect(activityActions).toContain(field);
   }
-  expect(softphone).toContain('recordCallActivity(connectedAtRef.current ? "completed" : "no_answer")');
-  expect(softphone).toContain("durationSeconds");
+  expect(launcher).toContain("recordCommunicationActivityAction");
+  expect(launcher).toContain('outcome: "opened_on_device"');
+  expect(launcher).toContain("durationSeconds: 0");
   expect(timeline).toContain("Recipient, request, outcome, and duration");
   expect(timeline).toContain("summarizeManagerStaffActivity(events)");
 });

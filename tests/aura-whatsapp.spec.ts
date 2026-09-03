@@ -88,13 +88,13 @@ test("Aura webhook rejects unverified requests", async ({ request }) => {
   expect(unsignedTwoChatCallWebhook.status()).toBe(401);
 });
 
-test("2Chat browser calls keep secrets server-side and store recordings", async () => {
-  const [route, broker, actions, inbox, softphone] = await Promise.all([
+test("legacy 2Chat call webhooks stay protected while Communications uses the safe Q U O launcher", async () => {
+  const [route, broker, actions, inbox, launcher] = await Promise.all([
     readFile(path.join(process.cwd(), "app/api/aura/2chat/calls/route.ts"), "utf8"),
     readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
     readFile(path.join(process.cwd(), "app/owner/aura/actions.ts"), "utf8"),
     readFile(path.join(process.cwd(), "components/buildflow/unified-communication-inbox.tsx"), "utf8"),
-    readFile(path.join(process.cwd(), "components/buildflow/two-chat-softphone.tsx"), "utf8"),
+    readFile(path.join(process.cwd(), "components/buildflow/communication-call-launcher.tsx"), "utf8"),
   ]);
   expect(route).toContain("mode=2chat-call-webhook");
   expect(route).toContain('"x-avantia-2chat-token": token');
@@ -106,8 +106,12 @@ test("2Chat browser calls keep secrets server-side and store recordings", async 
   expect(broker).toContain("call.status.update");
   expect(broker).toContain("gpt-4o-mini-transcribe");
   expect(actions).toContain('action: "twochat_voice_token"');
-  expect(softphone).toContain('import("@2chat/voice-sdk")');
-  expect(inbox).toContain("Call from (347) 937-8665");
+  expect(launcher).toContain("communicationQuoCallHref");
+  expect(launcher).not.toContain('@2chat/voice-sdk');
+  expect(launcher).not.toContain("getTwoChatVoiceTokenAction");
+  expect(inbox).toContain("CommunicationCallLauncher");
+  expect(inbox).not.toContain("TwoChatSoftphone");
+  expect(inbox).toContain('title="Open call options"');
   expect(inbox).toContain("Save this number");
   expect(inbox).toContain("Link to an existing person instead");
   expect(broker).not.toContain('await sendTwilioWhatsApp(input.to, input.message');

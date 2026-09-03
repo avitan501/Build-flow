@@ -10,7 +10,7 @@ import {
   mergeCommunicationHistory,
 } from "@/lib/aura/communication-history"
 import type { AuraCustomerIdentity } from "@/lib/aura/identity"
-import { normalizeAuraEmail, normalizeAuraPhone } from "@/lib/aura/identity"
+import { normalizeCommunicationThread } from "@/lib/aura/phone-links"
 import { syncRecentTwilioWhatsAppMessages } from "@/lib/aura/twilio-whatsapp"
 import type { ShopQualificationSettings, SupplierRoutingOption } from "@/lib/shop-qualification"
 
@@ -63,8 +63,9 @@ export default async function CommunicationsPage({
   if (access.customers) after(() => syncRecentTwilioWhatsAppMessages().catch(() => null))
   const exactThread = String(requestedThread || "").trim().slice(0, 160)
   const exactCommunicationId = String(requestedCommunication || "").trim().slice(0, 64)
-  const exactPhone = normalizeAuraPhone(exactThread)
-  const exactEmail = normalizeAuraEmail(exactThread)
+  const exactThreadIdentity = normalizeCommunicationThread(exactThread)
+  const exactPhone = exactThreadIdentity?.phone ?? null
+  const exactEmail = exactThreadIdentity?.email ?? null
   const historyPromise = access.customers
     ? Promise.all([
         loadCommunicationHistoryPage({ pageSize: COMMUNICATION_HISTORY_PAGE_SIZE }, supabase),
