@@ -9,6 +9,7 @@ import { prepareQuoAttachmentMessageAction, sendAuraMessageAction, sendAuraMessa
 import { completeSmsReplyDraftAction, createSmsMaterialRequestAction, generateSmsReplyAction, linkCommunicationContactAction, linkEmailConversationAction, markCommunicationConversationReadAction, quickTagPhoneContactAction, reviewSmsRequestAction, saveSmsAutomationAction, type SmsReplyDraft, type SmsRequestProposal } from "@/app/admin/communications/actions"
 import { CommunicationCallLauncher } from "@/components/buildflow/communication-call-launcher"
 import { captureAvantiaEvent } from "@/lib/analytics/posthog-client"
+import { callerIdentityCandidateLabel, resolveCallerIdentity, type CallerIdentityCandidate, type CallerIdentityResolution } from "@/lib/aura/caller-identity"
 import { communicationHistoryCursor } from "@/lib/aura/communication-history-cursor"
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard"
 import { normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identity"
@@ -60,6 +61,8 @@ type Conversation = {
   latest: AuraCommunicationRow
   channels: AuraCommunicationRow["channel"][]
   unread: number
+  identityStatus: CallerIdentityResolution["status"]
+  identityCandidates: CallerIdentityCandidate[]
 }
 
 type CommunicationUpdatesResponse = {
@@ -387,33 +390,96 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     const entries: DirectoryEntry[] = [
       ...customers.map((item) => ({ key: `customer:${item.id}`, id: item.id, name: item.full_name || item.company_name || item.email || item.phone || "Unnamed customer", company: item.company_name || "", phone: item.phone || "", whatsapp: item.phone || "", email: item.email || "", kind: "customer" as const })),
       ...leads.map((item) => ({ key: `lead:${item.id}`, id: item.id, name: item.full_name || item.company_name || item.email || item.phone || "Unnamed lead", company: item.company_name || "", phone: item.phone || "", whatsapp: item.phone || "", email: item.email || "", kind: "lead" as const })),
-      ...suppliers.map((item) => ({ key: `supplier:${item.id}`, id: item.id, name: item.name || item.contactName || item.email || item.phone || "Unnamed supplier", company: item.contactName || item.contactLabel || "", phone: item.phone || "", whatsapp: item.whatsapp || "", email: item.email || "", kind: "supplier" as const })),
+      ...suppliers.map((item) => ({ key: `supplier:${item.id}`, id: item.id, name: item.contactName || item.name || item.email || item.phone || "Unnamed supplier", company: item.name || "", phone: item.phone || "", whatsapp: item.whatsapp || "", email: item.email || "", kind: "supplier" as const })),
       ...contacts.map((item) => ({ key: `contact:${item.id}`, id: item.id, name: item.full_name || item.company || item.email || item.normalized_phone || "Unnamed contact", company: item.company || "", phone: item.normalized_phone || "", whatsapp: item.normalized_phone || "", email: item.email || "", kind: "contact" as const })),
     ]
-    const alias = new Map<string, DirectoryEntry>()
-    for (const entry of entries) {
-      for (const value of [identityKey(entry.phone, null), identityKey(entry.whatsapp, null), identityKey(null, entry.email)]) {
-        if (value && !alias.has(value)) alias.set(value, entry)
-      }
-    }
+    const entryByKey = new Map(entries.map((entry) => [entry.key, entry]))
+    const contactTarget = new Map<string, DirectoryEntry>()
     for (const contact of contacts) {
       const match = contact.notes?.match(/^Avantia link:(customer|lead|supplier):([A-Za-z0-9_-]+)$/)
-      if (!match) continue
-      const target = entries.find((entry) => entry.kind === match[1] && entry.id === match[2])
-      if (!target) continue
-      for (const value of [identityKey(contact.normalized_phone, null), identityKey(null, contact.email)]) {
-        if (value) alias.set(value, target)
+      const target = match ? entryByKey.get(`${match[1]}:${match[2]}`) : undefined
+      if (target) contactTarget.set(contact.id, target)
+    }
+
+    const phoneCandidates: CallerIdentityCandidate[] = []
+    for (const entry of entries) {
+      const linkedTarget = entry.kind === "contact" ? contactTarget.get(entry.id) : undefined
+      const target = linkedTarget || entry
+      for (const phone of new Set([entry.phone, entry.whatsapp].filter(Boolean))) {
+        phoneCandidates.push({
+          canonicalKey: target.key,
+          id: target.id,
+          kind: target.kind,
+          name: target.name,
+          company: target.company,
+          phone,
+          source: linkedTarget ? "contact-link" : "directory",
+        })
+      }
+    }
+    for (const supplier of suppliers) {
+      for (const contact of supplier.additionalContacts ?? []) {
+        if (!contact.phone) continue
+        phoneCandidates.push({
+          canonicalKey: `supplier:${supplier.id}`,
+          id: supplier.id,
+          kind: "supplier",
+          name: contact.name || supplier.name,
+          company: supplier.name,
+          phone: contact.phone,
+          source: "directory",
+        })
       }
     }
     for (const communication of liveCommunications) {
-      const link = communication.links?.find((item) => ["client", "lead", "supplier"].includes(item.entity_type))
-      if (!link) continue
-      const kind = link.entity_type === "client" ? "customer" : link.entity_type
-      const target = entries.find((entry) => entry.kind === kind && entry.id === link.entity_id)
-      const rawKey = identityKey(communication.counterparty_phone, communication.counterparty_email)
-      if (target && rawKey) alias.set(rawKey, target)
+      const phone = normalizeAuraPhone(communication.counterparty_phone)
+      if (!phone) continue
+      for (const link of communication.links ?? []) {
+        if (!["client", "lead", "supplier"].includes(link.entity_type)) continue
+        const kind = link.entity_type === "client" ? "customer" : link.entity_type as ContactKind
+        const canonicalKey = `${kind}:${link.entity_id}`
+        const target = entryByKey.get(canonicalKey)
+        phoneCandidates.push({
+          canonicalKey,
+          id: link.entity_id,
+          kind,
+          name: target?.name || link.entity_label,
+          company: target?.company || "",
+          phone,
+          source: "communication-link",
+        })
+      }
     }
-    return { entries, alias }
+
+    const alias = new Map<string, DirectoryEntry>()
+    for (const entry of entries) {
+      const emailKey = identityKey(null, entry.email)
+      if (emailKey && !alias.has(emailKey)) alias.set(emailKey, entry)
+    }
+    const phoneResolutions = new Map<string, CallerIdentityResolution>()
+    for (const candidate of phoneCandidates) {
+      const phone = normalizeAuraPhone(candidate.phone)
+      if (phone && !phoneResolutions.has(phone)) phoneResolutions.set(phone, resolveCallerIdentity(phone, phoneCandidates))
+    }
+    for (const communication of liveCommunications) {
+      const phone = normalizeAuraPhone(communication.counterparty_phone)
+      if (phone && !phoneResolutions.has(phone)) phoneResolutions.set(phone, resolveCallerIdentity(phone, phoneCandidates))
+    }
+    for (const [phone, resolution] of phoneResolutions) {
+      if (resolution.status !== "verified" || !resolution.primary) continue
+      const target = entryByKey.get(resolution.primary.canonicalKey) || {
+        key: resolution.primary.canonicalKey,
+        id: resolution.primary.id,
+        name: resolution.primary.name,
+        company: resolution.primary.company || "",
+        phone,
+        whatsapp: phone,
+        email: "",
+        kind: resolution.primary.kind,
+      }
+      alias.set(phone, target)
+    }
+    return { entries, alias, phoneResolutions }
   }, [contacts, customers, leads, suppliers, liveCommunications])
 
   const conversations = useMemo(() => {
@@ -429,17 +495,24 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       const latest = ordered[ordered.length - 1]
       const rawKey = identityKey(latest.counterparty_phone, latest.counterparty_email)
       const entry = directory.entries.find((item) => item.key === key) || directory.alias.get(rawKey)
+      const phone = normalizeAuraPhone(latest.counterparty_phone)
+      const resolution = phone ? directory.phoneResolutions.get(phone) || resolveCallerIdentity(phone, []) : null
+      const verified = resolution?.status === "verified" ? resolution.primary : null
+      const unknownName = latest.channel === "call" ? "Unknown caller" : latest.direction === "incoming" ? "Unknown sender" : "Unknown contact"
+      const ambiguousName = latest.channel === "call" ? "Ambiguous caller" : "Ambiguous sender"
       return {
         key,
-        name: entry?.name || latest.counterparty_phone || latest.counterparty_email || "Unknown contact",
-        company: entry?.company || "",
-        phone: entry?.phone || latest.counterparty_phone || "",
+        name: resolution?.status === "ambiguous" ? ambiguousName : verified?.name || entry?.name || latest.counterparty_email || unknownName,
+        company: resolution?.status === "ambiguous" ? `${resolution.candidates.length} exact matches` : verified?.company || entry?.company || "",
+        phone: phone || entry?.phone || latest.counterparty_phone || "",
         email: entry?.email || latest.counterparty_email || "",
-        kind: entry?.kind || "contact",
+        kind: verified?.kind || entry?.kind || "contact",
         messages: ordered,
         latest,
         channels: [...new Set(ordered.map((item) => item.channel))],
         unread: ordered.filter((item) => item.direction === "incoming" && !item.read_at).length,
+        identityStatus: resolution?.status || "unknown",
+        identityCandidates: resolution?.candidates || [],
       } satisfies Conversation
     }).sort((left, right) => Date.parse(right.latest.occurred_at) - Date.parse(left.latest.occurred_at))
   }, [channelFilter, liveCommunications, directory])
@@ -449,11 +522,13 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
     return conversations.filter((conversation) => {
       if (contactFilter !== "all" && conversation.kind !== contactFilter) return false
       if (!needle) return true
-      return [conversation.name, conversation.company, conversation.phone, conversation.email, ...conversation.messages.map(messageText)].some((value) => value.toLowerCase().includes(needle))
+      return [conversation.name, conversation.company, conversation.phone, conversation.email, ...conversation.identityCandidates.map(callerIdentityCandidateLabel), ...conversation.messages.map(messageText)].some((value) => value.toLowerCase().includes(needle))
     })
   }, [contactFilter, conversations, query])
 
-  const activeConversation = conversations.find((conversation) => conversation.key === activeKey) || (activeKey !== "__new__" ? conversations[0] : undefined)
+  const activeConversation = conversations.find((conversation) => conversation.key === activeKey)
+    || (initialCommunicationId ? conversations.find((conversation) => conversation.messages.some((message) => message.id === initialCommunicationId)) : undefined)
+    || (activeKey !== "__new__" ? conversations[0] : undefined)
   const recipientOptions = directory.entries.filter((entry) => entry.kind === recipientType)
   const selectedChannelReady = channel === "call" || (channel === "sms" ? connections.quo.send : channel === "whatsapp" ? connections.whatsapp.send : connections.email.send)
   const activeThreadHistory = activeConversation ? threadHistory[activeConversation.key] : undefined
@@ -847,7 +922,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
           <label className="mt-2 block"><span className="sr-only">Filter channel</span><select value={channelFilter} onChange={(event) => changeChannelFilter(event.target.value)} className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold"><option value="all">All channels</option><option value="whatsapp">WhatsApp</option><option value="sms">Text</option><option value="email">Email</option><option value="call">Calls</option></select></label>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {filteredConversations.map((conversation) => <button key={conversation.key} type="button" onClick={() => openConversation(conversation)} className={`flex w-full items-start gap-3 border-b border-slate-100 px-3 py-3 text-left ${activeKey === conversation.key ? "bg-sky-50" : "hover:bg-slate-50"}`}><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">{initials(conversation.name)}</span><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><strong className={`truncate text-sm ${conversation.unread ? "font-black text-slate-950" : ""}`}>{conversation.name}</strong><span className="flex shrink-0 items-center gap-1.5">{conversation.unread ? <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#0071e3] px-1.5 py-0.5 text-[9px] font-black text-white" aria-label={`${conversation.unread} unread`}>{conversation.unread}</span> : null}<time className="text-[10px] text-slate-400">{formatTime(conversation.latest.occurred_at)}</time></span></span><span className="mt-0.5 flex items-center gap-1.5"><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${contactKindTone(conversation.kind)}`}>{contactKindLabel(conversation.kind)}</span>{conversation.channels.slice(0, 3).map((item) => <span key={item}>{channelIcon(item, "h-3 w-3")}</span>)}</span><span className={`mt-1 block truncate text-xs ${conversation.unread ? "font-semibold text-slate-800" : "text-slate-500"}`}>{messageText(conversation.latest)}</span></span></button>)}
+          {filteredConversations.map((conversation) => <button key={conversation.key} type="button" onClick={() => openConversation(conversation)} className={`flex w-full items-start gap-3 border-b border-slate-100 px-3 py-3 text-left ${activeKey === conversation.key ? "bg-sky-50" : "hover:bg-slate-50"}`}><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">{initials(conversation.name)}</span><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><strong className={`truncate text-sm ${conversation.unread ? "font-black text-slate-950" : ""}`}>{conversation.name}</strong><span className="flex shrink-0 items-center gap-1.5">{conversation.unread ? <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#0071e3] px-1.5 py-0.5 text-[9px] font-black text-white" aria-label={`${conversation.unread} unread`}>{conversation.unread}</span> : null}<time className="text-[10px] text-slate-400">{formatTime(conversation.latest.occurred_at)}</time></span></span>{conversation.company ? <span className={`mt-0.5 block truncate text-[10px] font-semibold ${conversation.identityStatus === "ambiguous" ? "text-amber-700" : "text-slate-500"}`}>{conversation.company}</span> : null}<span className="mt-0.5 flex items-center gap-1.5"><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${conversation.identityStatus === "ambiguous" ? "bg-amber-100 text-amber-800" : contactKindTone(conversation.kind)}`}>{conversation.identityStatus === "ambiguous" ? "Duplicate phone" : contactKindLabel(conversation.kind)}</span>{conversation.channels.slice(0, 3).map((item) => <span key={item}>{channelIcon(item, "h-3 w-3")}</span>)}{conversation.identityStatus !== "verified" && conversation.phone ? <span className="truncate text-[9px] font-semibold text-slate-500">{conversation.phone}</span> : null}</span><span className={`mt-1 block truncate text-xs ${conversation.unread ? "font-semibold text-slate-800" : "text-slate-500"}`}>{messageText(conversation.latest)}</span></span></button>)}
           {!filteredConversations.length ? <p className="p-6 text-center text-sm text-slate-500">No conversations found.</p> : null}
           {historyHasMore ? <div className="border-t border-slate-100 p-3"><button type="button" onClick={() => void loadOlderHistory("all")} disabled={historyLoading} className="h-9 w-full rounded-md border border-slate-300 bg-white text-[11px] font-bold text-slate-700 disabled:opacity-50">{historyLoading ? "Loading…" : "Load older conversations"}</button></div> : null}
           {historyError ? <p className="px-3 pb-3 text-center text-[10px] font-semibold text-rose-700">{historyError}</p> : null}
@@ -855,8 +930,9 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       </aside>
 
       <div className={`${threadVisible ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-col overflow-hidden bg-[#f5f5f7]`}>
-        {activeKey !== "__new__" && activeConversation?.phone && activeConversation.kind === "contact" ? <section className="shrink-0 border-b border-sky-200 bg-sky-50 px-3 py-2" aria-label="Add contact"><div className="flex min-w-0 items-center gap-2"><UserRound className="h-4 w-4 shrink-0 text-sky-700" /><span className="min-w-0 flex-1 truncate text-[11px] font-bold text-slate-800">Save this number</span>{([['customer', 'Customer'], ['lead', 'Lead'], ['supplier', 'Supplier']] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => quickTag(kind)} disabled={pending} className="h-7 shrink-0 rounded-full border border-sky-200 bg-white px-2 text-[10px] font-bold text-sky-900 disabled:opacity-50">{label}</button>)}</div></section> : null}
-        {activeKey === "__new__" ? <header className="shrink-0 border-b border-slate-200 bg-white p-3"><div className="flex items-center gap-2"><button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations"><ArrowLeft className="h-5 w-5" /></button><div><h2 className="font-bold">New conversation</h2><p className="text-xs text-slate-500">Choose a person and channel</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]"><select value={recipientType} onChange={(event) => { setRecipientType(event.target.value as Exclude<ContactKind, "contact">); setSelectedRecipientId(""); setRecipient("") }} className="h-10 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="customer">Customers</option><option value="lead">Leads</option><option value="supplier">Suppliers / Vendors</option></select><select value={selectedRecipientId} onChange={(event) => selectNewRecipient(event.target.value)} className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="">Choose a contact</option>{recipientOptions.map((item) => <option key={item.key} value={item.id}>{item.name}{item.company && item.company !== item.name ? ` · ${item.company}` : ""}</option>)}</select></div></header> : activeConversation ? <header className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5"><div className="flex items-center gap-3"><button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations"><ArrowLeft className="h-5 w-5" /></button><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold">{initials(activeConversation.name)}</span><div className="min-w-0 flex-1"><h2 className="truncate text-sm font-bold">{activeConversation.name}</h2><div className="mt-0.5 flex items-center gap-2"><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${contactKindTone(activeConversation.kind)}`}>{contactKindLabel(activeConversation.kind)}</span><span className="truncate text-[10px] text-slate-500">{activeConversation.phone || activeConversation.email}</span></div></div>{activeConversation.phone ? <button type="button" onClick={() => openConversationCall(activeConversation)} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white" aria-label={`Call ${activeConversation.name}`} title="Open call options"><Phone className="h-4 w-4" /></button> : null}</div>{activeConversation.phone ? <details className="mt-2 rounded-md border border-slate-200 bg-white"><summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 px-2.5 text-[10px] font-bold text-slate-700"><UserRound className="h-3.5 w-3.5 text-sky-700" /><span className="flex-1">{activeConversation.kind === "contact" ? "Save this number" : `${contactKindLabel(activeConversation.kind)} contact`}</span><span className="text-sky-700">{activeConversation.kind === "contact" ? "Add" : "Change"}</span></summary><div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 p-2"><span className="mr-1 text-[10px] font-bold text-slate-600">Save as</span>{([['customer', 'Customer'], ['lead', 'Lead'], ['supplier', 'Supplier']] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => quickTag(kind)} disabled={pending || activeConversation.kind === kind} className={`h-7 rounded-full border px-2.5 text-[10px] font-bold disabled:opacity-60 ${activeConversation.kind === kind ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-300 bg-white"}`}>{label}{activeConversation.kind === kind ? " ✓" : ""}</button>)}<details className="w-full border-t border-slate-100 pt-1"><summary className="cursor-pointer text-[10px] font-semibold text-sky-700">Link to an existing person instead</summary><div className="mt-2 flex gap-2"><select value={linkTarget} onChange={(event) => setLinkTarget(event.target.value)} className="h-9 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 text-xs"><option value="">Choose existing contact</option>{directory.entries.filter((entry) => entry.kind !== "contact").map((entry) => <option key={entry.key} value={entry.key}>{contactKindLabel(entry.kind)} · {entry.name}</option>)}</select><button type="button" onClick={linkConversation} disabled={!linkTarget || pending} className="h-9 rounded-md bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40">Link</button></div></details></div></details> : null}{activeConversation.phone ? <details className="mt-2 rounded-md bg-slate-50 p-1.5"><summary className="flex h-7 cursor-pointer list-none items-center gap-1.5 px-1 text-[10px] font-bold text-slate-700"><Bot className="h-3.5 w-3.5 text-sky-700" />AI replies · {smsAiMode === "off" ? "Off" : smsAiMode === "draft" ? "Drafts" : "Auto when safe"}<span className="ml-auto text-sky-700">Settings</span></summary><div className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-1.5"><select aria-label="AI reply mode" value={smsAiMode} onChange={(event) => setSmsAiMode(event.target.value as typeof smsAiMode)} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold"><option value="off">AI off</option><option value="draft">AI drafts</option><option value="auto_safe">Auto when safe</option></select><select aria-label="AI reply style" value={smsAiStyle} onChange={(event) => setSmsAiStyle(event.target.value as typeof smsAiStyle)} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-semibold"><option value="professional">Professional</option><option value="friendly">Friendly</option><option value="brief">Very brief</option></select><button type="button" onClick={saveSmsAiSettings} disabled={pending} className="h-8 rounded-md bg-slate-950 px-3 text-[10px] font-bold text-white disabled:opacity-40">Save AI</button></div></details> : null}</header> : null}
+        {activeKey !== "__new__" && activeConversation?.phone && activeConversation.identityStatus === "unknown" ? <section className="shrink-0 border-b border-sky-200 bg-sky-50 px-3 py-2" aria-label="Add contact"><div className="flex min-w-0 items-center gap-2"><UserRound className="h-4 w-4 shrink-0 text-sky-700" /><span className="min-w-0 flex-1 truncate text-[11px] font-bold text-slate-800">{activeConversation.latest.channel === "call" ? "Unknown caller" : "Unknown sender"} · save this number</span>{([['customer', 'Customer'], ['lead', 'Lead'], ['supplier', 'Supplier']] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => quickTag(kind)} disabled={pending} className="h-7 shrink-0 rounded-full border border-sky-200 bg-white px-2 text-[10px] font-bold text-sky-900 disabled:opacity-50">{label}</button>)}</div></section> : null}
+        {activeKey === "__new__" ? <header className="shrink-0 border-b border-slate-200 bg-white p-3"><div className="flex items-center gap-2"><button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations"><ArrowLeft className="h-5 w-5" /></button><div><h2 className="font-bold">New conversation</h2><p className="text-xs text-slate-500">Choose a person and channel</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]"><select value={recipientType} onChange={(event) => { setRecipientType(event.target.value as Exclude<ContactKind, "contact">); setSelectedRecipientId(""); setRecipient("") }} className="h-10 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="customer">Customers</option><option value="lead">Leads</option><option value="supplier">Suppliers / Vendors</option></select><select value={selectedRecipientId} onChange={(event) => selectNewRecipient(event.target.value)} className="h-10 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm"><option value="">Choose a contact</option>{recipientOptions.map((item) => <option key={item.key} value={item.id}>{item.name}{item.company && item.company !== item.name ? ` · ${item.company}` : ""}</option>)}</select></div></header> : activeConversation ? <header className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5"><div className="flex items-center gap-3"><button type="button" onClick={() => setMobileThreadOpen(false)} className="inline-flex h-9 w-9 items-center justify-center rounded-full md:hidden" aria-label="Back to conversations"><ArrowLeft className="h-5 w-5" /></button><span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold">{initials(activeConversation.name)}</span><div className="min-w-0 flex-1"><h2 className="truncate text-sm font-bold">{activeConversation.name}</h2><div className="mt-0.5 flex items-center gap-2"><span className={`rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${contactKindTone(activeConversation.kind)}`}>{contactKindLabel(activeConversation.kind)}</span><span className="truncate text-[10px] text-slate-500">{activeConversation.phone || activeConversation.email}</span></div></div>{activeConversation.phone ? <button type="button" onClick={() => openConversationCall(activeConversation)} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white" aria-label={`Call ${activeConversation.name}`} title={connections.voice?.send ? "Call from (347) 937-8665" : "Call from this device"}><Phone className="h-4 w-4" /></button> : null}</div>{activeConversation.phone ? <details className="mt-2 rounded-md border border-slate-200 bg-white"><summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 px-2.5 text-[10px] font-bold text-slate-700"><UserRound className="h-3.5 w-3.5 text-sky-700" /><span className="flex-1">{activeConversation.kind === "contact" ? "Save this number" : `${contactKindLabel(activeConversation.kind)} contact`}</span><span className="text-sky-700">{activeConversation.kind === "contact" ? "Add" : "Change"}</span></summary><div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 p-2"><span className="mr-1 text-[10px] font-bold text-slate-600">Save as</span>{([['customer', 'Customer'], ['lead', 'Lead'], ['supplier', 'Supplier']] as const).map(([kind, label]) => <button key={kind} type="button" onClick={() => quickTag(kind)} disabled={pending || activeConversation.kind === kind} className={`h-7 rounded-full border px-2.5 text-[10px] font-bold disabled:opacity-60 ${activeConversation.kind === kind ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-300 bg-white"}`}>{label}{activeConversation.kind === kind ? " ✓" : ""}</button>)}<details className="w-full border-t border-slate-100 pt-1"><summary className="cursor-pointer text-[10px] font-semibold text-sky-700">Link to an existing person instead</summary><div className="mt-2 flex gap-2"><select value={linkTarget} onChange={(event) => setLinkTarget(event.target.value)} className="h-9 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 text-xs"><option value="">Choose existing contact</option>{directory.entries.filter((entry) => entry.kind !== "contact").map((entry) => <option key={entry.key} value={entry.key}>{contactKindLabel(entry.kind)} · {entry.name}</option>)}</select><button type="button" onClick={linkConversation} disabled={!linkTarget || pending} className="h-9 rounded-md bg-slate-950 px-3 text-xs font-bold text-white disabled:opacity-40">Link</button></div></details></div></details> : null}{activeConversation.phone ? <details className="mt-2 rounded-md bg-slate-50 p-1.5"><summary className="flex h-7 cursor-pointer list-none items-center gap-1.5 px-1 text-[10px] font-bold text-slate-700"><Bot className="h-3.5 w-3.5 text-sky-700" />AI replies · {smsAiMode === "off" ? "Off" : smsAiMode === "draft" ? "Drafts" : "Auto when safe"}<span className="ml-auto text-sky-700">Settings</span></summary><div className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-1.5"><select aria-label="AI reply mode" value={smsAiMode} onChange={(event) => setSmsAiMode(event.target.value as typeof smsAiMode)} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold"><option value="off">AI off</option><option value="draft">AI drafts</option><option value="auto_safe">Auto when safe</option></select><select aria-label="AI reply style" value={smsAiStyle} onChange={(event) => setSmsAiStyle(event.target.value as typeof smsAiStyle)} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-semibold"><option value="professional">Professional</option><option value="friendly">Friendly</option><option value="brief">Very brief</option></select><button type="button" onClick={saveSmsAiSettings} disabled={pending} className="h-8 rounded-md bg-slate-950 px-3 text-[10px] font-bold text-white disabled:opacity-40">Save AI</button></div></details> : null}</header> : null}
+        {activeConversation?.identityStatus === "ambiguous" ? <section className="shrink-0 border-b border-amber-200 bg-amber-50 px-3 py-2" role="alert"><p className="text-[11px] font-bold text-amber-950">Duplicate phone number · no caller was selected automatically</p><p className="mt-0.5 text-[10px] leading-4 text-amber-800">{activeConversation.identityCandidates.map(callerIdentityCandidateLabel).join(" · ")} · {activeConversation.phone}</p></section> : activeConversation?.identityStatus === "verified" && activeConversation.company ? <section className="shrink-0 border-b border-slate-200 bg-white px-3 py-1.5"><p className="truncate text-[10px] font-semibold text-slate-600">Verified exact phone match · {activeConversation.company}</p></section> : null}
         {activeHasEmail && activeConversation ? <section className="shrink-0 border-b border-slate-200 bg-sky-50/70 px-3 py-2" aria-label="Email links"><div className="flex flex-wrap items-center gap-1.5">{activeEmailLinks.map((link) => <Link key={`${link.entity_type}:${link.entity_id}`} href={link.entity_type === "material_request" ? `/owner/materials/requests/${link.entity_id}` : link.entity_type === "supplier" ? `/admin/vendors?q=${encodeURIComponent(link.entity_label)}` : "/admin/users"} className="rounded-full border border-sky-200 bg-white px-2 py-1 text-[10px] font-bold text-sky-800">{link.entity_type === "material_request" ? "Request" : link.entity_type === "supplier" ? "Supplier" : link.entity_type === "client" ? "Client" : "Lead"} · {link.entity_label}</Link>)}{!activeEmailLinks.length ? <span className="text-[10px] font-semibold text-slate-500">Not linked yet</span> : null}</div><div className="mt-2 flex gap-2"><select value={emailLinkTarget} onChange={(event) => setEmailLinkTarget(event.target.value)} className="h-8 min-w-0 flex-1 rounded-md border border-sky-200 bg-white px-2 text-[11px] font-semibold"><option value="">Link email to…</option><optgroup label="Material requests">{materialRequests.map((request) => <option key={request.id} value={`material_request:${request.id}`}>{request.title} · {request.status}</option>)}</optgroup><optgroup label="Clients">{customers.map((client) => <option key={client.id} value={`client:${client.id}`}>{client.full_name || client.company_name || client.email}</option>)}</optgroup><optgroup label="Leads">{leads.map((lead) => <option key={lead.id} value={`lead:${lead.id}`}>{lead.full_name || lead.company_name || lead.email || lead.phone}</option>)}</optgroup><optgroup label="Suppliers">{suppliers.map((supplier) => <option key={supplier.id} value={`supplier:${supplier.id}`}>{supplier.name}</option>)}</optgroup></select><button type="button" onClick={linkEmailConversation} disabled={!emailLinkTarget || pending} className="h-8 rounded-md bg-slate-950 px-3 text-[11px] font-bold text-white disabled:opacity-40">Link</button></div></section> : null}
 
         {activeConversation?.phone ? <span className="sr-only">Add or change contact type</span> : null}

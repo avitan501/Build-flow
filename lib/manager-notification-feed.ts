@@ -1,3 +1,5 @@
+import { callerIdentityCandidateLabel, type CallerIdentityResolution } from "@/lib/aura/caller-identity";
+
 export type ManagerNotificationEventType =
   | "new_order"
   | "call_message"
@@ -15,6 +17,7 @@ export type ManagerNotificationEvent = {
   created_at: string;
   processed_at: string | null;
   read_at: string | null;
+  caller_identity?: CallerIdentityResolution | null;
 };
 
 export type ManagerNotificationCategory =
@@ -67,7 +70,7 @@ export function managerNotificationCategory(
   if (path.startsWith("/admin/goals-progress")) return "task";
   if (event.event_type === "test") return "system";
   if (event.event_type === "call_message") {
-    if (channel === "call" || /\bcall\b/.test(copy)) {
+    if (channel === "call" || (!channel && /\bcall\b/.test(copy))) {
       return /\bmissed\b|\bno answer\b/.test(copy)
         ? "missed_call"
         : "incoming_call";
@@ -98,6 +101,47 @@ export function managerNotificationCategoryLabel(
     delivery: "Delivery",
   };
   return labels[category];
+}
+
+export function withManagerCallerIdentity(
+  event: ManagerNotificationEvent,
+  resolution: CallerIdentityResolution,
+): ManagerNotificationEvent {
+  if (event.event_type !== "call_message" || !resolution.phone) return event;
+  const category = managerNotificationCategory(event);
+  if (!["incoming_call", "missed_call", "message"].includes(category)) return event;
+  const eventLabel = category === "missed_call" ? "Missed call" : category === "incoming_call" ? "Incoming call" : "Text message";
+  const party = category === "message" ? "sender" : "caller";
+  const detailedBody = (identity: string) => {
+    const original = event.body.trim();
+    return original && !identity.includes(original) ? `${identity} · ${original}` : identity;
+  };
+
+  if (resolution.status === "verified" && resolution.primary) {
+    const identity = resolution.primary.company && resolution.primary.company !== resolution.primary.name
+      ? `${resolution.primary.name} · ${resolution.primary.company}`
+      : resolution.primary.name;
+    return {
+      ...event,
+      title: `${eventLabel} from ${resolution.primary.name}`,
+      body: detailedBody(`${identity} · ${resolution.phone}`),
+      caller_identity: resolution,
+    };
+  }
+  if (resolution.status === "ambiguous") {
+    return {
+      ...event,
+      title: `${eventLabel} — ${resolution.candidates.length} exact phone matches`,
+      body: detailedBody(`${resolution.candidates.map(callerIdentityCandidateLabel).join(" · ")} · ${resolution.phone}`),
+      caller_identity: resolution,
+    };
+  }
+  return {
+    ...event,
+    title: `${eventLabel} from Unknown ${party}`,
+    body: detailedBody(resolution.phone),
+    caller_identity: resolution,
+  };
 }
 
 export function summarizeManagerNotifications(

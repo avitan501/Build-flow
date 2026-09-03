@@ -17,7 +17,7 @@ test("manager push notifications stay private and cover business events", async 
     readFile(path.join(root, "supabase/migrations/20260824011214_add_manager_web_push_notifications.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260824022900_harden_manager_web_push_delivery.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260902173000_fix_manager_communication_notifications.sql"), "utf8"),
-    readFile(path.join(root, "supabase/migrations/20260902222024_enrich_manager_communication_notifications.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260902223753_enrich_manager_communication_notifications.sql"), "utf8"),
     readFile(path.join(root, "supabase/migrations/20260824023200_lock_down_manager_push_trigger_functions.sql"), "utf8"),
   ]);
 

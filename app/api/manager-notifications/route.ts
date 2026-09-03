@@ -79,7 +79,7 @@ export async function GET(request: Request) {
       return response;
     }
     if (searchParams.get("history") === "1") {
-      const notifications = await loadManagerNotificationFeed(session.supabase, session.user.id);
+      const notifications = await loadManagerNotificationFeed(session.supabase, session.user.id, 100, true);
       const response = NextResponse.json({ notifications });
       response.headers.set("Cache-Control", "private, no-store");
       response.headers.set("Server-Timing", `notification-history;dur=${Math.round(performance.now() - startedAt)}`);
