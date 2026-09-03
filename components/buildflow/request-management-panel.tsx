@@ -228,6 +228,10 @@ export function RequestManagementPanel({
   const quoteDialogRef = useRef<HTMLElement | null>(null)
   const contactTriggerRef = useRef<HTMLElement | null>(null)
   const routeDepartment = departments.length === 1 ? departments[0] : departments.length > 1 ? "Multiple departments" : "Others"
+
+  useEffect(() => {
+    setSupplierContactStatuses(Object.fromEntries(initialSupplierRecommendations.map((entry) => [entry.supplierId, entry.contactStatus || "not_contacted"])))
+  }, [initialSupplierRecommendations])
   const availableSuppliers = useMemo(() => [...suppliers].sort((left, right) => supplierNameCollator.compare(left.name, right.name)), [suppliers])
   const routeMatches = useMemo(() => {
     return routeSelections.map((selection) => ({ selection, supplier: findCanonicalSupplier(availableSuppliers, selection) ?? null }))

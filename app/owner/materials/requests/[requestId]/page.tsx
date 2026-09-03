@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status";
 import { MaterialRequestAssigneeControl } from "@/components/buildflow/material-request-assignee-control";
 import { RequestClientContact } from "@/components/buildflow/request-client-contact";
+import { RequestLiveSync } from "@/components/buildflow/request-live-sync";
 import { RequestMaterialWorktable, type RequestWorktableComparison } from "@/components/buildflow/request-material-worktable";
 import {
   RequestManagementPanel,
@@ -467,6 +468,7 @@ export default async function OwnerMaterialRequestPage({
 
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-3 pb-28 pt-4 text-slate-950 sm:px-6">
+      <RequestLiveSync />
       <div className="mx-auto max-w-6xl">
         <header className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_5px_18px_rgba(15,23,42,.04)]">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">

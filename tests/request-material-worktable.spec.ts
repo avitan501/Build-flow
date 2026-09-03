@@ -17,6 +17,7 @@ const clientContactPath = path.join(root, "components/buildflow/request-client-c
 const routeEditorPath = path.join(root, "components/buildflow/request-supplier-route-editor.tsx")
 const originalEditorPath = path.join(root, "components/buildflow/original-request-item-editor.tsx")
 const autosaveHookPath = path.join(root, "lib/use-sequenced-autosave.ts")
+const liveSyncPath = path.join(root, "components/buildflow/request-live-sync.tsx")
 const routeAutosaveMigrationPath = path.join(root, "supabase/migrations/20260902233933_atomic_request_supplier_route_autosave.sql")
 
 async function source(filePath: string) {
@@ -50,10 +51,26 @@ test("review and organization are one compact four-column material work table", 
   expect(worktable).toMatch(/Missing info|AI notes/)
   expect(worktable).toContain("Supplier route")
   expect(worktable).toContain("<tbody")
+  expect(worktable).toContain("sm:py-1.5")
+  expect(worktable).toContain("sm:min-h-6")
 
   expect(page, "steps 1 and 2 must not remain as separate expandable cards").not.toContain('title="Review client list"')
   expect(page, "steps 1 and 2 must not remain as separate expandable cards").not.toContain('title="Organize request"')
   expect(page, "original items should not be repeated below the combined table").not.toContain("Original request & files")
+})
+
+test("request changes synchronize between staff screens", async () => {
+  const [page, liveSync, management] = await Promise.all([
+    source(pagePath),
+    source(liveSyncPath),
+    source(managementPath),
+  ])
+
+  expect(page).toContain("<RequestLiveSync />")
+  expect(liveSync).toContain("router.refresh()")
+  expect(liveSync).toContain("REQUEST_REFRESH_INTERVAL_MS = 10_000")
+  expect(liveSync).toContain('window.addEventListener("focus", refresh)')
+  expect(management).toMatch(/useEffect\(\(\) => \{[\s\S]*setSupplierContactStatuses/)
 })
 
 test("comparison rows preserve exact request and supplier quote provenance", async () => {
