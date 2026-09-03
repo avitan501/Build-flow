@@ -293,18 +293,19 @@ test("Sheet Rock uses compact configurable products and expandable images", asyn
   await expect(page.getByRole("button", { name: /Add configured item/i })).toBeVisible()
 })
 
-test("request estimate PDF has the branded estimate structure and does not persist ACH values", async () => {
+test("request estimate PDF has the branded estimate structure and a safe payment request", async () => {
   const [panel, actions, pdf, proposalTerms] = await Promise.all([
     readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8"),
     readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8"),
     readFile(path.join(root, "lib/request-client-quote-pdf.ts"), "utf8"),
     readFile(path.join(root, "lib/proposal-terms.ts"), "utf8"),
   ])
-  expect(panel).toContain("Create client quote")
-  expect(panel).toContain("Include ACH payment information")
-  expect(panel).toContain('type="password"')
-  expect(panel).toContain("These values are used only to create this PDF and are not saved")
-  expect(actions).toContain('client_action: "estimate_sent"')
+  expect(panel).toContain("Create client {documentLabel.toLowerCase()}")
+  expect(panel).toContain("Request payment from client")
+  expect(panel).not.toContain("Include ACH payment information")
+  expect(panel).not.toContain("ach.routingNumber")
+  expect(panel).toContain("Never enter card numbers")
+  expect(actions).toContain("client_action: `${documentType}_sent`")
   expect(actions).not.toContain("routing_number:")
   expect(actions).not.toContain("account_number:")
   expect(pdf).toContain('"ESTIMATE"')
@@ -321,5 +322,7 @@ test("request estimate PDF has the branded estimate structure and does not persi
   expect(proposalTerms).toContain("A 3% processing fee applies to credit card payments.")
   expect(proposalTerms).not.toContain("not to exceed")
   expect(proposalTerms).not.toContain("unless different payment terms")
-  expect(pdf).toContain('"ACH payment information"')
+  expect(actions).toContain("sanitizeRequestClientPayment")
+  expect(pdf).toContain('"Payment request"')
+  expect(pdf).not.toContain('"ACH payment information"')
 })

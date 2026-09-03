@@ -6,6 +6,7 @@ import path from "node:path"
 import { PDFDocument, type PDFFont, type PDFPage, rgb, StandardFonts } from "pdf-lib"
 
 import { includeCreditCardProcessingTerm } from "@/lib/proposal-terms"
+import { requestPaymentGuidance, requestPaymentMethodLabel, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 
 export type RequestClientQuoteLine = {
   description: string
@@ -30,13 +31,9 @@ export type RequestClientQuotePdfInput = {
   salesTaxRate: number
   taxableDelivery: boolean
   terms: string
+  paymentRequest?: RequestClientPaymentRequest
+  /** Legacy documents created before explicit payment requests. */
   paymentLink?: string
-  ach?: {
-    bankName: string
-    accountOwner: string
-    routingNumber: string
-    accountNumber: string
-  }
 }
 
 const navy = rgb(0.02, 0.06, 0.14)
@@ -160,19 +157,19 @@ export async function generateRequestClientQuotePdf(input: RequestClientQuotePdf
   const termsY = Math.min(y - 48, 160)
   page.drawText("Terms & conditions", { x: 40, y: termsY, size: 9, font: bold, color: blue })
   wrap(regular, includeCreditCardProcessingTerm(input.terms), 7.6, 330).slice(0, 7).forEach((line, index) => page.drawText(line, { x: 40, y: termsY - 13 - index * 10, size: 7.6, font: regular, color: slate }))
-  if (input.ach && (input.ach.bankName || input.ach.accountOwner || input.ach.routingNumber || input.ach.accountNumber)) {
-    page.drawText("ACH payment information", { x: 392, y: termsY, size: 9, font: bold, color: blue })
-    const achLines = [
-      `Bank: ${input.ach.bankName || "Not provided"}`,
-      `Account owner: ${input.ach.accountOwner || "Not provided"}`,
-      `Routing: ${input.ach.routingNumber || "Not provided"}`,
-      `Account: ${input.ach.accountNumber || "Not provided"}`,
+  if (input.paymentRequest) {
+    page.drawText("Payment request", { x: 392, y: termsY, size: 9, font: bold, color: blue })
+    const paymentLines = [
+      `Amount due: ${money(input.paymentRequest.amountDue)}`,
+      `Method: ${requestPaymentMethodLabel(input.paymentRequest.method)}`,
+      ...wrap(regular, input.paymentRequest.instructions, 7.2, 172).filter(Boolean).slice(0, 3),
+      ...wrap(regular, requestPaymentGuidance(input.paymentRequest), 7.2, 172).slice(0, 3),
+      ...wrap(regular, input.paymentRequest.securePaymentUrl || "", 7.2, 172).filter(Boolean).slice(0, 3),
     ]
-    achLines.forEach((line, index) => page.drawText(clean(line), { x: 392, y: termsY - 14 - index * 12, size: 7.8, font: regular, color: slate }))
-  }
-  if (input.paymentLink) {
-    page.drawText("Secure payment", { x: 392, y: termsY - 70, size: 8.5, font: bold, color: blue })
-    page.drawText(clean(input.paymentLink), { x: 392, y: termsY - 83, size: 7.2, font: regular, color: slate })
+    paymentLines.slice(0, 11).forEach((line, index) => page.drawText(clean(line), { x: 392, y: termsY - 14 - index * 10, size: 7.2, font: regular, color: slate }))
+  } else if (input.paymentLink) {
+    page.drawText("Secure payment", { x: 392, y: termsY, size: 8.5, font: bold, color: blue })
+    wrap(regular, input.paymentLink, 7.2, 172).slice(0, 4).forEach((line, index) => page.drawText(clean(line), { x: 392, y: termsY - 13 - index * 10, size: 7.2, font: regular, color: slate }))
   }
 
   pdf.setTitle(`Avantia Build ${documentLabel} ${input.quoteNumber}`)

@@ -20,6 +20,7 @@ import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
 import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms"
 import { AVANTIA_PAYMENT_LINK } from "@/lib/payment-link"
 import type { RequestClientDocumentType } from "@/lib/request-client-quote-pdf"
+import { requestPaymentGuidance, type RequestPaymentMethod } from "@/lib/request-client-payment"
 import { requestWorkflowState, type RequestWorkflowAction } from "@/lib/request-workflow-state"
 import { findCanonicalSupplier } from "@/lib/supplier-canonical"
 import { useSequencedAutosave } from "@/lib/use-sequenced-autosave"
@@ -43,6 +44,8 @@ export type RequestClientDocumentSnapshot = {
     salesTaxRate?: number
     taxableDelivery?: boolean
     terms?: string
+    paymentRequest?: { method: RequestPaymentMethod; amountDue: number; instructions: string; securePaymentUrl?: string }
+    paymentLink?: string
   }
 }
 
@@ -58,6 +61,14 @@ function resolvedRouteSupplierIds(routeSelections: RequestSupplierRouteSelection
 
 function supplierRouteVersion(metadata: Record<string, unknown> | null | undefined) {
   return JSON.stringify([metadata?.supplier_route_names ?? [], metadata?.supplier_route_entries ?? [], metadata?.supplier_route_notes ?? {}])
+}
+
+function savedDocumentTotal(documentData: RequestClientDocumentSnapshot["documentData"]) {
+  const subtotal = (documentData.lines ?? []).reduce((sum, line) => sum + Number(line.quantity || 0) * Number(line.unitPrice || 0), 0)
+  const deliveryCharge = Number(documentData.deliveryCharge || 0)
+  const salesTaxRate = Number(documentData.salesTaxRate || 0)
+  const tax = (subtotal + (documentData.taxableDelivery === false ? 0 : deliveryCharge)) * salesTaxRate / 100
+  return subtotal + deliveryCharge + tax
 }
 
 function SupplierContactRow({ entry, recommendedSupplierIds, supplierIds, toggleRecommendedSupplier, toggleSupplier }: {
@@ -200,8 +211,11 @@ export function RequestManagementPanel({
   const [taxRecommendation, setTaxRecommendation] = useState("")
   const [quoteTerms, setQuoteTerms] = useState(DEFAULT_PROPOSAL_TERMS)
   const [quoteMessage, setQuoteMessage] = useState("Please review your Avantia Build estimate. Reply with any questions or approval.")
-  const [includeAch, setIncludeAch] = useState(false)
-  const [ach, setAch] = useState({ bankName: "", accountOwner: "", routingNumber: "", accountNumber: "" })
+  const [requestPayment, setRequestPayment] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState<RequestPaymentMethod>("credit_card")
+  const [paymentAmountDue, setPaymentAmountDue] = useState("")
+  const [paymentInstructions, setPaymentInstructions] = useState("")
+  const [hostedPaymentUrl, setHostedPaymentUrl] = useState(AVANTIA_PAYMENT_LINK)
   const [quoteFeedback, setQuoteFeedback] = useState("")
   const [documentLinks, setDocumentLinks] = useState<Record<RequestClientDocumentType, string | undefined>>(() => Object.fromEntries(initialClientDocuments.map((entry) => [entry.documentType, `/client-document/${entry.publicToken}`])) as Record<RequestClientDocumentType, string | undefined>)
   const [onlineSupplierSearchOpen, setOnlineSupplierSearchOpen] = useState(false)
@@ -340,6 +354,8 @@ export function RequestManagementPanel({
 
   function openDocument(nextType: RequestClientDocumentType) {
     const saved = initialClientDocuments.find((entry) => entry.documentType === nextType)
+    const savedPayment = saved?.documentData.paymentRequest
+    const legacyPaymentLink = saved?.documentData.paymentLink
     const prefix = nextType === "invoice" ? "INV" : nextType === "receipt" ? "REC" : "AVA"
     setDocumentType(nextType)
     setQuoteNumber(saved?.documentNumber || `${prefix}-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${requestId.slice(0, 4).toUpperCase()}`)
@@ -351,7 +367,12 @@ export function RequestManagementPanel({
     setSalesTaxRate(Number.isFinite(saved?.documentData.salesTaxRate) ? Number(saved?.documentData.salesTaxRate) : 8.875)
     setTaxableDelivery(saved?.documentData.taxableDelivery !== false)
     setQuoteTerms(saved?.documentData.terms || DEFAULT_PROPOSAL_TERMS)
-    setQuoteMessage(nextType === "invoice" ? "Please review your Avantia Build invoice and use the secure payment link." : nextType === "receipt" ? "Your payment was received. Please keep this Avantia Build receipt for your records." : "Please review your Avantia Build estimate. Reply with any questions or approval.")
+    setRequestPayment(Boolean(savedPayment || legacyPaymentLink))
+    setPaymentMethod(savedPayment?.method || "credit_card")
+    setPaymentAmountDue(savedPayment?.amountDue ? String(savedPayment.amountDue) : legacyPaymentLink ? savedDocumentTotal(saved.documentData).toFixed(2) : "")
+    setPaymentInstructions(savedPayment?.instructions || "")
+    setHostedPaymentUrl(savedPayment?.securePaymentUrl || legacyPaymentLink || AVANTIA_PAYMENT_LINK)
+    setQuoteMessage(nextType === "invoice" ? "Please review your Avantia Build invoice. Reply with any questions." : nextType === "receipt" ? "Your payment was received. Please keep this Avantia Build receipt for your records." : "Please review your Avantia Build estimate. Reply with any questions or approval.")
     setContactOpen(false)
     setQuoteOpen(true)
   }
@@ -527,7 +548,12 @@ export function RequestManagementPanel({
       salesTaxRate,
       taxableDelivery,
       terms: quoteTerms,
-      ach: includeAch ? ach : undefined,
+      paymentRequest: requestPayment ? {
+        method: paymentMethod,
+        amountDue: Number(paymentAmountDue),
+        instructions: paymentInstructions,
+        ...(hostedPaymentUrl.trim() ? { securePaymentUrl: hostedPaymentUrl.trim() } : {}),
+      } : undefined,
     }
   }
 
@@ -885,8 +911,17 @@ export function RequestManagementPanel({
               <div className="grid gap-3">
                 <label className="grid gap-1 text-xs font-bold">Terms & conditions<textarea value={quoteTerms} onChange={(event) => setQuoteTerms(event.target.value)} rows={3} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
                 <label className="grid gap-1 text-xs font-bold">Email message<textarea value={quoteMessage} onChange={(event) => setQuoteMessage(event.target.value)} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
-                <label className="inline-flex min-h-10 items-center gap-2 text-sm font-bold"><input type="checkbox" checked={includeAch} onChange={(event) => setIncludeAch(event.target.checked)} className="h-4 w-4 accent-[#0071e3]" />Include ACH payment information in this PDF</label>
-                {includeAch ? <div className="grid gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:grid-cols-2"><label className="grid gap-1 text-xs font-bold">Bank name<input value={ach.bankName} onChange={(event) => setAch({ ...ach, bankName: event.target.value })} className="h-9 rounded-md border border-slate-300 bg-white px-2 font-normal" /></label><label className="grid gap-1 text-xs font-bold">Account owner<input value={ach.accountOwner} onChange={(event) => setAch({ ...ach, accountOwner: event.target.value })} className="h-9 rounded-md border border-slate-300 bg-white px-2 font-normal" /></label><label className="grid gap-1 text-xs font-bold">Routing number<input type="password" inputMode="numeric" value={ach.routingNumber} onChange={(event) => setAch({ ...ach, routingNumber: event.target.value })} className="h-9 rounded-md border border-slate-300 bg-white px-2 font-normal" /></label><label className="grid gap-1 text-xs font-bold">Account number<input type="password" value={ach.accountNumber} onChange={(event) => setAch({ ...ach, accountNumber: event.target.value })} className="h-9 rounded-md border border-slate-300 bg-white px-2 font-normal" /></label><p className="sm:col-span-2 text-[10px] font-semibold text-amber-800">These values are used only to create this PDF and are not saved in the customer request.</p></div> : null}
+                <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-bold"><input type="checkbox" checked={requestPayment} onChange={(event) => { setRequestPayment(event.target.checked); if (event.target.checked && !paymentAmountDue) setPaymentAmountDue(quoteTotal.toFixed(2)) }} className="h-4 w-4 accent-[#0071e3]" />Request payment from client</label>
+                {requestPayment ? <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-3 sm:p-4">
+                  <p className="text-xs font-bold leading-5 text-slate-700">Add only payment-request details. Never enter card numbers, CVV/security codes, routing numbers, or bank account numbers.</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label className="grid gap-1 text-xs font-bold">Payment method<select value={paymentMethod} onChange={(event) => { const method = event.target.value as RequestPaymentMethod; setPaymentMethod(method); if (method !== "credit_card" && hostedPaymentUrl === AVANTIA_PAYMENT_LINK) setHostedPaymentUrl(""); if (method === "credit_card" && !hostedPaymentUrl) setHostedPaymentUrl(AVANTIA_PAYMENT_LINK) }} className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal"><option value="credit_card">Credit card</option><option value="ach">ACH</option><option value="check">Check</option></select></label>
+                    <label className="grid gap-1 text-xs font-bold">Amount due<input type="number" min="0.01" max="10000000" step="0.01" inputMode="decimal" value={paymentAmountDue} onChange={(event) => setPaymentAmountDue(event.target.value)} className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal" /></label>
+                    <label className="grid gap-1 text-xs font-bold sm:col-span-2">Optional instructions<textarea value={paymentInstructions} onChange={(event) => setPaymentInstructions(event.target.value)} maxLength={500} rows={2} placeholder="For example: Please call us to coordinate payment." className="resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal" /></label>
+                    <label className="grid gap-1 text-xs font-bold sm:col-span-2">Hosted secure payment URL <span className="font-normal text-slate-500">(optional)</span><input type="url" inputMode="url" autoComplete="url" value={hostedPaymentUrl} onChange={(event) => setHostedPaymentUrl(event.target.value)} placeholder="Paste an existing HTTPS payment link" className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal" /><span className="font-normal leading-5 text-slate-500">Use only an existing HTTPS checkout URL. Leave blank when payment must be coordinated by phone.</span></label>
+                  </div>
+                  <p className="mt-3 rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-semibold leading-5 text-slate-700">{requestPaymentGuidance({ method: paymentMethod, securePaymentUrl: hostedPaymentUrl.trim() || undefined })}</p>
+                </div> : null}
               </div>
               <aside className="rounded-lg border border-slate-200 bg-slate-50 p-4"><div className="flex justify-between text-sm"><span>Subtotal</span><strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quoteSubtotal)}</strong></div><label className="mt-3 flex items-center justify-between gap-3 text-sm"><span>Delivery</span><input type="number" min="0" step="0.01" value={deliveryCharge} onChange={(event) => setDeliveryCharge(Number(event.target.value))} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-right" /></label><label className="mt-2 flex items-center justify-between gap-3 text-sm"><span>Sales tax % <span className="block text-[10px] font-normal text-slate-500">Destination rate</span></span><input type="number" min="0" max="20" step="0.001" value={salesTaxRate} onChange={(event) => { setSalesTaxRate(Number(event.target.value)); setTaxRecommendation("Rate edited manually") }} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-right" /></label><label className="mt-2 flex items-start gap-2 text-xs leading-5 text-slate-600"><input type="checkbox" checked={taxableDelivery} onChange={(event) => setTaxableDelivery(event.target.checked)} className="mt-1" /><span>Include Avantia-billed delivery in the taxable amount</span></label>{taxRecommendation ? <p className="mt-2 text-xs font-semibold text-emerald-700">{taxRecommendation}</p> : <p className="mt-2 text-xs text-slate-500">Tax is calculated on materials and, when checked, Avantia-billed delivery.</p>}<div className="mt-3 flex justify-between border-t border-slate-300 pt-3 text-lg"><strong>Total</strong><strong>{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(quoteTotal)}</strong></div></aside>
             </div>

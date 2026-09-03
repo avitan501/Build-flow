@@ -8,7 +8,7 @@ import { requireStaffProfile } from "@/lib/auth"
 import { scheduleClientMaterialListOrganization } from "@/lib/material-request-organization"
 import { buildProjectUploadStoragePath, PROJECT_UPLOAD_ALLOWED_MIME_TYPES, PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/projects"
 import { generateRequestClientQuotePdf, type RequestClientDocumentType, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
-import { AVANTIA_PAYMENT_LINK } from "@/lib/payment-link"
+import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sanitizeRequestClientPayment, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
 import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
@@ -158,7 +158,7 @@ export type RequestClientQuoteInput = {
   salesTaxRate: number
   taxableDelivery?: boolean
   terms: string
-  ach?: { bankName: string; accountOwner: string; routingNumber: string; accountNumber: string }
+  paymentRequest?: RequestClientPaymentRequest
 }
 
 const ALLOWED_ATTACHMENT_TYPES = new Set([
@@ -645,6 +645,7 @@ export async function updateRequestWorkflowStepAction(input: { requestId: string
 }
 
 async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
+  if (hasForbiddenPaymentFields(input) || containsRawPaymentCredentialsInPayload(input)) return { ok: false as const, error: "Card and bank account details must never be entered in Avantia Build." }
   const { supabase, user } = await requireStaffProfile("customers")
   const requestId = String(input.requestId || "").trim()
   const quoteNumber = String(input.quoteNumber || "").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 40)
@@ -661,6 +662,8 @@ async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
   const salesTaxRate = Number(input.salesTaxRate)
   const documentType: RequestClientDocumentType = ["estimate", "invoice", "receipt"].includes(String(input.documentType)) ? input.documentType! : "estimate"
   if (!Number.isFinite(deliveryCharge) || deliveryCharge < 0 || !Number.isFinite(salesTaxRate) || salesTaxRate < 0 || salesTaxRate > 20) return { ok: false as const, error: "Check delivery and sales tax amounts." }
+  const paymentRequest = input.paymentRequest === undefined ? undefined : sanitizeRequestClientPayment(input.paymentRequest)
+  if (paymentRequest && !paymentRequest.ok) return { ok: false as const, error: paymentRequest.error }
 
   const { data: request, error: requestError } = await supabase.from("quote_requests").select("id,title,owner_id,project_id,projects(address)").eq("id", requestId).maybeSingle<{ id: string; title: string; owner_id: string; project_id: string; projects: { address: string | null } | null }>()
   if (requestError || !request) return { ok: false as const, error: "Request not found." }
@@ -680,13 +683,7 @@ async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
     salesTaxRate: Math.round(salesTaxRate * 1000) / 1000,
     taxableDelivery: input.taxableDelivery !== false,
     terms: String(input.terms || "").trim().slice(0, 4000),
-    paymentLink: documentType === "invoice" ? AVANTIA_PAYMENT_LINK : undefined,
-    ach: input.ach ? {
-      bankName: String(input.ach.bankName || "").trim().slice(0, 120),
-      accountOwner: String(input.ach.accountOwner || "").trim().slice(0, 160),
-      routingNumber: String(input.ach.routingNumber || "").replace(/\D/g, "").slice(0, 9),
-      accountNumber: String(input.ach.accountNumber || "").replace(/[^0-9A-Za-z-]/g, "").slice(0, 34),
-    } : undefined,
+    paymentRequest: paymentRequest?.ok ? paymentRequest.value : undefined,
   }
   const pdf = await generateRequestClientQuotePdf(pdfInput)
   return { ok: true as const, supabase, user, request, client, pdf, quoteNumber, lines, pdfInput }
@@ -694,15 +691,13 @@ async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
 
 async function savePreparedRequestClientDocument(prepared: Awaited<ReturnType<typeof prepareRequestClientQuote>>, markSent = false) {
   if (!prepared.ok) return prepared
-  const { ach: sensitiveAch, ...publicDocumentData } = prepared.pdfInput
-  void sensitiveAch
   const { data, error } = await prepared.supabase.from("request_client_documents").upsert({
     request_id: prepared.request.id,
     project_id: prepared.request.project_id,
     owner_id: prepared.request.owner_id,
     document_type: prepared.pdfInput.documentType,
     document_number: prepared.quoteNumber,
-    document_data: publicDocumentData,
+    document_data: prepared.pdfInput,
     updated_by: prepared.user.id,
     created_by: prepared.user.id,
     updated_at: new Date().toISOString(),

@@ -1,4 +1,5 @@
 import type { RequestClientDocumentType, RequestClientQuotePdfInput } from "@/lib/request-client-quote-pdf"
+import { parseHostedPaymentUrl, parseStoredRequestClientPayment } from "@/lib/request-client-payment"
 
 export type StoredRequestClientDocument = {
   document_type: RequestClientDocumentType
@@ -35,6 +36,7 @@ export function parseRequestClientDocument(row: StoredRequestClientDocument): Re
     salesTaxRate: Math.max(0, Number(value.salesTaxRate) || 0),
     taxableDelivery: value.taxableDelivery !== false,
     terms: String(value.terms || ""),
-    paymentLink: typeof value.paymentLink === "string" ? value.paymentLink : undefined,
+    paymentRequest: parseStoredRequestClientPayment(value.paymentRequest),
+    paymentLink: parseHostedPaymentUrl(value.paymentLink),
   }
 }
