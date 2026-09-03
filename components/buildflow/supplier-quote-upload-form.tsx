@@ -66,7 +66,6 @@ export function SupplierQuoteUploadForm({ clients, requests, suppliers, departme
       return
     }
     if (supplierId !== "auto" && !supplier) { setError("Choose a valid supplier."); return }
-    formData.set("supplierName", supplier?.name ?? "")
     startTransition(async () => {
       const file = formData.get("quoteFile")
       if (!aiEnabled && file instanceof File && file.type.startsWith("image/")) {

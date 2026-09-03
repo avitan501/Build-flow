@@ -14,6 +14,11 @@ import {
   inferSupplierName,
 } from "@/lib/supplier-quote-supplier";
 import {
+  matchSupplierQuoteItems,
+  requestItemSpecification,
+  resolveExplicitSupplierSelection,
+} from "@/lib/supplier-quote-routing";
+import {
   SUPPLIER_QUOTE_BUCKET,
   type SupplierQuoteItemRecord,
   type SupplierQuoteRecord,
@@ -207,7 +212,7 @@ async function ensureClientRequestComparison(input: {
           source_request_item_id: item.id,
           description:
             clean(item.name, 500) || `Requested material ${index + 1}`,
-          specification: clean(item.department, 1000),
+          specification: requestItemSpecification(item.metadata, item.department),
           quantity: safeNumber(item.quantity, 1) || 1,
           unit: clean(item.unit, 40) || "each",
           sort_order: index,
@@ -319,18 +324,31 @@ export async function uploadSupplierQuoteAction(
 
   const supplierSelection = clean(formData.get("supplierId"), 160) || "auto";
   let supplierId = supplierSelection === "auto" ? "" : supplierSelection;
-  let supplierName = clean(formData.get("supplierName"), 200);
+  let supplierName = "";
   const department = normalizeMaterialCatalogDepartment(
     clean(formData.get("department"), 120),
   );
-  if (
-    supplierSelection !== "auto" &&
-    (!UUID_PATTERN.test(supplierId) || !supplierName)
-  )
-    return {
-      ok: false,
-      error: "Choose a valid supplier or use automatic detection.",
-    };
+  if (supplierSelection !== "auto") {
+    const { data: supplierRows, error: supplierError } = await supabase.rpc(
+      "staff_load_catalog_suppliers",
+    );
+    if (supplierError)
+      return {
+        ok: false,
+        error: "The Supplier Directory could not be checked. Try again.",
+      };
+    const selectedSupplier = resolveExplicitSupplierSelection(
+      Array.isArray(supplierRows) ? (supplierRows as CatalogSupplier[]) : [],
+      supplierId,
+    );
+    if (!selectedSupplier)
+      return {
+        ok: false,
+        error: "Choose a valid supplier or use automatic detection.",
+      };
+    supplierId = selectedSupplier.id;
+    supplierName = selectedSupplier.name;
+  }
 
   const quoteId = crypto.randomUUID();
   const filePath = `${user.id}/${quoteId}/${cleanFileName(file.name)}`;
@@ -991,46 +1009,6 @@ export async function addSupplierQuoteItemsToCatalogAction(
   };
 }
 
-function comparisonWords(value: string) {
-  return new Set(
-    value
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .split(" ")
-      .filter((word) => word.length > 1),
-  );
-}
-
-function comparisonMatchScore(
-  quoteItem: SupplierQuoteItemRecord,
-  requestItem: { description: string; specification: string },
-) {
-  const quoteText =
-    `${quoteItem.item_code} ${quoteItem.description} ${quoteItem.specification}`.trim();
-  const requestText =
-    `${requestItem.description} ${requestItem.specification}`.trim();
-  const normalizedQuote = quoteText
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-  const normalizedRequest = requestText
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-  if (normalizedQuote === normalizedRequest) return 10;
-  if (
-    normalizedQuote.includes(normalizedRequest) ||
-    normalizedRequest.includes(normalizedQuote)
-  )
-    return 5;
-  const quoteWords = comparisonWords(quoteText);
-  const requestWords = comparisonWords(requestText);
-  const overlap = [...quoteWords].filter((word) =>
-    requestWords.has(word),
-  ).length;
-  return overlap / Math.max(quoteWords.size, requestWords.size, 1);
-}
-
 async function createComparisonFromQuote(
   quoteId: string,
   itemIds: string[],
@@ -1266,32 +1244,11 @@ async function createComparisonFromQuote(
   if (bidError || !bid)
     return fail("The supplier could not be added to the comparison.");
 
-  const matches = items.map((item, index) => {
-    if (!comparison.request_id)
-      return { item, comparisonItem: comparisonItems[index] };
-    const ranked = comparisonItems
-      .map((candidate) => ({
-        candidate,
-        score: comparisonMatchScore(item, candidate),
-      }))
-      .sort((a, b) => b.score - a.score);
-    return {
-      item,
-      comparisonItem: ranked[0]?.score >= 0.3 ? ranked[0].candidate : null,
-    };
-  });
-  const bestByComparisonItem = new Map<string, (typeof matches)[number]>();
-  for (const match of matches) {
-    if (!match.comparisonItem) continue;
-    const current = bestByComparisonItem.get(match.comparisonItem.id);
-    if (
-      !current ||
-      (match.item.unit_price ?? Number.POSITIVE_INFINITY) <
-        (current.item.unit_price ?? Number.POSITIVE_INFINITY)
-    )
-      bestByComparisonItem.set(match.comparisonItem.id, match);
-  }
-  const matched = [...bestByComparisonItem.values()];
+  const matched = comparison.request_id
+    ? matchSupplierQuoteItems(items, comparisonItems)
+    : items.flatMap((item, index) => comparisonItems[index]
+      ? [{ item, comparisonItem: comparisonItems[index] }]
+      : []);
   if (!matched.length) {
     if (!existingBid.data)
       await supabase.from("quote_comparison_bids").delete().eq("id", bid.id);

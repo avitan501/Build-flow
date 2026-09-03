@@ -134,7 +134,7 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(uploadForm).toContain('name="requestId" required');
   expect(actions).toContain("ensureClientRequestComparison");
   expect(actions).toContain('eq("request_id", input.requestId)');
-  expect(actions).toContain("comparisonMatchScore");
+  expect(actions).toContain("matchSupplierQuoteItems");
   expect(page).toContain("client_name_snapshot");
   expect(page).toContain('aria-label="Filter supplier quotes"');
   expect(page).toContain('name="supplier"');
