@@ -230,7 +230,6 @@ function bidMetadataMissingFields(bid: QuoteComparisonBidRecord) {
   const missing: string[] = [];
   if (!Number.isFinite(bid.delivery_charge) || bid.delivery_charge < 0) missing.push("delivery");
   if (!Number.isFinite(bid.tax_percent) || bid.tax_percent < 0 || bid.tax_percent > 100) missing.push("tax");
-  if (bid.lead_time_days === null || !Number.isFinite(bid.lead_time_days) || bid.lead_time_days < 0) missing.push("lead time");
   return missing;
 }
 

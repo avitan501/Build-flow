@@ -177,18 +177,19 @@ test("gross profit and margin preserve zero and negative outcomes", () => {
   expect(options.find((option) => option.id === "loss")?.grossMarginPercent).toBe(-10);
 });
 
-test("missing delivery, tax, or lead time cannot be ranked or selected", () => {
+test("missing delivery or tax blocks selection while lead time remains optional", () => {
   const complete = bid("complete", { prices: [["studs", 5], ["plywood", 25]], delivery: 20, taxPercent: 0, lead: 4 });
   const missingDelivery = bid("missing-delivery", { prices: [["studs", 1], ["plywood", 1]], delivery: Number.NaN, taxPercent: 0, lead: 1 });
   const missingTax = bid("missing-tax", { prices: [["studs", 1], ["plywood", 1]], delivery: 0, taxPercent: Number.NaN, lead: 1 });
   const missingLead = bid("missing-lead", { prices: [["studs", 1], ["plywood", 1]], delivery: 0, taxPercent: 0, lead: null });
   const analyses = analyzeQuoteComparison(items, [missingDelivery, missingTax, missingLead, complete]);
 
-  expect(analyses.find((entry) => entry.bidId === "complete")?.isLowestCost).toBe(true);
+  expect(analyses.find((entry) => entry.bidId === "missing-lead")?.isLowestCost).toBe(true);
   expect(analyses.find((entry) => entry.bidId === "missing-delivery")?.missingFields).toContain("delivery");
   expect(analyses.find((entry) => entry.bidId === "missing-tax")?.missingFields).toContain("tax");
-  expect(analyses.find((entry) => entry.bidId === "missing-lead")?.missingFields).toContain("lead time");
-  expect(analyses.filter((entry) => entry.bidId.startsWith("missing")).every((entry) => !entry.eligible && !entry.isRecommended && !entry.isLowestCost)).toBe(true);
+  expect(analyses.find((entry) => entry.bidId === "missing-lead")?.missingFields).not.toContain("lead time");
+  expect(analyses.find((entry) => entry.bidId === "missing-lead")?.eligible).toBe(true);
+  expect(analyses.filter((entry) => ["missing-delivery", "missing-tax"].includes(entry.bidId)).every((entry) => !entry.eligible && !entry.isRecommended && !entry.isLowestCost)).toBe(true);
 });
 
 test("an incomplete client target blocks option profit and selection", () => {
@@ -332,6 +333,8 @@ test("supplier comparison captures the client's ready-to-pay target beside suppl
   expect(workspace).toContain("Supplier unit price");
   expect(workspace).toContain("Whole order");
   expect(workspace).toContain("Estimated gross profit");
+  expect(workspace).toContain("Profit comparison");
+  expect(workspace).toContain("Client pre-tax amount minus supplier total");
   expect(workspace).toContain("Gross margin");
   expect(workspace).toContain("Finish missing values");
   expect(workspace).toContain('className="mt-4 hidden');
