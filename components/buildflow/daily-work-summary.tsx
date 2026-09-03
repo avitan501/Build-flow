@@ -6,33 +6,34 @@ import { useEffect, useState, useTransition } from "react"
 
 import { markDailySummaryPaidAction, recordDailyAttendanceAction, saveDailyWorkSummaryAction, uploadDailyProblemPhotoAction } from "@/app/admin/daily-summary/actions"
 import { captureAvantiaEvent } from "@/lib/analytics/posthog-client"
-import { calculateWorkedMinutes, totalPausedMilliseconds, type DailyWorkSummary } from "@/lib/daily-work-summary"
+import { calculateDailyWorkMinutes, dailyWorkDateKey, DAILY_WORK_TIME_ZONE, type DailyWorkSummary } from "@/lib/daily-work-summary"
 
 function localToday() {
-  const date = new Date()
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date)
-  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]))
-  return `${value.year}-${value.month}-${value.day}`
+  return dailyWorkDateKey() ?? ""
 }
 
 function displayDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value}T12:00:00`))
+  return new Intl.DateTimeFormat("en-US", { timeZone: DAILY_WORK_TIME_ZONE, month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value}T12:00:00Z`))
 }
 
 function displayTime(value: string | null | undefined) {
   if (!value) return "Not recorded"
-  return new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date(value))
+  return new Intl.DateTimeFormat("en-US", { timeZone: DAILY_WORK_TIME_ZONE, hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(value))
 }
 
-function workedTime(summary: Pick<DailyWorkSummary, "checkInAt" | "checkOutAt" | "pauseStartedAt" | "pausedMilliseconds">, now: number) {
-  if (!summary.checkInAt) return null
-  const endAt = summary.checkOutAt ?? new Date(now).toISOString()
-  const paused = totalPausedMilliseconds(summary.pausedMilliseconds, summary.pauseStartedAt, endAt)
-  const minutes = calculateWorkedMinutes(summary.checkInAt, endAt, paused)
+function durationLabel(minutes: number | null) {
   if (minutes === null) return null
   const hours = Math.floor(minutes / 60)
   const remainingMinutes = minutes % 60
   return `${hours} hr ${remainingMinutes} min`
+}
+
+function timeLabels(summary: Pick<DailyWorkSummary, "checkInAt" | "checkOutAt" | "pauseStartedAt" | "pausedMilliseconds">, now: number) {
+  const totals = calculateDailyWorkMinutes(summary, new Date(now).toISOString())
+  return {
+    worked: durationLabel(totals.workedMinutes),
+    paused: durationLabel(totals.pausedMinutes),
+  }
 }
 
 export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: DailyWorkSummary[]; canMarkPaid: boolean }) {
@@ -51,10 +52,10 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
   const [currentTime, setCurrentTime] = useState(() => Date.now())
 
   useEffect(() => {
-    if (!selectedSummary?.checkInAt || selectedSummary.checkOutAt || selectedSummary.pauseStartedAt) return
+    if (!selectedSummary?.checkInAt || selectedSummary.checkOutAt) return
     const timer = window.setInterval(() => setCurrentTime(Date.now()), 30_000)
     return () => window.clearInterval(timer)
-  }, [selectedSummary?.checkInAt, selectedSummary?.checkOutAt, selectedSummary?.pauseStartedAt])
+  }, [selectedSummary?.checkInAt, selectedSummary?.checkOutAt])
 
   function selectDate(date: string) {
     const summary = summaries.find((entry) => entry.date === date)
@@ -142,7 +143,8 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
     })
   }
 
-  const totalWorked = selectedSummary ? workedTime(selectedSummary, currentTime) : null
+  const totals = selectedSummary ? timeLabels(selectedSummary, currentTime) : { worked: null, paused: null }
+  const attendanceAvailable = selectedDate === today
 
   return <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
     <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -152,20 +154,22 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
       </header>
 
       <div className="grid gap-4 p-4 sm:p-5">
-        <label className="grid max-w-xs gap-1.5 text-sm font-semibold">Work date<input type="date" value={selectedDate} onChange={(event) => selectDate(event.target.value)} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal" /></label>
+        <label className="grid max-w-xs gap-1.5 text-sm font-semibold">Work date<input type="date" value={selectedDate} onChange={(event) => selectDate(event.target.value)} className="min-h-11 rounded-md border border-slate-300 bg-white px-3 font-normal" /><span className="text-xs font-normal text-slate-500">Attendance and day boundaries use Eastern Time (America/New_York).</span></label>
         <section className="rounded-md border border-slate-200 bg-slate-50 p-3" aria-label="Carlos attendance">
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
             <div><p className="text-[10px] font-bold uppercase text-slate-500">Check in</p><p className="mt-1 text-sm font-semibold">{displayTime(selectedSummary?.checkInAt)}</p></div>
             <div><p className="text-[10px] font-bold uppercase text-slate-500">Check out</p><p className="mt-1 text-sm font-semibold">{displayTime(selectedSummary?.checkOutAt)}</p></div>
-            <div><p className="text-[10px] font-bold uppercase text-slate-500">Hours</p><p className="mt-1 text-sm font-semibold text-[#0066cc]">{totalWorked ?? (selectedSummary?.checkInAt ? "In progress" : "—")}</p></div>
+            <div><p className="text-[10px] font-bold uppercase text-slate-500">Worked</p><p className="mt-1 text-sm font-semibold text-[#0066cc]">{totals.worked ?? (selectedSummary?.checkInAt ? "In progress" : "—")}</p></div>
+            <div><p className="text-[10px] font-bold uppercase text-slate-500">Paused</p><p className="mt-1 text-sm font-semibold text-violet-700">{totals.paused ?? "—"}</p></div>
           </div>
           {selectedSummary?.pauseStartedAt ? <p className="mt-3 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-center text-xs font-bold text-violet-700">Paused — break time is not being counted</p> : null}
+          {!attendanceAvailable ? <p className="mt-3 text-center text-xs font-medium text-slate-500">Select today&apos;s Eastern Time date to record attendance.</p> : null}
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <button type="button" onClick={() => recordAttendance("check_in")} disabled={pending || Boolean(selectedSummary?.checkInAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-emerald-300 bg-white px-3 text-sm font-semibold text-emerald-700 disabled:opacity-40"><LogIn className="h-4 w-4" />Check in</button>
+            <button type="button" onClick={() => recordAttendance("check_in")} disabled={pending || !attendanceAvailable || Boolean(selectedSummary?.checkInAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-emerald-300 bg-white px-3 text-sm font-semibold text-emerald-700 disabled:opacity-40"><LogIn className="h-4 w-4" />Check in</button>
             {selectedSummary?.pauseStartedAt
-              ? <button type="button" onClick={() => recordAttendance("resume")} disabled={pending || Boolean(selectedSummary?.checkOutAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet-300 bg-violet-50 px-3 text-sm font-semibold text-violet-700 disabled:opacity-40"><Play className="h-4 w-4" />Resume</button>
-              : <button type="button" onClick={() => recordAttendance("pause")} disabled={pending || !selectedSummary?.checkInAt || Boolean(selectedSummary?.checkOutAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet-300 bg-white px-3 text-sm font-semibold text-violet-700 disabled:opacity-40"><Pause className="h-4 w-4" />Pause</button>}
-            <button type="button" onClick={() => recordAttendance("check_out")} disabled={pending || !selectedSummary?.checkInAt || Boolean(selectedSummary?.checkOutAt) || !completed.trim()} title={!completed.trim() ? "Write what you completed today first" : undefined} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-amber-300 bg-white px-3 text-sm font-semibold text-amber-700 disabled:opacity-40"><LogOut className="h-4 w-4" />Check out</button>
+              ? <button type="button" onClick={() => recordAttendance("resume")} disabled={pending || !attendanceAvailable || Boolean(selectedSummary?.checkOutAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet-300 bg-violet-50 px-3 text-sm font-semibold text-violet-700 disabled:opacity-40"><Play className="h-4 w-4" />Resume</button>
+              : <button type="button" onClick={() => recordAttendance("pause")} disabled={pending || !attendanceAvailable || !selectedSummary?.checkInAt || Boolean(selectedSummary?.checkOutAt)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet-300 bg-white px-3 text-sm font-semibold text-violet-700 disabled:opacity-40"><Pause className="h-4 w-4" />Pause</button>}
+            <button type="button" onClick={() => recordAttendance("check_out")} disabled={pending || !attendanceAvailable || !selectedSummary?.checkInAt || Boolean(selectedSummary?.checkOutAt) || !completed.trim()} title={!attendanceAvailable ? "Attendance uses today's Eastern Time date" : !completed.trim() ? "Write what you completed today first" : undefined} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-amber-300 bg-white px-3 text-sm font-semibold text-amber-700 disabled:opacity-40"><LogOut className="h-4 w-4" />Check out</button>
           </div>
         </section>
         <label className="grid gap-1.5 text-sm font-semibold"><span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600" />Completed today <span className="text-xs font-bold text-rose-600">Required to check out</span></span><textarea value={completed} onChange={(event) => setCompleted(event.target.value)} maxLength={4000} rows={5} required placeholder="Calls made, leads contacted, supplier pricing received, orders handled..." className="min-h-28 rounded-md border border-slate-300 p-3 font-normal leading-6 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" /></label>
@@ -185,8 +189,11 @@ export function DailyWorkSummaryForm({ summaries, canMarkPaid }: { summaries: Da
       <header className="border-b border-slate-200 p-4"><h2 className="text-sm font-semibold">Recent summaries</h2><p className="mt-1 text-xs text-slate-500">Choose a date to review or update it.</p></header>
       <div className="max-h-[34rem] overflow-y-auto">
         {summaries.length ? summaries.map((summary) => {
-          const hours = workedTime(summary, currentTime)
-          return <div key={summary.id} className={`flex items-center gap-2 border-b border-slate-100 px-2 py-2 ${selectedDate === summary.date ? "bg-sky-50" : ""}`}><button type="button" onClick={() => selectDate(summary.date)} className="min-w-0 flex-1 rounded-md px-2 py-1 text-left hover:bg-slate-50"><span className="block text-sm font-semibold">{displayDate(summary.date)}</span><span className="mt-0.5 block text-xs text-slate-500">{hours ?? (summary.completed ? "Work recorded" : "Open items only")}{summary.pauseStartedAt ? " · Paused" : ""}</span></button>{summary.paidAt ? <span className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-2 text-[10px] font-bold text-emerald-700"><BadgeCheck className="h-3.5 w-3.5" />Paid</span> : canMarkPaid ? <button type="button" onClick={() => markPaid(summary.date)} disabled={pending} className="min-h-9 shrink-0 rounded-md border border-emerald-300 bg-white px-2 text-[10px] font-bold text-emerald-700 disabled:opacity-40">Mark paid</button> : null}<span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${summary.pauseStartedAt ? "bg-violet-50 text-violet-700" : summary.open || (summary.checkInAt && !summary.checkOutAt) ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{summary.pauseStartedAt ? "Paused" : summary.checkInAt && !summary.checkOutAt ? "Working" : summary.open ? "Open" : "Complete"}</span></div>
+          const summaryTotals = timeLabels(summary, currentTime)
+          const timeSummary = summaryTotals.worked
+            ? `Worked ${summaryTotals.worked} · Paused ${summaryTotals.paused ?? "0 hr 0 min"}`
+            : summary.completed ? "Work recorded" : "Open items only"
+          return <div key={summary.id} className={`flex items-center gap-2 border-b border-slate-100 px-2 py-2 ${selectedDate === summary.date ? "bg-sky-50" : ""}`}><button type="button" onClick={() => selectDate(summary.date)} className="min-w-0 flex-1 rounded-md px-2 py-1 text-left hover:bg-slate-50"><span className="block text-sm font-semibold">{displayDate(summary.date)}</span><span className="mt-0.5 block text-xs text-slate-500">{timeSummary}</span></button>{summary.paidAt ? <span className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-2 text-[10px] font-bold text-emerald-700"><BadgeCheck className="h-3.5 w-3.5" />Paid</span> : canMarkPaid ? <button type="button" onClick={() => markPaid(summary.date)} disabled={pending} className="min-h-9 shrink-0 rounded-md border border-emerald-300 bg-white px-2 text-[10px] font-bold text-emerald-700 disabled:opacity-40">Mark paid</button> : null}<span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${summary.pauseStartedAt ? "bg-violet-50 text-violet-700" : summary.open || (summary.checkInAt && !summary.checkOutAt) ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{summary.pauseStartedAt ? "Paused" : summary.checkInAt && !summary.checkOutAt ? "Working" : summary.open ? "Open" : "Complete"}</span></div>
         }) : <p className="p-4 text-sm leading-6 text-slate-500">No daily summaries yet. Carlos can save today&apos;s first update.</p>}
       </div>
     </aside>

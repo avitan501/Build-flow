@@ -3,25 +3,23 @@
 import { revalidatePath } from "next/cache"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
-import { DAILY_WORK_SUMMARY_PREFIX, DAILY_WORK_SUMMARY_TITLE_PREFIX, parseDailyWorkSummary, serializeDailyWorkSummary, totalPausedMilliseconds } from "@/lib/daily-work-summary"
+import {
+  applyDailyAttendanceAction,
+  dailyWorkDateKey,
+  DAILY_WORK_SUMMARY_PREFIX,
+  DAILY_WORK_SUMMARY_TITLE_PREFIX,
+  isValidDailyWorkDateKey,
+  parseDailyWorkSummary,
+  serializeDailyWorkSummary,
+  type DailyAttendanceAction,
+} from "@/lib/daily-work-summary"
 import { SUPPLIER_QUOTE_BUCKET } from "@/lib/supplier-quotes"
 
 type SaveDailySummaryResult = { ok: true } | { ok: false; error: string }
 type ExistingSummaryRow = { id: string; title: string; details: string | null; updated_at: string }
 
 function validDate(date: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(`${date}T12:00:00Z`))
-}
-
-function newYorkDate(date: Date) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date)
-  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]))
-  return `${value.year}-${value.month}-${value.day}`
+  return isValidDailyWorkDateKey(date)
 }
 
 async function findDailySummary(supabase: Awaited<ReturnType<typeof requireManagerPortalProfile>>["supabase"], date: string) {
@@ -34,6 +32,20 @@ async function findDailySummary(supabase: Awaited<ReturnType<typeof requireManag
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle<ExistingSummaryRow>()
+}
+
+async function updateDailySummaryIfCurrent(
+  supabase: Awaited<ReturnType<typeof requireManagerPortalProfile>>["supabase"],
+  existing: ExistingSummaryRow,
+  values: { details: string; status?: "open" | "completed" },
+) {
+  return supabase
+    .from("manager_goals")
+    .update(values)
+    .eq("id", existing.id)
+    .eq("updated_at", existing.updated_at)
+    .select("id")
+    .maybeSingle<{ id: string }>()
 }
 
 function revalidateDailySummary() {
@@ -75,11 +87,14 @@ export async function saveDailyWorkSummaryAction(input: {
     paidAt: current?.paidAt,
   })
 
-  const result = existing.data
-    ? await supabase.from("manager_goals").update({ details, status: open ? "open" : "completed" }).eq("id", existing.data.id)
-    : await supabase.from("manager_goals").insert({ assignee: "carlos", title, details, status: open ? "open" : "completed", created_by: user.id })
-
-  if (result.error) return { ok: false, error: "The daily summary could not be saved. Please try again." }
+  if (existing.data) {
+    const result = await updateDailySummaryIfCurrent(supabase, existing.data, { details, status: open ? "open" : "completed" })
+    if (result.error) return { ok: false, error: "The daily summary could not be saved. Please try again." }
+    if (!result.data) return { ok: false, error: "The time log changed while you were editing. Refresh and try again." }
+  } else {
+    const result = await supabase.from("manager_goals").insert({ assignee: "carlos", title, details, status: open ? "open" : "completed", created_by: user.id })
+    if (result.error) return { ok: false, error: "The daily summary could not be saved. Please try again." }
+  }
 
   revalidateDailySummary()
   return { ok: true }
@@ -87,7 +102,7 @@ export async function saveDailyWorkSummaryAction(input: {
 
 export async function recordDailyAttendanceAction(input: {
   date: string
-  action: "check_in" | "pause" | "resume" | "check_out"
+  action: DailyAttendanceAction
   completed?: string
   open?: string
   problems?: string
@@ -95,41 +110,36 @@ export async function recordDailyAttendanceAction(input: {
   const { supabase, user } = await requireManagerPortalProfile()
   const date = input.date.trim()
   const now = new Date()
+  const nowAt = now.toISOString()
 
   if (!validDate(date)) return { ok: false, error: "Choose a valid work date." }
-  if (date !== newYorkDate(now)) return { ok: false, error: "Check in and check out are available only for today." }
+  if (date !== dailyWorkDateKey(now)) return { ok: false, error: "Attendance actions are available only for today's Eastern Time work date." }
 
   const existing = await findDailySummary(supabase, date)
   if (existing.error) return { ok: false, error: "Attendance could not be checked. Please try again." }
 
   const current = existing.data ? parseDailyWorkSummary(existing.data) : null
-  if (input.action === "check_in" && current?.checkInAt) return { ok: false, error: "Carlos is already checked in for today." }
-  if (input.action === "check_out" && !current?.checkInAt) return { ok: false, error: "Carlos must check in before checking out." }
-  if (input.action === "check_out" && current?.checkOutAt) return { ok: false, error: "Carlos is already checked out for today." }
-  if (input.action === "pause" && (!current?.checkInAt || current.checkOutAt)) return { ok: false, error: "Carlos must be working before taking a pause." }
-  if (input.action === "pause" && current?.pauseStartedAt) return { ok: false, error: "Carlos is already paused." }
-  if (input.action === "resume" && !current?.pauseStartedAt) return { ok: false, error: "Carlos is not paused." }
+  const transition = applyDailyAttendanceAction(current, input.action, nowAt)
+  if (!transition.ok) return transition
 
   const checkoutCompleted = input.action === "check_out" ? String(input.completed || "").trim().slice(0, 4000) : ""
   if (input.action === "check_out" && !checkoutCompleted) return { ok: false, error: "Write what you completed today before checking out." }
 
-  const checkInAt = input.action === "check_in" ? now.toISOString() : current?.checkInAt ?? null
-  const checkOutAt = input.action === "check_out" ? now.toISOString() : current?.checkOutAt ?? null
-  const pausedMilliseconds = input.action === "resume" || (input.action === "check_out" && current?.pauseStartedAt)
-    ? totalPausedMilliseconds(current?.pausedMilliseconds ?? 0, current?.pauseStartedAt, now.toISOString())
-    : current?.pausedMilliseconds ?? 0
-  const pauseStartedAt = input.action === "pause" ? now.toISOString() : input.action === "resume" || input.action === "check_out" ? null : current?.pauseStartedAt ?? null
+  const { checkInAt, checkOutAt, pauseStartedAt, pausedMilliseconds } = transition.attendance
   const completed = input.action === "check_out" ? checkoutCompleted : current?.completed ?? ""
   const open = input.action === "check_out" ? String(input.open || "").trim().slice(0, 4000) : current?.open ?? ""
   const problems = input.action === "check_out" ? String(input.problems || "").trim().slice(0, 4000) : current?.problems ?? ""
   const details = serializeDailyWorkSummary({ date, completed, open, problems, problemAttachments: current?.problemAttachments ?? [], checkInAt, checkOutAt, pauseStartedAt, pausedMilliseconds, paidAt: current?.paidAt })
   const status = open || (checkInAt && !checkOutAt) ? "open" : "completed"
   const title = `${DAILY_WORK_SUMMARY_TITLE_PREFIX}${date}`
-  const result = existing.data
-    ? await supabase.from("manager_goals").update({ details, status }).eq("id", existing.data.id)
-    : await supabase.from("manager_goals").insert({ assignee: "carlos", title, details, status, created_by: user.id })
-
-  if (result.error) return { ok: false, error: "Attendance could not be saved. Please try again." }
+  if (existing.data) {
+    const result = await updateDailySummaryIfCurrent(supabase, existing.data, { details, status })
+    if (result.error) return { ok: false, error: "Attendance could not be saved. Please try again." }
+    if (!result.data) return { ok: false, error: "The time log changed in another window. Refresh before recording attendance." }
+  } else {
+    const result = await supabase.from("manager_goals").insert({ assignee: "carlos", title, details, status, created_by: user.id })
+    if (result.error) return { ok: false, error: "Attendance could not be saved. Please try again." }
+  }
 
   revalidateDailySummary()
   return { ok: true }
@@ -157,8 +167,9 @@ export async function markDailySummaryPaidAction(input: { date: string }): Promi
     pausedMilliseconds: current.pausedMilliseconds,
     paidAt: new Date().toISOString(),
   })
-  const result = await supabase.from("manager_goals").update({ details }).eq("id", existing.data.id)
+  const result = await updateDailySummaryIfCurrent(supabase, existing.data, { details })
   if (result.error) return { ok: false, error: "Paid status could not be saved. Please try again." }
+  if (!result.data) return { ok: false, error: "The time log changed in another window. Refresh before marking it paid." }
   revalidateDailySummary()
   return { ok: true }
 }
@@ -196,11 +207,11 @@ export async function uploadDailyProblemPhotoAction(formData: FormData): Promise
   })
   const title = `${DAILY_WORK_SUMMARY_TITLE_PREFIX}${date}`
   const result = existing.data
-    ? await supabase.from("manager_goals").update({ details, status: "open" }).eq("id", existing.data.id)
+    ? await updateDailySummaryIfCurrent(supabase, existing.data, { details, status: "open" })
     : await supabase.from("manager_goals").insert({ assignee: "carlos", title, details, status: "open", created_by: user.id })
-  if (result.error) {
+  if (result.error || (existing.data && !result.data)) {
     await supabase.storage.from(SUPPLIER_QUOTE_BUCKET).remove([path])
-    return { ok: false, error: "The problem image was uploaded but could not be linked to the summary." }
+    return { ok: false, error: existing.data && !result.error ? "The time log changed while the image was uploading. Refresh and try again." : "The problem image was uploaded but could not be linked to the summary." }
   }
   revalidateDailySummary()
   return { ok: true }

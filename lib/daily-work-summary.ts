@@ -1,5 +1,13 @@
 export const DAILY_WORK_SUMMARY_PREFIX = "daily_work_summary:"
 export const DAILY_WORK_SUMMARY_TITLE_PREFIX = "Daily summary - "
+export const DAILY_WORK_TIME_ZONE = "America/New_York"
+
+const dailyWorkDateKeyFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: DAILY_WORK_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+})
 
 export type DailyWorkSummary = {
   id: string
@@ -21,6 +29,42 @@ type DailyWorkSummaryRow = {
   title: string
   details: string | null
   updated_at: string
+}
+
+export type DailyAttendanceAction = "check_in" | "pause" | "resume" | "check_out"
+
+type DailyAttendanceState = Pick<DailyWorkSummary, "checkInAt" | "checkOutAt" | "pauseStartedAt" | "pausedMilliseconds">
+
+type DailyAttendanceTransition =
+  | { ok: true; attendance: DailyAttendanceState }
+  | { ok: false; error: string }
+
+function timestampMilliseconds(value: string | null | undefined) {
+  if (!value) return null
+  const milliseconds = new Date(value).getTime()
+  return Number.isFinite(milliseconds) ? milliseconds : null
+}
+
+function normalizedPausedMilliseconds(value: number) {
+  return Number.isFinite(value) ? Math.max(0, value) : 0
+}
+
+export function dailyWorkDateKey(value: Date | string | number = new Date()) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (!Number.isFinite(date.getTime())) return null
+  const parts = dailyWorkDateKeyFormatter.formatToParts(date)
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day}`
+}
+
+export function isValidDailyWorkDateKey(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
 }
 
 export function parseDailyWorkSummary(row: DailyWorkSummaryRow): DailyWorkSummary | null {
@@ -52,7 +96,7 @@ export function parseDailyWorkSummary(row: DailyWorkSummaryRow): DailyWorkSummar
       checkInAt: typeof value.checkInAt === "string" ? value.checkInAt : null,
       checkOutAt: typeof value.checkOutAt === "string" ? value.checkOutAt : null,
       pauseStartedAt: typeof value.pauseStartedAt === "string" ? value.pauseStartedAt : null,
-      pausedMilliseconds: typeof value.pausedMilliseconds === "number" && value.pausedMilliseconds >= 0 ? value.pausedMilliseconds : 0,
+      pausedMilliseconds: typeof value.pausedMilliseconds === "number" ? normalizedPausedMilliseconds(value.pausedMilliseconds) : 0,
       paidAt: typeof value.paidAt === "string" ? value.paidAt : null,
       updatedAt: row.updated_at,
     }
@@ -77,17 +121,92 @@ export function serializeDailyWorkSummary(input: {
 }
 
 export function calculateWorkedMinutes(checkInAt: string | null | undefined, checkOutAt: string | null | undefined, pausedMilliseconds = 0) {
-  if (!checkInAt || !checkOutAt) return null
-  const checkIn = new Date(checkInAt).getTime()
-  const checkOut = new Date(checkOutAt).getTime()
-  if (!Number.isFinite(checkIn) || !Number.isFinite(checkOut) || checkOut < checkIn) return null
-  return Math.max(0, Math.round((checkOut - checkIn - Math.max(0, pausedMilliseconds)) / 60000))
+  const checkIn = timestampMilliseconds(checkInAt)
+  const checkOut = timestampMilliseconds(checkOutAt)
+  if (checkIn === null || checkOut === null || checkOut < checkIn) return null
+  const elapsedMilliseconds = checkOut - checkIn
+  const paused = Math.min(elapsedMilliseconds, normalizedPausedMilliseconds(pausedMilliseconds))
+  return Math.max(0, Math.round((elapsedMilliseconds - paused) / 60000))
 }
 
 export function totalPausedMilliseconds(pausedMilliseconds: number, pauseStartedAt: string | null | undefined, endAt: string) {
-  if (!pauseStartedAt) return Math.max(0, pausedMilliseconds)
-  const pauseStart = new Date(pauseStartedAt).getTime()
-  const end = new Date(endAt).getTime()
-  if (!Number.isFinite(pauseStart) || !Number.isFinite(end) || end < pauseStart) return Math.max(0, pausedMilliseconds)
-  return Math.max(0, pausedMilliseconds) + (end - pauseStart)
+  const accumulated = normalizedPausedMilliseconds(pausedMilliseconds)
+  if (!pauseStartedAt) return accumulated
+  const pauseStart = timestampMilliseconds(pauseStartedAt)
+  const end = timestampMilliseconds(endAt)
+  if (pauseStart === null || end === null || end < pauseStart) return accumulated
+  return accumulated + (end - pauseStart)
+}
+
+export function calculateDailyWorkMinutes(attendance: DailyAttendanceState, nowAt: string) {
+  const checkIn = timestampMilliseconds(attendance.checkInAt)
+  const endAt = attendance.checkOutAt ?? nowAt
+  const end = timestampMilliseconds(endAt)
+  if (checkIn === null || end === null || end < checkIn) return { workedMinutes: null, pausedMinutes: 0 }
+
+  const elapsedMilliseconds = end - checkIn
+  const pausedMilliseconds = Math.min(
+    elapsedMilliseconds,
+    totalPausedMilliseconds(attendance.pausedMilliseconds, attendance.pauseStartedAt, endAt),
+  )
+
+  return {
+    workedMinutes: calculateWorkedMinutes(attendance.checkInAt, endAt, pausedMilliseconds),
+    pausedMinutes: Math.max(0, Math.round(pausedMilliseconds / 60000)),
+  }
+}
+
+export function applyDailyAttendanceAction(
+  attendance: DailyAttendanceState | null,
+  action: DailyAttendanceAction,
+  nowAt: string,
+): DailyAttendanceTransition {
+  if (timestampMilliseconds(nowAt) === null) return { ok: false, error: "Attendance time is invalid." }
+
+  const current: DailyAttendanceState = attendance ?? {
+    checkInAt: null,
+    checkOutAt: null,
+    pauseStartedAt: null,
+    pausedMilliseconds: 0,
+  }
+
+  if (action === "check_in") {
+    if (current.checkInAt) return { ok: false, error: "Carlos is already checked in for today." }
+    return {
+      ok: true,
+      attendance: { checkInAt: nowAt, checkOutAt: null, pauseStartedAt: null, pausedMilliseconds: 0 },
+    }
+  }
+
+  if (!current.checkInAt) {
+    if (action === "check_out") return { ok: false, error: "Carlos must check in before checking out." }
+    if (action === "resume") return { ok: false, error: "Carlos is not paused." }
+    return { ok: false, error: "Carlos must be working before taking a pause." }
+  }
+  if (current.checkOutAt) return { ok: false, error: "Carlos is already checked out for today." }
+
+  if (action === "pause") {
+    if (current.pauseStartedAt) return { ok: false, error: "Carlos is already paused." }
+    return { ok: true, attendance: { ...current, pauseStartedAt: nowAt } }
+  }
+
+  if (action === "resume") {
+    if (!current.pauseStartedAt) return { ok: false, error: "Carlos is not paused." }
+    return {
+      ok: true,
+      attendance: {
+        ...current,
+        pauseStartedAt: null,
+        pausedMilliseconds: totalPausedMilliseconds(current.pausedMilliseconds, current.pauseStartedAt, nowAt),
+      },
+    }
+  }
+
+  const pausedMilliseconds = current.pauseStartedAt
+    ? totalPausedMilliseconds(current.pausedMilliseconds, current.pauseStartedAt, nowAt)
+    : normalizedPausedMilliseconds(current.pausedMilliseconds)
+  return {
+    ok: true,
+    attendance: { ...current, checkOutAt: nowAt, pauseStartedAt: null, pausedMilliseconds },
+  }
 }
