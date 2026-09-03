@@ -96,3 +96,10 @@ test("a failed mark-read action never crashes an opened conversation", () => {
   expect(actions).not.toContain('.update({ read_at: readAt, last_event_at: readAt })');
   expect(inbox).toContain("The conversation opened, but its unread status could not be updated.");
 });
+
+test("the owner communication timeline uses New York time and shows media-only messages", () => {
+  const workspace = readFileSync(path.join(root, "components/buildflow/aura-communication-workspace.tsx"), "utf8");
+  expect(workspace).toContain("formatSiteDateTime");
+  expect(workspace).toContain("Open attachment");
+  expect(workspace).toContain("communication.media");
+});
