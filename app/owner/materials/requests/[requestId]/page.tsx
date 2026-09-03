@@ -585,7 +585,10 @@ export default async function OwnerMaterialRequestPage({
         ) : null}
         <div className="mt-2">
           <RequestManagementPanel
-            key={routeSelections.map((selection) => `${selection.supplierId || "manual"}:${selection.name}:${selection.note}`).sort().join("|")}
+            key={[
+              ...routeSelections.map((selection) => `${selection.supplierId || "manual"}:${selection.name}:${selection.note}`),
+              ...initialSupplierRecommendations.map((entry) => `${entry.supplierId}:${entry.contactStatus}:${entry.note}`),
+            ].sort().join("|")}
             requestId={request.id}
             requestTitle={request.title}
             client={{

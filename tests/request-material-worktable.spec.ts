@@ -60,17 +60,17 @@ test("review and organization are one compact four-column material work table", 
 })
 
 test("request changes synchronize between staff screens", async () => {
-  const [page, liveSync, management] = await Promise.all([
+  const [page, liveSync] = await Promise.all([
     source(pagePath),
     source(liveSyncPath),
-    source(managementPath),
   ])
 
   expect(page).toContain("<RequestLiveSync />")
   expect(liveSync).toContain("router.refresh()")
   expect(liveSync).toContain("REQUEST_REFRESH_INTERVAL_MS = 10_000")
   expect(liveSync).toContain('window.addEventListener("focus", refresh)')
-  expect(management).toMatch(/useEffect\(\(\) => \{[\s\S]*setSupplierContactStatuses/)
+  expect(page).toContain("entry.contactStatus")
+  expect(page).toContain("entry.note")
 })
 
 test("comparison rows preserve exact request and supplier quote provenance", async () => {
