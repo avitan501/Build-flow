@@ -141,10 +141,12 @@ test("release workflow preserves serialization and end-to-end verification", () 
   );
   const trigger = workflow.indexOf("production-release-guard.mjs trigger");
   const regression = workflow.indexOf("npm run test:release");
+  const cleanGeneratedTypes = workflow.indexOf("rmSync('.next'");
   const build = workflow.indexOf("npm run build");
   const wait = workflow.indexOf("production-release-guard.mjs wait-vercel");
   const live = workflow.indexOf("production-release-guard.mjs verify-live");
   assert.ok(regression > 0 && regression < trigger);
+  assert.ok(cleanGeneratedTypes > regression && cleanGeneratedTypes < build);
   assert.ok(build > regression && build < trigger);
   assert.ok(wait > trigger);
   assert.ok(live > wait);

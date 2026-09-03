@@ -52,6 +52,7 @@ jobs:
 
       - name: Lint, type-check and build
         run: |
+          node -e "require('node:fs').rmSync('.next', { recursive: true, force: true })"
           npm run lint
           npx tsc --noEmit --incremental false
           npm run build
