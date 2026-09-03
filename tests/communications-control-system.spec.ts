@@ -88,8 +88,11 @@ test("communications page does not load the hidden legacy log", () => {
 
 test("a failed mark-read action never crashes an opened conversation", () => {
   const inbox = readFileSync(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8");
+  const actions = readFileSync(path.join(root, "app/admin/communications/actions.ts"), "utf8");
 
   expect(inbox).toContain("try {");
   expect(inbox).toContain("await markCommunicationConversationReadAction");
+  expect(actions).toContain('supabase.rpc("mark_aura_conversation_read"');
+  expect(actions).not.toContain('.update({ read_at: readAt, last_event_at: readAt })');
   expect(inbox).toContain("The conversation opened, but its unread status could not be updated.");
 });

@@ -1170,36 +1170,16 @@ export async function markCommunicationConversationReadAction(input: {
   conversationPhone?: string;
   conversationEmail?: string;
 }): Promise<Result> {
-  const { access } = await requireManagerPortalProfile();
+  const { access, supabase } = await requireManagerPortalProfile();
   const phone = normalizeAuraPhone(input.conversationPhone || "");
   const email = normalizeAuraEmail(input.conversationEmail || "");
   if (!access.customers || (!phone && !email))
     return { ok: false, error: "Choose a valid conversation." };
-  const admin = createAdminClient();
-  const readAt = new Date().toISOString();
-  const updates = await Promise.all([
-    ...(phone
-      ? [
-          admin
-            .from("aura_communications")
-            .update({ read_at: readAt, last_event_at: readAt })
-            .eq("direction", "incoming")
-            .eq("counterparty_phone", phone)
-            .is("read_at", null),
-        ]
-      : []),
-    ...(email
-      ? [
-          admin
-            .from("aura_communications")
-            .update({ read_at: readAt, last_event_at: readAt })
-            .eq("direction", "incoming")
-            .ilike("counterparty_email", email)
-            .is("read_at", null),
-        ]
-      : []),
-  ]);
-  if (updates.some((result) => result.error))
+  const result = await supabase.rpc("mark_aura_conversation_read", {
+    p_phone: phone || null,
+    p_email: email || null,
+  });
+  if (result.error)
     return { ok: false, error: "The conversation could not be marked as read." };
   revalidatePath("/admin/communications");
   return { ok: true };
