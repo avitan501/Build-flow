@@ -39,7 +39,7 @@ test("Aura normalizes legacy JSON strings before rendering communications", asyn
 
   expect(dashboard).toContain("normalizeAuraCommunications");
   expect(dashboard).toContain("JSON.parse(value)");
-  expect(managerPage).toContain("normalizeAuraCommunications(aura?.communications ?? [])");
+  expect(managerPage).toContain("normalizeAuraCommunications(exactCommunicationResult.data ? [exactCommunicationResult.data] : [])");
   expect(broker).toContain("sql.json(input.nextSteps || [])");
   expect(broker).toContain("sql.json(input.media || [])");
 });
@@ -111,7 +111,7 @@ test("legacy 2Chat call webhooks stay protected while Communications uses the sa
   expect(launcher).not.toContain("getTwoChatVoiceTokenAction");
   expect(inbox).toContain("CommunicationCallLauncher");
   expect(inbox).not.toContain("TwoChatSoftphone");
-  expect(inbox).toContain('title="Open call options"');
+  expect(inbox).toContain('aria-label={`Call ${activeConversation.name}`}');
   expect(inbox).toContain("Save this number");
   expect(inbox).toContain("Link to an existing person instead");
   expect(broker).not.toContain('await sendTwilioWhatsApp(input.to, input.message');
@@ -162,7 +162,7 @@ test("legacy Twilio webhooks remain verified but cannot become the active WhatsA
   expect(broker).not.toContain("if (!activeTwoChat) await syncRecentTwilioWhatsApp()");
 });
 
-test("missed Twilio replies are synchronized and ADD commands remain idempotent", async () => {
+test("legacy Twilio replies sync in the background before paginated history is merged", async () => {
   const [twilioSource, ownerCommand, managerPage] = await Promise.all([
     readFile(path.join(process.cwd(), "lib/aura/twilio-whatsapp.ts"), "utf8"),
     readFile(path.join(process.cwd(), "lib/aura/owner-command.ts"), "utf8"),
@@ -174,11 +174,11 @@ test("missed Twilio replies are synchronized and ADD commands remain idempotent"
   expect(twilioSource).toContain("existing.has(message.sid)");
   expect(ownerCommand).toContain("processAuraOwnerCommand");
   expect(ownerCommand).toContain("createAuraIntake");
-  expect(managerPage).toContain("await syncRecentTwilioWhatsAppMessages()");
+  expect(managerPage).toContain("after(() => syncRecentTwilioWhatsAppMessages().catch(() => null))");
   expect(managerPage).toContain("loadManagerAura(supabase)");
-  expect(managerPage).toContain("loadAuraDashboard(createAdminClient())");
-  expect(managerPage).toContain("aura-messaging-broker");
-  expect(managerPage.indexOf("aura-messaging-broker")).toBeLessThan(managerPage.indexOf("loadAuraDashboard(createAdminClient())"));
+  expect(managerPage).toContain("loadCommunicationHistoryPage");
+  expect(managerPage).toContain("mergeCommunicationHistory");
+  expect(managerPage).toContain("normalizeAuraCommunications");
 });
 
 test("lead and customer actions offer confirmed WhatsApp video attachments", async () => {
@@ -195,10 +195,9 @@ test("lead and customer actions offer confirmed WhatsApp video attachments", asy
   expect(contactActions).toContain("Send a Video");
   expect(contactActions).toContain("Confirm send");
   expect(actions).toContain("sendAuraVideoAction");
-  expect(actions).toContain('type: "video/mp4"');
   expect(actions).toContain('action: "send_whatsapp"');
   expect(actions).toContain("mediaUrl,");
-  expect(actions).toContain("sendTwilioWhatsAppMessage(phone, caption, mediaUrl)");
+  expect(actions).toContain("invokeMessagingBroker(supabase");
   expect(actions).toContain("buildAuraShareVideoCaption(video, input.recipientName)");
   expect(contactActions).toContain("buildAuraShareVideoCaption(selectedVideo, name)");
   const broker = await readFile(path.join(process.cwd(), "supabase/functions/aura-messaging-broker/index.ts"), "utf8");

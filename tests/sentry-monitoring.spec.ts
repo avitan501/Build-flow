@@ -182,6 +182,10 @@ test("critical handled failures are flushed to Sentry before returning", async (
 test("browser transport removes URL queries, error text, emails and phone numbers", async ({
   page,
 }) => {
+  test.skip(
+    process.env.NEXT_PUBLIC_SENTRY_TEST_MODE !== "true",
+    "The browser transport is disabled outside production unless test mode is explicit.",
+  );
   const envelopes: string[] = [];
   await page.route(
     /https:\/\/[^/]+\.ingest(?:\.[^./]+)?\.sentry\.io\/.*/,

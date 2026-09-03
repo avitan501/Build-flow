@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { BarChart3, Bot, Calculator, Clapperboard, Files, ListTree, Store, Video } from "lucide-react"
+import { BarChart3, Bot, Calculator, Clapperboard, Files, LibraryBig, ListTree, MessageSquareText, Search, Store, Video } from "lucide-react"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
 
@@ -12,6 +12,10 @@ export default async function AdminAiToolsPage() {
     { href: "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Avantia%20Build%20meeting%20with%20Carlos&details=Avantia%20Build%20manager%20meeting&add=buildavantiap%40gmail.com", title: "Google Meet", description: "Schedule a manager meeting with Carlos without using permanent sidebar space.", icon: Video },
     { href: "/admin/ai-tools/media-messages", title: "Media & Messages", description: "Preview approved videos and pages, copy exact wording, and open a safe editable communication draft.", icon: Clapperboard },
     ...(access.owner ? [{ href: "/admin/ai-tools/aura", title: "Aura AI", description: "Reply settings, construction knowledge, and the private internal library in one place.", icon: Bot, badge: "Private" }] : []),
+    ...(access.owner ? [{ href: "/admin/ai-tools/internal-library", title: "Aura Internal Library", description: "Search private, retrieval-only operating knowledge. Nothing here can be sent to a customer.", icon: LibraryBig, badge: "Owner" }] : []),
+    ...(access.owner ? [{ href: "/admin/ai-tools/construction-amazon-deals", title: "Amazon Construction Deals", description: "Research construction products through the verified Amazon Associates record.", icon: Store, badge: "Owner" }] : []),
+    { href: "/admin/ai-tools/locate-cheap-item", title: "Locate Cheap Item", description: "Compare live public sources for a specific material without sending or ordering.", icon: Search, badge: "Live beta" },
+    { href: "/admin/ai-tools/sms-replies", title: "AI Reply Settings", description: "Set the global safety and follow-up rules for customer text replies.", icon: MessageSquareText },
     ...(access.suppliers ? [{ href: "/admin/documents", title: "Documents", description: "Upload once, let AI prepare the details, then review and choose the correct destination.", icon: Files }] : []),
     { href: "/admin/ai-tools/material-list", title: "Material List Organizer", description: "Turn field notes and supplier lists into editable rows and CSV.", icon: ListTree },
     { href: "/shop/wood-floor/flooring-calculator", title: "Wood Floor Calculator", description: "Room takeoff, waste allowance, and marked-plan workflow.", icon: Calculator },

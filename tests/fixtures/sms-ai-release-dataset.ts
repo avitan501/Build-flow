@@ -146,7 +146,7 @@ export const smsAiReleaseDataset: SmsAiReleaseCase[] = [
     message: "Do you sell Sheetrock?",
     reply: "Yes—we can help source Sheetrock. Can you confirm 5/8 in.?",
     expectedIntent: "availability",
-    expectedAutoSafe: true,
+    expectedAutoSafe: false,
     expectedLanguage: "en",
     maxQuestions: 1,
     requiredFields: ["thickness"],

@@ -84,7 +84,7 @@ test("research, verified affiliate, and dashboard links use the correct external
   expect(researchSection).not.toContain("sponsored")
   expect(source).toContain("program.affiliate_test_url")
   expect(source).toContain('rel="noopener noreferrer sponsored"')
-  expect(source).toContain("Open verified Amazon link")
+  expect(source).toContain("Open Amazon affiliate link")
   expect(source).toContain("program.application_url")
   expect(source).toContain("Associates dashboard")
   expect(source.match(/target="_blank"/g)?.length).toBeGreaterThanOrEqual(3)

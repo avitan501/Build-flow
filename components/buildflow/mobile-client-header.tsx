@@ -193,7 +193,7 @@ export function MobileClientHeader({ isSignedIn, isAdmin, managerHref = "/admin/
               href="/"
               prefetch={false}
               aria-label="Avantia Build home"
-              className="flex min-h-10 shrink-0 items-center overflow-hidden transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
+              className="hidden min-h-10 shrink-0 items-center overflow-hidden transition active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 min-[360px]:flex"
             >
               <span className="text-[13px] font-semibold tracking-tight text-[#1d1d1f]">Avantia</span>
             </Link>

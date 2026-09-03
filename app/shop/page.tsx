@@ -25,7 +25,7 @@ export default async function ShopPage({ searchParams }: { searchParams: ShopSea
   const showCatalog = Boolean(category || search)
 
   if (!showCatalog) {
-    return <ShopShowroom />
+    return <><ShopShowroom /><ShopFaq /></>
   }
 
   const [{ data: itemsData, error }, recentActivity] = await Promise.all([

@@ -238,18 +238,19 @@ test("David quote challenge is private, persistent, and action focused", async (
   expect(migration).not.toContain("to anon");
 });
 
-test("homepage preview has five distinct designs and video stories", async () => {
+test("approved homepage keeps the selected layout, three-photo hero, process film, and services", async () => {
   const preview = await readFile(
     path.join(root, "components/buildflow/homepage-concept-preview.tsx"),
     "utf8",
   );
-  for (const name of ["Quote Rescue", "Before / After", "Crew Moving", "Supplier Grid", "Delivery Mission"]) {
-    expect(preview).toContain(name);
+  expect(preview).toContain("reviewHeroPhotos");
+  expect(preview).toContain("hero-material-yard-v4.webp");
+  expect(preview).toContain("hero-long-island-home-v4.webp");
+  expect(preview).toContain("hero-exterior-materials-v4.webp");
+  expect(preview).toContain("homepage-material-process.mp4");
+  expect(preview).toContain("ShopBrandShowcase compact transparent");
+  for (const service of ["Beat Your Quote", "Send Any Material List", "Find a Specific Item"]) {
+    expect(preview).toContain(service);
   }
-  expect(preview).toContain("01-contractor-request.mp4");
-  expect(preview).toContain("supplier-comparison.mp4");
-  expect(preview).toContain("02-contractor-crew-moving.mp4");
-  expect(preview).toContain("04-supplier-send-products.mp4");
-  expect(preview).toContain("delivery-coordination.mp4");
-  expect(preview).toContain("Different message. Different film. Different design.");
+  expect(preview).toContain("Serving all 50 states");
 });

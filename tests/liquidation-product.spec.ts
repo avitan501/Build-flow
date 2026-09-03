@@ -55,16 +55,15 @@ test("Bruce flooring and 24 x 48 tile are separate liquidation products", async 
   expect(catalog).toContain('color and finish to be confirmed');
 });
 
-test("Order Materials opens the service hub while category links retain the catalog", async () => {
+test("Order Materials opens the compact category hub while category links retain the catalog", async () => {
   const [shopPage, catalogExperience, detailExperience] = await Promise.all([
     readFile(path.join(root, "app/shop/page.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/shop-catalog-experience.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/shop-product-detail-experience.tsx"), "utf8"),
   ]);
 
-  expect(shopPage).toContain("<HomepageShopPicker");
+  expect(shopPage).toContain("<ShopShowroom");
   expect(shopPage).toContain("const showCatalog = Boolean(category || search)");
-  expect(shopPage).toContain("Order materials");
   expect(shopPage).toContain("<ShopCatalogExperience");
   expect(shopPage).not.toContain("<ShopProjectToolPicker");
   expect(shopPage).not.toContain("Project address");

@@ -32,7 +32,7 @@ test("live SMS automation prioritizes the new message without draining old backl
   expect(webhook).toContain("EdgeRuntime.waitUntil(");
   expect(webhook).toContain("accepted: true }, 202");
   expect(webhook).toContain("${sql.json(payload)}");
-  expect(polled).toContain("select id from public.aura_communications");
+  expect(polled).toMatch(/select id, body, media from public\.aura_communications/);
   expect(polled).toContain("if (existing[0]?.id)");
   expect(polled).toContain("dispatchSmsAutomationWorker()");
   expect(polled).not.toContain("canonical[0]?.external_event_id");

@@ -50,12 +50,13 @@ test("manager communications support file attachments and phone-number history",
 
   expect(workspace).toContain('aria-label="Remove attachment"')
   expect(workspace).toContain("Add attachment")
-  expect(workspace).toContain("Q U O supports up to 5 MB")
+  expect(actions).toContain("Keep Q U O attachments under 5 MB")
   expect(workspace).toContain("Search chats")
   expect(workspace).toContain("activeConversation.messages.map")
   expect(workspace).toContain("prepared.quoWebUrl")
   expect(workspace).toContain("prepared.attachmentUrl")
-  expect(workspace).toContain("window.setInterval(refresh, 10_000)")
+  expect(workspace).toContain("/api/admin/communications/updates?after=")
+  expect(workspace).toContain("window.setTimeout(sync, delay)")
   expect(actions).toContain('quoWebUrl: "https://my.quo.com/inbox"')
   expect(actions).toContain("attachmentUrl: signed.data.signedUrl")
   expect(actions).toContain("prepareQuoAttachmentMessageAction")
@@ -85,19 +86,17 @@ test("supplier draft supports channel checkboxes and an exact safe preview", asy
   expect(page).toContain("whatsapp: supplier.whatsapp")
 })
 
-test("owner ADD WhatsApp commands require AI review and confirmation", async () => {
-  const [route, command, intake] = await Promise.all([
-    readFile(path.join(root, "app/api/aura/whatsapp/twilio/route.ts"), "utf8"),
-    readFile(path.join(root, "lib/aura/owner-command.ts"), "utf8"),
+test("trusted phone ADD commands require AI review and owner approval", async () => {
+  const [broker, command, intake] = await Promise.all([
+    readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8"),
+    readFile(path.join(root, "supabase/functions/_shared/trusted-phone-intake-routing.ts"), "utf8"),
     readFile(path.join(root, "lib/aura/intake.ts"), "utf8"),
   ])
 
-  expect(route).toContain("processAuraOwnerCommand")
-  expect(command).toContain("OWNER_ADD_PHONE")
-  expect(command).toContain("createAuraIntake")
-  expect(command).toContain("confirmAuraIntakeByCode")
-  expect(command).toContain("cancelAuraIntakeByCode")
-  expect(command).toContain("/^add")
+  expect(command).toContain("trustedPhoneAddCommandText")
+  expect(command).toContain("isExplicitTrustedPhoneAddCommand")
+  expect(broker).toContain("createTrustedSmsIntake")
+  expect(broker).toContain("Nothing is saved until the owner approves it")
   expect(intake).toContain('z.enum(["contact", "client", "lead", "task", "material_request"])')
   expect(intake).toContain("Reply CONFIRM")
 })

@@ -227,11 +227,17 @@ test("contact bar uses a strict marketing allowlist and never overlaps the mobil
   }
 });
 
-test("how-it-works opens a six-video swipeable walkthrough", async ({
+test("the homepage opens a six-video swipeable walkthrough", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "See How It Works" }).click();
+  if ((page.viewportSize()?.width ?? 0) < 640) {
+    await page.getByTestId("public-contact-bar").getByRole("button", { name: "Start by Text" }).click();
+    await page.getByRole("button", { name: "See full 6-step flow" }).click();
+  } else {
+    await page.getByRole("button", { name: "Open chat" }).click();
+    await page.getByRole("button", { name: "See full 6-step flow" }).click();
+  }
 
   const dialog = page.getByRole("dialog", { name: "See the full flow." });
   await expect(dialog).toBeVisible();
@@ -289,7 +295,13 @@ test("walkthrough respects reduced motion and closes cleanly when navigation hid
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  await page.getByRole("button", { name: "See How It Works" }).click();
+  if ((page.viewportSize()?.width ?? 0) < 640) {
+    await page.getByTestId("public-contact-bar").getByRole("button", { name: "Start by Text" }).click();
+    await page.getByRole("button", { name: "See full 6-step flow" }).click();
+  } else {
+    await page.getByRole("button", { name: "Open chat" }).click();
+    await page.getByRole("button", { name: "See full 6-step flow" }).click();
+  }
   const video = page.getByLabel("1 of 6: Start with one text");
   await expect(video).toBeVisible();
   await expect

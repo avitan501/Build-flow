@@ -620,6 +620,13 @@ export function PublicContactBar() {
                     className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#071126]/90 via-[#071126]/20 to-[#071126]/35"
                     aria-hidden="true"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setOpenPanel("demo")}
+                    className="absolute right-2.5 top-2.5 inline-flex min-h-8 items-center rounded-full border border-white/25 bg-[#071126]/80 px-3 text-[9px] font-extrabold text-white shadow-lg backdrop-blur focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5eead4]"
+                  >
+                    See full 6-step flow
+                  </button>
                   <div
                     className="pointer-events-none absolute inset-x-3 bottom-11 rounded-xl bg-[#071126]/92 px-3.5 py-3 text-white shadow-xl backdrop-blur"
                     data-testid="text-demo-step"
