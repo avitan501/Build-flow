@@ -385,3 +385,29 @@ test("organizer has bounded OpenAI deadlines and the server action only enqueues
   expect(scheduler).toContain('after(async () =>')
   expect(scheduler).toContain('"enqueue_client_material_list_job_for_requester"')
 })
+
+test("partial AI organization keeps manually added request rows in pricing", async () => {
+  const [page, supplierActions] = await Promise.all([
+    source(pagePath),
+    source(supplierQuoteActionsPath),
+  ])
+
+  for (const implementation of [page, supplierActions]) {
+    expect(implementation).toContain("organizedSourceIds")
+    expect(implementation).toContain("!organizedSourceIds.has(item.id)")
+  }
+})
+
+test("step three starts from the latest client-ready-to-pay values", async () => {
+  const [page, management] = await Promise.all([
+    source(pagePath),
+    source(managementPath),
+  ])
+
+  expect(page).toContain("clientReadyToPayDefaults")
+  expect(page).toContain("client_unit_price")
+  expect(page).toContain("client_delivery_charge")
+  expect(management).toContain("clientReadyToPayDefaults.itemUnitPrices[item.id]")
+  expect(management).toContain("clientReadyToPayDefaults.deliveryCharge")
+  expect(management).toContain("clientReadyToPayDefaults.salesTaxRate")
+})
