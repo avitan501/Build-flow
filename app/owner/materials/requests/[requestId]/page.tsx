@@ -93,6 +93,19 @@ type ComparisonRecord = Pick<
   | "client_tax_percent"
   | "updated_at"
 >;
+type CurrentClientDocumentAcceptance = {
+  acceptance_id: string;
+  request_id: string;
+  document_type: "estimate" | "invoice";
+  document_number: string;
+  document_version: number;
+  terms_version: string;
+  terms_hash: string;
+  signer_name: string;
+  signer_email: string | null;
+  accepted_at: string;
+  accepted_timezone: string;
+};
 
 function zipCodeFromAddress(address: string | null | undefined) {
   return address?.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || "11516";
@@ -116,6 +129,7 @@ export default async function OwnerMaterialRequestPage({
     { data: comparisons },
     { data: supplierRecommendations },
     { data: clientDocuments },
+    { data: currentClientDocumentAcceptances, error: clientDocumentAcceptancesError },
   ] = await Promise.all([
     supabase
       .from("quote_requests")
@@ -191,13 +205,20 @@ export default async function OwnerMaterialRequestPage({
       .eq("request_id", requestId)
       .order("updated_at", { ascending: false })
       .returns<Array<{ document_type: "estimate" | "invoice" | "receipt"; document_number: string; document_data: RequestClientDocumentSnapshot["documentData"]; public_token: string; version: number; updated_at: string }>>(),
+    supabase
+      .rpc("get_request_current_client_document_acceptances", { p_request_id: requestId })
+      .returns<CurrentClientDocumentAcceptance[]>(),
   ]);
   if (attachmentsError) console.error("Request attachments could not be loaded", { requestId, reason: attachmentsError.message });
+  if (clientDocumentAcceptancesError) console.error("Current client document acceptances could not be loaded", { requestId, reason: clientDocumentAcceptancesError.message });
   if (requestError)
     throw new Error(
       `Could not load this material request: ${requestError.message}`,
     );
   if (!request) notFound();
+  const currentClientDocumentAcceptanceRows = Array.isArray(currentClientDocumentAcceptances)
+    ? currentClientDocumentAcceptances as CurrentClientDocumentAcceptance[]
+    : [];
   const clientActions = (clientActionEvents ?? []).filter(
     (event) => typeof event.metadata?.client_action === "string",
   );
@@ -215,8 +236,10 @@ export default async function OwnerMaterialRequestPage({
     clientActions.map((event) => event.metadata),
     receiptDocument ? { documentNumber: receiptDocument.document_number, publicToken: receiptDocument.public_token, version: receiptDocument.version } : null,
   );
+  const currentEstimateAcceptance = currentClientDocumentAcceptanceRows.find((acceptance) => acceptance.document_type === "estimate") ?? null;
   const clientApproved = clientActions.some((event) => event.metadata.client_action === "client_approved")
     || (comparisons ?? []).some((comparison) => comparison.client_quote_status === "accepted")
+    || Boolean(currentEstimateAcceptance)
     || paymentReceived;
   const initialPaymentDelivery = {
     documentType: latestClientDocument?.metadata.client_action === "receipt_sent" ? "receipt" as const : latestClientDocument?.metadata.client_action === "invoice_sent" ? "invoice" as const : null,
@@ -228,6 +251,22 @@ export default async function OwnerMaterialRequestPage({
     paymentReceived,
     deliveryScheduled: clientActions.some((event) => event.metadata.client_action === "delivery_scheduled"),
   };
+  const activityEvents = [
+    ...(clientActionEvents ?? []),
+    ...currentClientDocumentAcceptanceRows.map((acceptance) => ({
+      id: `client-document-acceptance-${acceptance.acceptance_id}`,
+      title: `${acceptance.document_type === "invoice" ? "Invoice" : "Estimate"} ${acceptance.document_number} accepted by client`,
+      description: `${acceptance.signer_name} acknowledged exact document version ${acceptance.document_version}.`,
+      metadata: {
+        client_action: acceptance.document_type === "estimate" ? "client_approved" : "invoice_acknowledged",
+        document_type: acceptance.document_type,
+        document_number: acceptance.document_number,
+        document_version: acceptance.document_version,
+        acceptance_id: acceptance.acceptance_id,
+      },
+      created_at: acceptance.accepted_at,
+    })),
+  ].sort((left, right) => right.created_at.localeCompare(left.created_at));
   const workflowOverrides = new Map<number, boolean>();
   for (const event of clientActionEvents ?? []) {
     if (event.metadata?.manager_action !== "workflow_step_status") continue;
@@ -683,8 +722,8 @@ export default async function OwnerMaterialRequestPage({
             <h2 className="text-lg font-bold text-slate-950">
               Activity log
             </h2>
-            {clientActionEvents?.length ? <div className="mt-3 divide-y divide-slate-100">
-              {clientActionEvents.map((event) => (
+            {activityEvents.length ? <div className="mt-3 divide-y divide-slate-100">
+              {activityEvents.map((event) => (
                 <article key={event.id} className="py-3 first:pt-0 last:pb-0">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <h3 className="text-sm font-bold text-slate-900">

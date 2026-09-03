@@ -44,6 +44,32 @@ test("the public acceptance wrapper hashes only the exact stored terms", async (
   expect(migration).not.toContain("p_terms_hash text")
 })
 
+test("authorized managers can read only current-version client document acceptances", async () => {
+  const migration = await readFile(path.join(root, "supabase/migrations/20260903233412_expose_current_client_document_acceptance_to_staff.sql"), "utf8")
+  expect(migration).toContain("create or replace function public.get_request_current_client_document_acceptances")
+  expect(migration).toContain("private.has_staff_capability('customers')")
+  expect(migration).toContain("acceptance.document_version = document.version")
+  expect(migration).toContain("document.request_id = p_request_id")
+  expect(migration).toContain("to authenticated")
+  expect(migration).toContain("from public, anon")
+})
+
+test("request manager uses exact current estimate acceptance as approval and activity", async () => {
+  const page = await readFile(path.join(root, "app/owner/materials/requests/[requestId]/page.tsx"), "utf8")
+  expect(page).toContain('rpc("get_request_current_client_document_acceptances"')
+  expect(page).toContain('acceptance.document_type === "estimate"')
+  expect(page).toContain("Boolean(currentEstimateAcceptance)")
+  expect(page).toContain("activityEvents.map")
+  expect(page).toContain("acknowledged exact document version")
+})
+
+test("saved client documents capture the request owner's email for signer matching", async () => {
+  const actions = await readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8")
+  const panel = await readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8")
+  expect(actions).toContain("clientEmail: client?.email?.trim().toLowerCase() || undefined")
+  expect(panel).toContain("clientEmail?: string")
+})
+
 test("estimate and invoice links show one terms block and an explicit unchecked gate", async () => {
   const page = await readFile(path.join(root, "app/client-document/[token]/page.tsx"), "utf8")
   const form = await readFile(path.join(root, "app/client-document/[token]/client-document-acceptance.tsx"), "utf8")

@@ -806,6 +806,7 @@ async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
     issueDate: String(input.issueDate || "").slice(0, 30),
     expiresOn: String(input.expiresOn || "").slice(0, 30),
     clientName: client?.full_name || client?.email || "Client",
+    clientEmail: client?.email?.trim().toLowerCase() || undefined,
     clientAddress: String(input.clientAddress || "").trim().slice(0, 500),
     shipTo: String(input.shipTo || request.projects?.address || "").trim().slice(0, 500),
     requestTitle: request.title,

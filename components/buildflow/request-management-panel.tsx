@@ -46,6 +46,7 @@ export type RequestClientDocumentSnapshot = {
   updatedAt: string
   documentData: {
     issueDate?: string
+    clientEmail?: string
     clientAddress?: string
     shipTo?: string
     lines?: Array<{ description: string; quantity: number; unit: string; unitPrice: number }>
