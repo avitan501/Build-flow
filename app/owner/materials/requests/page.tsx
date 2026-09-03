@@ -44,7 +44,7 @@ export default async function MaterialRequestsInboxPage({
   const departments = Array.from(new Set([...(categories ?? []).map((category) => category.department_key), ...MATERIAL_DEPARTMENTS]))
   const activeRequests = requests.filter((request) => request.status !== "closed")
   const closedRequests = requests.filter((request) => request.status === "closed")
-  const statusLabels: Record<string, string> = { draft: "Draft", submitted: "New", in_review: "In progress", quoted: "Quote sent", closed: "Archived" }
+  const statusLabels: Record<string, string> = { draft: "Draft", submitted: "New", in_review: "In progress", quoted: "Payment received", closed: "Archived" }
 
   function requestCard(request: InboxRequest) {
     const profile = profileMap.get(request.owner_id)

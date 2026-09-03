@@ -1,13 +1,13 @@
 "use client"
 
-import { CalendarClock, CheckCircle2, ChevronDown, CreditCard, Download, FileCheck2, FileText, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, ReceiptText, Route, Search, Send, Trash2, X } from "lucide-react"
+import { Award, CalendarClock, Check, CheckCircle2, ChevronDown, CircleDollarSign, Download, FileCheck2, FileText, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, ReceiptText, Route, Search, Send, Trash2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
 import { openRequestPricingComparisonAction } from "@/app/admin/supplier-quotes/actions"
-import { previewRequestClientQuoteAction, recordRequestClientDocumentSentAction, recordRequestPaymentLinkSentAction, saveRequestClientDocumentAction, saveRequestManagerNotesAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
+import { previewRequestClientQuoteAction, recordRequestClientApprovalAction, recordRequestClientDocumentSentAction, recordRequestPaymentLinkSentAction, recordRequestPaymentReceivedAction, saveRequestClientDocumentAction, saveRequestManagerNotesAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
 import { AutosaveStatus } from "@/components/buildflow/autosave-status"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
 import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
@@ -20,12 +20,13 @@ import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
 import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms"
 import { AVANTIA_PAYMENT_LINK } from "@/lib/payment-link"
 import type { RequestClientDocumentType } from "@/lib/request-client-quote-pdf"
+import { requestWorkflowState, type RequestWorkflowAction } from "@/lib/request-workflow-state"
 import { findCanonicalSupplier } from "@/lib/supplier-canonical"
 import { useSequencedAutosave } from "@/lib/use-sequenced-autosave"
 
 type PackageRoute = { id: string; department: string; supplier_id: string | null; status: string }
 type QuoteLine = { key: string; description: string; quantity: number; unit: string; unitPrice: number }
-export type RequestComparisonSummary = { id: string; title: string; status: string; quoteNumber: string; updatedAt: string; bids: Array<{ id: string; supplierName: string; landedTotal: number; pricedItemCount: number; itemCount: number; recommended: boolean }> }
+export type RequestComparisonSummary = { id: string; title: string; status: string; awardedBidId: string | null; clientQuoteStatus: string; quoteNumber: string; updatedAt: string; bids: Array<{ id: string; supplierName: string; landedTotal: number; pricedItemCount: number; itemCount: number; recommended: boolean }> }
 export type RequestSupplierRouteSelection = { supplierId: string | null; name: string; note: string }
 export type RequestClientDocumentSnapshot = {
   documentType: RequestClientDocumentType
@@ -78,6 +79,22 @@ const REPLY_BLOCKS = [
   { id: "delivery", label: "Delivery scheduled", text: "Your material delivery is scheduled." },
 ] as const
 
+const WORKFLOW_ACTION_LABELS: Record<RequestWorkflowAction, string> = {
+  "choose-suppliers": "Choose Suppliers",
+  "contact-suppliers": "Contact Suppliers",
+  "add-supplier-quote": "Add Supplier Quote",
+  "review-quote": "Review Quote",
+  "compare-quotes": "Compare Quotes",
+  "send-estimate": "Create & Send Estimate",
+  "wait-for-approval": "Waiting for Client Approval",
+  "create-invoice": "Create Invoice",
+  "send-payment-link": "Send Payment Link",
+  "mark-paid": "Mark Payment Received",
+  "create-receipt": "Create Receipt",
+  "schedule-delivery": "Schedule Delivery",
+  complete: "Complete",
+}
+
 function deliveryDateLabel(value: string) {
   if (!value) return ""
   return new Date(`${value}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
@@ -108,7 +125,6 @@ export function RequestManagementPanel({
   pricingSummaryItems,
   routeSelections,
   projectAddress,
-  currentStage,
   comparisons,
   clientReplyCompleted,
   step2CompletedOverride,
@@ -134,7 +150,7 @@ export function RequestManagementPanel({
   clientReplyCompleted: boolean
   step2CompletedOverride: boolean | null
   step3CompletedOverride: boolean | null
-  initialPaymentDelivery: { documentType: "invoice" | "receipt" | null; paymentLinkSent: boolean; deliveryScheduled: boolean }
+  initialPaymentDelivery: { documentType: "invoice" | "receipt" | null; estimateSent: boolean; clientApproved: boolean; invoiceSent: boolean; receiptSent: boolean; paymentLinkSent: boolean; paymentReceived: boolean; deliveryScheduled: boolean }
   initialClientDocuments: RequestClientDocumentSnapshot[]
   initialManagerNotes: string
   initialSupplierRecommendations: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean }>
@@ -161,9 +177,15 @@ export function RequestManagementPanel({
   const [deliveryAddress, setDeliveryAddress] = useState(projectAddress)
   const [deliveryOpen, setDeliveryOpen] = useState(false)
   const [clientReplyDone, setClientReplyDone] = useState(clientReplyCompleted)
+  const [estimateSent, setEstimateSent] = useState(initialPaymentDelivery.estimateSent)
+  const [clientApproved, setClientApproved] = useState(initialPaymentDelivery.clientApproved)
+  const [invoiceSent, setInvoiceSent] = useState(initialPaymentDelivery.invoiceSent)
+  const [receiptSent, setReceiptSent] = useState(initialPaymentDelivery.receiptSent)
   const [paymentLinkSent, setPaymentLinkSent] = useState(initialPaymentDelivery.paymentLinkSent)
-  const [documentSent, setDocumentSent] = useState<"invoice" | "receipt" | null>(initialPaymentDelivery.documentType)
+  const [paymentReceived, setPaymentReceived] = useState(initialPaymentDelivery.paymentReceived)
   const [deliveryScheduled, setDeliveryScheduled] = useState(initialPaymentDelivery.deliveryScheduled)
+  const [supplierRoutingOpen, setSupplierRoutingOpen] = useState(false)
+  const [quoteEntryOpen, setQuoteEntryOpen] = useState(false)
   const [contactOpen, setContactOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
   const [documentType, setDocumentType] = useState<RequestClientDocumentType>("estimate")
@@ -513,6 +535,12 @@ export function RequestManagementPanel({
     setQuoteLines((current) => current.map((line) => line.key === key ? { ...line, ...patch } : line))
   }
 
+  function markDocumentSent(type: RequestClientDocumentType) {
+    if (type === "estimate") setEstimateSent(true)
+    if (type === "invoice") setInvoiceSent(true)
+    if (type === "receipt") setReceiptSent(true)
+  }
+
   function downloadQuote() {
     setQuoteFeedback("")
     startTransition(async () => {
@@ -537,9 +565,10 @@ export function RequestManagementPanel({
       const message = `${quoteMessage.trim() || `Hello ${firstName}, your Avantia Build ${documentLabel.toLowerCase()} is ready.`}\n\nOpen or download the latest version: ${saved.shareUrl}`
       const sent = await sendAuraMessageAction({ channel: "sms", recipient: client.phone, recipientLabel: client.name, message, materialRequestId: requestId, materialRequestTitle: requestTitle })
       if (!sent.ok) return setQuoteFeedback(sent.error)
-      await recordRequestClientDocumentSentAction({ requestId, documentType, documentNumber: quoteNumber, channel: "sms" })
+      const recorded = await recordRequestClientDocumentSentAction({ requestId, documentType, documentNumber: quoteNumber, channel: "sms" })
+      if (!recorded.ok) return setQuoteFeedback(recorded.error)
       setDocumentLinks((current) => ({ ...current, [documentType]: saved.shareUrl }))
-      if (documentType === "invoice" || documentType === "receipt") setDocumentSent(documentType)
+      markDocumentSent(documentType)
       setQuoteFeedback(`${documentLabel} link sent by text. Future edits will update the same link.`)
     })
   }
@@ -564,38 +593,155 @@ export function RequestManagementPanel({
       if (result.ok) {
         setFeedback(`${label} ${quoteNumber} emailed to ${client.email}.`)
         setClientReplyDone(true)
-        if (documentType === "invoice" || documentType === "receipt") setDocumentSent(documentType)
+        markDocumentSent(documentType)
         if (result.shareUrl) setDocumentLinks((current) => ({ ...current, [documentType]: result.shareUrl }))
       }
     })
   }
 
+  function markPaymentReceived() {
+    if (!window.confirm("Confirm that the client payment was received?")) return
+    startTransition(async () => {
+      setFeedback("")
+      const result = await recordRequestPaymentReceivedAction({ requestId })
+      setFeedbackError(!result.ok)
+      setFeedback(result.ok ? "Client payment marked received." : result.error)
+      if (result.ok) {
+        setPaymentReceived(true)
+        router.refresh()
+      }
+    })
+  }
+
+  function markClientApproved() {
+    if (!window.confirm("Confirm that the client approved this estimate?")) return
+    startTransition(async () => {
+      setFeedback("")
+      const result = await recordRequestClientApprovalAction({ requestId })
+      setFeedbackError(!result.ok)
+      setFeedback(result.ok ? "Client approval recorded." : result.error)
+      if (result.ok) {
+        setClientApproved(true)
+        router.refresh()
+      }
+    })
+  }
+
   const supplierQuoteCount = comparisons.reduce((total, comparison) => total + comparison.bids.length, 0)
-  const pricingComplete = step2CompletedOverride ?? supplierQuoteCount > 0
-  const pricingStatus = pricingComplete ? "complete" : currentStage === "pricing" ? "active" : "upcoming"
-  const paymentDeliveryComplete = step3CompletedOverride ?? Boolean(documentSent === "receipt" && deliveryScheduled)
-  const paymentDeliveryStatus = paymentDeliveryComplete ? "complete" : ["approval", "delivery"].includes(currentStage) || pricingComplete ? "active" : "upcoming"
+  const winningComparison = comparisons.find((comparison) => comparison.status === "awarded" && Boolean(comparison.awardedBidId)) ?? null
+  const primaryComparison = winningComparison ?? comparisons[0] ?? null
+  const winningBid = winningComparison?.bids.find((bid) => bid.id === winningComparison.awardedBidId) ?? null
+  const selectedSupplierNames = [...new Set([
+    ...routeSupplierNames,
+    ...supplierIds.flatMap((supplierId) => availableSuppliers.find((supplier) => supplier.id === supplierId)?.name || []),
+  ])].sort(supplierNameCollator.compare)
+  const workflow = requestWorkflowState({
+    routeSupplierCount: selectedSupplierNames.length,
+    supplierRequestCount: packages.length,
+    supplierQuoteCount,
+    winningSupplierSelected: Boolean(winningComparison),
+    estimateSent,
+    clientApproved,
+    invoiceSent,
+    paymentLinkSent,
+    paymentReceived,
+    receiptSent,
+    deliveryScheduled,
+    step2CompletedOverride,
+    step3CompletedOverride,
+  })
+  const pricingStatus = workflow.step2Status
+  const paymentDeliveryStatus = workflow.step3Status
   const replyComplete = clientReplyDone
-  const fulfillmentDetail = [documentSent ? `${documentSent === "invoice" ? "Invoice" : "Receipt"} sent` : "Document not sent", paymentLinkSent ? "payment link sent" : "payment link not sent", deliveryScheduled ? "delivery scheduled" : "delivery not scheduled"].join(" · ")
+  const pricingDetail = workflow.step2Complete
+    ? winningBid ? `Selected: ${winningBid.supplierName}` : "Supplier pricing complete"
+    : `Next: ${WORKFLOW_ACTION_LABELS[workflow.step2Action]}`
+  const fulfillmentDetail = `Next: ${WORKFLOW_ACTION_LABELS[workflow.step3Action]}`
+  const latestClientDocument = initialClientDocuments[0] ?? null
+  const supplierProgressRows = selectedSupplierNames.map((name) => {
+    const supplier = findCanonicalSupplier(availableSuppliers, { supplierId: null, name }) ?? null
+    const bid = comparisons.flatMap((comparison) => comparison.bids).find((candidate) => supplierNameCollator.compare(candidate.supplierName, name) === 0) ?? null
+    const supplierPackage = supplier ? packages.find((entry) => entry.supplier_id === supplier.id) ?? null : null
+    const note = routeSelections.find((selection) => supplierNameCollator.compare(selection.name, name) === 0)?.note || ""
+    return { name, supplier, bid, supplierPackage, note }
+  })
+
+  const primaryWorkflowClass = "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#0066cc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
+  const secondaryWorkflowClass = "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-sky-400 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
+
+  function openSupplierRouting() {
+    setSupplierRoutingOpen(true)
+    window.requestAnimationFrame(() => document.getElementById("supplier-routing")?.scrollIntoView({ behavior: "smooth", block: "nearest" }))
+  }
+
+  function renderStep2PrimaryAction() {
+    if (workflow.step2Complete) {
+      return <button type="button" onClick={() => openDocument("estimate")} className={primaryWorkflowClass}><FileCheck2 className="h-4 w-4" />Continue to Client Estimate</button>
+    }
+    if (workflow.step2Action === "choose-suppliers" || workflow.step2Action === "contact-suppliers") {
+      return <button type="button" onClick={openSupplierRouting} className={primaryWorkflowClass}><Route className="h-4 w-4" />{workflow.step2Action === "contact-suppliers" ? `Contact ${selectedSupplierNames.length} Supplier${selectedSupplierNames.length === 1 ? "" : "s"}` : "Choose Suppliers"}</button>
+    }
+    if (workflow.step2Action === "add-supplier-quote") {
+      return <button type="button" onClick={() => setQuoteEntryOpen((open) => !open)} aria-expanded={quoteEntryOpen} className={primaryWorkflowClass}><Paperclip className="h-4 w-4" />Add Supplier Quote</button>
+    }
+    if (workflow.step2Action === "review-quote" || workflow.step2Action === "compare-quotes") {
+      return primaryComparison ? <a href={`/admin/quote-comparison/${primaryComparison.id}`} className={primaryWorkflowClass}><Award className="h-4 w-4" />{workflow.step2Action === "review-quote" ? "Review Quote & Select Supplier" : `Compare ${supplierQuoteCount} Quotes`}</a> : null
+    }
+    return <button type="button" onClick={() => openDocument("estimate")} className={primaryWorkflowClass}><FileCheck2 className="h-4 w-4" />Continue to Client Estimate</button>
+  }
+
+  function renderStep3PrimaryAction() {
+    if (workflow.step3Action === "send-estimate") return <button type="button" onClick={() => openDocument("estimate")} className={primaryWorkflowClass}><FileCheck2 className="h-4 w-4" />Create & Send Estimate</button>
+    if (workflow.step3Action === "wait-for-approval") return <button type="button" onClick={markClientApproved} disabled={pending} className={primaryWorkflowClass}><CheckCircle2 className="h-4 w-4" />{pending ? "Saving..." : "Mark Client Approved"}</button>
+    if (workflow.step3Action === "create-invoice") return <button type="button" onClick={() => openDocument("invoice")} className={primaryWorkflowClass}><FileText className="h-4 w-4" />Create & Send Invoice</button>
+    if (workflow.step3Action === "send-payment-link") return <button type="button" onClick={openPaymentLink} disabled={!client.phone && !client.email} className={primaryWorkflowClass}><Send className="h-4 w-4" />Send Payment Link</button>
+    if (workflow.step3Action === "mark-paid") return <button type="button" onClick={markPaymentReceived} disabled={pending} className={primaryWorkflowClass}><CircleDollarSign className="h-4 w-4" />Mark Payment Received</button>
+    if (workflow.step3Action === "create-receipt") return <button type="button" onClick={() => openDocument("receipt")} className={primaryWorkflowClass}><ReceiptText className="h-4 w-4" />Create & Send Receipt</button>
+    if (workflow.step3Action === "schedule-delivery") return <button type="button" onClick={openDeliverySchedule} className={primaryWorkflowClass}><CalendarClock className="h-4 w-4" />Schedule Delivery</button>
+    return latestClientDocument && documentLinks[latestClientDocument.documentType]
+      ? <a href={documentLinks[latestClientDocument.documentType]} target="_blank" rel="noreferrer" className={secondaryWorkflowClass}><CheckCircle2 className="h-4 w-4 text-emerald-700" />Open Final Document</a>
+      : <span className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-emerald-50 px-3 text-sm font-bold text-emerald-800"><CheckCircle2 className="h-4 w-4" />Payment & Delivery Complete</span>
+  }
 
   return (
-    <div className="grid gap-2">
-      <details open={currentStage === "pricing"} className={workflowStepCardClass()}>
-        <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier pricing & comparison" detail={supplierQuoteCount ? `${supplierQuoteCount} quote${supplierQuoteCount === 1 ? "" : "s"} ready to compare` : packages.length ? `${packages.length} supplier request${packages.length === 1 ? "" : "s"} sent` : "Choose a route, contact suppliers, and add returned pricing"} status={pricingStatus} icon="pricing" />
-        <div className="border-t border-slate-200 p-3">
-          <details className="mb-3 rounded-md border border-slate-200 bg-white"><summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-bold"><span>Request notes</span><span className="max-w-[60%] truncate font-normal text-slate-400">{managerNotes || "Add a note"}</span></summary><div className="grid gap-2 border-t border-slate-100 p-2"><textarea value={managerNotes} onChange={(event) => { const value = event.target.value; setManagerNotes(value); notesAutosave.queue(value) }} rows={2} maxLength={5000} placeholder="Notes for this pricing request" className="resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-950" /><AutosaveStatus status={notesAutosave.status} error={notesAutosave.error} retry={notesAutosave.retry} /></div></details>
-          {routeSupplierNames.length ? <div className="mb-2 flex flex-wrap items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2 py-1.5"><span className="mr-1 text-[10px] font-black uppercase tracking-[.08em] text-sky-900">Suppliers from Step 1</span>{routeSupplierNames.map((name) => <span key={name} className="rounded bg-white px-2 py-1 text-[10px] font-bold text-slate-700 ring-1 ring-sky-100">{name}</span>)}</div> : null}
-          <div className="mb-3 overflow-x-auto rounded-md border border-slate-200 bg-slate-100">
-            <table className="w-full min-w-[42rem] table-fixed text-left text-[11px]"><thead className="text-[9px] font-bold uppercase tracking-[.08em] text-slate-500"><tr><th className="w-16 px-2 py-1.5">Qty</th><th className="px-2 py-1.5">Original</th><th className="px-2 py-1.5">AI request</th><th className="px-2 py-1.5">Supplier route &amp; note</th></tr></thead><tbody className="divide-y divide-slate-200 bg-slate-50">{pricingSummaryItems.slice(0, 8).map((item) => <tr key={item.id}><td className="px-2 py-1.5 font-bold">{requestItems.find((candidate) => candidate.id === item.id)?.quantity || "—"}</td><td title={item.original} className="truncate px-2 py-1.5 text-slate-500">{item.original}</td><td title={item.organized} className="truncate px-2 py-1.5 font-semibold">{item.organized}</td><td className="px-2 py-1.5"><RequestSupplierRouteEditor key={`${item.id}-${supplierRouteVersion(item.metadata)}`} requestId={requestId} itemId={item.id} metadata={item.metadata} suppliers={availableSuppliers} /></td></tr>)}</tbody></table>
-          </div>
-          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <a href="#supplier-routing" className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-xs font-bold"><Route className="h-3.5 w-3.5" />Choose route</a>
-            <a href={`/admin/supplier-quotes?request=${requestId}#supplier-quote-upload`} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md bg-[#0071e3] px-2 text-center text-xs font-bold text-white"><Paperclip className="h-3.5 w-3.5" />Upload returned quote</a>
-            <button type="button" onClick={openManualPricing} disabled={pending} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-center text-xs font-bold disabled:opacity-40"><Plus className="h-3.5 w-3.5" />Add pricing by hand</button>
-            {comparisons[0] ? <a href={`/admin/quote-comparison/${comparisons[0].id}`} className="inline-flex min-h-10 items-center justify-center rounded-md border border-emerald-300 bg-emerald-50 px-2 text-xs font-bold text-emerald-900">Compare quotes</a> : <a href={`/admin/supplier-quotes?request=${requestId}`} className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-xs font-bold text-slate-600">Quotes will compare here</a>}
+    <div className="grid gap-2 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:pb-0">
+      <details open={pricingStatus === "active"} className={workflowStepCardClass()}>
+        <RequestWorkflowStepHeader requestId={requestId} step={2} title="Supplier quotes" detail={pricingDetail} status={pricingStatus} icon="pricing" />
+        <div className="border-t border-slate-200 p-3" data-testid="request-step-2">
+          <div className="mb-3 flex flex-wrap gap-1.5 text-[10px] font-bold">
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{pricingSummaryItems.length} item{pricingSummaryItems.length === 1 ? "" : "s"}</span>
+            <span className="rounded-full bg-sky-50 px-2.5 py-1 text-sky-800">{selectedSupplierNames.length} supplier{selectedSupplierNames.length === 1 ? "" : "s"}</span>
+            <span className={`rounded-full px-2.5 py-1 ${supplierQuoteCount ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>{supplierQuoteCount} quote{supplierQuoteCount === 1 ? "" : "s"} received</span>
           </div>
 
-          <details id="supplier-routing" className="group/route scroll-mt-24 rounded-md border border-slate-200 bg-slate-50">
+          {supplierProgressRows.length ? <div className="mb-3 divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">{supplierProgressRows.map((row) => {
+            const status = row.bid ? "Quote received" : row.supplierPackage ? row.supplierPackage.status.replaceAll("_", " ") : "Ready to contact"
+            return <article key={row.name} className="flex min-h-14 items-center gap-2 px-3 py-2.5">
+              <div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-[#12263f]">{row.name}</p><p className={`mt-0.5 truncate text-[10px] font-bold ${row.bid ? "text-emerald-700" : row.supplierPackage ? "text-sky-700" : "text-amber-700"}`}>{status}{row.bid ? ` · ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)}` : ""}</p>{row.note ? <p title={row.note} className="mt-0.5 truncate text-[10px] text-slate-500">{row.note}</p> : null}</div>
+              {row.supplier?.phone ? <a href={`tel:${row.supplier.phone}`} aria-label={`Call ${row.name}`} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><Phone className="h-4 w-4" /></a> : null}
+              {row.supplier?.email ? <a href={`mailto:${row.supplier.email}`} aria-label={`Email ${row.name}`} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><Mail className="h-4 w-4" /></a> : null}
+            </article>
+          })}</div> : <p className="mb-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">Choose suppliers in Step 1 to begin pricing.</p>}
+
+          <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-20 mb-3 rounded-xl border border-slate-200 bg-white/95 p-2 shadow-[0_10px_30px_rgba(15,23,42,.14)] backdrop-blur">{renderStep2PrimaryAction()}</div>
+
+          {!workflow.step2Complete && workflow.step2Action !== "add-supplier-quote" ? <button type="button" onClick={() => setQuoteEntryOpen((open) => !open)} aria-expanded={quoteEntryOpen} className={secondaryWorkflowClass}><Plus className="h-4 w-4" />Add Supplier Quote</button> : null}
+          {!workflow.step2Complete && quoteEntryOpen ? <div className="mt-2 grid gap-2 rounded-lg border border-sky-200 bg-sky-50 p-2 sm:grid-cols-2">
+            <a href={`/admin/supplier-quotes?request=${requestId}#supplier-quote-upload`} className={secondaryWorkflowClass}><Paperclip className="h-4 w-4" />Upload File or Photo</a>
+            <button type="button" onClick={() => { setQuoteEntryOpen(false); openManualPricing() }} disabled={pending} className={secondaryWorkflowClass}><Plus className="h-4 w-4" />Enter Pricing Manually</button>
+          </div> : null}
+
+          <details className="group/request mt-2 rounded-lg border border-slate-200 bg-slate-50">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-bold"><span>Request Details &amp; Notes</span><span className="inline-flex items-center gap-2 text-[10px] font-normal text-slate-400">{managerNotes ? "Note saved" : `${pricingSummaryItems.length} items`}<ChevronDown className="h-4 w-4 transition group-open/request:rotate-180" /></span></summary>
+            <div className="border-t border-slate-200 p-2">
+              <label className="grid gap-1 text-[10px] font-bold uppercase tracking-[.08em] text-slate-500">Request Notes<textarea value={managerNotes} onChange={(event) => { const value = event.target.value; setManagerNotes(value); notesAutosave.queue(value) }} rows={2} maxLength={5000} placeholder="Add a note for this request…" className="min-h-20 resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-normal normal-case tracking-normal text-slate-950" /></label>
+              <AutosaveStatus status={notesAutosave.status} error={notesAutosave.error} retry={notesAutosave.retry} />
+              <div className="mt-2 grid gap-1 sm:hidden">{pricingSummaryItems.slice(0, 8).map((item) => <div key={item.id} className="rounded-md border border-slate-200 bg-white p-2"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-xs font-black text-slate-900">{requestItems.find((candidate) => candidate.id === item.id)?.quantity || "—"} · {item.organized}</p><p className="mt-0.5 line-clamp-2 text-[10px] text-slate-500">Original: {item.original}</p></div></div><div className="mt-2"><RequestSupplierRouteEditor key={`${item.id}-${supplierRouteVersion(item.metadata)}`} requestId={requestId} itemId={item.id} metadata={item.metadata} suppliers={availableSuppliers} /></div></div>)}</div>
+              <div className="mt-2 hidden overflow-x-auto rounded-md border border-slate-200 bg-slate-100 sm:block" data-testid="request-step-2-scroll-region"><table className="w-full min-w-[42rem] table-fixed text-left text-[11px]"><thead className="text-[9px] font-bold uppercase tracking-[.08em] text-slate-500"><tr><th className="w-16 px-2 py-1.5">Qty</th><th className="px-2 py-1.5">Original</th><th className="px-2 py-1.5">Organized Item</th><th className="px-2 py-1.5">Supplier Route &amp; Note</th></tr></thead><tbody className="divide-y divide-slate-200 bg-slate-50">{pricingSummaryItems.slice(0, 8).map((item) => <tr key={item.id}><td className="px-2 py-1.5 font-bold">{requestItems.find((candidate) => candidate.id === item.id)?.quantity || "—"}</td><td title={item.original} className="truncate px-2 py-1.5 text-slate-500">{item.original}</td><td title={item.organized} className="truncate px-2 py-1.5 font-semibold">{item.organized}</td><td className="px-2 py-1.5"><RequestSupplierRouteEditor key={`${item.id}-${supplierRouteVersion(item.metadata)}`} requestId={requestId} itemId={item.id} metadata={item.metadata} suppliers={availableSuppliers} /></td></tr>)}</tbody></table></div>
+            </div>
+          </details>
+
+          <details id="supplier-routing" open={supplierRoutingOpen} onToggle={(event) => setSupplierRoutingOpen(event.currentTarget.open)} className="group/route mt-2 scroll-mt-24 rounded-md border border-slate-200 bg-slate-50">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold"><span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-sky-700" />Contact Suppliers</span><ChevronDown className="h-4 w-4 text-slate-400 transition group-open/route:rotate-180" /></summary>
             <div className="border-t border-slate-200 p-3">
           <div className="mt-3 grid gap-3">
@@ -609,7 +755,7 @@ export function RequestManagementPanel({
                 {remainingSuppliers.length ? <details className="border-t border-slate-100"><summary className="min-h-10 cursor-pointer px-2 py-3 text-xs font-bold text-[#0066cc]">All Supplier Directory ({remainingSuppliers.length})</summary><div>{remainingSuppliers.map((entry) => <SupplierContactRow key={entry.id} entry={entry} recommendedSupplierIds={recommendedSupplierIds} supplierIds={supplierIds} toggleRecommendedSupplier={toggleRecommendedSupplier} toggleSupplier={toggleSupplier} />)}</div></details> : null}
               </div>
             </fieldset>
-            <div className="flex flex-wrap justify-end gap-2"><button type="button" onClick={() => startTransition(async () => { await saveSupplierPlan() })} disabled={pending} className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 disabled:opacity-50">Save supplier choices</button><button type="button" onClick={createSupplierRequest} disabled={!supplierIds.length || pending} className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-[#0071e3] px-3 text-xs font-bold text-white disabled:opacity-50"><Route className="h-4 w-4" />Contact {supplierIds.length || ""} supplier{supplierIds.length === 1 ? "" : "s"}</button></div>
+            <div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => startTransition(async () => { await saveSupplierPlan() })} disabled={pending} className={secondaryWorkflowClass}>Save Supplier Choices</button><button type="button" onClick={createSupplierRequest} disabled={!supplierIds.length || pending} className={primaryWorkflowClass}><Route className="h-4 w-4" />Contact {supplierIds.length || ""} Supplier{supplierIds.length === 1 ? "" : "s"}</button></div>
             <div className="rounded-md border border-violet-200 bg-violet-50 p-2"><button type="button" onClick={() => setOnlineSupplierSearchOpen((value) => !value)} className="inline-flex min-h-10 w-full items-center justify-between gap-2 rounded-md bg-white px-3 text-left text-xs font-bold text-violet-900"><span className="inline-flex items-center gap-2"><Search className="h-4 w-4" />AI · Look for suppliers online</span><ChevronDown className={`h-4 w-4 transition ${onlineSupplierSearchOpen ? "rotate-180" : ""}`} /></button>{onlineSupplierSearchOpen ? <MaterialPriceCheck requestId={requestId} query={onlineSupplierQuery || requestTitle} department={routeDepartment} defaultZipCode={(projectAddress.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || "11516")} onClose={() => setOnlineSupplierSearchOpen(false)} /> : null}</div>
           </div>
           {packages.length ? <div className="mt-4 border-t border-slate-200 pt-3"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Current routes</p><div className="mt-2 grid gap-2">{packages.map((pkg) => <div key={pkg.id} className="flex items-center justify-between gap-3 text-sm"><span className="font-semibold">{pkg.department}</span><span className="text-right text-slate-600">{suppliers.find((entry) => entry.id === pkg.supplier_id)?.name || "Not assigned"} · {pkg.status.replaceAll("_", " ")}</span></div>)}</div></div> : null}
@@ -618,27 +764,27 @@ export function RequestManagementPanel({
         </div>
       </details>
 
-      <details open={["approval", "delivery"].includes(currentStage)} className={workflowStepCardClass()}>
-        <RequestWorkflowStepHeader requestId={requestId} step={3} title="Payment & delivery" detail={fulfillmentDetail} status={paymentDeliveryStatus} icon="payment" />
-        <div className="grid gap-2 border-t border-slate-200 p-3 sm:grid-cols-3">
-          <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-center gap-2"><FileCheck2 className="h-4 w-4 text-[#0066cc]" /><h3 className="text-sm font-black text-[#12263f]">Estimate, invoice, or receipt</h3></div>
-            <p className="mt-1 text-[11px] leading-4 text-slate-500">Create or edit any client document. Its live link always shows the newest saved version.</p>
-            <div className="mt-3 grid grid-cols-3 gap-1.5"><button type="button" onClick={() => openDocument("estimate")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-1 text-[11px] font-bold"><FileCheck2 className="h-3.5 w-3.5" />Estimate</button><button type="button" onClick={() => openDocument("invoice")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md bg-[#17304f] px-1 text-[11px] font-bold text-white"><FileText className="h-3.5 w-3.5" />Invoice</button><button type="button" onClick={() => openDocument("receipt")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-1 text-[11px] font-bold"><ReceiptText className="h-3.5 w-3.5" />Receipt</button></div>
-            {documentSent ? <p className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />{documentSent === "invoice" ? "Invoice" : "Receipt"} sent</p> : null}
-          </section>
-          <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-center gap-2"><CreditCard className="h-4 w-4 text-[#0066cc]" /><h3 className="text-sm font-black text-[#12263f]">Collect payment</h3></div>
-            <p className="mt-1 text-[11px] leading-4 text-slate-500">Prepare the secure Avantia payment link by text, email, or WhatsApp.</p>
-            <button type="button" onClick={openPaymentLink} disabled={!client.phone && !client.email} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-md bg-[#0071e3] px-2 text-xs font-bold text-white disabled:opacity-40"><Send className="h-3.5 w-3.5" />Send payment link</button>
-            {paymentLinkSent ? <p className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Payment link sent</p> : null}
-          </section>
-          <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-center gap-2"><CalendarClock className="h-4 w-4 text-[#0066cc]" /><h3 className="text-sm font-black text-[#12263f]">Schedule delivery</h3></div>
-            <p className="mt-1 text-[11px] leading-4 text-slate-500">Choose the jobsite, date, start time, and delivery window.</p>
-            <button type="button" onClick={openDeliverySchedule} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-xs font-bold text-emerald-900"><CalendarClock className="h-3.5 w-3.5" />Set delivery</button>
-            {deliveryScheduled ? <p className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Delivery scheduled</p> : null}
-          </section>
+      <details open={paymentDeliveryStatus === "active"} className={workflowStepCardClass()}>
+        <RequestWorkflowStepHeader requestId={requestId} step={3} title="Client, payment & delivery" detail={fulfillmentDetail} status={paymentDeliveryStatus} icon="payment" allowManualCompletion={false} />
+        <div className="border-t border-slate-200 p-3" data-testid="request-step-3">
+          <ol className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            {[
+              { key: "estimate", label: "Estimate & approval", done: estimateSent && clientApproved, active: ["send-estimate", "wait-for-approval"].includes(workflow.step3Action), detail: !estimateSent ? "Not sent" : clientApproved ? "Client approved" : "Waiting for approval", icon: FileCheck2 },
+              { key: "invoice", label: "Invoice & payment link", done: invoiceSent && paymentLinkSent, active: ["create-invoice", "send-payment-link"].includes(workflow.step3Action), detail: !invoiceSent ? "Invoice not sent" : paymentLinkSent ? "Payment link sent" : "Send payment link", icon: FileText },
+              { key: "receipt", label: "Payment & receipt", done: paymentReceived && receiptSent, active: ["mark-paid", "create-receipt"].includes(workflow.step3Action), detail: !paymentReceived ? "Payment pending" : receiptSent ? "Receipt sent" : "Create receipt", icon: ReceiptText },
+              { key: "delivery", label: "Delivery", done: deliveryScheduled, active: workflow.step3Action === "schedule-delivery", detail: deliveryScheduled ? "Scheduled" : "Not scheduled", icon: CalendarClock },
+            ].map((item, index) => <li key={item.key} data-fulfillment-action={item.key} className={`flex min-h-14 items-center gap-3 border-b border-slate-100 px-3 py-2.5 last:border-b-0 ${item.active ? "bg-sky-50" : ""}`}>
+              <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${item.done ? "border-emerald-200 bg-emerald-50 text-emerald-700" : item.active ? "border-sky-200 bg-white text-sky-700" : "border-slate-200 bg-slate-50 text-slate-400"}`}>{item.done ? <Check className="h-4 w-4" /> : <item.icon className="h-4 w-4" />}</span>
+              <span className="min-w-0 flex-1"><span className="block text-xs font-black text-[#12263f]">{index + 1}. {item.label}</span><span className={`mt-0.5 block text-[10px] font-semibold ${item.done ? "text-emerald-700" : item.active ? "text-sky-700" : "text-slate-500"}`}>{item.detail}</span></span>
+            </li>)}
+          </ol>
+
+          {latestClientDocument ? <div className="mt-2 flex min-h-12 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"><FileCheck2 className="h-4 w-4 shrink-0 text-[#0066cc]" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-black text-[#12263f]">{latestClientDocument.documentType[0].toUpperCase() + latestClientDocument.documentType.slice(1)} {latestClientDocument.documentNumber}</p><p className="text-[10px] text-slate-500">Version {latestClientDocument.version} · live link always shows the latest saved version</p></div>{documentLinks[latestClientDocument.documentType] ? <a href={documentLinks[latestClientDocument.documentType]} target="_blank" rel="noreferrer" className="shrink-0 text-[10px] font-bold text-[#0066cc] underline">Open</a> : null}</div> : null}
+
+          <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-20 mt-3 rounded-xl border border-slate-200 bg-white/95 p-2 shadow-[0_10px_30px_rgba(15,23,42,.14)] backdrop-blur">{renderStep3PrimaryAction()}</div>
+
+          <details className="group/docs mt-2 rounded-lg border border-slate-200 bg-slate-50"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-bold"><span>All Documents</span><span className="inline-flex items-center gap-1 text-[10px] font-normal text-slate-500">Edit, send, or download<ChevronDown className="h-4 w-4 transition group-open/docs:rotate-180" /></span></summary><div className="grid grid-cols-3 gap-1.5 border-t border-slate-200 p-2"><button type="button" onClick={() => openDocument("estimate")} className={secondaryWorkflowClass}><FileCheck2 className="h-3.5 w-3.5" />Estimate</button><button type="button" onClick={() => openDocument("invoice")} className={secondaryWorkflowClass}><FileText className="h-3.5 w-3.5" />Invoice</button><button type="button" onClick={() => openDocument("receipt")} className={secondaryWorkflowClass}><ReceiptText className="h-3.5 w-3.5" />Receipt</button></div></details>
+          {feedback ? <p className={`mt-2 rounded-lg border px-3 py-2 text-xs font-semibold ${feedbackError ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`} role="status" aria-live="polite">{feedback}</p> : null}
         </div>
       </details>
 
@@ -649,7 +795,7 @@ export function RequestManagementPanel({
               <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#0066cc]">Available at every stage</p><h2 id="request-client-contact-title" className="truncate text-lg font-bold">Contact client</h2><p className="text-xs text-slate-500">{replyComplete ? "Client contacted · send another update when needed" : "Message, estimate, or delivery"}</p></div>
               <button type="button" onClick={closeContact} disabled={pending} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white disabled:opacity-40" aria-label="Close contact client"><X className="h-4 w-4" /></button>
             </header>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-4">
           <RelatedEmailTimeline title="Client email" emails={clientEmails} />
           <div>
             {missingQuestions.length ? <p className="mt-1 text-xs font-semibold text-amber-700">{missingQuestions.length} missing details can be added to the reply automatically.</p> : null}
@@ -746,7 +892,7 @@ export function RequestManagementPanel({
             </div>
             {quoteFeedback ? <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold" role="status">{quoteFeedback}</p> : null}
           </div>
-          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-4 py-3">{documentLinks[documentType] ? <a href={documentLinks[documentType]} target="_blank" rel="noreferrer" className="mr-auto text-xs font-bold text-[#0066cc] underline">Open live client link</a> : null}<button type="button" onClick={saveDocument} disabled={pending || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-sm font-bold text-emerald-900 disabled:opacity-40"><FileCheck2 className="h-4 w-4" />Save changes</button><button type="button" onClick={downloadQuote} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={textQuote} disabled={pending || !client.phone || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#0071e3] bg-white px-4 text-sm font-bold text-[#0066cc] disabled:opacity-40"><MessageSquareText className="h-4 w-4" />Text live link</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Working..." : `Email live link`}</button></footer>
+          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-3">{documentLinks[documentType] ? <a href={documentLinks[documentType]} target="_blank" rel="noreferrer" className="mr-auto text-xs font-bold text-[#0066cc] underline">Open live client link</a> : null}<button type="button" onClick={saveDocument} disabled={pending || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-sm font-bold text-emerald-900 disabled:opacity-40"><FileCheck2 className="h-4 w-4" />Save changes</button><button type="button" onClick={downloadQuote} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={textQuote} disabled={pending || !client.phone || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#0071e3] bg-white px-4 text-sm font-bold text-[#0066cc] disabled:opacity-40"><MessageSquareText className="h-4 w-4" />Text live link</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Working..." : `Email live link`}</button></footer>
         </section>
       </div>, document.body) : null}
     </div>

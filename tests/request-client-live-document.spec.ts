@@ -6,13 +6,27 @@ const root = process.cwd()
 
 test("Step 3 keeps estimate, invoice, receipt, payment, and delivery together", async () => {
   const panel = await readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8")
-  expect(panel).toContain('title="Payment & delivery"')
-  expect(panel).toContain("Estimate, invoice, or receipt")
+  expect(panel).toContain('title="Client, payment & delivery"')
+  expect(panel).toContain("Estimate & approval")
+  expect(panel).toContain("Invoice & payment link")
+  expect(panel).toContain("Payment & receipt")
   expect(panel).toContain("Save changes")
   expect(panel).toContain("Text live link")
   expect(panel).toContain("Email live link")
   expect(panel).toContain("Send payment link")
   expect(panel).toContain("Schedule delivery")
+  expect(panel).toContain("recordRequestClientApprovalAction")
+  expect(panel).toContain("Mark Client Approved")
+  expect(panel).toContain("initialPaymentDelivery.clientApproved")
+})
+
+test("workflow CTAs stay singular and mobile sheets clear the safe area", async () => {
+  const panel = await readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8")
+  expect(panel).toContain("if (workflow.step2Complete)")
+  expect(panel).toContain('!workflow.step2Complete && workflow.step2Action !== "add-supplier-quote"')
+  expect(panel).toContain('!workflow.step2Complete && quoteEntryOpen')
+  expect(panel).toContain("pb-[max(1rem,env(safe-area-inset-bottom))]")
+  expect(panel).toContain("pb-[max(0.75rem,env(safe-area-inset-bottom))]")
 })
 
 test("client documents keep one stable token per request and document type", async () => {

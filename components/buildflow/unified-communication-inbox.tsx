@@ -14,6 +14,7 @@ import { communicationHistoryCursor } from "@/lib/aura/communication-history-cur
 import type { AuraCommunicationRow, AuraContactRow } from "@/lib/aura/dashboard"
 import { normalizeAuraPhone, type AuraCustomerIdentity } from "@/lib/aura/identity"
 import { looksLikeMaterialRequestMessage } from "@/lib/aura/material-request-detection"
+import { communicationTelHref, normalizeCommunicationCallPhone } from "@/lib/aura/phone-links"
 import { SMS_CORRECTION_REASONS, type SmsCorrectionReason } from "@/lib/ai/sms-training-privacy"
 import { isExplicitCustomerRequestConfirmation } from "@/lib/customer-request-confirmation"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
@@ -675,18 +676,23 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
   }
 
   function openConversationCall(conversation: Conversation) {
+    const phone = normalizeCommunicationCallPhone(conversation.phone)
+    if (!phone) {
+      setFeedback({ tone: "error", text: "This conversation does not have a valid phone number." })
+      return
+    }
     if (connections.voice?.send) {
-      setSoftphone({ phone: conversation.phone, name: conversation.name })
+      setSoftphone({ phone, name: conversation.name })
       return
     }
     void recordCommunicationActivityAction({
       channel: "call",
-      recipient: conversation.phone,
+      recipient: phone,
       label: conversation.name,
       outcome: "opened_on_device",
       durationSeconds: 0,
     })
-    window.location.assign(`tel:${conversation.phone}`)
+    window.location.assign(communicationTelHref(phone)!)
   }
 
   function sendMessage() {

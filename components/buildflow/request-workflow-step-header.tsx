@@ -42,6 +42,7 @@ export function RequestWorkflowStepHeader({
   status,
   icon,
   totalSteps = 3,
+  allowManualCompletion = true,
 }: {
   requestId: string
   step: 1 | 2 | 3 | 4
@@ -50,6 +51,7 @@ export function RequestWorkflowStepHeader({
   status: WorkflowStepStatus
   icon: WorkflowStepIcon
   totalSteps?: number
+  allowManualCompletion?: boolean
 }) {
   const Icon = icons[icon]
   const styles = statusStyles[status]
@@ -64,11 +66,11 @@ export function RequestWorkflowStepHeader({
         <span className="min-w-0 flex-1">
           <span className="text-[9px] font-black uppercase tracking-[.18em] text-[#8b6a27]">Step {step} of {totalSteps}</span>
           <span className="mt-1 flex items-center gap-2 text-base font-black tracking-[-0.01em] text-[#12263f] sm:text-lg"><Icon className="h-4 w-4 shrink-0 text-[#8b6a27]" />{title}</span>
-          <span className="mt-0.5 block truncate text-xs font-medium text-slate-500 sm:text-sm">{detail}</span>
+          <span className="mt-0.5 block line-clamp-2 text-xs font-medium text-slate-500 sm:line-clamp-1 sm:text-sm">{detail}</span>
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true" />
       </summary>
-      <RequestWorkflowStepToggle requestId={requestId} step={step} completed={status === "complete"} className={styles.status} />
+      {allowManualCompletion ? <RequestWorkflowStepToggle requestId={requestId} step={step} completed={status === "complete"} className={styles.status} /> : null}
     </>
   )
 }

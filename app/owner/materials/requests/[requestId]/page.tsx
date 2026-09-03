@@ -28,6 +28,7 @@ import {
 } from "@/lib/quote-comparison";
 import { managerPipelineStage } from "@/lib/manager-dashboard";
 import { mapRequestSupplierComparison } from "@/lib/request-supplier-comparison";
+import { hasPersistedReceiptProof } from "@/lib/request-workflow-state";
 import { canonicalSupplierDirectory, resolveRequestSupplierRouteSelections } from "@/lib/supplier-canonical";
 import type { RelatedEmailItem } from "@/components/buildflow/related-email-timeline";
 
@@ -158,7 +159,6 @@ export default async function OwnerMaterialRequestPage({
       .select("id,title,description,metadata,created_at")
       .contains("metadata", { quote_request_id: requestId })
       .order("created_at", { ascending: false })
-      .limit(20)
       .returns<
         Array<{
           id: string;
@@ -204,9 +204,23 @@ export default async function OwnerMaterialRequestPage({
   const latestClientDocument = clientActions.find((event) =>
     ["invoice_sent", "receipt_sent"].includes(String(event.metadata.client_action)),
   );
+  const paymentReceived = clientActions.some((event) => event.metadata.client_action === "payment_received") || ["quoted", "closed"].includes(request.status);
+  const receiptDocument = (clientDocuments ?? []).find((document) => document.document_type === "receipt");
+  const receiptSent = hasPersistedReceiptProof(
+    clientActions.map((event) => event.metadata),
+    receiptDocument ? { documentNumber: receiptDocument.document_number, publicToken: receiptDocument.public_token, version: receiptDocument.version } : null,
+  );
+  const clientApproved = clientActions.some((event) => event.metadata.client_action === "client_approved")
+    || (comparisons ?? []).some((comparison) => comparison.client_quote_status === "accepted")
+    || paymentReceived;
   const initialPaymentDelivery = {
     documentType: latestClientDocument?.metadata.client_action === "receipt_sent" ? "receipt" as const : latestClientDocument?.metadata.client_action === "invoice_sent" ? "invoice" as const : null,
+    estimateSent: clientActions.some((event) => event.metadata.client_action === "estimate_sent"),
+    clientApproved,
+    invoiceSent: clientActions.some((event) => event.metadata.client_action === "invoice_sent"),
+    receiptSent,
     paymentLinkSent: clientActions.some((event) => event.metadata.client_action === "payment_link_sent"),
+    paymentReceived,
     deliveryScheduled: clientActions.some((event) => event.metadata.client_action === "delivery_scheduled"),
   };
   const workflowOverrides = new Map<number, boolean>();
@@ -355,6 +369,8 @@ export default async function OwnerMaterialRequestPage({
       id: comparison.id,
       title: comparison.title,
       status: comparison.status,
+      awardedBidId: comparison.awarded_bid_id,
+      clientQuoteStatus: comparison.client_quote_status,
       quoteNumber: comparison.quote_number,
       updatedAt: comparison.updated_at,
       bids: analyses.map((analysis) => ({

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useTransition } from "react"
 
 import { getTwoChatVoiceTokenAction } from "@/app/owner/aura/actions"
 import { recordCommunicationActivityAction } from "@/app/admin/activity-actions"
+import { communicationTelHref, normalizeCommunicationCallPhone } from "@/lib/aura/phone-links"
 
 type CallStatus = "idle" | "connecting" | "ringing" | "active" | "ended" | "error"
 
@@ -30,6 +31,12 @@ export function TwoChatSoftphone({ open, phone, name, onClose }: { open: boolean
   }
 
   function startCall() {
+    const normalizedPhone = normalizeCommunicationCallPhone(phone)
+    if (!normalizedPhone) {
+      setStatus("error")
+      setError("This contact does not have a valid phone number.")
+      return
+    }
     setError("")
     setStatus("connecting")
     connectedAtRef.current = null
@@ -44,7 +51,7 @@ export function TwoChatSoftphone({ open, phone, name, onClose }: { open: boolean
         deviceRef.current = device
         device.on("error", (event) => { setStatus("error"); setError(event.message); recordCallActivity("failed") })
         await device.register()
-        const call = await device.connect({ to: phone, from: result.from })
+        const call = await device.connect({ to: normalizedPhone, from: result.from })
         callRef.current = call
         call.on("ringing", () => setStatus("ringing"))
         call.on("accepted", () => { connectedAtRef.current = Date.now(); setStatus("active") })
@@ -75,11 +82,12 @@ export function TwoChatSoftphone({ open, phone, name, onClose }: { open: boolean
 
   if (!open) return null
   const busy = pending || ["connecting", "ringing", "active"].includes(status)
+  const deviceCallHref = communicationTelHref(phone)
   return <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/35 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label={`Call ${name}`}>
     <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-2xl">
       <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#0071e3]">2Chat business line</p><h2 className="mt-1 text-xl font-bold">{name}</h2><p className="mt-1 text-sm text-slate-500">{phone}</p></div><button type="button" onClick={onClose} disabled={busy} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 disabled:opacity-40" aria-label="Close"><X className="h-4 w-4" /></button></div>
       <p className="mt-5 rounded-md bg-slate-50 px-3 py-2 text-center text-sm font-semibold text-slate-700">{status === "idle" ? "Ready to call from (347) 937-8665" : status === "connecting" ? "Connecting microphone..." : status === "ringing" ? "Ringing..." : status === "active" ? "Call connected" : status === "ended" ? "Call ended" : "Call could not connect"}</p>
-      {error ? <p className="mt-3 text-sm font-semibold text-rose-700" role="alert">{error}</p> : null}
+      {error ? <div className="mt-3 rounded-md bg-rose-50 p-3"><p className="text-sm font-semibold text-rose-700" role="alert">{error}</p>{deviceCallHref ? <a href={deviceCallHref} className="mt-2 inline-flex min-h-10 items-center gap-2 rounded-md border border-rose-200 bg-white px-3 text-sm font-semibold text-rose-800"><Phone className="h-4 w-4" />Call from this device</a> : null}</div> : null}
       <div className="mt-5 flex justify-center gap-3">
         {status === "active" ? <button type="button" onClick={toggleMute} className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-300" aria-label={muted ? "Unmute" : "Mute"}>{muted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}</button> : null}
         {busy ? <button type="button" onClick={endCall} className="inline-flex h-12 min-w-32 items-center justify-center gap-2 rounded-full bg-rose-600 px-5 text-sm font-bold text-white"><PhoneOff className="h-5 w-5" />End</button> : <button type="button" onClick={startCall} className="inline-flex h-12 min-w-32 items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 text-sm font-bold text-white"><Phone className="h-5 w-5" />Call</button>}

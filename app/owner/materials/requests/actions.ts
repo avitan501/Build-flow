@@ -9,6 +9,7 @@ import { scheduleClientMaterialListOrganization } from "@/lib/material-request-o
 import { buildProjectUploadStoragePath, PROJECT_UPLOAD_ALLOWED_MIME_TYPES, PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/projects"
 import { generateRequestClientQuotePdf, type RequestClientDocumentType, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
 import { AVANTIA_PAYMENT_LINK } from "@/lib/payment-link"
+import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
 import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import { canonicalSupplierId, canonicalSupplierKey, findCanonicalSupplier, uniqueCanonicalSupplierNames } from "@/lib/supplier-canonical"
@@ -186,7 +187,7 @@ export async function updateMaterialRequestStatusAction(input: { requestId: stri
   const { data: updated, error: updateError } = await supabase.from("quote_requests").update({ status }).eq("id", requestId).select("id").maybeSingle<{ id: string }>()
   if (updateError || !updated) return { ok: false as const, error: "The request status could not be changed." }
 
-  const labels: Record<MaterialRequestStatus, string> = { submitted: "New", in_review: "In progress", quoted: "Quote sent", closed: "Archived" }
+  const labels: Record<MaterialRequestStatus, string> = { submitted: "New", in_review: "In progress", quoted: "Payment received", closed: "Archived" }
   const { error: eventError } = await supabase.from("project_events").insert({
     project_id: request.project_id,
     owner_id: request.owner_id,
@@ -602,10 +603,27 @@ export async function updateRequestWorkflowStepAction(input: { requestId: string
   const { supabase } = await requireStaffProfile("customers")
   const { data: request } = await supabase
     .from("quote_requests")
-    .select("id,owner_id,project_id")
+    .select("id,owner_id,project_id,status")
     .eq("id", requestId)
-    .maybeSingle<{ id: string; owner_id: string; project_id: string }>()
+    .maybeSingle<{ id: string; owner_id: string; project_id: string; status: string }>()
   if (!request) return { ok: false as const, error: "Request not found." }
+
+  if (step === 3 && input.completed) {
+    const [{ data: clientEvents, error: clientEventsError }, { data: receiptDocument, error: receiptDocumentError }] = await Promise.all([
+      supabase.from("project_events").select("metadata").contains("metadata", { quote_request_id: requestId }),
+      supabase.from("request_client_documents").select("document_number,public_token,version").eq("request_id", requestId).eq("document_type", "receipt").maybeSingle<{ document_number: string; public_token: string; version: number }>(),
+    ])
+    if (clientEventsError || receiptDocumentError) return { ok: false as const, error: "Payment, receipt, and delivery proof could not be checked." }
+    const actions = new Set((clientEvents ?? []).map((event) => String((event.metadata as Record<string, unknown> | null)?.client_action || "")))
+    const paymentReceived = ["quoted", "closed"].includes(request.status) || actions.has("payment_received")
+    const receiptSent = hasPersistedReceiptProof(
+      (clientEvents ?? []).map((event) => event.metadata as Record<string, unknown> | null),
+      receiptDocument ? { documentNumber: receiptDocument.document_number, publicToken: receiptDocument.public_token, version: receiptDocument.version } : null,
+    )
+    if (!paymentReceived || !receiptSent || !actions.has("delivery_scheduled")) {
+      return { ok: false as const, error: "Finish payment, send the receipt, and schedule delivery before completing Step 3." }
+    }
+  }
 
   const { error } = await supabase.from("project_events").insert({
     project_id: request.project_id,
@@ -689,9 +707,9 @@ async function savePreparedRequestClientDocument(prepared: Awaited<ReturnType<ty
     created_by: prepared.user.id,
     updated_at: new Date().toISOString(),
     ...(markSent ? { sent_at: new Date().toISOString() } : {}),
-  }, { onConflict: "request_id,document_type" }).select("public_token").single<{ public_token: string }>()
+  }, { onConflict: "request_id,document_type" }).select("public_token,document_number,version").single<{ public_token: string; document_number: string; version: number }>()
   if (error || !data?.public_token) return { ok: false as const, error: "The client document could not be saved." }
-  return { ok: true as const, shareUrl: `${PRODUCTION_SITE_ORIGIN}/client-document/${data.public_token}` }
+  return { ok: true as const, shareUrl: `${PRODUCTION_SITE_ORIGIN}/client-document/${data.public_token}`, publicToken: data.public_token, documentNumber: data.document_number, version: data.version }
 }
 
 export async function saveRequestClientDocumentAction(input: RequestClientQuoteInput): Promise<QuoteResult> {
@@ -717,7 +735,7 @@ export async function sendRequestClientQuoteAction(input: RequestClientQuoteInpu
   const documentType = prepared.pdfInput.documentType
   const label = documentType === "invoice" ? "Invoice" : documentType === "receipt" ? "Receipt" : "Estimate"
   const fileName = `Avantia-Build-${label}-${prepared.quoteNumber}.pdf`
-  const saved = await savePreparedRequestClientDocument(prepared, true)
+  const saved = await savePreparedRequestClientDocument(prepared)
   if (!saved.ok) return saved
   const baseMessage = String(input.message || `Please review the Avantia Build ${label.toLowerCase()}.`).trim().slice(0, 4600)
   const message = `${baseMessage}\n\nOpen or download the latest version: ${saved.shareUrl}`
@@ -741,15 +759,25 @@ export async function sendRequestClientQuoteAction(input: RequestClientQuoteInpu
   }
   if (!sent) return { ok: false, error: direct.status === "skipped" ? "Email was not sent." : deliveryError }
 
-  await prepared.supabase.from("project_events").insert({
+  const { data: sentDocument, error: sentDocumentError } = await prepared.supabase
+    .from("request_client_documents")
+    .update({ sent_at: new Date().toISOString() })
+    .eq("request_id", prepared.request.id)
+    .eq("document_type", documentType)
+    .select("public_token,document_number,version")
+    .maybeSingle<{ public_token: string; document_number: string; version: number }>()
+  if (sentDocumentError || !sentDocument) return { ok: false, error: `${label} was emailed, but its persisted sent status could not be saved.` }
+
+  const { error: eventError } = await prepared.supabase.from("project_events").insert({
     project_id: prepared.request.project_id,
     owner_id: prepared.request.owner_id,
     event_type: "status_changed",
     source: "admin",
     title: `${label} ${prepared.quoteNumber} emailed to client`,
     description: message,
-    metadata: { quote_request_id: prepared.request.id, client_action: `${documentType}_sent`, document_type: documentType, document_number: prepared.quoteNumber, share_url: saved.shareUrl, delivery_channel: "email" },
+    metadata: { quote_request_id: prepared.request.id, client_action: `${documentType}_sent`, document_type: documentType, document_number: sentDocument.document_number, document_public_token: sentDocument.public_token, document_version: sentDocument.version, share_url: saved.shareUrl, delivery_channel: "email" },
   })
+  if (eventError) return { ok: false, error: `${label} was emailed, but its activity history could not be saved.` }
   return { ok: true, providerId, fileName, shareUrl: saved.shareUrl }
 }
 
@@ -757,11 +785,32 @@ export async function recordRequestClientDocumentSentAction(input: { requestId: 
   const requestId = String(input.requestId || "").trim()
   const documentType = String(input.documentType || "") as RequestClientDocumentType
   const documentNumber = String(input.documentNumber || "").trim().slice(0, 40)
-  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !["estimate", "invoice", "receipt"].includes(documentType) || !documentNumber) return { ok: false as const, error: "The document activity could not be saved." }
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !["estimate", "invoice", "receipt"].includes(documentType) || !["sms", "whatsapp"].includes(input.channel) || !documentNumber) return { ok: false as const, error: "The document activity could not be saved." }
   const { supabase } = await requireStaffProfile("customers")
   const { data: request } = await supabase.from("quote_requests").select("id,owner_id,project_id").eq("id", requestId).maybeSingle<{ id: string; owner_id: string; project_id: string }>()
   if (!request) return { ok: false as const, error: "Request not found." }
   const label = documentType === "invoice" ? "Invoice" : documentType === "receipt" ? "Receipt" : "Estimate"
+  let receiptProof: { document_number: string; public_token: string; version: number } | null = null
+  if (documentType === "receipt") {
+    const { data: savedReceipt, error: savedReceiptError } = await supabase
+      .from("request_client_documents")
+      .select("document_number,public_token,version")
+      .eq("request_id", requestId)
+      .eq("document_type", "receipt")
+      .maybeSingle<{ document_number: string; public_token: string; version: number }>()
+    if (savedReceiptError || !savedReceipt || savedReceipt.document_number.trim().toUpperCase() !== documentNumber.toUpperCase()) {
+      return { ok: false as const, error: "Save this receipt before recording that it was sent." }
+    }
+    const { data: markedReceipt, error: markedReceiptError } = await supabase
+      .from("request_client_documents")
+      .update({ sent_at: new Date().toISOString() })
+      .eq("request_id", requestId)
+      .eq("document_type", "receipt")
+      .select("document_number,public_token,version")
+      .maybeSingle<{ document_number: string; public_token: string; version: number }>()
+    if (markedReceiptError || !markedReceipt) return { ok: false as const, error: "The receipt sent status could not be saved." }
+    receiptProof = markedReceipt
+  }
   const { error } = await supabase.from("project_events").insert({
     project_id: request.project_id,
     owner_id: request.owner_id,
@@ -769,9 +818,39 @@ export async function recordRequestClientDocumentSentAction(input: { requestId: 
     source: "admin",
     title: `${label} ${documentNumber} sent by ${input.channel === "sms" ? "text" : "WhatsApp"}`,
     description: "The client received the live document link. Future saved edits remain available at the same link.",
-    metadata: { quote_request_id: request.id, client_action: `${documentType}_sent`, document_type: documentType, document_number: documentNumber, delivery_channel: input.channel },
+    metadata: { quote_request_id: request.id, client_action: `${documentType}_sent`, document_type: documentType, document_number: receiptProof?.document_number ?? documentNumber, ...(receiptProof ? { document_public_token: receiptProof.public_token, document_version: receiptProof.version } : {}), delivery_channel: input.channel },
   })
   if (error) return { ok: false as const, error: "The document was sent, but its history could not be saved." }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const }
+}
+
+export async function recordRequestClientApprovalAction(input: { requestId: string }) {
+  const requestId = String(input.requestId || "").trim()
+  if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false as const, error: "The client approval could not be saved." }
+
+  const { supabase } = await requireStaffProfile("customers")
+  const { data: request } = await supabase.from("quote_requests").select("id,owner_id,project_id").eq("id", requestId).maybeSingle<{ id: string; owner_id: string; project_id: string }>()
+  if (!request) return { ok: false as const, error: "Request not found." }
+
+  const { data: existing, error: existingError } = await supabase
+    .from("project_events")
+    .select("id")
+    .contains("metadata", { quote_request_id: requestId, client_action: "client_approved" })
+    .limit(1)
+  if (existingError) return { ok: false as const, error: "Client approval history could not be checked." }
+  if (existing?.length) return { ok: true as const }
+
+  const { error } = await supabase.from("project_events").insert({
+    project_id: request.project_id,
+    owner_id: request.owner_id,
+    event_type: "status_changed",
+    source: "admin",
+    title: "Client approval recorded",
+    description: "The manager confirmed that the client approved the estimate.",
+    metadata: { quote_request_id: request.id, client_action: "client_approved", manager_action: "client_approval" },
+  })
+  if (error) return { ok: false as const, error: "Client approval could not be saved." }
   revalidatePath(`/owner/materials/requests/${requestId}`)
   return { ok: true as const }
 }
@@ -794,5 +873,48 @@ export async function recordRequestPaymentLinkSentAction(input: { requestId: str
   })
   if (error) return { ok: false as const, error: "The payment link was sent, but its history could not be saved." }
   revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const }
+}
+
+export async function recordRequestPaymentReceivedAction(input: { requestId: string }) {
+  const requestId = String(input.requestId || "").trim()
+  if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false as const, error: "The payment activity could not be saved." }
+
+  const { supabase } = await requireStaffProfile("customers")
+  const { data: request } = await supabase
+    .from("quote_requests")
+    .select("id,owner_id,project_id,status")
+    .eq("id", requestId)
+    .maybeSingle<{ id: string; owner_id: string; project_id: string; status: string }>()
+  if (!request) return { ok: false as const, error: "Request not found." }
+
+  const { data: existing, error: existingError } = await supabase
+    .from("project_events")
+    .select("id")
+    .contains("metadata", { quote_request_id: requestId, client_action: "payment_received" })
+    .limit(1)
+  if (existingError) return { ok: false as const, error: "Payment history could not be checked. Try again." }
+
+  if (!existing?.length) {
+    const { error: eventError } = await supabase.from("project_events").insert({
+      project_id: request.project_id,
+      owner_id: request.owner_id,
+      event_type: "status_changed",
+      source: "admin",
+      title: "Client payment received",
+      description: "The manager confirmed that payment was received for this material request.",
+      metadata: { quote_request_id: request.id, client_action: "payment_received", manager_action: "payment_received" },
+    })
+    if (eventError) return { ok: false as const, error: "Payment was not marked received because its history could not be saved." }
+  }
+
+  if (!["quoted", "closed"].includes(request.status)) {
+    const { data: statusUpdated, error: statusError } = await supabase.from("quote_requests").update({ status: "quoted" }).eq("id", requestId).select("id").maybeSingle<{ id: string }>()
+    if (statusError || !statusUpdated) console.error("Payment proof was saved, but the request status could not be synchronized", { requestId, statusError })
+  }
+
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  revalidatePath("/owner/materials/requests")
+  revalidatePath("/admin/build-map")
   return { ok: true as const }
 }

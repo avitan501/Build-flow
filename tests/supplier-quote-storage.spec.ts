@@ -490,11 +490,11 @@ test("request workspace keeps pricing steps and makes client contact globally av
   expect(management).toContain("Contact {supplierIds.length");
   expect(management).toContain('id="supplier-routing"');
   expect(management).toContain(
-    "Choose a route, contact suppliers, and add returned pricing",
+    "Client, payment & delivery",
   );
-  expect(management).toContain("Supplier route &amp; note");
+  expect(management).toContain("Supplier Route &amp; Note");
   expect(management).not.toContain("step={4}");
-  expect(management).not.toContain("step={3}");
+  expect(management).toContain("step={3}");
   expect(management).not.toContain('id="contact-client"');
   expect(management).toContain('id="request-client-contact-dialog"');
   expect(management).toContain("OPEN_REQUEST_CLIENT_CONTACT_EVENT");

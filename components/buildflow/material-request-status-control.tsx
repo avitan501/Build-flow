@@ -10,7 +10,7 @@ import { MaterialRequestAssigneeControl } from "@/components/buildflow/material-
 const STATUS_OPTIONS: Array<{ value: MaterialRequestStatus; label: string }> = [
   { value: "submitted", label: "New" },
   { value: "in_review", label: "In progress" },
-  { value: "quoted", label: "Quote sent" },
+  { value: "quoted", label: "Payment received" },
   { value: "closed", label: "Archive" },
 ]
 
