@@ -121,4 +121,6 @@ test("communication UI and detailed notifications use every verified internal ph
   expect(pushIdentityMigration).toContain("manager_outreach_leads")
   expect(pushIdentityMigration).toContain("additionalContacts")
   expect(pushIdentityMigration).toContain("aura_communication_links")
+  expect(pushIdentityMigration.match(/'supplier:' \|\| \(supplier\.value->>'id'\)/g)).toHaveLength(2)
+  expect(pushIdentityMigration).not.toContain("'supplier:' || supplier.value->>'id'")
 })

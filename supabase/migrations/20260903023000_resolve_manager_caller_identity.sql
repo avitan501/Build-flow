@@ -82,7 +82,7 @@ begin
       union all
 
       select
-        'supplier:' || supplier.value->>'id',
+        'supplier:' || (supplier.value->>'id'),
         3,
         concat_ws(' · ', nullif(trim(supplier.value->>'contactName'), ''), nullif(trim(supplier.value->>'name'), '')),
         private.manager_notification_normalized_phone(phone.value)
@@ -94,7 +94,7 @@ begin
       union all
 
       select
-        'supplier:' || supplier.value->>'id',
+        'supplier:' || (supplier.value->>'id'),
         3,
         concat_ws(' · ', nullif(trim(additional.value->>'name'), ''), nullif(trim(supplier.value->>'name'), '')),
         private.manager_notification_normalized_phone(additional.value->>'phone')
