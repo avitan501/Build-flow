@@ -269,11 +269,15 @@ export async function removeQuoteComparisonSupplierAction(input: {
 
 export async function saveQuoteComparisonClientTargetsAction(input: {
   comparisonId: string;
+  clientDeliveryCharge: number;
+  clientTaxPercent: number;
   items: Array<{ itemId: string; clientUnitPrice: number | null }>;
 }): Promise<ActionResult> {
   const { supabase } = await requireStaffProfile("suppliers");
   const comparisonId = cleanText(input.comparisonId, 100);
   if (!comparisonId || !Array.isArray(input.items) || input.items.length > 500) return { ok: false, error: "The client target prices are invalid." };
+  const lockedError = await ensureComparisonEditable(supabase, comparisonId);
+  if (lockedError) return { ok: false, error: lockedError };
   const itemIds = [...new Set(input.items.map((item) => cleanText(item.itemId, 100)).filter(Boolean))];
   const { data: existing, error: loadError } = await supabase.from("quote_comparison_items").select("id").eq("comparison_id", comparisonId).in("id", itemIds).returns<Array<{ id: string }>>();
   if (loadError || (existing ?? []).length !== itemIds.length) return { ok: false, error: "One of the material lines is no longer available." };
@@ -283,6 +287,11 @@ export async function saveQuoteComparisonClientTargetsAction(input: {
     return supabase.from("quote_comparison_items").update({ client_unit_price: value }).eq("comparison_id", comparisonId).eq("id", item.itemId);
   }));
   if (updates.some((result) => result.error)) return { ok: false, error: "The client target prices could not be saved." };
+  const { error: comparisonError } = await supabase.from("quote_comparisons").update({
+    client_delivery_charge: cleanMoney(input.clientDeliveryCharge),
+    client_tax_percent: cleanTaxPercent(input.clientTaxPercent),
+  }).eq("id", comparisonId);
+  if (comparisonError) return { ok: false, error: "The client delivery and tax could not be saved." };
   revalidatePath(comparisonPath(comparisonId));
   return { ok: true };
 }
@@ -361,7 +370,7 @@ export async function awardQuoteComparisonBidAction(input: {
   if (itemsResult.error || bidsResult.error) return { ok: false, error: "Could not verify the comparison." };
   const analysis = analyzeQuoteComparison(itemsResult.data ?? [], bidsResult.data ?? []).find((entry) => entry.bidId === input.bidId);
   if (!analysis || analysis.blocked || !analysis.eligible || analysis.missingItemCount > 0) {
-    return { ok: false, error: "This supplier cannot be selected until every client-request item has valid pricing." };
+    return { ok: false, error: "This supplier cannot be selected until material prices, delivery, tax, and lead time are complete." };
   }
   const selectedBid = (bidsResult.data ?? []).find((bid) => bid.id === input.bidId);
   const prices = new Map((selectedBid?.quote_comparison_prices ?? []).map((price) => [price.item_id, price]));

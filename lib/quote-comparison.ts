@@ -85,6 +85,12 @@ export type QuoteComparisonAnalysis = {
   actualSubtotal: number;
   comparisonSubtotal: number;
   landedTotal: number;
+  materialSubtotal: number;
+  deliveryCharge: number;
+  taxAmount: number;
+  taxPercent: number;
+  leadTimeDays: number | null;
+  missingFields: string[];
   completeness: number;
   pricedItemCount: number;
   itemCount: number;
@@ -118,8 +124,46 @@ export type MixedSupplierAnalysis = {
   supplierCount: number;
   supplierNames: string[];
   materialSubtotal: number;
+  deliveryCharge: number;
+  taxAmount: number;
   landedTotal: number;
+  leadTimeDays: number | null;
+  missingFields: string[];
   lines: LowestSupplierLine[];
+};
+
+export type ClientReadyToPaySummary = {
+  materialSubtotal: number;
+  deliveryCharge: number;
+  taxPercent: number;
+  taxAmount: number;
+  preTaxTotal: number;
+  finalTotal: number;
+  missingItemCount: number;
+  missingFields: string[];
+  complete: boolean;
+};
+
+export type QuoteBuyingOption = {
+  id: string;
+  kind: "supplier" | "mixed";
+  label: string;
+  supplierNames: string[];
+  supplierMaterialSubtotal: number;
+  supplierDeliveryCharge: number;
+  supplierTaxAmount: number;
+  supplierTotal: number;
+  clientMaterialSubtotal: number;
+  clientDeliveryCharge: number;
+  clientTaxAmount: number;
+  clientTotal: number;
+  estimatedGrossProfit: number;
+  grossMarginPercent: number;
+  leadTimeDays: number | null;
+  missingFields: string[];
+  complete: boolean;
+  isLowestCost: boolean;
+  selectable: boolean;
 };
 
 export type QuoteLineMatchStatus = "exact" | "possible" | "review" | "manual";
@@ -174,12 +218,20 @@ export function calculateQuoteTax(subtotal: number, taxPercent: number | null | 
 }
 
 function leadTimeScore(days: number | null) {
-  if (days === null || !Number.isFinite(days)) return 3;
+  if (days === null || !Number.isFinite(days)) return 0;
   if (days <= 2) return 10;
   if (days <= 5) return 8;
   if (days <= 10) return 6;
   if (days <= 20) return 4;
   return 2;
+}
+
+function bidMetadataMissingFields(bid: QuoteComparisonBidRecord) {
+  const missing: string[] = [];
+  if (!Number.isFinite(bid.delivery_charge) || bid.delivery_charge < 0) missing.push("delivery");
+  if (!Number.isFinite(bid.tax_percent) || bid.tax_percent < 0 || bid.tax_percent > 100) missing.push("tax");
+  if (bid.lead_time_days === null || !Number.isFinite(bid.lead_time_days) || bid.lead_time_days < 0) missing.push("lead time");
+  return missing;
 }
 
 export function analyzeQuoteComparison(
@@ -207,7 +259,7 @@ export function analyzeQuoteComparison(
     for (const item of items) {
       const quantity = positiveNumber(item.quantity);
       const price = prices.get(item.id);
-      const hasPrice = Boolean(price?.is_available && price.unit_price !== null);
+      const hasPrice = Boolean(price?.is_available && price.unit_price !== null && Number.isFinite(price.unit_price) && price.unit_price >= 0);
 
       if (hasPrice) {
         const lineTotal = positiveNumber(price?.unit_price) * quantity;
@@ -227,8 +279,13 @@ export function analyzeQuoteComparison(
 
     const completeness = items.length === 0 ? 0 : pricedItemCount / items.length;
     const deliveryCharge = positiveNumber(bid.delivery_charge);
-    const landedTotal = comparisonSubtotal + deliveryCharge + calculateQuoteTax(comparisonSubtotal + deliveryCharge, bid.tax_percent);
+    const taxAmount = calculateQuoteTax(actualSubtotal + deliveryCharge, bid.tax_percent);
+    const landedTotal = actualSubtotal + deliveryCharge + taxAmount;
     const blocked = bid.trust_level_snapshot === "do-not-use" || bid.status === "declined";
+    const missingFields = [
+      ...(pricedItemCount === items.length ? [] : [`${Math.max(0, items.length - pricedItemCount)} material price${items.length - pricedItemCount === 1 ? "" : "s"}`]),
+      ...bidMetadataMissingFields(bid),
+    ];
 
     return {
       bid,
@@ -239,31 +296,34 @@ export function analyzeQuoteComparison(
       pricedItemCount,
       missingItemCount: Math.max(0, items.length - pricedItemCount),
       missingWithoutBenchmark,
+      deliveryCharge,
+      taxAmount,
+      missingFields,
       blocked,
     };
   });
 
-  const hasCompleteBid = base.some((result) => result.completeness === 1 && !result.blocked);
-  const eligibleResults = base.filter((result) => {
-    if (result.blocked || result.pricedItemCount === 0 || result.missingWithoutBenchmark > 0) return false;
-    return hasCompleteBid ? result.completeness === 1 : true;
-  });
-  const minimumTotal = Math.min(...eligibleResults.map((result) => result.landedTotal).filter((total) => total > 0));
+  const eligibleResults = base.filter((result) => !result.blocked && items.length > 0 && result.missingFields.length === 0);
+  const minimumTotal = Math.min(...eligibleResults.map((result) => result.landedTotal));
   const fastestDays = Math.min(
     ...base
-      .filter((result) => !result.blocked && result.bid.lead_time_days !== null)
+      .filter((result) => eligibleResults.some((candidate) => candidate.bid.id === result.bid.id))
       .map((result) => result.bid.lead_time_days as number),
   );
 
   const analyses = base.map<QuoteComparisonAnalysis>((result) => {
     const eligible = eligibleResults.some((candidate) => candidate.bid.id === result.bid.id);
-    const costScore = eligible && Number.isFinite(minimumTotal) && result.landedTotal > 0
-      ? Math.min(60, (minimumTotal / result.landedTotal) * 60)
+    const costScore = eligible && Number.isFinite(minimumTotal)
+      ? result.landedTotal === minimumTotal
+        ? 60
+        : result.landedTotal > 0 && minimumTotal > 0
+          ? Math.min(60, (minimumTotal / result.landedTotal) * 60)
+          : 0
       : 0;
     const completenessScore = result.completeness * 20;
     const bidLeadTimeScore = leadTimeScore(result.bid.lead_time_days);
     const trustScore = trustScores[result.bid.trust_level_snapshot] ?? 3;
-    const score = result.blocked || result.pricedItemCount === 0
+    const score = !eligible
       ? 0
       : costScore + completenessScore + bidLeadTimeScore + trustScore;
 
@@ -273,6 +333,12 @@ export function analyzeQuoteComparison(
       actualSubtotal: result.actualSubtotal,
       comparisonSubtotal: result.comparisonSubtotal,
       landedTotal: result.landedTotal,
+      materialSubtotal: result.actualSubtotal,
+      deliveryCharge: result.deliveryCharge,
+      taxAmount: result.taxAmount,
+      taxPercent: positiveNumber(result.bid.tax_percent),
+      leadTimeDays: result.bid.lead_time_days,
+      missingFields: result.missingFields,
       completeness: result.completeness,
       pricedItemCount: result.pricedItemCount,
       itemCount: items.length,
@@ -287,7 +353,7 @@ export function analyzeQuoteComparison(
       eligible,
       isRecommended: false,
       isLowestCost: eligible && result.landedTotal === minimumTotal,
-      isFastest: !result.blocked && result.bid.lead_time_days !== null && result.bid.lead_time_days === fastestDays,
+      isFastest: eligible && result.bid.lead_time_days !== null && result.bid.lead_time_days === fastestDays,
     };
   });
 
@@ -304,12 +370,12 @@ export function lowestSupplierPriceByItem(
   bids: QuoteComparisonBidRecord[],
 ) {
   const result = new Map<string, LowestSupplierLine>();
-  const eligibleBids = bids.filter((bid) => bid.trust_level_snapshot !== "do-not-use" && bid.status !== "declined");
+  const eligibleBids = bids.filter((bid) => bid.trust_level_snapshot !== "do-not-use" && bid.status !== "declined" && bidMetadataMissingFields(bid).length === 0);
 
   for (const item of items) {
     for (const bid of eligibleBids) {
       const price = (bid.quote_comparison_prices ?? []).find((entry) => entry.item_id === item.id);
-      if (!price?.is_available || price.unit_price === null) continue;
+      if (!price?.is_available || price.unit_price === null || !Number.isFinite(price.unit_price) || price.unit_price < 0) continue;
       const unitPrice = positiveNumber(price.unit_price);
       const current = result.get(item.id);
       if (!current || unitPrice < current.unitPrice) {
@@ -339,26 +405,131 @@ export function buildMixedSupplierAnalysis(
   const subtotals = new Map<string, number>();
   for (const line of lines) subtotals.set(line.bidId, (subtotals.get(line.bidId) ?? 0) + line.lineTotal);
 
-  let landedTotal = 0;
+  let deliveryCharge = 0;
+  let taxAmount = 0;
+  let leadTimeDays: number | null = null;
   for (const [bidId, subtotal] of subtotals) {
     const bid = bids.find((entry) => entry.id === bidId);
     if (!bid) continue;
     const delivery = positiveNumber(bid.delivery_charge);
-    landedTotal += subtotal + delivery + calculateQuoteTax(subtotal + delivery, bid.tax_percent);
+    deliveryCharge += delivery;
+    taxAmount += calculateQuoteTax(subtotal + delivery, bid.tax_percent);
+    leadTimeDays = Math.max(leadTimeDays ?? 0, bid.lead_time_days ?? 0);
   }
 
   const supplierNames = [...new Set(lines.map((line) => line.supplierName))];
+  const missingFields = lines.length === items.length ? [] : [`${Math.max(0, items.length - lines.length)} material price${items.length - lines.length === 1 ? "" : "s"}`];
+  const materialSubtotal = lines.reduce((total, line) => total + line.lineTotal, 0);
   return {
-    complete: items.length > 0 && lines.length === items.length,
+    complete: items.length > 0 && missingFields.length === 0,
     pricedItemCount: lines.length,
     itemCount: items.length,
     missingItemCount: Math.max(0, items.length - lines.length),
     supplierCount: supplierNames.length,
     supplierNames,
-    materialSubtotal: lines.reduce((total, line) => total + line.lineTotal, 0),
-    landedTotal,
+    materialSubtotal,
+    deliveryCharge,
+    taxAmount,
+    landedTotal: materialSubtotal + deliveryCharge + taxAmount,
+    leadTimeDays,
+    missingFields,
     lines,
   };
+}
+
+export function buildClientReadyToPaySummary(
+  items: QuoteComparisonItemRecord[],
+  clientDeliveryCharge: number | null,
+  clientTaxPercent: number | null,
+): ClientReadyToPaySummary {
+  const missingItemCount = items.filter((item) => item.client_unit_price === null || !Number.isFinite(item.client_unit_price) || item.client_unit_price < 0).length;
+  const missingFields = [
+    ...(missingItemCount ? [`${missingItemCount} client unit price${missingItemCount === 1 ? "" : "s"}`] : []),
+    ...(!Number.isFinite(clientDeliveryCharge) || clientDeliveryCharge === null || clientDeliveryCharge < 0 ? ["client delivery"] : []),
+    ...(!Number.isFinite(clientTaxPercent) || clientTaxPercent === null || clientTaxPercent < 0 || clientTaxPercent > 100 ? ["client tax"] : []),
+  ];
+  const materialSubtotal = items.reduce((total, item) => total + positiveNumber(item.client_unit_price) * positiveNumber(item.quantity), 0);
+  const deliveryCharge = positiveNumber(clientDeliveryCharge);
+  const taxPercent = Math.min(100, positiveNumber(clientTaxPercent));
+  const preTaxTotal = materialSubtotal + deliveryCharge;
+  const taxAmount = calculateQuoteTax(preTaxTotal, taxPercent);
+
+  return {
+    materialSubtotal,
+    deliveryCharge,
+    taxPercent,
+    taxAmount,
+    preTaxTotal,
+    finalTotal: preTaxTotal + taxAmount,
+    missingItemCount,
+    missingFields,
+    complete: items.length > 0 && missingFields.length === 0,
+  };
+}
+
+export function buildQuoteBuyingOptions(
+  items: QuoteComparisonItemRecord[],
+  bids: QuoteComparisonBidRecord[],
+  clientReady: ClientReadyToPaySummary,
+): QuoteBuyingOption[] {
+  const analyses = analyzeQuoteComparison(items, bids);
+  const supplierOptions = analyses.map<QuoteBuyingOption>((analysis) => {
+    const missingFields = [...analysis.missingFields, ...clientReady.missingFields];
+    const estimatedGrossProfit = clientReady.preTaxTotal - analysis.landedTotal;
+    return {
+      id: analysis.bidId,
+      kind: "supplier",
+      label: analysis.supplierName,
+      supplierNames: [analysis.supplierName],
+      supplierMaterialSubtotal: analysis.materialSubtotal,
+      supplierDeliveryCharge: analysis.deliveryCharge,
+      supplierTaxAmount: analysis.taxAmount,
+      supplierTotal: analysis.landedTotal,
+      clientMaterialSubtotal: clientReady.materialSubtotal,
+      clientDeliveryCharge: clientReady.deliveryCharge,
+      clientTaxAmount: clientReady.taxAmount,
+      clientTotal: clientReady.finalTotal,
+      estimatedGrossProfit,
+      grossMarginPercent: clientReady.preTaxTotal > 0 ? (estimatedGrossProfit / clientReady.preTaxTotal) * 100 : 0,
+      leadTimeDays: analysis.leadTimeDays,
+      missingFields,
+      complete: analysis.eligible && clientReady.complete,
+      isLowestCost: analysis.isLowestCost,
+      selectable: analysis.eligible && clientReady.complete,
+    };
+  });
+
+  const mixed = buildMixedSupplierAnalysis(items, bids);
+  const hasTrueMix = mixed.complete && mixed.supplierCount > 1;
+  if (hasTrueMix) {
+    const missingFields = [...mixed.missingFields, ...clientReady.missingFields];
+    const estimatedGrossProfit = clientReady.preTaxTotal - mixed.landedTotal;
+    supplierOptions.push({
+      id: "mixed",
+      kind: "mixed",
+      label: "Mixed suppliers",
+      supplierNames: mixed.supplierNames,
+      supplierMaterialSubtotal: mixed.materialSubtotal,
+      supplierDeliveryCharge: mixed.deliveryCharge,
+      supplierTaxAmount: mixed.taxAmount,
+      supplierTotal: mixed.landedTotal,
+      clientMaterialSubtotal: clientReady.materialSubtotal,
+      clientDeliveryCharge: clientReady.deliveryCharge,
+      clientTaxAmount: clientReady.taxAmount,
+      clientTotal: clientReady.finalTotal,
+      estimatedGrossProfit,
+      grossMarginPercent: clientReady.preTaxTotal > 0 ? (estimatedGrossProfit / clientReady.preTaxTotal) * 100 : 0,
+      leadTimeDays: mixed.leadTimeDays,
+      missingFields,
+      complete: clientReady.complete && missingFields.length === 0,
+      isLowestCost: false,
+      selectable: false,
+    });
+  }
+
+  const lowestCompleteTotal = Math.min(...supplierOptions.filter((option) => option.complete).map((option) => option.supplierTotal));
+  for (const option of supplierOptions) option.isLowestCost = option.complete && option.supplierTotal === lowestCompleteTotal;
+  return supplierOptions.sort((a, b) => Number(b.complete) - Number(a.complete) || a.supplierTotal - b.supplierTotal || a.label.localeCompare(b.label));
 }
 
 function normalizedMatchText(value: string) {

@@ -5,7 +5,9 @@ import { expect, test } from "@playwright/test";
 
 import {
   analyzeQuoteComparison,
+  buildClientReadyToPaySummary,
   buildMixedSupplierAnalysis,
+  buildQuoteBuyingOptions,
   buildClientQuoteSummary,
   calculateQuoteTax,
   lowestSupplierPriceByItem,
@@ -38,7 +40,7 @@ function bid(
     delivery_charge: options.delivery ?? 0,
     tax_amount: 0,
     tax_percent: options.taxPercent ?? 0,
-    lead_time_days: options.lead ?? null,
+    lead_time_days: Object.prototype.hasOwnProperty.call(options, "lead") ? options.lead ?? null : 5,
     notes: "",
     status: "received",
     created_at: "",
@@ -116,8 +118,8 @@ test("supplier tax is calculated from the taxable subtotal", () => {
 });
 
 test("lowest-per-item comparison includes every supplier delivery and tax", () => {
-  const supplierA = bid("supplier-a", { prices: [["studs", 4], ["plywood", 35]], delivery: 100 });
-  const supplierB = bid("supplier-b", { prices: [["studs", 6], ["plywood", 20]], delivery: 100 });
+  const supplierA = bid("supplier-a", { prices: [["studs", 4], ["plywood", 35]], delivery: 100, taxPercent: 5, lead: 3 });
+  const supplierB = bid("supplier-b", { prices: [["studs", 6], ["plywood", 20]], delivery: 100, taxPercent: 10, lead: 8 });
   const lowest = lowestSupplierPriceByItem(items, [supplierA, supplierB]);
   const mixed = buildMixedSupplierAnalysis(items, [supplierA, supplierB]);
 
@@ -126,7 +128,90 @@ test("lowest-per-item comparison includes every supplier delivery and tax", () =
   expect(mixed.complete).toBe(true);
   expect(mixed.supplierCount).toBe(2);
   expect(mixed.materialSubtotal).toBe(800);
-  expect(mixed.landedTotal).toBe(1000);
+  expect(mixed.deliveryCharge).toBe(200);
+  expect(mixed.taxAmount).toBe(75);
+  expect(mixed.landedTotal).toBe(1075);
+  expect(mixed.leadTimeDays).toBe(8);
+});
+
+test("client ready to pay uses explicit unit prices and whole-order delivery and tax", () => {
+  const clientItems = items.map((item, index) => ({ ...item, client_unit_price: index === 0 ? 7 : 40 }));
+  const target = buildClientReadyToPaySummary(clientItems, 150, 10);
+
+  expect(target.materialSubtotal).toBe(1500);
+  expect(target.deliveryCharge).toBe(150);
+  expect(target.taxAmount).toBe(165);
+  expect(target.finalTotal).toBe(1815);
+  expect(target.complete).toBe(true);
+});
+
+test("every complete supplier and mixed option uses the same client total", () => {
+  const clientItems = items.map((item, index) => ({ ...item, client_unit_price: index === 0 ? 8 : 45 }));
+  const target = buildClientReadyToPaySummary(clientItems, 200, 8);
+  const options = buildQuoteBuyingOptions(clientItems, [
+    bid("supplier-a", { prices: [["studs", 4], ["plywood", 40]], delivery: 50, taxPercent: 5, lead: 3 }),
+    bid("supplier-b", { prices: [["studs", 7], ["plywood", 20]], delivery: 75, taxPercent: 10, lead: 7 }),
+  ], target);
+
+  expect(options.map((option) => option.kind)).toEqual(["mixed", "supplier", "supplier"]);
+  expect(new Set(options.map((option) => option.clientTotal))).toEqual(new Set([target.finalTotal]));
+  const mixed = options.find((option) => option.kind === "mixed");
+  expect(mixed?.supplierMaterialSubtotal).toBe(800);
+  expect(mixed?.supplierDeliveryCharge).toBe(125);
+  expect(mixed?.supplierTaxAmount).toBe(70);
+  expect(mixed?.leadTimeDays).toBe(7);
+  expect(mixed?.estimatedGrossProfit).toBe(target.preTaxTotal - 995);
+});
+
+test("gross profit and margin preserve zero and negative outcomes", () => {
+  const clientItems = items.map((item, index) => ({ ...item, client_unit_price: index === 0 ? 5 : 25 }));
+  const target = buildClientReadyToPaySummary(clientItems, 0, 0);
+  const options = buildQuoteBuyingOptions(clientItems, [
+    bid("break-even", { prices: [["studs", 5], ["plywood", 25]], delivery: 0, taxPercent: 0, lead: 2 }),
+    bid("loss", { prices: [["studs", 6], ["plywood", 25]], delivery: 0, taxPercent: 0, lead: 2 }),
+  ], target);
+
+  expect(options.find((option) => option.id === "break-even")?.estimatedGrossProfit).toBe(0);
+  expect(options.find((option) => option.id === "break-even")?.grossMarginPercent).toBe(0);
+  expect(options.find((option) => option.id === "loss")?.estimatedGrossProfit).toBe(-100);
+  expect(options.find((option) => option.id === "loss")?.grossMarginPercent).toBe(-10);
+});
+
+test("missing delivery, tax, or lead time cannot be ranked or selected", () => {
+  const complete = bid("complete", { prices: [["studs", 5], ["plywood", 25]], delivery: 20, taxPercent: 0, lead: 4 });
+  const missingDelivery = bid("missing-delivery", { prices: [["studs", 1], ["plywood", 1]], delivery: Number.NaN, taxPercent: 0, lead: 1 });
+  const missingTax = bid("missing-tax", { prices: [["studs", 1], ["plywood", 1]], delivery: 0, taxPercent: Number.NaN, lead: 1 });
+  const missingLead = bid("missing-lead", { prices: [["studs", 1], ["plywood", 1]], delivery: 0, taxPercent: 0, lead: null });
+  const analyses = analyzeQuoteComparison(items, [missingDelivery, missingTax, missingLead, complete]);
+
+  expect(analyses.find((entry) => entry.bidId === "complete")?.isLowestCost).toBe(true);
+  expect(analyses.find((entry) => entry.bidId === "missing-delivery")?.missingFields).toContain("delivery");
+  expect(analyses.find((entry) => entry.bidId === "missing-tax")?.missingFields).toContain("tax");
+  expect(analyses.find((entry) => entry.bidId === "missing-lead")?.missingFields).toContain("lead time");
+  expect(analyses.filter((entry) => entry.bidId.startsWith("missing")).every((entry) => !entry.eligible && !entry.isRecommended && !entry.isLowestCost)).toBe(true);
+});
+
+test("an incomplete client target blocks option profit and selection", () => {
+  const target = buildClientReadyToPaySummary(items, 100, 8.875);
+  const [option] = buildQuoteBuyingOptions(items, [
+    bid("complete-supplier", { prices: [["studs", 5], ["plywood", 25]], delivery: 25, taxPercent: 5, lead: 3 }),
+  ], target);
+
+  expect(target.missingFields).toContain("1 client unit price");
+  expect(option.complete).toBe(false);
+  expect(option.selectable).toBe(false);
+  expect(option.isLowestCost).toBe(false);
+});
+
+test("mixed option is omitted when it duplicates a single supplier order", () => {
+  const clientItems = items.map((item) => ({ ...item, client_unit_price: 50 }));
+  const target = buildClientReadyToPaySummary(clientItems, 0, 0);
+  const options = buildQuoteBuyingOptions(clientItems, [
+    bid("all-lowest", { prices: [["studs", 4], ["plywood", 20]], lead: 2 }),
+    bid("higher", { prices: [["studs", 5], ["plywood", 25]], lead: 3 }),
+  ], target);
+
+  expect(options.filter((option) => option.kind === "mixed")).toHaveLength(0);
 });
 
 test("supplier line matching distinguishes exact, possible, review, and manual prices", () => {
@@ -217,10 +302,11 @@ test("selecting a supplier saves the current price draft before awarding it", as
 
   expect(saveCall).toBeGreaterThan(-1);
   expect(awardCall).toBeGreaterThan(saveCall);
-  expect(workspace).toContain("Use this supplier");
+  expect(workspace).toContain("Select supplier");
   expect(workspace).toContain("prices saved and supplier selected");
-  expect(workspace).toContain("Best single supplier");
-  expect(workspace).toContain("Lowest per item");
+  expect(workspace).toContain("Buying option comparison");
+  expect(workspace).not.toContain("Best single supplier");
+  expect(workspace).not.toContain("All supplier totals");
   expect(workspace).toContain("Confirm match");
   expect(workspace).toContain("Locked to client request");
   expect(actions).toContain("analysis.missingItemCount > 0");
@@ -241,10 +327,19 @@ test("supplier comparison captures the client's ready-to-pay target beside suppl
   const workspace = await readFile(path.join(process.cwd(), "components/buildflow/quote-comparison-workspace.tsx"), "utf8");
   const actions = await readFile(path.join(process.cwd(), "app/admin/quote-comparison/actions.ts"), "utf8");
 
-  expect(workspace).toContain("Client ready to pay");
-  expect(workspace).toContain("Target unit price");
+  expect(workspace).toContain("Client Ready to Pay");
+  expect(workspace).toContain("Client unit price");
+  expect(workspace).toContain("Supplier unit price");
+  expect(workspace).toContain("Whole order");
+  expect(workspace).toContain("Estimated gross profit");
+  expect(workspace).toContain("Gross margin");
+  expect(workspace).toContain("Finish missing values");
+  expect(workspace).toContain('className="mt-4 hidden');
+  expect(workspace).toContain('className="mt-4 grid gap-3 md:hidden"');
   expect(workspace).toContain("saveQuoteComparisonClientTargetsAction");
   expect(actions).toContain("client_unit_price: value");
+  expect(actions).toContain("client_delivery_charge: cleanMoney(input.clientDeliveryCharge)");
+  expect(actions).toContain("client_tax_percent: cleanTaxPercent(input.clientTaxPercent)");
 });
 
 test("new comparison asks only for a comparison name", async () => {

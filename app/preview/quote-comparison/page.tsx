@@ -27,9 +27,9 @@ const comparison: QuoteComparisonRecord = {
 };
 
 const items: QuoteComparisonItemRecord[] = [
-  { id: "studs", comparison_id: comparison.id, description: "2 x 4 x 10 ft. studs", specification: "Douglas Fir", quantity: 400, unit: "piece", markup_percent: 15, client_unit_price: null, sort_order: 0, created_at: comparison.created_at, updated_at: comparison.updated_at },
-  { id: "osb", comparison_id: comparison.id, description: "3/4 in. OSB subfloor", specification: "4 x 8 ft. tongue-and-groove", quantity: 172, unit: "sheet", markup_percent: 15, client_unit_price: null, sort_order: 1, created_at: comparison.created_at, updated_at: comparison.updated_at },
-  { id: "nails", comparison_id: comparison.id, description: "3-1/4 in. framing nails", specification: "Collated", quantity: 20, unit: "box", markup_percent: 15, client_unit_price: null, sort_order: 2, created_at: comparison.created_at, updated_at: comparison.updated_at },
+  { id: "studs", comparison_id: comparison.id, description: "2 x 4 x 10 ft. studs", specification: "Douglas Fir", quantity: 400, unit: "piece", markup_percent: 15, client_unit_price: 6.77, sort_order: 0, created_at: comparison.created_at, updated_at: comparison.updated_at },
+  { id: "osb", comparison_id: comparison.id, description: "3/4 in. OSB subfloor", specification: "4 x 8 ft. tongue-and-groove", quantity: 172, unit: "sheet", markup_percent: 15, client_unit_price: 36.92, sort_order: 1, created_at: comparison.created_at, updated_at: comparison.updated_at },
+  { id: "nails", comparison_id: comparison.id, description: "3-1/4 in. framing nails", specification: "Collated", quantity: 20, unit: "box", markup_percent: 15, client_unit_price: 62.68, sort_order: 2, created_at: comparison.created_at, updated_at: comparison.updated_at },
 ];
 
 function sampleBid(

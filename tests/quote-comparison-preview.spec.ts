@@ -4,9 +4,20 @@ test("staff can prepare a branded client quote without exposing private pricing"
   await page.goto("/preview/quote-comparison");
   await expect(page.getByRole("heading", { name: "Prepare the client quote" })).toBeVisible();
   await expect(page.getByTestId("avantia-build-lockup").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Buying option comparison" })).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Use this supplier" }).click();
+  if ((page.viewportSize()?.width ?? 1_000) < 768) {
+    const optionCard = page.getByRole("article").filter({ hasText: "Metro Lumber" });
+    await expect(optionCard).toBeVisible();
+    await expect(optionCard.getByText("Estimated gross profit", { exact: true })).toBeVisible();
+    await optionCard.getByRole("button", { name: "Select supplier" }).click();
+  } else {
+    const optionRow = page.getByRole("row").filter({ has: page.getByRole("button", { name: "Select", exact: true }), hasText: "Metro Lumber" });
+    await expect(optionRow).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Estimated gross profit" })).toBeVisible();
+    await optionRow.getByRole("button", { name: "Select", exact: true }).click();
+  }
   await expect(page.getByText(/Pricing from Metro Lumber/)).toBeVisible();
 
   await page.getByLabel("Markup for all").fill("22");
