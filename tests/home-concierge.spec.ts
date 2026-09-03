@@ -34,9 +34,12 @@ test("new homepage presents the approved request flow", async ({ page }) => {
   for (const asset of [
     "service-beat-quote-v4.webp",
     "service-send-list-v4.webp",
-    "service-find-item-v4.webp",
+    "service-find-item-v5.webp",
   ]) {
-    await expect(page.locator(`img[src*="${asset}"]`)).toBeAttached();
+    const image = page.locator(`img[src*="${asset}"]`);
+    await expect(image).toBeAttached();
+    await image.scrollIntoViewIfNeeded();
+    await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true);
   }
   await expect(page.getByRole("contentinfo")).toBeAttached();
   expect(
@@ -44,6 +47,34 @@ test("new homepage presents the approved request flow", async ({ page }) => {
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
     ),
   ).toBe(false);
+});
+
+test("all three mobile service photographs can be revealed in the swipe rail", async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 1024) >= 640, "Mobile-only swipe rail check");
+  await page.goto("/");
+
+  const first = page.getByRole("heading", { name: "Beat Your Quote" });
+  const third = page.getByRole("heading", { name: "Find a Specific Item" });
+  await first.scrollIntoViewIfNeeded();
+  await expect(first).toBeVisible();
+  await third.scrollIntoViewIfNeeded();
+  await expect(third).toBeVisible();
+});
+
+test("homepage process film is motion footage rather than a generated slide sequence", async ({ page }) => {
+  await page.goto("/");
+
+  const film = page.locator('video:has(source[src="/videos/homepage-material-process.mp4"])');
+  await expect(film).toBeVisible();
+  await expect(film).toHaveAttribute("autoplay", "");
+  await expect(film).toHaveAttribute("loop", "");
+  await expect(film).toHaveAttribute("muted", "");
+  await expect(film).toHaveAttribute("playsinline", "");
+
+  await film.evaluate((video: HTMLVideoElement) => video.pause());
+  await film.evaluate((video: HTMLVideoElement) => { video.currentTime = 4.8; });
+  await expect.poll(() => film.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeGreaterThan(4.7);
+  expect(await film.evaluate((video: HTMLVideoElement) => video.duration)).toBeGreaterThan(11);
 });
 
 test("new homepage keeps the approved mobile composition compact", async ({ page }) => {

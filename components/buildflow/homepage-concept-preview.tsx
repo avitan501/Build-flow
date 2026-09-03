@@ -40,7 +40,7 @@ const reviewServices = [
     title: "Find a Specific Item",
     description: "Search the material catalog or send the exact item you need.",
     href: "/shop",
-    image: "/images/buildflow-homepage/service-find-item-v4.webp",
+    image: "/images/buildflow-homepage/service-find-item-v5.webp",
     action: "Find an item",
   },
 ] as const
@@ -98,7 +98,7 @@ function HomepageReviewSections() {
           className={`relative mx-auto w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/70 bg-slate-950 p-2 shadow-[0_35px_90px_rgba(15,23,42,.2)] transition-[transform,opacity] duration-700 ease-out motion-reduce:transform-none ${videoInView ? "scale-100 opacity-100" : "scale-[0.965] opacity-90"}`}
         >
           <div className="relative aspect-[4/5] overflow-hidden rounded-[1.55rem] bg-slate-900 sm:aspect-[16/10]">
-            <video autoPlay muted loop playsInline preload="metadata" poster="/images/buildflow-homepage/service-send-list-v4.webp" className="h-full w-full object-cover object-center" aria-label="A material request moving from a contractor's list through supplier comparison to jobsite delivery">
+            <video autoPlay muted loop playsInline preload="metadata" poster="/images/buildflow-homepage/process-text-request-v5.webp" className="h-full w-full object-cover object-center" aria-label="A material request moving from a contractor's list through supplier comparison to jobsite delivery">
               <source src="/videos/homepage-material-process.mp4" type="video/mp4" />
             </video>
             <div className="absolute inset-x-3 bottom-3 flex items-center gap-2 rounded-2xl border border-white/20 bg-black/45 px-4 py-3 text-sm font-bold text-white shadow-lg backdrop-blur-md sm:inset-x-auto sm:bottom-5 sm:left-5">
@@ -187,7 +187,7 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
           fill
           priority={index === 0}
           sizes="(max-width: 640px) 100vw, 62vw"
-          className={`object-cover brightness-[.42] contrast-[1.02] saturate-[.55] transition-[opacity,transform] duration-[1400ms] ease-out motion-reduce:transform-none motion-reduce:transition-none ${photo.position} ${index === heroPhotoIndex ? "scale-[1.035] opacity-100" : "scale-100 opacity-0"}`}
+          className={`object-cover brightness-[.32] contrast-[1.03] saturate-[.48] transition-[opacity,transform] duration-[1400ms] ease-out motion-reduce:transform-none motion-reduce:transition-none ${photo.position} ${index === heroPhotoIndex ? "scale-[1.035] opacity-100" : "scale-100 opacity-0"}`}
         />)}
       </div> : <video key={videoSource} ref={videoRef} src={videoSource} poster={posterSource} autoPlay muted playsInline preload="auto" onEnded={() => setVideoIndex((current) => (current + 1) % concept.videos.length)} className={`absolute object-cover ${conceptId === 2 ? "inset-y-0 right-0 h-full w-full sm:w-[62%]" : conceptId === 4 ? "inset-y-0 right-0 h-full w-full lg:w-[68%]" : conceptId === 5 ? "inset-x-4 bottom-5 top-24 h-[calc(100%-7.25rem)] w-[calc(100%-2rem)] rounded-[2rem] sm:inset-x-[38%] sm:w-[60%]" : "inset-0 h-full w-full scale-[1.015]"}`} aria-hidden="true" />}
 
