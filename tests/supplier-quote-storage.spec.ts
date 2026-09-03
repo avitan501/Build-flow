@@ -496,6 +496,9 @@ test("request workspace keeps pricing steps and makes client contact globally av
   expect(status).toContain("Payment & delivery");
   expect(management).toContain("step={2}");
   expect(management).toContain("Contact Suppliers");
+  expect(management).toContain("Add or change suppliers");
+  expect(management).toContain("updateRequestSupplierContactStatusAction");
+  expect(management).toContain("Compare Client Price &amp; Supplier Quotes");
   expect(management).toContain("Suppliers selected in Step 1");
   expect(management).toContain("All Supplier Directory");
   expect(management).toContain("Contact {supplierIds.length");

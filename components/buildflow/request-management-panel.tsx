@@ -7,7 +7,7 @@ import { createPortal } from "react-dom"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
 import { openRequestPricingComparisonAction } from "@/app/admin/supplier-quotes/actions"
-import { previewRequestClientQuoteAction, recordRequestClientApprovalAction, recordRequestClientDocumentSentAction, recordRequestPaymentLinkSentAction, recordRequestPaymentReceivedAction, saveRequestClientDocumentAction, saveRequestManagerNotesAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
+import { previewRequestClientQuoteAction, recordRequestClientApprovalAction, recordRequestClientDocumentSentAction, recordRequestPaymentLinkSentAction, recordRequestPaymentReceivedAction, saveRequestClientDocumentAction, saveRequestManagerNotesAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestSupplierContactStatusAction, type RequestClientQuoteInput, type RequestSupplierContactStatus } from "@/app/owner/materials/requests/actions"
 import { AutosaveStatus } from "@/components/buildflow/autosave-status"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
 import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
@@ -52,6 +52,13 @@ export type RequestClientDocumentSnapshot = {
 
 const actionClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:border-sky-400 hover:bg-sky-50"
 const supplierNameCollator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true })
+const SUPPLIER_CONTACT_STATUS_OPTIONS: Array<{ value: RequestSupplierContactStatus; label: string }> = [
+  { value: "not_contacted", label: "Not contacted" },
+  { value: "request_sent", label: "Request sent" },
+  { value: "supplier_replied", label: "They replied" },
+  { value: "awaiting_supplier_reply", label: "We replied · waiting" },
+  { value: "quote_received", label: "Quote received" },
+]
 
 function resolvedRouteSupplierIds(routeSelections: RequestSupplierRouteSelection[], suppliers: SupplierRoutingOption[]) {
   return [...new Set(routeSelections.flatMap((selection) => {
@@ -163,13 +170,14 @@ export function RequestManagementPanel({
   initialPaymentDelivery: { documentType: "invoice" | "receipt" | null; estimateSent: boolean; clientApproved: boolean; invoiceSent: boolean; receiptSent: boolean; paymentLinkSent: boolean; paymentReceived: boolean; deliveryScheduled: boolean }
   initialClientDocuments: RequestClientDocumentSnapshot[]
   initialManagerNotes: string
-  initialSupplierRecommendations: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean }>
+  initialSupplierRecommendations: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean; contactStatus: RequestSupplierContactStatus }>
   clientEmails: RelatedEmailItem[]
 }) {
   const router = useRouter()
   const initialRouteSupplierIds = resolvedRouteSupplierIds(routeSelections, suppliers)
   const [supplierIds, setSupplierIds] = useState<string[]>(() => [...new Set([...initialSupplierRecommendations.filter((entry) => entry.shouldContact).map((entry) => entry.supplierId), ...initialRouteSupplierIds])])
   const [recommendedSupplierIds, setRecommendedSupplierIds] = useState<string[]>(() => [...new Set([...initialSupplierRecommendations.filter((entry) => entry.isRecommended).map((entry) => entry.supplierId), ...initialRouteSupplierIds])])
+  const [supplierContactStatuses, setSupplierContactStatuses] = useState<Record<string, RequestSupplierContactStatus>>(() => Object.fromEntries(initialSupplierRecommendations.map((entry) => [entry.supplierId, entry.contactStatus || "not_contacted"])))
   const [managerNotes, setManagerNotes] = useState(initialManagerNotes)
   const notesAutosave = useSequencedAutosave<string>({
     save: (value, version) => saveRequestManagerNotesAction({ requestId, managerNotes: value, version }),
@@ -409,6 +417,23 @@ export function RequestManagementPanel({
       const result = await openRequestPricingComparisonAction(requestId)
       if (!result.ok) { setFeedbackError(true); setFeedback(result.error); return }
       router.push(`/admin/quote-comparison/${result.data.comparisonId}`)
+    })
+  }
+
+  function updateSupplierContactStatus(supplierId: string, status: RequestSupplierContactStatus) {
+    const previous = supplierContactStatuses[supplierId] || "not_contacted"
+    setSupplierContactStatuses((current) => ({ ...current, [supplierId]: status }))
+    setFeedback("")
+    startTransition(async () => {
+      const result = await updateRequestSupplierContactStatusAction({ requestId, supplierId, status })
+      if (!result.ok) {
+        setSupplierContactStatuses((current) => ({ ...current, [supplierId]: previous }))
+        setFeedbackError(true)
+        setFeedback(result.error)
+        return
+      }
+      setFeedbackError(false)
+      setFeedback("Supplier status saved.")
     })
   }
 
@@ -739,14 +764,17 @@ export function RequestManagementPanel({
             <span className={`rounded-full px-2.5 py-1 ${supplierQuoteCount ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>{supplierQuoteCount} quote{supplierQuoteCount === 1 ? "" : "s"} received</span>
           </div>
 
-          {supplierProgressRows.length ? <div className="mb-3 divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">{supplierProgressRows.map((row) => {
-            const status = row.bid ? "Quote received" : row.supplierPackage ? row.supplierPackage.status.replaceAll("_", " ") : "Ready to contact"
-            return <article key={row.name} className="flex min-h-14 items-center gap-2 px-3 py-2.5">
-              <div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-[#12263f]">{row.name}</p><p className={`mt-0.5 truncate text-[10px] font-bold ${row.bid ? "text-emerald-700" : row.supplierPackage ? "text-sky-700" : "text-amber-700"}`}>{status}{row.bid ? ` · ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)}` : ""}</p>{row.note ? <p title={row.note} className="mt-0.5 truncate text-[10px] text-slate-500">{row.note}</p> : null}</div>
+          {supplierProgressRows.length ? <div role="table" aria-label="Suppliers selected in Step 1" className="mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white"><div role="row" className="hidden grid-cols-[minmax(0,1fr)_13rem_6rem] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[.08em] text-slate-500 sm:grid"><span role="columnheader">Supplier</span><span role="columnheader">Status</span><span role="columnheader" className="text-right">Contact</span></div><div className="divide-y divide-slate-100">{supplierProgressRows.map((row) => {
+            const contactStatus = row.bid ? "quote_received" : row.supplier ? supplierContactStatuses[row.supplier.id] || (row.supplierPackage ? "request_sent" : "not_contacted") : "not_contacted"
+            return <article role="row" key={row.name} className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_13rem_6rem]">
+              <div role="cell" className="min-w-0"><p className="truncate text-sm font-black text-[#12263f]">{row.name}</p>{row.bid ? <p className="mt-0.5 truncate text-[10px] font-bold text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)} total received</p> : null}{row.note ? <p title={row.note} className="mt-0.5 truncate text-[10px] text-slate-500">{row.note}</p> : null}</div>
+              <div role="cell" className="col-span-2 sm:col-span-1"><label className="sr-only" htmlFor={`supplier-status-${row.supplier?.id || row.name}`}>Status for {row.name}</label><select id={`supplier-status-${row.supplier?.id || row.name}`} value={contactStatus} disabled={!row.supplier || pending || Boolean(row.bid)} onChange={(event) => row.supplier && updateSupplierContactStatus(row.supplier.id, event.target.value as RequestSupplierContactStatus)} className={`min-h-10 w-full rounded-lg border px-2.5 text-xs font-bold ${contactStatus === "quote_received" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : contactStatus === "not_contacted" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-sky-200 bg-sky-50 text-sky-800"}`}>{SUPPLIER_CONTACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+              <div role="cell" className="row-start-1 flex justify-end gap-1.5 sm:col-start-3">
               {row.supplier?.phone ? <a href={`tel:${row.supplier.phone}`} aria-label={`Call ${row.name}`} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><Phone className="h-4 w-4" /></a> : null}
               {row.supplier?.email ? <a href={`mailto:${row.supplier.email}`} aria-label={`Email ${row.name}`} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><Mail className="h-4 w-4" /></a> : null}
+              </div>
             </article>
-          })}</div> : <p className="mb-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">Choose suppliers in Step 1 to begin pricing.</p>}
+          })}</div></div> : <p className="mb-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">Choose suppliers in Step 1 to begin pricing.</p>}
 
           <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-20 mb-3 rounded-xl border border-slate-200 bg-white/95 p-2 shadow-[0_10px_30px_rgba(15,23,42,.14)] backdrop-blur">{renderStep2PrimaryAction()}</div>
 
@@ -767,7 +795,7 @@ export function RequestManagementPanel({
           </details>
 
           <details id="supplier-routing" open={supplierRoutingOpen} onToggle={(event) => setSupplierRoutingOpen(event.currentTarget.open)} className="group/route mt-2 scroll-mt-24 rounded-md border border-slate-200 bg-slate-50">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold"><span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-sky-700" />Contact Suppliers</span><ChevronDown className="h-4 w-4 text-slate-400 transition group-open/route:rotate-180" /></summary>
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold"><span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-sky-700" />Add or change suppliers</span><ChevronDown className="h-4 w-4 text-slate-400 transition group-open/route:rotate-180" /></summary>
             <div className="border-t border-slate-200 p-3">
           <div className="mt-3 grid gap-3">
             <fieldset>
@@ -786,6 +814,7 @@ export function RequestManagementPanel({
           {packages.length ? <div className="mt-4 border-t border-slate-200 pt-3"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Current routes</p><div className="mt-2 grid gap-2">{packages.map((pkg) => <div key={pkg.id} className="flex items-center justify-between gap-3 text-sm"><span className="font-semibold">{pkg.department}</span><span className="text-right text-slate-600">{suppliers.find((entry) => entry.id === pkg.supplier_id)?.name || "Not assigned"} · {pkg.status.replaceAll("_", " ")}</span></div>)}</div></div> : null}
             </div>
           </details>
+          <button type="button" onClick={openManualPricing} disabled={pending || !selectedSupplierNames.length} className={`${primaryWorkflowClass} mt-2`}><Award className="h-4 w-4" />Compare Client Price &amp; Supplier Quotes</button>
         </div>
       </details>
 

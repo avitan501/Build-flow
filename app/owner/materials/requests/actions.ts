@@ -28,8 +28,66 @@ export type RequestSupplierPlanInput = {
   suppliers: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean }>
 }
 
+export type RequestSupplierContactStatus = "not_contacted" | "request_sent" | "supplier_replied" | "awaiting_supplier_reply" | "quote_received"
+
 const MATERIAL_REQUEST_STATUSES = new Set<MaterialRequestStatus>(["submitted", "in_review", "quoted", "closed"])
 const MATERIAL_REQUEST_ASSIGNEES = new Set<MaterialRequestAssignee>(["carlos", "david"])
+const REQUEST_SUPPLIER_CONTACT_STATUSES = new Set<RequestSupplierContactStatus>(["not_contacted", "request_sent", "supplier_replied", "awaiting_supplier_reply", "quote_received"])
+
+export async function updateRequestSupplierContactStatusAction(input: { requestId: string; supplierId: string; status: RequestSupplierContactStatus }) {
+  const requestId = String(input.requestId || "").trim()
+  const supplierId = String(input.supplierId || "").trim()
+  const status = String(input.status || "") as RequestSupplierContactStatus
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !supplierId || supplierId.length > 180 || !REQUEST_SUPPLIER_CONTACT_STATUSES.has(status)) return { ok: false as const, error: "Choose a valid supplier status." }
+
+  const { supabase, user } = await requireStaffProfile("customers")
+  const [{ data: request }, { data: supplierData }, { data: previous }] = await Promise.all([
+    supabase.from("quote_requests").select("id,project_id,owner_id").eq("id", requestId).maybeSingle<{ id: string; project_id: string; owner_id: string }>(),
+    supabase.rpc("staff_load_catalog_suppliers"),
+    supabase.from("quote_request_supplier_recommendations").select("contact_status").eq("request_id", requestId).eq("supplier_id", supplierId).maybeSingle<{ contact_status: RequestSupplierContactStatus }>(),
+  ])
+  const supplier = (Array.isArray(supplierData) ? supplierData : []).find((entry) => String((entry as { id?: unknown }).id || "") === supplierId) as { id?: string; name?: string } | undefined
+  if (!request || !supplier?.name) return { ok: false as const, error: "The supplier could not be found for this request." }
+  if (previous?.contact_status === status) return { ok: true as const }
+
+  const { error: statusError } = await supabase.from("quote_request_supplier_recommendations").upsert({
+    request_id: requestId,
+    supplier_id: supplierId,
+    supplier_name_snapshot: supplier.name,
+    is_recommended: true,
+    should_contact: true,
+    contact_status: status,
+    updated_by: user.id,
+    created_by: user.id,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "request_id,supplier_id" })
+  if (statusError) return { ok: false as const, error: "The supplier status could not be saved." }
+
+  const labels: Record<RequestSupplierContactStatus, string> = {
+    not_contacted: "Not contacted",
+    request_sent: "Request sent",
+    supplier_replied: "Supplier replied",
+    awaiting_supplier_reply: "Replied · waiting for supplier",
+    quote_received: "Quote received",
+  }
+  const { error: eventError } = await supabase.from("project_events").insert({
+    project_id: request.project_id,
+    owner_id: request.owner_id,
+    event_type: "status_changed",
+    source: "admin",
+    title: `${supplier.name}: ${labels[status]}`,
+    description: `Supplier progress changed from ${labels[previous?.contact_status || "not_contacted"]} to ${labels[status]}.`,
+    metadata: { quote_request_id: requestId, supplier_id: supplierId, supplier_name: supplier.name, manager_action: "supplier_contact_status", previous_status: previous?.contact_status || "not_contacted", supplier_contact_status: status },
+  })
+  if (eventError) {
+    if (previous) await supabase.from("quote_request_supplier_recommendations").update({ contact_status: previous.contact_status, updated_at: new Date().toISOString() }).eq("request_id", requestId).eq("supplier_id", supplierId)
+    else await supabase.from("quote_request_supplier_recommendations").delete().eq("request_id", requestId).eq("supplier_id", supplierId)
+    return { ok: false as const, error: "The supplier status was not saved because its history could not be recorded." }
+  }
+
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const }
+}
 
 export async function addRequestAttachmentsAction(input: { requestId: string; attachments: ExistingRequestUploadInput[] }) {
   const requestId = String(input.requestId || "").trim()
