@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { requireStaffProfile } from "@/lib/auth"
 import type { ShopQualificationSettings, SupplierContact, SupplierReferralSource, SupplierRelationshipUpdate, SupplierRoutingOption } from "@/lib/shop-qualification"
 import { canonicalSupplierId, findCanonicalSupplier } from "@/lib/supplier-canonical"
+import { confirmSupplierDirectoryPersistence, parseSupplierDirectorySnapshot } from "@/lib/supplier-directory-persistence"
 import { SUPPLIER_PROGRAM_CHANNELS, type SupplierProgramChannel } from "@/lib/supplier-program-channels"
 
 const JOB_ADDRESS = "280 Lawrence Ave, Lawrence, NY 11559"
@@ -37,23 +38,6 @@ type DeleteSupplierResult =
 type LoadSupplierDirectoryResult =
   | { ok: true; settings: ShopQualificationSettings; deletedSupplierIds: string[] }
   | { ok: false; error: string }
-
-export type SupplierDirectorySnapshot = {
-  settings: ShopQualificationSettings
-  deletedSupplierIds: string[]
-}
-
-function cleanDirectorySnapshot(value: unknown): SupplierDirectorySnapshot | null {
-  if (!value || typeof value !== "object") return null
-  const snapshot = value as Partial<SupplierDirectorySnapshot>
-  if (!snapshot.settings || !Array.isArray(snapshot.settings.suppliers) || !snapshot.settings.products) return null
-  return {
-    settings: snapshot.settings,
-    deletedSupplierIds: Array.isArray(snapshot.deletedSupplierIds)
-      ? snapshot.deletedSupplierIds.filter((id): id is string => typeof id === "string")
-      : [],
-  }
-}
 
 function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | null {
   const name = input.name.trim().slice(0, 160)
@@ -120,7 +104,7 @@ export async function saveSupplierDirectoryEntryAction(input: {
   let create = input.create ?? false
   if (create) {
     const { data: snapshotData, error: snapshotError } = await supabase.rpc("staff_load_supplier_directory_snapshot")
-    const snapshot = cleanDirectorySnapshot(snapshotData)
+    const snapshot = parseSupplierDirectorySnapshot(snapshotData)
     if (snapshotError || !snapshot) {
       return { ok: false, error: "Could not verify the Supplier Directory before saving." }
     }
@@ -150,17 +134,24 @@ export async function saveSupplierDirectoryEntryAction(input: {
     return { ok: false, error: "Could not save the supplier. Refresh the page and try again." }
   }
 
+  const { data: verifiedSnapshotData, error: verifyError } = await supabase.rpc("staff_load_supplier_directory_snapshot")
+  const verifiedSupplier = confirmSupplierDirectoryPersistence(verifiedSnapshotData, supplier)
+  if (verifyError || !verifiedSupplier) {
+    console.error("Supplier directory persistence verification failed", verifyError)
+    return { ok: false, error: "The supplier save could not be confirmed. Refresh the directory and try again." }
+  }
+
   revalidatePath("/admin/vendors")
   revalidatePath("/admin/supplier-network")
   revalidatePath("/admin/catalog")
   revalidatePath("/owner/materials/requests/[requestId]", "page")
-  return { ok: true, supplier: persisted as SupplierRoutingOption }
+  return { ok: true, supplier: verifiedSupplier }
 }
 
 export async function loadSupplierDirectoryAction(): Promise<LoadSupplierDirectoryResult> {
   const { supabase } = await requireStaffProfile("suppliers")
   const { data, error } = await supabase.rpc("staff_load_supplier_directory_snapshot")
-  const snapshot = cleanDirectorySnapshot(data)
+  const snapshot = parseSupplierDirectorySnapshot(data)
   if (error || !snapshot) return { ok: false, error: "Could not refresh the supplier directory." }
   return { ok: true, ...snapshot }
 }
@@ -182,7 +173,7 @@ export async function saveSupplierRoutingProductsAction(
   revalidatePath("/admin/supplier-approvals")
   revalidatePath("/owner/materials/requests/[requestId]", "page")
   const { data: snapshotData } = await supabase.rpc("staff_load_supplier_directory_snapshot")
-  const snapshot = cleanDirectorySnapshot(snapshotData)
+  const snapshot = parseSupplierDirectorySnapshot(snapshotData)
   return {
     ok: true,
     settings: settings as ShopQualificationSettings,
@@ -210,7 +201,7 @@ export async function deleteSupplierDirectoryEntryAction(supplierId: string): Pr
   revalidatePath("/admin/supplier-approvals")
   revalidatePath("/owner/materials/requests/[requestId]", "page")
   const { data: snapshotData } = await supabase.rpc("staff_load_supplier_directory_snapshot")
-  const snapshot = cleanDirectorySnapshot(snapshotData)
+  const snapshot = parseSupplierDirectorySnapshot(snapshotData)
   return {
     ok: true,
     settings: settings as ShopQualificationSettings,

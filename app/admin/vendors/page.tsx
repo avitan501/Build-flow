@@ -3,7 +3,7 @@ import { requireStaffProfile } from "@/lib/auth";
 import type { ManagerCatalogAddOns } from "@/lib/manager-add-ons";
 import { materialCatalogDepartmentOptions } from "@/lib/material-catalog";
 import type { ShopQualificationSettings } from "@/lib/shop-qualification";
-import type { SupplierDirectorySnapshot } from "./actions";
+import type { SupplierDirectorySnapshot } from "@/lib/supplier-directory-persistence";
 
 export default async function AdminVendorsPage() {
   const { supabase } = await requireStaffProfile("suppliers");
