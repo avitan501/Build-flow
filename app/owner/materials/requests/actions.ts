@@ -7,13 +7,15 @@ import { sendManagerClientReplyEmail } from "@/lib/cart-submission-email"
 import { requireStaffProfile } from "@/lib/auth"
 import { scheduleClientMaterialListOrganization } from "@/lib/material-request-organization"
 import { buildProjectUploadStoragePath, PROJECT_UPLOAD_ALLOWED_MIME_TYPES, PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/projects"
-import { generateRequestClientQuotePdf, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
+import { generateRequestClientQuotePdf, type RequestClientDocumentType, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
+import { AVANTIA_PAYMENT_LINK } from "@/lib/payment-link"
+import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import { canonicalSupplierId, canonicalSupplierKey, findCanonicalSupplier, uniqueCanonicalSupplierNames } from "@/lib/supplier-canonical"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 type ReplyResult = { ok: true; providerId: string | null } | { ok: false; error: string }
-type QuoteResult = { ok: true; providerId: string | null; pdfBase64?: string; fileName?: string } | { ok: false; error: string }
+type QuoteResult = { ok: true; providerId: string | null; pdfBase64?: string; fileName?: string; shareUrl?: string } | { ok: false; error: string }
 type DeliveryScheduleResult = { ok: true } | { ok: false; error: string }
 export type MaterialRequestStatus = "submitted" | "in_review" | "quoted" | "closed"
 export type MaterialRequestAssignee = "carlos" | "david"
@@ -142,6 +144,7 @@ export async function convertSmsRequestDraftAction(formData: FormData) {
 }
 
 export type RequestClientQuoteInput = {
+  documentType?: RequestClientDocumentType
   requestId: string
   quoteNumber: string
   issueDate: string
@@ -624,7 +627,7 @@ export async function updateRequestWorkflowStepAction(input: { requestId: string
 }
 
 async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
-  const { supabase } = await requireStaffProfile("customers")
+  const { supabase, user } = await requireStaffProfile("customers")
   const requestId = String(input.requestId || "").trim()
   const quoteNumber = String(input.quoteNumber || "").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 40)
   if (!requestId || quoteNumber.length < 3) return { ok: false as const, error: "Enter a valid estimate code." }
@@ -638,18 +641,19 @@ async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
   if (lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0 || !Number.isFinite(line.unitPrice) || line.unitPrice < 0)) return { ok: false as const, error: "Check every quantity and unit price." }
   const deliveryCharge = Number(input.deliveryCharge)
   const salesTaxRate = Number(input.salesTaxRate)
+  const documentType: RequestClientDocumentType = ["estimate", "invoice", "receipt"].includes(String(input.documentType)) ? input.documentType! : "estimate"
   if (!Number.isFinite(deliveryCharge) || deliveryCharge < 0 || !Number.isFinite(salesTaxRate) || salesTaxRate < 0 || salesTaxRate > 20) return { ok: false as const, error: "Check delivery and sales tax amounts." }
 
   const { data: request, error: requestError } = await supabase.from("quote_requests").select("id,title,owner_id,project_id,projects(address)").eq("id", requestId).maybeSingle<{ id: string; title: string; owner_id: string; project_id: string; projects: { address: string | null } | null }>()
   if (requestError || !request) return { ok: false as const, error: "Request not found." }
   const { data: client } = await supabase.from("profiles").select("full_name,email").eq("id", request.owner_id).maybeSingle<{ full_name: string | null; email: string | null }>()
-  if (!client?.email) return { ok: false as const, error: "This client does not have an email address." }
 
   const pdfInput = {
+    documentType,
     quoteNumber,
     issueDate: String(input.issueDate || "").slice(0, 30),
     expiresOn: String(input.expiresOn || "").slice(0, 30),
-    clientName: client.full_name || client.email,
+    clientName: client?.full_name || client?.email || "Client",
     clientAddress: String(input.clientAddress || "").trim().slice(0, 500),
     shipTo: String(input.shipTo || request.projects?.address || "").trim().slice(0, 500),
     requestTitle: request.title,
@@ -658,6 +662,7 @@ async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
     salesTaxRate: Math.round(salesTaxRate * 1000) / 1000,
     taxableDelivery: input.taxableDelivery !== false,
     terms: String(input.terms || "").trim().slice(0, 4000),
+    paymentLink: documentType === "invoice" ? AVANTIA_PAYMENT_LINK : undefined,
     ach: input.ach ? {
       bankName: String(input.ach.bankName || "").trim().slice(0, 120),
       accountOwner: String(input.ach.accountOwner || "").trim().slice(0, 160),
@@ -666,35 +671,70 @@ async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
     } : undefined,
   }
   const pdf = await generateRequestClientQuotePdf(pdfInput)
-  return { ok: true as const, supabase, request, client, pdf, quoteNumber, lines, pdfInput }
+  return { ok: true as const, supabase, user, request, client, pdf, quoteNumber, lines, pdfInput }
+}
+
+async function savePreparedRequestClientDocument(prepared: Awaited<ReturnType<typeof prepareRequestClientQuote>>, markSent = false) {
+  if (!prepared.ok) return prepared
+  const { ach: sensitiveAch, ...publicDocumentData } = prepared.pdfInput
+  void sensitiveAch
+  const { data, error } = await prepared.supabase.from("request_client_documents").upsert({
+    request_id: prepared.request.id,
+    project_id: prepared.request.project_id,
+    owner_id: prepared.request.owner_id,
+    document_type: prepared.pdfInput.documentType,
+    document_number: prepared.quoteNumber,
+    document_data: publicDocumentData,
+    updated_by: prepared.user.id,
+    created_by: prepared.user.id,
+    updated_at: new Date().toISOString(),
+    ...(markSent ? { sent_at: new Date().toISOString() } : {}),
+  }, { onConflict: "request_id,document_type" }).select("public_token").single<{ public_token: string }>()
+  if (error || !data?.public_token) return { ok: false as const, error: "The client document could not be saved." }
+  return { ok: true as const, shareUrl: `${PRODUCTION_SITE_ORIGIN}/client-document/${data.public_token}` }
+}
+
+export async function saveRequestClientDocumentAction(input: RequestClientQuoteInput): Promise<QuoteResult> {
+  const prepared = await prepareRequestClientQuote(input)
+  if (!prepared.ok) return prepared
+  const saved = await savePreparedRequestClientDocument(prepared)
+  if (!saved.ok) return saved
+  revalidatePath(`/owner/materials/requests/${prepared.request.id}`)
+  return { ok: true, providerId: null, shareUrl: saved.shareUrl }
 }
 
 export async function previewRequestClientQuoteAction(input: RequestClientQuoteInput): Promise<QuoteResult> {
   const prepared = await prepareRequestClientQuote(input)
   if (!prepared.ok) return prepared
-  return { ok: true, providerId: null, pdfBase64: prepared.pdf.toString("base64"), fileName: `Avantia-Build-Estimate-${prepared.quoteNumber}.pdf` }
+  const label = prepared.pdfInput.documentType === "invoice" ? "Invoice" : prepared.pdfInput.documentType === "receipt" ? "Receipt" : "Estimate"
+  return { ok: true, providerId: null, pdfBase64: prepared.pdf.toString("base64"), fileName: `Avantia-Build-${label}-${prepared.quoteNumber}.pdf` }
 }
 
 export async function sendRequestClientQuoteAction(input: RequestClientQuoteInput): Promise<QuoteResult> {
   const prepared = await prepareRequestClientQuote(input)
   if (!prepared.ok) return prepared
-  const fileName = `Avantia-Build-Estimate-${prepared.quoteNumber}.pdf`
-  const message = String(input.message || "Please review the attached Avantia Build estimate.").trim().slice(0, 5000)
+  if (!prepared.client?.email) return { ok: false, error: "This client does not have an email address." }
+  const documentType = prepared.pdfInput.documentType
+  const label = documentType === "invoice" ? "Invoice" : documentType === "receipt" ? "Receipt" : "Estimate"
+  const fileName = `Avantia-Build-${label}-${prepared.quoteNumber}.pdf`
+  const saved = await savePreparedRequestClientDocument(prepared, true)
+  if (!saved.ok) return saved
+  const baseMessage = String(input.message || `Please review the Avantia Build ${label.toLowerCase()}.`).trim().slice(0, 4600)
+  const message = `${baseMessage}\n\nOpen or download the latest version: ${saved.shareUrl}`
   const emailInput = {
     requestId: prepared.request.id,
-    requestTitle: `Estimate ${prepared.quoteNumber}: ${prepared.request.title}`,
+    requestTitle: `${label} ${prepared.quoteNumber}: ${prepared.request.title}`,
     recipientName: prepared.client.full_name || "Client",
-    recipientEmail: prepared.client.email!,
+    recipientEmail: prepared.client.email,
     message,
     items: prepared.lines.map((line) => ({ name: line.description, quantity: line.quantity, unit: line.unit, details: [`Unit price: $${line.unitPrice.toFixed(2)}`] })),
-    attachment: { filename: fileName, content: prepared.pdf.toString("base64") },
   }
   const direct = await sendManagerClientReplyEmail(emailInput)
   let sent = direct.status === "sent"
   let providerId = direct.status === "sent" ? direct.providerId : null
   let deliveryError = direct.status === "failed" ? direct.error : "Website email is not configured."
   if (!sent && direct.status !== "skipped") {
-    const { data: fallback, error } = await prepared.supabase.functions.invoke<{ ok?: boolean; providerId?: string | null; error?: string }>("send-supplier-quote", { body: { action: "send_client_reply", requestId: prepared.request.id, message, items: emailInput.items, attachment: emailInput.attachment } })
+    const { data: fallback, error } = await prepared.supabase.functions.invoke<{ ok?: boolean; providerId?: string | null; error?: string }>("send-supplier-quote", { body: { action: "send_client_reply", requestId: prepared.request.id, message, items: emailInput.items } })
     sent = !error && Boolean(fallback?.ok)
     providerId = fallback?.providerId || null
     deliveryError = fallback?.error || error?.message || deliveryError
@@ -706,9 +746,53 @@ export async function sendRequestClientQuoteAction(input: RequestClientQuoteInpu
     owner_id: prepared.request.owner_id,
     event_type: "status_changed",
     source: "admin",
-    title: `Estimate ${prepared.quoteNumber} emailed to client`,
+    title: `${label} ${prepared.quoteNumber} emailed to client`,
     description: message,
-    metadata: { quote_request_id: prepared.request.id, client_action: "estimate_sent", quote_number: prepared.quoteNumber, attachment_name: fileName },
+    metadata: { quote_request_id: prepared.request.id, client_action: `${documentType}_sent`, document_type: documentType, document_number: prepared.quoteNumber, share_url: saved.shareUrl, delivery_channel: "email" },
   })
-  return { ok: true, providerId, fileName }
+  return { ok: true, providerId, fileName, shareUrl: saved.shareUrl }
+}
+
+export async function recordRequestClientDocumentSentAction(input: { requestId: string; documentType: RequestClientDocumentType; documentNumber: string; channel: "sms" | "whatsapp" }) {
+  const requestId = String(input.requestId || "").trim()
+  const documentType = String(input.documentType || "") as RequestClientDocumentType
+  const documentNumber = String(input.documentNumber || "").trim().slice(0, 40)
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !["estimate", "invoice", "receipt"].includes(documentType) || !documentNumber) return { ok: false as const, error: "The document activity could not be saved." }
+  const { supabase } = await requireStaffProfile("customers")
+  const { data: request } = await supabase.from("quote_requests").select("id,owner_id,project_id").eq("id", requestId).maybeSingle<{ id: string; owner_id: string; project_id: string }>()
+  if (!request) return { ok: false as const, error: "Request not found." }
+  const label = documentType === "invoice" ? "Invoice" : documentType === "receipt" ? "Receipt" : "Estimate"
+  const { error } = await supabase.from("project_events").insert({
+    project_id: request.project_id,
+    owner_id: request.owner_id,
+    event_type: "status_changed",
+    source: "admin",
+    title: `${label} ${documentNumber} sent by ${input.channel === "sms" ? "text" : "WhatsApp"}`,
+    description: "The client received the live document link. Future saved edits remain available at the same link.",
+    metadata: { quote_request_id: request.id, client_action: `${documentType}_sent`, document_type: documentType, document_number: documentNumber, delivery_channel: input.channel },
+  })
+  if (error) return { ok: false as const, error: "The document was sent, but its history could not be saved." }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const }
+}
+
+export async function recordRequestPaymentLinkSentAction(input: { requestId: string; channel: "email" | "sms" | "whatsapp" }) {
+  const requestId = String(input.requestId || "").trim()
+  const channel = String(input.channel || "")
+  if (!/^[0-9a-f-]{36}$/i.test(requestId) || !["email", "sms", "whatsapp"].includes(channel)) return { ok: false as const, error: "The payment-link activity could not be saved." }
+  const { supabase } = await requireStaffProfile("customers")
+  const { data: request } = await supabase.from("quote_requests").select("id,owner_id,project_id").eq("id", requestId).maybeSingle<{ id: string; owner_id: string; project_id: string }>()
+  if (!request) return { ok: false as const, error: "Request not found." }
+  const { error } = await supabase.from("project_events").insert({
+    project_id: request.project_id,
+    owner_id: request.owner_id,
+    event_type: "status_changed",
+    source: "admin",
+    title: `Payment link sent by ${channel === "sms" ? "text" : channel}`,
+    description: "The secure Avantia Build payment link was sent to the client.",
+    metadata: { quote_request_id: request.id, client_action: "payment_link_sent", payment_channel: channel },
+  })
+  if (error) return { ok: false as const, error: "The payment link was sent, but its history could not be saved." }
+  revalidatePath(`/owner/materials/requests/${requestId}`)
+  return { ok: true as const }
 }

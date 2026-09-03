@@ -6,6 +6,7 @@ import { RequestMaterialWorktable, type RequestWorktableComparison } from "@/com
 import {
   RequestManagementPanel,
   type RequestComparisonSummary,
+  type RequestClientDocumentSnapshot,
 } from "@/components/buildflow/request-management-panel";
 import { requireStaffProfile } from "@/lib/auth";
 import { contactEmailForDisplay } from "@/lib/auth-phone";
@@ -109,6 +110,7 @@ export default async function OwnerMaterialRequestPage({
     { data: clientActionEvents },
     { data: comparisons },
     { data: supplierRecommendations },
+    { data: clientDocuments },
   ] = await Promise.all([
     supabase
       .from("quote_requests")
@@ -179,6 +181,12 @@ export default async function OwnerMaterialRequestPage({
       .select("supplier_id,is_recommended,should_contact")
       .eq("request_id", requestId)
       .returns<Array<{ supplier_id: string; is_recommended: boolean; should_contact: boolean }>>(),
+    supabase
+      .from("request_client_documents")
+      .select("document_type,document_number,document_data,public_token,version,updated_at")
+      .eq("request_id", requestId)
+      .order("updated_at", { ascending: false })
+      .returns<Array<{ document_type: "estimate" | "invoice" | "receipt"; document_number: string; document_data: RequestClientDocumentSnapshot["documentData"]; public_token: string; version: number; updated_at: string }>>(),
   ]);
   if (requestError)
     throw new Error(
@@ -189,10 +197,18 @@ export default async function OwnerMaterialRequestPage({
     (event) => typeof event.metadata?.client_action === "string",
   );
   const clientReplyCompleted = clientActions.some((event) =>
-    ["email_reply", "estimate_sent"].includes(
+    ["email_reply", "estimate_sent", "invoice_sent", "receipt_sent"].includes(
       String(event.metadata.client_action),
     ),
   );
+  const latestClientDocument = clientActions.find((event) =>
+    ["invoice_sent", "receipt_sent"].includes(String(event.metadata.client_action)),
+  );
+  const initialPaymentDelivery = {
+    documentType: latestClientDocument?.metadata.client_action === "receipt_sent" ? "receipt" as const : latestClientDocument?.metadata.client_action === "invoice_sent" ? "invoice" as const : null,
+    paymentLinkSent: clientActions.some((event) => event.metadata.client_action === "payment_link_sent"),
+    deliveryScheduled: clientActions.some((event) => event.metadata.client_action === "delivery_scheduled"),
+  };
   const workflowOverrides = new Map<number, boolean>();
   for (const event of clientActionEvents ?? []) {
     if (event.metadata?.manager_action !== "workflow_step_status") continue;
@@ -588,8 +604,10 @@ export default async function OwnerMaterialRequestPage({
             currentStage={currentStage}
             comparisons={comparisonSummaries}
             clientReplyCompleted={clientReplyCompleted}
+            step2CompletedOverride={workflowOverrides.get(2) ?? null}
             step3CompletedOverride={workflowOverrides.get(3) ?? null}
-            step4CompletedOverride={workflowOverrides.get(4) ?? null}
+            initialPaymentDelivery={initialPaymentDelivery}
+            initialClientDocuments={(clientDocuments ?? []).map((entry) => ({ documentType: entry.document_type, documentNumber: entry.document_number, documentData: entry.document_data, publicToken: entry.public_token, version: entry.version, updatedAt: entry.updated_at }))}
             initialManagerNotes={request.manager_notes || ""}
             initialSupplierRecommendations={(supplierRecommendations ?? []).map((entry) => ({ supplierId: entry.supplier_id, isRecommended: entry.is_recommended, shouldContact: entry.should_contact }))}
             clientEmails={clientEmails}

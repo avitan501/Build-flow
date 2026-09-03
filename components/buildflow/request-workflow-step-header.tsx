@@ -1,13 +1,14 @@
-import { BadgeDollarSign, Check, ChevronDown, ClipboardList, ListChecks, MessageSquareText } from "lucide-react"
+import { BadgeDollarSign, Check, ChevronDown, ClipboardList, CreditCard, ListChecks, MessageSquareText } from "lucide-react"
 import { RequestWorkflowStepToggle } from "@/components/buildflow/request-workflow-step-toggle"
 
 type WorkflowStepStatus = "complete" | "active" | "upcoming"
-type WorkflowStepIcon = "review" | "organize" | "pricing" | "reply"
+type WorkflowStepIcon = "review" | "organize" | "pricing" | "payment" | "reply"
 
 const icons = {
   review: ClipboardList,
   organize: ListChecks,
   pricing: BadgeDollarSign,
+  payment: CreditCard,
   reply: MessageSquareText,
 } as const
 
@@ -40,6 +41,7 @@ export function RequestWorkflowStepHeader({
   detail,
   status,
   icon,
+  totalSteps = 3,
 }: {
   requestId: string
   step: 1 | 2 | 3 | 4
@@ -47,6 +49,7 @@ export function RequestWorkflowStepHeader({
   detail: string
   status: WorkflowStepStatus
   icon: WorkflowStepIcon
+  totalSteps?: number
 }) {
   const Icon = icons[icon]
   const styles = statusStyles[status]
@@ -59,7 +62,7 @@ export function RequestWorkflowStepHeader({
           {status === "complete" ? <span className="absolute -right-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-700 text-white"><Check className="h-3.5 w-3.5" strokeWidth={3} /></span> : null}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="text-[9px] font-black uppercase tracking-[.18em] text-[#8b6a27]">Step {step} of 2</span>
+          <span className="text-[9px] font-black uppercase tracking-[.18em] text-[#8b6a27]">Step {step} of {totalSteps}</span>
           <span className="mt-1 flex items-center gap-2 text-base font-black tracking-[-0.01em] text-[#12263f] sm:text-lg"><Icon className="h-4 w-4 shrink-0 text-[#8b6a27]" />{title}</span>
           <span className="mt-0.5 block truncate text-xs font-medium text-slate-500 sm:text-sm">{detail}</span>
         </span>

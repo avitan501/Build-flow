@@ -389,6 +389,10 @@ export function smsOutputSafetySignals(params: {
     /\b(?:is|are|it's|they're)\s+(?:currently\s+)?(?:in stock|available)|\bwe\s+have\s+(?:it|them|this|those)?\s*(?:in stock|available)|\b(?:currently\s+)?available\s+(?:now|today)|\b(?:out of stock|sold out)|\b(?:stock|availability)\s+(?:is|:)?\s*(?:confirmed|available|yes)|(?:יש\s+(?:לנו\s+)?במלאי|זמין\s+(?:כעת|עכשיו|במלאי)|אזל\s+מהמלאי|המלאי\s+אושר)|\b(?:est[aá]|hay|tenemos)\s+(?:disponible|en stock)\b/i.test(
       reply,
     );
+  const unverifiedSellerAssertion =
+    params.intent === "availability" &&
+    (/^\s*(?:yes|yeah|yep)\b/i.test(reply) ||
+      /\bwe\s+(?:have|carry|sell|stock)\b/i.test(reply));
   const deliveryOrOrderPromise =
     /\b(?:we|i|avantia)\s+(?:will|can|guarantee|promise)\s+(?:deliver|place|process|complete|confirm)\b|\b(?:order|delivery)\s+(?:is|has been)\s+(?:confirmed|placed|scheduled|guaranteed|ready|today|tomorrow)|\bdelivery\s+is\s+(?:today|tomorrow|on\s+\w+)|(?:נ(?:ספק|בצע|אשר)|המשלוח\s+(?:מאושר|נקבע|מחר|היום)|ההזמנה\s+(?:אושרה|בוצעה|מוכנה))|\b(?:vamos a|podemos|garantizamos)\s+(?:entregar|procesar|confirmar)|\b(?:pedido|entrega)\s+(?:est[aá]|ha sido)\s+(?:confirmad[oa]|programad[oa]|list[oa]|hoy|ma[nñ]ana)\b/i.test(
       reply,
@@ -410,7 +414,8 @@ export function smsOutputSafetySignals(params: {
     "delivery",
   ].includes(params.intent);
   if (numericPrice) signals.push("reply contains an unapproved numeric price");
-  if (stockAssertion) signals.push("reply asserts stock or availability");
+  if (stockAssertion || unverifiedSellerAssertion)
+    signals.push("reply asserts stock or availability");
   if (deliveryOrOrderPromise)
     signals.push("reply makes a delivery or order promise");
   if (transactionalStatusAssertion)
@@ -1386,10 +1391,10 @@ export function smsBareOrderIntentReply(value: string) {
     return null;
   const language = smsReplyLanguage(trimmed);
   if (language === "he")
-    return "כן. שלח את רשימת החומרים והכמויות, מיקוד המשלוח ומתי אתה צריך אותם.";
+    return "בהחלט—שלח את רשימת החומרים והכמויות, כתובת המשלוח ומתי אתה צריך אותם. הצוות יאשר זמינות ומשלוח.";
   if (language === "es")
-    return "Sí. Envíe la lista de materiales y cantidades, el código postal de entrega y para cuándo los necesita.";
-  return "Yes. Send the material list and quantities, delivery ZIP code, and when you need them.";
+    return "Claro—envíe la lista de materiales y cantidades, la dirección de entrega y para cuándo los necesita. El equipo confirmará disponibilidad y entrega.";
+  return "Absolutely—send the material list and quantities, delivery address, and when you need them. Our team will confirm availability and delivery.";
 }
 
 export function applyAvantiaMaterialDefaults<
@@ -1576,8 +1581,8 @@ export function smsProductInquiryFallbackReply(
       : "What type do you need?";
   const primary =
     product === "Sheetrock"
-      ? `Yes. ${specification}`
-      : `Yes—we can help with ${product}. ${specification}`;
+      ? `We can help source Sheetrock. ${specification}`
+      : `We can help source ${product}. ${specification}`;
   return primary;
 }
 

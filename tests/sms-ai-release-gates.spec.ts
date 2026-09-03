@@ -61,7 +61,8 @@ test("request summaries pluralize packages and avoid repeated package wording", 
 test("Quo recovery batches duplicate checks before ingesting messages", async () => {
   const broker = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
   expect(broker).toContain("external_activity_id = any(${candidateIds}::text[])")
-  expect(broker).toContain("if (!activityId || storedIds.has(activityId)) continue")
+  expect(broker).toContain("storedIds.has(activityId)")
+  expect(broker).toContain("isTrustedSmsCommandPhone(normalizePhone(message.from))")
 })
 
 test("customer SMS uses semantic-first strong models and deterministic rules only as fallback", async () => {
@@ -462,7 +463,7 @@ test("an idle SMS thread starts with fresh context and a safe order prompt", asy
   ]
   expect(smsMessagesAfterInactivityBoundary(messages)).toEqual([messages[2]])
   expect(smsBareOrderIntentReply("Can I order")).toBe(
-    "Yes. Send the material list and quantities, delivery ZIP code, and when you need them.",
+    "Absolutely—send the material list and quantities, delivery address, and when you need them. Our team will confirm availability and delivery.",
   )
   expect(smsBareOrderIntentReply("Can I order 45 sheets of 5/8 Sheetrock")).toBeNull()
 
@@ -474,7 +475,7 @@ test("an idle SMS thread starts with fresh context and a safe order prompt", asy
 
 test("product inquiry fallback answers the product and asks only useful next questions", () => {
   const sheetrock = smsProductInquiryFallbackReply("Do you sell sheetricj?")
-  expect(sheetrock).toBe("Yes. Can you confirm 5/8 in.?")
+  expect(sheetrock).toBe("We can help source Sheetrock. Can you confirm 5/8 in.?")
   expect(smsProductInquiryFallbackReply("Do you carry Sheetrook drywall?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Can I get Sheetrcok?")).toBe(sheetrock)
   expect(smsProductInquiryFallbackReply("Could we order shetrock?")).toBe(sheetrock)
@@ -483,7 +484,7 @@ test("product inquiry fallback answers the product and asks only useful next que
   expect(evaluateSmsReplyGate({ message: "Do you sell sheetricj?", reply: sheetrock || "", intent: "availability", event: "message", participantRole: "lead", modelAutoSafe: true })).toMatchObject({ level: "green", gateAutoSafe: true })
   const replyParts = smsReplyParts({ reply: sheetrock || "", deterministicProductInquiry: true })
   expect(replyParts).toHaveLength(1)
-  expect(replyParts[0]).toBe("Yes. Can you confirm 5/8 in.?")
+  expect(replyParts[0]).toBe("We can help source Sheetrock. Can you confirm 5/8 in.?")
   expect(new Set(replyParts).size).toBe(replyParts.length)
 
   const exactListReply = smsProductInquiryFallbackReply("Do you sell Sheetrock?", { allowRelatedSuggestion: false }) || ""

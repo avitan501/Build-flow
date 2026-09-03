@@ -14,7 +14,10 @@ export type RequestClientQuoteLine = {
   unitPrice: number
 }
 
+export type RequestClientDocumentType = "estimate" | "invoice" | "receipt"
+
 export type RequestClientQuotePdfInput = {
+  documentType?: RequestClientDocumentType
   quoteNumber: string
   issueDate: string
   expiresOn: string
@@ -27,6 +30,7 @@ export type RequestClientQuotePdfInput = {
   salesTaxRate: number
   taxableDelivery: boolean
   terms: string
+  paymentLink?: string
   ach?: {
     bankName: string
     accountOwner: string
@@ -79,12 +83,15 @@ export async function generateRequestClientQuotePdf(input: RequestClientQuotePdf
   const subtotal = input.lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0)
   const salesTax = (subtotal + (input.taxableDelivery ? input.deliveryCharge : 0)) * input.salesTaxRate / 100
   const total = subtotal + input.deliveryCharge + salesTax
+  const documentType = input.documentType || "estimate"
+  const documentLabel = documentType === "invoice" ? "INVOICE" : documentType === "receipt" ? "RECEIPT" : "ESTIMATE"
+  const totalLabel = documentType === "invoice" ? "Amount due" : documentType === "receipt" ? "Amount paid" : "Estimate total"
 
   function addPage() {
     const page = pdf.addPage([612, 792])
     const logoScale = Math.min(175 / logo.width, 56 / logo.height)
     page.drawImage(logo, { x: 40, y: 714, width: logo.width * logoScale, height: logo.height * logoScale })
-    rightText(page, bold, "ESTIMATE", 572, 752, 18)
+    rightText(page, bold, documentLabel, 572, 752, 18)
     rightText(page, regular, `Code: ${clean(input.quoteNumber)}`, 572, 730, 9, slate)
     page.drawLine({ start: { x: 40, y: 700 }, end: { x: 572, y: 700 }, thickness: 1, color: border })
     page.drawText("Avantia Build  |  build.avantiap.com  |  office@build.avantiap.com  |  Call or text (516) 908-8319", { x: 40, y: 24, size: 7.2, font: regular, color: slate })
@@ -148,7 +155,7 @@ export async function generateRequestClientQuotePdf(input: RequestClientQuotePdf
   page.drawText(`Sales tax (${input.salesTaxRate.toFixed(3)}%)`, { x: totalsX, y, size: 9, font: regular, color: slate }); rightText(page, regular, money(salesTax), 564, y, 9)
   y -= 22
   page.drawLine({ start: { x: totalsX, y: y + 10 }, end: { x: 572, y: y + 10 }, thickness: 1.2, color: navy })
-  page.drawText("Total", { x: totalsX, y: y - 2, size: 13, font: bold, color: navy }); rightText(page, bold, money(total), 564, y - 2, 13)
+  page.drawText(totalLabel, { x: totalsX, y: y - 2, size: 13, font: bold, color: navy }); rightText(page, bold, money(total), 564, y - 2, 13)
 
   const termsY = Math.min(y - 48, 160)
   page.drawText("Terms & conditions", { x: 40, y: termsY, size: 9, font: bold, color: blue })
@@ -163,9 +170,13 @@ export async function generateRequestClientQuotePdf(input: RequestClientQuotePdf
     ]
     achLines.forEach((line, index) => page.drawText(clean(line), { x: 392, y: termsY - 14 - index * 12, size: 7.8, font: regular, color: slate }))
   }
+  if (input.paymentLink) {
+    page.drawText("Secure payment", { x: 392, y: termsY - 70, size: 8.5, font: bold, color: blue })
+    page.drawText(clean(input.paymentLink), { x: 392, y: termsY - 83, size: 7.2, font: regular, color: slate })
+  }
 
-  pdf.setTitle(`Avantia Build Estimate ${input.quoteNumber}`)
+  pdf.setTitle(`Avantia Build ${documentLabel} ${input.quoteNumber}`)
   pdf.setAuthor("Avantia Build")
-  pdf.setSubject(`Estimate for ${input.clientName}`)
+  pdf.setSubject(`${documentLabel} for ${input.clientName}`)
   return Buffer.from(await pdf.save())
 }

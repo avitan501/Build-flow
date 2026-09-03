@@ -6122,6 +6122,18 @@ async function handleQuoWebhook(req: Request) {
       updated_at = now()
     returning id
   `;
+    if (channel === "sms" && direction === "outgoing" && counterpartyPhone && !current) {
+      await sql`update public.aura_contacts set sms_ai_mode = 'off', updated_at = now() where normalized_phone = ${counterpartyPhone}`;
+      await sql`
+        update public.aura_sms_unanswered_followups
+        set status = 'cancelled', cancel_reason = 'manager took over conversation', updated_at = now()
+        where counterparty_phone = ${counterpartyPhone} and status in ('pending', 'processing')
+      `;
+      await sql`
+        insert into public.aura_audit_log (action, details)
+        values ('sms_ai_human_takeover', ${sql.json({ communicationId: storedCommunications[0]?.id || null, phone: counterpartyPhone, route: "quo_outgoing_webhook" })})
+      `;
+    }
     if (
       eventType === "message.delivered" &&
       direction === "outgoing" &&
@@ -7248,6 +7260,22 @@ async function enqueueManagerMessage(
     sourceCommunicationId,
     attachments,
   }));
+  if (channel === "sms") {
+    await sql`
+      update public.aura_contacts
+      set sms_ai_mode = 'off', updated_at = now()
+      where normalized_phone = ${destination}
+    `;
+    await sql`
+      update public.aura_sms_unanswered_followups
+      set status = 'cancelled', cancel_reason = 'manager took over conversation', updated_at = now()
+      where counterparty_phone = ${destination} and status in ('pending', 'processing')
+    `;
+    await sql`
+      insert into public.aura_audit_log (actor_user_id, action, details)
+      values (${managerId}::uuid, 'sms_ai_human_takeover', ${sql.json({ phone: destination, route: "manager_send" })})
+    `;
+  }
   const rows = await sql<{ result: {
     outboxId: string;
     communicationId: string;

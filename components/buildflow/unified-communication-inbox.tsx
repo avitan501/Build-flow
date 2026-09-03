@@ -780,6 +780,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         duration_ms: Math.round(performance.now() - startedAt),
         success: true,
       })
+      if (messageChannel === "sms") setSmsAiMode("off")
       if (sentDraftId) {
         const completed = await completeSmsReplyDraftAction({ draftId: sentDraftId, reply: message, teachAi: teachSentReply, correctionReasons })
         setActiveDraftId(null)
@@ -793,7 +794,7 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
         }
       }
       setMessage("")
-      setFeedback({ tone: "success", text: `${messageChannel === "sms" ? "Text" : messageChannel === "whatsapp" ? "WhatsApp" : "Email"} sent and saved.${teachSentReply ? " This manager-approved correction was added to AI training examples." : ""}` })
+      setFeedback({ tone: "success", text: `${messageChannel === "sms" ? "Text sent and saved. AI replies are paused for this conversation until you turn them on again." : messageChannel === "whatsapp" ? "WhatsApp sent and saved." : "Email sent and saved."}${teachSentReply ? " This manager-approved correction was added to AI training examples." : ""}` })
     })
   }
 

@@ -1,13 +1,13 @@
 "use client"
 
-import { CalendarClock, ChevronDown, Download, FileText, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, Route, Search, Send, Trash2, X } from "lucide-react"
+import { CalendarClock, CheckCircle2, ChevronDown, CreditCard, Download, FileCheck2, FileText, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, ReceiptText, Route, Search, Send, Trash2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
 import { openRequestPricingComparisonAction } from "@/app/admin/supplier-quotes/actions"
-import { previewRequestClientQuoteAction, saveRequestManagerNotesAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestWorkflowStepAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
+import { previewRequestClientQuoteAction, recordRequestClientDocumentSentAction, recordRequestPaymentLinkSentAction, saveRequestClientDocumentAction, saveRequestManagerNotesAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, type RequestClientQuoteInput } from "@/app/owner/materials/requests/actions"
 import { AutosaveStatus } from "@/components/buildflow/autosave-status"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
 import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
@@ -18,6 +18,8 @@ import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/b
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
 import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms"
+import { AVANTIA_PAYMENT_LINK } from "@/lib/payment-link"
+import type { RequestClientDocumentType } from "@/lib/request-client-quote-pdf"
 import { findCanonicalSupplier } from "@/lib/supplier-canonical"
 import { useSequencedAutosave } from "@/lib/use-sequenced-autosave"
 
@@ -25,6 +27,23 @@ type PackageRoute = { id: string; department: string; supplier_id: string | null
 type QuoteLine = { key: string; description: string; quantity: number; unit: string; unitPrice: number }
 export type RequestComparisonSummary = { id: string; title: string; status: string; quoteNumber: string; updatedAt: string; bids: Array<{ id: string; supplierName: string; landedTotal: number; pricedItemCount: number; itemCount: number; recommended: boolean }> }
 export type RequestSupplierRouteSelection = { supplierId: string | null; name: string; note: string }
+export type RequestClientDocumentSnapshot = {
+  documentType: RequestClientDocumentType
+  documentNumber: string
+  publicToken: string
+  version: number
+  updatedAt: string
+  documentData: {
+    issueDate?: string
+    clientAddress?: string
+    shipTo?: string
+    lines?: Array<{ description: string; quantity: number; unit: string; unitPrice: number }>
+    deliveryCharge?: number
+    salesTaxRate?: number
+    taxableDelivery?: boolean
+    terms?: string
+  }
+}
 
 const actionClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:border-sky-400 hover:bg-sky-50"
 const supplierNameCollator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true })
@@ -55,6 +74,7 @@ const REPLY_BLOCKS = [
   { id: "question", label: "I have a question", text: "I have a question about your request before we continue." },
   { id: "pricing", label: "Pricing is ready", text: "Your pricing is ready. Please review the attached quote." },
   { id: "missing", label: "Ask for missing details", text: "Please reply with the missing information so we can complete your request." },
+  { id: "payment", label: "Secure payment link", text: `You can pay securely here: ${AVANTIA_PAYMENT_LINK}` },
   { id: "delivery", label: "Delivery scheduled", text: "Your material delivery is scheduled." },
 ] as const
 
@@ -91,8 +111,10 @@ export function RequestManagementPanel({
   currentStage,
   comparisons,
   clientReplyCompleted,
+  step2CompletedOverride,
   step3CompletedOverride,
-  step4CompletedOverride,
+  initialPaymentDelivery,
+  initialClientDocuments,
   initialManagerNotes,
   initialSupplierRecommendations,
   clientEmails,
@@ -110,8 +132,10 @@ export function RequestManagementPanel({
   currentStage: ManagerPipelineStage
   comparisons: RequestComparisonSummary[]
   clientReplyCompleted: boolean
+  step2CompletedOverride: boolean | null
   step3CompletedOverride: boolean | null
-  step4CompletedOverride: boolean | null
+  initialPaymentDelivery: { documentType: "invoice" | "receipt" | null; paymentLinkSent: boolean; deliveryScheduled: boolean }
+  initialClientDocuments: RequestClientDocumentSnapshot[]
   initialManagerNotes: string
   initialSupplierRecommendations: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean }>
   clientEmails: RelatedEmailItem[]
@@ -135,11 +159,16 @@ export function RequestManagementPanel({
   const [deliveryWindowStart, setDeliveryWindowStart] = useState("")
   const [deliveryWindowHours, setDeliveryWindowHours] = useState("2")
   const [deliveryAddress, setDeliveryAddress] = useState(projectAddress)
+  const [deliveryOpen, setDeliveryOpen] = useState(false)
   const [clientReplyDone, setClientReplyDone] = useState(clientReplyCompleted)
+  const [paymentLinkSent, setPaymentLinkSent] = useState(initialPaymentDelivery.paymentLinkSent)
+  const [documentSent, setDocumentSent] = useState<"invoice" | "receipt" | null>(initialPaymentDelivery.documentType)
+  const [deliveryScheduled, setDeliveryScheduled] = useState(initialPaymentDelivery.deliveryScheduled)
   const [contactOpen, setContactOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
+  const [documentType, setDocumentType] = useState<RequestClientDocumentType>("estimate")
   const [quoteNumber, setQuoteNumber] = useState(() => `AVA-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${requestId.slice(0, 4).toUpperCase()}`)
-  const [issueDate] = useState(() => new Date().toLocaleDateString("en-US"))
+  const [issueDate, setIssueDate] = useState(() => new Date().toLocaleDateString("en-US"))
   const [clientAddress, setClientAddress] = useState("")
   const [shipTo, setShipTo] = useState(projectAddress)
   const [quoteLines, setQuoteLines] = useState<QuoteLine[]>(() => requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
@@ -148,10 +177,11 @@ export function RequestManagementPanel({
   const [taxableDelivery, setTaxableDelivery] = useState(true)
   const [taxRecommendation, setTaxRecommendation] = useState("")
   const [quoteTerms, setQuoteTerms] = useState(DEFAULT_PROPOSAL_TERMS)
-  const [quoteMessage, setQuoteMessage] = useState("Please review the attached Avantia Build estimate. Reply with any questions or approval.")
+  const [quoteMessage, setQuoteMessage] = useState("Please review your Avantia Build estimate. Reply with any questions or approval.")
   const [includeAch, setIncludeAch] = useState(false)
   const [ach, setAch] = useState({ bankName: "", accountOwner: "", routingNumber: "", accountNumber: "" })
   const [quoteFeedback, setQuoteFeedback] = useState("")
+  const [documentLinks, setDocumentLinks] = useState<Record<RequestClientDocumentType, string | undefined>>(() => Object.fromEntries(initialClientDocuments.map((entry) => [entry.documentType, `/client-document/${entry.publicToken}`])) as Record<RequestClientDocumentType, string | undefined>)
   const [onlineSupplierSearchOpen, setOnlineSupplierSearchOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const pendingRef = useRef(pending)
@@ -286,9 +316,38 @@ export function RequestManagementPanel({
     window.setTimeout(() => contactTriggerRef.current?.focus(), 0)
   }
 
-  function openQuote() {
+  function openDocument(nextType: RequestClientDocumentType) {
+    const saved = initialClientDocuments.find((entry) => entry.documentType === nextType)
+    const prefix = nextType === "invoice" ? "INV" : nextType === "receipt" ? "REC" : "AVA"
+    setDocumentType(nextType)
+    setQuoteNumber(saved?.documentNumber || `${prefix}-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${requestId.slice(0, 4).toUpperCase()}`)
+    setIssueDate(saved?.documentData.issueDate || new Date().toLocaleDateString("en-US"))
+    setClientAddress(saved?.documentData.clientAddress || "")
+    setShipTo(saved?.documentData.shipTo || projectAddress)
+    setQuoteLines(saved?.documentData.lines?.length ? saved.documentData.lines.map((line) => ({ ...line, key: crypto.randomUUID() })) : requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
+    setDeliveryCharge(Number(saved?.documentData.deliveryCharge) || 0)
+    setSalesTaxRate(Number.isFinite(saved?.documentData.salesTaxRate) ? Number(saved?.documentData.salesTaxRate) : 8.875)
+    setTaxableDelivery(saved?.documentData.taxableDelivery !== false)
+    setQuoteTerms(saved?.documentData.terms || DEFAULT_PROPOSAL_TERMS)
+    setQuoteMessage(nextType === "invoice" ? "Please review your Avantia Build invoice and use the secure payment link." : nextType === "receipt" ? "Your payment was received. Please keep this Avantia Build receipt for your records." : "Please review your Avantia Build estimate. Reply with any questions or approval.")
     setContactOpen(false)
     setQuoteOpen(true)
+  }
+
+  function openQuote() {
+    openDocument("estimate")
+  }
+
+  function openPaymentLink() {
+    setReplyBlock("payment")
+    setDeliveryMethod(client.phone ? "text" : client.email ? "email" : "whatsapp")
+    setContactOpen(true)
+  }
+
+  function openDeliverySchedule() {
+    setReplyBlock("delivery")
+    setDeliveryOpen(true)
+    setContactOpen(true)
   }
 
   function closeQuote() {
@@ -345,7 +404,10 @@ export function RequestManagementPanel({
       const result = await scheduleRequestDeliveryAction({ requestId, date: deliveryDate, startTime: deliveryWindowStart, durationHours: deliveryWindowHoursNumber, address: deliveryAddress })
       setFeedbackError(!result.ok)
       setFeedback(result.ok ? "Delivery schedule saved. The client message is ready to send." : result.error)
-      if (result.ok) setReplyBlock("delivery")
+      if (result.ok) {
+        setReplyBlock("delivery")
+        setDeliveryScheduled(true)
+      }
     })
   }
 
@@ -359,7 +421,13 @@ export function RequestManagementPanel({
       const result = await sendClientReplyAction(formData)
       setFeedbackError(!result.ok)
       setFeedback(result.ok ? `Email sent directly to ${client.email}.` : result.error)
-      if (result.ok) setClientReplyDone(true)
+      if (result.ok) {
+        setClientReplyDone(true)
+        if (replyBlock === "payment") {
+          const recorded = await recordRequestPaymentLinkSentAction({ requestId, channel: "email" })
+          if (recorded.ok) setPaymentLinkSent(true)
+        }
+      }
     })
   }
 
@@ -372,7 +440,10 @@ export function RequestManagementPanel({
         setFeedback(result.ok ? `Text sent directly to ${client.phone} from Q U O.` : result.error)
         if (result.ok) {
           setClientReplyDone(true)
-          await updateRequestWorkflowStepAction({ requestId, step: 4, completed: true })
+          if (replyBlock === "payment") {
+            const recorded = await recordRequestPaymentLinkSentAction({ requestId, channel: "sms" })
+            if (recorded.ok) setPaymentLinkSent(true)
+          }
         }
         return
       }
@@ -406,7 +477,10 @@ export function RequestManagementPanel({
       setFeedback(result.ok ? `WhatsApp message sent to ${client.phone}.` : result.error)
       if (result.ok) {
         setClientReplyDone(true)
-        await updateRequestWorkflowStepAction({ requestId, step: 4, completed: true })
+        if (replyBlock === "payment") {
+          const recorded = await recordRequestPaymentLinkSentAction({ requestId, channel: "whatsapp" })
+          if (recorded.ok) setPaymentLinkSent(true)
+        }
       }
     })
   }
@@ -414,10 +488,12 @@ export function RequestManagementPanel({
   const quoteSubtotal = quoteLines.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), 0)
   const quoteTax = (quoteSubtotal + (taxableDelivery ? deliveryCharge : 0)) * salesTaxRate / 100
   const quoteTotal = quoteSubtotal + deliveryCharge + quoteTax
+  const documentLabel = documentType === "invoice" ? "Invoice" : documentType === "receipt" ? "Receipt" : "Estimate"
 
   function quoteInput(): RequestClientQuoteInput {
     return {
       requestId,
+      documentType,
       quoteNumber,
       issueDate,
       expiresOn: "",
@@ -449,31 +525,33 @@ export function RequestManagementPanel({
       link.download = result.fileName
       link.click()
       URL.revokeObjectURL(url)
-      setQuoteFeedback("Estimate PDF downloaded for review.")
+      setQuoteFeedback(`${documentLabel} PDF downloaded for review.`)
     })
   }
 
   function textQuote() {
     setQuoteFeedback("")
     startTransition(async () => {
-      const result = await previewRequestClientQuoteAction(quoteInput())
-      if (!result.ok || !result.pdfBase64 || !result.fileName) return setQuoteFeedback(result.ok ? "The PDF could not be prepared." : result.error)
-      const bytes = Uint8Array.from(atob(result.pdfBase64), (character) => character.charCodeAt(0))
-      const file = new File([bytes], result.fileName, { type: "application/pdf" })
-      const formData = new FormData()
-      formData.set("phone", client.phone)
-      formData.set("message", quoteMessage.trim() || `Hello ${firstName}, your Avantia Build estimate is attached.`)
-      formData.set("attachment", file)
-      const prepared = await prepareQuoAttachmentMessageAction(formData)
-      if (!prepared.ok) return setQuoteFeedback(prepared.error)
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        window.location.href = prepared.deepLink
-      } else {
-        await navigator.clipboard?.writeText(quoteMessage).catch(() => undefined)
-        window.open(prepared.quoWebUrl, "_blank", "noopener,noreferrer")
-        window.open(prepared.attachmentUrl, "_blank", "noopener,noreferrer")
-      }
-      setQuoteFeedback("The estimate and message are ready in Q U O. Review them and press Send.")
+      const saved = await saveRequestClientDocumentAction(quoteInput())
+      if (!saved.ok || !saved.shareUrl) return setQuoteFeedback(saved.ok ? "The live link could not be prepared." : saved.error)
+      const message = `${quoteMessage.trim() || `Hello ${firstName}, your Avantia Build ${documentLabel.toLowerCase()} is ready.`}\n\nOpen or download the latest version: ${saved.shareUrl}`
+      const sent = await sendAuraMessageAction({ channel: "sms", recipient: client.phone, recipientLabel: client.name, message, materialRequestId: requestId, materialRequestTitle: requestTitle })
+      if (!sent.ok) return setQuoteFeedback(sent.error)
+      await recordRequestClientDocumentSentAction({ requestId, documentType, documentNumber: quoteNumber, channel: "sms" })
+      setDocumentLinks((current) => ({ ...current, [documentType]: saved.shareUrl }))
+      if (documentType === "invoice" || documentType === "receipt") setDocumentSent(documentType)
+      setQuoteFeedback(`${documentLabel} link sent by text. Future edits will update the same link.`)
+    })
+  }
+
+  function saveDocument() {
+    setQuoteFeedback("")
+    startTransition(async () => {
+      const result = await saveRequestClientDocumentAction(quoteInput())
+      if (!result.ok || !result.shareUrl) return setQuoteFeedback(result.ok ? "The live link could not be saved." : result.error)
+      setDocumentLinks((current) => ({ ...current, [documentType]: result.shareUrl }))
+      setQuoteFeedback(`${documentLabel} saved. The client link now shows this version.`)
+      router.refresh()
     })
   }
 
@@ -481,18 +559,24 @@ export function RequestManagementPanel({
     setQuoteFeedback("")
     startTransition(async () => {
       const result = await sendRequestClientQuoteAction(quoteInput())
-      setQuoteFeedback(result.ok ? `Estimate emailed to ${client.email}.` : result.error)
+      const label = documentType === "invoice" ? "Invoice" : documentType === "receipt" ? "Receipt" : "Estimate"
+      setQuoteFeedback(result.ok ? `${label} emailed to ${client.email}.` : result.error)
       if (result.ok) {
-        setFeedback(`Estimate ${quoteNumber} emailed to ${client.email}.`)
+        setFeedback(`${label} ${quoteNumber} emailed to ${client.email}.`)
         setClientReplyDone(true)
+        if (documentType === "invoice" || documentType === "receipt") setDocumentSent(documentType)
+        if (result.shareUrl) setDocumentLinks((current) => ({ ...current, [documentType]: result.shareUrl }))
       }
     })
   }
 
   const supplierQuoteCount = comparisons.reduce((total, comparison) => total + comparison.bids.length, 0)
-  const pricingComplete = step3CompletedOverride ?? supplierQuoteCount > 0
+  const pricingComplete = step2CompletedOverride ?? supplierQuoteCount > 0
   const pricingStatus = pricingComplete ? "complete" : currentStage === "pricing" ? "active" : "upcoming"
-  const replyComplete = step4CompletedOverride ?? clientReplyDone
+  const paymentDeliveryComplete = step3CompletedOverride ?? Boolean(documentSent === "receipt" && deliveryScheduled)
+  const paymentDeliveryStatus = paymentDeliveryComplete ? "complete" : ["approval", "delivery"].includes(currentStage) || pricingComplete ? "active" : "upcoming"
+  const replyComplete = clientReplyDone
+  const fulfillmentDetail = [documentSent ? `${documentSent === "invoice" ? "Invoice" : "Receipt"} sent` : "Document not sent", paymentLinkSent ? "payment link sent" : "payment link not sent", deliveryScheduled ? "delivery scheduled" : "delivery not scheduled"].join(" · ")
 
   return (
     <div className="grid gap-2">
@@ -534,6 +618,30 @@ export function RequestManagementPanel({
         </div>
       </details>
 
+      <details open={["approval", "delivery"].includes(currentStage)} className={workflowStepCardClass()}>
+        <RequestWorkflowStepHeader requestId={requestId} step={3} title="Payment & delivery" detail={fulfillmentDetail} status={paymentDeliveryStatus} icon="payment" />
+        <div className="grid gap-2 border-t border-slate-200 p-3 sm:grid-cols-3">
+          <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center gap-2"><FileCheck2 className="h-4 w-4 text-[#0066cc]" /><h3 className="text-sm font-black text-[#12263f]">Estimate, invoice, or receipt</h3></div>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">Create or edit any client document. Its live link always shows the newest saved version.</p>
+            <div className="mt-3 grid grid-cols-3 gap-1.5"><button type="button" onClick={() => openDocument("estimate")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-1 text-[11px] font-bold"><FileCheck2 className="h-3.5 w-3.5" />Estimate</button><button type="button" onClick={() => openDocument("invoice")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md bg-[#17304f] px-1 text-[11px] font-bold text-white"><FileText className="h-3.5 w-3.5" />Invoice</button><button type="button" onClick={() => openDocument("receipt")} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-1 text-[11px] font-bold"><ReceiptText className="h-3.5 w-3.5" />Receipt</button></div>
+            {documentSent ? <p className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />{documentSent === "invoice" ? "Invoice" : "Receipt"} sent</p> : null}
+          </section>
+          <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center gap-2"><CreditCard className="h-4 w-4 text-[#0066cc]" /><h3 className="text-sm font-black text-[#12263f]">Collect payment</h3></div>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">Prepare the secure Avantia payment link by text, email, or WhatsApp.</p>
+            <button type="button" onClick={openPaymentLink} disabled={!client.phone && !client.email} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-md bg-[#0071e3] px-2 text-xs font-bold text-white disabled:opacity-40"><Send className="h-3.5 w-3.5" />Send payment link</button>
+            {paymentLinkSent ? <p className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Payment link sent</p> : null}
+          </section>
+          <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center gap-2"><CalendarClock className="h-4 w-4 text-[#0066cc]" /><h3 className="text-sm font-black text-[#12263f]">Schedule delivery</h3></div>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">Choose the jobsite, date, start time, and delivery window.</p>
+            <button type="button" onClick={openDeliverySchedule} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-xs font-bold text-emerald-900"><CalendarClock className="h-3.5 w-3.5" />Set delivery</button>
+            {deliveryScheduled ? <p className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Delivery scheduled</p> : null}
+          </section>
+        </div>
+      </details>
+
       {contactOpen && typeof document !== "undefined" ? createPortal(
         <div className="fixed inset-0 z-[145] flex items-end justify-center bg-slate-950/55 sm:items-center sm:p-5" role="dialog" aria-modal="true" aria-labelledby="request-client-contact-title" onMouseDown={(event) => { if (event.currentTarget === event.target) closeContact() }}>
           <section ref={contactDialogRef} id="request-client-contact-dialog" className="flex max-h-[94dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
@@ -546,7 +654,7 @@ export function RequestManagementPanel({
           <div>
             {missingQuestions.length ? <p className="mt-1 text-xs font-semibold text-amber-700">{missingQuestions.length} missing details can be added to the reply automatically.</p> : null}
 
-            <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50">
+            <details open={deliveryOpen} onToggle={(event) => setDeliveryOpen(event.currentTarget.open)} className="mt-3 rounded-lg border border-slate-200 bg-slate-50">
               <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold"><span className="inline-flex items-center gap-2"><CalendarClock className="h-4 w-4 text-emerald-700" />Schedule delivery</span><ChevronDown className="h-4 w-4 text-slate-400" /></summary>
               <div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-3">
                 <label className="grid gap-1 text-xs font-bold text-slate-600">Date<input type="date" min={new Date().toISOString().slice(0, 10)} value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
@@ -595,10 +703,11 @@ export function RequestManagementPanel({
 
       {quoteOpen && typeof document !== "undefined" ? createPortal(<div className="fixed inset-0 z-[150] grid place-items-center overflow-y-auto bg-slate-950/55 p-2 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="request-quote-title" onMouseDown={(event) => { if (event.currentTarget === event.target) closeQuote() }}>
         <section ref={quoteDialogRef} className="flex max-h-[96dvh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
-          <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#0066cc]">Avantia Build estimate</p><h2 id="request-quote-title" className="mt-0.5 text-xl font-bold">Create client quote</h2><p className="mt-0.5 text-xs text-slate-500">Review the PDF, then send it by email or text.</p></div><button type="button" onClick={closeQuote} disabled={pending} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 disabled:opacity-40" aria-label="Close"><X className="h-4 w-4" /></button></header>
+          <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3"><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#0066cc]">Avantia Build document</p><h2 id="request-quote-title" className="mt-0.5 text-xl font-bold">Create client {documentLabel.toLowerCase()}</h2><p className="mt-0.5 text-xs text-slate-500">Review the PDF, then send it by email or text.</p></div><button type="button" onClick={closeQuote} disabled={pending} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 disabled:opacity-40" aria-label="Close"><X className="h-4 w-4" /></button></header>
           <div className="overflow-y-auto p-4">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <label className="grid gap-1 text-xs font-bold">Estimate code<input value={quoteNumber} onChange={(event) => setQuoteNumber(event.target.value)} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
+              <label className="grid gap-1 text-xs font-bold">Document type<select value={documentType} onChange={(event) => openDocument(event.target.value as RequestClientDocumentType)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal"><option value="estimate">Estimate</option><option value="invoice">Invoice</option><option value="receipt">Receipt</option></select></label>
+              <label className="grid gap-1 text-xs font-bold">{documentLabel} code<input value={quoteNumber} onChange={(event) => setQuoteNumber(event.target.value)} className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-normal" /></label>
               <label className="grid gap-1 text-xs font-bold">Date<input value={issueDate} disabled className="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-normal" /></label>
               <label className="grid gap-1 text-xs font-bold">Client<input value={client.name} disabled className="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-normal" /></label>
               <label className="grid gap-1 text-xs font-bold sm:col-span-2">Customer address<textarea value={clientAddress} onChange={(event) => setClientAddress(event.target.value)} rows={2} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal" /></label>
@@ -637,7 +746,7 @@ export function RequestManagementPanel({
             </div>
             {quoteFeedback ? <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold" role="status">{quoteFeedback}</p> : null}
           </div>
-          <footer className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white px-4 py-3"><button type="button" onClick={downloadQuote} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={textQuote} disabled={pending || !client.phone || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#0071e3] bg-white px-4 text-sm font-bold text-[#0066cc] disabled:opacity-40"><MessageSquareText className="h-4 w-4" />Text estimate</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Working..." : "Email estimate"}</button></footer>
+          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-4 py-3">{documentLinks[documentType] ? <a href={documentLinks[documentType]} target="_blank" rel="noreferrer" className="mr-auto text-xs font-bold text-[#0066cc] underline">Open live client link</a> : null}<button type="button" onClick={saveDocument} disabled={pending || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 text-sm font-bold text-emerald-900 disabled:opacity-40"><FileCheck2 className="h-4 w-4" />Save changes</button><button type="button" onClick={downloadQuote} disabled={pending} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold disabled:opacity-40"><Download className="h-4 w-4" />Download PDF</button><button type="button" onClick={textQuote} disabled={pending || !client.phone || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#0071e3] bg-white px-4 text-sm font-bold text-[#0066cc] disabled:opacity-40"><MessageSquareText className="h-4 w-4" />Text live link</button><button type="button" onClick={sendQuote} disabled={pending || !client.email || !quoteLines.length} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-40"><Send className="h-4 w-4" />{pending ? "Working..." : `Email live link`}</button></footer>
         </section>
       </div>, document.body) : null}
     </div>
