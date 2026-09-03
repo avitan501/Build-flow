@@ -106,6 +106,17 @@ test("manager supplier quote storage is private, durable, and routable", async (
   expect(uploadForm).toContain("AI fills vendor, date, and prices");
   expect(uploadForm).toContain("Detect from invoice");
   expect(uploadForm).toContain("extractImageTextInBrowser");
+  expect(uploadForm).toContain('role="dialog"');
+  expect(uploadForm).toContain('aria-modal="true"');
+  expect(uploadForm).toContain('data-testid="supplier-quote-intake-modal"');
+  expect(uploadForm).toContain("max-w-[920px]");
+  expect(uploadForm).toContain("max-h-full");
+  expect(uploadForm).toContain("overflow-y-auto");
+  expect(uploadForm).toContain("overflow-x-hidden");
+  expect(uploadForm).toContain("sm:grid-cols-2");
+  expect(uploadForm).toContain("document.body.style.overflow = \"hidden\"");
+  expect(uploadForm).toContain('event.key === "Escape"');
+  expect(uploadForm).toContain("Cancel");
   expect(uploadForm).not.toContain(
     "Scanned-image OCR is waiting for AI activation.",
   );
