@@ -250,9 +250,11 @@ test("approved homepage keeps the selected layout, three-photo hero, process fil
   expect(preview).toContain("homepage-material-process-v2.mp4");
   expect(preview).toContain("process-text-request-v6.webp");
   expect(preview).toContain("A contractor texts a same-day material list");
-  expect(preview).toContain('compact ? "w-[82%] max-w-[30rem]"');
+  expect(preview).toContain(">Building materials</p>");
+  expect(preview).not.toContain(">Before / after</p>");
+  expect(preview).toContain('compact ? "w-[60%] min-w-[12.5rem] max-w-[22rem]"');
   expect(preview).toContain("brightness-[.72]");
-  expect(preview).toContain("rgba(244,239,230,.18)_100%");
+  expect(preview).toContain("rgba(244,239,230,.18)_82%");
   expect(preview).toContain("ShopBrandShowcase compact transparent");
   for (const service of ["Beat Your Quote", "Send Any Material List", "Find a Specific Item"]) {
     expect(preview).toContain(service);
