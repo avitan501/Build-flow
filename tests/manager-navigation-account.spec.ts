@@ -50,6 +50,17 @@ test("My Account remains personal and saves notification preferences", async () 
   expect(settings).toContain("Profile information");
   expect(settings).toContain("Password & security");
   expect(settings).toContain("Notifications");
+  expect(settings).toContain('name="fullName"');
+  expect(settings).toContain('name="phone"');
+  expect(settings).toContain('name="alternateEmail"');
+  expect(settings).toContain('name="alternatePhone"');
+  expect(settings).toContain('name="password"');
+  expect(settings).toContain('name="passwordConfirmation"');
+  expect(settings).toContain('name="notificationEmail"');
+  expect(settings).toContain('name="notificationSms"');
+  expect(settings).toContain("bg-[#f4efe6]");
+  expect(settings).toContain("bg-[#071126]");
+  expect(settings).toContain("bg-[#fffdf8]/95");
   expect(settings).not.toContain("ABC Supply");
   expect(settings).not.toContain("Payments");
   expect(settings).not.toContain("Order Materials");

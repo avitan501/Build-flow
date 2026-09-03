@@ -24,7 +24,7 @@ export function AccountSignOutButton() {
           setBusy(false);
         }
       }}
-      className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70"
+      className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-rose-300/80 bg-white/70 px-4 text-sm font-semibold text-rose-700 transition hover:border-rose-400 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:cursor-not-allowed disabled:opacity-70"
     >
       {busy ? "Signing out..." : "Sign Out"}
     </button>
