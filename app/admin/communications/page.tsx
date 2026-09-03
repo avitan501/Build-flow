@@ -72,8 +72,10 @@ export default async function CommunicationsPage({
         loadCommunicationHistoryPage({ pageSize: COMMUNICATION_HISTORY_PAGE_SIZE }, supabase),
         exactPhone || exactEmail
           ? loadCommunicationHistoryPage({ pageSize: 60, phone: exactPhone, email: exactEmail }, supabase)
+              .catch(() => null)
           : requestedSearch?.trim()
             ? loadCommunicationHistoryPage({ pageSize: 60, query: requestedSearch }, supabase)
+                .catch(() => null)
             : Promise.resolve(null),
       ])
     : Promise.resolve(null)

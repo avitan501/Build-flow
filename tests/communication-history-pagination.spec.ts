@@ -74,6 +74,8 @@ test("communications page starts small and preserves an exact thread deep link",
   expect(page).toContain("initialHistoryCursor");
   expect(page).toContain("initialHistoryHasMore");
   expect(page).toContain("initialThread={exactThread}");
+  expect(page).toContain("loadCommunicationHistoryPage({ pageSize: 60, phone: exactPhone, email: exactEmail }, supabase)\n              .catch(() => null)");
+  expect(page).toContain("loadCommunicationHistoryPage({ pageSize: 60, query: requestedSearch }, supabase)\n                .catch(() => null)");
   expect(page).toContain("loadAuraConnectionStatus");
   expect(page).not.toContain('body: { action: "dashboard" }');
   expect(inbox).toContain('url.searchParams.set("thread", thread)');
