@@ -367,6 +367,9 @@ export default async function OwnerMaterialRequestPage({
     const comparisonBids = (comparisonBidsResult.data ?? []).filter(
       (bid) => bid.comparison_id === comparison.id,
     );
+    const comparisonDocuments = supplierQuoteSources.filter(
+      (quote) => quote.comparison_id === comparison.id,
+    );
     const analyses = analyzeQuoteComparison(comparisonItems, comparisonBids);
     return {
       id: comparison.id,
@@ -378,11 +381,18 @@ export default async function OwnerMaterialRequestPage({
       updatedAt: comparison.updated_at,
       bids: analyses.map((analysis) => ({
         id: analysis.bidId,
+        supplierId: comparisonBids.find((bid) => bid.id === analysis.bidId)?.supplier_id || "",
         supplierName: analysis.supplierName,
         landedTotal: analysis.landedTotal,
         pricedItemCount: analysis.pricedItemCount,
         itemCount: analysis.itemCount,
         recommended: analysis.isRecommended,
+      })),
+      documents: comparisonDocuments.map((document) => ({
+        id: document.id,
+        supplierId: document.supplier_id,
+        fileName: document.file_name,
+        sourceUrl: document.sourceUrl,
       })),
     };
   });

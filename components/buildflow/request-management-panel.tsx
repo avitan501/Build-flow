@@ -1,6 +1,6 @@
 "use client"
 
-import { Award, CalendarClock, Check, CheckCircle2, ChevronDown, CircleDollarSign, Download, FileCheck2, FileText, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, ReceiptText, Route, Search, Send, Trash2, X } from "lucide-react"
+import { Award, CalendarClock, Check, CheckCircle2, ChevronDown, CircleDollarSign, Download, FileCheck2, FileText, FolderOpen, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, ReceiptText, Route, Search, Send, Trash2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
@@ -28,7 +28,17 @@ import { useSequencedAutosave } from "@/lib/use-sequenced-autosave"
 
 type PackageRoute = { id: string; department: string; supplier_id: string | null; status: string }
 type QuoteLine = { key: string; description: string; quantity: number; unit: string; unitPrice: number }
-export type RequestComparisonSummary = { id: string; title: string; status: string; awardedBidId: string | null; clientQuoteStatus: string; quoteNumber: string; updatedAt: string; bids: Array<{ id: string; supplierName: string; landedTotal: number; pricedItemCount: number; itemCount: number; recommended: boolean }> }
+export type RequestComparisonSummary = {
+  id: string
+  title: string
+  status: string
+  awardedBidId: string | null
+  clientQuoteStatus: string
+  quoteNumber: string
+  updatedAt: string
+  bids: Array<{ id: string; supplierId: string; supplierName: string; landedTotal: number; pricedItemCount: number; itemCount: number; recommended: boolean }>
+  documents: Array<{ id: string; supplierId: string | null; fileName: string; sourceUrl: string | null }>
+}
 export type RequestSupplierRouteSelection = { supplierId: string | null; name: string; note: string }
 export type RequestClientDocumentSnapshot = {
   documentType: RequestClientDocumentType
@@ -206,6 +216,7 @@ export function RequestManagementPanel({
   const [quoteEntryOpen, setQuoteEntryOpen] = useState(false)
   const [contactOpen, setContactOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
+  const [comparisonFolderSupplier, setComparisonFolderSupplier] = useState<string | null>(null)
   const [documentType, setDocumentType] = useState<RequestClientDocumentType>("estimate")
   const [quoteNumber, setQuoteNumber] = useState(() => `AVA-${(siteBusinessDateKey() ?? "").replaceAll("-", "")}-${requestId.slice(0, 4).toUpperCase()}`)
   const [issueDate, setIssueDate] = useState(() => formatSiteDate(new Date(), { month: "numeric", day: "numeric", year: "numeric" }))
@@ -713,7 +724,12 @@ export function RequestManagementPanel({
     const bid = comparisons.flatMap((comparison) => comparison.bids).find((candidate) => supplierNameCollator.compare(candidate.supplierName, name) === 0) ?? null
     const supplierPackage = supplier ? packages.find((entry) => entry.supplier_id === supplier.id) ?? null : null
     const note = routeSelections.find((selection) => supplierNameCollator.compare(selection.name, name) === 0)?.note || ""
-    return { name, supplier, bid, supplierPackage, note }
+    const comparisonCount = comparisons.filter((comparison) => comparison.bids.some((candidate) =>
+      supplier
+        ? candidate.supplierId === supplier.id || supplierNameCollator.compare(candidate.supplierName, name) === 0
+        : supplierNameCollator.compare(candidate.supplierName, name) === 0,
+    )).length
+    return { name, supplier, bid, supplierPackage, note, comparisonCount }
   })
 
   const primaryWorkflowClass = "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#0066cc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
@@ -764,14 +780,15 @@ export function RequestManagementPanel({
             <span className={`rounded-full px-2.5 py-1 ${supplierQuoteCount ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>{supplierQuoteCount} quote{supplierQuoteCount === 1 ? "" : "s"} received</span>
           </div>
 
-          {supplierProgressRows.length ? <div role="table" aria-label="Suppliers selected in Step 1" className="mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white"><div role="row" className="hidden grid-cols-[minmax(0,1fr)_13rem_6rem] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[.08em] text-slate-500 sm:grid"><span role="columnheader">Supplier</span><span role="columnheader">Status</span><span role="columnheader" className="text-right">Contact</span></div><div className="divide-y divide-slate-100">{supplierProgressRows.map((row) => {
+          {supplierProgressRows.length ? <div role="table" aria-label="Suppliers selected in Step 1" className="mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white"><div role="row" className="hidden grid-cols-[minmax(0,1fr)_13rem_9rem] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[.08em] text-slate-500 sm:grid"><span role="columnheader">Supplier</span><span role="columnheader">Status</span><span role="columnheader" className="text-right">Contact &amp; files</span></div><div className="divide-y divide-slate-100">{supplierProgressRows.map((row) => {
             const contactStatus = row.bid ? "quote_received" : row.supplier ? supplierContactStatuses[row.supplier.id] || (row.supplierPackage ? "request_sent" : "not_contacted") : "not_contacted"
-            return <article role="row" key={row.name} className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_13rem_6rem]">
+            return <article role="row" key={row.name} className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_13rem_9rem]">
               <div role="cell" className="min-w-0"><p className="truncate text-sm font-black text-[#12263f]">{row.name}</p>{row.bid ? <p className="mt-0.5 truncate text-[10px] font-bold text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)} total received</p> : null}{row.note ? <p title={row.note} className="mt-0.5 truncate text-[10px] text-slate-500">{row.note}</p> : null}</div>
               <div role="cell" className="col-span-2 sm:col-span-1"><label className="sr-only" htmlFor={`supplier-status-${row.supplier?.id || row.name}`}>Status for {row.name}</label><select id={`supplier-status-${row.supplier?.id || row.name}`} value={contactStatus} disabled={!row.supplier || pending || Boolean(row.bid)} onChange={(event) => row.supplier && updateSupplierContactStatus(row.supplier.id, event.target.value as RequestSupplierContactStatus)} className={`min-h-10 w-full rounded-lg border px-2.5 text-xs font-bold ${contactStatus === "quote_received" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : contactStatus === "not_contacted" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-sky-200 bg-sky-50 text-sky-800"}`}>{SUPPLIER_CONTACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
               <div role="cell" className="row-start-1 flex justify-end gap-1.5 sm:col-start-3">
               {row.supplier?.phone ? <a href={`tel:${row.supplier.phone}`} aria-label={`Call ${row.name}`} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><Phone className="h-4 w-4" /></a> : null}
               {row.supplier?.email ? <a href={`mailto:${row.supplier.email}`} aria-label={`Email ${row.name}`} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><Mail className="h-4 w-4" /></a> : null}
+              <button type="button" onClick={() => setComparisonFolderSupplier(row.name)} aria-label={`Open ${client.name} price comparisons`} className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><FolderOpen className="h-4 w-4" />{row.comparisonCount ? <span className="absolute -right-1 -top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-[#0071e3] px-1 text-[9px] font-black text-white">{row.comparisonCount}</span> : null}</button>
               </div>
             </article>
           })}</div></div> : <p className="mb-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">Choose suppliers in Step 1 to begin pricing.</p>}
@@ -841,6 +858,28 @@ export function RequestManagementPanel({
           {feedback ? <p className={`mt-2 rounded-lg border px-3 py-2 text-xs font-semibold ${feedbackError ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`} role="status" aria-live="polite">{feedback}</p> : null}
         </div>
       </details>
+
+      {comparisonFolderSupplier && typeof document !== "undefined" ? createPortal(
+        <div className="fixed inset-0 z-[150] flex items-end justify-center bg-slate-950/55 sm:items-center sm:p-5" role="dialog" aria-modal="true" aria-labelledby="client-price-comparisons-title" onMouseDown={(event) => { if (event.currentTarget === event.target) setComparisonFolderSupplier(null) }}>
+          <section className="flex max-h-[88dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+            <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
+              <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#0066cc]">Correct client · current request</p><h2 id="client-price-comparisons-title" className="truncate text-lg font-black text-[#12263f]">{client.name} price comparisons</h2><p className="truncate text-xs text-slate-500">{requestTitle} · opened from {comparisonFolderSupplier}</p></div>
+              <button type="button" onClick={() => setComparisonFolderSupplier(null)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200" aria-label="Close price comparisons"><X className="h-4 w-4" /></button>
+            </header>
+            <div className="grid gap-2 overflow-y-auto p-3">
+              {comparisons.length ? comparisons.map((comparison) => {
+                const supplierBid = comparison.bids.find((bid) => supplierNameCollator.compare(bid.supplierName, comparisonFolderSupplier) === 0)
+                return <article key={comparison.id} className={`rounded-xl border p-3 ${supplierBid ? "border-sky-200 bg-sky-50" : "border-slate-200 bg-white"}`}>
+                  <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-black text-[#12263f]">{comparison.title}</p><p className="mt-0.5 text-[10px] font-semibold text-slate-500">{comparison.quoteNumber || "No quote number"} · {comparison.bids.length} supplier quote{comparison.bids.length === 1 ? "" : "s"}</p></div><a href={`/admin/quote-comparison/${comparison.id}`} className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-[#0071e3] px-3 text-xs font-black text-white">Open comparison</a></div>
+                  {comparison.bids.length ? <div className="mt-2 grid gap-1">{comparison.bids.map((bid) => <div key={bid.id} className="flex items-center justify-between gap-3 rounded-lg bg-white px-2.5 py-2 text-xs"><span className="truncate font-bold text-slate-700">{bid.supplierName}</span><span className="shrink-0 font-black text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(bid.landedTotal)}</span></div>)}</div> : null}
+                  {comparison.documents.length ? <div className="mt-2 flex flex-wrap gap-1.5">{comparison.documents.map((file) => file.sourceUrl ? <a key={file.id} href={file.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[10px] font-bold text-[#0066cc]"><FileText className="h-3.5 w-3.5" />{file.fileName}</a> : <span key={file.id} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-[10px] font-bold text-slate-500"><FileText className="h-3.5 w-3.5" />{file.fileName}</span>)}</div> : null}
+                </article>
+              }) : <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center"><FolderOpen className="mx-auto h-6 w-6 text-slate-400" /><p className="mt-2 text-sm font-black text-slate-700">No price comparisons yet</p><p className="mt-1 text-xs text-slate-500">Upload a supplier quote or enter pricing manually for this request.</p></div>}
+            </div>
+          </section>
+        </div>,
+        document.body,
+      ) : null}
 
       {contactOpen && typeof document !== "undefined" ? createPortal(
         <div className="fixed inset-0 z-[145] flex items-end justify-center bg-slate-950/55 sm:items-center sm:p-5" role="dialog" aria-modal="true" aria-labelledby="request-client-contact-title" onMouseDown={(event) => { if (event.currentTarget === event.target) closeContact() }}>
