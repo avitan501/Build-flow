@@ -101,7 +101,7 @@ test("manager notification feed is per user, queue-backed, and links to the exac
   expect(communicationsPage).toContain("key={inboxNavigationKey}");
   expect(communicationsPage).toContain('.from("aura_communications")');
   expect(communicationsPage).toContain('.eq("id", exactCommunicationId)');
-  expect(inbox).toContain("communication.id === communicationId");
+  expect(inbox).toContain("communications.find((communication) => communication.id === initialCommunicationId)");
   expect(inbox).toContain("Boolean(initialDraft || ((initialCommunicationId || initialThread) && initialCommunication))");
   expect(inbox).toContain("exactCommunicationRef.current?.scrollIntoView");
   expect(inbox).toContain('ring-2 ring-[#0071e3]');
