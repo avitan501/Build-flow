@@ -625,10 +625,14 @@ export function UnifiedCommunicationInbox({ communications, contacts, customers,
       const readAt = new Date().toISOString()
       setLiveCommunications((current) => current.map((item) => unreadIds.has(item.id) ? { ...item, read_at: readAt } : item))
       startTransition(async () => {
-        const result = await markCommunicationConversationReadAction({ conversationPhone: conversation.phone, conversationEmail: conversation.email })
-        if (!result.ok) {
+        try {
+          const result = await markCommunicationConversationReadAction({ conversationPhone: conversation.phone, conversationEmail: conversation.email })
+          if (result.ok) return
           setLiveCommunications((current) => current.map((item) => unreadIds.has(item.id) ? { ...item, read_at: null } : item))
           setFeedback({ tone: "error", text: result.error })
+        } catch {
+          setLiveCommunications((current) => current.map((item) => unreadIds.has(item.id) ? { ...item, read_at: null } : item))
+          setFeedback({ tone: "error", text: "The conversation opened, but its unread status could not be updated." })
         }
       })
     }

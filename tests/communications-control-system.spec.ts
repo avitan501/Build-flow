@@ -85,3 +85,11 @@ test("communications page does not load the hidden legacy log", () => {
   expect(page).not.toContain("COMMUNICATION_LOG_PREFIX");
   expect(page).not.toContain("listInboxThreads");
 });
+
+test("a failed mark-read action never crashes an opened conversation", () => {
+  const inbox = readFileSync(path.join(root, "components/buildflow/unified-communication-inbox.tsx"), "utf8");
+
+  expect(inbox).toContain("try {");
+  expect(inbox).toContain("await markCommunicationConversationReadAction");
+  expect(inbox).toContain("The conversation opened, but its unread status could not be updated.");
+});
