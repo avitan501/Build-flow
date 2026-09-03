@@ -105,7 +105,7 @@ export default async function OwnerMaterialRequestPage({
   const [
     { data: request, error: requestError },
     { data: responses },
-    { data: attachments },
+    { data: attachments, error: attachmentsError },
     { data: items },
     { data: managerSettings },
     { data: packages },
@@ -189,6 +189,7 @@ export default async function OwnerMaterialRequestPage({
       .order("updated_at", { ascending: false })
       .returns<Array<{ document_type: "estimate" | "invoice" | "receipt"; document_number: string; document_data: RequestClientDocumentSnapshot["documentData"]; public_token: string; version: number; updated_at: string }>>(),
   ]);
+  if (attachmentsError) console.error("Request attachments could not be loaded", { requestId, reason: attachmentsError.message });
   if (requestError)
     throw new Error(
       `Could not load this material request: ${requestError.message}`,
@@ -297,15 +298,17 @@ export default async function OwnerMaterialRequestPage({
     })),
   );
   const signedFiles = await Promise.all(
-    (attachments ?? []).map(async (file) => ({
-      ...file,
-      url:
-        (
-          await supabase.storage
-            .from("project-uploads")
-            .createSignedUrl(file.file_path, 1800)
-        ).data?.signedUrl ?? null,
-    })),
+    (attachments ?? []).map(async (file) => {
+      try {
+        return {
+          ...file,
+          url: (await supabase.storage.from("project-uploads").createSignedUrl(file.file_path, 1800)).data?.signedUrl ?? null,
+        };
+      } catch (cause) {
+        console.error("Request attachment URL could not be signed", { requestId, attachmentId: file.id, reason: cause instanceof Error ? cause.message : "unknown" });
+        return { ...file, url: null };
+      }
+    }),
   );
   const suppliers = canonicalSupplierDirectory(
     managerSettings?.state?.qualificationSettings?.suppliers ?? [],

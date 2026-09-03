@@ -60,7 +60,8 @@ export function RequestAttachmentUploader({ requestId, compact = false }: { requ
         setMessage(`${uploads.length} file${uploads.length === 1 ? "" : "s"} attached. AI is reorganizing the request.`)
         router.refresh()
       } catch (cause) {
-        showError(cause instanceof Error ? cause.message : "The files could not be attached. Please try again.")
+        console.error("Request attachment upload failed", cause)
+        showError("The files could not be attached. Please try again.")
       }
     })
   }

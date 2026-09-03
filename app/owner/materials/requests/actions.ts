@@ -122,9 +122,15 @@ export async function addRequestAttachmentsAction(input: { requestId: string; at
     console.error("Existing request attachment storage failed", cause)
     return { ok: false as const, error: "The files could not be attached. Please try again." }
   }
-  await scheduleClientMaterialListOrganization({ requestId, force: true })
+  let organizationStatus = "not_scheduled"
+  try {
+    const organization = await scheduleClientMaterialListOrganization({ requestId, force: true })
+    organizationStatus = organization.status
+  } catch (cause) {
+    console.error("Existing request attachment organization scheduling failed", cause)
+  }
   revalidatePath(`/owner/materials/requests/${requestId}`)
-  return { ok: true as const, organizationStatus: "scheduled" as const }
+  return { ok: true as const, organizationStatus }
 }
 
 export async function saveRequestSupplierPlanAction(input: RequestSupplierPlanInput) {
