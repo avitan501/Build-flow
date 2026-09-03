@@ -4,7 +4,7 @@ import { connection } from "next/server"
 
 import { AVANTIA_PAYMENT_LINK } from "@/lib/payment-link"
 import { parseRequestClientDocument, type StoredRequestClientDocument } from "@/lib/request-client-document-data"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { createClient } from "@/lib/supabase/server"
 
 export const metadata = { robots: { index: false, follow: false } }
 
@@ -14,7 +14,8 @@ export default async function ClientDocumentPage({ params }: { params: Promise<{
   await connection()
   const { token } = await params
   if (!/^[0-9a-f-]{36}$/i.test(token)) notFound()
-  const { data: row } = await createAdminClient().from("request_client_documents").select("document_type,document_number,document_data,version,updated_at").eq("public_token", token).maybeSingle<StoredRequestClientDocument>()
+  const supabase = await createClient()
+  const { data: row } = await supabase.rpc("get_request_client_document", { p_public_token: token }).maybeSingle<StoredRequestClientDocument>()
   if (!row) notFound()
   const document = parseRequestClientDocument(row)
   if (!document) notFound()
