@@ -1,4 +1,4 @@
-import { ConstructionConciergeHome } from "@/components/buildflow/construction-concierge-home";
+import { HomepageConceptPreview } from "@/components/buildflow/homepage-concept-preview";
 import { pageMetadata } from "@/lib/site-metadata";
 
 export const metadata = pageMetadata({
@@ -9,5 +9,5 @@ export const metadata = pageMetadata({
 });
 
 export default function Home() {
-  return <ConstructionConciergeHome />;
+  return <HomepageConceptPreview initialConceptId={2} reviewOnly />;
 }

@@ -16,7 +16,7 @@ export function SiteFooter() {
 
   if (pathname && (HIDDEN_PATHS.has(pathname) || pathname.startsWith("/admin"))) return null
 
-  if (pathname === "/homepage-review") {
+  if (pathname === "/" || pathname === "/homepage-review") {
     return (
       <ShopTranslationBoundary>
         <footer className="border-t border-white/10 bg-[#030507] px-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-7 text-white sm:px-8 sm:pb-7 sm:pt-9">

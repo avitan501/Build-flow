@@ -46,9 +46,14 @@ const reviewServices = [
 ] as const
 
 function Actions({ primary, secondary, dark = false }: { primary: string; secondary: string; dark?: boolean }) {
+  const primaryHref = primary.toLowerCase().includes("quote") ? "/beat-a-quote" : "/request-quote"
+  const secondaryHref = secondary.toLowerCase().includes("text")
+    ? "sms:+15169088319?body=Hi%20Avantia%20Build%2C%20I%20want%20to%20send%20a%20material%20list."
+    : "/request-quote"
+
   return <div className="relative -ml-2 mt-7 flex w-[calc(100vw-1.5rem)] max-w-none flex-col gap-2.5 sm:ml-0 sm:w-full sm:max-w-xl sm:flex-row">
-    <Link href="/beat-a-quote" className={`inline-flex min-h-14 flex-1 items-center justify-center gap-2 px-6 text-sm font-bold transition ${dark ? "bg-slate-950 text-white hover:bg-blue-700" : "bg-white text-black hover:bg-[#e7b85d]"}`}><Upload className="h-4 w-4" />{primary}</Link>
-    <Link href="/request-quote" className={`inline-flex min-h-14 flex-1 items-center justify-center gap-2 border px-6 text-sm font-bold backdrop-blur-md transition ${dark ? "border-slate-300 bg-white text-slate-950 hover:bg-slate-100" : "border-white/65 bg-black/28 text-white hover:bg-white hover:text-black"}`}><Send className="h-4 w-4" />{secondary}</Link>
+    <Link href={primaryHref} className={`inline-flex min-h-14 flex-1 items-center justify-center gap-2 px-6 text-sm font-bold transition ${dark ? "bg-slate-950 text-white hover:bg-blue-700" : "bg-white text-black hover:bg-[#e7b85d]"}`}><Upload className="h-4 w-4" />{primary}</Link>
+    <a href={secondaryHref} className={`inline-flex min-h-14 flex-1 items-center justify-center gap-2 border px-6 text-sm font-bold backdrop-blur-md transition ${dark ? "border-slate-300 bg-white text-slate-950 hover:bg-slate-100" : "border-white/65 bg-black/28 text-white hover:bg-white hover:text-black"}`}><Send className="h-4 w-4" />{secondary}</a>
   </div>
 }
 
@@ -161,7 +166,7 @@ export function HomepageConceptPreview({ initialConceptId = 1, reviewOnly = fals
   }
 
   const text = <>
-    <p className={`text-[10px] font-bold uppercase tracking-[0.26em] ${conceptId === 3 ? "text-amber-300" : conceptId === 5 ? "text-blue-700" : "text-white/72"}`}>{concept.eyebrow}</p>
+    <p className={`text-[10px] font-bold uppercase tracking-[0.26em] ${conceptId === 2 ? "text-slate-600" : conceptId === 3 ? "text-amber-300" : conceptId === 5 ? "text-blue-700" : "text-white/72"}`}>{concept.eyebrow}</p>
     <h1 className="mt-3 text-balance text-[clamp(3rem,8.5vw,7rem)] font-semibold leading-[0.9] tracking-[-0.065em]">{concept.headline}</h1>
     <p className="mt-5 max-w-xl text-sm font-semibold leading-6 opacity-85 sm:text-base">{concept.summary}</p>
   </>
