@@ -69,6 +69,11 @@ function moneyInput(value: string) {
   return Number.isFinite(number) && number >= 0 ? number : 0;
 }
 
+function positiveDraftQuantity(value: number) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : 0;
+}
+
 function draftNumber(value: string | undefined) {
   if (value === undefined || value.trim() === "") return Number.NaN;
   return Number(value);
@@ -181,6 +186,23 @@ export function QuoteComparisonWorkspace({
     clientTaxDraft === "" ? null : draftNumber(clientTaxDraft),
   ), [clientDeliveryDraft, clientTaxDraft, liveItems]);
   const buyingOptions = useMemo(() => buildQuoteBuyingOptions(liveItems, liveBids, clientReady), [clientReady, liveBids, liveItems]);
+  const partialComparisonByBid = useMemo(() => new Map(liveBids.map((bid) => {
+    const prices = new Map((bid.quote_comparison_prices ?? []).map((price) => [price.item_id, price]));
+    let clientTotal = 0;
+    let supplierTotal = 0;
+    let comparableRows = 0;
+    for (const item of liveItems) {
+      const clientUnitPrice = Number(item.client_unit_price);
+      const supplierUnitPrice = Number(prices.get(item.id)?.unit_price);
+      if (!(clientUnitPrice > 0) || !(supplierUnitPrice > 0) || prices.get(item.id)?.is_available === false) continue;
+      const quantity = positiveDraftQuantity(item.quantity);
+      clientTotal += clientUnitPrice * quantity;
+      supplierTotal += supplierUnitPrice * quantity;
+      comparableRows += 1;
+    }
+    const profit = clientTotal - supplierTotal;
+    return [bid.id, { clientTotal, supplierTotal, profit, marginPercent: clientTotal > 0 ? (profit / clientTotal) * 100 : 0, comparableRows }];
+  })), [liveBids, liveItems]);
   const unfinishedOptions = analyses.filter((analysis) => !analysis.eligible && !analysis.blocked).length;
   const hasMissingValues = !clientReady.complete || unfinishedOptions > 0 || (!mixedAnalysis.complete && bids.length > 1);
   const locked = !previewMode && (comparison.status === "awarded" || comparison.status === "archived");
@@ -235,13 +257,8 @@ export function QuoteComparisonWorkspace({
   function saveAllQuotes() {
     setError("");
     setMessage("");
-    if (hasMissingValues) {
-      setError("Finish the missing client and supplier values before saving the comparison.");
-      window.requestAnimationFrame(() => document.getElementById("quote-inputs")?.scrollIntoView({ behavior: "smooth", block: "start" }));
-      return;
-    }
     if (previewMode) {
-      setMessage("Sample supplier prices updated locally. No data was saved.");
+      setMessage("Entered sample prices updated locally. Unfilled rows were left open.");
       return;
     }
     startTransition(async () => {
@@ -264,7 +281,7 @@ export function QuoteComparisonWorkspace({
         setError(failed.error);
         return;
       }
-      setMessage("All supplier quotes saved.");
+      setMessage("Entered prices saved. Unfilled rows remain open for later.");
       router.refresh();
     });
   }
@@ -403,7 +420,7 @@ export function QuoteComparisonWorkspace({
             <div><h2 id="quotes-heading" className="text-lg font-bold">Client target and supplier prices</h2><p className="mt-1 text-xs text-slate-500">Unit prices are per listed unit. Delivery, tax, and totals are for the whole order.</p></div>
             {!locked ? <div className="flex flex-wrap gap-2">
               {canManageStructure ? <button type="button" onClick={() => setShowSupplierForm((value) => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold"><Store className="h-4 w-4" /> Add supplier</button> : null}
-              <button type="button" onClick={saveAllQuotes} disabled={pending || bids.length === 0} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-40"><Save className="h-4 w-4" /> Save prices</button>
+              <button type="button" onClick={saveAllQuotes} disabled={pending || bids.length === 0} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-40"><Save className="h-4 w-4" /> Save entered prices</button>
             </div> : null}
           </div>
 
@@ -420,14 +437,20 @@ export function QuoteComparisonWorkspace({
                     const lowest = lowestPrices.get(item.id);
                     const isLowest = Boolean(price.isAvailable && price.unitPrice !== "" && lowest?.bidId === bid.id);
                     const matchStatus = quoteLineMatchStatus(item, price.notes);
-                    return <td key={bid.id} className={`border-l border-slate-100 px-4 py-3 align-top ${isLowest ? "bg-emerald-50" : ""}`}><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">$</span><input type="number" min="0" step="0.01" value={price.unitPrice} disabled={locked || !price.isAvailable} onChange={(event) => setPriceDrafts((current) => ({ ...current, [key]: { ...price, unitPrice: event.target.value } }))} placeholder="0.00" aria-label={`${bid.supplier_name_snapshot} unit price for ${item.description}`} className={`min-h-10 w-full rounded-lg border pl-7 pr-2 text-right text-sm font-bold tabular-nums disabled:bg-slate-100 disabled:text-slate-400 ${isLowest ? "border-emerald-400 bg-white" : "border-slate-300"}`} /></div><div className="mt-2 flex flex-wrap items-center gap-2"><label className="flex items-center gap-2 text-[11px] font-semibold text-slate-500"><input type="checkbox" checked={!price.isAvailable} disabled={locked} onChange={(event) => setPriceDrafts((current) => ({ ...current, [key]: { ...price, isAvailable: !event.target.checked, unitPrice: event.target.checked ? "" : price.unitPrice } }))} /> Not available</label>{isLowest ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">Lowest</span> : null}{matchStatus !== "manual" ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${matchStatus === "exact" ? "bg-sky-100 text-sky-800" : matchStatus === "possible" ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"}`}>{matchStatus === "exact" ? "Exact match" : matchStatus === "possible" ? "Possible match" : "Needs review"}</span> : null}{!locked && ["possible", "review"].includes(matchStatus) ? <button type="button" onClick={() => confirmMatch(key, bid.id, item.id)} disabled={pending} className="text-[10px] font-bold text-[#0066cc] underline underline-offset-2">Confirm match</button> : null}</div></td>;
+                    const clientUnitPrice = Number(clientTargetDrafts[item.id]);
+                    const supplierUnitPrice = Number(price.unitPrice);
+                    const lineClientTotal = clientUnitPrice * positiveDraftQuantity(item.quantity);
+                    const lineProfit = (clientUnitPrice - supplierUnitPrice) * positiveDraftQuantity(item.quantity);
+                    const lineMargin = lineClientTotal > 0 ? (lineProfit / lineClientTotal) * 100 : 0;
+                    const canCompareLine = clientUnitPrice > 0 && supplierUnitPrice > 0 && price.isAvailable;
+                    return <td key={bid.id} className={`border-l border-slate-100 px-4 py-3 align-top ${isLowest ? "bg-emerald-50" : ""}`}><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">$</span><input type="number" min="0" step="0.01" value={price.unitPrice} disabled={locked || !price.isAvailable} onChange={(event) => setPriceDrafts((current) => ({ ...current, [key]: { ...price, unitPrice: event.target.value } }))} placeholder="0.00" aria-label={`${bid.supplier_name_snapshot} unit price for ${item.description}`} className={`min-h-10 w-full rounded-lg border pl-7 pr-2 text-right text-sm font-bold tabular-nums disabled:bg-slate-100 disabled:text-slate-400 ${isLowest ? "border-emerald-400 bg-white" : "border-slate-300"}`} /></div>{canCompareLine ? <div className={`mt-2 rounded-md px-2 py-1.5 text-right ${lineProfit < 0 ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-800"}`}><p className="text-xs font-black tabular-nums">Line profit {formatComparisonMoney(lineProfit)}</p><p className="text-[10px] font-bold">{lineMargin.toFixed(1)}% margin</p></div> : <p className="mt-2 text-[10px] font-semibold text-slate-400">Enter both prices to compare this row.</p>}<div className="mt-2 flex flex-wrap items-center gap-2"><label className="flex items-center gap-2 text-[11px] font-semibold text-slate-500"><input type="checkbox" checked={!price.isAvailable} disabled={locked} onChange={(event) => setPriceDrafts((current) => ({ ...current, [key]: { ...price, isAvailable: !event.target.checked, unitPrice: event.target.checked ? "" : price.unitPrice } }))} /> Not available</label>{isLowest ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">Lowest</span> : null}{matchStatus !== "manual" ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${matchStatus === "exact" ? "bg-sky-100 text-sky-800" : matchStatus === "possible" ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"}`}>{matchStatus === "exact" ? "Exact match" : matchStatus === "possible" ? "Possible match" : "Needs review"}</span> : null}{!locked && ["possible", "review"].includes(matchStatus) ? <button type="button" onClick={() => confirmMatch(key, bid.id, item.id)} disabled={pending} className="text-[10px] font-bold text-[#0066cc] underline underline-offset-2">Confirm match</button> : null}</div></td>;
                   })}</tr>)}
                   <tr className="border-b border-slate-200 bg-slate-50"><th className="sticky left-0 bg-slate-50 px-5 py-3 text-sm font-bold">Delivery charge <span className="block text-[10px] font-medium text-slate-500">Whole order</span></th><td className="border-l border-amber-100 bg-amber-50/50 px-4 py-3"><input aria-label="Client delivery charge for whole order" type="number" min="0" step="0.01" value={clientDeliveryDraft} disabled={locked} onChange={(event) => setClientDeliveryDraft(event.target.value)} className="min-h-10 w-full rounded-lg border border-amber-300 bg-white px-3 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /></td>{bids.map((bid) => <td key={bid.id} className="border-l border-slate-200 px-4 py-3"><input aria-label={`${bid.supplier_name_snapshot} delivery charge for whole order`} type="number" min="0" step="0.01" value={bidDrafts[bid.id]?.deliveryCharge ?? ""} disabled={locked} onChange={(event) => setBidDrafts((current) => ({ ...current, [bid.id]: { ...current[bid.id], deliveryCharge: event.target.value } }))} className="min-h-10 w-full rounded-lg border border-slate-300 px-3 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /></td>)}</tr>
                   <tr className="border-b border-slate-200 bg-slate-50"><th className="sticky left-0 bg-slate-50 px-5 py-3 text-sm font-bold">Tax percentage <span className="block text-[10px] font-medium text-slate-500">Whole order</span></th><td className="border-l border-amber-100 bg-amber-50/50 px-4 py-3"><div className="relative"><input aria-label="Client tax percentage for whole order" type="number" min="0" max="100" step="0.001" value={clientTaxDraft} disabled={locked} onChange={(event) => setClientTaxDraft(event.target.value)} placeholder="8.875" className="min-h-10 w-full rounded-lg border border-amber-300 bg-white pl-3 pr-8 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-amber-700">%</span></div></td>{bids.map((bid) => <td key={bid.id} className="border-l border-slate-200 px-4 py-3"><div className="relative"><input aria-label={`${bid.supplier_name_snapshot} tax percentage for whole order`} type="number" min="0" max="100" step="0.001" value={bidDrafts[bid.id]?.taxPercent ?? ""} disabled={locked} onChange={(event) => setBidDrafts((current) => ({ ...current, [bid.id]: { ...current[bid.id], taxPercent: event.target.value } }))} placeholder="8.875" className="min-h-10 w-full rounded-lg border border-slate-300 pl-3 pr-8 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">%</span></div></td>)}</tr>
                   <tr className="bg-slate-50"><th className="sticky left-0 bg-slate-50 px-5 py-3 text-sm font-bold">Lead time in days</th><td className="border-l border-amber-100 bg-amber-50/50 px-4 py-3 text-xs font-semibold text-amber-800">Derived from each buying option</td>{bids.map((bid) => <td key={bid.id} className="border-l border-slate-200 px-4 py-3"><input aria-label={`${bid.supplier_name_snapshot} lead time in days`} type="number" min="0" step="1" value={bidDrafts[bid.id]?.leadTimeDays ?? ""} disabled={locked} onChange={(event) => setBidDrafts((current) => ({ ...current, [bid.id]: { ...current[bid.id], leadTimeDays: event.target.value } }))} className="min-h-10 w-full rounded-lg border border-slate-300 px-3 text-right text-sm font-bold tabular-nums disabled:bg-slate-100" /></td>)}</tr>
-                  <tr className="border-t-2 border-emerald-200 bg-emerald-50"><th className="sticky left-0 bg-emerald-50 px-5 py-4 text-sm font-black text-emerald-950">Profit comparison <span className="mt-1 block text-[10px] font-semibold text-emerald-800">Client pre-tax amount minus supplier total</span></th><td className="border-l border-emerald-200 px-4 py-4 text-right"><p className="text-lg font-black tabular-nums text-amber-950">{clientReady.complete ? formatComparisonMoney(clientReady.preTaxTotal) : "Incomplete"}</p><p className="text-[10px] font-bold uppercase tracking-[0.06em] text-amber-800">Client pre-tax</p></td>{bids.map((bid) => {
-                    const option = buyingOptions.find((entry) => entry.id === bid.id);
-                    return <td key={bid.id} className="border-l border-emerald-200 px-4 py-4 text-right">{option?.complete ? <><p className={`text-lg font-black tabular-nums ${option.estimatedGrossProfit < 0 ? "text-rose-700" : "text-emerald-800"}`}>{formatComparisonMoney(option.estimatedGrossProfit)}</p><p className={`text-xs font-black ${option.grossMarginPercent < 0 ? "text-rose-700" : "text-emerald-800"}`}>{option.grossMarginPercent.toFixed(1)}% margin</p><p className="mt-1 text-[10px] font-semibold text-slate-600">Supplier cost {formatComparisonMoney(option.supplierTotal)}</p></> : <><p className="text-sm font-bold text-amber-800">Missing pricing</p><p className="mt-1 text-[10px] text-slate-600">{option?.missingFields.join(", ") || "Enter client and supplier prices"}</p></>}</td>;
+                  <tr className="border-t-2 border-emerald-200 bg-emerald-50"><th className="sticky left-0 bg-emerald-50 px-5 py-4 text-sm font-black text-emerald-950">Entered rows summary <span className="mt-1 block text-[10px] font-semibold text-emerald-800">Material prices entered on both sides only</span></th><td className="border-l border-emerald-200 px-4 py-4 text-right"><p className="text-xs font-bold text-amber-900">Each supplier is calculated separately</p></td>{bids.map((bid) => {
+                    const partial = partialComparisonByBid.get(bid.id);
+                    return <td key={bid.id} className="border-l border-emerald-200 px-4 py-4 text-right">{partial?.comparableRows ? <><p className={`text-lg font-black tabular-nums ${partial.profit < 0 ? "text-rose-700" : "text-emerald-800"}`}>{formatComparisonMoney(partial.profit)}</p><p className={`text-xs font-black ${partial.marginPercent < 0 ? "text-rose-700" : "text-emerald-800"}`}>{partial.marginPercent.toFixed(1)}% margin</p><p className="mt-1 text-[10px] font-semibold text-slate-600">{partial.comparableRows} of {items.length} rows · cost {formatComparisonMoney(partial.supplierTotal)} · client {formatComparisonMoney(partial.clientTotal)}</p></> : <p className="text-xs font-bold text-slate-500">No comparable rows yet</p>}</td>;
                   })}</tr>
                 </tbody>
               </table>

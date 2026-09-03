@@ -333,8 +333,11 @@ test("supplier comparison captures the client's ready-to-pay target beside suppl
   expect(workspace).toContain("Supplier unit price");
   expect(workspace).toContain("Whole order");
   expect(workspace).toContain("Estimated gross profit");
-  expect(workspace).toContain("Profit comparison");
-  expect(workspace).toContain("Client pre-tax amount minus supplier total");
+  expect(workspace).toContain("Line profit")
+  expect(workspace).toContain("Entered rows summary")
+  expect(workspace).toContain("Save entered prices")
+  expect(workspace).toContain("Unfilled rows remain open for later")
+  expect(workspace).not.toContain("Finish the missing client and supplier values before saving the comparison")
   expect(workspace).toContain("Gross margin");
   expect(workspace).toContain("Finish missing values");
   expect(workspace).toContain('className="mt-4 hidden');
