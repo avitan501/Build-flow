@@ -4,12 +4,13 @@ import Link from "next/link";
 import { QuoteComparisonCreateForm } from "@/components/buildflow/quote-comparison-create-form";
 import { requireStaffProfile } from "@/lib/auth";
 import { quoteComparisonStatusLabel, type QuoteComparisonRecord } from "@/lib/quote-comparison";
+import { formatSiteDate } from "@/lib/site-date-time";
 
 type ProjectOption = { id: string; name: string; address: string | null };
 type CountRow = { comparison_id: string };
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+  return formatSiteDate(value);
 }
 
 function statusClass(status: QuoteComparisonRecord["status"]) {

@@ -9,6 +9,7 @@ import {
   type ProjectUploadRecord,
 } from "@/lib/projects";
 import type { ExtractedWindowScheduleItem } from "@/lib/window-schedule-extraction";
+import { formatSiteDateTime } from "@/lib/site-date-time";
 
 type WindowUploadReviewPageProps = {
   params: Promise<{ uploadId: string }>;
@@ -26,7 +27,7 @@ const reviewMessages = {
 } as const;
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleString("en-US", {
+  return formatSiteDateTime(value, {
     month: "short",
     day: "numeric",
     year: "numeric",

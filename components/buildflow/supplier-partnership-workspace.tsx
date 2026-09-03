@@ -12,6 +12,7 @@ import {
   type SupplierPartnerProgress,
   type SupplierPartnerStatus,
 } from "@/lib/supplier-partners/catalog";
+import { formatSiteDateTime } from "@/lib/site-date-time";
 
 type Props = {
   partners: SupplierPartner[];
@@ -32,10 +33,7 @@ const STATUS_COLORS: Record<SupplierPartnerStatus, string> = {
 };
 
 function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
+  return formatSiteDateTime(value, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }, value);
 }
 
 function cleanPhone(phone: string) {

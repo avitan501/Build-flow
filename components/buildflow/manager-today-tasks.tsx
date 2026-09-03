@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { FormEvent, useState, useTransition } from "react"
 
 import { createTodayTaskAction, setTodayTaskCompletedAction } from "@/app/admin/build-map/actions"
+import { formatSiteTime } from "@/lib/site-date-time"
 
 export type ManagerTodayTask = {
   id: string
@@ -14,11 +15,7 @@ export type ManagerTodayTask = {
 }
 
 function addedTime(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value))
+  return formatSiteTime(value, { hour: "numeric", minute: "2-digit" })
 }
 
 export function ManagerTodayTasks({ tasks }: { tasks: ManagerTodayTask[] }) {

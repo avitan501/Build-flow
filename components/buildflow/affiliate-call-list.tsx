@@ -21,16 +21,11 @@ import {
   type AffiliateProgram,
   type AffiliateStatus,
 } from "@/lib/affiliate-tracker";
+import { formatSiteDate } from "@/lib/site-date-time";
 
 function shortDate(value: string | null) {
   if (!value) return "—";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-      }).format(date);
+  return formatSiteDate(value, { month: "short", day: "numeric" }, value);
 }
 
 function statusStyle(status: AffiliateStatus | undefined) {

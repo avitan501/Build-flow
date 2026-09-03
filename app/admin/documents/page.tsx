@@ -5,6 +5,7 @@ import { ManagerDocumentUpload } from "@/components/buildflow/manager-document-u
 import { requireStaffProfile } from "@/lib/auth"
 import { confidenceLabel, managerDocumentStatusLabel, managerDocumentTypeLabel, managerDocumentTypes, type ManagerDocumentRecord, type ManagerDocumentStatus } from "@/lib/manager-documents"
 import type { CatalogSupplier } from "@/lib/material-catalog"
+import { formatSiteDate } from "@/lib/site-date-time"
 
 const PAGE_SIZE = 50
 const statusOptions: Array<{ value: "all" | ManagerDocumentStatus; label: string }> = [
@@ -18,7 +19,7 @@ const statusOptions: Array<{ value: "all" | ManagerDocumentStatus; label: string
 ]
 
 function dateLabel(value: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value))
+  return formatSiteDate(value)
 }
 
 function pageHref(input: { q: string; status: string; type: string; page: number }) {

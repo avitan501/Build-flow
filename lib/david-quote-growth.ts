@@ -1,3 +1,5 @@
+import { siteBusinessDateKey } from "@/lib/site-date-time";
+
 export type QuoteGrowthPeriod = "daily" | "campaign";
 
 export type QuoteGrowthMetricDefinition = {
@@ -65,12 +67,7 @@ export const SUPPLIER_GROWTH_PIPELINE = [
 ] as const;
 
 export function quoteGrowthDateInNewYork(date = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+  return siteBusinessDateKey(date) ?? "";
 }
 
 export function quoteGrowthMetricDefinition(period: QuoteGrowthPeriod, key: string) {

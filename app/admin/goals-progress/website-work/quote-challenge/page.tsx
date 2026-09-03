@@ -13,11 +13,10 @@ import {
   verifyWebsiteWorkToken,
   WEBSITE_WORK_COOKIE,
 } from "@/lib/website-work-access";
+import { addSiteCalendarDays } from "@/lib/site-date-time";
 
 function addDays(dateText: string, days: number) {
-  const date = new Date(`${dateText}T12:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
+  return addSiteCalendarDays(dateText, days) ?? dateText;
 }
 
 export default async function DavidQuoteChallengePage() {

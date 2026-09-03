@@ -6,6 +6,8 @@ import {
   Truck,
 } from "lucide-react";
 
+import { formatSiteDate } from "@/lib/site-date-time";
+
 export type RequestSupplierComparisonItem = {
   id: string;
   sourceRequestItemId?: string | null;
@@ -49,12 +51,6 @@ export type RequestSupplierComparisonProps = {
   headingId?: string;
 };
 
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
-
 function money(value: number, currency: string) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -65,8 +61,7 @@ function money(value: number, currency: string) {
 
 function displayDate(value?: string | null) {
   if (!value) return "Date not provided";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
+  return formatSiteDate(value, { month: "short", day: "numeric", year: "numeric" }, value);
 }
 
 function safeNumber(value: number | null | undefined) {

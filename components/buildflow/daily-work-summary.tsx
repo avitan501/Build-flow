@@ -6,19 +6,20 @@ import { useEffect, useState, useTransition } from "react"
 
 import { markDailySummaryPaidAction, recordDailyAttendanceAction, saveDailyWorkSummaryAction, uploadDailyProblemPhotoAction } from "@/app/admin/daily-summary/actions"
 import { captureAvantiaEvent } from "@/lib/analytics/posthog-client"
-import { calculateDailyWorkMinutes, dailyWorkDateKey, DAILY_WORK_TIME_ZONE, type DailyWorkSummary } from "@/lib/daily-work-summary"
+import { calculateDailyWorkMinutes, dailyWorkDateKey, type DailyWorkSummary } from "@/lib/daily-work-summary"
+import { formatSiteDate, formatSiteTime } from "@/lib/site-date-time"
 
 function localToday() {
   return dailyWorkDateKey() ?? ""
 }
 
 function displayDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { timeZone: DAILY_WORK_TIME_ZONE, month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value}T12:00:00Z`))
+  return formatSiteDate(value)
 }
 
 function displayTime(value: string | null | undefined) {
   if (!value) return "Not recorded"
-  return new Intl.DateTimeFormat("en-US", { timeZone: DAILY_WORK_TIME_ZONE, hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(value))
+  return formatSiteTime(value)
 }
 
 function durationLabel(minutes: number | null) {

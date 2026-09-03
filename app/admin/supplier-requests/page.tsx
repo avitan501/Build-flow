@@ -3,6 +3,7 @@ import Link from "next/link"
 
 import { DeleteSupplierQuoteRequestButton } from "@/components/buildflow/delete-supplier-quote-request-button"
 import { requireStaffProfile } from "@/lib/auth"
+import { formatSiteDateTime } from "@/lib/site-date-time"
 
 type SupplierQuoteRequestRow = {
   id: string
@@ -24,13 +25,13 @@ const statusStyles = {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
+  return formatSiteDateTime(value, {
     month: "short",
     day: "numeric",
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(value))
+  })
 }
 
 export default async function SupplierRequestsPage() {

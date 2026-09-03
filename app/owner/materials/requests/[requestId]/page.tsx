@@ -29,6 +29,7 @@ import {
 import { managerPipelineStage } from "@/lib/manager-dashboard";
 import { mapRequestSupplierComparison } from "@/lib/request-supplier-comparison";
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state";
+import { formatSiteDateTime } from "@/lib/site-date-time";
 import { canonicalSupplierDirectory, resolveRequestSupplierRouteSelections } from "@/lib/supplier-canonical";
 import type { RelatedEmailItem } from "@/components/buildflow/related-email-timeline";
 
@@ -326,12 +327,11 @@ export default async function OwnerMaterialRequestPage({
   const organizationCompletedLabel =
     organizationCompletedAt &&
     Number.isFinite(Date.parse(organizationCompletedAt))
-      ? new Date(organizationCompletedAt).toLocaleString("en-US", {
+      ? formatSiteDateTime(organizationCompletedAt, {
           month: "short",
           day: "numeric",
           hour: "numeric",
           minute: "2-digit",
-          timeZone: "America/New_York",
         })
       : "";
   const departmentItems = organizedItems.length
@@ -642,7 +642,7 @@ export default async function OwnerMaterialRequestPage({
                       {event.title}
                     </h3>
                     <time className="text-xs text-slate-500">
-                      {new Date(event.created_at).toLocaleString("en-US", {
+                      {formatSiteDateTime(event.created_at, {
                         month: "short",
                         day: "numeric",
                         hour: "numeric",

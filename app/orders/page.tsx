@@ -6,6 +6,7 @@ import { statusButtonClass, statusClasses } from "@/components/buildflow/wirefra
 import { requireSignedInProfile } from "@/lib/auth";
 import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
 import type { ProjectOrderRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
+import { formatSiteDate } from "@/lib/site-date-time";
 
 const journeySteps = [
   "Start Project",
@@ -62,7 +63,7 @@ function formatTrackingStatus(status: ProjectOrderRecord["tracking_status"]) {
 }
 
 function formatOrderDate(value: string) {
-  return new Date(value).toLocaleDateString("en-US", {
+  return formatSiteDate(value, {
     month: "short",
     day: "numeric",
     year: "numeric",

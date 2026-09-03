@@ -22,6 +22,7 @@ import { AVANTIA_PAYMENT_LINK } from "@/lib/payment-link"
 import type { RequestClientDocumentType } from "@/lib/request-client-quote-pdf"
 import { requestPaymentGuidance, type RequestPaymentMethod } from "@/lib/request-client-payment"
 import { requestWorkflowState, type RequestWorkflowAction } from "@/lib/request-workflow-state"
+import { formatSiteDate, formatSiteWallTime, siteBusinessDateKey } from "@/lib/site-date-time"
 import { findCanonicalSupplier } from "@/lib/supplier-canonical"
 import { useSequencedAutosave } from "@/lib/use-sequenced-autosave"
 
@@ -108,13 +109,11 @@ const WORKFLOW_ACTION_LABELS: Record<RequestWorkflowAction, string> = {
 
 function deliveryDateLabel(value: string) {
   if (!value) return ""
-  return new Date(`${value}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+  return formatSiteDate(value, { weekday: "short", month: "short", day: "numeric", year: "numeric" }, "")
 }
 
 function deliveryTimeLabel(value: string) {
-  if (!value) return ""
-  const [hours, minutes] = value.split(":").map(Number)
-  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+  return value ? formatSiteWallTime(value, "") : ""
 }
 
 function deliveryWindowEndTime(startTime: string, durationHours: number) {
@@ -200,8 +199,8 @@ export function RequestManagementPanel({
   const [contactOpen, setContactOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
   const [documentType, setDocumentType] = useState<RequestClientDocumentType>("estimate")
-  const [quoteNumber, setQuoteNumber] = useState(() => `AVA-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${requestId.slice(0, 4).toUpperCase()}`)
-  const [issueDate, setIssueDate] = useState(() => new Date().toLocaleDateString("en-US"))
+  const [quoteNumber, setQuoteNumber] = useState(() => `AVA-${(siteBusinessDateKey() ?? "").replaceAll("-", "")}-${requestId.slice(0, 4).toUpperCase()}`)
+  const [issueDate, setIssueDate] = useState(() => formatSiteDate(new Date(), { month: "numeric", day: "numeric", year: "numeric" }))
   const [clientAddress, setClientAddress] = useState("")
   const [shipTo, setShipTo] = useState(projectAddress)
   const [quoteLines, setQuoteLines] = useState<QuoteLine[]>(() => requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
@@ -253,7 +252,7 @@ export function RequestManagementPanel({
       if (block.id === "delivery") return [
         block.text,
         ...(deliveryDate ? [`Date: ${deliveryDateLabel(deliveryDate)}`] : []),
-        ...(deliveryWindowStart && deliveryWindowEnd ? [`Delivery window: Between ${deliveryTimeLabel(deliveryWindowStart)} and ${deliveryTimeLabel(deliveryWindowEnd)} (${deliveryWindowHoursNumber.toLocaleString()} hour${deliveryWindowHoursNumber === 1 ? "" : "s"})`] : []),
+        ...(deliveryWindowStart && deliveryWindowEnd ? [`Delivery window: Between ${deliveryTimeLabel(deliveryWindowStart)} and ${deliveryTimeLabel(deliveryWindowEnd)} Eastern (${deliveryWindowHoursNumber.toLocaleString()} hour${deliveryWindowHoursNumber === 1 ? "" : "s"})`] : []),
         ...(deliveryAddress.trim() ? [`Address: ${deliveryAddress.trim()}`] : []),
       ]
       return [block.text]
@@ -358,8 +357,8 @@ export function RequestManagementPanel({
     const legacyPaymentLink = saved?.documentData.paymentLink
     const prefix = nextType === "invoice" ? "INV" : nextType === "receipt" ? "REC" : "AVA"
     setDocumentType(nextType)
-    setQuoteNumber(saved?.documentNumber || `${prefix}-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${requestId.slice(0, 4).toUpperCase()}`)
-    setIssueDate(saved?.documentData.issueDate || new Date().toLocaleDateString("en-US"))
+    setQuoteNumber(saved?.documentNumber || `${prefix}-${(siteBusinessDateKey() ?? "").replaceAll("-", "")}-${requestId.slice(0, 4).toUpperCase()}`)
+    setIssueDate(saved?.documentData.issueDate || formatSiteDate(new Date(), { month: "numeric", day: "numeric", year: "numeric" }))
     setClientAddress(saved?.documentData.clientAddress || "")
     setShipTo(saved?.documentData.shipTo || projectAddress)
     setQuoteLines(saved?.documentData.lines?.length ? saved.documentData.lines.map((line) => ({ ...line, key: crypto.randomUUID() })) : requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
@@ -829,8 +828,8 @@ export function RequestManagementPanel({
             <details open={deliveryOpen} onToggle={(event) => setDeliveryOpen(event.currentTarget.open)} className="mt-3 rounded-lg border border-slate-200 bg-slate-50">
               <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold"><span className="inline-flex items-center gap-2"><CalendarClock className="h-4 w-4 text-emerald-700" />Schedule delivery</span><ChevronDown className="h-4 w-4 text-slate-400" /></summary>
               <div className="grid gap-3 border-t border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-3">
-                <label className="grid gap-1 text-xs font-bold text-slate-600">Date<input type="date" min={new Date().toISOString().slice(0, 10)} value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
-                <label className="grid gap-1 text-xs font-bold text-slate-600">Window starts<input type="time" value={deliveryWindowStart} onChange={(event) => setDeliveryWindowStart(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
+                <label className="grid gap-1 text-xs font-bold text-slate-600">Date<input type="date" min={siteBusinessDateKey() ?? undefined} value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
+                <label className="grid gap-1 text-xs font-bold text-slate-600">Window starts (Eastern)<input type="time" value={deliveryWindowStart} onChange={(event) => setDeliveryWindowStart(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
                 <label className="grid gap-1 text-xs font-bold text-slate-600">Window length (hours)<input type="number" min="0.5" max="12" step="0.5" value={deliveryWindowHours} onChange={(event) => setDeliveryWindowHours(event.target.value)} className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950" /></label>
                 <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2 lg:col-span-3">Delivery address<input value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} placeholder="Jobsite delivery address" className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950" /></label>
                 {deliveryWindowStart && !deliveryWindowEnd ? <p className="text-xs font-bold text-rose-700 sm:col-span-2 lg:col-span-3">Choose a shorter window that ends before midnight.</p> : null}

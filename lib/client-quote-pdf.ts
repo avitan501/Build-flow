@@ -5,6 +5,7 @@ import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from "pdf-lib";
 
 import type { ClientQuoteSummary, QuoteComparisonRecord } from "@/lib/quote-comparison";
 import { CREDIT_CARD_PROCESSING_TERM } from "@/lib/proposal-terms";
+import { formatSiteDate } from "@/lib/site-date-time";
 
 export type ClientQuotePdfInput = {
   comparison: QuoteComparisonRecord;
@@ -25,8 +26,7 @@ function money(value: number) {
 
 function dateLabel(value: Date | string | null) {
   if (!value) return "Not specified";
-  const date = value instanceof Date ? value : new Date(`${value}T12:00:00`);
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
+  return formatSiteDate(value, { month: "short", day: "numeric", year: "numeric" }, "Not specified");
 }
 
 function clean(value: string) {

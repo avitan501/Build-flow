@@ -7,6 +7,7 @@ import {
   retrieveInternalAuraDocuments,
   type AuraInternalKnowledgeDocument,
 } from "@/lib/aura/internal-library";
+import { formatSiteDate } from "@/lib/site-date-time";
 
 export default async function InternalAuraLibraryPage({
   searchParams,
@@ -68,7 +69,7 @@ export default async function InternalAuraLibraryPage({
               <div className="border-t border-slate-200 px-4 py-4 sm:px-5">
                 <div className="whitespace-pre-wrap text-sm leading-6 text-slate-700">{document.content_markdown}</div>
                 <div className="mt-4 flex flex-wrap gap-1.5">{document.tags.map((tag) => <span key={tag} className="rounded bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{tag}</span>)}</div>
-                <p className="mt-3 text-[10px] text-slate-400">Reviewed {document.reviewed_at ? new Date(document.reviewed_at).toLocaleDateString("en-US") : "internally"} · {document.slug}</p>
+                <p className="mt-3 text-[10px] text-slate-400">Reviewed {document.reviewed_at ? formatSiteDate(document.reviewed_at) : "internally"} · {document.slug}</p>
               </div>
             </details>
           ))}

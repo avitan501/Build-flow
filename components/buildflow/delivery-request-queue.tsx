@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { updateDeliveryStatusAction } from "@/app/admin/ai-tools/jobsite-delivery/actions";
 import { DELIVERY_SPEEDS, DELIVERY_VEHICLES } from "@/lib/delivery-pricing";
 import type { SavedDeliveryRequest } from "@/lib/delivery-requests";
+import { formatSiteDateTime } from "@/lib/site-date-time";
 
 type QueueRequest = SavedDeliveryRequest & { id: string };
 
@@ -71,7 +72,7 @@ export function DeliveryRequestQueue({ requests }: { requests: QueueRequest[] })
                 <div className="flex flex-wrap items-center gap-2"><strong className="text-base text-slate-950">{request.reference}</strong><span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">{DELIVERY_SPEEDS[request.speed as keyof typeof DELIVERY_SPEEDS]?.label || request.speed}</span></div>
                 <h3 className="mt-2 text-lg font-semibold text-slate-950">{request.storeName} → {request.jobsiteName || "Jobsite"}</h3>
                 <p className="mt-1 text-sm text-slate-500">{request.pickupAddress || request.pickupCoordinates} → {request.jobsiteAddress || request.jobsiteCoordinates}</p>
-                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-600"><span>{DELIVERY_VEHICLES[request.vehicle as keyof typeof DELIVERY_VEHICLES]?.label || request.vehicle}</span><span>{request.estimate.estimatedRoadMiles} mi planned</span><span>{currency.format(request.providerQuote?.total ?? request.estimate.total)} {request.providerQuote ? "Uber Direct quote" : "planning estimate"}</span><span>{new Date(request.createdAt).toLocaleString()}</span></div>
+                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-600"><span>{DELIVERY_VEHICLES[request.vehicle as keyof typeof DELIVERY_VEHICLES]?.label || request.vehicle}</span><span>{request.estimate.estimatedRoadMiles} mi planned</span><span>{currency.format(request.providerQuote?.total ?? request.estimate.total)} {request.providerQuote ? "Uber Direct quote" : "planning estimate"}</span><span>Created {formatSiteDateTime(request.createdAt)}</span>{request.scheduledPickupAt ? <span>Pickup {formatSiteDateTime(request.scheduledPickupAt, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })}</span> : null}</div>
                 {request.providerDelivery ? <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900"><strong>Uber {request.providerDelivery.status}</strong><span>ID {request.providerDelivery.deliveryId}</span>{request.providerDelivery.trackingUrl ? <a href={request.providerDelivery.trackingUrl} target="_blank" rel="noreferrer" className="font-bold underline underline-offset-4">Open live tracking</a> : null}</div> : null}
               </div>
               <RequestStatus request={request} />

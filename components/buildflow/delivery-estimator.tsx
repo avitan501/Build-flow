@@ -13,6 +13,7 @@ import {
   type DeliverySpeed,
   type DeliveryVehicle,
 } from "@/lib/delivery-pricing"
+import { formatSiteTime, siteLocalDateTimeToIso } from "@/lib/site-date-time"
 
 const currency = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -112,7 +113,8 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
   const totalWeightPounds = parsedPackageQuantity * parsedWeightPerPackage
   const packageQuantityValid = Number.isInteger(parsedPackageQuantity) && parsedPackageQuantity >= 1 && parsedPackageQuantity <= 20
   const weightPerPackageValid = Number.isFinite(parsedWeightPerPackage) && parsedWeightPerPackage > 0 && parsedWeightPerPackage <= 50
-  const scheduledPickupMs = scheduledPickupLocal ? new Date(scheduledPickupLocal).getTime() : Number.NaN
+  const scheduledPickupIso = scheduledPickupLocal ? siteLocalDateTimeToIso(scheduledPickupLocal) : null
+  const scheduledPickupMs = scheduledPickupIso ? new Date(scheduledPickupIso).getTime() : Number.NaN
   const timingReady = deliveryTiming === "asap" || (Number.isFinite(scheduledPickupMs) && scheduledPickupMs > Date.now() + 60 * 60 * 1000 && scheduledPickupMs < Date.now() + 30 * 24 * 60 * 60 * 1000)
   const quoteRequirements = [
     { label: "Pickup address", ready: pickupAddress.trim().length >= 8 },
@@ -160,7 +162,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
           packageQuantity: parsedPackageQuantity,
           weightPerPackage: parsedWeightPerPackage,
           vehicle,
-          scheduledPickupAt: deliveryTiming === "later" ? new Date(scheduledPickupLocal).toISOString() : null,
+          scheduledPickupAt: deliveryTiming === "later" ? scheduledPickupIso : null,
         }),
       })
       const payload = await response.json() as { ok?: boolean; error?: string; code?: string; providerCode?: string; quote?: LiveUberQuote }
@@ -204,9 +206,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
   function saveRequest() {
     if (!readyToSave || (!estimate && !liveQuote)) return
 
-    const scheduledPickupAt = deliveryTiming === "later" && scheduledPickupLocal
-      ? new Date(scheduledPickupLocal).toISOString()
-      : null
+    const scheduledPickupAt = deliveryTiming === "later" ? scheduledPickupIso : null
     const request = {
       storeName: effectiveStoreName,
       orderNumber: orderNumber.trim(),
@@ -449,7 +449,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
                   <button type="button" onClick={() => { setDeliveryTiming("asap"); resetLiveQuote() }} aria-pressed={deliveryTiming === "asap"} className={`min-h-10 rounded-lg text-xs font-semibold ${deliveryTiming === "asap" ? "bg-[#10233f] text-white" : "text-slate-600"}`}>As soon as possible</button>
                   <button type="button" onClick={() => { setDeliveryTiming("later"); resetLiveQuote() }} aria-pressed={deliveryTiming === "later"} className={`min-h-10 rounded-lg text-xs font-semibold ${deliveryTiming === "later" ? "bg-[#10233f] text-white" : "text-slate-600"}`}>Schedule for later</button>
                 </div>
-                {deliveryTiming === "later" ? <label className="mt-3 grid gap-1.5 text-xs font-semibold text-slate-700">Requested pickup time<input type="datetime-local" value={scheduledPickupLocal} onChange={(event) => { setScheduledPickupLocal(event.target.value); resetLiveQuote() }} aria-invalid={!timingReady} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal" /><span className={timingReady ? "font-normal text-slate-500" : "font-normal text-rose-600"}>Choose a time between 1 hour and 30 days from now.</span></label> : null}
+              {deliveryTiming === "later" ? <label className="mt-3 grid gap-1.5 text-xs font-semibold text-slate-700">Requested pickup time (Eastern Time)<input type="datetime-local" value={scheduledPickupLocal} onChange={(event) => { setScheduledPickupLocal(event.target.value); resetLiveQuote() }} aria-invalid={!timingReady} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal" /><span className={timingReady ? "font-normal text-slate-500" : "font-normal text-rose-600"}>Choose a valid Eastern Time between 1 hour and 30 days from now.</span></label> : null}
               </div>
               <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -457,7 +457,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
                   <button type="button" onClick={requestLiveQuote} disabled={liveQuoteState === "loading"} className="min-h-11 rounded-xl bg-[#10233f] px-4 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-70">{liveQuoteState === "loading" ? "Checking Uber…" : "Get live Uber price"}</button>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">{quoteRequirements.map((item) => <span key={item.label} className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${item.ready ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"}`}>{item.ready ? "✓" : "Needs"} {item.label}</span>)}</div>
-                {liveQuote ? <div role="status" className="mt-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-emerald-800"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{currency.format(liveQuote.total)} live Uber route fee</strong><span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">Live now</span></div><p className="mt-1 text-xs">{liveQuote.pickupMinutes !== null ? `${liveQuote.pickupMinutes} min pickup` : "Pickup time shown after dispatch"} · {parsedPackageQuantity} × {parsedWeightPerPackage.toLocaleString()} lb box{parsedPackageQuantity === 1 ? "" : "es"}</p><p className="mt-1 text-[10px] text-emerald-700">Uber quote {liveQuote.quoteId.slice(-10)} · received {liveQuoteReceivedAt ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" }).format(new Date(liveQuoteReceivedAt)) : "now"} · expires {new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(liveQuote.expiresAt))}</p></div> : null}
+                {liveQuote ? <div role="status" className="mt-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-emerald-800"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{currency.format(liveQuote.total)} live Uber route fee</strong><span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">Live now</span></div><p className="mt-1 text-xs">{liveQuote.pickupMinutes !== null ? `${liveQuote.pickupMinutes} min pickup` : "Pickup time shown after dispatch"} · {parsedPackageQuantity} × {parsedWeightPerPackage.toLocaleString()} lb box{parsedPackageQuantity === 1 ? "" : "es"}</p><p className="mt-1 text-[10px] text-emerald-700">Uber quote {liveQuote.quoteId.slice(-10)} · received {liveQuoteReceivedAt ? formatSiteTime(liveQuoteReceivedAt, { hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short" }) : "now"} · expires {formatSiteTime(liveQuote.expiresAt)}</p></div> : null}
                 {liveQuoteMessage ? <div role="alert" className="mt-3 rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm text-rose-700">{liveQuoteMessage}</div> : null}
               </div>
             </div>
@@ -489,7 +489,7 @@ export function DeliveryEstimator({ defaultContactName, defaultContactPhone, del
 
             {estimate || liveQuote ? (
               <>
-                {liveQuote ? <div className="mt-5 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4"><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-emerald-100">Uber Direct production quote</p><span className="rounded-full bg-emerald-200/15 px-2.5 py-1 text-[10px] font-bold text-emerald-100">0% markup</span></div><div className="mt-3 grid grid-cols-2 gap-2 text-xs text-emerald-50/80"><p>Pickup: <strong className="text-white">{liveQuote.pickupMinutes !== null ? `${liveQuote.pickupMinutes} min` : "Pending"}</strong></p><p>Trip: <strong className="text-white">{liveQuote.durationMinutes !== null ? `${liveQuote.durationMinutes} min` : "Pending"}</strong></p></div><p className="mt-3 text-[10px] text-emerald-50/60">Quote expires {new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(liveQuote.expiresAt))}. Saving it does not dispatch a courier.</p></div> : null}
+                {liveQuote ? <div className="mt-5 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4"><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-emerald-100">Uber Direct production quote</p><span className="rounded-full bg-emerald-200/15 px-2.5 py-1 text-[10px] font-bold text-emerald-100">0% markup</span></div><div className="mt-3 grid grid-cols-2 gap-2 text-xs text-emerald-50/80"><p>Pickup: <strong className="text-white">{liveQuote.pickupMinutes !== null ? `${liveQuote.pickupMinutes} min` : "Pending"}</strong></p><p>Trip: <strong className="text-white">{liveQuote.durationMinutes !== null ? `${liveQuote.durationMinutes} min` : "Pending"}</strong></p></div><p className="mt-3 text-[10px] text-emerald-50/60">Quote expires {formatSiteTime(liveQuote.expiresAt)}. Saving it does not dispatch a courier.</p></div> : null}
 
                 {estimate ? <>
                   <div className="mt-5 grid grid-cols-2 gap-2">

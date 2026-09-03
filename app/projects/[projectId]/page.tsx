@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { ProjectInfoEditor, ProjectQuestionsForm, ProjectRequestActions } from "@/components/buildflow/project-workspace-controls"
 import { requireSignedInProfile } from "@/lib/auth"
 import { PROJECT_UPLOAD_STORAGE_BUCKET, type ProjectEventRecord, type ProjectRecord, type ProjectUploadRecord } from "@/lib/projects"
+import { formatSiteDate, formatSiteDateTime } from "@/lib/site-date-time"
 import {
   quoteRequestStatusClass,
   quoteRequestStatusLabel,
@@ -27,11 +28,11 @@ type AttachmentRecord = {
 }
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  return formatSiteDate(value)
 }
 
 function formatActivityDate(value: string) {
-  return new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+  return formatSiteDateTime(value, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
 }
 
 function RequestProgress({ status }: { status: QuoteRequestRecord["status"] }) {

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { BookOpenCheck, CheckCircle2, ChevronLeft, ClipboardCheck, House, MessageSquareText, Search, ShieldCheck } from "lucide-react"
 
 import { requireManagerPortalProfile } from "@/lib/auth"
+import { formatSiteDate } from "@/lib/site-date-time"
 import { addConstructionKnowledgeAction, addOrderStandardAction, deleteConstructionKnowledgeAction, setConstructionKnowledgeEnabledAction, updateConstructionKnowledgeAction } from "./actions"
 
 type KnowledgeRow = {
@@ -293,7 +294,7 @@ export default async function ConstructionKnowledgePage({ searchParams }: { sear
             <label className="text-xs font-bold text-slate-700">Category<input name="category" required maxLength={80} defaultValue={entry.category} className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label>
             <label className="text-xs font-bold text-slate-700">Source<input name="sourcePath" required maxLength={500} defaultValue={entry.source_path} className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" /></label>
             <label className="text-xs font-bold text-slate-700 sm:col-span-2">Fact<textarea name="fact" required maxLength={2000} rows={3} defaultValue={entry.fact} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm leading-6" /></label>
-            <div className="flex items-center justify-between gap-3 sm:col-span-2"><span className="text-[10px] text-slate-500">Last reviewed {new Date(entry.reviewed_at || entry.updated_at).toLocaleDateString("en-US")}</span><button type="submit" className="h-9 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold text-slate-800">Save changes</button></div>
+            <div className="flex items-center justify-between gap-3 sm:col-span-2"><span className="text-[10px] text-slate-500">Last reviewed {formatSiteDate(entry.reviewed_at || entry.updated_at)}</span><button type="submit" className="h-9 rounded-lg border border-slate-300 bg-white px-4 text-xs font-bold text-slate-800">Save changes</button></div>
           </form>
         </article>) : <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">No reviewed facts yet. AI will rely on the conversation, catalog matches, and safety fallback.</p>}
       </section>

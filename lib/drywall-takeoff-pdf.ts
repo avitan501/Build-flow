@@ -1,6 +1,7 @@
 import type { DrywallPlanTakeoffResult } from "@/lib/drywall-plan-takeoff-extraction";
 import type { DrywallMaterialCalculation } from "@/lib/drywall-takeoff-materials";
 import type { ProjectRecord } from "@/lib/projects";
+import { formatSiteDate } from "@/lib/site-date-time";
 
 export type DrywallTakeoffPdfInput = {
   project: Pick<ProjectRecord, "id" | "name" | "address">;
@@ -68,7 +69,7 @@ function summarizeOpeningSources(input: DrywallTakeoffPdfInput) {
 
 function buildPageContent(input: DrywallTakeoffPdfInput) {
   const lines: string[] = [];
-  const createdLabel = input.createdAt.toLocaleDateString("en-US", {
+  const createdLabel = formatSiteDate(input.createdAt, {
     month: "short",
     day: "numeric",
     year: "numeric",

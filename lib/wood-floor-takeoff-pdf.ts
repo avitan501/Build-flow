@@ -3,6 +3,7 @@ import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from "pdf-lib";
 import type { WoodFloorRoom, WoodFloorTakeoffResult } from "@/lib/wood-floor-takeoff-extraction";
 import type { WoodFloorMaterialCalculation } from "@/lib/wood-floor-takeoff-materials";
 import type { ProjectRecord } from "@/lib/projects";
+import { formatSiteDate } from "@/lib/site-date-time";
 
 export type WoodFloorTakeoffPdfInput = {
   project: Pick<ProjectRecord, "id" | "name" | "address">;
@@ -86,7 +87,7 @@ export async function generateWoodFloorTakeoffPdf(input: WoodFloorTakeoffPdfInpu
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const selected = selectedRooms(input.takeoff);
   const excluded = excludedRooms(input.takeoff);
-  const createdLabel = input.createdAt.toLocaleDateString("en-US", {
+  const createdLabel = formatSiteDate(input.createdAt, {
     month: "short",
     day: "numeric",
     year: "numeric",

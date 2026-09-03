@@ -5,6 +5,7 @@ import { SupplierQuoteUploadForm } from "@/components/buildflow/supplier-quote-u
 import { requireStaffProfile } from "@/lib/auth"
 import { materialCatalogDepartmentOptions, type CatalogSupplier } from "@/lib/material-catalog"
 import { preferredRequestMaterialSources, toRequestMaterialChartRow, type RequestMaterialChartSource } from "@/lib/request-material-chart"
+import { formatSiteDate, siteBusinessDateKey } from "@/lib/site-date-time"
 import { supplierQuoteStatusLabel, type SupplierQuoteClient, type SupplierQuoteRecord, type SupplierQuoteRequestOption } from "@/lib/supplier-quotes"
 
 type RequestRow = { id: string; title: string; status: string; project_id: string; owner_id: string; created_at: string }
@@ -12,7 +13,7 @@ type RequestProjectRow = { id: string; name: string; address: string | null }
 type RequestComparisonRow = { id: string; request_id: string | null; status: string }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value))
+  return formatSiteDate(value)
 }
 
 function QuoteRows({ quotes, unlinked = false }: { quotes: SupplierQuoteRecord[]; unlinked?: boolean }) {
@@ -88,7 +89,7 @@ export default async function SupplierQuotesPage({ searchParams }: {
     if (supplierFilter && quote.supplier_name !== supplierFilter) return false
     if (clientFilter === "__legacy__" && quote.client_name_snapshot) return false
     if (clientFilter && clientFilter !== "__legacy__" && quote.client_name_snapshot !== clientFilter) return false
-    if (dateFilter && quote.updated_at.slice(0, 10) !== dateFilter) return false
+    if (dateFilter && siteBusinessDateKey(quote.updated_at) !== dateFilter) return false
     return true
   })
   const filtersActive = Boolean(supplierFilter || clientFilter || dateFilter)

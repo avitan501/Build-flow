@@ -10,6 +10,7 @@ import { QuoCallButton } from "@/components/buildflow/quo-call-button"
 import { SupplierQuoteRequestDialog } from "@/components/buildflow/supplier-quote-request-dialog"
 import { SupplierProgramBadges, SUPPLIER_PROGRAM_COLORS } from "@/components/buildflow/supplier-program-badges"
 import { SUPPLIER_PROGRAM_CHANNELS, type SupplierProgramChannel } from "@/lib/supplier-program-channels"
+import { siteBusinessDateKey } from "@/lib/site-date-time"
 
 import {
   buildManagerDepartmentOverride,
@@ -457,7 +458,7 @@ export function SupplierRoutingManager({
   function addSupplierRelationshipUpdate(supplier: SupplierRoutingOption) {
     const summary = supplierUpdateDraft.trim()
     if (!summary) return
-    updateSupplier(supplier.id, { relationshipUpdates: [{ id: crypto.randomUUID(), date: new Date().toISOString().slice(0, 10), summary }, ...(supplier.relationshipUpdates ?? [])] })
+    updateSupplier(supplier.id, { relationshipUpdates: [{ id: crypto.randomUUID(), date: siteBusinessDateKey() ?? "", summary }, ...(supplier.relationshipUpdates ?? [])] })
     setSupplierUpdateDraft("")
   }
 

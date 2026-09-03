@@ -3,6 +3,7 @@ import { BarChart3, Eye, MapPin, Monitor, Smartphone, Users } from "lucide-react
 import { TrafficInternalFilterStatus } from "@/components/buildflow/traffic-internal-filter-status"
 import { requireStaffProfile } from "@/lib/auth"
 import { FILTERED_TRAFFIC_START } from "@/lib/site-traffic"
+import { addSiteCalendarDays, formatSiteDate, formatSiteDateTime, siteBusinessDateKey } from "@/lib/site-date-time"
 
 type TrafficRow = { path: string; referrer_host: string | null; session_hash: string; device_class: "mobile" | "desktop"; city: string | null; region: string | null; country: string | null; user_id: string | null; created_at: string; profile_full_name: string | null; profile_email: string | null }
 type TrafficProfile = { id: string; full_name: string | null; email: string }
@@ -22,16 +23,6 @@ function locationLabel(row: Pick<TrafficRow, "city" | "region" | "country">) {
   return [row.city, row.region, row.country].filter(Boolean).join(", ") || "Location unavailable"
 }
 
-function easternDayKey(value: string | Date) {
-  const parts = new Intl.DateTimeFormat("en-US", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "America/New_York" }).formatToParts(new Date(value))
-  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || ""
-  return `${get("year")}-${get("month")}-${get("day")}`
-}
-
-function formatEasternDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York", timeZoneName: "short" }).format(new Date(value))
-}
-
 export default async function WebsiteTrafficPage() {
   const { supabase } = await requireStaffProfile("traffic")
   const now = new Date()
@@ -49,10 +40,10 @@ export default async function WebsiteTrafficPage() {
   } catch {
     loadError = true
   }
-  const todayKey = easternDayKey(now)
+  const todayKey = siteBusinessDateKey(now) ?? ""
   const sevenDaysAgo = new Date(now)
   sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7)
-  const todayViews = rows.filter((row) => easternDayKey(row.created_at) === todayKey).length
+  const todayViews = rows.filter((row) => siteBusinessDateKey(row.created_at) === todayKey).length
   const sevenDayRows = rows.filter((row) => new Date(row.created_at) >= sevenDaysAgo)
   const uniqueSessions = new Set(rows.map((row) => row.session_hash)).size
   const topPages = countBy(rows.map((row) => row.path)).slice(0, 10)
@@ -61,10 +52,8 @@ export default async function WebsiteTrafficPage() {
   const desktopViews = rows.length - mobileViews
   const locations = countBy(rows.map(locationLabel)).slice(0, 8)
   const daily = Array.from({ length: 14 }, (_, offset) => {
-    const date = new Date(now)
-    date.setUTCDate(date.getUTCDate() - (13 - offset))
-    const key = easternDayKey(date)
-    return { key, label: date.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" }), value: rows.filter((row) => easternDayKey(row.created_at) === key).length }
+    const key = addSiteCalendarDays(todayKey, -(13 - offset)) ?? ""
+    return { key, label: formatSiteDate(key, { month: "short", day: "numeric" }), value: rows.filter((row) => siteBusinessDateKey(row.created_at) === key).length }
   })
   const profileById = new Map<string, TrafficProfile>()
   for (const row of rows) {
@@ -72,7 +61,7 @@ export default async function WebsiteTrafficPage() {
   }
   const dailyLocationMap = new Map<string, { day: string; location: string; views: number; sessions: Set<string>; signedIn: Set<string> }>()
   for (const row of rows) {
-    const day = easternDayKey(row.created_at)
+    const day = siteBusinessDateKey(row.created_at) ?? ""
     const location = locationLabel(row)
     const key = `${day}::${location}`
     const entry = dailyLocationMap.get(key) ?? { day, location, views: 0, sessions: new Set<string>(), signedIn: new Set<string>() }
@@ -96,7 +85,7 @@ export default async function WebsiteTrafficPage() {
   const maxDaily = Math.max(...daily.map((day) => day.value), 1)
   const maxPage = Math.max(topPages[0]?.[1] || 0, 1)
   const latestView = rows[0]?.created_at
-    ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York", timeZoneName: "short" }).format(new Date(rows[0].created_at))
+    ? formatSiteDateTime(rows[0].created_at, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })
     : null
 
   return (
@@ -116,12 +105,12 @@ export default async function WebsiteTrafficPage() {
 
         <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5"><div><h2 className="text-lg font-bold text-slate-950">Traffic by day and place</h2><p className="mt-1 text-xs text-slate-500">Approximate location from the visitor&apos;s connection</p></div><MapPin className="h-5 w-5 text-slate-400" /></div>
-          <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-4 py-3 font-semibold sm:px-5">Date</th><th className="px-4 py-3 font-semibold">Place</th><th className="px-4 py-3 text-right font-semibold">Visitors</th><th className="px-4 py-3 text-right font-semibold">Views</th><th className="px-4 py-3 text-right font-semibold sm:px-5">Signed in</th></tr></thead><tbody className="divide-y divide-slate-100">{dailyLocations.length ? dailyLocations.map((entry) => <tr key={`${entry.day}-${entry.location}`}><td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900 sm:px-5">{new Date(`${entry.day}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td><td className="px-4 py-3 text-slate-700">{entry.location}</td><td className="px-4 py-3 text-right font-semibold tabular-nums">{entry.sessions.size}</td><td className="px-4 py-3 text-right tabular-nums">{entry.views}</td><td className="px-4 py-3 text-right tabular-nums sm:px-5">{entry.signedIn.size}</td></tr>) : <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500">New visits with location will appear here.</td></tr>}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-4 py-3 font-semibold sm:px-5">Date</th><th className="px-4 py-3 font-semibold">Place</th><th className="px-4 py-3 text-right font-semibold">Visitors</th><th className="px-4 py-3 text-right font-semibold">Views</th><th className="px-4 py-3 text-right font-semibold sm:px-5">Signed in</th></tr></thead><tbody className="divide-y divide-slate-100">{dailyLocations.length ? dailyLocations.map((entry) => <tr key={`${entry.day}-${entry.location}`}><td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900 sm:px-5">{formatSiteDate(entry.day)}</td><td className="px-4 py-3 text-slate-700">{entry.location}</td><td className="px-4 py-3 text-right font-semibold tabular-nums">{entry.sessions.size}</td><td className="px-4 py-3 text-right tabular-nums">{entry.views}</td><td className="px-4 py-3 text-right tabular-nums sm:px-5">{entry.signedIn.size}</td></tr>) : <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500">New visits with location will appear here.</td></tr>}</tbody></table></div>
         </section>
 
         <section className="mt-5 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-4 py-4 sm:px-5"><h2 className="text-lg font-bold text-slate-950">Recent visitors</h2><p className="mt-1 text-xs text-slate-500">Signed-in customers are named. Guests remain anonymous.</p></div>
-          <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-4 py-3 font-semibold sm:px-5">Person</th><th className="px-4 py-3 font-semibold">Last seen</th><th className="px-4 py-3 font-semibold">Place</th><th className="px-4 py-3 font-semibold">Last page</th><th className="px-4 py-3 text-right font-semibold sm:px-5">Views</th></tr></thead><tbody className="divide-y divide-slate-100">{recentVisitors.length ? recentVisitors.map((visitor) => { const profile = visitor.userId ? profileById.get(visitor.userId) : null; return <tr key={visitor.session}><td className="px-4 py-3 sm:px-5"><p className="font-semibold text-slate-900">{profile?.full_name || profile?.email || `Anonymous ${visitor.session.slice(0, 6)}`}</p>{profile?.full_name ? <p className="text-xs text-slate-500">{profile.email}</p> : <p className="text-xs text-slate-500">{visitor.device}</p>}</td><td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatEasternDateTime(visitor.lastSeen)}</td><td className="px-4 py-3 text-slate-600">{visitor.location}</td><td className="max-w-[14rem] truncate px-4 py-3 text-slate-600">{pageLabel(visitor.path)}</td><td className="px-4 py-3 text-right font-bold tabular-nums sm:px-5">{visitor.views}</td></tr> }) : <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500">New visitor sessions will appear here.</td></tr>}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-4 py-3 font-semibold sm:px-5">Person</th><th className="px-4 py-3 font-semibold">Last seen</th><th className="px-4 py-3 font-semibold">Place</th><th className="px-4 py-3 font-semibold">Last page</th><th className="px-4 py-3 text-right font-semibold sm:px-5">Views</th></tr></thead><tbody className="divide-y divide-slate-100">{recentVisitors.length ? recentVisitors.map((visitor) => { const profile = visitor.userId ? profileById.get(visitor.userId) : null; return <tr key={visitor.session}><td className="px-4 py-3 sm:px-5"><p className="font-semibold text-slate-900">{profile?.full_name || profile?.email || `Anonymous ${visitor.session.slice(0, 6)}`}</p>{profile?.full_name ? <p className="text-xs text-slate-500">{profile.email}</p> : <p className="text-xs text-slate-500">{visitor.device}</p>}</td><td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatSiteDateTime(visitor.lastSeen, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })}</td><td className="px-4 py-3 text-slate-600">{visitor.location}</td><td className="max-w-[14rem] truncate px-4 py-3 text-slate-600">{pageLabel(visitor.path)}</td><td className="px-4 py-3 text-right font-bold tabular-nums sm:px-5">{visitor.views}</td></tr> }) : <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500">New visitor sessions will appear here.</td></tr>}</tbody></table></div>
         </section>
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,.65fr)]">

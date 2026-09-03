@@ -7,6 +7,7 @@ import type { ShopQualificationSettings, SupplierContact, SupplierReferralSource
 import { canonicalSupplierId, findCanonicalSupplier } from "@/lib/supplier-canonical"
 import { confirmSupplierDirectoryPersistence, parseSupplierDirectorySnapshot } from "@/lib/supplier-directory-persistence"
 import { SUPPLIER_PROGRAM_CHANNELS, type SupplierProgramChannel } from "@/lib/supplier-program-channels"
+import { siteBusinessDateKey } from "@/lib/site-date-time"
 
 const JOB_ADDRESS = "280 Lawrence Ave, Lawrence, NY 11559"
 const MAX_MATERIAL_LIST_LENGTH = 20_000
@@ -61,7 +62,7 @@ function cleanSupplier(input: SupplierRoutingOption): SupplierRoutingOption | nu
     if (!update || typeof update !== "object") return []
     const summary = String(update.summary || "").trim().slice(0, 2000)
     if (!summary) return []
-    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(update.date || "")) ? String(update.date) : new Date().toISOString().slice(0, 10)
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(update.date || "")) ? String(update.date) : siteBusinessDateKey() ?? ""
     return [{ id: String(update.id || crypto.randomUUID()).slice(0, 160), date, summary }]
   }).slice(0, 100)
   return {

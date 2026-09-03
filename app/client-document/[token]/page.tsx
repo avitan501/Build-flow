@@ -4,6 +4,7 @@ import { connection } from "next/server"
 
 import { parseRequestClientDocument, type StoredRequestClientDocument } from "@/lib/request-client-document-data"
 import { requestPaymentGuidance, requestPaymentMethodLabel } from "@/lib/request-client-payment"
+import { formatSiteDateTime } from "@/lib/site-date-time"
 import { createClient } from "@/lib/supabase/server"
 
 export const metadata = { robots: { index: false, follow: false } }
@@ -28,7 +29,7 @@ export default async function ClientDocumentPage({ params }: { params: Promise<{
     <article className="mx-auto max-w-4xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <header className="flex flex-wrap items-start justify-between gap-5 border-b border-slate-200 px-5 py-6 sm:px-8">
         <Image src="/images/avantia/avantia-build-lockup-share.png" alt="Avantia Build" width={210} height={70} className="h-auto w-44" priority />
-        <div className="text-right"><p className="text-xs font-black uppercase tracking-[.18em] text-[#0066cc]">{label}</p><h1 className="mt-1 text-xl font-black">{row.document_number}</h1><p className="mt-1 text-xs text-slate-500">Version {row.version} · Updated {new Date(row.updated_at).toLocaleString("en-US")}</p></div>
+        <div className="text-right"><p className="text-xs font-black uppercase tracking-[.18em] text-[#0066cc]">{label}</p><h1 className="mt-1 text-xl font-black">{row.document_number}</h1><p className="mt-1 text-xs text-slate-500">Version {row.version} · Updated {formatSiteDateTime(row.updated_at)}</p></div>
       </header>
       <section className="grid gap-4 border-b border-slate-200 px-5 py-5 text-sm sm:grid-cols-2 sm:px-8">
         <div><p className="text-[10px] font-black uppercase tracking-[.12em] text-slate-500">Prepared for</p><p className="mt-1 font-bold">{document.clientName}</p><p className="whitespace-pre-wrap text-slate-600">{document.clientAddress}</p></div>

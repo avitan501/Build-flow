@@ -7,6 +7,7 @@ import { updateRequestStatusAction } from "@/app/preview-admin/workflow-actions"
 import { MaterialRequestAssigneeControl } from "@/components/buildflow/material-request-assignee-control";
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard";
 import type { QuoteRequestStatus } from "@/lib/quote-requests";
+import { formatSiteDateTime } from "@/lib/site-date-time";
 
 const stages: Array<{ status: QuoteRequestStatus; label: string }> = [
   { status: "draft", label: "Request created" },
@@ -114,7 +115,7 @@ export function CustomerRequestStatus({
           </p>
           <p className="whitespace-nowrap">
             Updated{" "}
-            {new Date(updatedAt).toLocaleString("en-US", {
+            {formatSiteDateTime(updatedAt, {
               month: "short",
               day: "numeric",
               hour: "numeric",

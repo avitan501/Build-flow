@@ -6,9 +6,10 @@ import { useEffect, useRef, useState, useTransition } from "react"
 
 import { searchManagerDashboardAction } from "@/app/admin/build-map/actions"
 import type { DashboardAiHistoryItem } from "@/lib/manager-command-center"
+import { formatSiteDateTime } from "@/lib/site-date-time"
 
 function formatTime(value: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value))
+  return formatSiteDateTime(value, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
 }
 
 const AI_MODELS = [

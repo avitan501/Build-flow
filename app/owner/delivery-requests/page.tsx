@@ -3,11 +3,12 @@ import Link from "next/link";
 import { DELIVERY_SPEEDS, DELIVERY_VEHICLES } from "@/lib/delivery-pricing";
 import { loadDeliveryRequests } from "@/lib/delivery-requests";
 import { requireStaffProfile } from "@/lib/auth";
+import { formatSiteDateTime } from "@/lib/site-date-time";
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 function dateLabel(value: string) {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/New_York" }).format(new Date(value));
+  return formatSiteDateTime(value, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
 }
 
 export default async function OwnerDeliveryRequestsPage() {
@@ -25,7 +26,7 @@ export default async function OwnerDeliveryRequestsPage() {
           {requests.length ? requests.map((request) => (
             <article key={request.id} className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-sky-700">{request.reference} · {request.status}</p><h2 className="mt-1 text-xl font-semibold">{request.storeName} → {request.jobsiteName || request.jobsiteAddress || "Jobsite"}</h2><p className="mt-1 text-sm text-slate-500">{request.customerName} · {request.customerEmail || request.customerPhone || "Signed-in customer"}</p></div><div className="text-right"><p className="text-2xl font-semibold">{money.format(request.providerQuote?.total ?? request.estimate.total)}</p><p className="text-xs text-slate-500">{request.providerQuote ? "Uber Direct live quote" : "Website planning estimate"}</p></div></div>
-              <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-3"><p><strong className="text-slate-800">Load:</strong> {DELIVERY_VEHICLES[request.vehicle as keyof typeof DELIVERY_VEHICLES]?.label || request.vehicle}</p><p><strong className="text-slate-800">Timing:</strong> {DELIVERY_SPEEDS[request.speed as keyof typeof DELIVERY_SPEEDS]?.label || request.speed}</p><p><strong className="text-slate-800">Created:</strong> {dateLabel(request.createdAt)}</p><p className="sm:col-span-3"><strong className="text-slate-800">Pickup:</strong> {request.pickupAddress || request.pickupCoordinates}</p><p className="sm:col-span-3"><strong className="text-slate-800">Drop-off:</strong> {request.jobsiteAddress || request.jobsiteCoordinates}</p></div>
+              <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-3"><p><strong className="text-slate-800">Load:</strong> {DELIVERY_VEHICLES[request.vehicle as keyof typeof DELIVERY_VEHICLES]?.label || request.vehicle}</p><p><strong className="text-slate-800">Timing:</strong> {DELIVERY_SPEEDS[request.speed as keyof typeof DELIVERY_SPEEDS]?.label || request.speed}</p><p><strong className="text-slate-800">Created:</strong> {dateLabel(request.createdAt)}</p>{request.scheduledPickupAt ? <p className="sm:col-span-3"><strong className="text-slate-800">Scheduled pickup:</strong> {dateLabel(request.scheduledPickupAt)}</p> : null}<p className="sm:col-span-3"><strong className="text-slate-800">Pickup:</strong> {request.pickupAddress || request.pickupCoordinates}</p><p className="sm:col-span-3"><strong className="text-slate-800">Drop-off:</strong> {request.jobsiteAddress || request.jobsiteCoordinates}</p></div>
             </article>
           )) : <div className="rounded-[22px] border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No signed-in delivery requests yet.</div>}
         </div>

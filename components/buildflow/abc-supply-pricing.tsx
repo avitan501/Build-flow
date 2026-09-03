@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { formatSiteDateTime } from "@/lib/site-date-time";
 
 type AbcAccount = {
   name: string;
@@ -342,7 +343,7 @@ export function AbcSupplyPricing({ connectionMode = "automatic" }: { connectionM
             <div className="rounded-2xl bg-white p-4"><dt className="text-xs text-slate-500">ABC unit price</dt><dd className="mt-1 text-lg font-semibold text-slate-950">{money(result.unitPrice, result.currencyCode)} / {result.uom || "unit"}</dd></div>
             <div className="rounded-2xl bg-slate-950 p-4 text-white"><dt className="text-xs text-slate-300">ABC material total</dt><dd className="mt-1 text-lg font-semibold">{money(result.materialSubtotal, result.currencyCode)}</dd></div>
           </dl>
-          <p className="mt-4 text-xs leading-5 text-slate-600">Branch {result.branchNumber} · Ship-To {result.shipToNumber} · {new Date(result.pricedAt).toLocaleString("en-US")}</p>
+          <p className="mt-4 text-xs leading-5 text-slate-600">Branch {result.branchNumber} · Ship-To {result.shipToNumber} · {formatSiteDateTime(result.pricedAt)}</p>
         </section>
       ) : null}
     </div>

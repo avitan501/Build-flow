@@ -1,4 +1,5 @@
 import type { ProjectQuoteItemRecord, ProjectQuoteRecord, ProjectRecord } from "@/lib/projects";
+import { formatSiteDate } from "@/lib/site-date-time";
 
 type OrderPdfLine = Pick<ProjectQuoteItemRecord, "name" | "quantity" | "unit" | "unit_price" | "line_total">;
 
@@ -63,7 +64,7 @@ function rect(x: number, y: number, width: number, height: number) {
 
 function buildPageContent(input: OrderPdfInput) {
   const lines: string[] = [];
-  const createdLabel = input.order.createdAt.toLocaleDateString("en-US", {
+  const createdLabel = formatSiteDate(input.order.createdAt, {
     month: "short",
     day: "numeric",
     year: "numeric",

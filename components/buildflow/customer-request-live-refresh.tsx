@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { formatSiteTime } from "@/lib/site-date-time";
+
 const REFRESH_INTERVAL_MS = 20_000;
 
 export function CustomerRequestLiveRefresh() {
@@ -40,7 +42,7 @@ export function CustomerRequestLiveRefresh() {
       <span>
         {isPending
           ? "Checking…"
-          : `Last checked ${lastChecked.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}
+          : `Last checked ${formatSiteTime(lastChecked, { hour: "numeric", minute: "2-digit" })}`}
       </span>
       <button
         type="button"

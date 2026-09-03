@@ -8,15 +8,15 @@ import {
   summarizeManagerStaffActivity,
   type ManagerStaffActivityEvent,
 } from "@/lib/manager-staff-activity";
+import { formatSiteDateTime } from "@/lib/site-date-time";
 
 function time(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
+  return formatSiteDateTime(value, {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(value));
+  });
 }
 
 function channelLabel(channel?: string) {

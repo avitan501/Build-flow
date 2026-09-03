@@ -10,6 +10,7 @@ import type { OwnerMaterialBatchState, OwnerMaterialRowState, OwnerMaterialsAdmi
 import type { OwnerMaterialsStorageStatus } from "@/lib/owner-materials-admin-store";
 import { realPhotoForMaterialCategory } from "@/lib/material-photo-catalog";
 import { SHOP_CATEGORY_NAMES, mapExistingCategoryToShopCategory, suggestShopCategory, type ShopCategoryName } from "@/lib/shop";
+import { siteBusinessDateKey } from "@/lib/site-date-time";
 
 type FlowMode = "manual" | "pdf";
 type QueueFilter = "all" | "draft" | "ready" | "needs-work" | "published" | "skipped";
@@ -639,7 +640,7 @@ export function OwnerMaterialsAdminShell({
       id: batchId,
       supplier,
       quoteNumber: "Manual",
-      quoteDate: new Date().toISOString().slice(0, 10),
+      quoteDate: siteBusinessDateKey() ?? "",
       documents: ["Manual entry"],
       rows: [],
     };
@@ -707,7 +708,7 @@ export function OwnerMaterialsAdminShell({
       id: batchId,
       supplier: extracted.supplier,
       quoteNumber: "PDF import",
-      quoteDate: new Date().toISOString().slice(0, 10),
+      quoteDate: siteBusinessDateKey() ?? "",
       documents: [extracted.fileName],
       rows: [],
     };

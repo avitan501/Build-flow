@@ -31,6 +31,7 @@ import {
   managerPipelineStage,
   type ManagerPipelineStage,
 } from "@/lib/manager-dashboard";
+import { formatSiteDateTime, siteBusinessDateKey } from "@/lib/site-date-time";
 
 const QUO_INBOX_URL =
   "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602";
@@ -117,12 +118,12 @@ const pipelineStages: Array<{
 const closedRequestStatuses = new Set(["completed", "closed", "cancelled"]);
 
 function formatUpdated(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
+  return formatSiteDateTime(value, {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  }).format(new Date(value));
+  });
 }
 
 export default async function AdminDashboardPage({
@@ -211,13 +212,7 @@ export default async function AdminDashboardPage({
         goal.details?.startsWith(DASHBOARD_AI_HISTORY_PREFIX),
     )?.details,
   );
-  const newYorkDate = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const todayKey = newYorkDate.format(new Date());
+  const todayKey = siteBusinessDateKey() ?? "";
   const todaySummaryRow = goals.find(
     (goal) =>
       goal.title === `Daily summary - ${todayKey}` &&

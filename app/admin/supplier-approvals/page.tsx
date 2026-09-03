@@ -2,6 +2,7 @@ import { CheckCircle2, CircleAlert, Clock3, PackageCheck, XCircle } from "lucide
 import Link from "next/link"
 
 import { requireStaffProfile } from "@/lib/auth"
+import { formatSiteDateTime } from "@/lib/site-date-time"
 
 type PackageRow = {
   id: string
@@ -44,7 +45,7 @@ function statusLabel(status: string) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value))
+  return formatSiteDateTime(value)
 }
 
 export default async function SupplierApprovalsPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {

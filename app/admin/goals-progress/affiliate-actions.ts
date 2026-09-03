@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdminProfile } from "@/lib/auth";
 import { AFFILIATE_STATUSES, type AffiliateStatus } from "@/lib/affiliate-tracker";
+import { siteBusinessDateKey } from "@/lib/site-date-time";
 
 type Result = { ok: true } | { ok: false; error: string };
 const PAGE = "/admin/goals-progress";
@@ -47,7 +48,7 @@ export async function updateAffiliateProgramAction(input: {
     application_requirements: clean(input.requirements, 5000),
     program_restrictions: clean(input.restrictions, 5000),
     affiliate_test_url: affiliateTestUrl.value,
-    last_verified_date: new Date().toISOString().slice(0, 10),
+    last_verified_date: siteBusinessDateKey(),
     updated_at: new Date().toISOString(),
   }).eq("id", input.id);
   if (error) return { ok: false, error: "Could not save this supplier." };
@@ -305,7 +306,7 @@ export async function changeAffiliateStatusAction(input: {
     return { ok: false, error: "Approval date and approved commission are required." };
   }
 
-  const update: Record<string, unknown> = { affiliate_status: input.status, last_verified_date: new Date().toISOString().slice(0, 10), updated_at: new Date().toISOString() };
+  const update: Record<string, unknown> = { affiliate_status: input.status, last_verified_date: siteBusinessDateKey(), updated_at: new Date().toISOString() };
   if (input.status === "Applied") Object.assign(update, {
     application_date: input.applicationDate,
     application_email: clean(input.applicationEmail, 254),
@@ -324,7 +325,7 @@ export async function changeAffiliateStatusAction(input: {
     api_allowed: Boolean(input.apiAllowed),
     product_images_allowed: Boolean(input.productImagesAllowed),
   });
-  if (input.status === "Set Up") update.setup_date = new Date().toISOString().slice(0, 10);
+  if (input.status === "Set Up") update.setup_date = siteBusinessDateKey();
   const { error } = await supabase.from("affiliate_programs").update(update).eq("id", input.id);
   if (error) return { ok: false, error: error.message.includes("checklist") ? error.message : "Could not change the affiliate status." };
   await supabase.from("affiliate_program_activities").insert({
@@ -342,7 +343,7 @@ export async function addAffiliateActivityAction(input: { id: string; type: "not
   if (!await programExists(supabase, input.id)) return { ok: false, error: "Supplier program not found." };
   const title = input.type === "contact" ? "Contact recorded" : input.type === "follow_up" ? "Follow-up scheduled" : "Note added";
   const { error } = await supabase.from("affiliate_program_activities").insert({ program_id: input.id, activity_type: input.type, title, details, created_by: user.id });
-  if (!error && input.type === "contact") await supabase.from("affiliate_programs").update({ last_contact_date: new Date().toISOString().slice(0, 10) }).eq("id", input.id);
+  if (!error && input.type === "contact") await supabase.from("affiliate_programs").update({ last_contact_date: siteBusinessDateKey() }).eq("id", input.id);
   if (!error && input.type === "follow_up" && input.followUpDate) await supabase.from("affiliate_programs").update({ next_follow_up_date: input.followUpDate }).eq("id", input.id);
   if (error) return { ok: false, error: "Could not save this activity." };
   revalidatePath(PAGE);
