@@ -9,7 +9,22 @@ export type StoredRequestClientDocument = {
   updated_at: string
 }
 
-export function parseRequestClientDocument(row: StoredRequestClientDocument): RequestClientQuotePdfInput | null {
+export type StoredRequestClientDocumentWithAcceptance = StoredRequestClientDocument & {
+  acceptance_id: string | null
+  accepted_document_version: number | null
+  accepted_terms_version: string | null
+  accepted_terms_hash: string | null
+  accepted_signer_name: string | null
+  accepted_signer_email: string | null
+  accepted_timestamp: string | null
+  accepted_timezone: string | null
+}
+
+export type ParsedRequestClientDocument = RequestClientQuotePdfInput & {
+  clientEmail?: string
+}
+
+export function parseRequestClientDocument(row: StoredRequestClientDocument): ParsedRequestClientDocument | null {
   if (!row.document_data || typeof row.document_data !== "object" || Array.isArray(row.document_data)) return null
   const value = row.document_data as Record<string, unknown>
   const lines = Array.isArray(value.lines) ? value.lines.flatMap((raw) => {
@@ -22,12 +37,16 @@ export function parseRequestClientDocument(row: StoredRequestClientDocument): Re
     return [{ description, quantity, unit: String(line.unit || "each"), unitPrice }]
   }) : []
   if (!lines.length) return null
+  const clientEmail = typeof value.clientEmail === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.clientEmail.trim())
+    ? value.clientEmail.trim().toLowerCase().slice(0, 320)
+    : undefined
   return {
     documentType: row.document_type,
     quoteNumber: row.document_number,
     issueDate: String(value.issueDate || ""),
     expiresOn: String(value.expiresOn || ""),
     clientName: String(value.clientName || "Client"),
+    ...(clientEmail ? { clientEmail } : {}),
     clientAddress: String(value.clientAddress || ""),
     shipTo: String(value.shipTo || ""),
     requestTitle: String(value.requestTitle || "Material request"),
