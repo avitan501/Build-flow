@@ -587,7 +587,7 @@ export default async function OwnerMaterialRequestPage({
           <RequestManagementPanel
             key={[
               ...routeSelections.map((selection) => `${selection.supplierId || "manual"}:${selection.name}:${selection.note}`),
-              ...initialSupplierRecommendations.map((entry) => `${entry.supplierId}:${entry.contactStatus}:${entry.note}`),
+              ...(supplierRecommendations ?? []).map((entry) => `${entry.supplier_id}:${entry.contact_status}:${entry.notes}`),
             ].sort().join("|")}
             requestId={request.id}
             requestTitle={request.title}

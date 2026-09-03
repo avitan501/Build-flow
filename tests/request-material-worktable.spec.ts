@@ -69,8 +69,9 @@ test("request changes synchronize between staff screens", async () => {
   expect(liveSync).toContain("router.refresh()")
   expect(liveSync).toContain("REQUEST_REFRESH_INTERVAL_MS = 10_000")
   expect(liveSync).toContain('window.addEventListener("focus", refresh)')
-  expect(page).toContain("entry.contactStatus")
-  expect(page).toContain("entry.note")
+  expect(page).toContain("(supplierRecommendations ?? []).map")
+  expect(page).toContain("entry.contact_status")
+  expect(page).toContain("entry.notes")
 })
 
 test("comparison rows preserve exact request and supplier quote provenance", async () => {
