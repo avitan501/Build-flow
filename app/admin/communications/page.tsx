@@ -9,6 +9,7 @@ import {
   loadCommunicationHistoryPage,
   mergeCommunicationHistory,
 } from "@/lib/aura/communication-history"
+import { communicationInboxNavigationKey } from "@/lib/aura/communication-navigation"
 import type { AuraCustomerIdentity } from "@/lib/aura/identity"
 import { normalizeCommunicationThread } from "@/lib/aura/phone-links"
 import { syncRecentTwilioWhatsAppMessages } from "@/lib/aura/twilio-whatsapp"
@@ -118,6 +119,16 @@ export default async function CommunicationsPage({
         connections: aura.connections,
       }
     : null
+  // Query-only navigation keeps Client Component state in place. Notification
+  // deep links need a fresh inbox state so the requested record is selected,
+  // even when the manager is already on /admin/communications.
+  const inboxNavigationKey = communicationInboxNavigationKey({
+    channel: initialChannelFilter,
+    communicationId: exactCommunicationId,
+    thread: exactThread,
+    query: requestedSearch || "",
+    draft: requestedDraft || "",
+  })
 
-  return <main className="h-[calc(100dvh-4rem)] min-h-0 min-w-0 overflow-hidden bg-[#f5f5f7] p-2 text-slate-950 sm:p-4 lg:h-screen lg:px-6"><div className="mx-auto h-full min-h-0 min-w-0 max-w-[96rem]">{liveAura ? <UnifiedCommunicationInbox communications={liveAura.communications} contacts={liveAura.contacts} customers={liveAura.customers} leads={liveAura.leads} suppliers={liveAura.suppliers} materialRequests={(requestsResult.data ?? []).map((request) => ({ id: request.id, title: request.title, status: request.status }))} smsReplyDrafts={(smsDraftsResult.data ?? []) as SmsReplyDraft[]} connections={liveAura.connections} initialChannelFilter={initialChannelFilter} initialCommunicationId={exactCommunicationId} initialQuery={(requestedSearch || "").slice(0, 160)} initialDraft={(requestedDraft || "").slice(0, 1600)} initialThread={exactThread} initialHistoryCursor={initialHistory?.cursor ?? null} initialHistoryHasMore={Boolean(initialHistory?.hasMore)} /> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Live phone connections are temporarily unavailable.</p>}</div></main>
+  return <main className="h-[calc(100dvh-4rem)] min-h-0 min-w-0 overflow-hidden bg-[#f5f5f7] p-2 text-slate-950 sm:p-4 lg:h-screen lg:px-6"><div className="mx-auto h-full min-h-0 min-w-0 max-w-[96rem]">{liveAura ? <UnifiedCommunicationInbox key={inboxNavigationKey} communications={liveAura.communications} contacts={liveAura.contacts} customers={liveAura.customers} leads={liveAura.leads} suppliers={liveAura.suppliers} materialRequests={(requestsResult.data ?? []).map((request) => ({ id: request.id, title: request.title, status: request.status }))} smsReplyDrafts={(smsDraftsResult.data ?? []) as SmsReplyDraft[]} connections={liveAura.connections} initialChannelFilter={initialChannelFilter} initialCommunicationId={exactCommunicationId} initialQuery={(requestedSearch || "").slice(0, 160)} initialDraft={(requestedDraft || "").slice(0, 1600)} initialThread={exactThread} initialHistoryCursor={initialHistory?.cursor ?? null} initialHistoryHasMore={Boolean(initialHistory?.hasMore)} /> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Live phone connections are temporarily unavailable.</p>}</div></main>
 }

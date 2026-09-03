@@ -97,6 +97,8 @@ test("manager notification feed is per user, queue-backed, and links to the exac
   expect(communicationsPage).toContain("loadCommunicationHistoryPage");
   expect(communicationsPage).toContain("loadManagerAura(supabase)");
   expect(communicationsPage).toContain("initialCommunicationId=");
+  expect(communicationsPage).toContain("communicationInboxNavigationKey({");
+  expect(communicationsPage).toContain("key={inboxNavigationKey}");
   expect(communicationsPage).toContain('.from("aura_communications")');
   expect(communicationsPage).toContain('.eq("id", exactCommunicationId)');
   expect(inbox).toContain("communication.id === communicationId");
