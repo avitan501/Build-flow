@@ -1,7 +1,7 @@
 import type { ProfileRecord } from "@/lib/auth"
 import type { ProjectRecord } from "@/lib/projects"
 import type { ShopCartItemDetails, ShopCustomCartItem } from "@/lib/shop-cart"
-import { CREDIT_CARD_PROCESSING_TERM } from "@/lib/proposal-terms"
+import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms"
 import type { EmailDeliveryAttempt } from "@/lib/email-delivery-fallback"
 
 type QuoteItemForEmail = {
@@ -523,7 +523,7 @@ export async function sendClientQuoteEmail(input: ClientQuoteEmailInput): Promis
     `Sales tax (${input.taxPercent.toFixed(3)}%): ${money(input.taxAmount)}`,
     `Total: ${money(input.total)}`,
     "",
-    `Terms & conditions: ${CREDIT_CARD_PROCESSING_TERM}`,
+    `Terms & conditions: ${DEFAULT_PROPOSAL_TERMS}`,
     ...(input.message.trim() ? ["", input.message.trim()] : []),
     "",
     input.attachments?.length
@@ -556,7 +556,7 @@ export async function sendClientQuoteEmail(input: ClientQuoteEmailInput): Promis
             <div style="margin-top:5px;font-size:19px;font-weight:700;color:#071126">Total: ${money(input.total)}</div>
           </div>
           ${input.message.trim() ? `<p style="margin:22px 0 0;white-space:pre-wrap;color:#475569">${escapeHtml(input.message.trim())}</p>` : ""}
-          <div style="margin:22px 0 0;padding-top:16px;border-top:1px solid #e5eaf1;color:#475569;font-size:13px"><strong style="color:#071126">Terms &amp; conditions</strong><br />${escapeHtml(CREDIT_CARD_PROCESSING_TERM)}</div>
+          <div style="margin:22px 0 0;padding-top:16px;border-top:1px solid #e5eaf1;color:#475569;font-size:13px"><strong style="color:#071126">Terms &amp; conditions</strong><br />${escapeHtml(DEFAULT_PROPOSAL_TERMS)}</div>
           <p style="margin:22px 0 0;color:#475569">The complete Avantia Build quote is attached as a PDF${input.attachments?.length ? `, together with ${input.attachments.length} additional attachment${input.attachments.length === 1 ? "" : "s"}` : ""}. Reply to this email with any questions or requested changes.</p>
         </div>
         <div style="padding:18px 22px;border-top:1px solid #e5eaf1;background:#f8fafc;color:#475569;font-size:13px;line-height:1.65">

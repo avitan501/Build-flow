@@ -4,7 +4,7 @@ import path from "node:path";
 import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from "pdf-lib";
 
 import type { ClientQuoteSummary, QuoteComparisonRecord } from "@/lib/quote-comparison";
-import { CREDIT_CARD_PROCESSING_TERM } from "@/lib/proposal-terms";
+import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms";
 import { formatSiteDate } from "@/lib/site-date-time";
 
 export type ClientQuotePdfInput = {
@@ -145,9 +145,9 @@ export async function generateClientQuotePdf(input: ClientQuotePdfInput) {
 
   const termsY = y - 55;
   page.drawText("Terms & conditions", { x: 42, y: termsY, size: 9, font: bold, color: blue });
-  const termLines = wrap(regular, CREDIT_CARD_PROCESSING_TERM, 8.5, 510).slice(0, 4);
+  const termLines = wrap(regular, DEFAULT_PROPOSAL_TERMS, 6.8, 510).slice(0, 10);
   termLines.forEach((line, index) => {
-    page.drawText(line, { x: 42, y: termsY - 15 - index * 12, size: 8.5, font: regular, color: slate });
+    page.drawText(line, { x: 42, y: termsY - 13 - index * 8.5, size: 6.8, font: regular, color: slate });
   });
 
   if (input.comparison.client_message.trim()) {

@@ -30,7 +30,7 @@ import {
   type QuoteComparisonItemRecord,
   type QuoteComparisonRecord,
 } from "@/lib/quote-comparison";
-import { CREDIT_CARD_PROCESSING_TERM } from "@/lib/proposal-terms";
+import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms";
 import { createClient } from "@/lib/supabase/client";
 
 const MAX_ATTACHMENT_FILES = 10;
@@ -493,7 +493,7 @@ export function ClientQuoteBuilder({
               <div className="divide-y divide-slate-100">{summary.lines.map((line) => <div key={line.itemId} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 py-4"><div><p className="text-sm font-bold">{line.description}</p><p className="mt-1 text-xs text-slate-500">{line.quantity.toLocaleString()} {line.unit}{line.specification ? ` · ${line.specification}` : ""} · {formatComparisonMoney(line.clientUnitPrice ?? 0)} each</p></div><p className="text-sm font-bold tabular-nums">{formatComparisonMoney(line.clientLineTotal)}</p></div>)}</div>
               <div className="ml-auto mt-5 max-w-xs border-t-2 border-slate-950 pt-4"><div className="flex justify-between gap-8 text-sm text-slate-600"><span>Materials</span><span className="tabular-nums">{formatComparisonMoney(summary.clientMaterialSubtotal)}</span></div>{summary.clientDeliveryCharge > 0 ? <div className="mt-2 flex justify-between gap-8 text-sm text-slate-600"><span>Delivery</span><span className="tabular-nums">{formatComparisonMoney(summary.clientDeliveryCharge)}</span></div> : null}<div className="mt-2 flex justify-between gap-8 text-sm text-slate-600"><span>Sales tax ({summary.clientTaxPercent.toFixed(3)}%)</span><span className="tabular-nums">{formatComparisonMoney(summary.clientTaxAmount)}</span></div><div className="mt-3 flex justify-between gap-8 text-lg font-bold"><span>Quote total</span><span className="tabular-nums">{formatComparisonMoney(summary.clientTotal)}</span></div></div>
               {clientMessage ? <p className="mt-6 rounded-lg bg-slate-50 p-4 text-sm leading-6 text-slate-600">{clientMessage}</p> : null}
-              <div className="mt-6 border-t border-slate-200 pt-5"><p className="text-xs font-bold uppercase tracking-[0.1em] text-slate-500">Terms &amp; conditions</p><p className="mt-2 text-xs leading-5 text-slate-600">{CREDIT_CARD_PROCESSING_TERM}</p></div>
+              <div className="mt-6 border-t border-slate-200 pt-5"><p className="text-xs font-bold uppercase tracking-[0.1em] text-slate-500">Terms &amp; conditions</p><p className="mt-2 text-xs leading-5 text-slate-600">{DEFAULT_PROPOSAL_TERMS}</p></div>
               <div className="mt-7 flex flex-col gap-3 border-t border-slate-200 pt-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between"><span>Avantia Build · (516) 908-8319 · office@build.avantiap.com</span><span className="inline-flex items-center gap-1 font-bold text-[#0066cc]">build.avantiap.com <ArrowRight className="h-3.5 w-3.5" /></span></div>
             </div>
             <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-7"><span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500"><FileText className="h-4 w-4" /> PDF{attachments.length ? ` + ${attachments.length} attachment${attachments.length === 1 ? "" : "s"}` : ""} sent together</span><button type="button" onClick={() => setShowPreview(false)} className="min-h-10 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white">Done</button></div>

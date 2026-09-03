@@ -17,7 +17,7 @@ import { OPEN_REQUEST_CLIENT_CONTACT_EVENT } from "@/components/buildflow/reques
 import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
-import { DEFAULT_PROPOSAL_TERMS } from "@/lib/proposal-terms"
+import { DEFAULT_PROPOSAL_TERMS, includeRequiredProposalTerms } from "@/lib/proposal-terms"
 import { AVANTIA_PAYMENT_LINK } from "@/lib/payment-link"
 import type { RequestClientDocumentType } from "@/lib/request-client-quote-pdf"
 import { requestPaymentGuidance, type RequestPaymentMethod } from "@/lib/request-client-payment"
@@ -365,7 +365,7 @@ export function RequestManagementPanel({
     setDeliveryCharge(Number(saved?.documentData.deliveryCharge) || 0)
     setSalesTaxRate(Number.isFinite(saved?.documentData.salesTaxRate) ? Number(saved?.documentData.salesTaxRate) : 8.875)
     setTaxableDelivery(saved?.documentData.taxableDelivery !== false)
-    setQuoteTerms(saved?.documentData.terms || DEFAULT_PROPOSAL_TERMS)
+    setQuoteTerms(includeRequiredProposalTerms(saved?.documentData.terms || DEFAULT_PROPOSAL_TERMS))
     setRequestPayment(Boolean(savedPayment || legacyPaymentLink))
     setPaymentMethod(savedPayment?.method || "credit_card")
     setPaymentAmountDue(savedPayment?.amountDue ? String(savedPayment.amountDue) : legacyPaymentLink ? savedDocumentTotal(saved.documentData).toFixed(2) : "")
@@ -546,7 +546,7 @@ export function RequestManagementPanel({
       deliveryCharge,
       salesTaxRate,
       taxableDelivery,
-      terms: quoteTerms,
+      terms: includeRequiredProposalTerms(quoteTerms),
       paymentRequest: requestPayment ? {
         method: paymentMethod,
         amountDue: Number(paymentAmountDue),

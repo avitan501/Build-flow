@@ -5,7 +5,7 @@ import path from "node:path"
 
 import { PDFDocument, type PDFFont, type PDFPage, rgb, StandardFonts } from "pdf-lib"
 
-import { includeCreditCardProcessingTerm } from "@/lib/proposal-terms"
+import { includeRequiredProposalTerms } from "@/lib/proposal-terms"
 import { requestPaymentGuidance, requestPaymentMethodLabel, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 
 export type RequestClientQuoteLine = {
@@ -156,7 +156,7 @@ export async function generateRequestClientQuotePdf(input: RequestClientQuotePdf
 
   const termsY = Math.min(y - 48, 160)
   page.drawText("Terms & conditions", { x: 40, y: termsY, size: 9, font: bold, color: blue })
-  wrap(regular, includeCreditCardProcessingTerm(input.terms), 7.6, 330).slice(0, 7).forEach((line, index) => page.drawText(line, { x: 40, y: termsY - 13 - index * 10, size: 7.6, font: regular, color: slate }))
+  wrap(regular, includeRequiredProposalTerms(input.terms), 6.8, 330).slice(0, 11).forEach((line, index) => page.drawText(line, { x: 40, y: termsY - 12 - index * 8.5, size: 6.8, font: regular, color: slate }))
   if (input.paymentRequest) {
     page.drawText("Payment request", { x: 392, y: termsY, size: 9, font: bold, color: blue })
     const paymentLines = [

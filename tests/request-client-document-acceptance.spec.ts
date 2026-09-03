@@ -48,3 +48,15 @@ test("estimate and invoice links show one terms block and an explicit unchecked 
   expect(form).not.toContain("legally binding")
   expect(form).not.toContain("waive")
 })
+
+test("shared proposal terms disclose the 25% return fee and preserve statutory disputes", async () => {
+  const terms = await readFile(path.join(root, "lib/proposal-terms.ts"), "utf8")
+  const acceptance = await readFile(path.join(root, "lib/request-client-document-acceptance.ts"), "utf8")
+  expect(terms).toContain("restocking fee of up to 25%")
+  expect(terms).toContain("prior written authorization")
+  expect(terms).toContain("Before requesting a stop-payment, reversal, or chargeback")
+  expect(terms).toContain("does not waive any billing-error, dispute, or other right")
+  expect(terms).not.toMatch(/cannot (?:request|initiate|file).*(?:chargeback|stop-payment)/i)
+  expect(acceptance).toContain('CLIENT_DOCUMENT_TERMS_VERSION = "avantia-client-document-terms-v2"')
+  expect(acceptance).toContain("includeRequiredProposalTerms")
+})
