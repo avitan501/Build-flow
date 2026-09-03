@@ -13,6 +13,7 @@ import {
   isSmsOptOutMessage,
   looksLikeSmsMaterialRequest,
   mergeSmsCorrectionItems,
+  normalizeSmsMaterialAnswerTypos,
   rankSmsReplyExamples,
   resolveSmsDeliveryAddressKnown,
   resolveSmsExactListPreference,
@@ -5229,12 +5230,20 @@ async function processCustomerSmsAutomation(
   ]
     .filter(Boolean)
     .join("\n");
+  // Normalize only for deterministic interpretation. The original customer
+  // text remains unchanged in communications and audit history. This lets a
+  // terse typo such as "Relugar" answer the prior Sheetrock-type question so
+  // the next reply advances to thickness instead of repeating type choices.
+  const normalizedAggregateIntelligenceText =
+    normalizeSmsMaterialAnswerTypos(aggregateIntelligenceText);
+  const normalizedLatestMaterialAnswer =
+    normalizeSmsMaterialAnswerTypos(effectiveBody);
   const aggregateMaterialIntelligence = smsMaterialIntelligenceAssessment(
-    aggregateIntelligenceText,
+    normalizedAggregateIntelligenceText,
     { exactListOnly },
   );
   const latestMaterialIntelligence = smsMaterialIntelligenceAssessment(
-    effectiveBody,
+    normalizedLatestMaterialAnswer,
     { exactListOnly },
   );
   const sameRuleScope =

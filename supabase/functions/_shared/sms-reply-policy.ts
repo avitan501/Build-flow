@@ -41,8 +41,16 @@ export function smsReplyLanguage(value: string) {
   return "en";
 }
 
-function canonicalMaterialText(value: string) {
+export function normalizeSmsMaterialAnswerTypos(value: string) {
   return value
+    .replace(/\b(?:relugar|regualr|reglar|reguler)\b/gi, "regular")
+    .replace(/\b(?:tyep\s*x|typex)\b/gi, "Type X")
+    .replace(/\bmoist(?:er|ure)\s+resist(?:ent|ant)\b/gi, "moisture-resistant")
+    .replace(/\bfire\s+rat(?:ted|ed)\b/gi, "fire-rated");
+}
+
+function canonicalMaterialText(value: string) {
+  return normalizeSmsMaterialAnswerTypos(value)
     .replace(/\b(?:paneles?|placas?)\s+de\s+yeso\b|\byeso\b/gi, "drywall")
     .replace(/(?:לוחות?\s+גבס|גבס)/g, "drywall")
     .replace(/\binterruptores?\b/gi, "breakers")

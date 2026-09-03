@@ -13,6 +13,7 @@ import {
   isSmsOptOutMessage,
   looksLikeSmsMaterialRequest,
   mergeSmsCorrectionItems,
+  normalizeSmsMaterialAnswerTypos,
   resolveSmsDeliveryAddressKnown,
   resolveSmsExactListPreference,
   resolveSmsMaterialReplyStep,
@@ -519,7 +520,7 @@ test("a new request isolates clarification from unrelated conversation history",
   expect(brokerSource).toMatch(/const activeCustomerText = startsNewRequest\s*\? body\s*:\s*context\.customerText \|\| body/)
   expect(brokerSource).toContain("const aggregateIntelligenceText = [")
   expect(brokerSource).toContain("const durableCrossChannelText = startsNewRequest")
-  expect(brokerSource).toMatch(/const aggregateMaterialIntelligence = smsMaterialIntelligenceAssessment\(\s*aggregateIntelligenceText/)
+  expect(brokerSource).toMatch(/const aggregateMaterialIntelligence = smsMaterialIntelligenceAssessment\(\s*normalizedAggregateIntelligenceText/)
   expect(brokerSource).toContain("const questionIntelligence =")
   expect(brokerSource).toContain("const materialIntelligence = aggregateMaterialIntelligence")
   expect(brokerSource).toContain('.replace(/\\bbreakers\\b/g, "breaker")')
@@ -598,6 +599,23 @@ test("Sheetrock follow-ups answer thickness corrections instead of repeating qua
   expect(smsSheetrockSpecificationFollowUpReply("I asked what do you have not how many?", conversation)).toBe("5/8 in. is the standard Sheetrock option. Can you confirm 5/8 in.?")
   expect(smsSheetrockSpecificationFollowUpReply("How many screws do you have?", conversation)).toBeNull()
   expect(smsSheetrockSpecificationFollowUpReply("What thickness do you have?", "Customer: plywood")).toBeNull()
+})
+
+test("misspelled Sheetrock type answers advance to the next missing detail", async () => {
+  const transcript = "Customer: I need 20 sheets of Sheetrock\nCustomer: Relugar"
+  expect(normalizeSmsMaterialAnswerTypos("Relugar")).toBe("regular")
+  expect(normalizeSmsMaterialAnswerTypos("regualr, tyep x, moisture resistent, fire ratted"))
+    .toBe("regular, Type X, moisture-resistant, fire-rated")
+
+  const assessment = smsMaterialIntelligenceAssessment(
+    normalizeSmsMaterialAnswerTypos(transcript),
+  )
+  expect(assessment.questions).toEqual(["Can we do 5/8-in. Sheetrock?"])
+  expect(assessment.questions.join(" ")).not.toMatch(/regular|Type X|moisture-resistant/i)
+
+  const brokerSource = await readFile(path.join(root, "supabase/functions/aura-messaging-broker/index.ts"), "utf8")
+  expect(brokerSource).toContain("normalizeSmsMaterialAnswerTypos(aggregateIntelligenceText)")
+  expect(brokerSource).toContain("normalizeSmsMaterialAnswerTypos(effectiveBody)")
 })
 
 test("short metal-stud answers keep conversation context and ask only missing specifications", () => {
