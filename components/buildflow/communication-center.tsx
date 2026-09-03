@@ -7,6 +7,7 @@ import { useState, useTransition } from "react"
 import { saveCommunicationLogAction } from "@/app/admin/communications/actions"
 import type { CommunicationLog } from "@/lib/manager-command-center"
 import type { InboxThread } from "@/lib/whatsapp-draft-inbox"
+import { formatSiteDateTime } from "@/lib/site-date-time"
 
 const QUO_URL = "https://my.quo.com/inbox/PN7lAbkMJw/c/CN30389c1bd6c542e78fbcec10a4e91602"
 const WHATSAPP_URL = "https://web.whatsapp.com/"
@@ -14,7 +15,7 @@ const WHATSAPP_URL = "https://web.whatsapp.com/"
 type ClientOption = { id: string; name: string }
 
 function formatTime(value: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value))
+  return formatSiteDateTime(value, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }, value)
 }
 
 export function CommunicationCenter({ clients, logs, threads }: { clients: ClientOption[]; logs: CommunicationLog[]; threads: InboxThread[] }) {

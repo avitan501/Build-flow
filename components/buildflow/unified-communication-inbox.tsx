@@ -18,6 +18,7 @@ import { normalizeCommunicationCallPhone, normalizeCommunicationThread } from "@
 import { SMS_CORRECTION_REASONS, type SmsCorrectionReason } from "@/lib/ai/sms-training-privacy"
 import { isExplicitCustomerRequestConfirmation } from "@/lib/customer-request-confirmation"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
+import { formatSiteDate, formatSiteDateTime, formatSiteTime, siteBusinessDateKey } from "@/lib/site-date-time"
 
 export type AuraLeadRecipient = {
   id: string
@@ -92,17 +93,15 @@ function identityKey(phone?: string | null, email?: string | null) {
 }
 
 function formatTime(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  const today = new Date()
-  if (date.toDateString() === today.toDateString()) return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date)
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date)
+  if (!siteBusinessDateKey(value)) return value
+  if (siteBusinessDateKey(value) === siteBusinessDateKey()) {
+    return formatSiteTime(value, { hour: "numeric", minute: "2-digit" }, value)
+  }
+  return formatSiteDate(value, { month: "short", day: "numeric" }, value)
 }
 
 function formatMessageTime(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date)
+  return formatSiteDateTime(value, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }, value)
 }
 
 function initials(name: string) {

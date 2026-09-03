@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { WhatsAppSettings } from "@/lib/whatsapp-settings";
+import { formatSiteDateTime } from "@/lib/site-date-time";
 
 type Props = {
   initialSettings: WhatsAppSettings;
@@ -243,7 +244,7 @@ export function SettingsForm({ initialSettings, readOnly }: Props) {
             {readOnly ? "Preview only on live runtime" : isSaving ? "Saving…" : "Save temporary settings"}
           </button>
           <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
-            Last updated: {new Date(settings.updated_at).toLocaleString()}
+            Last updated: {formatSiteDateTime(settings.updated_at)}
           </div>
         </div>
 

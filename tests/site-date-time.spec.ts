@@ -36,6 +36,16 @@ test("business dates change at New York midnight on DST transition days", () => 
   expect(siteBusinessDateKey("2026-11-01T04:00:00.000Z")).toBe("2026-11-01")
 })
 
+test("communication dates stay on the New York business day near UTC midnight", () => {
+  expect(siteBusinessDateKey("2026-09-04T02:30:00.000Z")).toBe("2026-09-03")
+  expect(formatSiteDateTime("2026-09-04T02:30:00.000Z", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })).toBe("Sep 3, 10:30 PM")
+})
+
 test("date-only values remain calendar dates instead of shifting through UTC", () => {
   expect(formatSiteDate("2026-09-03")).toBe("Sep 3, 2026")
   expect(addSiteCalendarDays("2026-03-07", 2)).toBe("2026-03-09")

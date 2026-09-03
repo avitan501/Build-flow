@@ -4,6 +4,7 @@ import { PageStatusHeader, statusButtonClass } from "@/components/buildflow/wire
 import { requireAdminProfile } from "@/lib/auth";
 import { getBuildflowWireframeData } from "@/lib/buildflow-wireframe";
 import { getWhatsAppSettingsState } from "@/lib/whatsapp-settings";
+import { formatSiteDateTime } from "@/lib/site-date-time";
 
 import { SettingsForm } from "./SettingsForm";
 
@@ -61,7 +62,7 @@ export default async function AdminWhatsAppSettingsPage() {
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Last updated</div>
-              <div className="mt-2 text-lg font-semibold">{new Date(settings.updated_at).toLocaleString()}</div>
+              <div className="mt-2 text-lg font-semibold">{formatSiteDateTime(settings.updated_at)}</div>
             </div>
           </div>
         </div>

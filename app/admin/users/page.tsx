@@ -16,6 +16,7 @@ import { normalizeAuraEmail, normalizeAuraPhone } from "@/lib/aura/identity"
 import { MATERIAL_DEPARTMENTS } from "@/lib/material-questionnaires"
 import { COMMUNICATION_LOG_PREFIX, parseCommunicationLog, type CommunicationLog } from "@/lib/manager-command-center"
 import { isApprovedManagerIdentity } from "@/lib/owner-identity"
+import { formatSiteDate } from "@/lib/site-date-time"
 
 const roleOptions = ["admin", "staff", "client"] as const
 const deletableRequestStatuses = new Set(["draft", "submitted", "in_review", "quoted"])
@@ -66,7 +67,7 @@ function badgeTone(value: string) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value))
+  return formatSiteDate(value, { month: "short", day: "numeric", year: "numeric" }, value)
 }
 
 function customerName(customer: Pick<CustomerRecord, "full_name" | "email"> | undefined) {
