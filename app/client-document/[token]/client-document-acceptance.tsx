@@ -2,6 +2,8 @@
 
 import { useActionState } from "react"
 
+import { formatSiteDateTime } from "@/lib/site-date-time"
+
 import { acceptClientDocumentAction, type ClientDocumentAcceptanceState } from "./actions"
 
 export type ClientDocumentAcceptanceReceipt = {
@@ -15,12 +17,14 @@ export type ClientDocumentAcceptanceReceipt = {
 }
 
 function newYorkTime(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "America/New_York",
+  return formatSiteDateTime(value, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
     timeZoneName: "short",
-  }).format(new Date(value))
+  })
 }
 
 function AcceptanceReceipt({ receipt, message = "Acknowledgement recorded." }: { receipt: ClientDocumentAcceptanceReceipt; message?: string }) {
