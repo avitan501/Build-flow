@@ -15,6 +15,7 @@ import {
 } from "@/lib/supplier-network";
 import { saveSupplierNetworkOptions } from "@/lib/supplier-network-options";
 import type { SupplierRoutingOption } from "@/lib/shop-qualification";
+import { confirmSupplierDirectoryPersistence } from "@/lib/supplier-directory-persistence";
 import {
   safeSupplierSourceUrl,
   supplierIdentityKeys,
@@ -109,11 +110,21 @@ export async function addDiscoveredSupplierNetworkAction(input: z.infer<typeof d
     additionalContacts: [],
     relationshipUpdates: [],
   };
-  const { error } = await supabase.rpc("staff_upsert_supplier_directory_entry", { p_supplier: supplier, p_create: true });
-  if (error) return { ok: false as const, error: "The supplier could not be added to the directory." };
-  await saveSupplierNetworkOptions(supabase, user.id, key, parsed.data.name, {
-    channels: [], stage: "more", status: "Research ready", note: parsed.data.summary, hidden: false, priority: false,
-  });
+  try {
+    const { error } = await supabase.rpc("staff_upsert_supplier_directory_entry", { p_supplier: supplier, p_create: true });
+    if (error) throw error;
+    const { data: verifiedSnapshotData, error: verifyError } = await supabase.rpc("staff_load_supplier_directory_snapshot");
+    const verifiedSupplier = confirmSupplierDirectoryPersistence(verifiedSnapshotData, supplier);
+    if (verifyError || !verifiedSupplier) {
+      return { ok: false as const, error: "The supplier save could not be confirmed. Refresh the directory and try again." };
+    }
+    await saveSupplierNetworkOptions(supabase, user.id, key, parsed.data.name, {
+      channels: [], stage: "more", status: "Research ready", note: parsed.data.summary, hidden: false, priority: false,
+    });
+  } catch (error) {
+    console.error("Supplier Network discovery save failed", error);
+    return { ok: false as const, error: "The supplier could not be saved completely. Refresh the directory and try again." };
+  }
   revalidatePath("/admin/supplier-network");
   revalidatePath("/admin/vendors");
   return { ok: true as const, status: "added" as const, supplierName: parsed.data.name };
@@ -152,20 +163,6 @@ export async function updateSupplierNetworkRowAction(
       };
     }
 
-    await saveSupplierNetworkOptions(
-      supabase,
-      user.id,
-      parsed.data.key,
-      parsed.data.supplierName,
-      {
-        channels: parsed.data.channels,
-        stage: parsed.data.stage,
-        status: parsed.data.status,
-        note: parsed.data.note,
-        hidden: parsed.data.hidden,
-        priority: parsed.data.priority,
-      } satisfies SupplierNetworkOverride,
-    );
     if (parsed.data.directorySupplierId || parsed.data.stage === "approved") {
       const supplierId = existing?.id || canonicalSupplierId(parsed.data.supplierName);
       const supplier = {
@@ -196,7 +193,25 @@ export async function updateSupplierNetworkRowAction(
       };
       const { error: directoryError } = await supabase.rpc("staff_upsert_supplier_directory_entry", { p_supplier: supplier, p_create: !existing });
       if (directoryError) throw directoryError;
+      const { data: verifiedSnapshotData, error: verifyError } = await supabase.rpc("staff_load_supplier_directory_snapshot");
+      if (verifyError || !confirmSupplierDirectoryPersistence(verifiedSnapshotData, supplier)) {
+        throw new Error("supplier_persistence_failed");
+      }
     }
+    await saveSupplierNetworkOptions(
+      supabase,
+      user.id,
+      parsed.data.key,
+      parsed.data.supplierName,
+      {
+        channels: parsed.data.channels,
+        stage: parsed.data.stage,
+        status: parsed.data.status,
+        note: parsed.data.note,
+        hidden: parsed.data.hidden,
+        priority: parsed.data.priority,
+      } satisfies SupplierNetworkOverride,
+    );
   } catch {
     return {
       ok: false as const,

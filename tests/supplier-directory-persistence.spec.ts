@@ -60,6 +60,20 @@ test("the server action performs read-after-write verification before reporting 
   expect(source).toContain("The supplier save could not be confirmed")
 })
 
+test("Supplier Network confirms the canonical directory before reporting success", async () => {
+  const source = await readFile(path.join(root, "app/admin/supplier-network/actions.ts"), "utf8")
+  const discoveredStart = source.indexOf("export async function addDiscoveredSupplierNetworkAction")
+  const updateStart = source.indexOf("export async function updateSupplierNetworkRowAction")
+  const discovered = source.slice(discoveredStart, updateStart)
+  const update = source.slice(updateStart)
+
+  expect(discovered).toContain("confirmSupplierDirectoryPersistence")
+  expect(discovered.indexOf("staff_upsert_supplier_directory_entry")).toBeLessThan(discovered.indexOf("saveSupplierNetworkOptions"))
+  expect(discovered.indexOf("staff_load_supplier_directory_snapshot", discovered.indexOf("staff_upsert_supplier_directory_entry"))).toBeLessThan(discovered.indexOf("saveSupplierNetworkOptions"))
+  expect(update).toContain("supplier_persistence_failed")
+  expect(update.indexOf("staff_upsert_supplier_directory_entry")).toBeLessThan(update.indexOf("saveSupplierNetworkOptions"))
+})
+
 test("the upsert migration verifies the final locked row and keeps access controls", async () => {
   const migration = await readFile(
     path.join(root, "supabase/migrations/20260903031011_verify_supplier_directory_persistence.sql"),

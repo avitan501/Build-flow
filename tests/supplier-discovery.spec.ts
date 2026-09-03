@@ -145,6 +145,8 @@ test("supplier discovery UI and server actions enforce review without outreach",
   expect(workspace).toContain("Contact details are");
   expect(actions).toContain("reviewConfirmed: z.literal(true)");
   expect(actions).toContain("Confirm the supplier review before promoting this candidate.");
+  expect(actions).toContain("The supplier could not be saved completely.");
+  expect(actions).toContain("confirmSupplierDirectoryPersistence");
   expect(actions.indexOf("staff_load_supplier_directory_snapshot")).toBeLessThan(
     actions.indexOf("staff_upsert_supplier_directory_entry"),
   );
