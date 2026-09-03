@@ -179,9 +179,9 @@ export default async function OwnerMaterialRequestPage({
       .returns<ComparisonRecord[]>(),
     supabase
       .from("quote_request_supplier_recommendations")
-      .select("supplier_id,is_recommended,should_contact,contact_status")
+      .select("supplier_id,is_recommended,should_contact,contact_status,notes")
       .eq("request_id", requestId)
-      .returns<Array<{ supplier_id: string; is_recommended: boolean; should_contact: boolean; contact_status: "not_contacted" | "request_sent" | "supplier_replied" | "awaiting_supplier_reply" | "quote_received" }>>(),
+      .returns<Array<{ supplier_id: string; is_recommended: boolean; should_contact: boolean; contact_status: "not_contacted" | "request_sent" | "supplier_replied" | "awaiting_supplier_reply" | "quote_received"; notes: string }>>(),
     supabase
       .from("request_client_documents")
       .select("document_type,document_number,document_data,public_token,version,updated_at")
@@ -638,7 +638,7 @@ export default async function OwnerMaterialRequestPage({
             initialPaymentDelivery={initialPaymentDelivery}
             initialClientDocuments={(clientDocuments ?? []).map((entry) => ({ documentType: entry.document_type, documentNumber: entry.document_number, documentData: entry.document_data, publicToken: entry.public_token, version: entry.version, updatedAt: entry.updated_at }))}
             initialManagerNotes={request.manager_notes || ""}
-            initialSupplierRecommendations={(supplierRecommendations ?? []).map((entry) => ({ supplierId: entry.supplier_id, isRecommended: entry.is_recommended, shouldContact: entry.should_contact, contactStatus: entry.contact_status }))}
+            initialSupplierRecommendations={(supplierRecommendations ?? []).map((entry) => ({ supplierId: entry.supplier_id, isRecommended: entry.is_recommended, shouldContact: entry.should_contact, contactStatus: entry.contact_status, note: entry.notes || "" }))}
             clientEmails={clientEmails}
           />
         </div>
