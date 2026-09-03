@@ -354,6 +354,7 @@ export async function prepareManagerDocumentUploadAction(input: {
   fileType: string;
   fileSize: number;
   sourceSha256: string;
+  supplierId?: string;
 }): Promise<Result<PreparedManagerDocumentUpload>> {
   const { supabase, user } = await requireStaffProfile("suppliers");
   const fileError = validateManagerDocumentFile(input);
@@ -364,15 +365,40 @@ export async function prepareManagerDocumentUploadAction(input: {
       error: "The document could not be verified. Try it again.",
     };
 
+  const requestedSupplierId = clean(input.supplierId, 200);
   const duplicate = await supabase
     .from("manager_documents")
-    .select("id")
+    .select("id,supplier_id")
     .eq("source_sha256", input.sourceSha256.toLowerCase())
     .neq("status", "archived")
     .order("created_at", { ascending: false })
     .limit(1)
-    .maybeSingle<{ id: string }>();
+    .maybeSingle<{ id: string; supplier_id: string | null }>();
   if (duplicate.data) {
+    if (
+      requestedSupplierId &&
+      duplicate.data.supplier_id &&
+      duplicate.data.supplier_id !== requestedSupplierId
+    ) {
+      return {
+        ok: false,
+        error: "This exact document is already attached to another supplier.",
+      };
+    }
+    if (requestedSupplierId && !duplicate.data.supplier_id) {
+      const { error: linkError } = await supabase
+        .from("manager_documents")
+        .update({ supplier_id: requestedSupplierId, updated_by: user.id })
+        .eq("id", duplicate.data.id)
+        .is("supplier_id", null);
+      if (linkError) {
+        return {
+          ok: false,
+          error: "The saved document could not be linked to this supplier.",
+        };
+      }
+      revalidatePath("/admin/vendors");
+    }
     return {
       ok: true,
       data: {
@@ -731,6 +757,7 @@ export async function uploadManagerDocumentAction(
         created_by: user.id,
       });
     revalidatePath("/admin/documents");
+    revalidatePath("/admin/vendors");
     return { ok: true, data: { documentId }, message: note };
   }
 
@@ -804,6 +831,7 @@ export async function uploadManagerDocumentAction(
     return { ok: true, data: { documentId }, message: note };
   }
   revalidatePath("/admin/documents");
+  revalidatePath("/admin/vendors");
   return { ok: true, data: { documentId }, message: extractionNote };
 }
 

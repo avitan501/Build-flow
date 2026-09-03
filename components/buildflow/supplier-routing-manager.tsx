@@ -1,11 +1,12 @@
 "use client"
 
-import { Check, Mail, Plus, RefreshCw, Search, ShieldCheck, Star, StickyNote, Trash2, X } from "lucide-react"
+import { Check, FileText, Mail, Plus, RefreshCw, Search, ShieldCheck, Star, StickyNote, Trash2, X } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useRef, useState, useTransition } from "react"
 import { deleteSupplierDirectoryEntryAction, loadSupplierDirectoryAction, saveSupplierDirectoryEntryAction } from "@/app/admin/vendors/actions"
 import { saveWorkflowManagerSettingsAction } from "@/app/preview-admin/workflow-actions"
 import { DepartmentSymbolBadges, DEPARTMENT_SYMBOL_OPTIONS } from "@/components/buildflow/department-symbol-badges"
+import { ManagerDocumentUpload } from "@/components/buildflow/manager-document-upload"
 import { QuoCallButton } from "@/components/buildflow/quo-call-button"
 import { SupplierQuoteRequestDialog } from "@/components/buildflow/supplier-quote-request-dialog"
 import { SupplierProgramBadges, SUPPLIER_PROGRAM_COLORS } from "@/components/buildflow/supplier-program-badges"
@@ -66,6 +67,16 @@ type SupplierRoutingManagerProps = {
   initialPanel?: ManagerPanel
   supplierDirectoryOnly?: boolean
   catalogDepartments?: string[]
+  initialSupplierDocuments?: SupplierProfileDocumentSummary[]
+}
+
+export type SupplierProfileDocumentSummary = {
+  id: string
+  supplierId: string
+  title: string
+  fileName: string
+  statusLabel: string
+  updatedLabel: string
 }
 
 const questionTypes: QualifyingQuestionType[] = ["text", "textarea", "select"]
@@ -183,6 +194,7 @@ export function SupplierRoutingManager({
   initialPanel = "departments",
   supplierDirectoryOnly = false,
   catalogDepartments = [],
+  initialSupplierDocuments = [],
 }: SupplierRoutingManagerProps) {
   const [settings, setSettings] = useState<ShopQualificationSettings>(() => loadSettings(initialSettings))
   const [deletedSupplierIds, setDeletedSupplierIds] = useState<string[]>(initialDeletedSupplierIds)
@@ -287,6 +299,10 @@ export function SupplierRoutingManager({
       : assignmentTargets.find((target) => target.id === selectedTargetId) ?? assignmentTargets[0] ?? SERVICE_ASSIGNMENT_TARGETS[0]
   const selectedSetting = useMemo(() => selectedSettingFor(settings, selectedTarget.id, assignmentTargets), [assignmentTargets, selectedTarget.id, settings])
   const selectedSupplier = settings.suppliers.find((supplier) => supplier.id === selectedSupplierId) ?? settings.suppliers[0] ?? null
+  const selectedSupplierDocuments = useMemo(
+    () => initialSupplierDocuments.filter((document) => document.supplierId === selectedSupplier?.id),
+    [initialSupplierDocuments, selectedSupplier?.id],
+  )
   const trialSuppliers = useMemo(() => settings.suppliers.filter((supplier) => !["verified", "trusted", "preferred"].includes(supplier.trustLevel ?? "not-reviewed")), [settings.suppliers])
   const verifiedSuppliers = useMemo(() => settings.suppliers.filter((supplier) => ["verified", "trusted", "preferred"].includes(supplier.trustLevel ?? "not-reviewed")), [settings.suppliers])
   const groupedDirectorySuppliers = useMemo(
@@ -1400,6 +1416,14 @@ export function SupplierRoutingManager({
                         Address
                         <input value={selectedSupplier.address || ""} onChange={(event) => updateSupplier(selectedSupplier.id, { address: event.target.value })} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100" />
                       </label>
+                      <details className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50">
+                        <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-semibold text-slate-900"><span className="inline-flex items-center gap-2"><FileText className="h-4 w-4 text-[#0071e3]" />Documents & photos</span><span className="text-xs font-normal text-slate-500">{selectedSupplierDocuments.length} attached · Open</span></summary>
+                        <div className="grid gap-3 border-t border-slate-200 p-3">
+                          <ManagerDocumentUpload key={selectedSupplier.id} initialIntent="supplier profile attachment" initialSupplierId={selectedSupplier.id} suppliers={[{ id: selectedSupplier.id, name: selectedSupplier.name }]} compact />
+                          {selectedSupplierDocuments.length ? <div className="max-h-44 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200 bg-white">{selectedSupplierDocuments.map((document) => <Link key={document.id} href={`/admin/documents/${document.id}`} className="flex items-center justify-between gap-3 px-3 py-2 text-xs hover:bg-sky-50"><span className="min-w-0"><span className="block truncate font-bold text-slate-900">{document.title || document.fileName}</span><span className="mt-0.5 block truncate text-slate-500">{document.fileName} · {document.updatedLabel}</span></span><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-600">{document.statusLabel}</span></Link>)}</div> : <p className="text-xs text-slate-500">No documents or photos attached to this supplier yet.</p>}
+                          <Link href={`/admin/documents?q=${encodeURIComponent(selectedSupplier.name)}`} className="text-xs font-bold text-[#0066cc]">Open Document Center</Link>
+                        </div>
+                      </details>
                       <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
                         <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-bold text-slate-950">Salespeople & emails</p><p className="text-[11px] text-slate-500">Keep every useful person at this supplier.</p></div><button type="button" onClick={() => addSupplierContact(selectedSupplier)} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-bold text-[#0066cc]"><Plus className="h-3.5 w-3.5" />Add salesperson or email</button></div>
                         {(selectedSupplier.additionalContacts ?? []).length ? <div className="mt-3 grid gap-2">{(selectedSupplier.additionalContacts ?? []).map((contact) => <div key={contact.id} className="grid gap-2 rounded-md border border-slate-200 bg-white p-2 sm:grid-cols-[1fr_1fr_1fr_1fr_auto]"><input value={contact.name} onChange={(event) => updateAdditionalSupplierContact(selectedSupplier, contact.id, { name: event.target.value })} placeholder="Name" aria-label="Salesperson name" className="h-9 rounded-md border border-slate-200 px-2 text-xs" /><input value={contact.role || ""} onChange={(event) => updateAdditionalSupplierContact(selectedSupplier, contact.id, { role: event.target.value })} placeholder="Role" aria-label="Salesperson role" className="h-9 rounded-md border border-slate-200 px-2 text-xs" /><input type="email" value={contact.email || ""} onChange={(event) => updateAdditionalSupplierContact(selectedSupplier, contact.id, { email: event.target.value })} placeholder="Email" aria-label="Salesperson email" className="h-9 rounded-md border border-slate-200 px-2 text-xs" /><input value={contact.phone || ""} onChange={(event) => updateAdditionalSupplierContact(selectedSupplier, contact.id, { phone: event.target.value })} placeholder="Phone" aria-label="Salesperson phone" className="h-9 rounded-md border border-slate-200 px-2 text-xs" /><button type="button" onClick={() => updateSupplier(selectedSupplier.id, { additionalContacts: (selectedSupplier.additionalContacts ?? []).filter((entry) => entry.id !== contact.id) })} className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-rose-200 text-rose-600" aria-label="Remove salesperson"><Trash2 className="h-3.5 w-3.5" /></button></div>)}</div> : null}
