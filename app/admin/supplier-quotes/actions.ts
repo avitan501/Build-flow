@@ -157,8 +157,22 @@ async function ensureClientRequestComparison(input: {
   const organizedItems = (requestItems ?? []).filter(
     (item) => item.metadata?.ai_organized === true,
   );
+  const organizedSourceIds = new Set(
+    organizedItems.flatMap((item) =>
+      typeof item.metadata?.source_item_id === "string"
+        ? [item.metadata.source_item_id]
+        : [],
+    ),
+  );
   const comparisonItems = organizedItems.length
-    ? organizedItems
+    ? [
+        ...organizedItems,
+        ...(requestItems ?? []).filter(
+          (item) =>
+            item.metadata?.ai_organized !== true &&
+            !organizedSourceIds.has(item.id),
+        ),
+      ]
     : (requestItems ?? []).filter(
         (item) => item.metadata?.ai_organized !== true,
       );

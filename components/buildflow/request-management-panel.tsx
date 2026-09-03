@@ -58,6 +58,12 @@ export type RequestClientDocumentSnapshot = {
   }
 }
 
+type ClientReadyToPayDefaults = {
+  itemUnitPrices: Record<string, number>
+  deliveryCharge: number
+  salesTaxRate: number
+}
+
 const actionClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:border-sky-400 hover:bg-sky-50"
 const supplierNameCollator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true })
 const SUPPLIER_CONTACT_STATUS_OPTIONS: Array<{ value: RequestSupplierContactStatus; label: string }> = [
@@ -141,6 +147,7 @@ export function RequestManagementPanel({
   suppliers,
   packages,
   requestItems,
+  clientReadyToPayDefaults,
   pricingSummaryItems,
   routeSelections,
   projectAddress,
@@ -160,6 +167,7 @@ export function RequestManagementPanel({
   suppliers: SupplierRoutingOption[]
   packages: PackageRoute[]
   requestItems: Array<{ id: string; name: string; quantity: number; unit: string | null; reviewReasons: string[] }>
+  clientReadyToPayDefaults: ClientReadyToPayDefaults
   pricingSummaryItems: Array<{ id: string; original: string; organized: string; route: string; metadata: Record<string, unknown> | null }>
   routeSelections: RequestSupplierRouteSelection[]
   projectAddress: string
@@ -208,9 +216,9 @@ export function RequestManagementPanel({
   const [issueDate, setIssueDate] = useState(() => formatSiteDate(new Date(), { month: "numeric", day: "numeric", year: "numeric" }))
   const [clientAddress, setClientAddress] = useState("")
   const [shipTo, setShipTo] = useState(projectAddress)
-  const [quoteLines, setQuoteLines] = useState<QuoteLine[]>(() => requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
-  const [deliveryCharge, setDeliveryCharge] = useState(0)
-  const [salesTaxRate, setSalesTaxRate] = useState(8.875)
+  const [quoteLines, setQuoteLines] = useState<QuoteLine[]>(() => requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: Number(clientReadyToPayDefaults.itemUnitPrices[item.id]) || 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
+  const [deliveryCharge, setDeliveryCharge] = useState(clientReadyToPayDefaults.deliveryCharge)
+  const [salesTaxRate, setSalesTaxRate] = useState(clientReadyToPayDefaults.salesTaxRate)
   const [taxableDelivery, setTaxableDelivery] = useState(true)
   const [taxRecommendation, setTaxRecommendation] = useState("")
   const [quoteTerms, setQuoteTerms] = useState(DEFAULT_PROPOSAL_TERMS)
@@ -360,9 +368,9 @@ export function RequestManagementPanel({
     setIssueDate(saved?.documentData.issueDate || formatSiteDate(new Date(), { month: "numeric", day: "numeric", year: "numeric" }))
     setClientAddress(saved?.documentData.clientAddress || "")
     setShipTo(saved?.documentData.shipTo || projectAddress)
-    setQuoteLines(saved?.documentData.lines?.length ? saved.documentData.lines.map((line) => ({ ...line, key: crypto.randomUUID() })) : requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
-    setDeliveryCharge(Number(saved?.documentData.deliveryCharge) || 0)
-    setSalesTaxRate(Number.isFinite(saved?.documentData.salesTaxRate) ? Number(saved?.documentData.salesTaxRate) : 8.875)
+    setQuoteLines(saved?.documentData.lines?.length ? saved.documentData.lines.map((line) => ({ ...line, key: crypto.randomUUID() })) : requestItems.length ? requestItems.map((item) => ({ key: item.id, description: item.name, quantity: Number(item.quantity) || 1, unit: item.unit || "each", unitPrice: Number(clientReadyToPayDefaults.itemUnitPrices[item.id]) || 0 })) : [{ key: crypto.randomUUID(), description: "", quantity: 1, unit: "each", unitPrice: 0 }])
+    setDeliveryCharge(saved?.documentData.deliveryCharge === undefined ? clientReadyToPayDefaults.deliveryCharge : Number(saved.documentData.deliveryCharge) || 0)
+    setSalesTaxRate(Number.isFinite(saved?.documentData.salesTaxRate) ? Number(saved?.documentData.salesTaxRate) : clientReadyToPayDefaults.salesTaxRate)
     setTaxableDelivery(saved?.documentData.taxableDelivery !== false)
     setQuoteTerms(includeRequiredProposalTerms(saved?.documentData.terms || DEFAULT_PROPOSAL_TERMS))
     setRequestPayment(Boolean(savedPayment || legacyPaymentLink))

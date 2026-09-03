@@ -89,6 +89,8 @@ type ComparisonRecord = Pick<
   | "client_quote_status"
   | "quote_number"
   | "awarded_bid_id"
+  | "client_delivery_charge"
+  | "client_tax_percent"
   | "updated_at"
 >;
 
@@ -173,7 +175,7 @@ export default async function OwnerMaterialRequestPage({
     supabase
       .from("quote_comparisons")
       .select(
-        "id,request_id,title,status,client_quote_status,quote_number,awarded_bid_id,updated_at",
+        "id,request_id,title,status,client_quote_status,quote_number,awarded_bid_id,client_delivery_charge,client_tax_percent,updated_at",
       )
       .eq("request_id", requestId)
       .order("updated_at", { ascending: false })
@@ -338,8 +340,18 @@ export default async function OwnerMaterialRequestPage({
           minute: "2-digit",
         })
       : "";
+  const organizedSourceIds = new Set(
+    organizedItems.flatMap((item) =>
+      typeof item.metadata?.source_item_id === "string"
+        ? [item.metadata.source_item_id]
+        : [],
+    ),
+  );
   const departmentItems = organizedItems.length
-    ? organizedItems
+    ? [
+        ...organizedItems,
+        ...originalItems.filter((item) => !organizedSourceIds.has(item.id)),
+      ]
     : (items ?? []);
   const routeSelections = resolveRequestSupplierRouteSelections(items ?? [], suppliers);
   const departments = Array.from(
@@ -397,6 +409,36 @@ export default async function OwnerMaterialRequestPage({
       })),
     };
   });
+  const latestClientTargetComparison = (comparisons ?? []).find((comparison) =>
+    (comparisonItemsResult.data ?? []).some(
+      (item) =>
+        item.comparison_id === comparison.id &&
+        item.client_unit_price !== null &&
+        item.client_unit_price !== undefined,
+    ),
+  );
+  const latestClientTargetItems = latestClientTargetComparison
+    ? (comparisonItemsResult.data ?? []).filter(
+        (item) => item.comparison_id === latestClientTargetComparison.id,
+      )
+    : [];
+  const clientReadyToPayDefaults = {
+    itemUnitPrices: Object.fromEntries(
+      latestClientTargetItems.flatMap((item) =>
+        item.source_request_item_id &&
+        item.client_unit_price !== null &&
+        item.client_unit_price !== undefined
+          ? [[item.source_request_item_id, Number(item.client_unit_price)]]
+          : [],
+      ),
+    ),
+    deliveryCharge: Number(
+      latestClientTargetComparison?.client_delivery_charge ?? 0,
+    ),
+    salesTaxRate: Number(
+      latestClientTargetComparison?.client_tax_percent ?? 8.875,
+    ),
+  };
   const supplierComparisonTables: RequestWorktableComparison[] = (
     comparisons ?? []
   ).map((comparison) => {
@@ -611,6 +653,7 @@ export default async function OwnerMaterialRequestPage({
                   )
                 : [],
             }))}
+            clientReadyToPayDefaults={clientReadyToPayDefaults}
             pricingSummaryItems={departmentItems.map((item) => ({
               id: item.id,
               original: (() => {
