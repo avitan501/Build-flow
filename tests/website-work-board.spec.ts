@@ -247,7 +247,9 @@ test("approved homepage keeps the selected layout, three-photo hero, process fil
   expect(preview).toContain("hero-material-yard-v4.webp");
   expect(preview).toContain("hero-long-island-home-v4.webp");
   expect(preview).toContain("hero-exterior-materials-v4.webp");
-  expect(preview).toContain("homepage-material-process.mp4");
+  expect(preview).toContain("homepage-material-process-v2.mp4");
+  expect(preview).toContain("process-text-request-v6.webp");
+  expect(preview).toContain("A contractor texts a same-day material list");
   expect(preview).toContain('compact ? "w-[82%] max-w-[30rem]"');
   expect(preview).toContain("brightness-[.72]");
   expect(preview).toContain("rgba(244,239,230,.18)_100%");
