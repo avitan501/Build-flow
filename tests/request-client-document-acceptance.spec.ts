@@ -25,12 +25,23 @@ test("the public action derives terms server-side and rejects stale or incomplet
   const action = await readFile(path.join(root, "app/client-document/[token]/actions.ts"), "utf8")
   expect(action).toContain('consent: z.literal("accepted")')
   expect(action).toContain("row.version !== input.data.documentVersion")
-  expect(action).toContain("clientDocumentTerms(document.terms)")
-  expect(action).toContain("clientDocumentTermsHash(termsText)")
-  expect(action).toContain('rpc("accept_request_client_document"')
+  expect(action).toContain('rpc("get_request_client_document"')
+  expect(action).toContain('rpc("accept_request_client_document_public"')
   expect(action).toContain("input.data.signerEmail?.toLowerCase() !== signerEmail")
-  expect(action).not.toContain("p_terms_hash: formData")
-  expect(action).not.toContain("p_terms_text: formData")
+  expect(action).not.toContain("createAdminClient")
+  expect(action).not.toContain("p_terms_hash:")
+  expect(action).not.toContain("p_terms_text:")
+})
+
+test("the public acceptance wrapper hashes only the exact stored terms", async () => {
+  const migration = await readFile(path.join(root, "supabase/migrations/20260903212526_allow_public_client_document_acceptance.sql"), "utf8")
+  expect(migration).toContain("create or replace function public.accept_request_client_document_public")
+  expect(migration).toContain("document.document_data ->> 'terms'")
+  expect(migration).toContain("extensions.digest")
+  expect(migration).toContain("'avantia-client-document-terms-v2'")
+  expect(migration).toContain("to anon, authenticated")
+  expect(migration).not.toContain("p_terms_text text")
+  expect(migration).not.toContain("p_terms_hash text")
 })
 
 test("estimate and invoice links show one terms block and an explicit unchecked gate", async () => {

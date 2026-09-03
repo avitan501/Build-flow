@@ -3,13 +3,8 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
-import {
-  CLIENT_DOCUMENT_TERMS_VERSION,
-  clientDocumentTerms,
-  clientDocumentTermsHash,
-} from "@/lib/request-client-document-acceptance"
 import { parseRequestClientDocument, type StoredRequestClientDocument } from "@/lib/request-client-document-data"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { createClient } from "@/lib/supabase/server"
 
 export type ClientDocumentAcceptanceState = {
   status: "idle" | "accepted" | "already-accepted" | "error" | "version-changed"
@@ -58,11 +53,9 @@ export async function acceptClientDocumentAction(
   if (!input.success) return { status: "error", message: "Enter your name and check the acknowledgement box." }
 
   try {
-    const admin = createAdminClient()
-    const { data: row, error: documentError } = await admin
-      .from("request_client_documents")
-      .select("document_type,document_number,document_data,version,updated_at")
-      .eq("public_token", input.data.token)
+    const supabase = await createClient()
+    const { data: row, error: documentError } = await supabase
+      .rpc("get_request_client_document", { p_public_token: input.data.token })
       .maybeSingle<StoredRequestClientDocument>()
     if (documentError || !row) return { status: "error", message: "This document link is no longer available." }
     if (row.document_type === "receipt") return { status: "error", message: "Receipts do not require acknowledgement." }
@@ -75,20 +68,18 @@ export async function acceptClientDocumentAction(
       return { status: "error", message: "Enter the same email address shown on this document." }
     }
 
-    const termsText = clientDocumentTerms(document.terms)
-    const termsHash = clientDocumentTermsHash(termsText)
-    const { data, error } = await admin.rpc("accept_request_client_document", {
+    const { data, error } = await supabase.rpc("accept_request_client_document_public", {
       p_public_token: input.data.token,
       p_document_version: row.version,
-      p_terms_version: CLIENT_DOCUMENT_TERMS_VERSION,
-      p_terms_hash: termsHash,
-      p_terms_text: termsText,
       p_signer_name: input.data.signerName,
       p_signer_email: signerEmail,
     }).maybeSingle<AcceptanceRpcRow>()
 
     if (error?.message.includes("client_document_version_changed")) return { status: "version-changed", message: "This document was updated. Refresh the page and review the newest version." }
-    if (error || !data) return { status: "error", message: "The acknowledgement could not be recorded. Please try again." }
+    if (error || !data) {
+      console.error(JSON.stringify({ level: "error", message: "Client document acknowledgement failed", route: "/client-document/[token]", errorCode: error?.code || "empty_rpc_response", error: error?.message || "No acknowledgement row returned" }))
+      return { status: "error", message: "The acknowledgement could not be recorded. Please try again." }
+    }
     revalidatePath(`/client-document/${input.data.token}`)
     return {
       status: data.was_created ? "accepted" : "already-accepted",
@@ -103,7 +94,8 @@ export async function acceptClientDocumentAction(
         timezone: data.accepted_timezone,
       },
     }
-  } catch {
+  } catch (cause) {
+    console.error(JSON.stringify({ level: "error", message: "Client document acknowledgement crashed", route: "/client-document/[token]", error: cause instanceof Error ? cause.message : "Unknown error" }))
     return { status: "error", message: "The acknowledgement could not be recorded. Please try again." }
   }
 }
