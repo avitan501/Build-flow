@@ -1,19 +1,16 @@
 "use client"
 
-import { Award, CalendarClock, Check, CheckCircle2, ChevronDown, CircleDollarSign, Download, FileCheck2, FileText, FolderOpen, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, ReceiptText, Route, Search, Send, Trash2, X } from "lucide-react"
+import { Award, CalendarClock, Check, CheckCircle2, ChevronDown, CircleDollarSign, Download, FileCheck2, FileText, FolderOpen, Mail, MessageCircle, MessageSquareText, Paperclip, Phone, Plus, ReceiptText, Route, Send, Trash2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 
 import { prepareQuoAttachmentMessageAction, sendAuraMessageAction } from "@/app/owner/aura/actions"
 import { openRequestPricingComparisonAction } from "@/app/admin/supplier-quotes/actions"
-import { previewRequestClientQuoteAction, recordRequestClientApprovalAction, recordRequestClientDocumentSentAction, recordRequestPaymentLinkSentAction, recordRequestPaymentReceivedAction, saveRequestClientDocumentAction, saveRequestManagerNotesAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestSupplierContactStatusAction, type RequestClientQuoteInput, type RequestSupplierContactStatus } from "@/app/owner/materials/requests/actions"
+import { previewRequestClientQuoteAction, recordRequestClientApprovalAction, recordRequestClientDocumentSentAction, recordRequestPaymentLinkSentAction, recordRequestPaymentReceivedAction, saveRequestClientDocumentAction, saveRequestSupplierPlanAction, scheduleRequestDeliveryAction, sendClientReplyAction, sendRequestClientQuoteAction, updateRequestSupplierContactStatusAction, type RequestClientQuoteInput, type RequestSupplierContactStatus } from "@/app/owner/materials/requests/actions"
 import { saveRequestSupplierProgressNoteAction } from "@/app/owner/materials/requests/supplier-progress-actions"
-import { AutosaveStatus } from "@/components/buildflow/autosave-status"
 import { LocationAutocomplete } from "@/components/buildflow/location-autocomplete"
-import { MaterialPriceCheck } from "@/components/buildflow/material-price-check"
 import { RelatedEmailTimeline, type RelatedEmailItem } from "@/components/buildflow/related-email-timeline"
-import { RequestSupplierRouteEditor } from "@/components/buildflow/request-supplier-route-editor"
 import { OPEN_REQUEST_CLIENT_CONTACT_EVENT } from "@/components/buildflow/request-client-contact"
 import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
@@ -26,7 +23,6 @@ import { requestSupplierFolderContents } from "@/lib/request-supplier-folder"
 import { requestWorkflowState, type RequestWorkflowAction } from "@/lib/request-workflow-state"
 import { formatSiteDate, formatSiteWallTime, siteBusinessDateKey } from "@/lib/site-date-time"
 import { findCanonicalSupplier } from "@/lib/supplier-canonical"
-import { useSequencedAutosave } from "@/lib/use-sequenced-autosave"
 
 type PackageRoute = { id: string; department: string; supplier_id: string | null; status: string }
 type QuoteLine = { key: string; description: string; quantity: number; unit: string; unitPrice: number }
@@ -87,26 +83,12 @@ function resolvedRouteSupplierIds(routeSelections: RequestSupplierRouteSelection
   }))]
 }
 
-function supplierRouteVersion(metadata: Record<string, unknown> | null | undefined) {
-  return JSON.stringify([metadata?.supplier_route_names ?? [], metadata?.supplier_route_entries ?? [], metadata?.supplier_route_notes ?? {}])
-}
-
 function savedDocumentTotal(documentData: RequestClientDocumentSnapshot["documentData"]) {
   const subtotal = (documentData.lines ?? []).reduce((sum, line) => sum + Number(line.quantity || 0) * Number(line.unitPrice || 0), 0)
   const deliveryCharge = Number(documentData.deliveryCharge || 0)
   const salesTaxRate = Number(documentData.salesTaxRate || 0)
   const tax = (subtotal + (documentData.taxableDelivery === false ? 0 : deliveryCharge)) * salesTaxRate / 100
   return subtotal + deliveryCharge + tax
-}
-
-function SupplierContactRow({ entry, recommendedSupplierIds, supplierIds, toggleRecommendedSupplier, toggleSupplier }: {
-  entry: SupplierRoutingOption
-  recommendedSupplierIds: string[]
-  supplierIds: string[]
-  toggleRecommendedSupplier: (supplierId: string) => void
-  toggleSupplier: (supplierId: string) => void
-}) {
-  return <div className="flex min-h-12 items-center gap-3 rounded-md px-2 text-sm hover:bg-slate-50"><label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"><input aria-label={`Recommend ${entry.name}`} type="checkbox" checked={recommendedSupplierIds.includes(entry.id)} onChange={() => toggleRecommendedSupplier(entry.id)} className="h-4 w-4 rounded border-slate-300 accent-amber-500" /><span className="min-w-0"><span className="block truncate font-semibold">{entry.name}</span><span className="block truncate text-xs text-slate-500">{entry.email || entry.phone || entry.whatsapp || "No contact method"} · {(entry.trustLevel || "not-reviewed").replaceAll("-", " ")}</span></span></label><label className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold"><input aria-label={`Contact ${entry.name}`} type="checkbox" checked={supplierIds.includes(entry.id)} onChange={() => toggleSupplier(entry.id)} className="h-4 w-4 rounded border-slate-300 accent-[#0071e3]" />Contact</label></div>
 }
 
 const REPLY_BLOCKS = [
@@ -168,7 +150,6 @@ export function RequestManagementPanel({
   step3CompletedOverride,
   initialPaymentDelivery,
   initialClientDocuments,
-  initialManagerNotes,
   initialSupplierRecommendations,
   clientEmails,
 }: {
@@ -189,20 +170,15 @@ export function RequestManagementPanel({
   step3CompletedOverride: boolean | null
   initialPaymentDelivery: { documentType: "invoice" | "receipt" | null; estimateSent: boolean; clientApproved: boolean; invoiceSent: boolean; receiptSent: boolean; paymentLinkSent: boolean; paymentReceived: boolean; deliveryScheduled: boolean }
   initialClientDocuments: RequestClientDocumentSnapshot[]
-  initialManagerNotes: string
   initialSupplierRecommendations: Array<{ supplierId: string; isRecommended: boolean; shouldContact: boolean; contactStatus: RequestSupplierContactStatus; note: string }>
   clientEmails: RelatedEmailItem[]
 }) {
   const router = useRouter()
   const initialRouteSupplierIds = resolvedRouteSupplierIds(routeSelections, suppliers)
-  const [supplierIds, setSupplierIds] = useState<string[]>(() => [...new Set([...initialSupplierRecommendations.filter((entry) => entry.shouldContact).map((entry) => entry.supplierId), ...initialRouteSupplierIds])])
-  const [recommendedSupplierIds, setRecommendedSupplierIds] = useState<string[]>(() => [...new Set([...initialSupplierRecommendations.filter((entry) => entry.isRecommended).map((entry) => entry.supplierId), ...initialRouteSupplierIds])])
+  const [supplierIds] = useState<string[]>(() => [...new Set([...initialSupplierRecommendations.filter((entry) => entry.shouldContact).map((entry) => entry.supplierId), ...initialRouteSupplierIds])])
+  const [recommendedSupplierIds] = useState<string[]>(() => [...new Set([...initialSupplierRecommendations.filter((entry) => entry.isRecommended).map((entry) => entry.supplierId), ...initialRouteSupplierIds])])
   const [supplierContactStatuses, setSupplierContactStatuses] = useState<Record<string, RequestSupplierContactStatus>>(() => Object.fromEntries(initialSupplierRecommendations.map((entry) => [entry.supplierId, entry.contactStatus || "not_contacted"])))
   const [supplierNoteDrafts, setSupplierNoteDrafts] = useState<Record<string, string>>(() => Object.fromEntries(initialSupplierRecommendations.map((entry) => [entry.supplierId, entry.note || ""])))
-  const [managerNotes, setManagerNotes] = useState(initialManagerNotes)
-  const notesAutosave = useSequencedAutosave<string>({
-    save: (value, version) => saveRequestManagerNotesAction({ requestId, managerNotes: value, version }),
-  })
   const [greeting, setGreeting] = useState<"hi" | "hello" | "morning" | "afternoon">("hi")
   const [replyBlock, setReplyBlock] = useState<string>(() => requestItems.some((item) => item.reviewReasons.length) ? "missing" : "received")
   const [replyNote, setReplyNote] = useState("")
@@ -223,7 +199,6 @@ export function RequestManagementPanel({
   const [paymentLinkSent, setPaymentLinkSent] = useState(initialPaymentDelivery.paymentLinkSent)
   const [paymentReceived, setPaymentReceived] = useState(initialPaymentDelivery.paymentReceived)
   const [deliveryScheduled, setDeliveryScheduled] = useState(initialPaymentDelivery.deliveryScheduled)
-  const [supplierRoutingOpen, setSupplierRoutingOpen] = useState(false)
   const [quoteEntryOpen, setQuoteEntryOpen] = useState(false)
   const [contactOpen, setContactOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
@@ -247,7 +222,6 @@ export function RequestManagementPanel({
   const [hostedPaymentUrl, setHostedPaymentUrl] = useState(AVANTIA_PAYMENT_LINK)
   const [quoteFeedback, setQuoteFeedback] = useState("")
   const [documentLinks, setDocumentLinks] = useState<Record<RequestClientDocumentType, string | undefined>>(() => Object.fromEntries(initialClientDocuments.map((entry) => [entry.documentType, `/client-document/${entry.publicToken}`])) as Record<RequestClientDocumentType, string | undefined>)
-  const [onlineSupplierSearchOpen, setOnlineSupplierSearchOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const pendingRef = useRef(pending)
   const contactDialogRef = useRef<HTMLElement | null>(null)
@@ -259,12 +233,6 @@ export function RequestManagementPanel({
     return routeSelections.map((selection) => ({ selection, supplier: findCanonicalSupplier(availableSuppliers, selection) ?? null }))
   }, [availableSuppliers, routeSelections])
   const routeSupplierNames = useMemo(() => [...new Set(routeMatches.map(({ selection, supplier }) => supplier?.name || selection.name))].sort(supplierNameCollator.compare), [routeMatches])
-  const routeContactSupplierIds = useMemo(() => [...new Set(routeMatches.flatMap(({ supplier }) => supplier ? [supplier.id] : []))], [routeMatches])
-  const routeContactSupplierIdSet = useMemo(() => new Set(routeContactSupplierIds), [routeContactSupplierIds])
-  const selectedRouteSuppliers = useMemo(() => availableSuppliers.filter((supplier) => routeContactSupplierIdSet.has(supplier.id)), [availableSuppliers, routeContactSupplierIdSet])
-  const unlinkedRouteNames = useMemo(() => [...new Set(routeMatches.filter(({ supplier }) => !supplier).map(({ selection }) => selection.name))].sort(supplierNameCollator.compare), [routeMatches])
-  const remainingSuppliers = useMemo(() => availableSuppliers.filter((supplier) => !routeContactSupplierIdSet.has(supplier.id)), [availableSuppliers, routeContactSupplierIdSet])
-  const onlineSupplierQuery = useMemo(() => pricingSummaryItems.map((item) => item.organized).filter(Boolean).slice(0, 6).join("; "), [pricingSummaryItems])
 
   const firstName = client.name.trim().split(/\s+/)[0] || "there"
   const missingQuestions = useMemo(() => requestItems.flatMap((item) => item.reviewReasons.map((reason) => `${item.name}: ${reason}`)), [requestItems])
@@ -428,11 +396,6 @@ export function RequestManagementPanel({
     setContactOpen(true)
   }
 
-  function toggleSupplier(supplierId: string) {
-    setSupplierIds((current) => current.includes(supplierId) ? current.filter((id) => id !== supplierId) : [...current, supplierId])
-    setRecommendedSupplierIds((current) => current.includes(supplierId) ? current : [...current, supplierId])
-  }
-
   function openManualPricing() {
     setFeedback("")
     startTransition(async () => {
@@ -473,11 +436,6 @@ export function RequestManagementPanel({
     })
   }
 
-  function toggleRecommendedSupplier(supplierId: string) {
-    setRecommendedSupplierIds((current) => current.includes(supplierId) ? current.filter((id) => id !== supplierId) : [...current, supplierId])
-    if (recommendedSupplierIds.includes(supplierId)) setSupplierIds((current) => current.filter((id) => id !== supplierId))
-  }
-
   async function saveSupplierPlan() {
     const chosen = new Set([...recommendedSupplierIds, ...supplierIds])
     const result = await saveRequestSupplierPlanAction({ requestId, suppliers: [...chosen].map((supplierId) => ({ supplierId, isRecommended: recommendedSupplierIds.includes(supplierId), shouldContact: supplierIds.includes(supplierId) })) })
@@ -489,11 +447,6 @@ export function RequestManagementPanel({
   function createSupplierRequest() {
     if (!supplierIds.length) return
     startTransition(async () => {
-      if (!await notesAutosave.flush()) {
-        setFeedbackError(true)
-        setFeedback("Save the request note before contacting suppliers.")
-        return
-      }
       if (!await saveSupplierPlan()) return
       const query = new URLSearchParams({ department: routeDepartment })
       supplierIds.forEach((supplierId) => query.append("supplier", supplierId))
@@ -756,26 +709,25 @@ export function RequestManagementPanel({
 
   const primaryWorkflowClass = "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#0066cc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
   const secondaryWorkflowClass = "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-sky-400 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
-
-  function openSupplierRouting() {
-    setSupplierRoutingOpen(true)
-    window.requestAnimationFrame(() => document.getElementById("supplier-routing")?.scrollIntoView({ behavior: "smooth", block: "nearest" }))
-  }
+  const compactWorkflowClass = "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-[#0066cc] transition hover:border-sky-300 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] disabled:opacity-45"
 
   function renderStep2PrimaryAction() {
     if (workflow.step2Complete) {
-      return <button type="button" onClick={() => openDocument("estimate")} className={primaryWorkflowClass}><FileCheck2 className="h-4 w-4" />Continue to Client Estimate</button>
+      return <button type="button" onClick={() => openDocument("estimate")} className={compactWorkflowClass}><FileCheck2 className="h-4 w-4" />Continue to Client Estimate</button>
     }
-    if (workflow.step2Action === "choose-suppliers" || workflow.step2Action === "contact-suppliers") {
-      return <button type="button" onClick={openSupplierRouting} className={primaryWorkflowClass}><Route className="h-4 w-4" />{workflow.step2Action === "contact-suppliers" ? `Contact ${selectedSupplierNames.length} Supplier${selectedSupplierNames.length === 1 ? "" : "s"}` : "Choose Suppliers"}</button>
+    if (workflow.step2Action === "choose-suppliers") {
+      return <button type="button" onClick={() => document.getElementById("request-items-heading")?.scrollIntoView({ behavior: "smooth", block: "start" })} className={compactWorkflowClass}><Route className="h-4 w-4" />Choose supplier route in Step 1</button>
+    }
+    if (workflow.step2Action === "contact-suppliers") {
+      return <button type="button" onClick={createSupplierRequest} disabled={!supplierIds.length || pending} className={compactWorkflowClass}><Route className="h-4 w-4" />Contact {selectedSupplierNames.length} supplier{selectedSupplierNames.length === 1 ? "" : "s"}</button>
     }
     if (workflow.step2Action === "add-supplier-quote") {
-      return <button type="button" onClick={() => setQuoteEntryOpen((open) => !open)} aria-expanded={quoteEntryOpen} className={primaryWorkflowClass}><Paperclip className="h-4 w-4" />Add Supplier Quote</button>
+      return <button type="button" onClick={() => setQuoteEntryOpen((open) => !open)} aria-expanded={quoteEntryOpen} className={compactWorkflowClass}><Paperclip className="h-4 w-4" />Add Supplier Quote</button>
     }
     if (workflow.step2Action === "review-quote" || workflow.step2Action === "compare-quotes") {
-      return primaryComparison ? <a href={`/admin/quote-comparison/${primaryComparison.id}`} className={primaryWorkflowClass}><Award className="h-4 w-4" />{workflow.step2Action === "review-quote" ? "Review Quote & Select Supplier" : `Compare ${supplierQuoteCount} Quotes`}</a> : null
+      return primaryComparison ? <a href={`/admin/quote-comparison/${primaryComparison.id}`} className={compactWorkflowClass}><Award className="h-4 w-4" />{workflow.step2Action === "review-quote" ? "Review Quote & Select Supplier" : `Compare ${supplierQuoteCount} Quotes`}</a> : null
     }
-    return <button type="button" onClick={() => openDocument("estimate")} className={primaryWorkflowClass}><FileCheck2 className="h-4 w-4" />Continue to Client Estimate</button>
+    return <button type="button" onClick={() => openDocument("estimate")} className={compactWorkflowClass}><FileCheck2 className="h-4 w-4" />Continue to Client Estimate</button>
   }
 
   function renderStep3PrimaryAction() {
@@ -802,7 +754,7 @@ export function RequestManagementPanel({
             <span className={`rounded-full px-2.5 py-1 ${supplierQuoteCount ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>{supplierQuoteCount} quote{supplierQuoteCount === 1 ? "" : "s"} received</span>
           </div>
 
-          {supplierProgressRows.length ? <div role="table" aria-label="Suppliers selected in Step 1" className="mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white"><div role="row" className="hidden grid-cols-[minmax(0,1fr)_13rem_9rem] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[.08em] text-slate-500 sm:grid"><span role="columnheader">Supplier</span><span role="columnheader">Status</span><span role="columnheader" className="text-right">Contact &amp; files</span></div><div className="divide-y divide-slate-100">{supplierProgressRows.map((row) => {
+          {supplierProgressRows.length ? <div role="table" aria-label="Suppliers selected in Step 1" className="mb-3 overflow-hidden rounded-lg border border-slate-200 bg-white"><div role="row" className="hidden grid-cols-[minmax(0,1fr)_13rem_9rem] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[9px] font-bold uppercase tracking-[.08em] text-slate-500 sm:grid"><span role="columnheader">Supplier</span><span role="columnheader">Status</span><span role="columnheader" className="text-right">Supplier route<br />Contact &amp; files</span></div><div className="divide-y divide-slate-100">{supplierProgressRows.map((row) => {
             const contactStatus = row.supplier ? supplierContactStatuses[row.supplier.id] || (row.bid ? "quote_received" : row.supplierPackage ? "request_sent" : "not_contacted") : "not_contacted"
             return <article role="row" key={row.name} className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_13rem_9rem]">
               <div role="cell" className="min-w-0"><p className="truncate text-sm font-black text-[#12263f]">{row.name}</p>{row.bid ? <p className="mt-0.5 truncate text-[10px] font-bold text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)} total received</p> : null}{row.note ? <p title={row.note} className="mt-0.5 truncate text-[10px] text-slate-500">{row.note}</p> : null}</div>
@@ -815,7 +767,7 @@ export function RequestManagementPanel({
             </article>
           })}</div></div> : <p className="mb-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">Choose suppliers in Step 1 to begin pricing.</p>}
 
-          <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] z-20 mb-3 rounded-xl border border-slate-200 bg-white/95 p-2 shadow-[0_10px_30px_rgba(15,23,42,.14)] backdrop-blur">{renderStep2PrimaryAction()}</div>
+          <div className="mb-2 flex justify-end">{renderStep2PrimaryAction()}</div>
 
           {!workflow.step2Complete && workflow.step2Action !== "add-supplier-quote" ? <button type="button" onClick={() => setQuoteEntryOpen((open) => !open)} aria-expanded={quoteEntryOpen} className={secondaryWorkflowClass}><Plus className="h-4 w-4" />Add Supplier Quote</button> : null}
           {!workflow.step2Complete && quoteEntryOpen ? <div className="mt-2 grid gap-2 rounded-lg border border-sky-200 bg-sky-50 p-2 sm:grid-cols-2">
@@ -823,37 +775,7 @@ export function RequestManagementPanel({
             <button type="button" onClick={() => { setQuoteEntryOpen(false); openManualPricing() }} disabled={pending} className={secondaryWorkflowClass}><Plus className="h-4 w-4" />Enter Pricing Manually</button>
           </div> : null}
 
-          <details className="group/request mt-2 rounded-lg border border-slate-200 bg-slate-50">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-xs font-bold"><span>Request Details &amp; Notes</span><span className="inline-flex items-center gap-2 text-[10px] font-normal text-slate-400">{managerNotes ? "Note saved" : `${pricingSummaryItems.length} items`}<ChevronDown className="h-4 w-4 transition group-open/request:rotate-180" /></span></summary>
-            <div className="border-t border-slate-200 p-2">
-              <label className="grid gap-1 text-[10px] font-bold uppercase tracking-[.08em] text-slate-500">Request Notes<textarea value={managerNotes} onChange={(event) => { const value = event.target.value; setManagerNotes(value); notesAutosave.queue(value) }} rows={2} maxLength={5000} placeholder="Add a note for this request…" className="min-h-20 resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-normal normal-case tracking-normal text-slate-950" /></label>
-              <AutosaveStatus status={notesAutosave.status} error={notesAutosave.error} retry={notesAutosave.retry} />
-              <div className="mt-2 grid gap-1 sm:hidden">{pricingSummaryItems.slice(0, 8).map((item) => <div key={item.id} className="rounded-md border border-slate-200 bg-white p-2"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-xs font-black text-slate-900">{requestItems.find((candidate) => candidate.id === item.id)?.quantity || "—"} · {item.organized}</p><p className="mt-0.5 line-clamp-2 text-[10px] text-slate-500">Original: {item.original}</p></div></div><div className="mt-2"><RequestSupplierRouteEditor key={`${item.id}-${supplierRouteVersion(item.metadata)}`} requestId={requestId} itemId={item.id} metadata={item.metadata} suppliers={availableSuppliers} /></div></div>)}</div>
-              <div className="mt-2 hidden overflow-x-auto rounded-md border border-slate-200 bg-slate-100 sm:block" data-testid="request-step-2-scroll-region"><table className="w-full min-w-[42rem] table-fixed text-left text-[11px]"><thead className="text-[9px] font-bold uppercase tracking-[.08em] text-slate-500"><tr><th className="w-16 px-2 py-1.5">Qty</th><th className="px-2 py-1.5">Original</th><th className="px-2 py-1.5">Organized Item</th><th className="px-2 py-1.5">Supplier Route &amp; Note</th></tr></thead><tbody className="divide-y divide-slate-200 bg-slate-50">{pricingSummaryItems.slice(0, 8).map((item) => <tr key={item.id}><td className="px-2 py-1.5 font-bold">{requestItems.find((candidate) => candidate.id === item.id)?.quantity || "—"}</td><td title={item.original} className="truncate px-2 py-1.5 text-slate-500">{item.original}</td><td title={item.organized} className="truncate px-2 py-1.5 font-semibold">{item.organized}</td><td className="px-2 py-1.5"><RequestSupplierRouteEditor key={`${item.id}-${supplierRouteVersion(item.metadata)}`} requestId={requestId} itemId={item.id} metadata={item.metadata} suppliers={availableSuppliers} /></td></tr>)}</tbody></table></div>
-            </div>
-          </details>
-
-          <details id="supplier-routing" open={supplierRoutingOpen} onToggle={(event) => setSupplierRoutingOpen(event.currentTarget.open)} className="group/route mt-2 scroll-mt-24 rounded-md border border-slate-200 bg-slate-50">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-sm font-bold"><span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-sky-700" />Add or change suppliers</span><ChevronDown className="h-4 w-4 text-slate-400 transition group-open/route:rotate-180" /></summary>
-            <div className="border-t border-slate-200 p-3">
-          <div className="mt-3 grid gap-3">
-            <fieldset>
-              <legend className="text-sm font-semibold text-slate-700">Suppliers selected in Step 1</legend>
-              <p className="mt-0.5 text-xs text-slate-500">Your chosen routes appear first. Then use any supplier in the directory.</p>
-              <div className="mt-1.5 max-h-56 overflow-y-auto rounded-lg border border-slate-300 bg-white p-2">
-                {selectedRouteSuppliers.map((entry) => <SupplierContactRow key={entry.id} entry={entry} recommendedSupplierIds={recommendedSupplierIds} supplierIds={supplierIds} toggleRecommendedSupplier={toggleRecommendedSupplier} toggleSupplier={toggleSupplier} />)}
-                {unlinkedRouteNames.map((name) => <div key={name} className="flex min-h-11 items-center justify-between gap-3 rounded-md px-2 text-sm"><span className="truncate font-semibold text-slate-800">{name}</span><span className="shrink-0 rounded bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800">Not linked to directory</span></div>)}
-                {!selectedRouteSuppliers.length && !unlinkedRouteNames.length ? <p className="px-2 py-3 text-xs text-slate-500">Choose routes in Step 1.</p> : null}
-                {remainingSuppliers.length ? <details className="border-t border-slate-100"><summary className="min-h-10 cursor-pointer px-2 py-3 text-xs font-bold text-[#0066cc]">All Supplier Directory ({remainingSuppliers.length})</summary><div>{remainingSuppliers.map((entry) => <SupplierContactRow key={entry.id} entry={entry} recommendedSupplierIds={recommendedSupplierIds} supplierIds={supplierIds} toggleRecommendedSupplier={toggleRecommendedSupplier} toggleSupplier={toggleSupplier} />)}</div></details> : null}
-              </div>
-            </fieldset>
-            <div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => startTransition(async () => { await saveSupplierPlan() })} disabled={pending} className={secondaryWorkflowClass}>Save Supplier Choices</button><button type="button" onClick={createSupplierRequest} disabled={!supplierIds.length || pending} className={primaryWorkflowClass}><Route className="h-4 w-4" />Contact {supplierIds.length || ""} Supplier{supplierIds.length === 1 ? "" : "s"}</button></div>
-            <div className="rounded-md border border-violet-200 bg-violet-50 p-2"><button type="button" onClick={() => setOnlineSupplierSearchOpen((value) => !value)} className="inline-flex min-h-10 w-full items-center justify-between gap-2 rounded-md bg-white px-3 text-left text-xs font-bold text-violet-900"><span className="inline-flex items-center gap-2"><Search className="h-4 w-4" />AI · Look for suppliers online</span><ChevronDown className={`h-4 w-4 transition ${onlineSupplierSearchOpen ? "rotate-180" : ""}`} /></button>{onlineSupplierSearchOpen ? <MaterialPriceCheck requestId={requestId} query={onlineSupplierQuery || requestTitle} department={routeDepartment} defaultZipCode={(projectAddress.match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || "11516")} onClose={() => setOnlineSupplierSearchOpen(false)} /> : null}</div>
-          </div>
-          {packages.length ? <div className="mt-4 border-t border-slate-200 pt-3"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Current routes</p><div className="mt-2 grid gap-2">{packages.map((pkg) => <div key={pkg.id} className="flex items-center justify-between gap-3 text-sm"><span className="font-semibold">{pkg.department}</span><span className="text-right text-slate-600">{suppliers.find((entry) => entry.id === pkg.supplier_id)?.name || "Not assigned"} · {pkg.status.replaceAll("_", " ")}</span></div>)}</div></div> : null}
-            </div>
-          </details>
-          <button type="button" onClick={openManualPricing} disabled={pending || !selectedSupplierNames.length} className={`${primaryWorkflowClass} mt-2`}><Award className="h-4 w-4" />Compare Client Price &amp; Supplier Quotes</button>
+          <div className="mt-2 flex justify-end"><button type="button" onClick={openManualPricing} disabled={pending || !selectedSupplierNames.length} className={compactWorkflowClass}><Award className="h-4 w-4" />Compare supplier route</button></div>
         </div>
       </details>
 

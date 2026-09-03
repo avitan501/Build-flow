@@ -1,6 +1,6 @@
 "use client"
 
-import { MessageSquareText } from "lucide-react"
+import { Phone } from "lucide-react"
 
 export const OPEN_REQUEST_CLIENT_CONTACT_EVENT = "avantia:open-request-client-contact"
 
@@ -13,12 +13,13 @@ export function RequestClientContact() {
     <button
       type="button"
       onClick={openContactComposer}
-      className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0071e3] px-3 text-xs font-bold text-white"
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#0071e3] text-white shadow-sm transition hover:bg-[#0066cc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
+      aria-label="Contact client"
+      title="Contact client"
       aria-haspopup="dialog"
       aria-controls="request-client-contact-dialog"
     >
-      <MessageSquareText className="h-4 w-4" />
-      Contact client
+      <Phone className="h-4 w-4" />
     </button>
   )
 }

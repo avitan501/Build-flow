@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CustomerRequestStatus } from "@/components/buildflow/customer-request-status";
+import { MaterialRequestAssigneeControl } from "@/components/buildflow/material-request-assignee-control";
 import { RequestClientContact } from "@/components/buildflow/request-client-contact";
 import { RequestMaterialWorktable, type RequestWorktableComparison } from "@/components/buildflow/request-material-worktable";
 import {
@@ -468,14 +468,8 @@ export default async function OwnerMaterialRequestPage({
   return (
     <main className="min-h-screen bg-[#f5f5f7] px-3 pb-28 pt-4 text-slate-950 sm:px-6">
       <div className="mx-auto max-w-6xl">
-        <Link
-          href="/admin/users?view=requests"
-          className="text-sm font-semibold text-[#0066cc]"
-        >
-          Back to Customer Requests
-        </Link>
-        <header className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-3">
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <header className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_5px_18px_rgba(15,23,42,.04)]">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#0066cc]">
@@ -498,25 +492,21 @@ export default async function OwnerMaterialRequestPage({
                 </p>
               ) : null}
             </div>
-            <div className="flex min-w-0 items-center gap-3 border-t border-slate-100 pt-2 text-sm sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
-              <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-wrap items-end gap-2 border-t border-slate-100 pt-3 text-sm lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+              <div className="min-w-28 flex-1 pb-1 lg:flex-none">
+                <p className="text-[10px] font-bold uppercase tracking-[.08em] text-slate-500">Client</p>
                 <p className="font-bold text-slate-950">{profile?.full_name || "Client"}</p>
-                <div className="flex flex-wrap gap-x-3 text-xs text-slate-500">
-                  {clientEmail ? <a href={`mailto:${clientEmail}`} className="truncate hover:text-[#0066cc]">{clientEmail}</a> : null}
-                  {profile?.phone ? <a href={`tel:${profile.phone}`} className="hover:text-[#0066cc]">{profile.phone}</a> : null}
-                </div>
               </div>
               <RequestClientContact />
+              <div className="w-44"><MaterialRequestAssigneeControl requestId={request.id} assignee={request.manager_assignee} compact /></div>
+              <CustomerRequestStatus
+                requestId={request.id}
+                status={request.status}
+                currentStage={currentStage}
+              />
             </div>
           </div>
         </header>
-        <CustomerRequestStatus
-          requestId={request.id}
-          status={request.status}
-          currentStage={currentStage}
-          updatedAt={request.updated_at}
-          assignee={request.manager_assignee}
-        />
         <RequestMaterialWorktable
           requestId={request.id}
           originalItems={originalItems}
@@ -637,18 +627,16 @@ export default async function OwnerMaterialRequestPage({
             step3CompletedOverride={workflowOverrides.get(3) ?? null}
             initialPaymentDelivery={initialPaymentDelivery}
             initialClientDocuments={(clientDocuments ?? []).map((entry) => ({ documentType: entry.document_type, documentNumber: entry.document_number, documentData: entry.document_data, publicToken: entry.public_token, version: entry.version, updatedAt: entry.updated_at }))}
-            initialManagerNotes={request.manager_notes || ""}
             initialSupplierRecommendations={(supplierRecommendations ?? []).map((entry) => ({ supplierId: entry.supplier_id, isRecommended: entry.is_recommended, shouldContact: entry.should_contact, contactStatus: entry.contact_status, note: entry.notes || "" }))}
             clientEmails={clientEmails}
           />
         </div>
-        {clientActions.length ? (
-          <section className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-5">
+        <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="text-lg font-bold text-slate-950">
-              Activity history
+              Activity log
             </h2>
-            <div className="mt-3 divide-y divide-amber-200">
-              {clientActions.map((event) => (
+            {clientActionEvents?.length ? <div className="mt-3 divide-y divide-slate-100">
+              {clientActionEvents.map((event) => (
                 <article key={event.id} className="py-3 first:pt-0 last:pb-0">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <h3 className="text-sm font-bold text-slate-900">
@@ -670,9 +658,8 @@ export default async function OwnerMaterialRequestPage({
                   ) : null}
                 </article>
               ))}
-            </div>
+            </div> : <p className="mt-2 text-sm text-slate-500">No activity recorded yet.</p>}
           </section>
-        ) : null}
       </div>
     </main>
   );

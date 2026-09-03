@@ -51,15 +51,14 @@ test("manager status controls keep paid delivery and completion separate", async
     '{ status: "quoted", label: "Payment & delivery" }',
   );
   expect(requestStatus).toContain('{ status: "closed", label: "Completed" }');
-  expect(requestStatus).toContain('quoted: "Coordinate delivery"');
   expect(requestStatus).toContain(
     "Mark this request completed? The customer can no longer add items",
   );
-  expect(requestStatus).toContain("grid-cols-[minmax(0,1fr)_6.5rem]");
-  expect(requestStatus).toContain("col-span-2 flex min-w-0");
+  expect(requestStatus).toContain('className="w-44 min-w-0"');
+  expect(requestStatus).not.toContain("Next:");
   expect(requestStatus).toContain("useOptimistic(status)");
   expect(requestStatus).toContain("setSelectedStatus(nextStatus)");
-  expect(requestStatus).toContain("min-h-11 w-full");
+  expect(requestStatus).toContain("h-8 w-full");
   expect(requestStatus).not.toContain("grid-cols-2 gap-3");
   expect(workflowManager).toContain(
     "Payment Received · Waiting for Supplier Delivery",

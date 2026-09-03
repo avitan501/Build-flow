@@ -406,14 +406,15 @@ test("client material lists are organized securely in the background", async () 
   expect(ownerPage).toContain("comparisons={comparisonSummaries}");
   expect(ownerPage).toContain("supplierComparisons={supplierComparisonTables}");
   expect(ownerPage).toContain("quote_comparison_bids");
-  expect(ownerPage).toContain("updatedAt={request.updated_at}");
+  expect(ownerPage).toContain("Activity log");
+  expect(ownerPage).not.toContain("Next:");
   expect(ownerPage).not.toContain("OrganizedMaterialList");
   expect(ownerPage).not.toContain("RequestWorkflowStepHeader");
   expect(worktable).toContain("refresh={organizedItems.length > 0}");
   expect(worktable).toContain("Last AI review:");
   expect(worktable).toContain("<table");
   expect(worktable).toContain("Missing info / AI notes");
-  expect(worktable).toContain("RequestSupplierComparison");
+  expect(worktable).toContain("supplierComparisons.map");
   expect(organizedList).toContain("divide-y divide-slate-200");
   expect(organizedList).not.toContain("md:grid-cols-2");
   expect(organizedList).not.toContain("<table");
@@ -496,17 +497,17 @@ test("request workspace keeps pricing steps and makes client contact globally av
   expect(status).toContain("Payment & delivery");
   expect(management).toContain("step={2}");
   expect(management).toContain("Contact Suppliers");
-  expect(management).toContain("Add or change suppliers");
+  expect(management).not.toContain("Add or change suppliers");
   expect(management).toContain("updateRequestSupplierContactStatusAction");
-  expect(management).toContain("Compare Client Price &amp; Supplier Quotes");
+  expect(management).toContain("Compare supplier route");
   expect(management).toContain("Suppliers selected in Step 1");
-  expect(management).toContain("All Supplier Directory");
-  expect(management).toContain("Contact {supplierIds.length");
-  expect(management).toContain('id="supplier-routing"');
+  expect(management).not.toContain("All Supplier Directory");
+  expect(management).toContain("Contact {selectedSupplierNames.length}");
+  expect(management).not.toContain('id="supplier-routing"');
   expect(management).toContain(
     "Client, payment & delivery",
   );
-  expect(management).toContain("Supplier Route &amp; Note");
+  expect(management).toContain("Supplier route<br />Contact &amp; files");
   expect(management).not.toContain("step={4}");
   expect(management).toContain("step={3}");
   expect(management).not.toContain('id="contact-client"');

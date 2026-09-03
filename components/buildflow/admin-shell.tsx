@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowLeft,
   Files,
   LayoutDashboard,
   Menu,
@@ -17,7 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { AvantiaBuildLockup } from "@/components/buildflow/avantia-build-lockup";
@@ -176,6 +177,7 @@ function ManagerNavigation({
   onNavigate?: () => void;
   showNotifications?: boolean;
 }) {
+  const router = useRouter();
   const links = navigationLinks(access);
 
   return (
@@ -202,6 +204,16 @@ function ManagerNavigation({
       </div>
 
       <nav className={`flex flex-1 flex-col gap-1 overflow-visible py-3 ${collapsed ? "px-2" : "px-3"}`} aria-label="Manager navigation">
+        <button
+          type="button"
+          onClick={() => { router.back(); onNavigate?.(); }}
+          aria-label="Go back"
+          aria-describedby={collapsed ? "manager-nav-back-tooltip" : undefined}
+          className="group relative mx-auto mb-1 flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 outline-none transition hover:bg-slate-100 hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-[#0071e3]"
+        >
+          <ArrowLeft className="h-[18px] w-[18px] shrink-0" />
+          <NavigationTooltip id="manager-nav-back-tooltip" label="Back" />
+        </button>
         {collapsed && onCollapsedChange ? (
           <button
             type="button"
@@ -247,6 +259,7 @@ function ManagerNavigation({
 
 export function AdminShell({ children, access }: { children: ReactNode; access: ManagerAccess }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(true);
 
@@ -274,14 +287,17 @@ export function AdminShell({ children, access }: { children: ReactNode; access: 
 
       <div className="min-w-0">
         <header className="sticky top-0 z-50 flex min-h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:hidden">
-          <button
-            type="button"
-            onClick={() => setMenuOpen(true)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-800"
-            aria-label="Open manager navigation"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={() => router.back()} className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-800" aria-label="Go back"><ArrowLeft className="h-5 w-5" /></button>
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-800"
+              aria-label="Open manager navigation"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          </div>
           <Link href="/" aria-label="Open the Avantia Build customer website" className="min-w-0"><AvantiaBuildLockup compact /></Link>
           <ManagerNotificationCenter compact />
         </header>

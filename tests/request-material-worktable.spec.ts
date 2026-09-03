@@ -133,7 +133,7 @@ test("supplier quotes move into compact step two instead of expanding the reques
   expect(management).toContain("They replied")
   expect(management).toContain("We replied · waiting")
   expect(management).toContain("Quote received")
-  expect(management).toContain("Compare Client Price &amp; Supplier Quotes")
+  expect(management).toContain("Compare supplier route")
   expect(management).toContain("Contact &amp; files")
   expect(management).toContain("price comparisons")
   expect(management).toContain("Exact supplier · current request")
@@ -143,7 +143,8 @@ test("supplier quotes move into compact step two instead of expanding the reques
   expect(management).toContain("comparison.documents.map")
   expect(page).toContain('.eq("request_id", requestId)')
   expect(page).toContain("documents: comparisonDocuments.map")
-  expect(management).toContain("AI · Look for suppliers online")
+  expect(management).not.toContain("Request Details &amp; Notes")
+  expect(management).not.toContain("Add or change suppliers")
   expect(management).not.toContain('title="Supplier email"')
   expect(management, "supplier bids should not be isolated in repeated large comparison cards").not.toContain("comparisons.map((comparison) => <article")
 })
@@ -171,16 +172,16 @@ test("supplier routes are alphabetical checklists with per-item or whole-request
   expect(page).toContain("resolveRequestSupplierRouteSelections(items ?? [], suppliers)")
   expect(page).toContain("routeSelections={routeSelections}")
   expect(management).toContain("Suppliers selected in Step 1")
-  expect(management).toContain("routeContactSupplierIds")
-  expect(management).toContain("Not linked to directory")
-  expect(management).toContain("supplierRouteVersion(item.metadata)")
+  expect(management).not.toContain("routeContactSupplierIds")
+  expect(management).not.toContain("Add or change suppliers")
+  expect(management).toContain("Compare supplier route")
   expect(worktable.match(/Route \{selectedRouteIds\.length\} selected/g)).toHaveLength(1)
   expect(actions).not.toContain("].slice(0, 12)")
   expect(actions).toContain("p_supplier_route_entries: supplierRouteEntries")
   expect(actions).toContain('supabase.rpc("staff_save_request_item_supplier_routes"')
 })
 
-test("safe request text, notes, and routes autosave with stale-response protection and retry", async () => {
+test("safe request text and routes autosave with stale-response protection and retry", async () => {
   const [management, routeEditor, originalEditor, autosave] = await Promise.all([
     source(managementPath),
     source(routeEditorPath),
@@ -188,9 +189,8 @@ test("safe request text, notes, and routes autosave with stale-response protecti
     source(autosaveHookPath),
   ])
 
-  expect(management).toContain("saveRequestManagerNotesAction")
-  expect(management).toContain("notesAutosave.queue(value)")
-  expect(management).not.toContain(">Save notes</button>")
+  expect(management).not.toContain("Request Details &amp; Notes")
+  expect(management).not.toContain("notesAutosave")
   expect(routeEditor).toContain("autosave.queue")
   expect(routeEditor).not.toContain("Save route")
   expect(routeEditor).not.toContain("Apply to all items")
@@ -202,7 +202,6 @@ test("safe request text, notes, and routes autosave with stale-response protecti
   expect(autosave).toContain("saveQueueRef.current.then")
   expect(autosave).toContain("clearTimeout(timerRef.current)")
   expect(autosave).toContain("retry")
-  expect(management).toContain("notesAutosave.flush()")
 })
 
 test("a completed autosave response can update the UI only while its version is latest", () => {
@@ -239,7 +238,11 @@ test("client contact is available at the request header and does not consume ste
   ])
 
   expect(page).toContain("<RequestClientContact />")
-  expect(page).toMatch(/mailto:|tel:|MessageSquareText|Mail|Phone/)
+  expect(page).not.toContain("{clientEmail}")
+  expect(page).not.toContain("{profile?.email}")
+  expect(contact).toContain("<Phone")
+  expect(contact).toContain('aria-label="Contact client"')
+  expect(contact).toContain("h-9 w-9")
   expect(management).not.toContain("step={4}")
   expect(management).not.toContain('title="Contact client"')
   expect(management).not.toContain('<details id="contact-client"')
@@ -266,6 +269,26 @@ test("client contact is available at the request header and does not consume ste
   expect(management).toContain("sendClientText")
   expect(management).toContain("saveDeliverySchedule")
   expect(management).toContain("Create and send estimate")
+})
+
+test("request header is compact and request text edits directly on click", async () => {
+  const [page, worktable, editor] = await Promise.all([
+    source(pagePath),
+    source(worktablePath),
+    source(originalEditorPath),
+  ])
+
+  expect(page).not.toContain("Back to Customer Requests")
+  expect(page).toContain("MaterialRequestAssigneeControl")
+  expect(page).toContain("CustomerRequestStatus")
+  expect(page).toContain("Activity log")
+  expect(page).not.toContain("Next:")
+  expect(worktable).toContain("<FileText")
+  expect(worktable).toContain("Documents <span")
+  expect(worktable).toContain('trigger="content"')
+  expect(worktable).toContain('itemKind="organized"')
+  expect(editor).toContain('trigger === "content"')
+  expect(editor).toContain("updateOrganizedMaterialItemAction")
 })
 
 test("missing-question generation preserves answers and never asks an answered question twice", async () => {

@@ -41,12 +41,61 @@ export function smsReplyLanguage(value: string) {
   return "en";
 }
 
+const SMS_MATERIAL_SPELLING_WORDS = [
+  "address", "available", "availability", "cabinet", "cabinets", "cement", "compound", "concrete", "delivery", "drywall", "electrical", "flooring", "insulation", "lumber", "material", "materials", "moisture", "paint", "plumbing", "plywood", "primer", "quantity", "regular", "resistant", "screws", "sheetrock", "shingles", "tomorrow", "windows",
+  "aislamiento", "cantidad", "cemento", "concreto", "direccion", "disponible", "electrico", "entrega", "gabinetes", "humedad", "madera", "materiales", "necesito", "paneles", "pintura", "plomeria", "precio", "puertas", "resistente", "tornillos", "ventanas", "yeso",
+] as const;
+
+const SMS_MATERIAL_SPELLING_ALIASES: Record<string, string> = {
+  adress: "address", adres: "address", avalable: "available", availble: "available",
+  delivary: "delivery", delivry: "delivery", drywal: "drywall", drywll: "drywall",
+  plywod: "plywood", quntity: "quantity", quantaty: "quantity", sheetrok: "sheetrock",
+  tomorow: "tomorrow", tommorow: "tomorrow",
+  direcsion: "dirección", dirrecion: "dirección", direccion: "dirección",
+  disponivle: "disponible", entreja: "entrega", maniana: "mañana", manana: "mañana",
+  nececito: "necesito", nesecito: "necesito", nesesito: "necesito", plomeria: "plomería",
+  presio: "precio", tornilos: "tornillos", umedad: "humedad",
+};
+
+function smsSpellingDistance(left: string, right: string) {
+  if (Math.abs(left.length - right.length) > 2) return 3;
+  const row = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    let previous = row[0];
+    row[0] = leftIndex;
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const held = row[rightIndex];
+      row[rightIndex] = Math.min(
+        row[rightIndex] + 1,
+        row[rightIndex - 1] + 1,
+        previous + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
+      );
+      previous = held;
+    }
+  }
+  return row[right.length];
+}
+
+function normalizeSmsConstructionWord(word: string) {
+  const lowered = word.toLocaleLowerCase("en-US");
+  if (SMS_MATERIAL_SPELLING_ALIASES[lowered]) return SMS_MATERIAL_SPELLING_ALIASES[lowered];
+  if (lowered.length < 5 || /\d/.test(lowered) || SMS_MATERIAL_SPELLING_WORDS.includes(lowered as typeof SMS_MATERIAL_SPELLING_WORDS[number])) return word;
+  const maximumDistance = lowered.length >= 8 ? 2 : 1;
+  const matches = SMS_MATERIAL_SPELLING_WORDS
+    .map((candidate) => ({ candidate, distance: smsSpellingDistance(lowered, candidate) }))
+    .filter((entry) => entry.distance <= maximumDistance)
+    .sort((left, right) => left.distance - right.distance);
+  if (!matches.length || (matches[1] && matches[1].distance === matches[0].distance)) return word;
+  return matches[0].candidate;
+}
+
 export function normalizeSmsMaterialAnswerTypos(value: string) {
   return value
     .replace(/\b(?:relugar|regualr|reglar|reguler)\b/gi, "regular")
     .replace(/\b(?:tyep\s*x|typex)\b/gi, "Type X")
     .replace(/\bmoist(?:er|ure)\s+resist(?:ent|ant)\b/gi, "moisture-resistant")
-    .replace(/\bfire\s+rat(?:ted|ed)\b/gi, "fire-rated");
+    .replace(/\bfire\s+rat(?:ted|ed)\b/gi, "fire-rated")
+    .replace(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+/g, normalizeSmsConstructionWord);
 }
 
 function canonicalMaterialText(value: string) {

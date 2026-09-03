@@ -237,6 +237,16 @@ test("material request advances across turns after address until complete", () =
   expect(resolveSmsMaterialReplyStep({ isMaterialRequest: true, hasGroundedItems: true, addressKnown: true, neededByKnown: true, proposedReply: "Would you like to add accessories?" })).toBe("complete")
 })
 
+test("construction intake understands strong English and Spanish spelling mistakes without guessing names", () => {
+  expect(normalizeSmsMaterialAnswerTypos("Need 20 shetrock, delivry tomorow to this adress"))
+    .toBe("Need 20 sheetrock, delivery tomorrow to this address")
+  expect(normalizeSmsMaterialAnswerTypos("Nesesito 20 paneles de yeso, entreja manana, direcsion despues"))
+    .toBe("necesito 20 paneles de yeso, entrega mañana, dirección despues")
+  expect(looksLikeSmsMaterialRequest(normalizeSmsMaterialAnswerTypos("Nesesito 20 paneles de yeso"))).toBe(true)
+  expect(smsReplyLanguage(normalizeSmsMaterialAnswerTypos("Nesesito precio y entreja manana"))).toBe("es")
+  expect(normalizeSmsMaterialAnswerTypos("Call Frank at Dundy Glass")).toBe("Call Frank at Dundy Glass")
+})
+
 test("ambiguous material lists must be clarified before confirmation", () => {
   expect(smsMaterialClarificationQuestions("I need 50 Sheet Rock")).toEqual([
     "Can we do 5/8-in. regular Sheetrock, or do you need Type X/fire-rated or moisture-resistant?",
