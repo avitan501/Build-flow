@@ -54,8 +54,8 @@ jobs:
         run: |
           node -e "require('node:fs').rmSync('.next', { recursive: true, force: true })"
           npm run lint
-          npx tsc --noEmit --incremental false
           npm run build
+          npx tsc --noEmit --incremental false
 
       - name: Recheck immutable main immediately before deployment
         run: node scripts/production-release-guard.mjs preflight
