@@ -2,12 +2,14 @@
 
 import { randomUUID } from "node:crypto"
 import { revalidatePath } from "next/cache"
+import { headers } from "next/headers"
 
 import { sendManagerClientReplyEmail } from "@/lib/cart-submission-email"
 import { deliverEmailWithSupabaseFallback } from "@/lib/email-delivery-fallback"
 import { requireStaffProfile } from "@/lib/auth"
 import { scheduleClientMaterialListOrganization } from "@/lib/material-request-organization"
-import { buildProjectUploadStoragePath, PROJECT_UPLOAD_ALLOWED_MIME_TYPES, PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/projects"
+import { buildProjectUploadStoragePath, sanitizeProjectUploadFileName } from "@/lib/projects"
+import { requestActionHasSameOrigin, validateRequestAttachmentFile, verifyRequestAttachmentStorage } from "@/lib/request-attachment-upload"
 import { generateRequestClientQuotePdf, type RequestClientDocumentType, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
 import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sanitizeRequestClientPayment, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
@@ -22,6 +24,12 @@ type DeliveryScheduleResult = { ok: true } | { ok: false; error: string }
 export type MaterialRequestStatus = "submitted" | "in_review" | "quoted" | "closed"
 export type MaterialRequestAssignee = "carlos" | "david"
 export type ExistingRequestUploadInput = { storagePath: string; filename: string; type: string; size: number }
+export type PrepareRequestAttachmentUploadResult =
+  | { ok: true; data: { storagePath: string; token: string } }
+  | { ok: false; code: "invalid_origin" | "invalid_file" | "request_not_found" | "prepare_failed"; error: string }
+export type AddRequestAttachmentsResult =
+  | { ok: true; organizationStatus: string }
+  | { ok: false; code: "invalid_request" | "invalid_files" | "request_not_found" | "storage_failed"; error: string }
 
 export type RequestSupplierPlanInput = {
   requestId: string
@@ -33,6 +41,39 @@ export type RequestSupplierContactStatus = "not_contacted" | "request_sent" | "s
 const MATERIAL_REQUEST_STATUSES = new Set<MaterialRequestStatus>(["submitted", "in_review", "quoted", "closed"])
 const MATERIAL_REQUEST_ASSIGNEES = new Set<MaterialRequestAssignee>(["carlos", "david"])
 const REQUEST_SUPPLIER_CONTACT_STATUSES = new Set<RequestSupplierContactStatus>(["not_contacted", "request_sent", "supplier_replied", "awaiting_supplier_reply", "quote_received"])
+
+export async function prepareRequestAttachmentUploadAction(input: {
+  requestId: string
+  filename: string
+  type: string
+  size: number
+}): Promise<PrepareRequestAttachmentUploadResult> {
+  const requestHeaders = await headers()
+  if (!requestActionHasSameOrigin(requestHeaders.get("origin"), requestHeaders.get("x-forwarded-host"), requestHeaders.get("host"))) {
+    return { ok: false, code: "invalid_origin", error: "This upload request was blocked for security." }
+  }
+  const requestId = String(input?.requestId || "").trim()
+  const file = { filename: String(input?.filename || "").trim(), type: String(input?.type || "").trim(), size: Number(input?.size) }
+  if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false, code: "request_not_found", error: "Request not found." }
+  const fileError = validateRequestAttachmentFile(file)
+  if (fileError) return { ok: false, code: "invalid_file", error: fileError }
+
+  try {
+    const { supabase, user } = await requireStaffProfile("customers")
+    const { data: request, error: requestError } = await supabase.from("quote_requests").select("id").eq("id", requestId).maybeSingle<{ id: string }>()
+    if (requestError || !request) return { ok: false, code: "request_not_found", error: "Request not found." }
+    const storagePath = `public-intake/${user.id}/${randomUUID()}-${sanitizeProjectUploadFileName(file.filename)}`
+    const { data, error } = await createAdminClient().storage.from("project-uploads").createSignedUploadUrl(storagePath)
+    if (error || !data?.token) {
+      console.error("Existing request signed upload preparation failed", { requestId, code: error?.statusCode || "storage_error" })
+      return { ok: false, code: "prepare_failed", error: "The private upload could not be prepared. Please try again." }
+    }
+    return { ok: true, data: { storagePath, token: data.token } }
+  } catch (cause) {
+    console.error("Existing request signed upload preparation failed", cause)
+    return { ok: false, code: "prepare_failed", error: "The private upload could not be prepared. Please try again." }
+  }
+}
 
 export async function updateRequestSupplierContactStatusAction(input: { requestId: string; supplierId: string; status: RequestSupplierContactStatus }) {
   const requestId = String(input.requestId || "").trim()
@@ -89,39 +130,59 @@ export async function updateRequestSupplierContactStatusAction(input: { requestI
   return { ok: true as const }
 }
 
-export async function addRequestAttachmentsAction(input: { requestId: string; attachments: ExistingRequestUploadInput[] }) {
+export async function addRequestAttachmentsAction(input: { requestId: string; attachments: ExistingRequestUploadInput[] }): Promise<AddRequestAttachmentsResult> {
   const requestId = String(input.requestId || "").trim()
   const attachments = Array.isArray(input.attachments) ? input.attachments : []
-  if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false as const, error: "Request not found." }
-  if (!attachments.length || attachments.length > 10) return { ok: false as const, error: "Choose between 1 and 10 files." }
-  const allowedTypes = new Set<string>(PROJECT_UPLOAD_ALLOWED_MIME_TYPES)
-  const invalid = attachments.find((attachment) => !attachment.storagePath.startsWith("public-intake/") || attachment.storagePath.includes("..") || !attachment.filename.trim() || !allowedTypes.has(attachment.type) || !Number.isFinite(attachment.size) || attachment.size <= 0 || attachment.size > PROJECT_UPLOAD_MAX_FILE_SIZE_BYTES)
-  if (invalid) return { ok: false as const, error: "One of the selected files is invalid. Remove it and try again." }
+  if (!/^[0-9a-f-]{36}$/i.test(requestId)) return { ok: false, code: "invalid_request", error: "Request not found." }
+  if (!attachments.length || attachments.length > 10) return { ok: false, code: "invalid_files", error: "Choose between 1 and 10 files." }
+  const invalid = attachments.find((attachment) => !attachment
+    || typeof attachment.storagePath !== "string"
+    || !attachment.storagePath
+    || validateRequestAttachmentFile(attachment))
+  if (invalid) return { ok: false, code: "invalid_files", error: "One of the selected files is invalid. Remove it and try again." }
 
-  const { supabase } = await requireStaffProfile("customers")
-  const { data: request } = await supabase.from("quote_requests").select("id,project_id,owner_id").eq("id", requestId).maybeSingle<{ id: string; project_id: string; owner_id: string }>()
-  if (!request?.project_id || !request.owner_id) return { ok: false as const, error: "Request not found." }
-  const admin = createAdminClient()
+  let admin: ReturnType<typeof createAdminClient> | null = null
   const storedPaths: string[] = []
+  const stagedPaths = attachments.map((attachment) => attachment.storagePath)
   try {
+    const { supabase, user } = await requireStaffProfile("customers")
+    const expectedStagingPrefix = `public-intake/${user.id}/`
+    if (attachments.some((attachment) => !attachment.storagePath.startsWith(expectedStagingPrefix) || attachment.storagePath.includes(".."))) {
+      return { ok: false, code: "invalid_files", error: "One of the selected files could not be verified. Please upload it again." }
+    }
+    admin = createAdminClient()
+    const { data: request, error: requestError } = await supabase.from("quote_requests").select("id,project_id,owner_id").eq("id", requestId).maybeSingle<{ id: string; project_id: string; owner_id: string }>()
+    if (requestError || !request?.project_id || !request.owner_id) {
+      await admin.storage.from("project-uploads").remove(stagedPaths)
+      return { ok: false, code: "request_not_found", error: "Request not found." }
+    }
     for (const attachment of attachments) {
-      const { data: fileInfo, error: infoError } = await admin.storage.from("project-uploads").info(attachment.storagePath)
-      if (infoError || !fileInfo || fileInfo.size !== attachment.size || fileInfo.contentType !== attachment.type) throw new Error("attachment_verification_failed")
+      const storage = admin.storage.from("project-uploads")
+      const verified = await verifyRequestAttachmentStorage(
+        () => storage.info(attachment.storagePath),
+        { size: attachment.size, type: attachment.type },
+      )
+      if (!verified.ok) throw new Error("attachment_verification_failed")
       const finalPath = buildProjectUploadStoragePath({ ownerId: request.owner_id, projectId: request.project_id, uploadId: randomUUID(), fileName: attachment.filename })
-      const { error: moveError } = await admin.storage.from("project-uploads").move(attachment.storagePath, finalPath)
+      const { error: moveError } = await storage.move(attachment.storagePath, finalPath)
       if (moveError) throw new Error("attachment_move_failed")
       storedPaths.push(finalPath)
       const { error: recordError } = await admin.from("quote_request_attachments").insert({ request_id: request.id, project_id: request.project_id, owner_id: request.owner_id, file_name: attachment.filename.trim().slice(0, 180), file_path: finalPath, file_type: attachment.type, file_size: attachment.size })
       if (recordError) throw new Error("attachment_record_failed")
     }
   } catch (cause) {
-    if (storedPaths.length) {
-      await admin.from("quote_request_attachments").delete().eq("request_id", requestId).in("file_path", storedPaths)
-      await admin.storage.from("project-uploads").remove(storedPaths)
+    if (admin) {
+      try {
+        if (storedPaths.length) await admin.from("quote_request_attachments").delete().eq("request_id", requestId).in("file_path", storedPaths)
+        await admin.storage.from("project-uploads").remove([...new Set([...stagedPaths, ...storedPaths])])
+      } catch (cleanupCause) {
+        console.error("Existing request attachment cleanup failed", cleanupCause)
+      }
     }
     console.error("Existing request attachment storage failed", cause)
-    return { ok: false as const, error: "The files could not be attached. Please try again." }
+    return { ok: false, code: "storage_failed", error: "The files could not be attached. Please try again." }
   }
+
   let organizationStatus = "not_scheduled"
   try {
     const organization = await scheduleClientMaterialListOrganization({ requestId, force: true })
@@ -129,8 +190,12 @@ export async function addRequestAttachmentsAction(input: { requestId: string; at
   } catch (cause) {
     console.error("Existing request attachment organization scheduling failed", cause)
   }
-  revalidatePath(`/owner/materials/requests/${requestId}`)
-  return { ok: true as const, organizationStatus }
+  try {
+    revalidatePath(`/owner/materials/requests/${requestId}`)
+  } catch (cause) {
+    console.error("Existing request attachment revalidation failed", cause)
+  }
+  return { ok: true, organizationStatus }
 }
 
 export async function saveRequestSupplierPlanAction(input: RequestSupplierPlanInput) {

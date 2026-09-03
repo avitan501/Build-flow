@@ -4,9 +4,8 @@ import { FileUp, LoaderCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
-import { addRequestAttachmentsAction, type ExistingRequestUploadInput } from "@/app/owner/materials/requests/actions"
+import { addRequestAttachmentsAction, prepareRequestAttachmentUploadAction, type ExistingRequestUploadInput } from "@/app/owner/materials/requests/actions"
 import { createClient } from "@/lib/supabase/client"
-import { getSupabasePublicEnv } from "@/lib/supabase/env"
 
 const MAX_FILES = 10
 const MAX_FILE_SIZE = 25 * 1024 * 1024
@@ -33,17 +32,17 @@ export function RequestAttachmentUploader({ requestId, compact = false }: { requ
   }
 
   async function uploadFile(file: File): Promise<ExistingRequestUploadInput> {
-    const { url, anonKey } = getSupabasePublicEnv()
-    const response = await fetch(`${url}/functions/v1/public-quote-intake`, {
-      method: "POST",
-      headers: { apikey: anonKey, authorization: `Bearer ${anonKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ action: "prepare_upload", filename: file.name, type: file.type, size: file.size }),
+    const prepared = await prepareRequestAttachmentUploadAction({
+      requestId,
+      filename: file.name,
+      type: file.type,
+      size: file.size,
     })
-    const prepared = await response.json().catch(() => null) as { path?: string; token?: string; error?: string } | null
-    if (!response.ok || !prepared?.path || !prepared.token) throw new Error(prepared?.error || `Could not prepare ${file.name}.`)
-    const { error } = await createClient().storage.from("project-uploads").uploadToSignedUrl(prepared.path, prepared.token, file, { contentType: file.type, upsert: false })
+    if (!prepared.ok) throw new Error(prepared.error)
+    const { storagePath, token } = prepared.data
+    const { error } = await createClient().storage.from("project-uploads").uploadToSignedUrl(storagePath, token, file, { contentType: file.type, upsert: false })
     if (error) throw new Error(`Could not upload ${file.name}. Please try again.`)
-    return { storagePath: prepared.path, filename: file.name, type: file.type, size: file.size }
+    return { storagePath, filename: file.name, type: file.type, size: file.size }
   }
 
   function attachFiles(files: File[]) {
@@ -61,7 +60,7 @@ export function RequestAttachmentUploader({ requestId, compact = false }: { requ
         router.refresh()
       } catch (cause) {
         console.error("Request attachment upload failed", cause)
-        showError("The files could not be attached. Please try again.")
+        showError(cause instanceof Error ? cause.message : "The files could not be attached. Please try again.")
       }
     })
   }
