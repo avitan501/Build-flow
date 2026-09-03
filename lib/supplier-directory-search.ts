@@ -1,5 +1,10 @@
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 
+export type VerifiedSupplierDirectorySections = {
+  preferred: SupplierRoutingOption[]
+  approved: SupplierRoutingOption[]
+}
+
 function collectSearchValues(value: unknown): string[] {
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return [String(value)]
   if (Array.isArray(value)) return value.flatMap(collectSearchValues)
@@ -26,4 +31,19 @@ export function supplierMatchesDirectorySearch(supplier: SupplierRoutingOption, 
     const compactTerm = term.replace(/[^a-z0-9]+/g, "")
     return compactTerm.length > 0 && compactSearchableText.includes(compactTerm)
   })
+}
+
+export function sortSupplierDirectoryAlphabetically(suppliers: SupplierRoutingOption[]) {
+  return [...suppliers].sort((left, right) =>
+    left.name.localeCompare(right.name, "en-US", { numeric: true, sensitivity: "base" })
+      || left.id.localeCompare(right.id),
+  )
+}
+
+export function splitVerifiedSupplierDirectory(suppliers: SupplierRoutingOption[]): VerifiedSupplierDirectorySections {
+  const sorted = sortSupplierDirectoryAlphabetically(suppliers)
+  return {
+    preferred: sorted.filter((supplier) => supplier.trustLevel === "preferred"),
+    approved: sorted.filter((supplier) => supplier.trustLevel === "verified" || supplier.trustLevel === "trusted"),
+  }
 }
