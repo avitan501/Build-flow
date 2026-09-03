@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireStaffProfile } from "@/lib/auth";
+import { matchRequestClientQuoteItems } from "@/lib/client-quote-import";
+import { extractSupplierQuoteFile } from "@/lib/supplier-quote-extraction";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { sendClientQuoteEmail } from "@/lib/cart-submission-email";
 import { generateClientQuotePdf } from "@/lib/client-quote-pdf";
 import {
@@ -25,6 +28,7 @@ const comparisonPath = (comparisonId: string) => `/admin/quote-comparison/${comp
 const CLIENT_QUOTE_ATTACHMENT_BUCKET = "project-uploads";
 const CLIENT_QUOTE_MAX_FILES = 10;
 const CLIENT_QUOTE_MAX_TOTAL_SIZE = 25 * 1024 * 1024;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function cleanText(value: string, maxLength: number) {
   return value.trim().slice(0, maxLength);
@@ -294,6 +298,104 @@ export async function saveQuoteComparisonClientTargetsAction(input: {
   if (comparisonError) return { ok: false, error: "The client delivery and tax could not be saved." };
   revalidatePath(comparisonPath(comparisonId));
   return { ok: true };
+}
+
+export async function importRequestClientQuotePricesAction(input: {
+  comparisonId: string;
+  attachmentId: string;
+}): Promise<ActionResult<{
+  fileName: string;
+  matchedCount: number;
+  extractedCount: number;
+  prices: Array<{ itemId: string; clientUnitPrice: number }>;
+  deliveryCharge: number | null;
+  taxPercent: number | null;
+}>> {
+  const { supabase } = await requireStaffProfile("suppliers");
+  if (!UUID_PATTERN.test(input.comparisonId) || !UUID_PATTERN.test(input.attachmentId)) {
+    return { ok: false, error: "Choose a client quote from this request." };
+  }
+  const lockedError = await ensureComparisonEditable(supabase, input.comparisonId);
+  if (lockedError) return { ok: false, error: lockedError };
+
+  const { data: comparison, error: comparisonError } = await supabase
+    .from("quote_comparisons")
+    .select("id,request_id")
+    .eq("id", input.comparisonId)
+    .maybeSingle<{ id: string; request_id: string | null }>();
+  if (comparisonError || !comparison?.request_id) {
+    return { ok: false, error: "This comparison is not connected to a client request." };
+  }
+
+  const { data: attachment, error: attachmentError } = await supabase
+    .from("quote_request_attachments")
+    .select("id,request_id,file_name,file_path,file_type,file_size")
+    .eq("id", input.attachmentId)
+    .eq("request_id", comparison.request_id)
+    .maybeSingle<{ id: string; request_id: string; file_name: string; file_path: string; file_type: string; file_size: number }>();
+  if (attachmentError || !attachment) {
+    return { ok: false, error: "That client quote is not attached to this exact request." };
+  }
+
+  const { data: comparisonItems, error: itemsError } = await supabase
+    .from("quote_comparison_items")
+    .select("id,description,specification")
+    .eq("comparison_id", input.comparisonId)
+    .order("sort_order")
+    .returns<Array<{ id: string; description: string; specification: string }>>();
+  if (itemsError || !comparisonItems?.length) {
+    return { ok: false, error: "This comparison has no request lines to match." };
+  }
+
+  try {
+    const admin = createAdminClient();
+    const { data: fileBlob, error: downloadError } = await admin.storage
+      .from(CLIENT_QUOTE_ATTACHMENT_BUCKET)
+      .download(attachment.file_path);
+    if (downloadError || !fileBlob) throw downloadError ?? new Error("Client quote download failed");
+    const file = new File([fileBlob], attachment.file_name, { type: attachment.file_type });
+    const extraction = await extractSupplierQuoteFile(file, "", async (payload) => {
+      const { data, error } = await supabase.functions.invoke("supplier-quote-ocr", { body: payload });
+      if (error) throw error;
+      return data;
+    });
+    const { matches } = matchRequestClientQuoteItems(extraction.items, comparisonItems);
+    const extractedCount = extraction.items.filter((item) => item.unitPrice !== null || (item.lineTotal !== null && item.quantity > 0)).length;
+    if (!matches.length) {
+      return { ok: false, error: "No priced lines in this client quote matched the request. The file was kept; review the material names or enter prices manually." };
+    }
+    const updates = await Promise.all(matches.map((match) => supabase
+      .from("quote_comparison_items")
+      .update({ client_unit_price: cleanUnitPrice(match.clientUnitPrice) })
+      .eq("comparison_id", input.comparisonId)
+      .eq("id", match.comparisonItemId)));
+    if (updates.some((update) => update.error)) throw new Error("Client line price update failed");
+
+    const hasDelivery = Number(extraction.metadata.deliveryCharge) > 0;
+    const hasTax = Number(extraction.metadata.taxPercent) > 0;
+    if (hasDelivery || hasTax) {
+      const values: { client_delivery_charge?: number; client_tax_percent?: number } = {};
+      if (hasDelivery) values.client_delivery_charge = cleanMoney(extraction.metadata.deliveryCharge);
+      if (hasTax) values.client_tax_percent = cleanTaxPercent(extraction.metadata.taxPercent);
+      const { error } = await supabase.from("quote_comparisons").update(values).eq("id", input.comparisonId);
+      if (error) throw error;
+    }
+    revalidatePath(comparisonPath(input.comparisonId));
+    return {
+      ok: true,
+      data: {
+        fileName: attachment.file_name,
+        matchedCount: matches.length,
+        extractedCount,
+        prices: matches.map((match) => ({ itemId: match.comparisonItemId, clientUnitPrice: cleanUnitPrice(match.clientUnitPrice) })),
+        deliveryCharge: hasDelivery ? cleanMoney(extraction.metadata.deliveryCharge) : null,
+        taxPercent: hasTax ? cleanTaxPercent(extraction.metadata.taxPercent) : null,
+      },
+    };
+  } catch (error) {
+    console.error("Client quote import failed", error);
+    return { ok: false, error: "The client quote could not be read. The attachment is still saved; try again or enter the client prices manually." };
+  }
 }
 
 export async function saveQuoteComparisonBidAction(input: {

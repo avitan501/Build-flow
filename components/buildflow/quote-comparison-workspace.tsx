@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  FileInput,
   PackagePlus,
   Plus,
   RotateCcw,
@@ -25,6 +26,7 @@ import {
   confirmQuoteComparisonPriceMatchAction,
   deleteQuoteComparisonAction,
   deleteQuoteComparisonItemAction,
+  importRequestClientQuotePricesAction,
   removeQuoteComparisonSupplierAction,
   reopenQuoteComparisonAction,
   saveQuoteComparisonBidAction,
@@ -61,6 +63,15 @@ type BidDraft = {
   notes: string;
 };
 type PriceDraft = { unitPrice: string; isAvailable: boolean; notes: string };
+type RequestClientQuoteSource = {
+  id: string;
+  request_id: string;
+  file_name: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
+  created_at: string;
+};
 
 const commonUnits = ["each", "piece", "sheet", "box", "bag", "bundle", "linear ft", "sq. ft.", "yard", "gallon"];
 
@@ -99,6 +110,7 @@ export function QuoteComparisonWorkspace({
   departments,
   clients,
   clientQuoteAttachments,
+  requestClientQuoteSources = [],
   previewMode = false,
 }: {
   comparison: QuoteComparisonRecord;
@@ -109,6 +121,7 @@ export function QuoteComparisonWorkspace({
   departments: string[];
   clients: QuoteClientOption[];
   clientQuoteAttachments: ClientQuoteAttachmentRecord[];
+  requestClientQuoteSources?: RequestClientQuoteSource[];
   previewMode?: boolean;
 }) {
   const router = useRouter();
@@ -151,6 +164,7 @@ export function QuoteComparisonWorkspace({
   const [clientTargetDrafts, setClientTargetDrafts] = useState<Record<string, string>>(() => Object.fromEntries(items.map((item) => [item.id, item.client_unit_price === null || item.client_unit_price === undefined ? "" : String(item.client_unit_price)])));
   const [clientDeliveryDraft, setClientDeliveryDraft] = useState(String(comparison.client_delivery_charge));
   const [clientTaxDraft, setClientTaxDraft] = useState(String(comparison.client_tax_percent));
+  const [selectedClientQuoteSourceId, setSelectedClientQuoteSourceId] = useState(requestClientQuoteSources[0]?.id ?? "");
 
   const availableSuppliers = suppliers.filter((supplier) => !bids.some((bid) => bid.supplier_id === supplier.id));
   const liveBids = useMemo<QuoteComparisonBidRecord[]>(() => bids.map((bid) => {
@@ -282,6 +296,30 @@ export function QuoteComparisonWorkspace({
         return;
       }
       setMessage("Entered prices saved. Unfilled rows remain open for later.");
+      router.refresh();
+    });
+  }
+
+  function pullClientQuotePrices() {
+    if (!selectedClientQuoteSourceId || previewMode) return;
+    setError("");
+    setMessage("");
+    startTransition(async () => {
+      const result = await importRequestClientQuotePricesAction({
+        comparisonId: comparison.id,
+        attachmentId: selectedClientQuoteSourceId,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setClientTargetDrafts((current) => ({
+        ...current,
+        ...Object.fromEntries(result.data.prices.map((price) => [price.itemId, String(price.clientUnitPrice)])),
+      }));
+      if (result.data.deliveryCharge !== null) setClientDeliveryDraft(String(result.data.deliveryCharge));
+      if (result.data.taxPercent !== null) setClientTaxDraft(String(result.data.taxPercent));
+      setMessage(`Pulled ${result.data.matchedCount} of ${result.data.extractedCount} priced lines from ${result.data.fileName}. Unmatched rows remain open.`);
       router.refresh();
     });
   }
@@ -423,6 +461,24 @@ export function QuoteComparisonWorkspace({
               <button type="button" onClick={saveAllQuotes} disabled={pending || bids.length === 0} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-40"><Save className="h-4 w-4" /> Save entered prices</button>
             </div> : null}
           </div>
+
+          {comparison.request_id ? <div className="border-b border-amber-200 bg-amber-50/70 px-5 py-4 sm:px-6">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-black uppercase tracking-[0.08em] text-amber-900">Client quote for this request</p>
+                <p className="mt-1 text-xs text-amber-800">Pull the client’s attached quote into Client Ready to Pay. Only matched rows are filled; all other rows stay open.</p>
+              </div>
+              {requestClientQuoteSources.length ? <>
+                <label className="grid min-w-0 flex-1 gap-1 text-xs font-bold text-amber-900 lg:max-w-md">
+                  Attached document
+                  <select value={selectedClientQuoteSourceId} onChange={(event) => setSelectedClientQuoteSourceId(event.target.value)} disabled={pending || locked} className="min-h-11 min-w-0 rounded-lg border border-amber-300 bg-white px-3 text-sm text-slate-950 disabled:bg-slate-100">
+                    {requestClientQuoteSources.map((source) => <option key={source.id} value={source.id}>{source.file_name}</option>)}
+                  </select>
+                </label>
+                <button type="button" onClick={pullClientQuotePrices} disabled={pending || locked || !selectedClientQuoteSourceId} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-amber-950 px-4 text-sm font-bold text-white disabled:opacity-40"><FileInput className="h-4 w-4" /> Pull client prices</button>
+              </> : <p className="rounded-lg border border-dashed border-amber-300 bg-white px-4 py-3 text-xs font-bold text-amber-900">No client quote is attached yet. Add it under Documents &amp; photos in Step 1, then return here.</p>}
+            </div>
+          </div> : null}
 
           {showSupplierForm && canManageStructure ? <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-end sm:px-6"><label className="grid flex-1 gap-1 text-xs font-bold text-slate-600">Supplier<select value={supplierId} onChange={(event) => setSupplierId(event.target.value)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">Choose from Supplier Directory</option>{availableSuppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name} · {trustLabel(supplier.trustLevel || "not-reviewed")}</option>)}</select></label><button type="button" onClick={addSupplier} disabled={pending || !supplierId} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 text-sm font-bold text-white disabled:opacity-40"><Plus className="h-4 w-4" /> Add supplier</button></div> : null}
 

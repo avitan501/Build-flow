@@ -7,6 +7,15 @@ import type { SupplierRoutingOption } from "@/lib/shop-qualification";
 import { SHOP_TOOL_CATEGORIES } from "@/lib/shop-tools";
 
 type ProjectOption = { id: string; name: string; address: string | null };
+type RequestClientQuoteSource = {
+  id: string;
+  request_id: string;
+  file_name: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
+  created_at: string;
+};
 type ClientOption = {
   id: string;
   name: string;
@@ -47,6 +56,16 @@ export default async function QuoteComparisonDetailPage({
   if (comparisonResult.error || !comparisonResult.data) notFound();
   if (itemsResult.error || bidsResult.error || attachmentsResult.error) throw new Error("Could not load the quote comparison workspace.");
 
+  const requestClientQuoteSourcesResult = comparisonResult.data.request_id
+    ? await supabase
+        .from("quote_request_attachments")
+        .select("id,request_id,file_name,file_path,file_type,file_size,created_at")
+        .eq("request_id", comparisonResult.data.request_id)
+        .order("created_at", { ascending: false })
+        .returns<RequestClientQuoteSource[]>()
+    : { data: [] as RequestClientQuoteSource[], error: null };
+  if (requestClientQuoteSourcesResult.error) throw new Error("Could not load client quote attachments for this request.");
+
   const snapshot = directoryResult.data as { settings?: { suppliers?: SupplierRoutingOption[] } } | null;
   const suppliers = snapshot?.settings?.suppliers ?? [];
   const departments = [...new Set(SHOP_TOOL_CATEGORIES.map((department) => department.label))];
@@ -70,6 +89,7 @@ export default async function QuoteComparisonDetailPage({
       departments={departments}
       clients={clients}
       clientQuoteAttachments={attachmentsResult.data ?? []}
+      requestClientQuoteSources={requestClientQuoteSourcesResult.data ?? []}
     />
   );
 }
