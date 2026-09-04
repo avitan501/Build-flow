@@ -33,7 +33,7 @@ test("new homepage presents the approved request flow", async ({ page }) => {
     await expect(page.getByRole("heading", { name: title })).toBeAttached();
   }
   await expect(page.getByRole("heading", { name: "Why Avantia?" })).toBeVisible();
-  for (const reason of ["Lower the total cost", "Skip the supplier chase", "Support after the order"]) {
+  for (const reason of ["Check for a better price", "Skip the supplier calls", "Help after you order"]) {
     await expect(page.getByRole("heading", { name: reason })).toBeAttached();
   }
   for (const asset of [

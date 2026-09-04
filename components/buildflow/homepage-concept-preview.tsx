@@ -46,9 +46,9 @@ const reviewServices = [
 ] as const
 
 const reviewReasons = [
-  { title: "Lower the total cost", detail: "We compare materials, tax, and delivery—and suggest project-fit alternatives." },
-  { title: "Skip the supplier chase", detail: "Send a crew text, plan, or quote. We organize it and check suppliers." },
-  { title: "Support after the order", detail: "If an order is late or wrong, you have one person to call for help." },
+  { title: "Check for a better price", detail: "We compare prices and suggest better options." },
+  { title: "Skip the supplier calls", detail: "Send the list. We handle the follow-up." },
+  { title: "Help after you order", detail: "If something goes wrong, you have one person to call." },
 ] as const
 
 function Actions({ primary, secondary, dark = false, compact = false }: { primary: string; secondary: string; dark?: boolean; compact?: boolean }) {
