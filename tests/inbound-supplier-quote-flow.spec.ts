@@ -12,7 +12,7 @@ test("received email attachments enter a scoped review flow before comparison", 
     readFile(path.join(root, "lib/aura/inbound-supplier-quote.ts"), "utf8"),
     readFile(path.join(root, "components/buildflow/supplier-quote-upload-form.tsx"), "utf8"),
     readFile(path.join(root, "components/buildflow/aura-communication-workspace.tsx"), "utf8"),
-    readFile(path.join(root, "supabase/migrations/20260904023000_link_supplier_quotes_to_inbound_email.sql"), "utf8"),
+    readFile(path.join(root, "supabase/migrations/20260904020205_link_supplier_quotes_to_inbound_email.sql"), "utf8"),
   ])
 
   expect(inbox).toContain("Review as supplier quote")

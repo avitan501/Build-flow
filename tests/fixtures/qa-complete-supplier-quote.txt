@@ -1,0 +1,15 @@
+QA TEST SUPPLIER
+Quote: QA-20260904-001
+Project: QA-05 Wood Floor Quantities
+Valid through: September 11, 2026
+
+QTY  UNIT      DESCRIPTION                              UNIT PRICE  LINE TOTAL
+1200 sq ft     Engineered white oak flooring, 7 in wide $5.80       $6,960.00
+12   buckets   Flooring adhesive                         $92.00      $1,104.00
+6    rolls     Flooring underlayment                     $48.00      $288.00
+
+Materials subtotal: $8,352.00
+Delivery: $350.00
+Sales tax: 8.875% ($772.30)
+Grand total: $9,474.30
+Lead time: 3 business days

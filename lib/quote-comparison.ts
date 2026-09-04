@@ -211,6 +211,10 @@ function positiveNumber(value: number | null | undefined) {
   return Number.isFinite(number) && number >= 0 ? number : 0;
 }
 
+function moneyAmount(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 export function calculateQuoteTax(subtotal: number, taxPercent: number | null | undefined) {
   const safeSubtotal = positiveNumber(subtotal);
   const percent = Math.min(100, positiveNumber(taxPercent));
@@ -474,7 +478,7 @@ export function buildQuoteBuyingOptions(
   const analyses = analyzeQuoteComparison(items, bids);
   const supplierOptions = analyses.map<QuoteBuyingOption>((analysis) => {
     const missingFields = [...analysis.missingFields, ...clientReady.missingFields];
-    const estimatedGrossProfit = clientReady.preTaxTotal - analysis.landedTotal;
+    const estimatedGrossProfit = moneyAmount(clientReady.preTaxTotal - analysis.landedTotal);
     return {
       id: analysis.bidId,
       kind: "supplier",
@@ -502,7 +506,7 @@ export function buildQuoteBuyingOptions(
   const hasTrueMix = mixed.complete && mixed.supplierCount > 1;
   if (hasTrueMix) {
     const missingFields = [...mixed.missingFields, ...clientReady.missingFields];
-    const estimatedGrossProfit = clientReady.preTaxTotal - mixed.landedTotal;
+    const estimatedGrossProfit = moneyAmount(clientReady.preTaxTotal - mixed.landedTotal);
     supplierOptions.push({
       id: "mixed",
       kind: "mixed",

@@ -8,7 +8,17 @@ export type ExtractedSupplierQuoteItem = {
   lineTotal: number | null
 }
 
-const UNIT_PATTERN = "(?:ea(?:ch)?|pcs?|pieces?|sheets?|boards?|boxes?|bags?|rolls?|bundles?|pails?|tubes?|sets?|pairs?|sq\\.?\\s*ft\\.?|sf|lin\\.?\\s*ft\\.?|lf|ft|yards?|yds?)"
+export type ParsedSupplierQuoteMetadata = {
+  quoteNumber: string
+  expiresOn: string
+  deliveryCharge: number | null
+  taxPercent: number | null
+  subtotal: number | null
+  total: number | null
+  leadTimeDays: number | null
+}
+
+const UNIT_PATTERN = "(?:ea(?:ch)?|pcs?|pieces?|sheets?|boards?|boxes?|bags?|rolls?|bundles?|pails?|buckets?|tubes?|cartons?|gallons?|packs?|cases?|sets?|pairs?|sq\\.?\\s*ft\\.?|sf|lin\\.?\\s*ft\\.?|lf|ft|yards?|yds?)"
 const MONEY_PATTERN = "\\$?([0-9][0-9,]*(?:\\.[0-9]{1,4})?)"
 
 function amount(value: string | undefined) {
@@ -33,6 +43,35 @@ function normalizeUnit(value: string | undefined) {
 
 function cleanDescription(value: string) {
   return value.replace(/\s+/g, " ").replace(/^[-|:]+|[-|:]+$/g, "").trim().slice(0, 500)
+}
+
+function isoDateFromEnglish(value: string) {
+  const match = value.trim().match(/^(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s*(\d{4})$/i)
+  if (!match) return ""
+  const month = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"].indexOf(match[1].toLowerCase()) + 1
+  const day = Number(match[2])
+  if (!month || day < 1 || day > 31) return ""
+  return `${match[3]}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+}
+
+export function parseSupplierQuoteMetadata(text: string): ParsedSupplierQuoteMetadata {
+  const normalized = text.replace(/\r/g, "")
+  const quoteNumber = normalized.match(/^\s*(?:quote|quotation)(?:\s*(?:number|no\.?|#))?\s*:\s*([^\n]+)$/im)?.[1]?.trim().slice(0, 100) ?? ""
+  const expiresText = normalized.match(/^\s*(?:valid\s+(?:through|until)|expires?(?:\s+on)?)\s*:\s*([^\n]+)$/im)?.[1] ?? ""
+  const deliveryCharge = amount(normalized.match(/^\s*(?:delivery|freight|shipping)(?:\s+(?:charge|fee))?\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
+  const taxPercent = amount(normalized.match(/^\s*(?:sales\s+)?tax\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*%/im)?.[1])
+  const subtotal = amount(normalized.match(/^\s*(?:materials?\s+)?subtotal\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
+  const total = amount(normalized.match(/^\s*(?:grand\s+)?total\s*:\s*\$?([0-9][0-9,]*(?:\.[0-9]{1,4})?)/im)?.[1])
+  const leadTimeDays = quantity(normalized.match(/^\s*lead\s*time\s*:\s*([0-9]+)\s*(?:business\s+|calendar\s+)?days?\b/im)?.[1])
+  return {
+    quoteNumber,
+    expiresOn: /^\d{4}-\d{2}-\d{2}$/.test(expiresText.trim()) ? expiresText.trim() : isoDateFromEnglish(expiresText),
+    deliveryCharge,
+    taxPercent: taxPercent === null ? null : Math.min(100, taxPercent),
+    subtotal,
+    total,
+    leadTimeDays,
+  }
 }
 
 export function parseSupplierQuoteText(text: string): ExtractedSupplierQuoteItem[] {

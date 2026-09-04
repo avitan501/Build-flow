@@ -10,6 +10,7 @@ export type SupplierQuoteAiMetadata = {
   department: string
   deliveryCharge: number
   taxPercent: number
+  leadTimeDays: number | null
   subtotal: number | null
   total: number | null
 }
@@ -59,6 +60,11 @@ function positiveNumber(value: unknown, fallback = 1) {
   return parsed !== null && parsed > 0 ? parsed : fallback
 }
 
+function leadTimeInWholeDays(value: unknown) {
+  const parsed = nonNegativeNumber(value)
+  return parsed === null ? null : Math.min(3650, Math.round(parsed))
+}
+
 function isoDate(value: unknown) {
   const text = cleanText(value, 10)
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : ""
@@ -85,6 +91,7 @@ export function normalizeSupplierQuoteAiPayload(value: unknown): SupplierQuoteAi
       department: cleanText(metadata.department, 120),
       deliveryCharge: nonNegativeNumber(metadata.deliveryCharge) ?? 0,
       taxPercent: Math.min(100, nonNegativeNumber(metadata.taxPercent) ?? 0),
+      leadTimeDays: leadTimeInWholeDays(metadata.leadTimeDays),
       subtotal: nonNegativeNumber(metadata.subtotal),
       total: nonNegativeNumber(metadata.total),
     },
@@ -118,7 +125,7 @@ const quoteSchema = {
     metadata: {
       type: "object",
       additionalProperties: false,
-      required: ["supplierName", "quoteNumber", "quoteDate", "expiresOn", "department", "deliveryCharge", "taxPercent", "subtotal", "total"],
+      required: ["supplierName", "quoteNumber", "quoteDate", "expiresOn", "department", "deliveryCharge", "taxPercent", "leadTimeDays", "subtotal", "total"],
       properties: {
         supplierName: { type: "string" },
         quoteNumber: { type: "string" },
@@ -127,6 +134,7 @@ const quoteSchema = {
         department: { type: "string" },
         deliveryCharge: { type: "number", minimum: 0 },
         taxPercent: { type: "number", minimum: 0, maximum: 100 },
+        leadTimeDays: { type: ["number", "null"], minimum: 0, maximum: 3650 },
         subtotal: { type: ["number", "null"], minimum: 0 },
         total: { type: ["number", "null"], minimum: 0 },
       },
@@ -155,7 +163,7 @@ const quoteSchema = {
 
 const EXTRACTION_PROMPT = `Read this supplier quote, estimate, invoice, receipt, or material price list. Use the visual layout of the attached document as the source of truth when columns are misaligned in the text layer. Use OCR when the document is scanned or photographed. Extract only actual purchasable material rows. Do not turn headings, addresses, subtotals, tax, delivery, discounts, payments, or grand totals into material items.
 
-Preserve model numbers, SKUs, dimensions, thicknesses, colors, grades, pack sizes, and other product details. Put a concise product name in description and remaining details in specification. Never use a quantity, price, line total, tax, or other numeric-only value as the description. Use the quantity and unit shown in the same material row. Never invent unreadable values. Use an empty string or null where the schema allows it. Dates must be YYYY-MM-DD. Calculate taxPercent only when the printed tax amount and taxable subtotal make it dependable. Use 0 when tax or delivery is absent or unclear. Every extracted value must be reviewed by a person before use.`
+Preserve model numbers, SKUs, dimensions, thicknesses, colors, grades, pack sizes, and other product details. Put a concise product name in description and remaining details in specification. Never use a quantity, price, line total, tax, or other numeric-only value as the description. Use the quantity and unit shown in the same material row. Never invent unreadable values. Use an empty string or null where the schema allows it. Dates must be YYYY-MM-DD. Capture leadTimeDays only when a delivery or availability lead time is explicitly printed. Calculate taxPercent only when the printed tax amount and taxable subtotal make it dependable. Use 0 when tax or delivery is absent or unclear. Every extracted value must be reviewed by a person before use.`
 
 export async function extractSupplierQuoteWithAi(file: File, extractedText = "", invoke?: SupplierQuoteAiInvoker): Promise<SupplierQuoteAiResult | null> {
   if (invoke) {

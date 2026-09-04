@@ -1,7 +1,7 @@
 import "server-only"
 
 import { extractSupplierQuoteWithAi, type SupplierQuoteAiInvoker, type SupplierQuoteAiMetadata } from "@/lib/supplier-quote-ai"
-import { parseSupplierQuoteText } from "@/lib/supplier-quote-parser"
+import { parseSupplierQuoteMetadata, parseSupplierQuoteText } from "@/lib/supplier-quote-parser"
 
 const emptyMetadata: SupplierQuoteAiMetadata = {
   supplierName: "",
@@ -11,6 +11,7 @@ const emptyMetadata: SupplierQuoteAiMetadata = {
   department: "",
   deliveryCharge: 0,
   taxPercent: 0,
+  leadTimeDays: null,
   subtotal: null,
   total: null,
 }
@@ -33,6 +34,7 @@ export async function extractSupplierQuoteFile(file: File, suppliedOcrText = "",
   if (!text.trim() && suppliedOcrText.trim()) text = suppliedOcrText.slice(0, 250000)
 
   const parsedItems = parseSupplierQuoteText(text)
+  const parsedMetadata = parseSupplierQuoteMetadata(text)
   let aiResult = null
   try {
     aiResult = await extractSupplierQuoteWithAi(file, text, invoke)
@@ -55,10 +57,21 @@ export async function extractSupplierQuoteFile(file: File, suppliedOcrText = "",
       : text
         ? "The original document and its text were saved. AI could not confirm dependable rows yet; use Re-read with AI. Nothing was added to the catalog."
         : "The original document was saved. AI could not confirm dependable rows yet; use Re-read with AI. Nothing was added to the catalog."
+  const aiMetadata = aiResult?.metadata
+  const metadata: SupplierQuoteAiMetadata = {
+    ...(aiMetadata ?? emptyMetadata),
+    quoteNumber: aiMetadata?.quoteNumber || parsedMetadata.quoteNumber,
+    expiresOn: aiMetadata?.expiresOn || parsedMetadata.expiresOn,
+    deliveryCharge: aiMetadata?.deliveryCharge || parsedMetadata.deliveryCharge || 0,
+    taxPercent: aiMetadata?.taxPercent || parsedMetadata.taxPercent || 0,
+    leadTimeDays: aiMetadata?.leadTimeDays ?? parsedMetadata.leadTimeDays,
+    subtotal: aiMetadata?.subtotal ?? parsedMetadata.subtotal,
+    total: aiMetadata?.total ?? parsedMetadata.total,
+  }
   return {
     text: text.slice(0, 250000),
     items,
-    metadata: aiResult?.metadata ?? emptyMetadata,
+    metadata,
     extractionNote,
   }
 }

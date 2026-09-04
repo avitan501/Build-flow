@@ -34,6 +34,7 @@ export type SupplierQuoteRecord = {
   notes: string;
   delivery_charge: number;
   tax_percent: number;
+  lead_time_days: number | null;
   comparison_id: string | null;
   created_by: string;
   created_at: string;

@@ -649,6 +649,7 @@ test("supplier quote AI payload is normalized before database insertion", async 
       department: "Framing",
       deliveryCharge: "125.50",
       taxPercent: 108,
+      leadTimeDays: 3.4,
       subtotal: 400,
       total: 525.5,
     },
@@ -691,6 +692,7 @@ test("supplier quote AI payload is normalized before database insertion", async 
     expiresOn: "2026-09-20",
     deliveryCharge: 125.5,
     taxPercent: 100,
+    leadTimeDays: 3,
   });
   expect(result.items[0]).toMatchObject({
     description: "1/2 in. plywood",

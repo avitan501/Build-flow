@@ -13,6 +13,22 @@ type RequestMatchItem = {
   specification: string
 }
 
+type RequestSourceItem = {
+  id: string
+  metadata: Record<string, unknown> | null
+}
+
+type RequestComparisonSourceItem = RequestSourceItem & {
+  name: string
+  quantity: number
+  unit: string | null
+  department: string
+}
+
+type ExistingRequestComparisonItem = RequestMatchItem & {
+  source_request_item_id: string | null
+}
+
 function clean(value: unknown, max: number) {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, max)
 }
@@ -41,6 +57,59 @@ export function requestItemSpecification(
     clean(metadata?.request_details, 1000),
   ].filter(Boolean)
   return [...new Set(values)].join(" · ") || clean(fallbackDepartment, 1000)
+}
+
+export function effectiveRequestComparisonItems<T extends RequestSourceItem>(items: T[]) {
+  const organizedItems = items.filter((item) => item.metadata?.ai_organized === true)
+  if (!organizedItems.length) {
+    return items.filter((item) => item.metadata?.ai_organized !== true)
+  }
+
+  const organizedSourceIds = new Set(
+    organizedItems.flatMap((item) =>
+      typeof item.metadata?.source_item_id === "string"
+        ? [item.metadata.source_item_id]
+        : [],
+    ),
+  )
+  return [
+    ...organizedItems,
+    ...items.filter(
+      (item) =>
+        item.metadata?.ai_organized !== true &&
+        !organizedSourceIds.has(item.id),
+    ),
+  ]
+}
+
+export function planRequestComparisonSync<
+  TRequest extends RequestComparisonSourceItem,
+  TExisting extends ExistingRequestComparisonItem,
+>(requestItems: TRequest[], existingItems: TExisting[]) {
+  const currentItems = effectiveRequestComparisonItems(requestItems)
+  const currentSourceIds = new Set(currentItems.map((item) => item.id))
+  const existingBySourceId = new Map(
+    existingItems.flatMap((item) =>
+      item.source_request_item_id
+        ? [[item.source_request_item_id, item] as const]
+        : [],
+    ),
+  )
+  const missingItems = currentItems.filter((item) => !existingBySourceId.has(item.id))
+  const obsoleteItems = existingItems.filter(
+    (item) =>
+      !item.source_request_item_id ||
+      !currentSourceIds.has(item.source_request_item_id),
+  )
+  const semanticTransfers = matchSupplierQuoteItems(
+    missingItems.map((item) => ({
+      id: item.id,
+      description: item.name,
+      specification: requestItemSpecification(item.metadata, item.department),
+    })),
+    obsoleteItems,
+  )
+  return { currentItems, existingBySourceId, missingItems, obsoleteItems, semanticTransfers }
 }
 
 function comparisonWords(value: string) {

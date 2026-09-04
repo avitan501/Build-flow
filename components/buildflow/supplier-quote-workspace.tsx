@@ -52,6 +52,7 @@ export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, depar
   const [notes, setNotes] = useState(quote.notes)
   const [deliveryCharge, setDeliveryCharge] = useState(Number(quote.delivery_charge))
   const [taxPercent, setTaxPercent] = useState(Number(quote.tax_percent))
+  const [leadTimeDays, setLeadTimeDays] = useState<number | null>(quote.lead_time_days === null ? null : Number(quote.lead_time_days))
   const [message, setMessage] = useState(quote.extraction_note)
   const [tone, setTone] = useState<"info" | "success" | "error">(initialItems.length ? "info" : "error")
   const [pending, startTransition] = useTransition()
@@ -66,7 +67,7 @@ export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, depar
   }
 
   async function save() {
-    const result = await saveSupplierQuoteAction({ quoteId: quote.id, quoteNumber, department, quoteDate, expiresOn, notes, deliveryCharge, taxPercent, items })
+    const result = await saveSupplierQuoteAction({ quoteId: quote.id, quoteNumber, department, quoteDate, expiresOn, notes, deliveryCharge, taxPercent, leadTimeDays, items })
     if (!result.ok) {
       setTone("error")
       setMessage(result.error)
@@ -155,7 +156,8 @@ export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, depar
           <label className="grid gap-1 text-xs font-bold text-slate-600">Expires<input type="date" value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-950" /></label>
           <label className="grid gap-1 text-xs font-bold text-slate-600">Delivery<input type="number" min="0" step="0.01" value={deliveryCharge} onChange={(event) => setDeliveryCharge(Number(event.target.value))} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-950" /></label>
           <label className="grid gap-1 text-xs font-bold text-slate-600">Tax %<input type="number" min="0" max="100" step="0.01" value={taxPercent} onChange={(event) => setTaxPercent(Number(event.target.value))} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-950" /></label>
-          <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">Internal notes<input value={notes} onChange={(event) => setNotes(event.target.value)} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-950" placeholder="Delivery terms, contact, or follow-up" /></label>
+          <label className="grid gap-1 text-xs font-bold text-slate-600">Lead time (days)<input type="number" min="0" max="3650" step="1" value={leadTimeDays ?? ""} onChange={(event) => setLeadTimeDays(event.target.value === "" ? null : Number(event.target.value))} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-950" /></label>
+          <label className="grid gap-1 text-xs font-bold text-slate-600 lg:col-span-3">Internal notes<input value={notes} onChange={(event) => setNotes(event.target.value)} className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-950" placeholder="Delivery terms, contact, or follow-up" /></label>
           </div>
         </details>
 

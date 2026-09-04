@@ -3,10 +3,53 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 
 import {
+  effectiveRequestComparisonItems,
   matchSupplierQuoteItems,
+  planRequestComparisonSync,
   requestItemSpecification,
   resolveExplicitSupplierSelection,
 } from "../lib/supplier-quote-routing"
+
+test("stale comparison rows are reconciled to the current AI-organized request before matching", () => {
+  const requestItems = [
+    { id: "original", name: "6 rolls underlayment", quantity: 6, unit: "rolls", department: "Flooring", metadata: {} },
+    { id: "flooring", name: "Engineered white oak flooring", quantity: 1200, unit: "sq. ft.", department: "Flooring", metadata: { ai_organized: true, source_item_id: "original", dimensions: "7 in wide" } },
+    { id: "adhesive", name: "Flooring adhesive", quantity: 12, unit: "buckets", department: "Flooring", metadata: { ai_organized: true, source_item_id: "original" } },
+    { id: "underlayment", name: "Flooring underlayment", quantity: 6, unit: "rolls", department: "Flooring", metadata: { ai_organized: true, source_item_id: "original" } },
+  ]
+  const staleComparison = [{
+    id: "stale",
+    source_request_item_id: "original",
+    description: "Flooring underlayment",
+    specification: "Flooring",
+    markup_percent: 4,
+    client_unit_price: 60,
+  }]
+
+  expect(effectiveRequestComparisonItems(requestItems).map((item) => item.id)).toEqual([
+    "flooring",
+    "adhesive",
+    "underlayment",
+  ])
+  const plan = planRequestComparisonSync(requestItems, staleComparison)
+  expect(plan.missingItems.map((item) => item.id)).toEqual(["flooring", "adhesive", "underlayment"])
+  expect(plan.obsoleteItems.map((item) => item.id)).toEqual(["stale"])
+  expect(plan.semanticTransfers).toEqual([
+    { item: expect.objectContaining({ id: "underlayment" }), comparisonItem: staleComparison[0] },
+  ])
+
+  const currentComparison = plan.currentItems.map((item) => ({
+    id: item.id,
+    description: item.name,
+    specification: requestItemSpecification(item.metadata, item.department),
+  }))
+  const supplierRows = [
+    { id: "q1", description: "Engineered white oak flooring", specification: "7 in wide" },
+    { id: "q2", description: "Flooring adhesive", specification: "" },
+    { id: "q3", description: "Flooring underlayment", specification: "" },
+  ]
+  expect(matchSupplierQuoteItems(supplierRows, currentComparison)).toHaveLength(3)
+})
 
 test("explicit supplier selection accepts directory slugs and derives the trusted name", () => {
   const directory = [

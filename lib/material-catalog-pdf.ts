@@ -27,6 +27,7 @@ const EMPTY_METADATA: SupplierQuoteAiMetadata = {
   department: "",
   deliveryCharge: 0,
   taxPercent: 0,
+  leadTimeDays: null,
   subtotal: null,
   total: null,
 }

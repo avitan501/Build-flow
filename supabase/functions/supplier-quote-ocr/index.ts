@@ -20,7 +20,7 @@ const quoteSchema = {
     metadata: {
       type: "object",
       additionalProperties: false,
-      required: ["supplierName", "quoteNumber", "quoteDate", "expiresOn", "department", "deliveryCharge", "taxPercent", "subtotal", "total"],
+      required: ["supplierName", "quoteNumber", "quoteDate", "expiresOn", "department", "deliveryCharge", "taxPercent", "leadTimeDays", "subtotal", "total"],
       properties: {
         supplierName: { type: "string" },
         quoteNumber: { type: "string" },
@@ -29,6 +29,7 @@ const quoteSchema = {
         department: { type: "string" },
         deliveryCharge: { type: "number", minimum: 0 },
         taxPercent: { type: "number", minimum: 0, maximum: 100 },
+        leadTimeDays: { type: ["number", "null"], minimum: 0, maximum: 3650 },
         subtotal: { type: ["number", "null"], minimum: 0 },
         total: { type: ["number", "null"], minimum: 0 },
       },
@@ -57,7 +58,7 @@ const quoteSchema = {
 
 const prompt = `Read this supplier quote, estimate, invoice, receipt, or material price list. Use the visual layout of the attached document as the source of truth when columns are misaligned in the text layer. Use OCR when the document is scanned or photographed. Extract only actual purchasable material rows. Do not turn headings, addresses, subtotals, tax, delivery, discounts, payments, or grand totals into material items.
 
-Preserve model numbers, SKUs, dimensions, thicknesses, colors, grades, pack sizes, and other product details. Put a concise product name in description and remaining details in specification. Never use a quantity, price, line total, tax, or other numeric-only value as the description. Use the quantity and unit shown in the same material row. Never invent unreadable values. Use an empty string or null where the schema allows it. Dates must be YYYY-MM-DD. Calculate taxPercent only when the printed tax amount and taxable subtotal make it dependable. Use 0 when tax or delivery is absent or unclear. Every extracted value must be reviewed by a person before use.`;
+Preserve model numbers, SKUs, dimensions, thicknesses, colors, grades, pack sizes, and other product details. Put a concise product name in description and remaining details in specification. Never use a quantity, price, line total, tax, or other numeric-only value as the description. Use the quantity and unit shown in the same material row. Never invent unreadable values. Use an empty string or null where the schema allows it. Dates must be YYYY-MM-DD. Capture leadTimeDays only when a delivery or availability lead time is explicitly printed. Calculate taxPercent only when the printed tax amount and taxable subtotal make it dependable. Use 0 when tax or delivery is absent or unclear. Every extracted value must be reviewed by a person before use.`;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

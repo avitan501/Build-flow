@@ -15,7 +15,9 @@ import {
   inferSupplierName,
 } from "@/lib/supplier-quote-supplier";
 import {
+  effectiveRequestComparisonItems,
   matchSupplierQuoteItems,
+  planRequestComparisonSync,
   requestItemSpecification,
   resolveExplicitSupplierSelection,
 } from "@/lib/supplier-quote-routing";
@@ -160,28 +162,7 @@ async function ensureClientRequestComparison(input: {
         >(),
     ]);
   if (itemsError) throw itemsError;
-  const organizedItems = (requestItems ?? []).filter(
-    (item) => item.metadata?.ai_organized === true,
-  );
-  const organizedSourceIds = new Set(
-    organizedItems.flatMap((item) =>
-      typeof item.metadata?.source_item_id === "string"
-        ? [item.metadata.source_item_id]
-        : [],
-    ),
-  );
-  const comparisonItems = organizedItems.length
-    ? [
-        ...organizedItems,
-        ...(requestItems ?? []).filter(
-          (item) =>
-            item.metadata?.ai_organized !== true &&
-            !organizedSourceIds.has(item.id),
-        ),
-      ]
-    : (requestItems ?? []).filter(
-        (item) => item.metadata?.ai_organized !== true,
-      );
+  const comparisonItems = effectiveRequestComparisonItems(requestItems ?? []);
   const department = normalizeMaterialCatalogDepartment(
     comparisonItems[0]?.department || input.fallbackDepartment,
   );
@@ -453,6 +434,7 @@ export async function uploadSupplierQuoteAction(
       "Original document saved privately. AI extraction is in progress.",
     delivery_charge: 0,
     tax_percent: 0,
+    lead_time_days: null,
     notes: inboundSource
       ? clean(`Received by email from ${inboundSource.metadata.senderEmail || "unknown sender"}${inboundSource.metadata.subject ? ` · ${inboundSource.metadata.subject}` : ""}.`, 4000)
       : "",
@@ -522,6 +504,7 @@ export async function uploadSupplierQuoteAction(
         department: "",
         deliveryCharge: 0,
         taxPercent: 0,
+        leadTimeDays: null,
         subtotal: null,
         total: null,
       },
@@ -589,6 +572,7 @@ export async function uploadSupplierQuoteAction(
       extraction_note: extraction.extractionNote,
       delivery_charge: extraction.metadata.deliveryCharge,
       tax_percent: extraction.metadata.taxPercent,
+      lead_time_days: extraction.metadata.leadTimeDays,
       notes: reviewNote,
       updated_by: user.id,
     })
@@ -645,6 +629,7 @@ export async function saveSupplierQuoteAction(input: {
   notes: string;
   deliveryCharge: number;
   taxPercent: number;
+  leadTimeDays: number | null;
   items: EditableQuoteItem[];
 }): Promise<ActionResult<{ saved: number }>> {
   const { supabase, user, quote } = await loadQuote(input.quoteId);
@@ -727,6 +712,10 @@ export async function saveSupplierQuoteAction(input: {
       notes: clean(input.notes, 4000),
       delivery_charge: safeNumber(input.deliveryCharge),
       tax_percent: Math.min(100, safeNumber(input.taxPercent)),
+      lead_time_days:
+        input.leadTimeDays === null || input.leadTimeDays === undefined
+          ? null
+          : Math.min(3650, Math.round(safeNumber(input.leadTimeDays))),
       status: rows.some((row) => row.selected) ? "ready" : "needs_review",
       updated_by: user.id,
     })
@@ -888,6 +877,7 @@ export async function retrySupplierQuoteExtractionAction(
       expires_on: quote.expires_on || metadata.expiresOn || null,
       delivery_charge: metadata.deliveryCharge,
       tax_percent: metadata.taxPercent,
+      lead_time_days: metadata.leadTimeDays,
       raw_text: extraction.text,
       extraction_note: extraction.extractionNote,
       notes,
@@ -1168,19 +1158,159 @@ async function createComparisonFromQuote(
     return { ok: false, error: message };
   }
 
-  let comparisonItemsResult = await supabase
-    .from("quote_comparison_items")
-    .select("id,description,specification,sort_order")
-    .eq("comparison_id", comparison.id)
-    .order("sort_order")
-    .returns<
-      Array<{
-        id: string;
-        description: string;
-        specification: string;
-        sort_order: number;
-      }>
-    >();
+  type ComparisonItemForSync = {
+    id: string;
+    source_request_item_id: string | null;
+    description: string;
+    specification: string;
+    quantity: number;
+    unit: string;
+    markup_percent: number;
+    client_unit_price: number | null;
+    sort_order: number;
+  };
+
+  async function loadComparisonItems() {
+    return supabase
+      .from("quote_comparison_items")
+      .select("id,source_request_item_id,description,specification,quantity,unit,markup_percent,client_unit_price,sort_order")
+      .eq("comparison_id", comparison!.id)
+      .order("sort_order")
+      .returns<ComparisonItemForSync[]>();
+  }
+
+  async function syncComparisonItemsFromRequest() {
+    if (!comparison?.request_id) return loadComparisonItems();
+    const currentRequestResult = await supabase
+      .from("quote_request_items")
+      .select("id,name,quantity,unit,department,metadata")
+      .eq("request_id", comparison.request_id)
+      .order("created_at")
+      .returns<
+        Array<{
+          id: string;
+          name: string;
+          quantity: number;
+          unit: string | null;
+          department: string;
+          metadata: Record<string, unknown> | null;
+        }>
+      >();
+    if (currentRequestResult.error)
+      return { data: null, error: currentRequestResult.error };
+    const currentRequestItems = effectiveRequestComparisonItems(currentRequestResult.data ?? []);
+    if (!currentRequestItems.length)
+      return { data: null, error: new Error("The client request has no material rows to compare.") };
+
+    const existingResult = await loadComparisonItems();
+    if (existingResult.error)
+      return { data: null, error: existingResult.error };
+    const existingItems = existingResult.data ?? [];
+    const {
+      existingBySourceId,
+      missingItems: missingRequestItems,
+      obsoleteItems,
+      semanticTransfers,
+    } = planRequestComparisonSync(currentRequestResult.data ?? [], existingItems);
+    const previousByNewSourceId = new Map(
+      semanticTransfers.map(({ item, comparisonItem }) => [item.id, comparisonItem]),
+    );
+
+    for (const [index, item] of currentRequestItems.entries()) {
+      const existing = existingBySourceId.get(item.id);
+      if (!existing) continue;
+      const { error } = await supabase
+        .from("quote_comparison_items")
+        .update({
+          description: clean(item.name, 500) || `Requested material ${index + 1}`,
+          specification: requestItemSpecification(item.metadata, item.department),
+          quantity: safeNumber(item.quantity, 1) || 1,
+          unit: clean(item.unit, 40) || "each",
+          sort_order: index,
+        })
+        .eq("id", existing.id)
+        .eq("comparison_id", comparison.id);
+      if (error) return { data: null, error };
+    }
+
+    const insertedBySourceId = new Map<string, ComparisonItemForSync>();
+    if (missingRequestItems.length) {
+      const { data: inserted, error } = await supabase
+        .from("quote_comparison_items")
+        .insert(
+          missingRequestItems.map((item) => {
+            const previous = previousByNewSourceId.get(item.id);
+            return {
+              comparison_id: comparison!.id,
+              source_request_item_id: item.id,
+              description: clean(item.name, 500) || "Requested material",
+              specification: requestItemSpecification(item.metadata, item.department),
+              quantity: safeNumber(item.quantity, 1) || 1,
+              unit: clean(item.unit, 40) || "each",
+              markup_percent: previous?.markup_percent ?? 0,
+              client_unit_price: previous?.client_unit_price ?? null,
+              sort_order: currentRequestItems.findIndex((candidate) => candidate.id === item.id),
+            };
+          }),
+        )
+        .select("id,source_request_item_id,description,specification,quantity,unit,markup_percent,client_unit_price,sort_order")
+        .returns<ComparisonItemForSync[]>();
+      if (error || inserted?.length !== missingRequestItems.length)
+        return { data: null, error: error || new Error("The current request rows could not be synchronized.") };
+      for (const item of inserted ?? []) {
+        if (item.source_request_item_id)
+          insertedBySourceId.set(item.source_request_item_id, item);
+      }
+    }
+
+    const transferByOldItemId = new Map(
+      semanticTransfers.flatMap(({ item, comparisonItem }) => {
+        const inserted = insertedBySourceId.get(item.id);
+        return inserted ? [[comparisonItem.id, inserted.id] as const] : [];
+      }),
+    );
+    if (transferByOldItemId.size) {
+      const oldItemIds = [...transferByOldItemId.keys()];
+      const oldPrices = await supabase
+        .from("quote_comparison_prices")
+        .select("bid_id,item_id,unit_price,is_available,notes")
+        .in("item_id", oldItemIds)
+        .returns<
+          Array<{
+            bid_id: string;
+            item_id: string;
+            unit_price: number | null;
+            is_available: boolean;
+            notes: string;
+          }>
+        >();
+      if (oldPrices.error) return { data: null, error: oldPrices.error };
+      const transferredPrices = (oldPrices.data ?? []).flatMap((price) => {
+        const itemId = transferByOldItemId.get(price.item_id);
+        return itemId ? [{ ...price, item_id: itemId }] : [];
+      });
+      if (transferredPrices.length) {
+        const { error } = await supabase
+          .from("quote_comparison_prices")
+          .upsert(transferredPrices, { onConflict: "bid_id,item_id" });
+        if (error) return { data: null, error };
+      }
+    }
+
+    if (obsoleteItems.length) {
+      const { error } = await supabase
+        .from("quote_comparison_items")
+        .delete()
+        .eq("comparison_id", comparison.id)
+        .in("id", obsoleteItems.map((item) => item.id));
+      if (error) return { data: null, error };
+    }
+    return loadComparisonItems();
+  }
+
+  let comparisonItemsResult = comparison.request_id
+    ? await syncComparisonItemsFromRequest()
+    : await loadComparisonItems();
   if (comparisonItemsResult.error)
     return fail("The client request items could not be loaded.");
   if (!comparisonItemsResult.data?.length) {
@@ -1196,15 +1326,8 @@ async function createComparisonFromQuote(
           sort_order: index,
         })),
       )
-      .select("id,description,specification,sort_order")
-      .returns<
-        Array<{
-          id: string;
-          description: string;
-          specification: string;
-          sort_order: number;
-        }>
-      >();
+      .select("id,source_request_item_id,description,specification,quantity,unit,markup_percent,client_unit_price,sort_order")
+      .returns<ComparisonItemForSync[]>();
     if (
       comparisonItemsResult.error ||
       comparisonItemsResult.data?.length !== items.length
@@ -1250,6 +1373,7 @@ async function createComparisonFromQuote(
     trust_level_snapshot: supplier.trustLevel ?? "not-reviewed",
     delivery_charge: quote.delivery_charge,
     tax_percent: quote.tax_percent,
+    lead_time_days: quote.lead_time_days,
     notes: clean(
       [quote.notes, `Source quote: ${quote.quote_number || quote.file_name}`]
         .filter(Boolean)
