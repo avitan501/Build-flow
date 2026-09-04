@@ -851,7 +851,7 @@ export function RequestManagementPanel({
       return <button type="button" onClick={() => setQuoteEntryOpen((open) => !open)} aria-expanded={quoteEntryOpen} className={compactWorkflowClass}><Paperclip className="h-4 w-4" />Add Supplier Quote</button>
     }
     if (workflow.step2Action === "review-quote" || workflow.step2Action === "compare-quotes") {
-      return primaryComparison ? <a href={`/admin/quote-comparison/${primaryComparison.id}`} className={compactWorkflowClass}><Award className="h-4 w-4" />{workflow.step2Action === "review-quote" ? "Review Quote & Select Supplier" : `Compare ${supplierQuoteCount} Quotes`}</a> : null
+      return null
     }
     return <button type="button" onClick={() => openDocument("estimate")} className={compactWorkflowClass}><FileCheck2 className="h-4 w-4" />Continue to Client Estimate</button>
   }
@@ -869,6 +869,14 @@ export function RequestManagementPanel({
       : <span className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-emerald-50 px-3 text-sm font-bold text-emerald-800"><CheckCircle2 className="h-4 w-4" />Payment & Delivery Complete</span>
   }
 
+  function renderSupplierRouteActions(row: (typeof supplierProgressRows)[number]) {
+    return <>
+      {row.supplier?.phone ? <a href={`tel:${row.supplier.phone}`} aria-label={`Call ${row.name}`} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><Phone className="h-4 w-4" /></a> : null}
+      {row.supplier?.email ? <a href={`mailto:${row.supplier.email}`} aria-label={`Email ${row.name}`} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><Mail className="h-4 w-4" /></a> : null}
+      {row.supplier && row.comparisonCount ? <button type="button" onClick={() => setComparisonFolderSupplier({ supplierId: row.supplier!.id, name: row.name })} aria-label={`Open ${row.name} files`} className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><FolderOpen className="h-4 w-4" /><span className="absolute -right-1 -top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-[#0071e3] px-1 text-[9px] font-black text-white">{row.comparisonCount}</span></button> : null}
+    </>
+  }
+
   return (
     <div className="grid gap-2 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:pb-0">
       <details open={pricingStatus === "active"} className={workflowStepCardClass()}>
@@ -884,30 +892,32 @@ export function RequestManagementPanel({
             const persistedContactStatus = row.supplier ? supplierContactStatuses[row.supplier.id] : undefined
             const statusOverride = row.supplier ? supplierContactStatusOverrides[row.supplier.id] : undefined
             const contactStatus = row.supplier
-              ? statusOverride && statusOverride.base === (persistedContactStatus || "not_contacted")
+              ? row.bid
+                ? "quote_received"
+                : statusOverride && statusOverride.base === (persistedContactStatus || "not_contacted")
                 ? statusOverride.value
-                : persistedContactStatus || (row.bid ? "quote_received" : row.supplierPackage ? "request_sent" : "not_contacted")
+                : persistedContactStatus || (row.supplierPackage ? "request_sent" : "not_contacted")
               : "not_contacted"
-            return <article role="row" key={row.name} className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_13rem_9rem]">
-              <div role="cell" className="min-w-0"><p className="truncate text-sm font-black text-[#12263f]">{row.name}</p>{row.bid ? <p className="mt-0.5 truncate text-[10px] font-bold text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)} total received</p> : null}{row.note ? <p title={row.note} className="mt-0.5 truncate text-[10px] text-slate-500">{row.note}</p> : null}</div>
-              <div role="cell" className="col-span-2 grid gap-1.5 sm:col-span-1"><label className="sr-only" htmlFor={`supplier-status-${row.supplier?.id || row.name}`}>Status for {row.name}</label><select id={`supplier-status-${row.supplier?.id || row.name}`} value={contactStatus} disabled={!row.supplier || pending} onChange={(event) => row.supplier && updateSupplierContactStatus(row.supplier.id, event.target.value as RequestSupplierContactStatus)} className={`min-h-11 w-full rounded-lg border px-2.5 text-xs font-bold sm:min-h-10 ${supplierContactStatusClass(contactStatus)}`}>{SUPPLIER_CONTACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{row.supplier ? <div className="flex gap-1"><input aria-label={`Note for ${row.name}`} value={supplierNoteDrafts[row.supplier.id] || ""} onChange={(event) => setSupplierNoteDrafts((current) => ({ ...current, [row.supplier!.id]: event.target.value }))} placeholder="Supplier note" maxLength={2000} className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-slate-800 sm:min-h-9" /><button type="button" onClick={() => saveSupplierProgressNote(row.supplier!.id)} disabled={pending} className="min-h-11 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#0066cc] disabled:opacity-45 sm:min-h-9">Save</button></div> : null}</div>
-              <div role="cell" className="row-start-1 flex justify-end gap-1.5 sm:col-start-3">
-              {row.supplier?.phone ? <a href={`tel:${row.supplier.phone}`} aria-label={`Call ${row.name}`} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><Phone className="h-4 w-4" /></a> : null}
-              {row.supplier?.email ? <a href={`mailto:${row.supplier.email}`} aria-label={`Email ${row.name}`} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><Mail className="h-4 w-4" /></a> : null}
-              {row.supplier && row.comparisonCount ? <button type="button" onClick={() => setComparisonFolderSupplier({ supplierId: row.supplier!.id, name: row.name })} aria-label={`Open ${row.name} files`} className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-700"><FolderOpen className="h-4 w-4" /><span className="absolute -right-1 -top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-[#0071e3] px-1 text-[9px] font-black text-white">{row.comparisonCount}</span></button> : null}
+            return <article role="row" key={row.name} className="grid min-h-16 gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_13rem_9rem] sm:items-center">
+              <div role="cell" className="flex min-w-0 items-start justify-between gap-2">
+                <div className="min-w-0"><p className="truncate text-sm font-black text-[#12263f]">{row.name}</p>{row.bid ? <p className="mt-0.5 truncate text-[10px] font-bold text-emerald-700">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.bid.landedTotal)} total received</p> : null}{row.note ? <p title={row.note} className="mt-0.5 truncate text-[10px] text-slate-500">{row.note}</p> : null}</div>
+                <div className="flex shrink-0 justify-end gap-1.5 sm:hidden">{renderSupplierRouteActions(row)}</div>
               </div>
+              <div role="cell" className="grid gap-1.5"><label className="sr-only" htmlFor={`supplier-status-${row.supplier?.id || row.name}`}>Status for {row.name}</label><select id={`supplier-status-${row.supplier?.id || row.name}`} value={contactStatus} disabled={!row.supplier || pending || Boolean(row.bid)} onChange={(event) => row.supplier && updateSupplierContactStatus(row.supplier.id, event.target.value as RequestSupplierContactStatus)} className={`min-h-10 w-full rounded-lg border px-2.5 text-xs font-bold ${supplierContactStatusClass(contactStatus)}`}>{SUPPLIER_CONTACT_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{row.supplier ? <div className="flex gap-1"><input aria-label={`Note for ${row.name}`} value={supplierNoteDrafts[row.supplier.id] || ""} onChange={(event) => setSupplierNoteDrafts((current) => ({ ...current, [row.supplier!.id]: event.target.value }))} placeholder="Supplier note" maxLength={2000} className="min-h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-slate-800" /><button type="button" onClick={() => saveSupplierProgressNote(row.supplier!.id)} disabled={pending} className="min-h-10 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#0066cc] disabled:opacity-45">Save</button></div> : null}</div>
+              <div role="cell" className="hidden justify-end gap-1.5 sm:flex">{renderSupplierRouteActions(row)}</div>
             </article>
           })}</div></div> : <p className="mb-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">Choose suppliers in Step 1 to begin pricing.</p>}
 
-          <div className="mb-2 flex justify-end">{renderStep2PrimaryAction()}</div>
+          <div className="flex flex-wrap justify-end gap-2">
+            {renderStep2PrimaryAction()}
+            {!workflow.step2Complete && workflow.step2Action !== "add-supplier-quote" ? <button type="button" onClick={() => setQuoteEntryOpen((open) => !open)} aria-expanded={quoteEntryOpen} className={compactWorkflowClass}><Plus className="h-4 w-4" />{supplierQuoteCount ? "Add another quote" : "Add supplier quote"}</button> : null}
+            {primaryComparison ? <a href={`/admin/quote-comparison/${primaryComparison.id}`} className={compactWorkflowClass}><Award className="h-4 w-4" />Compare supplier route</a> : <button type="button" onClick={openManualPricing} disabled={pending || !selectedSupplierNames.length} className={compactWorkflowClass}><Award className="h-4 w-4" />Compare supplier route</button>}
+          </div>
 
-          {!workflow.step2Complete && workflow.step2Action !== "add-supplier-quote" ? <button type="button" onClick={() => setQuoteEntryOpen((open) => !open)} aria-expanded={quoteEntryOpen} className={secondaryWorkflowClass}><Plus className="h-4 w-4" />Add Supplier Quote</button> : null}
           {!workflow.step2Complete && quoteEntryOpen ? <div className="mt-2 grid gap-2 rounded-lg border border-sky-200 bg-sky-50 p-2 sm:grid-cols-2">
             <a href={`/admin/supplier-quotes?request=${requestId}#supplier-quote-upload`} className={secondaryWorkflowClass}><Paperclip className="h-4 w-4" />Upload File or Photo</a>
             <button type="button" onClick={() => { setQuoteEntryOpen(false); openManualPricing() }} disabled={pending} className={secondaryWorkflowClass}><Plus className="h-4 w-4" />Enter Pricing Manually</button>
           </div> : null}
-
-          <div className="mt-2 flex justify-end"><button type="button" onClick={openManualPricing} disabled={pending || !selectedSupplierNames.length} className={compactWorkflowClass}><Award className="h-4 w-4" />Compare supplier route</button></div>
         </div>
       </details>
 

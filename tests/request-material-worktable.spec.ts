@@ -186,10 +186,11 @@ test("AI controls and notes appear only on rows that are actually missing inform
 })
 
 test("supplier quotes move into compact step two instead of expanding the request grid", async () => {
-  const [page, worktable, management] = await Promise.all([
+  const [page, worktable, management, supplierQuoteActions] = await Promise.all([
     source(pagePath),
     source(worktablePath),
     source(managementPath),
+    source(supplierQuoteActionsPath),
   ])
 
   expect(page).toContain("comparisonSummaries")
@@ -208,7 +209,11 @@ test("supplier quotes move into compact step two instead of expanding the reques
   expect(management).toContain("They replied")
   expect(management).toContain("We replied · waiting")
   expect(management).toContain("Quote received")
+  expect(management).toMatch(/row\.bid\s*\?\s*"quote_received"/)
+  expect(management).toContain("Add another quote")
   expect(management).toContain("Compare supplier route")
+  expect(supplierQuoteActions).toContain('contact_status: "quote_received"')
+  expect(supplierQuoteActions).toContain('revalidatePath(`/owner/materials/requests/${comparison.request_id}`)')
   expect(management).toContain("Contact &amp; files")
   expect(management).toContain("price comparisons")
   expect(management).toContain("Exact supplier · current request")

@@ -22,6 +22,7 @@ test("Step 2 follows suppliers, outreach, quotes, and winner selection", () => {
   expect(requestWorkflowState({ ...base, routeSupplierCount: 2, supplierRequestCount: 2 }).step2Action).toBe("add-supplier-quote")
   expect(requestWorkflowState({ ...base, routeSupplierCount: 2, supplierRequestCount: 2, supplierQuoteCount: 1 }).step2Action).toBe("review-quote")
   expect(requestWorkflowState({ ...base, routeSupplierCount: 2, supplierRequestCount: 2, supplierQuoteCount: 2 }).step2Action).toBe("compare-quotes")
+  expect(requestWorkflowState({ ...base, routeSupplierCount: 1, supplierQuoteCount: 1 }).step2Action).toBe("review-quote")
   const awarded = requestWorkflowState({ ...base, routeSupplierCount: 2, supplierRequestCount: 2, supplierQuoteCount: 1, winningSupplierSelected: true })
   expect(awarded.step2Complete).toBe(true)
   expect(awarded.step2Action).toBe("send-estimate")

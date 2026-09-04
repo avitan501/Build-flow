@@ -1658,6 +1658,29 @@ async function createComparisonFromQuote(
       updated_by: user.id,
     })
     .eq("id", quote.id);
+  if (comparison.request_id && !clientMode) {
+    const { error: supplierProgressError } = await supabase
+      .from("quote_request_supplier_recommendations")
+      .upsert({
+        request_id: comparison.request_id,
+        supplier_id: quote.supplier_id,
+        supplier_name_snapshot: supplier.name,
+        is_recommended: true,
+        should_contact: true,
+        contact_status: "quote_received",
+        created_by: user.id,
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "request_id,supplier_id" });
+    if (supplierProgressError) {
+      console.error("Supplier quote status could not be synchronized", {
+        requestId: comparison.request_id,
+        supplierId: quote.supplier_id,
+        reason: supplierProgressError.message,
+      });
+    }
+    revalidatePath(`/owner/materials/requests/${comparison.request_id}`);
+  }
   revalidatePath("/admin/quote-comparison");
   revalidatePath(`/admin/supplier-quotes/${quote.id}`);
   const unmatched = items.length - matched.length;
