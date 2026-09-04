@@ -14,6 +14,7 @@ import {
   isManagerDocumentChargeLine,
   isObsoleteSelectionSubtotalWarning,
   managerDocumentReviewLineIncomplete,
+  normalizeDocumentPricingBasis,
 } from "../lib/manager-document-validation";
 
 const root = process.cwd();
@@ -197,7 +198,7 @@ test("document center preserves originals while allowing direct catalog row impo
   expect(review).toContain("Catalog pricing is saved");
   expect(actions).toContain("addManagerDocumentItemsToCatalogAction");
   expect(actions).toContain(
-    "staff_quick_import_manager_document_item_to_catalog",
+    "staff_import_resolved_manager_document_items_to_catalog",
   );
   expect(actions).toContain("usedCodes");
   expect(actions).toContain("DOC-${document.id.slice(0, 8).toUpperCase()}");
@@ -345,7 +346,7 @@ test("document catalog routing is capability-scoped and one comparison stays act
   expect(actions).toContain("requestedItemIds?.length !== itemIds.length");
   expect(actions).toContain('selectedItemsQuery.in("id", requestedItemIds)');
   expect(actions).toContain(
-    '"staff_quick_import_manager_document_item_to_catalog"',
+    '"staff_import_resolved_manager_document_items_to_catalog"',
   );
   expect(actions).toContain("p_item_ids: selected.map((item) => item.id)");
   expect(review).toContain("importTargets.map((target) => target.id)");
@@ -411,6 +412,98 @@ test("document intelligence keeps evidence and catches line and total mismatches
   expect(
     warnings.some((warning) => warning.includes("printed total")),
   ).toBeTruthy();
+});
+
+test("document pricing normalizes printed MS and ML per-thousand extensions", () => {
+  expect(
+    normalizeDocumentPricingBasis({
+      quantity: 20,
+      unit: "MS",
+      unitPrice: 0.64,
+      lineTotal: 300.8,
+      sourceText:
+        "20 PC U12LW 1/2 x 4 x 8 USG Sheetrock UltraLight 470.00/MS 300.80",
+    }),
+  ).toMatchObject({ quantity: 0.64, unit: "MS", unitPrice: 470 });
+  expect(
+    documentLineValidationStatus({
+      description: "USG Sheetrock UltraLight",
+      quantity: 20,
+      unit: "MS",
+      unitPrice: 0.64,
+      lineTotal: 300.8,
+      sourceText: "20 PC U12LW 470.00/MS 300.80",
+      confidence: 0.9,
+    }),
+  ).toBe("valid");
+
+  expect(
+    normalizeDocumentPricingBasis({
+      quantity: 10,
+      unit: "ML",
+      unitPrice: 225,
+      lineTotal: 22.5,
+      sourceText:
+        "10 PC CDQS10 1-1/4 x 10 Clark Corner Bead 50/bx 225.00/ML 22.50",
+    }),
+  ).toMatchObject({ quantity: 0.1, unit: "ML", unitPrice: 225 });
+});
+
+test("per-thousand normalization requires the exact extension in source evidence", () => {
+  const item = {
+    description: "Sheetrock",
+    quantity: 20,
+    unit: "MS",
+    unitPrice: 0.64,
+    lineTotal: 300.8,
+    sourceText: "rate discussed as 470/MS, total not printed",
+    confidence: 0.96,
+  };
+  expect(normalizeDocumentPricingBasis(item)).toMatchObject({
+    quantity: 20,
+    unitPrice: 0.64,
+  });
+  expect(documentLineValidationStatus(item)).toBe("mismatch");
+});
+
+test("saving a corrected Ready row clears stale Import pending without unlinking catalog rows", async () => {
+  const actions = await readFile(
+    path.join(root, "app/admin/documents/actions.ts"),
+    "utf8",
+  );
+  expect(actions).toContain("catalogImportStatus:");
+  expect(actions).toContain('? "imported"');
+  expect(actions).toContain('? "pending_review"');
+  expect(actions).toContain(': "not_requested"');
+  expect(actions).toContain(
+    "catalog_import_status: item.catalogImportStatus",
+  );
+  expect(actions).toContain(
+    '.select("id,source_text,catalog_import_status,matched_catalog_item_id")',
+  );
+});
+
+test("catalog import safely distinguishes same-name product variants by specification", async () => {
+  const migration = await readFile(
+    path.join(
+      root,
+      "supabase/migrations/20260904182500_resolve_document_catalog_name_spec.sql",
+    ),
+    "utf8",
+  );
+  expect(migration).toContain(
+    "staff_import_resolved_manager_document_items_to_catalog",
+  );
+  expect(migration).toContain("exact_name_spec");
+  expect(migration).toContain("qualified_name_spec");
+  expect(migration).toContain("name_conflict_missing_spec");
+  expect(migration).toContain("p_expected_document_updated_at");
+  expect(migration).toContain("for update");
+  expect(migration).toContain("pg_advisory_xact_lock");
+  expect(migration).toContain(
+    "public.staff_quick_import_manager_document_item_to_catalog",
+  );
+  expect(migration).toContain("exception when sqlstate 'P5601'");
 });
 
 test("document intelligence keeps charges and tax out of product rows", () => {

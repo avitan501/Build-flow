@@ -40,8 +40,10 @@ import {
   type ManagerDocumentRecord,
 } from "@/lib/manager-documents";
 import {
+  documentLineValidationStatus,
   isObsoleteSelectionSubtotalWarning,
   managerDocumentReviewLineIncomplete,
+  normalizeDocumentPricingBasis,
 } from "@/lib/manager-document-validation";
 
 function inputMoney(value: number | null) {
@@ -50,6 +52,22 @@ function inputMoney(value: number | null) {
 function numberOrNull(value: string) {
   const parsed = Number(value);
   return value.trim() && Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function normalizeReviewLine(line: ManagerDocumentItemRecord) {
+  const normalized = normalizeDocumentPricingBasis({
+    quantity: line.quantity,
+    unit: line.unit,
+    unitPrice: line.unit_price,
+    lineTotal: line.line_total,
+    sourceText: line.source_text,
+  });
+  return {
+    ...line,
+    quantity: normalized.quantity,
+    unit: normalized.unit ?? line.unit,
+    unit_price: normalized.unitPrice,
+  };
 }
 
 export function ManagerDocumentReview({
@@ -69,7 +87,9 @@ export function ManagerDocumentReview({
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState(document);
-  const [lines, setLines] = useState(items);
+  const [lines, setLines] = useState(() =>
+    items.map(normalizeReviewLine),
+  );
   const [acknowledgeWarnings, setAcknowledgeWarnings] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
@@ -171,6 +191,7 @@ export function ManagerDocumentReview({
           unit: line.unit,
           unitPrice: line.unit_price,
           lineTotal: line.line_total,
+          sourceText: line.source_text,
           selected: line.selected,
         })),
       });
@@ -212,6 +233,7 @@ export function ManagerDocumentReview({
           unit: line.unit,
           unitPrice: line.unit_price,
           lineTotal: line.line_total,
+          sourceText: line.source_text,
           selected: line.selected,
         })),
       });
@@ -338,6 +360,7 @@ export function ManagerDocumentReview({
           unit: line.unit,
           unitPrice: line.unit_price,
           lineTotal: line.line_total,
+          sourceText: line.source_text,
           selected: line.selected,
         })),
       });
@@ -452,15 +475,17 @@ export function ManagerDocumentReview({
     setLines((current) =>
       current.map((line, lineIndex) => {
         if (lineIndex !== index) return line;
-        const next = { ...line, ...changes };
-        const expected =
-          next.quantity !== null && next.unit_price !== null
-            ? Math.round(next.quantity * next.unit_price * 100) / 100
-            : null;
+        const next = normalizeReviewLine({ ...line, ...changes });
         const mismatch =
-          expected !== null &&
-          next.line_total !== null &&
-          Math.abs(expected - next.line_total) > 0.03;
+          documentLineValidationStatus({
+            description: next.description,
+            quantity: next.quantity,
+            unit: next.unit,
+            unitPrice: next.unit_price,
+            lineTotal: next.line_total,
+            sourceText: next.source_text,
+            confidence: next.confidence ?? 1,
+          }) === "mismatch";
         const incomplete = managerDocumentReviewLineIncomplete({
           documentType: draft.document_type,
           selected: next.selected,

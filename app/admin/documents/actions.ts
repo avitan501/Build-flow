@@ -27,6 +27,7 @@ import {
 import {
   isObsoleteSelectionSubtotalWarning,
   managerDocumentReviewLineIncomplete,
+  normalizeDocumentPricingBasis,
 } from "@/lib/manager-document-validation";
 import { captureOperationalError } from "@/lib/monitoring/capture-operational-error";
 import {
@@ -922,6 +923,7 @@ type ReviewItemInput = {
   unit: string;
   unitPrice: number | null;
   lineTotal: number | null;
+  sourceText: string;
   selected: boolean;
 };
 
@@ -950,6 +952,39 @@ export async function saveManagerDocumentReviewAction(input: {
     return { ok: false, error: "Invalid document." };
   if (!Array.isArray(input.items) || input.items.length > 500)
     return { ok: false, error: "Review no more than 500 lines at once." };
+  const requestedItemIds = input.items
+    .map((item) => item.id)
+    .filter((itemId) => UUID_PATTERN.test(itemId));
+  if (
+    requestedItemIds.length !== input.items.length ||
+    new Set(requestedItemIds).size !== requestedItemIds.length
+  )
+    return { ok: false, error: "The reviewed product selection is invalid." };
+  const storedItemsResult = requestedItemIds.length
+    ? await supabase
+        .from("manager_document_items")
+        .select("id,source_text,catalog_import_status,matched_catalog_item_id")
+        .eq("document_id", input.documentId)
+        .in("id", requestedItemIds)
+        .returns<
+          Array<
+            Pick<
+              ManagerDocumentItemRecord,
+              | "id"
+              | "source_text"
+              | "catalog_import_status"
+              | "matched_catalog_item_id"
+            >
+          >
+        >()
+    : { data: [], error: null };
+  const { data: storedItems, error: storedItemsError } = storedItemsResult;
+  if (storedItemsError || storedItems?.length !== requestedItemIds.length)
+    return {
+      ok: false,
+      error: "The reviewed products changed. Reload the document and try again.",
+    };
+  const storedItemsById = new Map(storedItems.map((item) => [item.id, item]));
   const nonNegative = (
     value: number | null | undefined,
     decimals: number,
@@ -979,8 +1014,25 @@ export async function saveManagerDocumentReviewAction(input: {
     "purchase_order",
   ].includes(input.documentType);
   const reviewedItems = input.items.map((item) => {
-    const quantity = nonNegative(item.quantity, 3, 100_000_000, true);
-    const unitPrice = nonNegative(item.unitPrice, 4, 100_000_000);
+    const storedItem = storedItemsById.get(item.id)!;
+    const pricingBasis = normalizeDocumentPricingBasis({
+      quantity: nonNegative(item.quantity, 3, 100_000_000, true),
+      unit: clean(item.unit, 40),
+      unitPrice: nonNegative(item.unitPrice, 4, 100_000_000),
+      lineTotal: nonNegative(item.lineTotal, 2, 100_000_000),
+      sourceText: storedItem.source_text,
+    });
+    const quantity = nonNegative(
+      pricingBasis.quantity,
+      3,
+      100_000_000,
+      true,
+    );
+    const unitPrice = nonNegative(
+      pricingBasis.unitPrice,
+      4,
+      100_000_000,
+    );
     const lineTotal = nonNegative(item.lineTotal, 2, 100_000_000);
     const expected =
       quantity !== null && unitPrice !== null
@@ -995,7 +1047,7 @@ export async function saveManagerDocumentReviewAction(input: {
       selected: item.selected,
       description: clean(item.description, 500),
       quantity,
-      unit: clean(item.unit, 40),
+      unit: pricingBasis.unit ?? "",
       unitPrice,
       lineTotal,
     });
@@ -1013,6 +1065,13 @@ export async function saveManagerDocumentReviewAction(input: {
         : incomplete
           ? "needs_review"
           : "valid",
+      catalogImportStatus:
+        storedItem.catalog_import_status === "imported" &&
+        storedItem.matched_catalog_item_id
+          ? "imported"
+          : mismatch || incomplete
+            ? "pending_review"
+            : "not_requested",
     };
   });
   if (reviewedItems.some((item) => item.selected && !item.description))
@@ -1130,6 +1189,7 @@ export async function saveManagerDocumentReviewAction(input: {
         line_total: item.lineTotal,
         selected: item.selected,
         validation_status: item.validationStatus,
+        catalog_import_status: item.catalogImportStatus,
       })
       .eq("id", item.id)
       .eq("document_id", input.documentId);
@@ -2506,7 +2566,7 @@ export async function addManagerDocumentItemsToCatalogAction(
 
   const { data, error } = await supabase.rpc(
     options?.directRowImport
-      ? "staff_quick_import_manager_document_item_to_catalog"
+      ? "staff_import_resolved_manager_document_items_to_catalog"
       : "staff_import_manager_document_items_to_catalog",
     {
       p_document_id: documentId,
@@ -2544,12 +2604,18 @@ export async function addManagerDocumentItemsToCatalogAction(
   } | null;
   if (!result?.ok) {
     const firstLine = result?.lines?.[0];
+    const firstReason = firstLine?.reason;
     const messageByCode: Record<string, string> = {
       stale_document: "The document changed. Reload it before importing.",
       selection_changed: "The selected rows changed. Reload before importing.",
-      review_required: firstLine?.lineNumber
-        ? `Line ${firstLine.lineNumber} needs review before import.`
-        : "A selected line needs review before import.",
+      review_required:
+        firstReason === "name_conflict_missing_spec" && firstLine?.lineNumber
+          ? `Line ${firstLine.lineNumber} needs its size or specification before it can be matched safely.`
+          : firstReason?.startsWith("ambiguous_") && firstLine?.lineNumber
+            ? `Line ${firstLine.lineNumber} matches more than one catalog product. Confirm its exact specification.`
+            : firstLine?.lineNumber
+              ? `Line ${firstLine.lineNumber} needs review before import.`
+              : "A selected line needs review before import.",
       document_not_ready: "Save and approve the document before importing.",
     };
     return {
