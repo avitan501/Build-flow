@@ -8476,10 +8476,17 @@ async function createLeadFromTrustedScreenshot(input: {
   senderPhone: string;
 }) {
   const externalMessageId = `lead-screenshot:${input.activityId}`;
-  const existing = await sql<{ id: string }[]>`
-    select id from public.aura_intakes where external_message_id = ${externalMessageId} limit 1
+  const existing = await sql<{ id: string; status: string; ai_model: string | null }[]>`
+    select id, status, ai_model from public.aura_intakes where external_message_id = ${externalMessageId} limit 1
   `;
-  if (existing[0]) return;
+  if (existing[0]?.ai_model === "fallback" && existing[0].status === "needs_follow_up")
+    await sql`
+      delete from public.aura_intakes
+      where id = ${existing[0].id}::uuid
+        and ai_model = 'fallback'
+        and status = 'needs_follow_up'
+    `;
+  else if (existing[0]) return;
   const { assessment, model } = await assessLeadScreenshot(input.body, input.media);
   if (assessment.classification === "not_lead") {
     await saveIgnoredLeadScreenshot({ ...input, assessment, model });
@@ -8678,17 +8685,58 @@ async function recoverLegacyBundledLeadScreenshots() {
     where intake.source = 'sms'
       and intake.external_message_id like 'quo:%'
       and intake.message_type = 'image'
-      and intake.status in ('pending', 'needs_follow_up', 'failed')
+      and (
+        intake.status in ('pending', 'needs_follow_up', 'failed')
+        or (
+          intake.status = 'cancelled'
+          and intake.error_message = 'Superseded by per-image lead classification.'
+          and exists (
+            select 1 from public.aura_intakes child
+            where child.external_message_id like 'lead-screenshot:' || coalesce(intake.raw_payload ->> 'activityId', substring(intake.external_message_id from 5)) || ':image:%'
+              and child.ai_model = 'fallback'
+              and child.status = 'needs_follow_up'
+          )
+        )
+      )
       and intake.created_at >= now() - interval '2 hours'
     order by intake.created_at desc
     limit 4
   `;
+  const [api, webhook] = rows.length
+    ? await Promise.all([quoConfig(), quoWebhookConfig()])
+    : [null, null];
   await Promise.all(
     rows.map(async (row) => {
       if (!isTrustedSmsCommandPhone(row.sender_phone)) return;
-      const media = Array.isArray(row.raw_payload?.media)
+      let media = Array.isArray(row.raw_payload?.media)
         ? row.raw_payload.media as TrustedSmsMedia[]
         : [];
+      if (api && webhook) {
+        try {
+          const messagesUrl = new URL("https://api.quo.com/v1/messages");
+          messagesUrl.searchParams.set("phoneNumberId", webhook.phoneNumberId);
+          messagesUrl.searchParams.append("participants", row.sender_phone);
+          messagesUrl.searchParams.set(
+            "createdAfter",
+            new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          );
+          messagesUrl.searchParams.set("maxResults", "50");
+          const response = await fetch(messagesUrl, {
+            headers: { Authorization: api.apiKey },
+            signal: AbortSignal.timeout(8_000),
+          });
+          if (response.ok) {
+            const payload = await response.json() as { data?: QuoPolledMessage[] };
+            const fresh = (payload.data || []).find(
+              (message) => message.id === row.activity_id,
+            );
+            const refreshedMedia = fresh ? quoPolledMedia(fresh) : [];
+            if (trustedImageMedia(refreshedMedia).length) media = refreshedMedia;
+          }
+        } catch {
+          // The durable Needs Review rows remain visible if media refresh fails.
+        }
+      }
       if (!trustedImageMedia(media).length) return;
       await createLeadsFromTrustedScreenshots({
         activityId: row.activity_id,
