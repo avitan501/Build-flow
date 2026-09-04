@@ -45,7 +45,7 @@ test("the public acceptance wrapper hashes only the exact stored terms", async (
 })
 
 test("legacy documents accept the exact complete terms rendered to the signer", async () => {
-  const migration = await readFile(path.join(root, "supabase/migrations/20260904023000_accept_exact_rendered_client_document_terms.sql"), "utf8")
+  const migration = await readFile(path.join(root, "supabase/migrations/20260904020211_accept_exact_rendered_client_document_terms.sql"), "utf8")
   expect(migration).toContain("Match the deterministic terms shown by clientDocumentTerms()")
   expect(migration).toContain("3% processing fee applies to credit card payments")
   expect(migration).toContain("restocking fee of up to 25%")
