@@ -87,3 +87,17 @@ test("primary client-side buttons are wired to concrete handlers and protected A
   expect(meet).toContain('fetch("/api/admin/google-meet"')
 })
 
+test("Material List Organizer only collects and organizes reviewable English and Spanish input", async () => {
+  const [page, organizer] = await Promise.all([
+    readFile(path.join(root, "app/admin/ai-tools/material-list/page.tsx"), "utf8"),
+    readFile(path.join(root, "components/buildflow/material-list-organizer.tsx"), "utf8"),
+  ])
+  expect(page).toContain("English or Spanish")
+  expect(page).toContain("Nothing is ordered or sent")
+  expect(organizer).toContain('aria-label="Material quantity"')
+  expect(organizer).toContain('aria-label="Material unit"')
+  expect(organizer).toContain("Notes / confirmation")
+  expect(organizer).toContain("does not choose a product")
+  expect(organizer).toContain("place an order")
+  expect(organizer).toContain("Review every highlighted interpretation")
+})

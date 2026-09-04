@@ -1,6 +1,7 @@
 export type MaterialIntakeRow = {
   id: string
   quantity: string
+  unit: string
   item: string
   notes: string
   needsReview?: boolean
@@ -78,18 +79,41 @@ function correctMaterialTerms(value: string) {
   return corrected.replace(/\s{2,}/g, " ").trim()
 }
 
+const LEADING_UNIT_ALIASES: Array<[RegExp, string]> = [
+  [/^(?:ea|each|pcs?|pieces?|peace|pees|piezas?|unidades?)\b\s*/i, "each"],
+  [/^(?:sheets?|shets?|hojas?|l[aá]minas?)\b\s*/i, "sheet"],
+  [/^(?:boxes?|cajas?)\b\s*/i, "box"],
+  [/^(?:bags?|bolsas?|sacos?)\b\s*/i, "bag"],
+  [/^(?:buckets?|cubetas?)\b\s*/i, "bucket"],
+  [/^(?:rolls?|rollos?)\b\s*/i, "roll"],
+  [/^(?:gallons?|galones?)\b\s*/i, "gallon"],
+  [/^(?:feet|foot|ft|pies)\b\s*/i, "ft"],
+]
+
+function extractLeadingUnit(value: string) {
+  for (const [pattern, unit] of LEADING_UNIT_ALIASES) {
+    if (pattern.test(value)) return { unit, item: value.replace(pattern, "").trim() }
+  }
+  return { unit: "", item: value }
+}
+
 export function parseMaterialIntakeLine(line: string, id = "row"): MaterialIntakeRow | null {
   const clean = line.replace(/^[-*•]+\s*/, "").trim()
   if (!clean || /^(qty|quantity)\s*[,|\t]/i.test(clean)) return null
 
   const csv = clean.split(/\t|\s*\|\s*|,(?=\s*[^,]+$)/).map((part) => part.trim()).filter(Boolean)
   let quantity = ""
+  let unit = ""
   let rawItem = clean
   let notes = ""
 
   if (csv.length >= 2 && /^\d+(?:\.\d+)?$/.test(csv[0])) {
     quantity = csv[0]
     rawItem = csv[1]
+    notes = csv.slice(2).join("; ")
+  } else if (csv.length >= 2 && /^\d+(?:\.\d+)?$/.test(csv[1])) {
+    quantity = csv[1]
+    rawItem = csv[0]
     notes = csv.slice(2).join("; ")
   } else {
     const numeric = clean.match(/^(\d+(?:\.\d+)?)\s+(?:x\s+)?(.+)$/i)
@@ -109,11 +133,15 @@ export function parseMaterialIntakeLine(line: string, id = "row"): MaterialIntak
     }
   }
 
-  const item = correctMaterialTerms(rawItem)
-  const changed = item.toLocaleLowerCase() !== rawItem.toLocaleLowerCase() || Boolean(spelledQuantity(clean))
+  const correctedItem = correctMaterialTerms(rawItem)
+  const extracted = extractLeadingUnit(correctedItem)
+  unit = extracted.unit
+  const item = extracted.item
+  const changed = item.toLocaleLowerCase() !== rawItem.toLocaleLowerCase() || Boolean(unit) || Boolean(spelledQuantity(clean))
   return {
     id,
     quantity,
+    unit,
     item,
     notes: changed ? [notes, `Review interpretation from: ${clean}`].filter(Boolean).join("; ") : notes,
     needsReview: changed,
