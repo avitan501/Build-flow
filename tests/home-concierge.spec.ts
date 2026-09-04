@@ -32,8 +32,8 @@ test("new homepage presents the approved request flow", async ({ page }) => {
   for (const title of ["Beat Your Quote", "Send Any Material List", "Find a Specific Item"]) {
     await expect(page.getByRole("heading", { name: title })).toBeAttached();
   }
-  await expect(page.getByRole("heading", { name: "Why contractors send us the list" })).toBeVisible();
-  for (const reason of ["Compare the full cost", "Approve before we order", "One team follows through"]) {
+  await expect(page.getByRole("heading", { name: "Why Avantia?" })).toBeVisible();
+  for (const reason of ["Lower the total cost", "Skip the supplier chase", "Support after the order"]) {
     await expect(page.getByRole("heading", { name: reason })).toBeAttached();
   }
   for (const asset of [

@@ -46,9 +46,9 @@ const reviewServices = [
 ] as const
 
 const reviewReasons = [
-  { title: "Compare the full cost", detail: "See material, tax, delivery, and lead time together." },
-  { title: "Approve before we order", detail: "Review the exact quote and terms before anything is placed." },
-  { title: "One team follows through", detail: "We coordinate the supplier, the order, and jobsite delivery." },
+  { title: "Lower the total cost", detail: "We compare materials, tax, and delivery—and suggest project-fit alternatives." },
+  { title: "Skip the supplier chase", detail: "Send a crew text, plan, or quote. We organize it and check suppliers." },
+  { title: "Support after the order", detail: "If an order is late or wrong, you have one person to call for help." },
 ] as const
 
 function Actions({ primary, secondary, dark = false, compact = false }: { primary: string; secondary: string; dark?: boolean; compact?: boolean }) {
@@ -140,7 +140,7 @@ function HomepageReviewSections() {
 
     <section className="border-t border-white/10 bg-[#030507] px-5 py-10 text-white sm:px-8 sm:py-14" aria-labelledby="homepage-reasons-heading">
       <div className="mx-auto max-w-7xl">
-        <h2 id="homepage-reasons-heading" className="text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">Why contractors send us the list</h2>
+        <h2 id="homepage-reasons-heading" className="text-2xl font-semibold tracking-[-0.035em] sm:text-3xl">Why Avantia?</h2>
         <div className="mt-6 grid gap-px overflow-hidden border border-white/15 bg-white/15 sm:grid-cols-3">
           {reviewReasons.map((reason, index) => <article key={reason.title} className="bg-[#030507] p-5 sm:p-6">
             <span className="text-[10px] font-black tracking-[0.18em] text-[#f1c66e]">0{index + 1}</span>
