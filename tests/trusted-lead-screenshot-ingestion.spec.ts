@@ -96,3 +96,16 @@ test("auto-created leads create one Carlos follow-up and an idempotent dashboard
   expect(leadFlow).toContain("outboundSent: false");
   expect(leadFlow).not.toMatch(/send(?:Sms|Message|Welcome)\s*\(/);
 });
+
+test("each screenshot in one trusted SMS is classified as a separate idempotent lead", async () => {
+  const source = await brokerSource();
+  const start = source.indexOf("function trustedLeadImageActivityId");
+  const end = source.indexOf("function trustedDocumentInputs", start);
+  const multiImageFlow = source.slice(start, end);
+
+  expect(multiImageFlow).toContain("`${activityId}:image:${imageIndex + 1}`");
+  expect(multiImageFlow).toContain("images.map((image, imageIndex)");
+  expect(multiImageFlow).toContain("media: [image]");
+  expect(multiImageFlow).toContain("recoverLegacyBundledLeadScreenshots");
+  expect(multiImageFlow).toContain("Superseded by per-image lead classification.");
+});

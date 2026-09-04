@@ -6344,19 +6344,18 @@ async function handleQuoWebhook(req: Request) {
       isTrustedSmsCommandPhone(counterpartyPhone) &&
       (isTrustedSmsCommand(body) || trustedAttachmentMedia(media).length > 0)
     ) {
-      await createTrustedSmsIntake(
-        activityId,
-        eventId,
-        body,
-        media,
-        object.conversationId || null,
-        counterpartyPhone,
-      );
-      if (
-        trustedImageMedia(media).length > 0 &&
-        !isExplicitTrustedPhoneAddCommand(body)
-      )
-        await createLeadFromTrustedScreenshot({
+      const explicitTrustedIntake = isExplicitTrustedPhoneAddCommand(body);
+      if (explicitTrustedIntake || trustedImageMedia(media).length === 0)
+        await createTrustedSmsIntake(
+          activityId,
+          eventId,
+          body,
+          media,
+          object.conversationId || null,
+          counterpartyPhone,
+        );
+      if (trustedImageMedia(media).length > 0 && !explicitTrustedIntake)
+        await createLeadsFromTrustedScreenshots({
           activityId,
           eventId,
           body,
@@ -7015,27 +7014,31 @@ async function ingestPolledQuoMessage(
   `;
   if (existing[0]?.id) {
     if (isTrustedIntake) {
-      await createTrustedSmsIntake(
-        activityId,
-        pollEventId,
-        body || existing[0].body,
-        media.length
-          ? media
-          : Array.isArray(existing[0].media)
-            ? existing[0].media
-            : [],
-        conversationId,
-        counterpartyPhone,
-      );
+      const resolvedBody = body || existing[0].body;
+      const resolvedMedia = media.length
+        ? media
+        : Array.isArray(existing[0].media)
+          ? existing[0].media
+          : [];
+      const explicitTrustedIntake = isExplicitTrustedPhoneAddCommand(resolvedBody);
+      if (explicitTrustedIntake || trustedImageMedia(resolvedMedia).length === 0)
+        await createTrustedSmsIntake(
+          activityId,
+          pollEventId,
+          resolvedBody,
+          resolvedMedia,
+          conversationId,
+          counterpartyPhone,
+        );
       if (
-        trustedImageMedia(media.length ? media : existing[0].media || []).length > 0 &&
-        !isExplicitTrustedPhoneAddCommand(body || existing[0].body)
+        trustedImageMedia(resolvedMedia).length > 0 &&
+        !explicitTrustedIntake
       )
-        await createLeadFromTrustedScreenshot({
+        await createLeadsFromTrustedScreenshots({
           activityId,
           eventId: pollEventId,
-          body: body || existing[0].body,
-          media: media.length ? media : existing[0].media || [],
+          body: resolvedBody,
+          media: resolvedMedia,
           conversationId,
           communicationId: existing[0].id,
           senderPhone: counterpartyPhone,
@@ -7070,19 +7073,21 @@ async function ingestPolledQuoMessage(
   await enqueueSmsAutomation(inserted[0].id);
   await dispatchSmsAutomationWorker();
   if (isTrustedIntake) {
-    await createTrustedSmsIntake(
-      activityId,
-      pollEventId,
-      body || null,
-      media,
-      conversationId,
-      counterpartyPhone,
-    );
+    const explicitTrustedIntake = isExplicitTrustedPhoneAddCommand(body);
+    if (explicitTrustedIntake || trustedImageMedia(media).length === 0)
+      await createTrustedSmsIntake(
+        activityId,
+        pollEventId,
+        body || null,
+        media,
+        conversationId,
+        counterpartyPhone,
+      );
     if (
       trustedImageMedia(media).length > 0 &&
-      !isExplicitTrustedPhoneAddCommand(body)
+      !explicitTrustedIntake
     )
-      await createLeadFromTrustedScreenshot({
+      await createLeadsFromTrustedScreenshots({
         activityId,
         eventId: pollEventId,
         body: body || null,
@@ -7256,6 +7261,7 @@ async function runQuoFastPollWindow(leaseToken: string) {
       return;
     }
     try {
+      await recoverLegacyBundledLeadScreenshots();
       ingested = await pollRecentQuoMessagesOnce();
     } catch (error) {
       const errorCode = quoFastPollErrorCode(error);
@@ -8600,6 +8606,104 @@ async function createLeadFromTrustedScreenshot(input: {
     insert into public.aura_audit_log (actor_user_id, action, details)
     values (${ownerRows[0].id}::uuid, 'lead_screenshot_auto_created', ${sql.json({ activityId: input.activityId, leadId, confidence: assessment.confidence, outboundSent: false })})
   `;
+}
+
+function trustedLeadImageActivityId(
+  activityId: string,
+  imageIndex: number,
+  imageCount: number,
+) {
+  return imageCount === 1
+    ? activityId
+    : `${activityId}:image:${imageIndex + 1}`;
+}
+
+async function createLeadsFromTrustedScreenshots(input: {
+  activityId: string;
+  eventId: string;
+  body: string | null;
+  media: TrustedSmsMedia[];
+  conversationId: string | null;
+  communicationId: string | null;
+  senderPhone: string;
+}) {
+  const images = trustedImageMedia(input.media);
+  await Promise.all(
+    images.map((image, imageIndex) =>
+      createLeadFromTrustedScreenshot({
+        ...input,
+        activityId: trustedLeadImageActivityId(
+          input.activityId,
+          imageIndex,
+          images.length,
+        ),
+        media: [image],
+      })
+    ),
+  );
+
+  // Older broker versions first created one generic intake for the entire SMS.
+  // Once every image has its own durable disposition, hide that stale bundle.
+  if (images.length)
+    await sql`
+      update public.aura_intakes
+      set status = 'cancelled',
+          error_message = 'Superseded by per-image lead classification.'
+      where external_message_id = ${trustedPhoneIntakeExternalMessageId(input.activityId)}
+        and message_type = 'image'
+        and status in ('pending', 'needs_follow_up', 'failed')
+    `;
+}
+
+async function recoverLegacyBundledLeadScreenshots() {
+  const rows = await sql<
+    Array<{
+      activity_id: string;
+      sender_phone: string;
+      message_text: string | null;
+      raw_payload: Record<string, unknown> | null;
+      communication_id: string | null;
+    }>
+  >`
+    select
+      coalesce(intake.raw_payload ->> 'activityId', substring(intake.external_message_id from 5)) as activity_id,
+      intake.sender_phone,
+      intake.message_text,
+      intake.raw_payload,
+      communication.id as communication_id
+    from public.aura_intakes intake
+    left join public.aura_communications communication
+      on communication.provider = 'quo'
+     and communication.external_activity_id = coalesce(intake.raw_payload ->> 'activityId', substring(intake.external_message_id from 5))
+    where intake.source = 'sms'
+      and intake.external_message_id like 'quo:%'
+      and intake.message_type = 'image'
+      and intake.status in ('pending', 'needs_follow_up', 'failed')
+      and intake.created_at >= now() - interval '2 hours'
+    order by intake.created_at desc
+    limit 4
+  `;
+  await Promise.all(
+    rows.map(async (row) => {
+      if (!isTrustedSmsCommandPhone(row.sender_phone)) return;
+      const media = Array.isArray(row.raw_payload?.media)
+        ? row.raw_payload.media as TrustedSmsMedia[]
+        : [];
+      if (!trustedImageMedia(media).length) return;
+      await createLeadsFromTrustedScreenshots({
+        activityId: row.activity_id,
+        eventId: `recovery:${row.activity_id}`,
+        body: row.message_text,
+        media,
+        conversationId:
+          typeof row.raw_payload?.conversationId === "string"
+            ? row.raw_payload.conversationId
+            : null,
+        communicationId: row.communication_id,
+        senderPhone: row.sender_phone,
+      });
+    }),
+  );
 }
 
 function trustedDocumentInputs(media: TrustedSmsMedia[]) {
