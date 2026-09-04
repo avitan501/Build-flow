@@ -26,13 +26,23 @@ test("server resolves selected attachment ids under the exact request and builds
 
 test("public attachment download is selected-version and request scoped", async () => {
   const route = await readFile(path.join(root, "app/client-document/[token]/attachments/[attachmentId]/route.ts"), "utf8")
-  expect(route).toContain("row.version !== expectedVersion")
-  expect(route).toContain('.eq("id", attachmentId).eq("request_id", row.request_id)')
-  expect(route).toContain("document?.attachments?.find")
+  const edge = await readFile(path.join(root, "supabase/functions/client-document-attachment/index.ts"), "utf8")
+  expect(route).toContain('endpoint.searchParams.set("version", String(expectedVersion))')
   expect(route).toContain('"Cache-Control": "private, no-store, max-age=0"')
-  expect(route).toContain('"X-Content-Type-Options": "nosniff"')
-  expect(route).toContain("attachment.file_name !== selected.fileName")
-  expect(route).toContain("attachment.file_size !== selected.fileSize")
+  expect(route).not.toContain("createAdminClient")
+  expect(edge).toContain("document?.version === expectedVersion")
+  expect(edge).toContain('.eq("id", attachmentId).eq("request_id", document.request_id)')
+  expect(edge).toContain("attachmentSnapshots(document.document_data).find")
+  expect(edge).toContain("attachment.file_name !== selected.fileName")
+  expect(edge).toContain("attachment.file_size !== selected.fileSize")
+  expect(edge).toContain('createSignedUrl(attachment.file_path, 90')
+  expect(edge).not.toContain(".download(")
+})
+
+test("failed browser batches remove already uploaded temporary objects", async () => {
+  const panel = await readFile(path.join(root, "components/buildflow/request-management-panel.tsx"), "utf8")
+  expect(panel).toContain('!registered && uploads.length')
+  expect(panel).toContain('storage.from("project-uploads").remove(uploads.map((entry) => entry.storagePath))')
 })
 
 test("live estimate and PDF expose the selected attachment bundle", async () => {

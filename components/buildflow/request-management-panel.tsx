@@ -642,21 +642,25 @@ export function RequestManagementPanel({
     if (selectedTotal > 25 * 1024 * 1024) return setQuoteFeedback("Keep all attachments for this document at 25 MB or less.")
     setAttachmentUploadPending(true)
     setQuoteFeedback("")
+    const uploads: ExistingRequestUploadInput[] = []
+    const browserSupabase = createClient()
+    let registered = false
     try {
-      const uploads: ExistingRequestUploadInput[] = []
       for (const file of files) {
         const prepared = await prepareRequestAttachmentUploadAction({ requestId, filename: file.name, type: file.type, size: file.size })
         if (!prepared.ok) throw new Error(prepared.error)
         const { storagePath, token } = prepared.data
-        const { error } = await createClient().storage.from("project-uploads").uploadToSignedUrl(storagePath, token, file, { contentType: file.type, upsert: false })
+        const { error } = await browserSupabase.storage.from("project-uploads").uploadToSignedUrl(storagePath, token, file, { contentType: file.type, upsert: false })
         if (error) throw new Error(`Could not upload ${file.name}. Please try again.`)
         uploads.push({ storagePath, filename: file.name, type: file.type, size: file.size })
       }
       const result = await addRequestAttachmentsAction({ requestId, attachments: uploads, organize: false })
       if (!result.ok) throw new Error(result.error)
+      registered = true
       setDocumentAttachments((current) => [...current, ...result.attachments.filter((entry) => !alreadySelected.has(entry.id))])
       setQuoteFeedback(`${result.attachments.length} file${result.attachments.length === 1 ? "" : "s"} added. Save the document to include them on the client link.`)
     } catch (cause) {
+      if (!registered && uploads.length) await browserSupabase.storage.from("project-uploads").remove(uploads.map((entry) => entry.storagePath))
       setQuoteFeedback(cause instanceof Error ? cause.message : "The files could not be attached. Please try again.")
     } finally {
       setAttachmentUploadPending(false)
