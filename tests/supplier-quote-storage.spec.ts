@@ -732,6 +732,18 @@ test("catalog Exa search is staff-only, cached, and keeps results out of the cat
   expect(catalog).toContain("/api/admin/catalog/exa-search");
 });
 
+test("request comparison sync parks stale sort positions before inserting organized rows", async () => {
+  const actions = await readFile(
+    path.join(root, "app/admin/supplier-quotes/actions.ts"),
+    "utf8",
+  );
+  const park = actions.indexOf("sort_order: 1_000_000 + index");
+  const insert = actions.indexOf("missingRequestItems.map((item) =>");
+
+  expect(park).toBeGreaterThan(-1);
+  expect(insert).toBeGreaterThan(park);
+});
+
 test("supplier quote AI extraction uses a cost-controlled model and does not retain responses", async () => {
   const [extraction, edgeFunction] = await Promise.all([
     readFile(path.join(root, "lib/supplier-quote-ai.ts"), "utf8"),

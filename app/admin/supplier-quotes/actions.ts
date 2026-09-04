@@ -1216,6 +1216,19 @@ async function createComparisonFromQuote(
       semanticTransfers.map(({ item, comparisonItem }) => [item.id, comparisonItem]),
     );
 
+    // Park every saved row outside the normal sort range before rebuilding the
+    // request-backed order. Otherwise the unique (comparison_id, sort_order)
+    // index rejects the first newly organized row while the obsolete source row
+    // is still occupying sort order zero.
+    for (const [index, existingItem] of existingItems.entries()) {
+      const { error } = await supabase
+        .from("quote_comparison_items")
+        .update({ sort_order: 1_000_000 + index })
+        .eq("id", existingItem.id)
+        .eq("comparison_id", comparison.id);
+      if (error) return { data: null, error };
+    }
+
     for (const [index, item] of currentRequestItems.entries()) {
       const existing = existingBySourceId.get(item.id);
       if (!existing) continue;
