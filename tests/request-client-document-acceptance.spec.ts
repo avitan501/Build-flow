@@ -44,6 +44,34 @@ test("the public acceptance wrapper hashes only the exact stored terms", async (
   expect(migration).not.toContain("p_terms_hash text")
 })
 
+test("legacy documents accept the exact complete terms rendered to the signer", async () => {
+  const migration = await readFile(path.join(root, "supabase/migrations/20260904023000_accept_exact_rendered_client_document_terms.sql"), "utf8")
+  expect(migration).toContain("Match the deterministic terms shown by clientDocumentTerms()")
+  expect(migration).toContain("3% processing fee applies to credit card payments")
+  expect(migration).toContain("restocking fee of up to 25%")
+  expect(migration).toContain("before requesting a stop-payment, reversal, or chargeback")
+  expect(migration).toContain("p_document_version")
+  expect(migration).toContain("p_signer_name")
+  expect(migration).toContain("extensions.digest")
+  expect(migration).toContain("to anon, authenticated")
+})
+
+test("acceptance errors explain whether to refresh, correct identity, or contact Avantia", async () => {
+  const action = await readFile(path.join(root, "app/client-document/[token]/actions.ts"), "utf8")
+  expect(action).toContain("acceptanceErrorMessage")
+  expect(action).toContain("client_document_version_changed")
+  expect(action).toContain("client_document_email_mismatch")
+  expect(action).toContain("client_document_terms_hash_mismatch")
+  expect(action).toContain("No acceptance was recorded")
+  expect(action).toContain("(516) 908-8319")
+})
+
+test("saved documents persist the same mandatory terms used by acceptance", async () => {
+  const actions = await readFile(path.join(root, "app/owner/materials/requests/actions.ts"), "utf8")
+  expect(actions).toContain('import { includeRequiredProposalTerms } from "@/lib/proposal-terms"')
+  expect(actions).toContain('terms: includeRequiredProposalTerms(String(input.terms || "").trim().slice(0, 4000))')
+})
+
 test("authorized managers can read only current-version client document acceptances", async () => {
   const migration = await readFile(path.join(root, "supabase/migrations/20260903233412_expose_current_client_document_acceptance_to_staff.sql"), "utf8")
   expect(migration).toContain("create or replace function public.get_request_current_client_document_acceptances")

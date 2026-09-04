@@ -13,6 +13,7 @@ import { requestActionHasSameOrigin, validateRequestAttachmentFile, verifyReques
 import { generateRequestClientQuotePdf, type RequestClientDocumentType, type RequestClientQuoteLine } from "@/lib/request-client-quote-pdf"
 import { containsRawPaymentCredentialsInPayload, hasForbiddenPaymentFields, sanitizeRequestClientPayment, type RequestClientPaymentRequest } from "@/lib/request-client-payment"
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state"
+import { includeRequiredProposalTerms } from "@/lib/proposal-terms"
 import { PRODUCTION_SITE_ORIGIN } from "@/lib/site-url"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import { canonicalSupplierId, canonicalSupplierKey, findCanonicalSupplier, uniqueCanonicalSupplierNames } from "@/lib/supplier-canonical"
@@ -839,7 +840,7 @@ async function prepareRequestClientQuote(input: RequestClientQuoteInput) {
     deliveryCharge: Math.round(deliveryCharge * 100) / 100,
     salesTaxRate: Math.round(salesTaxRate * 1000) / 1000,
     taxableDelivery: input.taxableDelivery !== false,
-    terms: String(input.terms || "").trim().slice(0, 4000),
+    terms: includeRequiredProposalTerms(String(input.terms || "").trim().slice(0, 4000)),
     paymentRequest: paymentRequest?.ok ? paymentRequest.value : undefined,
   }
   const pdf = await generateRequestClientQuotePdf(pdfInput)
