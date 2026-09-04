@@ -15,7 +15,7 @@ import { OPEN_REQUEST_CLIENT_CONTACT_EVENT } from "@/components/buildflow/reques
 import { RequestWorkflowStepHeader, workflowStepCardClass } from "@/components/buildflow/request-workflow-step-header"
 import type { SupplierRoutingOption } from "@/lib/shop-qualification"
 import type { ManagerPipelineStage } from "@/lib/manager-dashboard"
-import { DEFAULT_PROPOSAL_TERMS, includeRequiredProposalTerms } from "@/lib/proposal-terms"
+import { DEFAULT_PROPOSAL_TERMS, includeRequiredProposalTerms, proposalTermsForEditor } from "@/lib/proposal-terms"
 import { AVANTIA_PAYMENT_LINK } from "@/lib/payment-link"
 import type { RequestClientDocumentType } from "@/lib/request-client-quote-pdf"
 import type { RequestClientDocumentAttachment } from "@/lib/request-client-document-data"
@@ -387,7 +387,7 @@ export function RequestManagementPanel({
     setDeliveryCharge(saved?.documentData.deliveryCharge === undefined ? clientReadyToPayDefaults.deliveryCharge : Number(saved.documentData.deliveryCharge) || 0)
     setSalesTaxRate(Number.isFinite(saved?.documentData.salesTaxRate) ? Number(saved?.documentData.salesTaxRate) : clientReadyToPayDefaults.salesTaxRate)
     setTaxableDelivery(saved?.documentData.taxableDelivery !== false)
-    setQuoteTerms(includeRequiredProposalTerms(saved?.documentData.terms || DEFAULT_PROPOSAL_TERMS))
+    setQuoteTerms(proposalTermsForEditor(saved?.documentData.terms))
     setRequestPayment(Boolean(savedPayment || legacyPaymentLink))
     setPaymentMethods(savedPaymentMethods)
     setPaymentAmountDue(savedPayment?.amountDue ? String(savedPayment.amountDue) : legacyPaymentLink ? savedDocumentTotal(saved.documentData).toFixed(2) : "")

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 
-import { DEFAULT_PROPOSAL_TERMS, includeRequiredProposalTerms } from "../lib/proposal-terms"
+import { DEFAULT_PROPOSAL_TERMS, includeRequiredProposalTerms, proposalTermsForEditor } from "../lib/proposal-terms"
 
 const root = process.cwd()
 
@@ -143,4 +143,17 @@ test("new estimates use one compact client-friendly terms block without appended
   expect(DEFAULT_PROPOSAL_TERMS).toContain("All sales are final unless stated otherwise.")
   expect(DEFAULT_PROPOSAL_TERMS.length).toBeLessThan(600)
   expect(includeRequiredProposalTerms(DEFAULT_PROPOSAL_TERMS)).toBe(DEFAULT_PROPOSAL_TERMS)
+})
+
+test("editing a legacy default estimate offers compact terms without changing custom copy", () => {
+  const legacyDefault = [
+    "Prices may change until the order is approved and processed.",
+    "All sales are final unless stated otherwise.",
+    "Delivery, taxes, and freight are included only when shown above.",
+    "A 3% processing fee applies to credit card payments.",
+    "Approved returns may be subject to a restocking fee of up to 25% of the returned merchandise price, plus disclosed pickup, return-freight, or supplier charges. Returns require prior written authorization and remain subject to the applicable supplier return policy.",
+    "Before requesting a stop-payment, reversal, or chargeback, the customer agrees to contact Avantia promptly and allow a reasonable opportunity to investigate and resolve the issue. This does not waive any billing-error, dispute, or other right that cannot legally be waived.",
+  ].join(" ")
+  expect(proposalTermsForEditor(legacyDefault)).toBe(DEFAULT_PROPOSAL_TERMS)
+  expect(proposalTermsForEditor("Custom project condition.")).toContain("Custom project condition.")
 })

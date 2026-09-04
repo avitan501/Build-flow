@@ -20,6 +20,13 @@ export const DEFAULT_PROPOSAL_TERMS = [
   "Before requesting a stop-payment, reversal, or chargeback, please contact Avantia so we can help. Your legal rights remain unchanged.",
 ].join(" ")
 
+const LEGACY_DEFAULT_PROPOSAL_TERMS = [
+  "Prices may change until the order is approved and processed.",
+  "All sales are final unless stated otherwise.",
+  "Delivery, taxes, and freight are included only when shown above.",
+  ...REQUIRED_PROPOSAL_TERMS,
+].join(" ")
+
 export function includeRequiredProposalTerms(terms: string) {
   let result = terms.trim()
   const requiredTerms = [
@@ -32,6 +39,14 @@ export function includeRequiredProposalTerms(terms: string) {
     if (!term.pattern.test(result)) result = [result, term.text].filter(Boolean).join(" ")
   }
   return result
+}
+
+export function proposalTermsForEditor(terms?: string | null) {
+  const savedTerms = String(terms || "").trim()
+  if (!savedTerms) return DEFAULT_PROPOSAL_TERMS
+  const normalizedSavedTerms = savedTerms.replace(/\s+/g, " ")
+  if (normalizedSavedTerms === LEGACY_DEFAULT_PROPOSAL_TERMS) return DEFAULT_PROPOSAL_TERMS
+  return includeRequiredProposalTerms(savedTerms)
 }
 
 // Retained for older callers while enforcing every required shared term.
