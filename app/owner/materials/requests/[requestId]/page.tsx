@@ -237,13 +237,15 @@ export default async function OwnerMaterialRequestPage({
     receiptDocument ? { documentNumber: receiptDocument.document_number, publicToken: receiptDocument.public_token, version: receiptDocument.version } : null,
   );
   const currentEstimateAcceptance = currentClientDocumentAcceptanceRows.find((acceptance) => acceptance.document_type === "estimate") ?? null;
+  const estimateSent = clientActions.some((event) => event.metadata.client_action === "estimate_sent")
+    || Boolean(currentEstimateAcceptance);
   const clientApproved = clientActions.some((event) => event.metadata.client_action === "client_approved")
     || (comparisons ?? []).some((comparison) => comparison.client_quote_status === "accepted")
     || Boolean(currentEstimateAcceptance)
     || paymentReceived;
   const initialPaymentDelivery = {
     documentType: latestClientDocument?.metadata.client_action === "receipt_sent" ? "receipt" as const : latestClientDocument?.metadata.client_action === "invoice_sent" ? "invoice" as const : null,
-    estimateSent: clientActions.some((event) => event.metadata.client_action === "estimate_sent"),
+    estimateSent,
     clientApproved,
     invoiceSent: clientActions.some((event) => event.metadata.client_action === "invoice_sent"),
     receiptSent,
