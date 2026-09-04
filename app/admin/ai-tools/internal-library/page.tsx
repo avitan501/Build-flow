@@ -31,8 +31,8 @@ export default async function InternalAuraLibraryPage({
   return (
     <main className="min-h-screen bg-[#f5f6f8] px-3 py-5 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-5xl">
-        <Link href="/admin/ai-tools" className="inline-flex items-center gap-1 text-xs font-bold text-sky-700">
-          <ChevronLeft className="h-4 w-4" />Manager Tools
+        <Link href="/admin/ai-tools" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-sky-700">
+          <ChevronLeft aria-hidden="true" className="h-4 w-4" />Manager Tools
         </Link>
 
         <header className="mt-4 rounded-2xl bg-slate-950 px-5 py-6 text-white shadow-lg sm:px-7">

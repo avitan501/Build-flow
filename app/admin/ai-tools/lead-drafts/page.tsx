@@ -31,7 +31,7 @@ export default async function LeadDraftsPage() {
 
   return <main className="min-h-screen bg-[#f5f5f7] px-3 py-4 text-slate-950 sm:px-6 sm:py-6"><div className="mx-auto max-w-3xl">
     <Link href="/admin/ai-tools" className="inline-flex min-h-11 items-center text-sm font-bold text-[#0066cc]">← Manager Tools</Link>
-    <header className="mt-2"><p className="text-[10px] font-black uppercase tracking-[.16em] text-[#0066cc]">Exception inbox</p><h1 className="mt-1 text-3xl font-black">Leads — Needs Review</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">A clear screenshot from David with a usable phone number becomes a NEW lead automatically and creates a follow-up for Carlos. Only unclear, incomplete, or duplicate contacts wait here. Nothing in this inbox sends a welcome message automatically.</p></header>
+    <header className="mt-2"><p className="text-[10px] font-black uppercase tracking-[.16em] text-[#0066cc]">Exception inbox</p><h1 className="mt-1 text-3xl font-black">Leads — Needs Review</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">A clear screenshot from David with a usable phone number becomes a NEW lead automatically. Only unclear, incomplete, or duplicate contacts wait here. Nothing in this inbox sends a welcome message automatically.</p></header>
 
     {error ? <p role="alert" className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800">Lead drafts could not be loaded.</p> : null}
     <section className="mt-5 grid gap-3" aria-label="Pending lead drafts">
@@ -47,7 +47,7 @@ export default async function LeadDraftsPage() {
           <form action={cancelAuraIntakeAction}><input type="hidden" name="intakeId" value={draft.id} /><button type="submit" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700"><X className="h-4 w-4" />Not a lead</button></form>
         </div>
       </article>)}
-      {!drafts.length && !error ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center"><h2 className="font-black">Nothing needs review</h2><p className="mt-2 text-sm leading-6 text-slate-500">Clear screenshots from David are already added to the lead directory. Only missing, uncertain, or duplicate details appear here.</p></div> : null}
+      {!drafts.length && !error ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center"><h2 className="font-black">Nothing needs review</h2><p className="mt-1 text-sm leading-6 text-slate-500">Unclear or duplicate leads will appear here.</p></div> : null}
     </section>
   </div></main>
 }

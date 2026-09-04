@@ -91,7 +91,7 @@ export default async function AmazonConstructionDealsPage({ searchParams }: { se
 
   return <main className="min-h-screen bg-[#f2f0eb] px-3 py-5 sm:px-6 sm:py-8">
     <div className="mx-auto max-w-6xl">
-      <Link href="/admin/ai-tools" className="inline-flex min-h-10 items-center gap-1 text-xs font-bold text-slate-700 hover:text-sky-700"><ChevronLeft className="h-4 w-4" />Manager Tools</Link>
+      <Link href="/admin/ai-tools" className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-slate-700 hover:text-sky-700"><ChevronLeft aria-hidden="true" className="h-4 w-4" />Manager Tools</Link>
 
       <header className="relative overflow-hidden rounded-2xl bg-[#111820] px-5 py-7 text-white shadow-xl sm:px-8 sm:py-9">
         <div className="absolute inset-y-0 right-0 hidden w-2/5 border-l border-white/10 bg-[linear-gradient(135deg,transparent_20%,rgba(251,146,60,.12)_20%,rgba(251,146,60,.12)_22%,transparent_22%,transparent_46%,rgba(255,255,255,.06)_46%,rgba(255,255,255,.06)_48%,transparent_48%)] sm:block" />

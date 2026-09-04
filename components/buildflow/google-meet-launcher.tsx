@@ -73,14 +73,14 @@ export function GoogleMeetLauncher({ variant = "card" }: GoogleMeetLauncherProps
   }
 
   return (
-    <div className="grid min-h-24 grid-cols-[2.5rem_minmax(0,1fr)_auto] items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="grid min-h-[4.75rem] grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
       <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 text-white"><Video className="h-4 w-4" /></span>
       <span className="min-w-0">
         <span className="block text-sm font-bold text-slate-950">Google Meet</span>
-        <span className="mt-1 line-clamp-2 block text-xs leading-5 text-slate-500">Create a live meeting from avitanneto@gmail.com and invite the Avantia Build manager account.</span>
+        <span className="mt-0.5 line-clamp-2 block text-xs leading-5 text-slate-500">Create a live meeting from the connected Avantia account.</span>
         {status ? <span role="status" className="mt-1 block text-xs font-medium text-slate-700">{status}</span> : null}
       </span>
-      <button type="button" onClick={startMeeting} disabled={busy} className="pt-1 text-xs font-semibold text-[#0066cc] disabled:cursor-wait disabled:opacity-60">{busy ? "Creating…" : "Start"}</button>
+      <button type="button" onClick={startMeeting} disabled={busy} className="inline-flex min-h-11 items-center rounded-md px-3 text-xs font-semibold text-[#0066cc] hover:bg-sky-50 focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-wait disabled:opacity-60">{busy ? "Creating…" : "Start"}</button>
     </div>
   );
 }
