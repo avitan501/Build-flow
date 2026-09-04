@@ -4,6 +4,7 @@ import path from "node:path"
 import { expect, test } from "@playwright/test"
 
 import { canManageWebsiteDefects, canReportWebsiteDefects } from "@/lib/website-defects-access"
+import { normalizeWebsiteDefectFileType, retryWebsiteDefectUpload, websiteDefectUploadErrorMessage } from "@/lib/website-defect-upload"
 
 const root = process.cwd()
 
@@ -42,6 +43,9 @@ test("Manager Tools exposes a private website defect issue inbox", async () => {
   expect(inbox).toContain("Last checked:")
   expect(inbox).toContain("canManage: boolean")
   expect(inbox).toContain("Review the latest owner-verified results.")
+  expect(inbox).toContain("Connection interrupted—retrying securely…")
+  expect(inbox).toContain("file.slice(0, file.size, fileType)")
+  expect(inbox).toContain('isError ? "Try upload again"')
   expect(migration).toContain("alter table public.website_defects enable row level security")
   expect(migration).toContain("public = false")
   expect(migration).toContain("website_defect_files_manager_read")
@@ -53,6 +57,26 @@ test("Manager Tools exposes a private website defect issue inbox", async () => {
   expect(accessMigration).toContain("create policy website_qa_checks_owner_update")
   expect(accessMigration).toContain("create policy website_defect_files_owner_delete")
   expect(accessMigration).not.toContain("private.is_staff())")
+})
+
+test("mobile file metadata is normalized without accepting unapproved formats", () => {
+  expect(normalizeWebsiteDefectFileType({ name: "Screenshot.jpg", type: "image/jpg" })).toBe("image/jpeg")
+  expect(normalizeWebsiteDefectFileType({ name: "screen-recording.mp4", type: "" })).toBe("video/mp4")
+  expect(normalizeWebsiteDefectFileType({ name: "screen-recording.MOV", type: "application/octet-stream" })).toBe("video/quicktime")
+  expect(normalizeWebsiteDefectFileType({ name: "screen-recording.exe", type: "" })).toBe("")
+  expect(normalizeWebsiteDefectFileType({ name: "fake.jpg", type: "application/x-msdownload" })).toBe("")
+})
+
+test("secure upload retries only transient failures and gives actionable safe errors", () => {
+  expect(retryWebsiteDefectUpload({ status: 503 })).toBe(true)
+  expect(retryWebsiteDefectUpload({ status: 429 })).toBe(true)
+  expect(retryWebsiteDefectUpload(new TypeError("Failed to fetch"))).toBe(true)
+  expect(retryWebsiteDefectUpload({ status: 403 })).toBe(false)
+  expect(retryWebsiteDefectUpload({ status: 415 })).toBe(false)
+  expect(websiteDefectUploadErrorMessage({ status: 403 })).toContain("session expired")
+  expect(websiteDefectUploadErrorMessage({ status: 413 })).toContain("under 100 MB")
+  expect(websiteDefectUploadErrorMessage({ status: 415 })).toContain("MP4")
+  expect(websiteDefectUploadErrorMessage(new TypeError("secret backend detail"))).not.toContain("secret")
 })
 
 test("approved operations staff can report defects but only the owner can manage them", () => {

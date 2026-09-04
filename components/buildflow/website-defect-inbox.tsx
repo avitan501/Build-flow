@@ -7,9 +7,9 @@ import { useState, useTransition } from "react"
 
 import { completeWebsiteDefectUploadAction, prepareWebsiteDefectUploadAction, recordWebsiteQaCheckAction, updateWebsiteDefectAction } from "@/app/admin/ai-tools/website-defects/actions"
 import { createClient } from "@/lib/supabase/client"
+import { normalizeWebsiteDefectFileType, retryWebsiteDefectUpload, websiteDefectUploadErrorMessage, websiteDefectUploadErrorStatus } from "@/lib/website-defect-upload"
 
 const MAX_SIZE = 100 * 1024 * 1024
-const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime", "video/webm"])
 const STATUS_OPTIONS = [
   ["new", "New"],
   ["reviewing", "Reviewing"],
@@ -124,18 +124,40 @@ export function WebsiteDefectInbox({ issues, checks, canManage }: { issues: Webs
     if (!file || pending) return
     setMessage("")
     setIsError(false)
-    if (!ALLOWED_TYPES.has(file.type)) { setIsError(true); setMessage("Choose an MP4, MOV, WebM, JPG, PNG, or WebP file."); return }
-    if (file.size > MAX_SIZE) { setIsError(true); setMessage("Keep the file under 100 MB."); return }
+    const fileType = normalizeWebsiteDefectFileType(file)
+    if (!fileType) { setIsError(true); setMessage("Choose an MP4, MOV, WebM, JPG, PNG, or WebP file."); return }
+    if (file.size < 1 || file.size > MAX_SIZE) { setIsError(true); setMessage("Keep the file under 100 MB."); return }
     startTransition(async () => {
       try {
-        setMessage("Preparing a private upload…")
-        const prepared = await prepareWebsiteDefectUploadAction({ fileName: file.name, fileType: file.type, fileSize: file.size })
-        if (!prepared.ok) { setIsError(true); setMessage(prepared.error); return }
-        setMessage("Uploading the recording securely…")
-        const { error } = await createClient().storage.from("website-defects").uploadToSignedUrl(prepared.data.filePath, prepared.data.token, file, { contentType: file.type, upsert: false })
-        if (error) { setIsError(true); setMessage("The recording could not be uploaded. Try again."); return }
+        const uploadBody = file.type.trim().toLowerCase() === fileType ? file : file.slice(0, file.size, fileType)
+        let prepared: Awaited<ReturnType<typeof prepareWebsiteDefectUploadAction>> | null = null
+        let uploadError: unknown = null
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          setMessage(attempt === 0 ? "Preparing a private upload…" : "Connection interrupted—retrying securely…")
+          prepared = await prepareWebsiteDefectUploadAction({ fileName: file.name, fileType, fileSize: file.size })
+          if (!prepared.ok) {
+            setIsError(true)
+            setMessage(prepared.error)
+            return
+          }
+          setMessage(attempt === 0 ? "Uploading the recording securely…" : "Retrying the secure upload…")
+          const result = await createClient().storage.from("website-defects").uploadToSignedUrl(prepared.data.filePath, prepared.data.token, uploadBody, { contentType: fileType, upsert: false })
+          uploadError = result.error
+          if (!uploadError) break
+          console.warn("Website defect upload attempt failed", { attempt: attempt + 1, status: websiteDefectUploadErrorStatus(uploadError) })
+          if (attempt > 0 || !retryWebsiteDefectUpload(uploadError)) {
+            setIsError(true)
+            setMessage(websiteDefectUploadErrorMessage(uploadError))
+            return
+          }
+        }
+        if (!prepared?.ok || uploadError) {
+          setIsError(true)
+          setMessage(websiteDefectUploadErrorMessage(uploadError))
+          return
+        }
         setMessage("Creating the issue…")
-        const completed = await completeWebsiteDefectUploadAction({ defectId: prepared.data.defectId, filePath: prepared.data.filePath, fileName: file.name, fileType: file.type, fileSize: file.size, title: String(formData.get("title") ?? ""), description: String(formData.get("description") ?? ""), pageUrl: String(formData.get("pageUrl") ?? ""), priority: String(formData.get("priority") ?? "normal") })
+        const completed = await completeWebsiteDefectUploadAction({ defectId: prepared.data.defectId, filePath: prepared.data.filePath, fileName: file.name, fileType, fileSize: file.size, title: String(formData.get("title") ?? ""), description: String(formData.get("description") ?? ""), pageUrl: String(formData.get("pageUrl") ?? ""), priority: String(formData.get("priority") ?? "normal") })
         if (!completed.ok) { setIsError(true); setMessage(completed.error); return }
         setFile(null)
         setMessage(`Issue #${completed.data.issueNumber} created. Codex can now review it.`)
@@ -157,8 +179,8 @@ export function WebsiteDefectInbox({ issues, checks, canManage }: { issues: Webs
           <label className="grid gap-1 text-xs font-bold">Short title <span className="font-normal text-slate-400">(optional)</span><input name="title" maxLength={160} placeholder="Example: Add item button does nothing" className="h-11 rounded-lg border border-slate-300 px-3 text-sm" /></label>
           <label className="mt-3 grid gap-1 text-xs font-bold">What happened? <span className="font-normal text-slate-400">Write normally or leave a few words.</span><textarea name="description" maxLength={4000} rows={3} placeholder="I clicked Add item and nothing opened…" className="resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm leading-6" /></label>
           <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_8rem]"><label className="grid gap-1 text-xs font-bold">Page URL <span className="font-normal text-slate-400">(optional)</span><input name="pageUrl" type="url" placeholder="Paste the page link" className="h-11 min-w-0 rounded-lg border border-slate-300 px-3 text-sm" /></label><label className="grid gap-1 text-xs font-bold">Priority<select name="priority" className="h-11 rounded-lg border border-slate-300 bg-white px-2 text-sm"><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option></select></label></div>
-          <label className={`mt-4 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-4 text-center transition-[border-color,background-color] ${file ? "border-emerald-400 bg-emerald-50" : "border-slate-300 bg-slate-50 hover:border-sky-400 hover:bg-sky-50"}`}><Upload className="h-6 w-6 text-[#0071e3]" /><strong className="mt-2 text-sm">{file?.name || "Choose video or screenshot"}</strong><span className="mt-1 text-xs text-slate-500">MP4, MOV, WebM, JPG, PNG or WebP · up to 100 MB</span><input type="file" accept="video/mp4,video/quicktime,video/webm,image/jpeg,image/png,image/webp" disabled={pending} className="sr-only" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>
-          <button type="submit" disabled={!file || pending} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-5 text-sm font-bold text-white disabled:bg-slate-300">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Bug className="h-4 w-4" />}{pending ? "Saving the issue…" : "Upload and create issue"}</button>
+          <label className={`mt-4 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-4 text-center transition-[border-color,background-color] ${file ? "border-emerald-400 bg-emerald-50" : "border-slate-300 bg-slate-50 hover:border-sky-400 hover:bg-sky-50"}`}><Upload className="h-6 w-6 text-[#0071e3]" /><strong className="mt-2 text-sm">{file?.name || "Choose video or screenshot"}</strong><span className="mt-1 text-xs text-slate-500">MP4, MOV, WebM, JPG, PNG or WebP · up to 100 MB</span><input type="file" accept="video/mp4,video/quicktime,video/webm,image/jpeg,image/png,image/webp" disabled={pending} className="sr-only" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setMessage(""); setIsError(false) }} /></label>
+          <button type="submit" disabled={!file || pending} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-5 text-sm font-bold text-white disabled:bg-slate-300">{pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Bug className="h-4 w-4" />}{pending ? "Saving the issue…" : isError ? "Try upload again" : "Upload and create issue"}</button>
           {message ? <p role="status" className={`mt-3 rounded-lg px-3 py-2 text-xs font-bold ${isError ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-800"}`}>{message}</p> : null}
         </form>
       </div>
