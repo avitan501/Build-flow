@@ -28,7 +28,6 @@ import {
   type QuoteComparisonRecord,
 } from "@/lib/quote-comparison";
 import { managerPipelineStage } from "@/lib/manager-dashboard";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { mapRequestSupplierComparison } from "@/lib/request-supplier-comparison";
 import { hasPersistedReceiptProof } from "@/lib/request-workflow-state";
 import { formatSiteDateTime } from "@/lib/site-date-time";
@@ -119,7 +118,6 @@ export default async function OwnerMaterialRequestPage({
 }) {
   const { requestId } = await params;
   const { supabase } = await requireStaffProfile("customers");
-  const admin = createAdminClient();
   const [
     { data: request, error: requestError },
     { data: responses },
@@ -196,7 +194,7 @@ export default async function OwnerMaterialRequestPage({
       .eq("request_id", requestId)
       .order("updated_at", { ascending: false })
       .returns<ComparisonRecord[]>(),
-    admin
+    supabase
       .from("quote_request_supplier_recommendations")
       .select("supplier_id,is_recommended,should_contact,contact_status,notes")
       .eq("request_id", requestId)

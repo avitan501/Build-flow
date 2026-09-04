@@ -88,8 +88,8 @@ test("supplier progress persists centrally and refreshed staff screens do not ke
     source(managementPath),
   ])
 
-  expect(page).toContain("const admin = createAdminClient()")
-  expect(page).toMatch(/admin\s*\.from\("quote_request_supplier_recommendations"\)/)
+  expect(page).not.toContain("createAdminClient")
+  expect(page).toMatch(/supabase\s*\.from\("quote_request_supplier_recommendations"\)/)
   expect(page).toContain("supplierRecommendationsError")
   expect(actions).toContain('admin.from("quote_request_supplier_recommendations").upsert')
   expect(actions).toContain('.select("contact_status").single')

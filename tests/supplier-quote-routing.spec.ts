@@ -9,6 +9,7 @@ import {
   requestItemSpecification,
   resolveExplicitSupplierSelection,
 } from "../lib/supplier-quote-routing"
+import { detectSupplierMatch } from "../lib/supplier-quote-supplier"
 
 test("stale comparison rows are reconciled to the current AI-organized request before matching", () => {
   const requestItems = [
@@ -77,8 +78,7 @@ test("supplier upload validates the selected id against the server directory and
   expect(form).not.toContain('formData.set("supplierName"')
 })
 
-test("supplier detection safely recognizes FW Webb naming variants", async () => {
-  const { detectSupplierMatch } = await import("../lib/supplier-quote-supplier")
+test("supplier detection safely recognizes FW Webb naming variants", () => {
   const directory = [
     { id: "fw-webb-water-works", name: "FW WEBB water works" },
     { id: "rio", name: "Rio Supply" },
@@ -86,8 +86,7 @@ test("supplier detection safely recognizes FW Webb naming variants", async () =>
   expect(detectSupplierMatch(directory, "F.W. Webb Company", "F.W. Webb Company\nQUOTATION 10883")).toEqual(directory[0])
 })
 
-test("supplier detection refuses an equally strong ambiguous directory match", async () => {
-  const { detectSupplierMatch } = await import("../lib/supplier-quote-supplier")
+test("supplier detection refuses an equally strong ambiguous directory match", () => {
   expect(detectSupplierMatch([
     { id: "first", name: "Modern Window Manufacturing" },
     { id: "second", name: "Modern Window Manufacturing" },
