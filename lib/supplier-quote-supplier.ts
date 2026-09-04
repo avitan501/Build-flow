@@ -1,7 +1,11 @@
 import type { CatalogSupplier } from "@/lib/material-catalog"
 
 function searchable(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+  return value
+    .toLowerCase()
+    .replace(/\bf\s*[.\-_]*\s*w\s*[.\-_]*\s*webb\b(?:\s+(?:company|co|water\s+works))*\b/g, "fw webb")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
 }
 
 const COMPANY_SUFFIXES = new Set(["co", "company", "corp", "corporation", "inc", "llc", "manufacturer", "manufacturing"])
@@ -13,21 +17,28 @@ function canonicalToken(value: string) {
 }
 
 export function detectSupplierMatch(suppliers: Array<Pick<CatalogSupplier, "id" | "name">>, detectedName: string, documentText: string) {
+  const detected = searchable(detectedName)
   const haystack = searchable(`${detectedName} ${documentText.slice(0, 5000)}`)
   if (!haystack) return null
   const haystackTokens = new Set(haystack.split(" ").filter(Boolean).map(canonicalToken))
-  return suppliers
+  const detectedTokens = new Set(detected.split(" ").filter(Boolean).map(canonicalToken))
+  const ranked = suppliers
     .map((supplier) => {
       const name = searchable(supplier.name)
       const tokens = name.split(" ").filter((token) => token.length > 1)
       const identifyingTokens = tokens.map(canonicalToken).filter((token) => !COMPANY_SUFFIXES.has(token))
+      const detectedIdentityMatch = Boolean(detected) && name === detected
+      const detectedTokenMatch = identifyingTokens.length >= 2 && identifyingTokens.every((token) => detectedTokens.has(token))
       const tokenMatch = identifyingTokens.length >= 2 && identifyingTokens.every((token) => haystackTokens.has(token))
       const singleNameMatch = tokens.length === 1 && identifyingTokens.length === 1 && haystackTokens.has(identifyingTokens[0])
-      const score = name && haystack.includes(name) ? 100 : tokenMatch ? 80 + identifyingTokens.length : singleNameMatch ? 70 : 0
+      const score = detectedIdentityMatch ? 140 : detectedTokenMatch ? 120 + identifyingTokens.length : name && haystack.includes(name) ? 100 : tokenMatch ? 80 + identifyingTokens.length : singleNameMatch ? 70 : 0
       return { supplier, score }
     })
     .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score || b.supplier.name.length - a.supplier.name.length)[0]?.supplier ?? null
+    .sort((a, b) => b.score - a.score || b.supplier.name.length - a.supplier.name.length)
+  if (!ranked.length) return null
+  if (ranked[1]?.score === ranked[0].score && ranked[1].supplier.id !== ranked[0].supplier.id) return null
+  return ranked[0].supplier
 }
 
 export function inferSupplierName(documentText: string) {

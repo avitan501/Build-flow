@@ -77,6 +77,38 @@ test("supplier upload validates the selected id against the server directory and
   expect(form).not.toContain('formData.set("supplierName"')
 })
 
+test("supplier detection safely recognizes FW Webb naming variants", async () => {
+  const { detectSupplierMatch } = await import("../lib/supplier-quote-supplier")
+  const directory = [
+    { id: "fw-webb-water-works", name: "FW WEBB water works" },
+    { id: "rio", name: "Rio Supply" },
+  ]
+  expect(detectSupplierMatch(directory, "F.W. Webb Company", "F.W. Webb Company\nQUOTATION 10883")).toEqual(directory[0])
+})
+
+test("supplier detection refuses an equally strong ambiguous directory match", async () => {
+  const { detectSupplierMatch } = await import("../lib/supplier-quote-supplier")
+  expect(detectSupplierMatch([
+    { id: "first", name: "Modern Window Manufacturing" },
+    { id: "second", name: "Modern Window Manufacturing" },
+  ], "Modern Window Manufacturing", "quote")).toBeNull()
+})
+
+test("quote review provides a safe supplier select or create path and routing retries a current match", async () => {
+  const root = process.cwd()
+  const [actions, workspace, page] = await Promise.all([
+    readFile(path.join(root, "app/admin/supplier-quotes/actions.ts"), "utf8"),
+    readFile(path.join(root, "components/buildflow/supplier-quote-workspace.tsx"), "utf8"),
+    readFile(path.join(root, "app/admin/supplier-quotes/[quoteId]/page.tsx"), "utf8"),
+  ])
+  expect(actions).toContain("findAndPersistQuoteSupplier")
+  expect(actions).toContain("assignSupplierQuoteDirectoryAction")
+  expect(actions).toContain("createAndAssignSupplierQuoteDirectoryAction")
+  expect(workspace).toContain('aria-label="Supplier Directory record"')
+  expect(workspace).toContain("Prices remain isolated under the supplier you confirm.")
+  expect(page).toContain('supabase.rpc("staff_load_catalog_suppliers")')
+})
+
 test("request specifications preserve the fields needed to distinguish same-name materials", () => {
   expect(requestItemSpecification({
     product_type: "Regular SPF",

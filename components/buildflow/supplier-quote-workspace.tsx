@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowLeft, BookOpenCheck, Check, Columns3, ExternalLink, FileSearch, FileText, LoaderCircle, Plus, RotateCw, Save, Send, Trash2 } from "lucide-react"
+import { ArrowLeft, BookOpenCheck, Check, Columns3, ExternalLink, FileSearch, FileText, LoaderCircle, Plus, RotateCw, Save, Send, Store, Trash2 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -9,6 +9,8 @@ import { useMemo, useState, useTransition } from "react"
 import {
   addSupplierQuoteItemAction,
   addSupplierQuoteItemsToCatalogAction,
+  assignSupplierQuoteDirectoryAction,
+  createAndAssignSupplierQuoteDirectoryAction,
   createClientQuoteFromSupplierQuoteAction,
   deleteSupplierQuoteItemAction,
   retrySupplierQuoteExtractionAction,
@@ -37,11 +39,12 @@ function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
 }
 
-export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, departments }: {
+export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, departments, suppliers }: {
   quote: SupplierQuoteRecord
   initialItems: SupplierQuoteItemRecord[]
   documentUrl: string | null
   departments: string[]
+  suppliers: Array<{ id: string; name: string }>
 }) {
   const router = useRouter()
   const [items, setItems] = useState(initialItems.map(editableItem))
@@ -54,6 +57,8 @@ export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, depar
   const [taxPercent, setTaxPercent] = useState(Number(quote.tax_percent))
   const [leadTimeDays, setLeadTimeDays] = useState<number | null>(quote.lead_time_days === null ? null : Number(quote.lead_time_days))
   const [message, setMessage] = useState(quote.extraction_note)
+  const [linkedSupplier, setLinkedSupplier] = useState(quote.supplier_id ?? "")
+  const [supplierSelection, setSupplierSelection] = useState(quote.supplier_id ?? "")
   const [tone, setTone] = useState<"info" | "success" | "error">(initialItems.length ? "info" : "error")
   const [pending, startTransition] = useTransition()
   const selectedIds = items.filter((item) => item.selected).map((item) => item.id)
@@ -120,6 +125,29 @@ export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, depar
     })
   }
 
+  function connectSupplier(create = false) {
+    startTransition(async () => {
+      if (!create && !supplierSelection) {
+        setTone("error")
+        setMessage("Choose a supplier from the directory first.")
+        return
+      }
+      const result = create
+        ? await createAndAssignSupplierQuoteDirectoryAction(quote.id)
+        : await assignSupplierQuoteDirectoryAction(quote.id, supplierSelection)
+      if (!result.ok) {
+        setTone("error")
+        setMessage(result.error)
+        return
+      }
+      setLinkedSupplier(result.data.supplierId)
+      setSupplierSelection(result.data.supplierId)
+      setTone("success")
+      setMessage(result.message)
+      router.refresh()
+    })
+  }
+
   function route(destination: "catalog" | "comparison" | "client") {
     startTransition(async () => {
       if (!selectedIds.length) { setTone("error"); setMessage("Select at least one item first."); return }
@@ -146,6 +174,12 @@ export function SupplierQuoteWorkspace({ quote, initialItems, documentUrl, depar
         </header>
 
         {message ? <div role={tone === "error" ? "alert" : "status"} className={`mt-4 border px-4 py-3 text-sm font-semibold ${tone === "error" ? "border-rose-200 bg-rose-50 text-rose-800" : tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-sky-200 bg-sky-50 text-sky-800"}`}>{message}</div> : null}
+
+        {!linkedSupplier ? <section className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4" aria-labelledby="quote-supplier-link-heading">
+          <div className="flex items-start gap-3"><Store className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div className="min-w-0 flex-1"><h2 id="quote-supplier-link-heading" className="font-bold text-amber-950">Confirm the supplier for this quote</h2><p className="mt-1 text-xs leading-5 text-amber-900">We read “{quote.source_vendor_name || quote.supplier_name}”. Choose the existing directory record, or add this exact vendor as a first-time supplier. Prices remain isolated under the supplier you confirm.</p></div></div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]"><select aria-label="Supplier Directory record" value={supplierSelection} onChange={(event) => setSupplierSelection(event.target.value)} className="min-h-11 min-w-0 rounded-lg border border-amber-300 bg-white px-3 text-sm"><option value="">Choose existing supplier</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select><button type="button" onClick={() => connectSupplier(false)} disabled={pending || !supplierSelection} className="min-h-11 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white disabled:opacity-40">Use selected</button><button type="button" onClick={() => connectSupplier(true)} disabled={pending} className="min-h-11 rounded-lg border border-amber-400 bg-white px-4 text-sm font-bold text-amber-950 disabled:opacity-40">Add “{quote.source_vendor_name || quote.supplier_name}”</button></div>
+          <Link href="/admin/vendors" className="mt-3 inline-flex text-xs font-bold text-amber-900 underline underline-offset-2">Open Supplier Directory for full contact details</Link>
+        </section> : null}
 
         <details className="mt-4 overflow-hidden border border-slate-200 bg-white shadow-sm" aria-label="Quote details">
           <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3"><span className="font-bold">Quote details</span><span className="text-xs font-semibold text-[#0071e3]">Edit dates, tax, delivery, and notes</span></summary>

@@ -7,6 +7,7 @@ import {
   normalizeMaterialCatalogDepartment,
   type CatalogSupplier,
 } from "@/lib/material-catalog";
+import { canonicalSupplierId } from "@/lib/supplier-canonical";
 import { captureOperationalError } from "@/lib/monitoring/capture-operational-error";
 import { loadInboundSupplierQuoteAttachment } from "@/lib/aura/inbound-supplier-quote";
 import { extractSupplierQuoteFile } from "@/lib/supplier-quote-extraction";
@@ -98,6 +99,98 @@ async function loadQuote(quoteId: string) {
     .eq("id", quoteId)
     .maybeSingle<SupplierQuoteRecord>();
   return { supabase, user, quote: data ?? null };
+}
+
+async function findAndPersistQuoteSupplier(
+  supabase: StaffSupabase,
+  quote: SupplierQuoteRecord,
+) {
+  if (quote.supplier_id) return { id: quote.supplier_id, name: quote.supplier_name };
+  const { data, error } = await supabase.rpc("staff_load_catalog_suppliers");
+  if (error) return null;
+  const match = detectSupplierMatch(
+    Array.isArray(data) ? (data as CatalogSupplier[]) : [],
+    quote.source_vendor_name || quote.supplier_name,
+    quote.raw_text,
+  );
+  if (!match) return null;
+  const { error: updateError } = await supabase
+    .from("supplier_quotes")
+    .update({ supplier_id: match.id, supplier_name: match.name })
+    .eq("id", quote.id)
+    .is("supplier_id", null);
+  if (updateError) return null;
+  quote.supplier_id = match.id;
+  quote.supplier_name = match.name;
+  return match;
+}
+
+export async function assignSupplierQuoteDirectoryAction(
+  quoteId: string,
+  supplierId: string,
+): Promise<ActionResult<{ supplierId: string; supplierName: string }>> {
+  const { supabase, quote } = await loadQuote(quoteId);
+  if (!quote) return { ok: false, error: "This supplier quote could not be found." };
+  const { data, error } = await supabase.rpc("staff_load_catalog_suppliers");
+  if (error) return { ok: false, error: "The Supplier Directory could not be checked. Try again." };
+  const supplier = resolveExplicitSupplierSelection(
+    Array.isArray(data) ? (data as CatalogSupplier[]) : [],
+    clean(supplierId, 160),
+  );
+  if (!supplier) return { ok: false, error: "Choose a current Supplier Directory record." };
+  const { error: updateError } = await supabase
+    .from("supplier_quotes")
+    .update({ supplier_id: supplier.id, supplier_name: supplier.name })
+    .eq("id", quote.id);
+  if (updateError) return { ok: false, error: "The supplier could not be linked to this quote." };
+  revalidatePath(`/admin/supplier-quotes/${quote.id}`);
+  return { ok: true, data: { supplierId: supplier.id, supplierName: supplier.name }, message: `Linked to ${supplier.name}.` };
+}
+
+export async function createAndAssignSupplierQuoteDirectoryAction(
+  quoteId: string,
+): Promise<ActionResult<{ supplierId: string; supplierName: string }>> {
+  const { supabase, quote } = await loadQuote(quoteId);
+  if (!quote) return { ok: false, error: "This supplier quote could not be found." };
+  const matched = await findAndPersistQuoteSupplier(supabase, quote);
+  if (matched) {
+    revalidatePath(`/admin/supplier-quotes/${quote.id}`);
+    return { ok: true, data: { supplierId: matched.id, supplierName: matched.name }, message: `Matched to ${matched.name}.` };
+  }
+  const name = clean(quote.source_vendor_name || quote.supplier_name, 160);
+  if (!name || /supplier (?:needs review|detection pending)/i.test(name)) {
+    return { ok: false, error: "The document did not provide a dependable supplier name. Open Supplier Directory to create it with contact details." };
+  }
+  const supplier = {
+    id: canonicalSupplierId(name),
+    name,
+    contactLabel: "Supplier contact",
+    preferredDeliveryMethod: "manual",
+    contactMethods: ["manual"],
+    trustLevel: "first-time",
+    catalogDepartments: [normalizeMaterialCatalogDepartment(quote.department)],
+    catalogEnabledDepartments: [],
+    materials: normalizeMaterialCatalogDepartment(quote.department),
+    notes: `Created from reviewed supplier quote ${quote.quote_number || quote.file_name}.`,
+  };
+  const { data: created, error: createError } = await supabase.rpc(
+    "staff_upsert_supplier_directory_entry",
+    { p_supplier: supplier, p_create: true },
+  );
+  if (createError || !created) {
+    return { ok: false, error: "The supplier could not be created safely. Open Supplier Directory to review or restore the vendor." };
+  }
+  const createdId = clean((created as Record<string, unknown>).id, 160);
+  const createdName = clean((created as Record<string, unknown>).name, 160);
+  if (!createdId || !createdName) return { ok: false, error: "The new Supplier Directory record could not be confirmed." };
+  const { error: updateError } = await supabase
+    .from("supplier_quotes")
+    .update({ supplier_id: createdId, supplier_name: createdName })
+    .eq("id", quote.id);
+  if (updateError) return { ok: false, error: "The supplier was created, but this quote could not be linked. Choose it from the list." };
+  revalidatePath("/admin/vendors");
+  revalidatePath(`/admin/supplier-quotes/${quote.id}`);
+  return { ok: true, data: { supplierId: createdId, supplierName: createdName }, message: `${createdName} was added as a first-time supplier and linked to this quote.` };
 }
 
 type StaffSupabase = Awaited<
@@ -934,11 +1027,12 @@ export async function addSupplierQuoteItemsToCatalogAction(
   const { supabase, user, quote } = await loadQuote(quoteId);
   if (!quote)
     return { ok: false, error: "This supplier quote could not be found." };
+  if (!quote.supplier_id) await findAndPersistQuoteSupplier(supabase, quote);
   if (!quote.supplier_id)
     return {
       ok: false,
       error:
-        "Choose a Supplier Directory record before adding prices to the catalog.",
+        "Choose an existing supplier above, or add the detected vendor as a first-time supplier before adding prices to the catalog.",
     };
   const selectedIds = [
     ...new Set(itemIds.filter((id) => UUID_PATTERN.test(id))),
@@ -1070,10 +1164,11 @@ async function createComparisonFromQuote(
     return { ok: false, error: "This supplier quote could not be found." };
   if (quote.status === "needs_review")
     return { ok: false, error: "Review and save the extracted supplier rows before adding them to a comparison." };
+  if (!quote.supplier_id) await findAndPersistQuoteSupplier(supabase, quote);
   if (!quote.supplier_id)
     return {
       ok: false,
-      error: "Choose a Supplier Directory record before routing this quote.",
+      error: "Choose an existing supplier above, or add the detected vendor as a first-time supplier before routing this quote.",
     };
   const selectedIds = [
     ...new Set(itemIds.filter((id) => UUID_PATTERN.test(id))),
