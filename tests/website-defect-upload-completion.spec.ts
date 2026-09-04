@@ -92,3 +92,16 @@ test("batch upload keeps one primary file and stores private ordered attachments
   expect(migration).toContain("v_primary_size + v_extra_size > 262144000")
   expect(migration).toContain("security invoker")
 })
+
+test("active batch verification uses the authenticated reporter and treats admin cleanup as optional", () => {
+  const actions = fs.readFileSync(path.join(process.cwd(), "app/admin/ai-tools/website-defects/actions.ts"), "utf8")
+  const batchCompletion = actions.slice(
+    actions.indexOf("export async function completeWebsiteDefectUploadsAction"),
+    actions.indexOf("export async function updateWebsiteDefectAction"),
+  )
+
+  expect(batchCompletion).toContain("() => supabase.storage.from(BUCKET).info(file.filePath)")
+  expect(batchCompletion).not.toContain("The uploads could not be verified right now")
+  expect(batchCompletion).toContain("optional service-role cleanup client")
+  expect(batchCompletion.indexOf("verifyWebsiteDefectStorage")).toBeLessThan(batchCompletion.indexOf("createAdminClient()"))
+})

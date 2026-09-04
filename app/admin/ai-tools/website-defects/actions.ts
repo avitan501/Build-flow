@@ -163,16 +163,10 @@ export async function completeWebsiteDefectUploadsAction(input: { defectId: stri
     return { ok: false, error: "The uploaded file references are invalid." }
   }
 
-  let admin: ReturnType<typeof createAdminClient>
-  try {
-    admin = createAdminClient()
-  } catch {
-    return { ok: false, error: "The uploads could not be verified right now. Try again." }
-  }
   const verification = await Promise.all(files.map(async (file) => ({
     file,
     result: await verifyWebsiteDefectStorage(
-      () => admin.storage.from(BUCKET).info(file.filePath),
+      () => supabase.storage.from(BUCKET).info(file.filePath),
       { size: file.fileSize, type: file.fileType },
     ),
   })))
@@ -180,7 +174,11 @@ export async function completeWebsiteDefectUploadsAction(input: { defectId: stri
     return { ok: false, error: "The uploads are still being verified. Try again in a moment." }
   }
   if (verification.some(({ result }) => !result.ok)) {
-    await admin.storage.from(BUCKET).remove(files.map((file) => file.filePath))
+    try {
+      await createAdminClient().storage.from(BUCKET).remove(files.map((file) => file.filePath))
+    } catch {
+      // Verification must not depend on the optional service-role cleanup client.
+    }
     return { ok: false, error: "One of the uploaded files did not match the selected recording or image." }
   }
 
