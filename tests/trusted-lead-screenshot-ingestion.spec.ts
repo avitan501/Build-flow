@@ -21,6 +21,9 @@ test("trusted inbound lead screenshots are extracted fail-closed without trustin
   expect(source).toContain("Do not infer hidden digits, names, or intent.");
   expect(source).toContain("משה כהן becomes Moshe Cohen");
   expect(source).toContain("do not semantically translate a person's name");
+  expect(source).toContain("contact card with a clearly visible person/company name and valid phone number is sufficient");
+  expect(source).toContain("A standalone NY prefix or suffix is a location/contact tag");
+  expect(source).toContain('.replace(/(?:^|\\s)NY$/i, "")');
   expect(source).toContain("preserve the exact text in originalCompany");
   expect(source).toContain('phoneCountryContext: { type: "string", enum: ["US", "explicit_international", "unknown"] }');
   expect(source).toMatch(/rawPhone\?\.startsWith\("\+"\) \|\| phoneCountryContext === "US"[\s\S]*?normalizePhone\(rawPhone\)/);

@@ -361,9 +361,9 @@ test("client material lists are organized securely in the background", async () 
     'documentType: { type: "string", enum: ["material_list", "plan", "other"] }',
   );
   expect(aiFunction).toContain("Do not invent missing information");
-  expect(aiFunction).toContain("source.name");
-  expect(aiFunction).toContain("source.quantity");
-  expect(aiFunction).toContain("source.unit");
+  expect(aiFunction).toContain("originalSource.name");
+  expect(aiFunction).toContain("originalSource.quantity");
+  expect(aiFunction).toContain("originalSource.unit");
   expect(aiFunction).toContain("typedSource");
   expect(aiFunction).toContain("ai_organized: true");
   expect(aiFunction).toContain(
@@ -385,10 +385,10 @@ test("client material lists are organized securely in the background", async () 
   expect(aiFunction).toContain(
     "Never calculate perimeter, corners, or opening trim from siding squares alone",
   );
-  expect(aiFunction).toContain("detectExplicitQuantityUnit(sourceText)");
+  expect(aiFunction).toContain("findExplicitQuantityUnitEvidence(");
   expect(aiFunction).toContain("removeResolvedQuantityUnitReasons");
   expect(aiFunction).toContain(
-    "verifiedThickness(proposedThickness, typedSource || sourceText)",
+    "verifiedThickness(proposedThickness, groundedSourceText)",
   );
   expect(aiFunction).toContain("materialRequiresThickness(item.name)");
   expect(aiFunction).toContain(
@@ -717,7 +717,7 @@ test("catalog Exa search is staff-only, cached, and keeps results out of the cat
     ),
   ]);
 
-  expect(route).toContain('requireStaffProfile("quotes")');
+  expect(route).toContain('requireStaffProfile("aiTools")');
   expect(route).toContain("searchCatalogWithExa");
   expect(search).toContain("process.env.EXA_API_KEY");
   expect(search).toContain("https://api.exa.ai/search");
