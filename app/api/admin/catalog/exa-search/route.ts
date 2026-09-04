@@ -22,7 +22,10 @@ function mergeByUrl(...groups: Array<Array<Record<string, unknown>>>) {
 
 export async function POST(request: Request) {
   try {
-    const { supabase } = await requireStaffProfile("quotes")
+    // This endpoint powers Locate Cheap Item in Manager Tools. Keep its
+    // authorization aligned with the page/card instead of requiring the
+    // unrelated Quotes capability after the manager has already opened it.
+    const { supabase } = await requireStaffProfile("aiTools")
     const body = await request.json() as { query?: unknown; department?: unknown; zipCode?: unknown; domains?: unknown; excludeDomains?: unknown }
     const query = String(body.query ?? "")
     const result = await searchCatalogWithExa({
